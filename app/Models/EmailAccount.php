@@ -96,10 +96,21 @@ class EmailAccount extends Model
             // Gmail port 993 requires SSL, not TLS
             if ($port === 993 && $encryption === 'tls') {
                 $encryption = 'ssl';
+                \Illuminate\Support\Facades\Log::info('Auto-corrected TLS to SSL for port 993', [
+                    'email' => $this->email,
+                ]);
             }
             // Port 587 typically uses TLS
             if ($port === 587 && $encryption === 'ssl') {
                 $encryption = 'tls';
+            }
+            
+            // Warn if using POP settings
+            if (strpos(strtolower($this->host), 'pop') !== false) {
+                return [
+                    'success' => false,
+                    'message' => 'POP is not supported. Please use IMAP. Change host to "imap.gmail.com" and port to 993.',
+                ];
             }
             
             $cm = new \Webklex\PHPIMAP\ClientManager([
