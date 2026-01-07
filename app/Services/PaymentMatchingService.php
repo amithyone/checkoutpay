@@ -96,8 +96,13 @@ class PaymentMatchingService
         $fullText = $subject . ' ' . $text . ' ' . strip_tags($html);
 
         // Extract amount - look for currency patterns
+        // Updated to handle formats like "NGN 1000", "Amount: NGN 1000", etc.
         $amountPatterns = [
+            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*ngn\s*([\d,]+\.?\d*)/i',
+            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*naira\s*([\d,]+\.?\d*)/i',
             '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*[₦$]?\s*([\d,]+\.?\d*)/i',
+            '/ngn\s*([\d,]+\.?\d*)/i',
+            '/naira\s*([\d,]+\.?\d*)/i',
             '/[₦$]\s*([\d,]+\.?\d*)/i',
             '/([\d,]+\.?\d*)\s*(?:naira|ngn|usd|dollar)/i',
             '/([\d,]+\.?\d*)/i',

@@ -132,8 +132,11 @@ class GmailApiService
             $query = "is:unread after:{$sinceFormatted}";
             
             // Add keyword filters if provided
+            // Gmail search supports: transaction OR notification OR credit OR amount
             if (!empty($options['keywords']) && is_array($options['keywords'])) {
-                $keywordQuery = implode(' OR ', $options['keywords']);
+                // Use first few keywords for Gmail search (Gmail has query length limits)
+                $mainKeywords = array_slice($options['keywords'], 0, 5);
+                $keywordQuery = implode(' OR ', $mainKeywords);
                 $query .= " ({$keywordQuery})";
             }
             

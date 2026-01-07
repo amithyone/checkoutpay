@@ -113,7 +113,13 @@ class MonitorEmails extends Command
             
             // Add keyword filters to only get payment-related emails
             // This significantly reduces the number of emails to process
-            $keywords = ['transfer', 'deposit', 'credit', 'payment', 'transaction', 'alert', 'notification', 'received', 'credited'];
+            // Expanded keywords to match various bank notification formats
+            $keywords = [
+                'transfer', 'deposit', 'credit', 'payment', 'transaction', 
+                'alert', 'notification', 'received', 'credited', 'debit',
+                'gens', 'electronic', 'bank', 'account', 'amount', 'ngn',
+                'naira', 'value date', 'transaction location', 'document number'
+            ];
             $keywordQuery = implode(' OR ', array_map(fn($kw) => "TEXT \"{$kw}\"", $keywords));
             
             // Try to use keyword filter (may not work on all IMAP servers, so we'll also filter manually)
@@ -291,17 +297,34 @@ class MonitorEmails extends Command
                     }
                     
                     // Additional keyword filtering (Gmail API may not filter perfectly)
-                    $keywords = ['transfer', 'deposit', 'credit', 'payment', 'transaction', 'alert', 'notification', 'received', 'credited'];
+                    $paymentKeywords = [
+                        'transfer', 'deposit', 'credit', 'payment', 'transaction', 
+                        'alert', 'notification', 'received', 'credited', 'debit',
+                        'gens', 'electronic', 'bank', 'account', 'amount'
+                    ];
+                    
                     $hasPaymentKeyword = false;
-                    foreach ($keywords as $keyword) {
-                        if (strpos($subject, $keyword) !== false || strpos($text, $keyword) !== false) {
+                    $combinedText = strtolower($subject . ' ' . $text);
+                    
+                    foreach ($paymentKeywords as $keyword) {
+                        if (strpos($combinedText, $keyword) !== false) {
                             $hasPaymentKeyword = true;
                             break;
                         }
                     }
                     
-                    // Check for amount patterns
-                    if (!$hasPaymentKeyword && preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $subject . ' ' . $text)) {
+                    // Check for amount patterns (NGN format, currency symbols, etc.)
+                    if (!$hasPaymentKeyword && (
+                        preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $combinedText) ||
+                        preg_match('/ngn\s*[\d,]+\.?\d*/i', $combinedText) ||
+                        preg_match('/naira\s*[\d,]+\.?\d*/i', $combinedText) ||
+                        preg_match('/amount\s*:?\s*[\d,]+\.?\d*/i', $combinedText)
+                    )) {
+                        $hasPaymentKeyword = true;
+                    }
+                    
+                    // Check for account number patterns
+                    if (!$hasPaymentKeyword && preg_match('/account\s*number\s*:?\s*\d{8,}/i', $combinedText)) {
                         $hasPaymentKeyword = true;
                     }
                     
