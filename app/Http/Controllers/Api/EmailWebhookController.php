@@ -22,11 +22,30 @@ class EmailWebhookController extends Controller
     public function receive(Request $request)
     {
         try {
-            // Validate request
+            // Handle Zapier test connection (Zapier sends a test request with minimal data)
+            // Zapier test requests often have empty or missing fields, so we handle them gracefully
+            $isTestRequest = empty($request->input('from')) && empty($request->input('From'));
+            
+            if ($isTestRequest) {
+                // Return success response for Zapier test connection
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Webhook endpoint is ready. Send email data with fields: from, to, subject, text, html, date, message_id',
+                    'status' => 'ready',
+                    'endpoint' => 'email/webhook',
+                    'required_fields' => ['from', 'to'],
+                    'optional_fields' => ['subject', 'text', 'html', 'date', 'message_id'],
+                ], 200);
+            }
+
+            // Validate request (relaxed validation for Zapier compatibility)
             $validator = Validator::make($request->all(), [
-                'from' => 'required|string',
-                'to' => 'required|string',
+                'from' => 'required_without:From|string',
+                'From' => 'required_without:from|string',
+                'to' => 'required_without:To|string',
+                'To' => 'required_without:to|string',
                 'subject' => 'nullable|string',
+                'Subject' => 'nullable|string',
                 'text' => 'nullable|string',
                 'html' => 'nullable|string',
                 'date' => 'nullable|date',
@@ -38,6 +57,8 @@ class EmailWebhookController extends Controller
                     'success' => false,
                     'message' => 'Validation failed',
                     'errors' => $validator->errors(),
+                    'received_data' => array_keys($request->all()),
+                    'help' => 'Required fields: from (or From) and to (or To). Optional: subject, text, html, date, message_id',
                 ], 400);
             }
 
@@ -67,7 +88,8 @@ class EmailWebhookController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Skipped noreply@xtrapay.ng email',
-                ]);
+                    'status' => 'skipped',
+                ], 200);
             }
 
             // Find email account by forwarding address (to field)
@@ -87,7 +109,8 @@ class EmailWebhookController extends Controller
                     'success' => true,
                     'message' => 'Email already processed',
                     'duplicate' => true,
-                ]);
+                    'status' => 'duplicate',
+                ], 200);
             }
 
             // Extract payment info
@@ -170,7 +193,8 @@ class EmailWebhookController extends Controller
                         'matched' => true,
                         'payment_id' => $matchedPayment->id,
                         'transaction_id' => $matchedPayment->transaction_id,
-                    ]);
+                        'status' => 'matched',
+                    ], 200);
                 }
             }
 

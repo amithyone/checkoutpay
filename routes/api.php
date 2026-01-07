@@ -31,8 +31,10 @@ Route::prefix('v1')->group(function () {
     // Statistics routes
     Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index']);
     
-    // Email webhook (for email forwarding services)
-    Route::post('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']);
+    // Email webhook (for email forwarding services like Zapier)
+    Route::post('/email/webhook', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']);
+    Route::post('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']); // Legacy route for backward compatibility
+    Route::get('/email/webhook/health', [\App\Http\Controllers\Api\EmailWebhookController::class, 'health'])->name('email.webhook.health');
     
     // Transaction check endpoint (for external sites to trigger email checking)
     Route::post('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']);
