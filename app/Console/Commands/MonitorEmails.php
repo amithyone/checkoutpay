@@ -180,7 +180,7 @@ class MonitorEmails extends Command
                 }
             }
             
-            $this->info("Processed: {$processedCount}, Skipped: {$skippedCount} (non-payment emails)");
+            $this->info("✅ Stored: {$messages->count()} total emails | Processed for matching: {$processedCount} (with payment info) | Not processed: {$skippedCount} (no payment info extracted - check inbox to troubleshoot)");
 
             $client->disconnect();
         } catch (\Exception $e) {
@@ -335,7 +335,7 @@ class MonitorEmails extends Command
                 }
             }
             
-            $this->info("Processed: {$processedCount}, Skipped: {$skippedCount} (non-payment emails)");
+            $this->info("✅ Stored: " . count($messages) . " total emails | Processed for matching: {$processedCount} (with payment info) | Not processed: {$skippedCount} (no payment info extracted - check inbox to troubleshoot)");
         } catch (\Exception $e) {
             Log::error('Error monitoring email account with Gmail API', [
                 'email_account_id' => $emailAccount->id,
@@ -509,11 +509,19 @@ class MonitorEmails extends Command
                 $fromEmail = $from;
             }
             
-            // Extract payment info to store
-            $matchingService = new PaymentMatchingService(
-                new \App\Services\TransactionLogService()
-            );
-            $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+            // Try to extract payment info, but store email even if extraction fails
+            $extractedInfo = null;
+            try {
+                $matchingService = new PaymentMatchingService(
+                    new \App\Services\TransactionLogService()
+                );
+                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+            } catch (\Exception $e) {
+                Log::debug('Payment info extraction failed, storing email anyway', [
+                    'error' => $e->getMessage(),
+                    'subject' => $emailData['subject'] ?? '',
+                ]);
+            }
             
             // Check if email already exists
             $existing = ProcessedEmail::where('message_id', $messageId)
@@ -524,6 +532,7 @@ class MonitorEmails extends Command
                 return; // Already stored
             }
             
+            // Store email even if extraction failed or returned null
             ProcessedEmail::create([
                 'email_account_id' => $emailAccount->id,
                 'message_id' => $messageId,
