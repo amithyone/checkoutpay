@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\ProcessEmailPayment;
 use App\Models\EmailAccount;
+use App\Services\GmailApiService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Webklex\PHPIMAP\Client;
@@ -54,12 +55,21 @@ class MonitorEmails extends Command
         foreach ($emailAccounts as $emailAccount) {
             try {
                 $this->info("Monitoring email account: {$emailAccount->name} ({$emailAccount->email})");
-                $client = $this->getImapClientForAccount($emailAccount);
-                $this->monitorEmailAccount($client, $emailAccount);
+                
+                // Check which method to use
+                $method = $emailAccount->method ?? 'imap';
+                
+                if ($method === 'gmail_api') {
+                    $this->monitorEmailAccountGmailApi($emailAccount);
+                } else {
+                    $client = $this->getImapClientForAccount($emailAccount);
+                    $this->monitorEmailAccount($client, $emailAccount);
+                }
             } catch (\Exception $e) {
                 Log::error('Error monitoring email account', [
                     'email_account_id' => $emailAccount->id,
                     'email' => $emailAccount->email,
+                    'method' => $emailAccount->method ?? 'imap',
                     'error' => $e->getMessage(),
                 ]);
                 $this->warn("Error monitoring {$emailAccount->email}: {$e->getMessage()}");
@@ -150,6 +160,83 @@ class MonitorEmails extends Command
         ]);
 
         return $cm->account('gmail');
+    }
+
+    /**
+     * Monitor email account using Gmail API
+     */
+    protected function monitorEmailAccountGmailApi(EmailAccount $emailAccount): void
+    {
+        try {
+            $gmailService = new GmailApiService($emailAccount);
+            
+            // Get unread messages from the last day
+            $since = now()->subDay();
+            $messages = $gmailService->getMessagesSince($since);
+            
+            $this->info("Found " . count($messages) . " new email(s) in {$emailAccount->email} (Gmail API)");
+            
+            foreach ($messages as $emailData) {
+                $this->processGmailApiMessage($emailData, $emailAccount);
+                
+                // Mark as read
+                if (isset($emailData['id'])) {
+                    $gmailService->markAsRead($emailData['id']);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Error monitoring email account with Gmail API', [
+                'email_account_id' => $emailAccount->id,
+                'email' => $emailAccount->email,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Process email message from Gmail API
+     */
+    protected function processGmailApiMessage(array $emailData, EmailAccount $emailAccount): void
+    {
+        try {
+            // Extract email address from "Name <email@example.com>" format
+            $from = $emailData['from'] ?? '';
+            if (preg_match('/<(.+?)>/', $from, $matches)) {
+                $from = $matches[1];
+            } elseif (filter_var($from, FILTER_VALIDATE_EMAIL)) {
+                $from = $from;
+            } else {
+                // Try to extract email from string
+                if (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', $from, $matches)) {
+                    $from = $matches[0];
+                }
+            }
+            
+            $processedData = [
+                'subject' => $emailData['subject'] ?? '',
+                'from' => $from,
+                'text' => $emailData['text'] ?? '',
+                'html' => $emailData['html'] ?? '',
+                'date' => $emailData['date'] ?? now()->toDateTimeString(),
+                'email_account_id' => $emailAccount->id,
+            ];
+
+            $this->info("Processing email: {$processedData['subject']}");
+
+            // Dispatch job to process email
+            ProcessEmailPayment::dispatch($processedData);
+
+            $this->info("Dispatched job for email: {$processedData['subject']}");
+        } catch (\Exception $e) {
+            Log::error('Error processing Gmail API message', [
+                'error' => $e->getMessage(),
+                'email_account_id' => $emailAccount->id,
+                'email_data' => $emailData,
+            ]);
+
+            $this->warn("Error processing email: {$e->getMessage()}");
+        }
     }
 
     /**

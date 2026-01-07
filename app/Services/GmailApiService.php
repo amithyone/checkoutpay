@@ -14,11 +14,24 @@ class GmailApiService
     protected $service;
     protected $credentialsPath;
     protected $tokenPath;
+    protected $emailAccount;
 
-    public function __construct()
+    public function __construct($emailAccount = null)
     {
-        $this->credentialsPath = storage_path('app/gmail-credentials.json');
-        $this->tokenPath = storage_path('app/gmail-token.json');
+        $this->emailAccount = $emailAccount;
+        
+        if ($emailAccount) {
+            $this->credentialsPath = $emailAccount->gmail_credentials_path 
+                ? storage_path('app/' . $emailAccount->gmail_credentials_path)
+                : storage_path('app/gmail-credentials.json');
+            $this->tokenPath = $emailAccount->gmail_token_path
+                ? storage_path('app/' . $emailAccount->gmail_token_path)
+                : storage_path('app/gmail-token-' . $emailAccount->id . '.json');
+        } else {
+            $this->credentialsPath = storage_path('app/gmail-credentials.json');
+            $this->tokenPath = storage_path('app/gmail-token.json');
+        }
+        
         $this->initializeClient();
     }
 
@@ -48,6 +61,15 @@ class GmailApiService
             } else {
                 // Request authorization from the user.
                 $authUrl = $this->client->createAuthUrl();
+                
+                // Update email account with authorization URL if model exists
+                if ($this->emailAccount) {
+                    $this->emailAccount->update([
+                        'gmail_authorization_url' => $authUrl,
+                        'gmail_authorized' => false,
+                    ]);
+                }
+                
                 throw new \Exception("Please visit this URL to authorize the application: {$authUrl}");
             }
             
@@ -56,6 +78,14 @@ class GmailApiService
                 mkdir(dirname($this->tokenPath), 0700, true);
             }
             file_put_contents($this->tokenPath, json_encode($this->client->getAccessToken()));
+            
+            // Update email account authorization status
+            if ($this->emailAccount) {
+                $this->emailAccount->update([
+                    'gmail_authorized' => true,
+                    'gmail_authorization_url' => null,
+                ]);
+            }
         }
 
         $this->service = new Google_Service_Gmail($this->client);
@@ -193,6 +223,68 @@ class GmailApiService
             Log::error('Gmail API Error marking as read: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Get authorization URL
+     */
+    public function getAuthorizationUrl(): string
+    {
+        if (!file_exists($this->credentialsPath)) {
+            throw new \Exception('Gmail credentials file not found. Please upload credentials JSON file first.');
+        }
+
+        $this->client = new Google_Client();
+        $this->client->setApplicationName('Email Payment Gateway');
+        $this->client->setScopes(Google_Service_Gmail::GMAIL_READONLY);
+        $this->client->setAuthConfig($this->credentialsPath);
+        $this->client->setAccessType('offline');
+        $this->client->setPrompt('select_account consent');
+        $this->client->setRedirectUri($this->getRedirectUri());
+
+        return $this->client->createAuthUrl();
+    }
+
+    /**
+     * Handle OAuth callback
+     */
+    public function handleCallback(string $code): void
+    {
+        if (!file_exists($this->credentialsPath)) {
+            throw new \Exception('Gmail credentials file not found.');
+        }
+
+        $this->client = new Google_Client();
+        $this->client->setApplicationName('Email Payment Gateway');
+        $this->client->setScopes(Google_Service_Gmail::GMAIL_READONLY);
+        $this->client->setAuthConfig($this->credentialsPath);
+        $this->client->setAccessType('offline');
+        $this->client->setRedirectUri($this->getRedirectUri());
+
+        $accessToken = $this->client->fetchAccessTokenWithAuthCode($code);
+        
+        if (array_key_exists('error', $accessToken)) {
+            throw new \Exception('Error fetching access token: ' . $accessToken['error']);
+        }
+
+        // Save token
+        if (!file_exists(dirname($this->tokenPath))) {
+            mkdir(dirname($this->tokenPath), 0700, true);
+        }
+        file_put_contents($this->tokenPath, json_encode($this->client->getAccessToken()));
+
+        $this->client->setAccessToken($accessToken);
+        $this->service = new Google_Service_Gmail($this->client);
+    }
+
+    /**
+     * Get OAuth redirect URI
+     */
+    protected function getRedirectUri(): string
+    {
+        $baseUrl = config('app.url');
+        $emailAccountId = $this->emailAccount ? $this->emailAccount->id : 'default';
+        return $baseUrl . '/admin/email-accounts/' . $emailAccountId . '/gmail/callback';
     }
 
     /**

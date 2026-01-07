@@ -25,11 +25,27 @@
                 </div>
 
                 <div>
-                    <label for="host" class="block text-sm font-medium text-gray-700 mb-1">IMAP Host *</label>
-                    <input type="text" name="host" id="host" required
+                    <label for="method" class="block text-sm font-medium text-gray-700 mb-1">Connection Method *</label>
+                    <select name="method" id="method" required
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
-                        value="{{ old('host', 'imap.gmail.com') }}" placeholder="imap.gmail.com">
+                        onchange="toggleMethodFields()">
+                        <option value="imap" {{ old('method', 'imap') === 'imap' ? 'selected' : '' }}>IMAP (Traditional)</option>
+                        <option value="gmail_api" {{ old('method') === 'gmail_api' ? 'selected' : '' }}>Gmail API (Recommended - Bypasses Firewall)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <strong>Gmail API:</strong> Uses HTTPS (port 443), never blocked by firewalls. 
+                        <a href="{{ url('GMAIL_API_SETUP.md') }}" target="_blank" class="text-blue-600 hover:underline">Setup Guide</a>
+                    </p>
                 </div>
+
+                <!-- IMAP Fields -->
+                <div id="imap-fields">
+                    <div>
+                        <label for="host" class="block text-sm font-medium text-gray-700 mb-1">IMAP Host *</label>
+                        <input type="text" name="host" id="host"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
+                            value="{{ old('host', 'imap.gmail.com') }}" placeholder="imap.gmail.com">
+                    </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -53,15 +69,45 @@
                     </div>
                 </div>
 
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password/App Password *</label>
-                    <input type="password" name="password" id="password" required
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
-                        placeholder="Enter email password or app password">
-                    <p class="text-xs text-gray-500 mt-1">
-                        For Gmail: Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-blue-600 hover:underline">Google App Passwords</a>, 
-                        create a new app password with any name, and paste the 16-character code here.
-                    </p>
+                <!-- IMAP Password -->
+                <div id="imap-password">
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password/App Password *</label>
+                        <input type="password" name="password" id="password"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
+                            placeholder="Enter email password or app password">
+                        <p class="text-xs text-gray-500 mt-1">
+                            For Gmail: Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-blue-600 hover:underline">Google App Passwords</a>, 
+                            create a new app password with any name, and paste the 16-character code here.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Gmail API Fields -->
+                <div id="gmail-api-fields" style="display: none;">
+                    <div>
+                        <label for="gmail_credentials_path" class="block text-sm font-medium text-gray-700 mb-1">Credentials File Path *</label>
+                        <input type="text" name="gmail_credentials_path" id="gmail_credentials_path"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
+                            value="{{ old('gmail_credentials_path', 'gmail-credentials.json') }}" placeholder="gmail-credentials.json">
+                        <p class="text-xs text-gray-500 mt-1">
+                            Path to credentials JSON file (relative to storage/app/). 
+                            Upload your credentials file from Google Cloud Console.
+                        </p>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                        <p class="text-sm text-blue-800">
+                            <strong>📋 Setup Required:</strong> After creating this account, you'll need to:
+                        </p>
+                        <ol class="list-decimal list-inside text-sm text-blue-700 mt-2 space-y-1">
+                            <li>Upload credentials JSON to <code class="bg-blue-100 px-1 rounded">storage/app/</code></li>
+                            <li>Update redirect URI in Google Cloud Console</li>
+                            <li>Click "Authorize Gmail" button to complete setup</li>
+                        </ol>
+                        <a href="{{ url('GMAIL_API_SETUP.md') }}" target="_blank" class="text-blue-600 hover:underline text-sm mt-2 inline-block">
+                            View detailed setup guide →
+                        </a>
+                    </div>
                 </div>
 
                 <div>
@@ -102,4 +148,32 @@
         </form>
     </div>
 </div>
+
+<script>
+function toggleMethodFields() {
+    const method = document.getElementById('method').value;
+    const imapFields = document.getElementById('imap-fields');
+    const imapPassword = document.getElementById('imap-password');
+    const gmailApiFields = document.getElementById('gmail-api-fields');
+    const hostInput = document.getElementById('host');
+    const passwordInput = document.getElementById('password');
+    
+    if (method === 'gmail_api') {
+        imapFields.style.display = 'none';
+        imapPassword.style.display = 'none';
+        gmailApiFields.style.display = 'block';
+        hostInput.removeAttribute('required');
+        passwordInput.removeAttribute('required');
+    } else {
+        imapFields.style.display = 'block';
+        imapPassword.style.display = 'block';
+        gmailApiFields.style.display = 'none';
+        hostInput.setAttribute('required', 'required');
+        passwordInput.setAttribute('required', 'required');
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', toggleMethodFields);
+</script>
 @endsection

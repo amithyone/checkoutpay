@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmailAccountController;
+use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('email-accounts', EmailAccountController::class);
         Route::post('email-accounts/{emailAccount}/test-connection', [EmailAccountController::class, 'testConnection'])
             ->name('email-accounts.test-connection');
+        
+        // Gmail API Authorization
+        Route::get('email-accounts/{emailAccount}/gmail/authorize', [GmailAuthController::class, 'authorize'])
+            ->name('email-accounts.gmail.authorize');
+        Route::get('email-accounts/{emailAccount}/gmail/callback', [GmailAuthController::class, 'callback'])
+            ->name('email-accounts.gmail.callback');
 
         // Account Numbers
         Route::resource('account-numbers', AccountNumberController::class);

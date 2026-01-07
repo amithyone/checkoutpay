@@ -14,6 +14,7 @@ class EmailAccount extends Model
     protected $fillable = [
         'name',
         'email',
+        'method', // 'imap' or 'gmail_api'
         'host',
         'port',
         'encryption',
@@ -22,12 +23,17 @@ class EmailAccount extends Model
         'folder',
         'is_active',
         'notes',
+        'gmail_credentials_path',
+        'gmail_token_path',
+        'gmail_authorized',
+        'gmail_authorization_url',
     ];
 
     protected $casts = [
         'port' => 'integer',
         'validate_cert' => 'boolean',
         'is_active' => 'boolean',
+        'gmail_authorized' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',

@@ -24,8 +24,8 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Host</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Port</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Host/Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Businesses</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -36,8 +36,24 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $emailAccount->name }}</td>
                         <td class="px-6 py-4 text-sm text-gray-900">{{ $emailAccount->email }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">{{ $emailAccount->host }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">{{ $emailAccount->port }}</td>
+                        <td class="px-6 py-4 text-sm">
+                            @if(($emailAccount->method ?? 'imap') === 'gmail_api')
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">Gmail API</span>
+                            @else
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">IMAP</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            @if(($emailAccount->method ?? 'imap') === 'gmail_api')
+                                @if($emailAccount->gmail_authorized ?? false)
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Authorized</span>
+                                @else
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Not Authorized</span>
+                                @endif
+                            @else
+                                {{ $emailAccount->host }}:{{ $emailAccount->port }}
+                            @endif
+                        </td>
                         <td class="px-6 py-4">
                             @if($emailAccount->is_active)
                                 <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>
@@ -50,6 +66,12 @@
                         </td>
                         <td class="px-6 py-4 text-sm">
                             <div class="flex items-center space-x-2">
+                                @if(($emailAccount->method ?? 'imap') === 'gmail_api' && !($emailAccount->gmail_authorized ?? false))
+                                    <a href="{{ route('admin.email-accounts.gmail.authorize', $emailAccount) }}" 
+                                        class="text-purple-600 hover:text-purple-900" title="Authorize Gmail">
+                                        <i class="fas fa-key"></i> Authorize
+                                    </a>
+                                @endif
                                 <button onclick="testConnection({{ $emailAccount->id }})" 
                                     class="text-blue-600 hover:text-blue-900" title="Test Connection">
                                     <i class="fas fa-plug"></i>

@@ -31,18 +31,38 @@ class EmailAccountController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $method = $request->input('method', 'imap');
+        
+        $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:email_accounts,email',
-            'host' => 'required|string|max:255',
-            'port' => 'required|integer|min:1|max:65535',
-            'encryption' => 'required|in:ssl,tls,none',
-            'validate_cert' => 'boolean',
-            'password' => 'required|string',
+            'method' => 'required|in:imap,gmail_api',
             'folder' => 'nullable|string|max:255',
             'is_active' => 'boolean',
             'notes' => 'nullable|string',
-        ]);
+        ];
+
+        if ($method === 'imap') {
+            $rules['host'] = 'required|string|max:255';
+            $rules['port'] = 'required|integer|min:1|max:65535';
+            $rules['encryption'] = 'required|in:ssl,tls,none';
+            $rules['password'] = 'required|string';
+            $rules['validate_cert'] = 'boolean';
+        } else {
+            $rules['gmail_credentials_path'] = 'required|string|max:255';
+            $rules['gmail_token_path'] = 'nullable|string|max:255';
+        }
+
+        $validated = $request->validate($rules);
+
+        // Set defaults for Gmail API
+        if ($method === 'gmail_api') {
+            $validated['host'] = 'imap.gmail.com';
+            $validated['port'] = 993;
+            $validated['encryption'] = 'ssl';
+            $validated['password'] = ''; // Not needed for Gmail API
+            $validated['gmail_authorized'] = false;
+        }
 
         try {
             EmailAccount::create($validated);
