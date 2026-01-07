@@ -443,10 +443,22 @@ class MonitorEmails extends Command
     protected function storeEmail($message, ?EmailAccount $emailAccount): void
     {
         try {
+            $this->line("🔍 Attempting to store email...");
+            
             $messageId = $message->getUid() ?? $message->getMessageId();
+            if (!$messageId) {
+                $this->warn("⚠️  No message ID found, skipping email");
+                return;
+            }
+            
+            $this->line("📧 Message ID: {$messageId}");
+            
             $from = $message->getFrom()[0] ?? null;
             $fromEmail = $from->mail ?? '';
             $fromName = $from->personal ?? '';
+            
+            $subject = $message->getSubject() ?? 'No Subject';
+            $this->line("📝 Subject: {$subject} | From: {$fromEmail}");
             
             // Extract payment info to store
             $matchingService = new PaymentMatchingService(
@@ -458,31 +470,36 @@ class MonitorEmails extends Command
             $emailDate = $this->parseEmailDate($dateValue);
             
             $emailData = [
-                'subject' => $message->getSubject(),
+                'subject' => $subject,
                 'from' => $fromEmail,
                 'text' => $message->getTextBody(),
                 'html' => $message->getHTMLBody(),
                 'date' => $emailDate->toDateTimeString(),
                 'email_account_id' => $emailAccount?->id,
             ];
+            
+            $this->line("🔍 Extracting payment info...");
             $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+            $this->line("💰 Extracted amount: " . ($extractedInfo['amount'] ?? 'null'));
             
             // Check if email already exists
+            $this->line("🔍 Checking if email already exists...");
             $existing = ProcessedEmail::where('message_id', (string)$messageId)
                 ->where('email_account_id', $emailAccount?->id)
                 ->first();
             
             if ($existing) {
-                $this->line("⏭️  Email already stored: {$message->getSubject()}");
+                $this->line("⏭️  Email already stored: {$subject} (ID: {$existing->id})");
                 return; // Already stored
             }
             
             // Store email even if extraction failed or returned null
+            $this->line("💾 Creating database record...");
             try {
                 $stored = ProcessedEmail::create([
                     'email_account_id' => $emailAccount?->id,
                     'message_id' => (string)$messageId,
-                    'subject' => $message->getSubject(),
+                    'subject' => $subject,
                     'from_email' => $fromEmail,
                     'from_name' => $fromName,
                     'text_body' => $message->getTextBody(),
@@ -494,21 +511,25 @@ class MonitorEmails extends Command
                     'extracted_data' => $extractedInfo,
                 ]);
                 
-                $this->line("✅ Stored email: {$message->getSubject()} | From: {$fromEmail} | ID: {$stored->id}");
+                $this->line("✅ Stored email: {$subject} | From: {$fromEmail} | ID: {$stored->id}");
             } catch (\Exception $e) {
-                $this->error("❌ Failed to store email: {$message->getSubject()} | Error: {$e->getMessage()}");
+                $this->error("❌ Failed to store email: {$subject} | Error: {$e->getMessage()}");
+                $this->error("❌ Stack trace: " . $e->getTraceAsString());
                 Log::error('Failed to store email in database', [
                     'error' => $e->getMessage(),
-                    'subject' => $message->getSubject(),
+                    'subject' => $subject,
                     'from' => $fromEmail,
                     'message_id' => $messageId,
                     'trace' => $e->getTraceAsString(),
                 ]);
             }
         } catch (\Exception $e) {
+            $this->error("❌ Error in storeEmail(): {$e->getMessage()}");
+            $this->error("❌ Stack trace: " . $e->getTraceAsString());
             Log::error('Error storing email in database', [
                 'error' => $e->getMessage(),
                 'email_account_id' => $emailAccount?->id,
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
