@@ -120,10 +120,19 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify(data)
                 });
+
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text.substring(0, 500));
+                    throw new Error(`Server returned ${response.status} error. Check browser console for details.`);
+                }
 
                 const result = await response.json();
                 
@@ -143,7 +152,7 @@
             } catch (error) {
                 testResult.classList.remove('hidden');
                 testResult.className = 'mt-4 p-4 rounded-lg bg-red-100 border border-red-400 text-red-700';
-                testResult.innerHTML = '❌ <strong>Error!</strong> ' + error.message;
+                testResult.innerHTML = '❌ <strong>Error!</strong> ' + error.message + '<br><small>Check browser console (F12) for details.</small>';
                 connectionTested = false;
                 saveBtn.disabled = true;
             }
@@ -172,10 +181,19 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify(data)
                 });
+
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text.substring(0, 500));
+                    throw new Error(`Server returned ${response.status} error. Check browser console for details.`);
+                }
 
                 const result = await response.json();
 
@@ -192,7 +210,8 @@
                     saveBtn.textContent = '💾 Save & Continue';
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                console.error('Save error:', error);
+                alert('Error: ' + error.message + '\n\nCheck browser console (F12) for more details.');
                 saveBtn.disabled = false;
                 saveBtn.textContent = '💾 Save & Continue';
             }

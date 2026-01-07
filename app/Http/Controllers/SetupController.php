@@ -122,7 +122,11 @@ class SetupController extends Controller
                 }, $e->errors())),
             ], 422);
         } catch (\Exception $e) {
-            \Log::error('Setup save error: ' . $e->getMessage());
+            Log::error('Setup save error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to save: ' . $e->getMessage(),
