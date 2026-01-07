@@ -41,13 +41,14 @@ class EmailWebhookController extends Controller
                 ], 400);
             }
 
-            $from = $request->input('from');
-            $to = $request->input('to');
-            $subject = $request->input('subject', 'No Subject');
-            $text = $request->input('text', '');
-            $html = $request->input('html', '');
-            $date = $request->input('date', now()->toDateTimeString());
-            $messageId = $request->input('message_id', md5($from . $subject . $date));
+            // Handle Zapier format (supports multiple field name variations)
+            $from = $request->input('from') ?? $request->input('From') ?? '';
+            $to = $request->input('to') ?? $request->input('To') ?? '';
+            $subject = $request->input('subject') ?? $request->input('Subject') ?? 'No Subject';
+            $text = $request->input('text') ?? $request->input('Plain Body') ?? $request->input('Body Plain') ?? $request->input('body') ?? '';
+            $html = $request->input('html') ?? $request->input('HTML Body') ?? $request->input('Body HTML') ?? $request->input('html_body') ?? '';
+            $date = $request->input('date') ?? $request->input('Date') ?? now()->toDateTimeString();
+            $messageId = $request->input('message_id') ?? $request->input('Message ID') ?? md5($from . $subject . $date);
 
             // Extract email address from "Name <email@example.com>" format
             $fromEmail = $from;
