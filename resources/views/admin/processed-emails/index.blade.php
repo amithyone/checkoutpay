@@ -179,7 +179,7 @@
         <!-- Pagination -->
         @if($emails->hasPages())
             <div class="px-6 py-4 border-t border-gray-200">
-                {{ $emails->links() }}
+                {{ $emails->appends(request()->query())->links() }}
             </div>
         @endif
     </div>
