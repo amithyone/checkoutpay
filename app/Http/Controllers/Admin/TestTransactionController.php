@@ -167,6 +167,77 @@ class TestTransactionController extends Controller
     }
 
     /**
+     * Simulate Zapier webhook payload for testing
+     */
+    public function simulateZapierWebhook(Request $request)
+    {
+        $validated = $request->validate([
+            'transaction_id' => 'required|string',
+            'sender_name' => 'nullable|string|max:255',
+            'amount' => 'nullable|string', // Can be "NGN 800" or "800"
+            'time_sent' => 'nullable|string',
+            'email' => 'nullable|string',
+        ]);
+
+        try {
+            $payment = Payment::where('transaction_id', $validated['transaction_id'])->firstOrFail();
+            
+            // Use payment data if not provided
+            $senderName = $validated['sender_name'] ?? $payment->payer_name ?? 'Test Sender';
+            $amount = $validated['amount'] ?? (string) $payment->amount;
+            $timeSent = $validated['time_sent'] ?? now()->format('g:i:s A');
+            $emailContent = $validated['email'] ?? sprintf(
+                "From: GeNS@gtbank.com\nSubject: Transaction Notification\n\nAmount: %s\nSender: %s\nTime: %s",
+                $amount,
+                $senderName,
+                $timeSent
+            );
+
+            // Create Zapier payload
+            $zapierPayload = [
+                'sender_name' => $senderName,
+                'amount' => $amount,
+                'time_sent' => $timeSent,
+                'email' => $emailContent,
+            ];
+
+            // Create a request object with the payload
+            $webhookRequest = new \Illuminate\Http\Request($zapierPayload);
+            
+            // Add webhook secret header if configured
+            $webhookSecret = \App\Models\Setting::get('zapier_webhook_secret');
+            if ($webhookSecret) {
+                $webhookRequest->headers->set('X-Zapier-Secret', $webhookSecret);
+            }
+
+            // Call the webhook controller
+            $webhookController = new \App\Http\Controllers\Api\EmailWebhookController();
+            $result = $webhookController->receive($webhookRequest);
+
+            // Get response
+            $responseData = json_decode($result->getContent(), true);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Zapier webhook simulated successfully',
+                'payload' => $zapierPayload,
+                'webhook_response' => $responseData,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error simulating Zapier webhook', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error simulating webhook: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Determine current step in the process
      */
     protected function getCurrentStep(Payment $payment, $logs): string

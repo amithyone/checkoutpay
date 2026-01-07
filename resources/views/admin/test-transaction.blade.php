@@ -61,6 +61,9 @@
                 <button type="button" id="check-email-btn" class="px-4 py-2 border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50" style="display: none;">
                     🔍 Check Email Now
                 </button>
+                <button type="button" id="simulate-zapier-btn" class="px-4 py-2 border border-purple-300 rounded-lg text-purple-700 hover:bg-purple-50" style="display: none;">
+                    ⚡ Simulate Zapier Webhook
+                </button>
                 <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
                     🚀 Create Test Payment
                 </button>
@@ -99,11 +102,20 @@
                 </ul>
             </li>
             <li><strong>Manual Check:</strong> Click "Check Email Now" to manually trigger email checking</li>
+            <li><strong>Zapier Simulation:</strong> Click "Simulate Zapier Webhook" to test the Zapier payload flow without sending real money</li>
         </ol>
         <div class="mt-4 p-3 bg-blue-100 rounded-lg">
             <p class="text-sm text-blue-900">
-                <strong>💡 Tip:</strong> The system automatically checks emails every 30 seconds. 
-                You can also click "Check Email Now" to check immediately after sending money.
+                <strong>💡 Tip:</strong> The system automatically checks emails every 2 seconds. 
+                You can also click "Check Email Now" to check immediately after sending money, 
+                or use "Simulate Zapier Webhook" to test the entire flow instantly.
+            </p>
+        </div>
+        <div class="mt-4 p-3 bg-purple-100 rounded-lg">
+            <p class="text-sm text-purple-900">
+                <strong>⚡ Zapier Testing:</strong> The "Simulate Zapier Webhook" button sends a test payload 
+                in the exact format Zapier uses (sender_name, amount, time_sent, email). This allows you to 
+                test the payment matching flow without waiting for real email forwarding.
             </p>
         </div>
     </div>
@@ -138,6 +150,7 @@ document.getElementById('test-payment-form').addEventListener('submit', async fu
         if (data.success) {
             currentTransactionId = data.payment.transaction_id;
             document.getElementById('check-email-btn').style.display = 'inline-block';
+            document.getElementById('simulate-zapier-btn').style.display = 'inline-block';
             document.getElementById('transaction-details').style.display = 'block';
             document.getElementById('activity-logs').style.display = 'block';
             
@@ -187,6 +200,52 @@ document.getElementById('check-email-btn').addEventListener('click', async funct
         if (data.success) {
             // Refresh status immediately
             fetchStatus();
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+});
+
+// Simulate Zapier webhook
+document.getElementById('simulate-zapier-btn').addEventListener('click', async function() {
+    if (!currentTransactionId) return;
+    
+    const btn = this;
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    
+    try {
+        // Get payment amount from form or use default
+        const amount = document.getElementById('amount').value;
+        const payerName = document.getElementById('payer_name').value || 'Test Sender';
+        
+        const response = await fetch('{{ route("admin.test-transaction.simulate-zapier") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                transaction_id: currentTransactionId,
+                sender_name: payerName,
+                amount: 'NGN ' + amount, // Use Zapier format
+                time_sent: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }),
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Zapier webhook simulated! Check the logs below.');
+            // Refresh status immediately
+            setTimeout(() => fetchStatus(), 500);
         } else {
             alert('❌ Error: ' + data.message);
         }
