@@ -393,10 +393,23 @@ class PaymentMatchingService
         
         foreach ($storedEmails as $storedEmail) {
             foreach ($pendingPayments as $payment) {
-                $match = $this->matchPayment($payment, [
-                    'amount' => $storedEmail->amount,
-                    'sender_name' => $storedEmail->sender_name,
-                ]);
+                // Re-extract from html_body if available
+                $emailData = [
+                    'subject' => $storedEmail->subject,
+                    'from' => $storedEmail->from_email,
+                    'text' => $storedEmail->text_body ?? '',
+                    'html' => $storedEmail->html_body ?? '', // Use html_body for matching
+                    'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : null,
+                ];
+                
+                // Re-extract payment info (will use html_body)
+                $extractedInfo = $this->extractPaymentInfo($emailData);
+                
+                if (!$extractedInfo || !$extractedInfo['amount']) {
+                    continue;
+                }
+                
+                $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
                 
                 if ($match['matched']) {
                     // Mark stored email as matched
