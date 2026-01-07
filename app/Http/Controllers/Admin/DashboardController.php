@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountNumber;
 use App\Models\Business;
 use App\Models\Payment;
+use App\Models\ProcessedEmail;
 use App\Models\WithdrawalRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,11 @@ class DashboardController extends Controller
                 'pool' => AccountNumber::pool()->active()->count(),
                 'business_specific' => AccountNumber::businessSpecific()->active()->count(),
             ],
+            'stored_emails' => [
+                'total' => ProcessedEmail::count(),
+                'matched' => ProcessedEmail::where('is_matched', true)->count(),
+                'unmatched' => ProcessedEmail::where('is_matched', false)->count(),
+            ],
         ];
 
         // Recent payments
@@ -51,6 +57,12 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals'));
+        // Recent stored emails
+        $recentStoredEmails = ProcessedEmail::with('emailAccount', 'matchedPayment')
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails'));
     }
 }

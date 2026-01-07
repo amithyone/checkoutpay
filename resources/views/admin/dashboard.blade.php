@@ -74,6 +74,106 @@
                 <span class="text-gray-600">Business: {{ $stats['account_numbers']['business_specific'] }}</span>
             </div>
         </div>
+
+        <!-- Stored Emails -->
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Stored Emails</p>
+                    <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['stored_emails']['total']) }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-envelope text-indigo-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <span class="text-green-600">Matched: {{ $stats['stored_emails']['matched'] }}</span>
+                <span class="mx-2">•</span>
+                <span class="text-yellow-600">Unmatched: {{ $stats['stored_emails']['unmatched'] }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stored Emails Section -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Recent Stored Emails</h3>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-600">
+                    Total: <span class="font-medium">{{ number_format($stats['stored_emails']['total']) }}</span>
+                </span>
+                <span class="text-sm text-green-600">
+                    Matched: <span class="font-medium">{{ number_format($stats['stored_emails']['matched']) }}</span>
+                </span>
+                <span class="text-sm text-yellow-600">
+                    Unmatched: <span class="font-medium">{{ number_format($stats['stored_emails']['unmatched']) }}</span>
+                </span>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sender</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @forelse($recentStoredEmails as $email)
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ Str::limit($email->subject ?? 'No Subject', 50) }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            {{ $email->from_email }}
+                            @if($email->emailAccount)
+                                <div class="text-xs text-gray-500">{{ $email->emailAccount->email }}</div>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900">
+                            @if($email->amount)
+                                ₦{{ number_format($email->amount, 2) }}
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            {{ $email->sender_name ?? '-' }}
+                        </td>
+                        <td class="px-6 py-4">
+                            @if($email->is_matched)
+                                <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                    Matched
+                                </span>
+                                @if($email->matchedPayment)
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        {{ $email->matchedPayment->transaction_id }}
+                                    </div>
+                                @endif
+                            @else
+                                <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                    Unmatched
+                                </span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            {{ $email->email_date ? $email->email_date->format('M d, Y H:i') : $email->created_at->format('M d, Y H:i') }}
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No stored emails found</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
