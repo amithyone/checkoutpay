@@ -71,34 +71,93 @@ class EmailAccount extends Model
     public function testConnection(): array
     {
         try {
+            // Get decrypted password
+            $password = $this->getPasswordAttribute($this->attributes['password'] ?? '');
+            
+            if (empty($password)) {
+                return [
+                    'success' => false,
+                    'message' => 'Password is empty. Please enter a valid password.',
+                ];
+            }
+
+            // Validate required fields
+            if (empty($this->host) || empty($this->email)) {
+                return [
+                    'success' => false,
+                    'message' => 'Host and email are required.',
+                ];
+            }
+
             $cm = new \Webklex\PHPIMAP\ClientManager([
-                'default' => 'test',
+                'default' => 'test_' . $this->id,
                 'accounts' => [
-                    'test' => [
+                    'test_' . $this->id => [
                         'host' => $this->host,
-                        'port' => $this->port,
+                        'port' => (int)$this->port,
                         'encryption' => $this->encryption,
-                        'validate_cert' => $this->validate_cert,
+                        'validate_cert' => (bool)$this->validate_cert,
                         'username' => $this->email,
-                        'password' => $this->password,
+                        'password' => $password,
                         'protocol' => 'imap',
                     ],
                 ],
             ]);
 
-            $client = $cm->account('test');
+            $client = $cm->account('test_' . $this->id);
             $client->connect();
-            $folder = $client->getFolder($this->folder);
+            
+            // Try to access the folder
+            $folder = $client->getFolder($this->folder ?? 'INBOX');
+            
+            // Test folder access
+            $folder->query()->limit(1)->get();
+            
             $client->disconnect();
 
             return [
                 'success' => true,
-                'message' => 'Connection successful!',
+                'message' => 'Connection successful! Successfully connected to ' . $this->email,
             ];
-        } catch (\Exception $e) {
+        } catch (\Webklex\PHPIMAP\Exceptions\ConnectionFailedException $e) {
+            \Illuminate\Support\Facades\Log::error('Email connection failed', [
+                'email' => $this->email,
+                'host' => $this->host,
+                'port' => $this->port,
+                'error' => $e->getMessage(),
+            ]);
+            
+            $errorMessage = $e->getMessage();
+            
+            // Provide helpful error messages
+            if (strpos($errorMessage, 'authentication') !== false || strpos($errorMessage, 'password') !== false) {
+                return [
+                    'success' => false,
+                    'message' => 'Authentication failed. Please check your email and password. For Gmail, make sure you\'re using an App Password, not your regular password.',
+                ];
+            }
+            
+            if (strpos($errorMessage, 'connection') !== false || strpos($errorMessage, 'timeout') !== false) {
+                return [
+                    'success' => false,
+                    'message' => 'Connection failed. Please check your host (' . $this->host . ') and port (' . $this->port . ') settings.',
+                ];
+            }
+            
             return [
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Connection failed: ' . $errorMessage,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Email connection test error', [
+                'email' => $this->email,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return [
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
             ];
         }
     }
