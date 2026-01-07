@@ -62,4 +62,62 @@ class ZapierLogController extends Controller
         $zapierLog->load('processedEmail', 'payment');
         return view('admin.zapier-logs.show', compact('zapierLog'));
     }
+
+    /**
+     * Retry processing a Zapier log (for error/rejected/no_match status)
+     */
+    public function retry(ZapierLog $zapierLog)
+    {
+        try {
+            // Only allow retry for error, rejected, no_match, or processed status
+            if (!in_array($zapierLog->status, ['error', 'rejected', 'no_match', 'processed'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot retry log with status: ' . $zapierLog->status,
+                ], 400);
+            }
+
+            // Get payload from Zapier log
+            $payload = $zapierLog->payload;
+            
+            if (empty($payload)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No payload found in Zapier log',
+                ], 400);
+            }
+
+            // Create a new request with the payload data
+            $request = new \Illuminate\Http\Request($payload);
+            $webhookSecret = \App\Models\Setting::get('zapier_webhook_secret', '');
+            if ($webhookSecret) {
+                $request->headers->set('X-Zapier-Secret', $webhookSecret);
+            }
+
+            // Process using the webhook controller
+            $webhookController = new \App\Http\Controllers\Api\EmailWebhookController();
+            $result = $webhookController->receive($request);
+
+            // Get response data
+            $responseData = json_decode($result->getContent(), true);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Zapier log reprocessed successfully',
+                'result' => $responseData,
+            ]);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error retrying Zapier log', [
+                'zapier_log_id' => $zapierLog->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrying Zapier log: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

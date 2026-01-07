@@ -10,9 +10,16 @@
             <h3 class="text-lg font-semibold text-gray-900">Zapier Payload Details</h3>
             <p class="text-sm text-gray-600 mt-1">Received: {{ $zapierLog->created_at->format('M d, Y H:i:s') }}</p>
         </div>
-        <a href="{{ route('admin.zapier-logs.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
-            <i class="fas fa-arrow-left mr-1"></i> Back to Logs
-        </a>
+        <div class="flex items-center gap-3">
+            @if(in_array($zapierLog->status, ['error', 'rejected', 'no_match', 'processed']))
+                <button onclick="retryZapierLog({{ $zapierLog->id }})" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                    <i class="fas fa-redo mr-2"></i> Retry Processing
+                </button>
+            @endif
+            <a href="{{ route('admin.zapier-logs.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
+                <i class="fas fa-arrow-left mr-1"></i> Back to Logs
+            </a>
+        </div>
     </div>
 
     <!-- Status Card -->
@@ -127,4 +134,42 @@
     </div>
     @endif
 </div>
+
+<script>
+function retryZapierLog(logId) {
+    if (!confirm('Are you sure you want to retry processing this Zapier log?')) {
+        return;
+    }
+
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+
+    fetch(`/admin/zapier-logs/${logId}/retry`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Zapier log reprocessed successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while retrying the Zapier log');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+</script>
 @endsection

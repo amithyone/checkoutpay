@@ -152,9 +152,16 @@
                             @endif
                         </td>
                         <td class="px-6 py-4">
-                            <a href="{{ route('admin.zapier-logs.show', $log) }}" class="text-sm text-primary hover:underline">
-                                <i class="fas fa-eye mr-1"></i> View
-                            </a>
+                            <div class="flex items-center gap-2">
+                                <a href="{{ route('admin.zapier-logs.show', $log) }}" class="text-sm text-primary hover:underline">
+                                    <i class="fas fa-eye mr-1"></i> View
+                                </a>
+                                @if(in_array($log->status, ['error', 'rejected', 'no_match', 'processed']))
+                                    <button onclick="retryZapierLog({{ $log->id }})" class="text-sm text-green-600 hover:text-green-800">
+                                        <i class="fas fa-redo mr-1"></i> Retry
+                                    </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty
@@ -178,4 +185,33 @@
         @endif
     </div>
 </div>
+
+<script>
+function retryZapierLog(logId) {
+    if (!confirm('Are you sure you want to retry processing this Zapier log?')) {
+        return;
+    }
+
+    fetch(`/admin/zapier-logs/${logId}/retry`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Zapier log reprocessed successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while retrying the Zapier log');
+    });
+}
+</script>
 @endsection

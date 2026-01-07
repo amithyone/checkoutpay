@@ -222,44 +222,30 @@ class EmailWebhookController extends Controller
                 ], 200);
             }
 
-            // Extract payment info
-            $matchingService = new PaymentMatchingService(new TransactionLogService());
-            $emailData = [
-                'subject' => $subject,
-                'from' => $fromEmail,
-                'text' => $text,
-                'html' => $html,
-                'date' => $timeSent,
-                'email_account_id' => $emailAccount?->id,
-            ];
-
-            $extractedInfo = null;
-            
-            // If Zapier provided amount directly, use it
-            if (!empty($amount) && is_numeric($amount)) {
-                $extractedInfo = [
-                    'amount' => (float) $amount,
-                    'sender_name' => $senderName ? strtolower(trim($senderName)) : null,
-                    'account_number' => null,
-                    'email_subject' => $subject,
-                    'email_from' => $fromEmail,
-                ];
-            } else {
-                // Try to extract from email content
-                try {
-                    $extractedInfo = $matchingService->extractPaymentInfo($emailData);
-                    // Override sender_name with Zapier value if provided
-                    if (is_array($extractedInfo) && $senderName && empty($extractedInfo['sender_name'] ?? null)) {
-                        $extractedInfo['sender_name'] = strtolower(trim($senderName));
-                    }
-                } catch (\Exception $e) {
-                    Log::debug('Payment info extraction failed', [
-                        'error' => $e->getMessage(),
-                        'subject' => $subject,
-                    ]);
-                    $extractedInfo = null; // Ensure it's null on error
-                }
+            // Use Zapier payload directly - no email extraction needed
+            // Zapier payload is the standard: sender_name, amount, time_sent
+            if (empty($amount) || !is_numeric($amount)) {
+                $zapierLog->update([
+                    'status' => 'rejected',
+                    'status_message' => 'Invalid or missing amount in Zapier payload',
+                    'error_details' => 'Amount must be a valid number',
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid or missing amount in payload',
+                    'status' => 'validation_error',
+                ], 400);
             }
+
+            // Build extracted info directly from Zapier payload
+            $extractedInfo = [
+                'amount' => (float) $amount,
+                'sender_name' => $senderName ? strtolower(trim($senderName)) : null,
+                'account_number' => null,
+                'email_subject' => $subject,
+                'email_from' => $fromEmail,
+            ];
 
             // Store email (mark as webhook source, no email_account_id needed for Zapier)
             $processedEmail = ProcessedEmail::create([
@@ -272,9 +258,9 @@ class EmailWebhookController extends Controller
                 'text_body' => $text,
                 'html_body' => $html,
                 'email_date' => $timeSent,
-                'amount' => (is_array($extractedInfo) && isset($extractedInfo['amount'])) ? $extractedInfo['amount'] : null,
-                'sender_name' => (is_array($extractedInfo) && isset($extractedInfo['sender_name'])) ? $extractedInfo['sender_name'] : null,
-                'account_number' => (is_array($extractedInfo) && isset($extractedInfo['account_number'])) ? $extractedInfo['account_number'] : null,
+                'amount' => $extractedInfo['amount'],
+                'sender_name' => $extractedInfo['sender_name'],
+                'account_number' => $extractedInfo['account_number'],
                 'extracted_data' => $extractedInfo,
             ]);
             
@@ -285,20 +271,8 @@ class EmailWebhookController extends Controller
                 'status_message' => 'Email processed and stored',
             ]);
 
-            // Check if this is a GTBank transaction
-            $gtbankParser = new GtbankTransactionParser();
-            if ($gtbankParser->isGtbankTransaction($emailData)) {
-                $gtbankTemplate = \App\Models\BankEmailTemplate::where('bank_name', 'GTBank')
-                    ->orWhere('bank_name', 'Guaranty Trust Bank')
-                    ->active()
-                    ->orderBy('priority', 'desc')
-                    ->first();
-
-                $gtbankParser->parseTransaction($emailData, $processedEmail, $gtbankTemplate);
-            }
-
-            // Try to match payment immediately using Zapier payload
-            if (is_array($extractedInfo) && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+            // Try to match payment immediately using Zapier payload directly
+            if ($extractedInfo['amount'] > 0) {
                 // Get pending payments and match them
                 $pendingPayments = \App\Models\Payment::pending()->get();
                 
@@ -381,17 +355,20 @@ class EmailWebhookController extends Controller
                 }
             }
             
-            // Update Zapier log status
-            $zapierLog->update([
-                'status' => 'processed',
-                'status_message' => 'Email processed but no payment matched',
-            ]);
+            // Update Zapier log status if no match found
+            if ($zapierLog->status === 'processed') {
+                $zapierLog->update([
+                    'status' => 'no_match',
+                    'status_message' => 'Email processed but no matching payment found',
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Email received and stored',
+                'message' => 'Email received and stored, no matching payment found',
                 'matched' => false,
                 'email_id' => $processedEmail->id,
+                'status' => 'no_match',
             ]);
 
         } catch (\Exception $e) {

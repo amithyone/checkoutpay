@@ -86,5 +86,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Zapier Logs
         Route::get('zapier-logs', [\App\Http\Controllers\Admin\ZapierLogController::class, 'index'])->name('zapier-logs.index');
         Route::get('zapier-logs/{zapierLog}', [\App\Http\Controllers\Admin\ZapierLogController::class, 'show'])->name('zapier-logs.show');
+        Route::post('zapier-logs/{zapierLog}/retry', [\App\Http\Controllers\Admin\ZapierLogController::class, 'retry'])->name('zapier-logs.retry');
     });
 });
