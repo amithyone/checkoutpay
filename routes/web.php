@@ -18,6 +18,6 @@ Route::get('/', function () {
 
 // Setup routes (must be before any middleware that requires database)
 Route::get('/setup', [SetupController::class, 'index'])->name('setup');
-Route::post('/setup/test-database', [SetupController::class, 'testDatabase'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
-Route::post('/setup/save-database', [SetupController::class, 'saveDatabase'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
-Route::post('/setup/complete', [SetupController::class, 'complete'])->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);
+Route::post('/setup/save-database', [SetupController::class, 'saveDatabase']);
+Route::post('/setup/complete', [SetupController::class, 'complete']);

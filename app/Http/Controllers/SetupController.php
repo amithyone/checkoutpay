@@ -27,15 +27,15 @@ class SetupController extends Controller
      */
     public function testDatabase(Request $request)
     {
-        $request->validate([
-            'host' => 'required|string',
-            'port' => 'required|numeric',
-            'database' => 'required|string',
-            'username' => 'required|string',
-            'password' => 'nullable|string',
-        ]);
-
         try {
+            $request->validate([
+                'host' => 'required|string',
+                'port' => 'required|numeric',
+                'database' => 'required|string',
+                'username' => 'required|string',
+                'password' => 'nullable|string',
+            ]);
+
             // Test connection
             $connection = [
                 'driver' => 'mysql',
@@ -54,6 +54,11 @@ class SetupController extends Controller
                 'success' => true,
                 'message' => 'Database connection successful!',
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed: ' . implode(', ', $e->errors()),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -67,15 +72,15 @@ class SetupController extends Controller
      */
     public function saveDatabase(Request $request)
     {
-        $request->validate([
-            'host' => 'required|string',
-            'port' => 'required|numeric',
-            'database' => 'required|string',
-            'username' => 'required|string',
-            'password' => 'nullable|string',
-        ]);
-
         try {
+            $request->validate([
+                'host' => 'required|string',
+                'port' => 'required|numeric',
+                'database' => 'required|string',
+                'username' => 'required|string',
+                'password' => 'nullable|string',
+            ]);
+
             // Test connection first
             $connection = [
                 'driver' => 'mysql',
@@ -99,17 +104,31 @@ class SetupController extends Controller
             ]);
 
             // Clear config cache
-            Artisan::call('config:clear');
+            try {
+                Artisan::call('config:clear');
+            } catch (\Exception $e) {
+                // Ignore config clear errors
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => 'Database configuration saved successfully!',
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed: ' . implode(', ', array_map(function($errors) {
+                    return implode(', ', $errors);
+                }, $e->errors())),
+            ], 422);
         } catch (\Exception $e) {
+            \Log::error('Setup save error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to save: ' . $e->getMessage(),
-            ], 400);
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
         }
     }
 
