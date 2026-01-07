@@ -273,28 +273,30 @@ class MonitorEmails extends Command
         try {
             $gmailService = new GmailApiService($emailAccount);
             
-            // Check emails from the last 7 days (or since oldest pending payment if exists)
-            // Store all payment-related emails in database for later matching
-            $oldestPendingPayment = \App\Models\Payment::pending()
-                ->orderBy('created_at', 'asc')
-                ->first();
+            // Fetch emails from the last fetch time (not from oldest pending transaction)
+            // This ensures we don't re-fetch emails that have already been processed
+            $since = null;
             
-            // Use oldest pending payment date or last 7 days, whichever is older
-            if ($oldestPendingPayment) {
-                $since = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer
-            } else {
-                // If no pending payments, check last 7 days of emails and store them
-                $since = now()->subDays(7);
-            }
-            
-            // Also check for the most recent email we've already stored
+            // Check for the most recent email we've already stored
             $lastStoredEmail = ProcessedEmail::where('email_account_id', $emailAccount->id)
                 ->orderBy('email_date', 'desc')
                 ->first();
             
-            // If we have stored emails, only check emails after the last stored one
-            if ($lastStoredEmail && $lastStoredEmail->email_date > $since) {
+            if ($lastStoredEmail && $lastStoredEmail->email_date) {
+                // Fetch emails after the last stored email (don't re-fetch old emails)
                 $since = $lastStoredEmail->email_date;
+            } else {
+                // If no stored emails, fetch from oldest pending payment (if exists)
+                $oldestPendingPayment = \App\Models\Payment::pending()
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+                
+                if ($oldestPendingPayment) {
+                    $since = $oldestPendingPayment->created_at->subMinutes(5);
+                } else {
+                    // If no pending payments and no stored emails, fetch last 24 hours
+                    $since = now()->subDay();
+                }
             }
             
             // Get ALL messages without keyword filtering
