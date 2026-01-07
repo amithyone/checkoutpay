@@ -99,7 +99,19 @@ class EmailAccountController extends Controller
             'folder' => 'nullable|string|max:255',
             'is_active' => 'boolean',
             'notes' => 'nullable|string',
+            'allowed_senders' => 'nullable|string', // Will be converted to array
         ]);
+
+        // Convert allowed_senders from newline-separated string to array
+        if (isset($validated['allowed_senders']) && !empty($validated['allowed_senders'])) {
+            $senders = array_filter(
+                array_map('trim', explode("\n", $validated['allowed_senders'])),
+                fn($sender) => !empty($sender)
+            );
+            $validated['allowed_senders'] = !empty($senders) ? array_values($senders) : null;
+        } else {
+            $validated['allowed_senders'] = null;
+        }
 
         // Don't update password if not provided
         // Check if password is actually empty (not just whitespace)
