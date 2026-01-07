@@ -88,10 +88,31 @@ class MonitorEmails extends Command
         try {
             $client->connect();
             $folder = $client->getFolder($emailAccount ? $emailAccount->folder : 'INBOX');
-            $messages = $folder->query()->unseen()->since(now()->subDay())->get();
+            
+            // Only check emails after the oldest pending payment was created
+            // This ensures we don't process old emails for new transactions
+            $oldestPendingPayment = \App\Models\Payment::pending()
+                ->when($emailAccount, function ($query) use ($emailAccount) {
+                    return $query->whereHas('business', function ($q) use ($emailAccount) {
+                        $q->where('email_account_id', $emailAccount->id);
+                    });
+                })
+                ->orderBy('created_at', 'asc')
+                ->first();
+            
+            // If no pending payments, don't check emails (nothing to match against)
+            if (!$oldestPendingPayment) {
+                $this->info("No pending payments found. Skipping email check.");
+                $client->disconnect();
+                return;
+            }
+            
+            // Only check emails received after the oldest pending payment was created
+            $sinceDate = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer for email delivery delay
+            $messages = $folder->query()->unseen()->since($sinceDate)->get();
 
             $accountEmail = $emailAccount ? $emailAccount->email : 'default account';
-            $this->info("Found {$messages->count()} new email(s) in {$accountEmail}");
+            $this->info("Found {$messages->count()} new email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
 
             foreach ($messages as $message) {
                 $this->processMessage($message, $emailAccount);
@@ -170,11 +191,26 @@ class MonitorEmails extends Command
         try {
             $gmailService = new GmailApiService($emailAccount);
             
-            // Get unread messages from the last day
-            $since = now()->subDay();
+            // Only check emails after the oldest pending payment was created
+            // This ensures we don't process old emails for new transactions
+            $oldestPendingPayment = \App\Models\Payment::pending()
+                ->whereHas('business', function ($q) use ($emailAccount) {
+                    $q->where('email_account_id', $emailAccount->id);
+                })
+                ->orderBy('created_at', 'asc')
+                ->first();
+            
+            // If no pending payments, don't check emails (nothing to match against)
+            if (!$oldestPendingPayment) {
+                $this->info("No pending payments found for {$emailAccount->email}. Skipping email check.");
+                return;
+            }
+            
+            // Only check emails received after the oldest pending payment was created
+            $since = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer for email delivery delay
             $messages = $gmailService->getMessagesSince($since);
             
-            $this->info("Found " . count($messages) . " new email(s) in {$emailAccount->email} (Gmail API)");
+            $this->info("Found " . count($messages) . " new email(s) in {$emailAccount->email} (Gmail API) (after {$since->format('Y-m-d H:i:s')})");
             
             foreach ($messages as $emailData) {
                 $this->processGmailApiMessage($emailData, $emailAccount);
