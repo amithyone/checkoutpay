@@ -625,11 +625,10 @@ class MonitorEmails extends Command
             }
             
             // Store email even if extraction failed or returned null
-            $this->line("💾 Creating database record...");
             try {
-                $stored = ProcessedEmail::create([
+                return ProcessedEmail::create([
                     'email_account_id' => $emailAccount?->id,
-                    'message_id' => (string)$messageId,
+                    'message_id' => $messageId,
                     'subject' => $subject,
                     'from_email' => $fromEmail,
                     'from_name' => $fromName,
@@ -641,11 +640,7 @@ class MonitorEmails extends Command
                     'account_number' => $extractedInfo['account_number'] ?? null,
                     'extracted_data' => $extractedInfo,
                 ]);
-                
-                $this->line("✅ Stored email: {$subject} | From: {$fromEmail} | ID: {$stored->id}");
             } catch (\Exception $e) {
-                $this->error("❌ Failed to store email: {$subject} | Error: {$e->getMessage()}");
-                $this->error("❌ Stack trace: " . $e->getTraceAsString());
                 Log::error('Failed to store email in database', [
                     'error' => $e->getMessage(),
                     'subject' => $subject,
@@ -653,15 +648,15 @@ class MonitorEmails extends Command
                     'message_id' => $messageId,
                     'trace' => $e->getTraceAsString(),
                 ]);
+                return null;
             }
         } catch (\Exception $e) {
-            $this->error("❌ Error in storeEmail(): {$e->getMessage()}");
-            $this->error("❌ Stack trace: " . $e->getTraceAsString());
             Log::error('Error storing email in database', [
                 'error' => $e->getMessage(),
                 'email_account_id' => $emailAccount?->id,
                 'trace' => $e->getTraceAsString(),
             ]);
+            return null;
         }
     }
 
@@ -707,8 +702,7 @@ class MonitorEmails extends Command
                 ->first();
             
             if ($existing) {
-                $this->line("⏭️  Email already stored: " . ($emailData['subject'] ?? 'No subject'));
-                return; // Already stored
+                return null; // Already stored
             }
             
             // Store email even if extraction failed or returned null
