@@ -144,9 +144,45 @@ class MonitorEmails extends Command
 
             $processedCount = 0;
             $skippedCount = 0;
+            $alreadyStoredCount = 0;
+            
+            // Get all existing message IDs for this account (fast lookup)
+            $existingMessageIds = \App\Models\ProcessedEmail::where('email_account_id', $emailAccount?->id)
+                ->pluck('message_id')
+                ->toArray();
+            
+            // Get last processed message ID for fast skipping
+            $lastProcessedMessageId = $emailAccount?->last_processed_message_id;
+            $foundLastProcessed = false;
             
             foreach ($messages as $message) {
                 try {
+                    // Get message ID FIRST (before fetching body - much faster)
+                    $messageId = (string)($message->getUid() ?? $message->getMessageId() ?? '');
+                    
+                    if (!$messageId) {
+                        $skippedCount++;
+                        continue;
+                    }
+                    
+                    // FAST CHECK: Skip if already stored (check before fetching body)
+                    if (in_array($messageId, $existingMessageIds)) {
+                        $alreadyStoredCount++;
+                        continue; // Skip immediately - don't fetch body
+                    }
+                    
+                    // FAST CHECK: Skip if we've already processed this message ID
+                    if ($lastProcessedMessageId && $messageId === $lastProcessedMessageId) {
+                        $foundLastProcessed = true;
+                        continue;
+                    }
+                    
+                    // If we found the last processed message, skip all previous ones
+                    if ($foundLastProcessed) {
+                        continue;
+                    }
+                    
+                    // Only fetch email body if we need to process it
                     $fromEmail = $message->getFrom()[0]->mail ?? '';
                     
                     // Filter by allowed senders if configured
@@ -155,10 +191,16 @@ class MonitorEmails extends Command
                         continue;
                     }
                     
-                    // Store ALL emails in database (no keyword filtering)
-                    // This helps debug and ensures we don't miss any payment emails
-                    // Store even if no payment info extracted - we'll troubleshoot from inbox
+                    // Store email in database
                     $this->storeEmail($message, $emailAccount);
+                    
+                    // Update last processed message ID
+                    if ($emailAccount) {
+                        $emailAccount->update([
+                            'last_processed_message_id' => $messageId,
+                            'last_processed_at' => now(),
+                        ]);
+                    }
                     
                     // Try to extract payment info - if it has payment data, process it
                     $matchingService = new PaymentMatchingService(

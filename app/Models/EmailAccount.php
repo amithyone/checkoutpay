@@ -28,6 +28,8 @@ class EmailAccount extends Model
         'gmail_token_path',
         'gmail_authorized',
         'gmail_authorization_url',
+        'last_processed_message_id',
+        'last_processed_at',
     ];
 
     protected $casts = [
@@ -36,6 +38,7 @@ class EmailAccount extends Model
         'is_active' => 'boolean',
         'gmail_authorized' => 'boolean',
         'allowed_senders' => 'array', // JSON array of allowed senders
+        'last_processed_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
