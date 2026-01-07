@@ -271,9 +271,9 @@ class EmailWebhookController extends Controller
                 'text_body' => $text,
                 'html_body' => $html,
                 'email_date' => $timeSent,
-                'amount' => $extractedInfo['amount'] ?? null,
-                'sender_name' => $extractedInfo['sender_name'] ?? null,
-                'account_number' => $extractedInfo['account_number'] ?? null,
+                'amount' => ($extractedInfo && isset($extractedInfo['amount'])) ? $extractedInfo['amount'] : null,
+                'sender_name' => ($extractedInfo && isset($extractedInfo['sender_name'])) ? $extractedInfo['sender_name'] : null,
+                'account_number' => ($extractedInfo && isset($extractedInfo['account_number'])) ? $extractedInfo['account_number'] : null,
                 'extracted_data' => $extractedInfo,
             ]);
             
