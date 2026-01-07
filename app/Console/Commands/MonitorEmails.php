@@ -116,28 +116,12 @@ class MonitorEmails extends Command
             }
             
             // Check ALL emails (read and unread) after the payment request date
-            // This ensures emails that arrived before payment request are still checked
-            // We'll skip emails that already matched payments in the matching service
+            // Fetch ALL emails without filtering - store everything for debugging
             $query = $folder->query()->since($sinceDate);
             
-            // Add keyword filters to only get payment-related emails
-            // This significantly reduces the number of emails to process
-            // Expanded keywords to match various bank notification formats
-            $keywords = [
-                'transfer', 'deposit', 'credit', 'payment', 'transaction', 
-                'alert', 'notification', 'received', 'credited', 'debit',
-                'gens', 'electronic', 'bank', 'account', 'amount', 'ngn',
-                'naira', 'value date', 'transaction location', 'document number'
-            ];
-            $keywordQuery = implode(' OR ', array_map(fn($kw) => "TEXT \"{$kw}\"", $keywords));
-            
-            // Try to use keyword filter (may not work on all IMAP servers, so we'll also filter manually)
-            try {
-                $messages = $query->text($keywordQuery)->get();
-            } catch (\Exception $e) {
-                // If keyword search fails, get all and filter manually
-                $messages = $query->get();
-            }
+            // Get ALL emails without keyword filtering
+            // This ensures we don't miss any emails that might contain payment info
+            $messages = $query->get();
 
             $accountEmail = $emailAccount ? $emailAccount->email : 'default account';
             $this->info("Found {$messages->count()} email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
