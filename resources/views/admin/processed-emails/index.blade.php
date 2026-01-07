@@ -163,7 +163,12 @@
                     @empty
                     <tr>
                         <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
-                            No emails found
+                            @if(request()->hasAny(['search', 'status', 'email_account_id']))
+                                No emails found matching your search criteria.
+                                <a href="{{ route('admin.processed-emails.index') }}" class="text-primary hover:underline ml-2">Clear filters</a>
+                            @else
+                                No emails found
+                            @endif
                         </td>
                     </tr>
                     @endforelse
