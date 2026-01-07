@@ -19,7 +19,7 @@ class MonitorEmails extends Command
      *
      * @var string
      */
-    protected $signature = 'payment:monitor-emails';
+    protected $signature = 'payment:monitor-emails {--since= : Fetch emails since this date (Y-m-d H:i:s)}';
 
     /**
      * The console command description.
