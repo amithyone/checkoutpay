@@ -99,17 +99,40 @@ class SetupController extends Controller
             // Update .env file
             $this->updateEnvFile([
                 'DB_HOST' => $request->host,
-                'DB_PORT' => $request->port,
+                'DB_PORT' => (string)$request->port,
                 'DB_DATABASE' => $request->database,
                 'DB_USERNAME' => $request->username,
                 'DB_PASSWORD' => $request->password ?? '',
             ]);
 
-            // Clear config cache
+            // Clear ALL caches and reload config
             try {
+                // Clear config cache
                 Artisan::call('config:clear');
+                
+                // Clear application cache
+                Artisan::call('cache:clear');
+                
+                // Reload environment
+                $app = app();
+                $app->loadEnvironmentFrom('.env');
+                
+                // Update config directly
+                config([
+                    'database.connections.mysql.host' => $request->host,
+                    'database.connections.mysql.port' => $request->port,
+                    'database.connections.mysql.database' => $request->database,
+                    'database.connections.mysql.username' => $request->username,
+                    'database.connections.mysql.password' => $request->password ?? '',
+                ]);
+                
+                // Test the actual connection with new config
+                DB::purge('mysql');
+                DB::connection('mysql')->getPdo();
+                
             } catch (\Exception $e) {
-                // Ignore config clear errors
+                Log::warning('Config clear warning: ' . $e->getMessage());
+                // Continue anyway - config might be cleared
             }
 
             return response()->json([
@@ -144,6 +167,27 @@ class SetupController extends Controller
     public function complete(Request $request)
     {
         try {
+            // Reload environment and config before running migrations
+            $app = app();
+            $app->loadEnvironmentFrom('.env');
+            
+            // Clear all caches
+            Artisan::call('config:clear');
+            Artisan::call('cache:clear');
+            
+            // Purge database connection to force reload
+            DB::purge('mysql');
+            
+            // Test connection before migrations
+            try {
+                DB::connection('mysql')->getPdo();
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Database connection failed: ' . $e->getMessage() . '. Please check your .env file.',
+                ], 400);
+            }
+            
             // Run migrations
             Artisan::call('migrate', ['--force' => true]);
 
@@ -169,9 +213,17 @@ class SetupController extends Controller
                 'redirect' => '/admin',
             ]);
         } catch (\Exception $e) {
+            Log::error('Setup complete error: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Setup failed: ' . $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ], 400);
         }
     }
