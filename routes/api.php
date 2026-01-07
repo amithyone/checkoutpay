@@ -30,6 +30,9 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
 Route::prefix('v1')->group(function () {
     // Statistics routes
     Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index']);
+    
+    // Email webhook (for email forwarding services)
+    Route::post('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']);
 });
 
 // Health check

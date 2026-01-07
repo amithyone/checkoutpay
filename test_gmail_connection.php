@@ -10,7 +10,7 @@
 $host = 'imap.gmail.com';
 $port = 993;
 $email = 'fastifysales@gmail.com';
-$password = 'juqdqfdy mqks txgu'; // Your App Password (remove spaces if any)
+$password = 'hftp gysf vnnl iqlj'; // Your App Password (remove spaces if any)
 $folder = 'INBOX';
 
 echo "========================================\n";
