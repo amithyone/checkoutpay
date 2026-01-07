@@ -79,7 +79,7 @@ class EmailWebhookController extends Controller
             $zapierLog = ZapierLog::create([
                 'payload' => $request->all(), // Store full payload
                 'sender_name' => $senderName,
-                'amount' => !empty($amount) && is_numeric($amount) ? (float) $amount : null,
+                'amount' => $amount, // Already parsed, can be null if invalid
                 'time_sent' => $timeSent,
                 'email_content' => $emailContent,
                 'status' => 'received',
