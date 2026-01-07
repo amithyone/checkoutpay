@@ -279,14 +279,58 @@ class EmailWebhookController extends Controller
 
             // Try to match payment immediately using Zapier payload directly
             if ($extractedInfo['amount'] > 0) {
-                // Get pending payments and match them
-                $pendingPayments = \App\Models\Payment::pending()->get();
+                // Get pending payments and sort by:
+                // 1. Amount similarity (closest match first)
+                // 2. Most recent transaction creation time
+                $pendingPayments = \App\Models\Payment::pending()
+                    ->orderBy('created_at', 'desc') // Most recent first
+                    ->get()
+                    ->map(function ($payment) use ($extractedInfo) {
+                        // Calculate amount difference for sorting
+                        $amountDiff = abs($payment->amount - $extractedInfo['amount']);
+                        return [
+                            'payment' => $payment,
+                            'amount_diff' => $amountDiff,
+                        ];
+                    })
+                    ->sortBy('amount_diff') // Sort by closest amount match
+                    ->values(); // Reset keys
                 
-                foreach ($pendingPayments as $payment) {
-                    // Use webhook received time for matching
-                    $webhookTime = \Carbon\Carbon::parse($timeSent)->setTimezone(config('app.timezone'));
+                // Use webhook received time for matching
+                $webhookTime = \Carbon\Carbon::parse($timeSent)->setTimezone(config('app.timezone'));
+                
+                $bestMatch = null;
+                $bestMatchResult = null;
+                $allMatches = [];
+                
+                // Try all payments and find the best match
+                foreach ($pendingPayments as $item) {
+                    $payment = $item['payment'];
                     
                     $matchResult = $matchingService->matchPayment($payment, $extractedInfo, $webhookTime);
+                    
+                    // Store all match attempts for debugging
+                    $allMatches[] = [
+                        'transaction_id' => $payment->transaction_id,
+                        'amount' => $payment->amount,
+                        'amount_diff' => $item['amount_diff'],
+                        'created_at' => $payment->created_at->toDateTimeString(),
+                        'matched' => $matchResult['matched'] ?? false,
+                        'reason' => $matchResult['reason'] ?? 'No reason provided',
+                    ];
+                    
+                    if ($matchResult['matched']) {
+                        // Found a match - use this one (it's already sorted by best match)
+                        $bestMatch = $payment;
+                        $bestMatchResult = $matchResult;
+                        break; // Stop at first match (best match due to sorting)
+                    }
+                }
+                
+                // Process the best match if found
+                if ($bestMatch && $bestMatchResult) {
+                    $payment = $bestMatch;
+                    $matchResult = $bestMatchResult;
                     
                     if ($matchResult['matched']) {
                         // Mark email as matched
