@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\Payment;
 use App\Models\Business;
+use App\Models\ProcessedEmail;
 use App\Services\AccountNumberService;
 use App\Services\TransactionLogService;
+use App\Services\PaymentMatchingService;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -70,7 +72,7 @@ class PaymentService
             $this->transactionLogService->logAccountAssignment($payment, $assignedAccount);
         }
 
-        \Log::info('Payment request created', [
+        \Illuminate\Support\Facades\Log::info('Payment request created', [
             'transaction_id' => $payment->transaction_id,
             'amount' => $payment->amount,
             'payer_name' => $payment->payer_name,
