@@ -163,6 +163,13 @@ class EmailAccount extends Model
                 ];
             }
             
+            if (strpos($errorMessage, 'unreachable') !== false || strpos($errorMessage, 'Network is unreachable') !== false) {
+                return [
+                    'success' => false,
+                    'message' => 'Network is unreachable. The server cannot connect to Gmail. This is a firewall/network issue. Contact your hosting provider to allow outbound IMAP connections on port 993. Error: ' . $errorMessage,
+                ];
+            }
+            
             if (strpos($errorMessage, 'connection') !== false || strpos($errorMessage, 'timeout') !== false || strpos($errorMessage, 'refused') !== false) {
                 $detailedMessage = 'Connection failed to ' . $this->host . ':' . $this->port . '. ';
                 $detailedMessage .= 'Possible issues: ';
