@@ -668,12 +668,12 @@ class MonitorEmails extends Command
     /**
      * Store Gmail API email in database
      */
-    protected function storeGmailApiEmail(array $emailData, EmailAccount $emailAccount): void
+    protected function storeGmailApiEmail(array $emailData, EmailAccount $emailAccount): ?ProcessedEmail
     {
         try {
-            $messageId = $emailData['id'] ?? null;
+            $messageId = (string)($emailData['message_id'] ?? $emailData['id'] ?? '');
             if (!$messageId) {
-                return;
+                return null;
             }
             
             // Extract email address from "Name <email@example.com>" format
