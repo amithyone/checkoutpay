@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SetupController;
 
 Route::get('/', function () {
     return response()->json([
@@ -14,3 +15,9 @@ Route::get('/', function () {
         ],
     ]);
 });
+
+// Setup routes
+Route::get('/setup', [SetupController::class, 'index'])->name('setup');
+Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);
+Route::post('/setup/save-database', [SetupController::class, 'saveDatabase']);
+Route::post('/setup/complete', [SetupController::class, 'complete']);
