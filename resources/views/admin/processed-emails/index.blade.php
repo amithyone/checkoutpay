@@ -46,16 +46,16 @@
 
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-        <form method="GET" action="{{ route('admin.processed-emails.index') }}" class="flex flex-wrap gap-4">
+        <form method="GET" action="{{ route('admin.processed-emails.index') }}" id="searchForm" class="flex flex-wrap gap-4">
             <div class="flex-1 min-w-[200px]">
-                <input type="text" name="search" value="{{ request('search') }}" 
-                    placeholder="Search by Subject, From, Amount, or Sender..." 
+                <input type="text" name="search" id="searchInput" value="{{ request('search') }}" 
+                    placeholder="Search by Subject, From, Amount, or Sender (type to filter)..." 
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     autocomplete="off">
             </div>
             
             <div class="min-w-[150px]">
-                <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                <select name="status" id="statusFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
                     <option value="">All Status</option>
                     <option value="matched" {{ request('status') === 'matched' ? 'selected' : '' }}>Matched</option>
                     <option value="unmatched" {{ request('status') === 'unmatched' ? 'selected' : '' }}>Unmatched</option>
@@ -63,7 +63,7 @@
             </div>
 
             <div class="min-w-[200px]">
-                <select name="email_account_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                <select name="email_account_id" id="emailAccountFilter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
                     <option value="">All Email Accounts</option>
                     @foreach($emailAccounts as $account)
                         <option value="{{ $account->id }}" {{ request('email_account_id') == $account->id ? 'selected' : '' }}>
@@ -73,15 +73,9 @@
                 </select>
             </div>
 
-            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
-                <i class="fas fa-search mr-2"></i> Filter
+            <button type="button" onclick="clearFilters()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                <i class="fas fa-times mr-2"></i> Clear
             </button>
-
-            @if(request()->hasAny(['search', 'status', 'email_account_id']))
-                <a href="{{ route('admin.processed-emails.index') }}" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
-                    <i class="fas fa-times mr-2"></i> Clear
-                </a>
-            @endif
         </form>
     </div>
 
@@ -100,9 +94,16 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody id="emailsTableBody" class="divide-y divide-gray-200">
                     @forelse($emails as $email)
-                    <tr class="hover:bg-gray-50 {{ !$email->is_matched ? 'bg-yellow-50/30' : '' }}">
+                    <tr class="email-row hover:bg-gray-50 {{ !$email->is_matched ? 'bg-yellow-50/30' : '' }}" 
+                        data-subject="{{ strtolower($email->subject ?? '') }}"
+                        data-from-email="{{ strtolower($email->from_email ?? '') }}"
+                        data-from-name="{{ strtolower($email->from_name ?? '') }}"
+                        data-sender-name="{{ strtolower($email->sender_name ?? '') }}"
+                        data-amount="{{ $email->amount ?? '' }}"
+                        data-status="{{ $email->is_matched ? 'matched' : 'unmatched' }}"
+                        data-email-account-id="{{ $email->email_account_id ?? '' }}">
                         <td class="px-6 py-4">
                             <div class="text-sm font-medium text-gray-900" title="{{ $email->subject ?? 'No Subject' }}">
                                 @php
