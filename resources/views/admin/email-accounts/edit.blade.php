@@ -106,6 +106,28 @@
 </div>
 
 <script>
+function updateEncryptionHint() {
+    const encryption = document.getElementById('encryption').value;
+    const port = document.getElementById('port').value;
+    const hint = document.getElementById('encryption-hint');
+    
+    if (port == 993 && encryption === 'tls') {
+        hint.textContent = '⚠️ Warning: Port 993 requires SSL encryption, not TLS. Please change to SSL.';
+        hint.className = 'text-xs text-orange-600 mt-1 font-medium';
+    } else if (port == 587 && encryption === 'ssl') {
+        hint.textContent = '⚠️ Warning: Port 587 typically uses TLS encryption. Consider changing to TLS.';
+        hint.className = 'text-xs text-orange-600 mt-1 font-medium';
+    } else {
+        hint.textContent = 'For Gmail with port 993, use SSL. For port 587, use TLS.';
+        hint.className = 'text-xs text-gray-500 mt-1';
+    }
+}
+
+// Update hint when port changes
+document.getElementById('port').addEventListener('input', updateEncryptionHint);
+// Update hint on page load
+updateEncryptionHint();
+
 function testConnection(id) {
     const btn = event.target;
     const originalText = btn.textContent;
