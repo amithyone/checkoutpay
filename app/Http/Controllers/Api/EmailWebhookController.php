@@ -250,6 +250,9 @@ class EmailWebhookController extends Controller
                 'email_from' => $fromEmail,
             ];
 
+            // Initialize matching service for payment matching
+            $matchingService = new PaymentMatchingService(new TransactionLogService());
+
             // Store email (mark as webhook source, no email_account_id needed for Zapier)
             $processedEmail = ProcessedEmail::create([
                 'email_account_id' => null, // Not needed for Zapier webhook
