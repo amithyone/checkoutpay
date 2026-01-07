@@ -125,6 +125,7 @@ class MonitorEmails extends Command
 
             $accountEmail = $emailAccount ? $emailAccount->email : 'default account';
             $this->info("Found {$messages->count()} email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
+            $this->line("📧 Starting to process and store emails...");
 
             $processedCount = 0;
             $skippedCount = 0;
@@ -180,7 +181,12 @@ class MonitorEmails extends Command
                 }
             }
             
-            $this->info("✅ Stored: {$messages->count()} total emails | Processed for matching: {$processedCount} (with payment info) | Not processed: {$skippedCount} (no payment info extracted - check inbox to troubleshoot)");
+            // Count actually stored emails
+            $storedCount = ProcessedEmail::where('email_account_id', $emailAccount?->id)
+                ->where('created_at', '>=', now()->subMinutes(5))
+                ->count();
+            
+            $this->info("✅ Attempted: {$messages->count()} emails | Actually stored: {$storedCount} | Processed for matching: {$processedCount} (with payment info) | Not processed: {$skippedCount} (no payment info extracted - check inbox to troubleshoot)");
 
             $client->disconnect();
         } catch (\Exception $e) {
@@ -467,23 +473,38 @@ class MonitorEmails extends Command
                 ->first();
             
             if ($existing) {
+                $this->line("⏭️  Email already stored: {$message->getSubject()}");
                 return; // Already stored
             }
             
-            ProcessedEmail::create([
-                'email_account_id' => $emailAccount?->id,
-                'message_id' => (string)$messageId,
-                'subject' => $message->getSubject(),
-                'from_email' => $fromEmail,
-                'from_name' => $fromName,
-                'text_body' => $message->getTextBody(),
-                'html_body' => $message->getHTMLBody(),
-                'email_date' => $emailDate,
-                'amount' => $extractedInfo['amount'] ?? null,
-                'sender_name' => $extractedInfo['sender_name'] ?? null,
-                'account_number' => $extractedInfo['account_number'] ?? null,
-                'extracted_data' => $extractedInfo,
-            ]);
+            // Store email even if extraction failed or returned null
+            try {
+                $stored = ProcessedEmail::create([
+                    'email_account_id' => $emailAccount?->id,
+                    'message_id' => (string)$messageId,
+                    'subject' => $message->getSubject(),
+                    'from_email' => $fromEmail,
+                    'from_name' => $fromName,
+                    'text_body' => $message->getTextBody(),
+                    'html_body' => $message->getHTMLBody(),
+                    'email_date' => $emailDate,
+                    'amount' => $extractedInfo['amount'] ?? null,
+                    'sender_name' => $extractedInfo['sender_name'] ?? null,
+                    'account_number' => $extractedInfo['account_number'] ?? null,
+                    'extracted_data' => $extractedInfo,
+                ]);
+                
+                $this->line("✅ Stored email: {$message->getSubject()} | From: {$fromEmail} | ID: {$stored->id}");
+            } catch (\Exception $e) {
+                $this->error("❌ Failed to store email: {$message->getSubject()} | Error: {$e->getMessage()}");
+                Log::error('Failed to store email in database', [
+                    'error' => $e->getMessage(),
+                    'subject' => $message->getSubject(),
+                    'from' => $fromEmail,
+                    'message_id' => $messageId,
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
         } catch (\Exception $e) {
             Log::error('Error storing email in database', [
                 'error' => $e->getMessage(),
