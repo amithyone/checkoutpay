@@ -120,10 +120,23 @@ class PaymentService
                 ->get();
             
             foreach ($storedEmails as $storedEmail) {
-                $match = $this->paymentMatchingService->matchPayment($payment, [
-                    'amount' => $storedEmail->amount,
-                    'sender_name' => $storedEmail->sender_name,
-                ]);
+                // Re-extract from html_body if available
+                $emailData = [
+                    'subject' => $storedEmail->subject,
+                    'from' => $storedEmail->from_email,
+                    'text' => $storedEmail->text_body ?? '',
+                    'html' => $storedEmail->html_body ?? '', // Use html_body for matching
+                    'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : null,
+                ];
+                
+                // Re-extract payment info (will use html_body)
+                $extractedInfo = $this->paymentMatchingService->extractPaymentInfo($emailData);
+                
+                if (!$extractedInfo || !$extractedInfo['amount']) {
+                    continue;
+                }
+                
+                $match = $this->paymentMatchingService->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
                 
                 if ($match['matched']) {
                     // Mark stored email as matched

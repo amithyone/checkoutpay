@@ -155,10 +155,19 @@
                             {{ $email->email_date ? $email->email_date->format('M d, Y H:i') : $email->created_at->format('M d, Y H:i') }}
                         </td>
                         <td class="px-6 py-4">
-                            <a href="{{ route('admin.processed-emails.show', $email) }}" 
-                                class="text-sm text-primary hover:underline">
-                                <i class="fas fa-eye mr-1"></i> View
-                            </a>
+                            <div class="flex items-center gap-2">
+                                <a href="{{ route('admin.processed-emails.show', $email) }}" 
+                                    class="text-sm text-primary hover:underline">
+                                    <i class="fas fa-eye mr-1"></i> View
+                                </a>
+                                @if(!$email->is_matched && $email->amount)
+                                    <button onclick="checkMatch({{ $email->id }})" 
+                                        class="text-sm text-green-600 hover:underline check-match-btn"
+                                        data-email-id="{{ $email->id }}">
+                                        <i class="fas fa-search mr-1"></i> Check Match
+                                    </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty

@@ -77,4 +77,61 @@ class ProcessedEmailController extends Controller
         
         return view('admin.processed-emails.show', compact('processedEmail'));
     }
+
+    /**
+     * Check match for a stored email against pending payments
+     */
+    public function checkMatch(ProcessedEmail $processedEmail)
+    {
+        $matchingService = new \App\Services\PaymentMatchingService(
+            new \App\Services\TransactionLogService()
+        );
+        
+        $result = $matchingService->recheckStoredEmail($processedEmail);
+        
+        // If a match is found, approve the payment
+        $matchedPayment = null;
+        foreach ($result['matches'] as $match) {
+            if ($match['matched'] && $match['payment']) {
+                $matchedPayment = $match['payment'];
+                
+                // Mark email as matched
+                $processedEmail->markAsMatched($matchedPayment);
+                
+                // Approve payment
+                $matchedPayment->approve([
+                    'subject' => $processedEmail->subject,
+                    'from' => $processedEmail->from_email,
+                    'text' => $processedEmail->text_body,
+                    'html' => $processedEmail->html_body,
+                    'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                ]);
+                
+                // Update business balance
+                if ($matchedPayment->business_id) {
+                    $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                }
+                
+                // Dispatch event to send webhook
+                event(new \App\Events\PaymentApproved($matchedPayment));
+                
+                break;
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'matched' => $matchedPayment !== null,
+            'payment' => $matchedPayment ? [
+                'id' => $matchedPayment->id,
+                'transaction_id' => $matchedPayment->transaction_id,
+                'amount' => $matchedPayment->amount,
+            ] : null,
+            'matches' => $result['matches'],
+            'extracted_info' => $result['extracted_info'] ?? null,
+            'message' => $matchedPayment 
+                ? 'Payment matched and approved successfully!' 
+                : 'No matching payment found. Check the matches below for details.',
+        ]);
+    }
 }

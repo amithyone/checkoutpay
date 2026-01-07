@@ -23,6 +23,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Processed Emails (Inbox)
         Route::get('processed-emails', [ProcessedEmailController::class, 'index'])->name('processed-emails.index');
         Route::get('processed-emails/{processedEmail}', [ProcessedEmailController::class, 'show'])->name('processed-emails.show');
+        Route::post('processed-emails/{processedEmail}/check-match', [ProcessedEmailController::class, 'checkMatch'])->name('processed-emails.check-match');
 
         // Email Accounts
         Route::resource('email-accounts', EmailAccountController::class);

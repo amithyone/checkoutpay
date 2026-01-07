@@ -196,8 +196,22 @@ class PaymentMatchingService
     /**
      * Match payment with extracted email info
      */
-    public function matchPayment(Payment $payment, array $extractedInfo): array
+    public function matchPayment(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null): array
     {
+        // Check time window: email must be received within 15 minutes of transaction creation
+        if ($emailDate && $payment->created_at) {
+            $timeDiff = abs($payment->created_at->diffInMinutes($emailDate));
+            if ($timeDiff > 15) {
+                return [
+                    'matched' => false,
+                    'reason' => sprintf(
+                        'Time window exceeded: email received %d minutes after transaction (max 15 minutes)',
+                        $timeDiff
+                    ),
+                ];
+            }
+        }
+
         // Check amount match (allow small tolerance for rounding)
         $amountDiff = abs($payment->amount - $extractedInfo['amount']);
         $amountTolerance = 0.01; // 1 kobo tolerance
@@ -213,7 +227,7 @@ class PaymentMatchingService
             ];
         }
 
-        // If payer name is provided, it must match exactly (case-insensitive)
+        // If payer name is provided, check similarity (not exact match)
         if ($payment->payer_name) {
             if (empty($extractedInfo['sender_name'])) {
                 return [
@@ -228,7 +242,7 @@ class PaymentMatchingService
             $receivedName = trim(strtolower($extractedInfo['sender_name']));
             $receivedName = preg_replace('/\s+/', ' ', $receivedName);
 
-            // Check if names match (handles order variations and partial matches)
+            // Check if names match with similarity (handles order variations and partial matches)
             if (!$this->namesMatch($expectedName, $receivedName)) {
                 return [
                     'matched' => false,
@@ -243,7 +257,7 @@ class PaymentMatchingService
 
         return [
             'matched' => true,
-            'reason' => 'Amount and name match',
+            'reason' => 'Amount and name match within time window',
         ];
     }
 

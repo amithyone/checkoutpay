@@ -91,18 +91,21 @@ class MonitorEmails extends Command
             $client->connect();
             $folder = $client->getFolder($emailAccount ? $emailAccount->folder : 'INBOX');
             
-            // Check emails from the last 7 days (or since oldest pending payment if exists)
-            // Store all payment-related emails in database for later matching
+            // Only fetch emails from when the oldest pending transaction was created
+            // This ensures we don't fetch old emails unnecessarily
             $oldestPendingPayment = \App\Models\Payment::pending()
                 ->orderBy('created_at', 'asc')
                 ->first();
             
-            // Use oldest pending payment date or last 7 days, whichever is older
             if ($oldestPendingPayment) {
-                $sinceDate = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer
+                // Only fetch emails from when the oldest pending transaction was created
+                // Add 5 min buffer to catch emails that arrived slightly before
+                $sinceDate = $oldestPendingPayment->created_at->subMinutes(5);
             } else {
-                // If no pending payments, check last 7 days of emails and store them
-                $sinceDate = now()->subDays(7);
+                // If no pending payments, don't fetch any emails
+                // We only want emails that come AFTER transactions are created
+                $this->info("No pending payments found. Skipping email fetch.");
+                return;
             }
             
             // Also check for the most recent email we've already stored
