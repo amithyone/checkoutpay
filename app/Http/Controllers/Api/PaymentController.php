@@ -30,6 +30,9 @@ class PaymentController extends Controller
             $request
         );
 
+        // Load account number details for response
+        $payment->load('accountNumberDetails');
+
         return response()->json([
             'success' => true,
             'message' => 'Payment request received and monitoring started',
