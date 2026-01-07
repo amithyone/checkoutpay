@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('withdrawal_requests', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('business_id')->constrained('businesses')->onDelete('cascade');
+            $table->unsignedBigInteger('business_id');
             $table->decimal('amount', 15, 2);
             $table->string('account_number');
             $table->string('account_name');
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->enum('status', ['pending', 'approved', 'rejected', 'processed'])->default('pending');
             $table->text('rejection_reason')->nullable();
             $table->timestamp('processed_at')->nullable();
-            $table->foreignId('processed_by')->nullable()->constrained('admins')->onDelete('set null');
+            $table->unsignedBigInteger('processed_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
