@@ -129,7 +129,9 @@ class GmailApiService
             $maxResults = $options['maxResults'] ?? 50;
             
             // Build Gmail search query
-            $query = "is:unread after:{$sinceFormatted}";
+            // Check ALL emails (read and unread) after the payment request date
+            // This ensures emails that arrived before payment request are still checked
+            $query = "after:{$sinceFormatted}";
             
             // Add keyword filters if provided
             // Gmail search supports: transaction OR notification OR credit OR amount

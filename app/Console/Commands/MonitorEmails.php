@@ -108,8 +108,10 @@ class MonitorEmails extends Command
             // Only check emails received after the oldest pending payment was created
             $sinceDate = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer for email delivery delay
             
-            // Build query with date filter and payment-related keywords to reduce emails checked
-            $query = $folder->query()->unseen()->since($sinceDate);
+            // Check ALL emails (read and unread) after the payment request date
+            // This ensures emails that arrived before payment request are still checked
+            // We'll skip emails that already matched payments in the matching service
+            $query = $folder->query()->since($sinceDate);
             
             // Add keyword filters to only get payment-related emails
             // This significantly reduces the number of emails to process
