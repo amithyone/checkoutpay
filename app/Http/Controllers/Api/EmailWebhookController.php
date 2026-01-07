@@ -22,66 +22,77 @@ class EmailWebhookController extends Controller
     public function receive(Request $request)
     {
         try {
-            // Handle Zapier test connection (Zapier sends a test request with minimal data)
-            // Zapier test requests often have empty or missing fields, so we handle them gracefully
-            $isTestRequest = empty($request->input('from')) && empty($request->input('From'));
+            // Zapier sends data in this format:
+            // - sender_name
+            // - amount
+            // - time_sent
+            // - email (the email body/content)
+            
+            // Handle Zapier test connection (empty request)
+            $isTestRequest = empty($request->input('email')) && empty($request->input('sender_name'));
             
             if ($isTestRequest) {
                 // Return success response for Zapier test connection
                 return response()->json([
                     'success' => true,
-                    'message' => 'Webhook endpoint is ready. Send email data with fields: from, to, subject, text, html, date, message_id',
+                    'message' => 'Webhook endpoint is ready. Zapier format: sender_name, amount, time_sent, email',
                     'status' => 'ready',
                     'endpoint' => 'email/webhook',
-                    'required_fields' => ['from', 'to'],
-                    'optional_fields' => ['subject', 'text', 'html', 'date', 'message_id'],
+                    'expected_fields' => ['sender_name', 'amount', 'time_sent', 'email'],
                 ], 200);
             }
 
-            // Validate request (relaxed validation for Zapier compatibility)
-            $validator = Validator::make($request->all(), [
-                'from' => 'required_without:From|string',
-                'From' => 'required_without:from|string',
-                'to' => 'required_without:To|string',
-                'To' => 'required_without:to|string',
-                'subject' => 'nullable|string',
-                'Subject' => 'nullable|string',
-                'text' => 'nullable|string',
-                'html' => 'nullable|string',
-                'date' => 'nullable|date',
-                'message_id' => 'nullable|string',
-            ]);
-
-            if ($validator->fails()) {
+            // Extract Zapier payload
+            $senderName = $request->input('sender_name', '');
+            $amount = $request->input('amount', '');
+            $timeSent = $request->input('time_sent', now()->toDateTimeString());
+            $emailContent = $request->input('email', ''); // This is the full email body/content
+            
+            // Validate required fields
+            if (empty($emailContent)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors(),
-                    'received_data' => array_keys($request->all()),
-                    'help' => 'Required fields: from (or From) and to (or To). Optional: subject, text, html, date, message_id',
+                    'message' => 'Validation failed: email field is required',
+                    'received_fields' => array_keys($request->all()),
                 ], 400);
             }
 
-            // Handle Zapier format (supports multiple field name variations)
-            $from = $request->input('from') ?? $request->input('From') ?? '';
-            $to = $request->input('to') ?? $request->input('To') ?? '';
-            $subject = $request->input('subject') ?? $request->input('Subject') ?? 'No Subject';
-            $text = $request->input('text') ?? $request->input('Plain Body') ?? $request->input('Body Plain') ?? $request->input('body') ?? '';
-            $html = $request->input('html') ?? $request->input('HTML Body') ?? $request->input('Body HTML') ?? $request->input('html_body') ?? '';
-            $date = $request->input('date') ?? $request->input('Date') ?? now()->toDateTimeString();
-            $messageId = $request->input('message_id') ?? $request->input('Message ID') ?? md5($from . $subject . $date);
-
-            // Extract email address from "Name <email@example.com>" format
-            $fromEmail = $from;
-            $fromName = '';
-            if (preg_match('/<(.+?)>/', $from, $matches)) {
-                $fromEmail = $matches[1];
-                $fromName = trim(str_replace($matches[0], '', $from));
-            } elseif (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
-                if (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', $fromEmail, $matches)) {
-                    $fromEmail = $matches[0];
-                }
+            // Parse email content to extract details
+            // Zapier sends the email body, we need to extract from/to/subject from it
+            // For now, we'll use the email content as both text and HTML
+            $text = $emailContent;
+            $html = $emailContent; // Zapier might send HTML, use same for both
+            
+            // Try to extract email address from content (look for common patterns)
+            $fromEmail = '';
+            $toEmail = '';
+            $subject = 'Transaction Notification';
+            
+            // Extract from email patterns
+            if (preg_match('/from[:\s]+([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})/i', $emailContent, $matches)) {
+                $fromEmail = strtolower($matches[1]);
+            } elseif (preg_match('/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})/i', $emailContent, $matches)) {
+                $fromEmail = strtolower($matches[1]);
             }
+            
+            // Default to GTBank if no email found
+            if (empty($fromEmail)) {
+                $fromEmail = 'alerts@gtbank.com'; // Default bank email
+            }
+            
+            // Extract subject if present
+            if (preg_match('/subject[:\s]+(.+?)(?:\n|$)/i', $emailContent, $matches)) {
+                $subject = trim($matches[1]);
+            }
+            
+            // Generate message ID from content hash
+            $messageId = md5($emailContent . $timeSent . $senderName);
+            
+            // Use sender_name from Zapier payload
+            $fromName = $senderName;
+
+            // Use extracted email address
+            // $fromEmail already extracted above
 
             // Filter out noreply@xtrapay.ng emails
             if (strtolower($fromEmail) === 'noreply@xtrapay.ng') {
@@ -92,10 +103,23 @@ class EmailWebhookController extends Controller
                 ], 200);
             }
 
-            // Find email account by forwarding address (to field)
-            $emailAccount = EmailAccount::where('email', $to)
-                ->orWhere('email', 'like', '%' . explode('@', $to)[0] . '%')
-                ->first();
+            // Find email account (try to match by sender email domain or use first active)
+            $emailAccount = EmailAccount::where('is_active', true)->first();
+            
+            // Try to find account matching sender domain
+            if ($fromEmail) {
+                $domain = '@' . explode('@', $fromEmail)[1] ?? '';
+                $matchedAccount = EmailAccount::where('is_active', true)
+                    ->where(function ($q) use ($fromEmail, $domain) {
+                        $q->where('email', 'like', '%' . $domain)
+                          ->orWhere('email', 'like', '%' . str_replace('@', '', $domain) . '%');
+                    })
+                    ->first();
+                
+                if ($matchedAccount) {
+                    $emailAccount = $matchedAccount;
+                }
+            }
 
             // Check if email already exists
             $existing = ProcessedEmail::where('message_id', $messageId)
@@ -120,18 +144,35 @@ class EmailWebhookController extends Controller
                 'from' => $fromEmail,
                 'text' => $text,
                 'html' => $html,
-                'date' => $date,
+                'date' => $timeSent,
                 'email_account_id' => $emailAccount?->id,
             ];
 
             $extractedInfo = null;
-            try {
-                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
-            } catch (\Exception $e) {
-                Log::debug('Payment info extraction failed', [
-                    'error' => $e->getMessage(),
-                    'subject' => $subject,
-                ]);
+            
+            // If Zapier provided amount directly, use it
+            if (!empty($amount) && is_numeric($amount)) {
+                $extractedInfo = [
+                    'amount' => (float) $amount,
+                    'sender_name' => $senderName ? strtolower(trim($senderName)) : null,
+                    'account_number' => null,
+                    'email_subject' => $subject,
+                    'email_from' => $fromEmail,
+                ];
+            } else {
+                // Try to extract from email content
+                try {
+                    $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                    // Override sender_name with Zapier value if provided
+                    if ($senderName && empty($extractedInfo['sender_name'])) {
+                        $extractedInfo['sender_name'] = strtolower(trim($senderName));
+                    }
+                } catch (\Exception $e) {
+                    Log::debug('Payment info extraction failed', [
+                        'error' => $e->getMessage(),
+                        'subject' => $subject,
+                    ]);
+                }
             }
 
             // Store email (mark as webhook source)
@@ -144,7 +185,7 @@ class EmailWebhookController extends Controller
                 'from_name' => $fromName,
                 'text_body' => $text,
                 'html_body' => $html,
-                'email_date' => $date,
+                'email_date' => $timeSent,
                 'amount' => $extractedInfo['amount'] ?? null,
                 'sender_name' => $extractedInfo['sender_name'] ?? null,
                 'account_number' => $extractedInfo['account_number'] ?? null,
