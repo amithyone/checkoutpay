@@ -179,6 +179,26 @@ class MonitorEmails extends Command
                     ];
                     $extractedInfo = $matchingService->extractPaymentInfo($emailData);
                     
+                    // Check if this is a GTBank transaction notification
+                    $gtbankParser = new \App\Services\GtbankTransactionParser();
+                    if ($gtbankParser->isGtbankTransaction($emailData)) {
+                        // Parse and store GTBank transaction
+                        $storedEmail = ProcessedEmail::where('message_id', $messageId)
+                            ->where('email_account_id', $emailAccount?->id)
+                            ->first();
+                        
+                        if ($storedEmail) {
+                            // Find GTBank template
+                            $gtbankTemplate = \App\Models\BankEmailTemplate::where('bank_name', 'GTBank')
+                                ->orWhere('bank_name', 'Guaranty Trust Bank')
+                                ->active()
+                                ->orderBy('priority', 'desc')
+                                ->first();
+                            
+                            $gtbankParser->parseTransaction($emailData, $storedEmail, $gtbankTemplate);
+                        }
+                    }
+                    
                     // Only process if we extracted payment info (amount found)
                     if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
                         $this->processMessage($message, $emailAccount);
