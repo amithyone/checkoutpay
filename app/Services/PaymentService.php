@@ -107,4 +107,58 @@ class PaymentService
 
         return $transactionId;
     }
+
+    /**
+     * Check stored emails for immediate match when payment is created
+     */
+    protected function checkStoredEmailsForMatch(Payment $payment): void
+    {
+        try {
+            // Get unmatched stored emails with matching amount
+            $storedEmails = ProcessedEmail::unmatched()
+                ->withAmount($payment->amount)
+                ->get();
+            
+            foreach ($storedEmails as $storedEmail) {
+                $match = $this->paymentMatchingService->matchPayment($payment, [
+                    'amount' => $storedEmail->amount,
+                    'sender_name' => $storedEmail->sender_name,
+                ]);
+                
+                if ($match['matched']) {
+                    // Mark stored email as matched
+                    $storedEmail->markAsMatched($payment);
+                    
+                    // Approve payment
+                    $payment->approve([
+                        'subject' => $storedEmail->subject,
+                        'from' => $storedEmail->from_email,
+                        'text' => $storedEmail->text_body,
+                        'html' => $storedEmail->html_body,
+                        'date' => $storedEmail->email_date->toDateTimeString(),
+                    ]);
+                    
+                    // Update business balance
+                    if ($payment->business_id) {
+                        $payment->business->increment('balance', $payment->amount);
+                    }
+                    
+                    // Dispatch event to send webhook
+                    event(new \App\Events\PaymentApproved($payment));
+                    
+                    \Illuminate\Support\Facades\Log::info('Payment matched from stored email on creation', [
+                        'transaction_id' => $payment->transaction_id,
+                        'stored_email_id' => $storedEmail->id,
+                    ]);
+                    
+                    break; // Only match one email per payment
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error checking stored emails for match', [
+                'error' => $e->getMessage(),
+                'payment_id' => $payment->id,
+            ]);
+        }
+    }
 }
