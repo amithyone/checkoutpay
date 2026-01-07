@@ -95,11 +95,22 @@ class PaymentMatchingService
     public function extractPaymentInfo(array $emailData): ?array
     {
         $subject = strtolower($emailData['subject'] ?? '');
-        $text = strtolower($emailData['text'] ?? '');
-        $html = strtolower($emailData['html'] ?? '');
+        $text = $emailData['text'] ?? '';
+        $html = $emailData['html'] ?? '';
         $from = strtolower($emailData['from'] ?? '');
 
-        $fullText = $subject . ' ' . $text . ' ' . strip_tags($html);
+        // If text body is empty but HTML exists, extract text from HTML intelligently
+        if (empty(trim($text)) && !empty($html)) {
+            // Convert HTML to plain text, preserving structure
+            $text = $this->htmlToText($html);
+        }
+        
+        $text = strtolower($text);
+        $htmlLower = strtolower($html);
+        
+        // Use HTML directly for pattern matching (more accurate for structured emails)
+        // Also use extracted text as fallback
+        $fullText = $subject . ' ' . $text . ' ' . $htmlLower;
 
         // Extract amount - look for currency patterns
         // Updated to handle formats like "NGN 1000", "Amount: NGN 1000", etc.
@@ -126,18 +137,39 @@ class PaymentMatchingService
 
         // Extract sender name
         // Updated to handle formats like "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        // Also check HTML for structured name fields
         $namePatterns = [
-            '/from\s+([A-Z][A-Z\s]+?)\s+to/i', // "FROM SOLOMON INNOCENT AMITHY TO"
+            // GTBank format: "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+            '/from\s+([A-Z][A-Z\s]+?)\s+to/i',
+            // HTML table patterns
+            '/<td[^>]*>[\s]*(?:from|sender|payer|depositor|account\s*name|name)[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i',
+            // Standard patterns
             '/(?:from|sender|payer|depositor|account\s*name|name)[\s:]*([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i',
             '/(?:credited\s+by|from)\s+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i',
-            '/([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/', // Fallback: any capitalized name pattern
+            // Fallback: any capitalized name pattern
+            '/([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/',
         ];
 
         $senderName = null;
+        // Try HTML first (more structured)
         foreach ($namePatterns as $pattern) {
-            if (preg_match($pattern, $fullText, $matches)) {
+            if (preg_match($pattern, $htmlLower, $matches)) {
                 $senderName = trim(strtolower($matches[1]));
-                break;
+                if (strlen($senderName) > 2) { // Valid name
+                    break;
+                }
+            }
+        }
+        
+        // If not found in HTML, try full text
+        if (!$senderName) {
+            foreach ($namePatterns as $pattern) {
+                if (preg_match($pattern, $fullText, $matches)) {
+                    $senderName = trim(strtolower($matches[1]));
+                    if (strlen($senderName) > 2) {
+                        break;
+                    }
+                }
             }
         }
 
