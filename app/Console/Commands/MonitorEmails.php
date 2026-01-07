@@ -157,9 +157,26 @@ class MonitorEmails extends Command
                             if (is_object($dateValue) && method_exists($dateValue, 'get')) {
                                 $dateValue = $dateValue->get();
                             }
-                            // Convert to Carbon
-                            $emailDate = \Carbon\Carbon::parse($dateValue);
+                            // If it's an Attribute object, try accessing the value property
+                            if (is_object($dateValue) && property_exists($dateValue, 'value')) {
+                                $dateValue = $dateValue->value;
+                            }
+                            // If it's an array, try to get the date string from it
+                            if (is_array($dateValue)) {
+                                // Try common array keys for date
+                                $dateValue = $dateValue['date'] ?? $dateValue['value'] ?? $dateValue[0] ?? null;
+                            }
+                            // If we still have a value, convert to Carbon
+                            if ($dateValue && !is_array($dateValue)) {
+                                $emailDate = \Carbon\Carbon::parse($dateValue);
+                            } else {
+                                $emailDate = now();
+                            }
                         } catch (\Exception $e) {
+                            Log::debug('Error parsing email date', [
+                                'error' => $e->getMessage(),
+                                'date_value' => is_array($dateValue) ? json_encode($dateValue) : $dateValue,
+                            ]);
                             $emailDate = now();
                         }
                     } else {
