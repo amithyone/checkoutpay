@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Models\WhitelistedEmailAddress;
+use App\Models\ZapierLog;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
@@ -25,7 +27,19 @@ class SettingsController extends Controller
             $settings[$group] = Setting::getByGroup($group);
         }
 
-        return view('admin.settings.index', compact('settings', 'groups'));
+        // Get whitelisted emails for display
+        $whitelistedEmails = WhitelistedEmailAddress::orderBy('created_at', 'desc')->get();
+        
+        // Get Zapier logs statistics
+        $zapierStats = [
+            'total' => ZapierLog::count(),
+            'today' => ZapierLog::whereDate('created_at', today())->count(),
+            'matched' => ZapierLog::where('status', 'matched')->count(),
+            'error' => ZapierLog::where('status', 'error')->count(),
+            'last_log' => ZapierLog::latest()->first(),
+        ];
+
+        return view('admin.settings.index', compact('settings', 'groups', 'whitelistedEmails', 'zapierStats'));
     }
 
     /**
@@ -58,5 +72,36 @@ class SettingsController extends Controller
 
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');
+    }
+
+    /**
+     * Add whitelisted email from settings page
+     */
+    public function addWhitelistedEmail(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|string|max:255|unique:whitelisted_email_addresses,email',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        WhitelistedEmailAddress::create([
+            'email' => strtolower(trim($validated['email'])),
+            'description' => $validated['description'] ?? null,
+            'is_active' => true,
+        ]);
+
+        return redirect()->route('admin.settings.index')
+            ->with('success', 'Whitelisted email added successfully!');
+    }
+
+    /**
+     * Remove whitelisted email from settings page
+     */
+    public function removeWhitelistedEmail(WhitelistedEmailAddress $whitelistedEmail)
+    {
+        $whitelistedEmail->delete();
+        
+        return redirect()->route('admin.settings.index')
+            ->with('success', 'Whitelisted email removed successfully!');
     }
 }
