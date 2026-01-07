@@ -185,16 +185,16 @@ class MonitorEmails extends Command
                     
                     if (!$hasPaymentKeyword) {
                         $skippedCount++;
-                        // Mark as read even if skipped (to avoid checking again)
-                        $message->setFlag('Seen');
+                        // Don't mark as read - these aren't payment emails, skip them
                         continue;
                     }
                     
                     $this->processMessage($message, $emailAccount);
                     $processedCount++;
                     
-                    // Mark as read
-                    $message->setFlag('Seen');
+                    // Note: Emails are NOT marked as read immediately
+                    // They will be checked again on next run until they match a payment or become too old
+                    // This ensures emails that arrive before payment requests are still matched
                 } catch (\Exception $e) {
                     Log::error('Error processing email message', [
                         'error' => $e->getMessage(),
@@ -351,20 +351,16 @@ class MonitorEmails extends Command
                     
                     if (!$hasPaymentKeyword) {
                         $skippedCount++;
-                        // Mark as read even if skipped
-                        if (isset($emailData['id'])) {
-                            $gmailService->markAsRead($emailData['id']);
-                        }
+                        // Don't mark as read - these aren't payment emails
                         continue;
                     }
                     
                     $this->processGmailApiMessage($emailData, $emailAccount);
                     $processedCount++;
                     
-                    // Mark as read
-                    if (isset($emailData['id'])) {
-                        $gmailService->markAsRead($emailData['id']);
-                    }
+                    // Note: Emails are NOT marked as read immediately
+                    // They will be checked again on next run until they match a payment or become too old
+                    // This ensures emails that arrive before payment requests are still matched
                 } catch (\Exception $e) {
                     Log::error('Error processing Gmail API message', [
                         'error' => $e->getMessage(),
