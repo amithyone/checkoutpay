@@ -615,4 +615,66 @@ class MonitorEmails extends Command
             ]);
         }
     }
+
+    /**
+     * Parse email date from various formats (Attribute, array, string, Carbon)
+     */
+    protected function parseEmailDate($dateValue): \Carbon\Carbon
+    {
+        if (!$dateValue) {
+            return now();
+        }
+
+        try {
+            // If it's already a Carbon instance, return it
+            if ($dateValue instanceof \Carbon\Carbon) {
+                return $dateValue;
+            }
+
+            // If it's an Attribute object, get its value
+            if (is_object($dateValue)) {
+                if (method_exists($dateValue, 'get')) {
+                    $dateValue = $dateValue->get();
+                } elseif (property_exists($dateValue, 'value')) {
+                    $dateValue = $dateValue->value;
+                } elseif (method_exists($dateValue, '__toString')) {
+                    $dateValue = (string)$dateValue;
+                } else {
+                    // Try to convert object to string
+                    $dateValue = json_decode(json_encode($dateValue), true);
+                }
+            }
+
+            // If it's an array, try to extract the date string
+            if (is_array($dateValue)) {
+                // Try common array keys for date
+                $dateValue = $dateValue['date'] ?? $dateValue['value'] ?? $dateValue['datetime'] ?? $dateValue[0] ?? null;
+                
+                // If still an array, try to get first string value
+                if (is_array($dateValue)) {
+                    foreach ($dateValue as $val) {
+                        if (is_string($val) && !empty($val)) {
+                            $dateValue = $val;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If we have a string value, parse it
+            if (is_string($dateValue) && !empty($dateValue)) {
+                return \Carbon\Carbon::parse($dateValue);
+            }
+
+            // Fallback to current time
+            return now();
+        } catch (\Exception $e) {
+            Log::debug('Error parsing email date', [
+                'error' => $e->getMessage(),
+                'date_value_type' => gettype($dateValue),
+                'date_value' => is_array($dateValue) ? json_encode($dateValue) : (is_object($dateValue) ? get_class($dateValue) : $dateValue),
+            ]);
+            return now();
+        }
+    }
 }
