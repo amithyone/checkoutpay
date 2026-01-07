@@ -14,7 +14,8 @@ class PaymentService
 {
     public function __construct(
         protected AccountNumberService $accountNumberService,
-        protected TransactionLogService $transactionLogService
+        protected TransactionLogService $transactionLogService,
+        protected PaymentMatchingService $paymentMatchingService
     ) {}
 
     /**
