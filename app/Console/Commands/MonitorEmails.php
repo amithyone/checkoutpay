@@ -107,24 +107,78 @@ class MonitorEmails extends Command
             
             // Only check emails received after the oldest pending payment was created
             $sinceDate = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer for email delivery delay
-            $messages = $folder->query()->unseen()->since($sinceDate)->get();
+            
+            // Build query with date filter and payment-related keywords to reduce emails checked
+            $query = $folder->query()->unseen()->since($sinceDate);
+            
+            // Add keyword filters to only get payment-related emails
+            // This significantly reduces the number of emails to process
+            $keywords = ['transfer', 'deposit', 'credit', 'payment', 'transaction', 'alert', 'notification', 'received', 'credited'];
+            $keywordQuery = implode(' OR ', array_map(fn($kw) => "TEXT \"{$kw}\"", $keywords));
+            
+            // Try to use keyword filter (may not work on all IMAP servers, so we'll also filter manually)
+            try {
+                $messages = $query->text($keywordQuery)->get();
+            } catch (\Exception $e) {
+                // If keyword search fails, get all and filter manually
+                $messages = $query->get();
+            }
 
             $accountEmail = $emailAccount ? $emailAccount->email : 'default account';
-            $this->info("Found {$messages->count()} new email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
+            $this->info("Found {$messages->count()} email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
 
+            $processedCount = 0;
+            $skippedCount = 0;
+            
             foreach ($messages as $message) {
-                // Filter by allowed senders if configured
-                $fromEmail = $message->getFrom()[0]->mail ?? '';
-                if ($emailAccount && !$emailAccount->isSenderAllowed($fromEmail)) {
-                    $this->info("Skipping email from {$fromEmail} (not in allowed senders list)");
+                try {
+                    $subject = strtolower($message->getSubject() ?? '');
+                    $text = strtolower($message->getTextBody() ?? '');
+                    $fromEmail = $message->getFrom()[0]->mail ?? '';
+                    
+                    // Filter by allowed senders if configured
+                    if ($emailAccount && !$emailAccount->isSenderAllowed($fromEmail)) {
+                        $skippedCount++;
+                        continue;
+                    }
+                    
+                    // Filter by keywords - only process payment-related emails
+                    $hasPaymentKeyword = false;
+                    foreach ($keywords as $keyword) {
+                        if (strpos($subject, $keyword) !== false || strpos($text, $keyword) !== false) {
+                            $hasPaymentKeyword = true;
+                            break;
+                        }
+                    }
+                    
+                    // Also check for amount patterns (numbers with currency symbols)
+                    if (!$hasPaymentKeyword && preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $subject . ' ' . $text)) {
+                        $hasPaymentKeyword = true;
+                    }
+                    
+                    if (!$hasPaymentKeyword) {
+                        $skippedCount++;
+                        // Mark as read even if skipped (to avoid checking again)
+                        $message->setFlag('Seen');
+                        continue;
+                    }
+                    
+                    $this->processMessage($message, $emailAccount);
+                    $processedCount++;
+                    
+                    // Mark as read
+                    $message->setFlag('Seen');
+                } catch (\Exception $e) {
+                    Log::error('Error processing email message', [
+                        'error' => $e->getMessage(),
+                        'email_account_id' => $emailAccount?->id,
+                    ]);
+                    $skippedCount++;
                     continue;
                 }
-                
-                $this->processMessage($message, $emailAccount);
-                
-                // Mark as read
-                $message->setFlag('Seen');
             }
+            
+            $this->info("Processed: {$processedCount}, Skipped: {$skippedCount} (non-payment emails)");
 
             $client->disconnect();
         } catch (\Exception $e) {
@@ -213,25 +267,71 @@ class MonitorEmails extends Command
             
             // Only check emails received after the oldest pending payment was created
             $since = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer for email delivery delay
-            $messages = $gmailService->getMessagesSince($since);
             
-            $this->info("Found " . count($messages) . " new email(s) in {$emailAccount->email} (Gmail API) (after {$since->format('Y-m-d H:i:s')})");
+            // Get messages with keyword filtering
+            $messages = $gmailService->getMessagesSince($since, [
+                'keywords' => ['transfer', 'deposit', 'credit', 'payment', 'transaction', 'alert', 'notification', 'received', 'credited']
+            ]);
+            
+            $this->info("Found " . count($messages) . " email(s) in {$emailAccount->email} (Gmail API) (after {$since->format('Y-m-d H:i:s')})");
+            
+            $processedCount = 0;
+            $skippedCount = 0;
             
             foreach ($messages as $emailData) {
-                // Filter by allowed senders if configured
-                $fromEmail = $emailData['from'] ?? '';
-                if (!$emailAccount->isSenderAllowed($fromEmail)) {
-                    $this->info("Skipping email from {$fromEmail} (not in allowed senders list)");
+                try {
+                    $fromEmail = $emailData['from'] ?? '';
+                    $subject = strtolower($emailData['subject'] ?? '');
+                    $text = strtolower($emailData['text'] ?? '');
+                    
+                    // Filter by allowed senders if configured
+                    if (!$emailAccount->isSenderAllowed($fromEmail)) {
+                        $skippedCount++;
+                        continue;
+                    }
+                    
+                    // Additional keyword filtering (Gmail API may not filter perfectly)
+                    $keywords = ['transfer', 'deposit', 'credit', 'payment', 'transaction', 'alert', 'notification', 'received', 'credited'];
+                    $hasPaymentKeyword = false;
+                    foreach ($keywords as $keyword) {
+                        if (strpos($subject, $keyword) !== false || strpos($text, $keyword) !== false) {
+                            $hasPaymentKeyword = true;
+                            break;
+                        }
+                    }
+                    
+                    // Check for amount patterns
+                    if (!$hasPaymentKeyword && preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $subject . ' ' . $text)) {
+                        $hasPaymentKeyword = true;
+                    }
+                    
+                    if (!$hasPaymentKeyword) {
+                        $skippedCount++;
+                        // Mark as read even if skipped
+                        if (isset($emailData['id'])) {
+                            $gmailService->markAsRead($emailData['id']);
+                        }
+                        continue;
+                    }
+                    
+                    $this->processGmailApiMessage($emailData, $emailAccount);
+                    $processedCount++;
+                    
+                    // Mark as read
+                    if (isset($emailData['id'])) {
+                        $gmailService->markAsRead($emailData['id']);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error processing Gmail API message', [
+                        'error' => $e->getMessage(),
+                        'email_account_id' => $emailAccount->id,
+                    ]);
+                    $skippedCount++;
                     continue;
                 }
-                
-                $this->processGmailApiMessage($emailData, $emailAccount);
-                
-                // Mark as read
-                if (isset($emailData['id'])) {
-                    $gmailService->markAsRead($emailData['id']);
-                }
             }
+            
+            $this->info("Processed: {$processedCount}, Skipped: {$skippedCount} (non-payment emails)");
         } catch (\Exception $e) {
             Log::error('Error monitoring email account with Gmail API', [
                 'email_account_id' => $emailAccount->id,

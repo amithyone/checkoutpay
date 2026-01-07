@@ -121,14 +121,25 @@ class GmailApiService
     /**
      * Get messages since a specific date
      */
-    public function getMessagesSince(\DateTime $since, $maxResults = 50): array
+    public function getMessagesSince(\DateTime $since, array $options = []): array
     {
         try {
             $userId = 'me';
             $sinceFormatted = $since->format('Y/m/d');
+            $maxResults = $options['maxResults'] ?? 50;
+            
+            // Build Gmail search query
+            $query = "is:unread after:{$sinceFormatted}";
+            
+            // Add keyword filters if provided
+            if (!empty($options['keywords']) && is_array($options['keywords'])) {
+                $keywordQuery = implode(' OR ', $options['keywords']);
+                $query .= " ({$keywordQuery})";
+            }
+            
             $optParams = [
                 'maxResults' => $maxResults,
-                'q' => "is:unread after:{$sinceFormatted}",
+                'q' => $query,
             ];
 
             $messages = $this->service->users_messages->listUsersMessages($userId, $optParams);

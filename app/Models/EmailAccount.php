@@ -79,6 +79,48 @@ class EmailAccount extends Model
     }
 
     /**
+     * Check if an email sender is allowed
+     */
+    public function isSenderAllowed(string $senderEmail): bool
+    {
+        // If no allowed senders specified, allow all emails
+        if (empty($this->allowed_senders) || !is_array($this->allowed_senders)) {
+            return true;
+        }
+
+        $senderEmail = strtolower(trim($senderEmail));
+        
+        // Extract email from "Name <email@domain.com>" format
+        if (preg_match('/<(.+?)>/', $senderEmail, $matches)) {
+            $senderEmail = strtolower(trim($matches[1]));
+        }
+
+        foreach ($this->allowed_senders as $allowed) {
+            $allowed = strtolower(trim($allowed));
+            
+            // Exact match
+            if ($allowed === $senderEmail) {
+                return true;
+            }
+            
+            // Domain match (e.g., "@gtbank.com" matches "alerts@gtbank.com")
+            if (strpos($allowed, '@') === 0) {
+                $domain = substr($allowed, 1);
+                if (str_ends_with($senderEmail, '@' . $domain)) {
+                    return true;
+                }
+            }
+            
+            // Partial domain match (e.g., "gtbank.com" matches "alerts@gtbank.com")
+            if (strpos($senderEmail, $allowed) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Test email connection using PHP native IMAP (fallback)
      */
     protected function testConnectionNativeImap(string $password): array
