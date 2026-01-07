@@ -291,19 +291,57 @@ class PaymentMatchingService
             }
         }
 
-        // Check amount match (allow small tolerance for rounding)
-        $amountDiff = abs($payment->amount - $extractedInfo['amount']);
-        $amountTolerance = 0.01; // 1 kobo tolerance
-
-        if ($amountDiff > $amountTolerance) {
+        // Check amount match with new rules:
+        // - If received amount is N500 or more LOWER than expected → FAIL (reject)
+        // - If received amount is less than N500 lower → Approve but mark as mismatch
+        $expectedAmount = $payment->amount;
+        $receivedAmount = $extractedInfo['amount'];
+        $amountDiff = $expectedAmount - $receivedAmount; // Positive if received is lower
+        
+        // Small tolerance for rounding (1 kobo)
+        $amountTolerance = 0.01;
+        
+        // If received amount is significantly lower (N500 or more)
+        if ($amountDiff >= 500) {
             return [
                 'matched' => false,
                 'reason' => sprintf(
-                    'Amount mismatch: expected %s, got %s',
-                    $payment->amount,
-                    $extractedInfo['amount']
+                    'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Manual resettlement required.',
+                    number_format($expectedAmount, 2),
+                    number_format($receivedAmount, 2),
+                    number_format($amountDiff, 2)
                 ),
+                'should_reject' => true, // Flag to reject payment
+                'amount_diff' => $amountDiff,
             ];
+        }
+        
+        // If received amount is higher or difference is less than N500
+        // We'll approve but mark as mismatch if difference > tolerance
+        $isMismatch = false;
+        $mismatchReason = null;
+        $finalReceivedAmount = null;
+        
+        if ($amountDiff > $amountTolerance && $amountDiff < 500) {
+            // Amount is lower but within tolerance (less than N500 difference)
+            $isMismatch = true;
+            $finalReceivedAmount = $receivedAmount;
+            $mismatchReason = sprintf(
+                'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Payment approved with mismatch flag.',
+                number_format($expectedAmount, 2),
+                number_format($receivedAmount, 2),
+                number_format($amountDiff, 2)
+            );
+        } elseif ($receivedAmount > $expectedAmount + $amountTolerance) {
+            // Received more than expected (overpayment)
+            $isMismatch = true;
+            $finalReceivedAmount = $receivedAmount;
+            $mismatchReason = sprintf(
+                'Amount mismatch: expected ₦%s, received ₦%s (overpayment: ₦%s). Payment approved with mismatch flag.',
+                number_format($expectedAmount, 2),
+                number_format($receivedAmount, 2),
+                number_format($receivedAmount - $expectedAmount, 2)
+            );
         }
 
         // If payer name is provided, check similarity (not exact match)
