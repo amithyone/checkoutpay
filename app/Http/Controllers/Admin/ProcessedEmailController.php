@@ -30,13 +30,32 @@ class ProcessedEmailController extends Controller
             $query->where('email_account_id', $request->email_account_id);
         }
 
-        // Search by subject or sender
-        if ($request->has('search')) {
-            $search = $request->search;
+        // Search by multiple fields
+        if ($request->has('search') && !empty(trim($request->search))) {
+            $search = trim($request->search);
             $query->where(function ($q) use ($search) {
+                // Search in subject
                 $q->where('subject', 'like', "%{$search}%")
+                    // Search in from email
                     ->orWhere('from_email', 'like', "%{$search}%")
-                    ->orWhere('sender_name', 'like', "%{$search}%");
+                    // Search in from name
+                    ->orWhere('from_name', 'like', "%{$search}%")
+                    // Search in sender name
+                    ->orWhere('sender_name', 'like', "%{$search}%")
+                    // Search in account number
+                    ->orWhere('account_number', 'like', "%{$search}%")
+                    // Search in message ID
+                    ->orWhere('message_id', 'like', "%{$search}%")
+                    // Search in text body (first 500 chars for performance)
+                    ->orWhereRaw('SUBSTRING(text_body, 1, 500) LIKE ?', ["%{$search}%"])
+                    // Search in HTML body (first 500 chars for performance)
+                    ->orWhereRaw('SUBSTRING(html_body, 1, 500) LIKE ?', ["%{$search}%"]);
+                
+                // If search looks like a number, also search in amount
+                if (is_numeric($search)) {
+                    $amount = (float) str_replace(',', '', $search);
+                    $q->orWhere('amount', $amount);
+                }
             });
         }
 

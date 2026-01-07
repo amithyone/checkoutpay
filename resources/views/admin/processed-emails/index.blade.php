@@ -49,8 +49,9 @@
         <form method="GET" action="{{ route('admin.processed-emails.index') }}" class="flex flex-wrap gap-4">
             <div class="flex-1 min-w-[200px]">
                 <input type="text" name="search" value="{{ request('search') }}" 
-                    placeholder="Search by subject, sender, or email..." 
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                    placeholder="Search by subject, sender, email, amount, account number, or content..." 
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    autocomplete="off">
             </div>
             
             <div class="min-w-[150px]">
