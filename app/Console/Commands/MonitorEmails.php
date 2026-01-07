@@ -182,6 +182,9 @@ class MonitorEmails extends Command
                     // Check if this is a GTBank transaction notification
                     $gtbankParser = new \App\Services\GtbankTransactionParser();
                     if ($gtbankParser->isGtbankTransaction($emailData)) {
+                        // Get message ID for lookup
+                        $messageId = $message->getUid() ?? $message->getMessageId();
+                        
                         // Parse and store GTBank transaction
                         $storedEmail = ProcessedEmail::where('message_id', $messageId)
                             ->where('email_account_id', $emailAccount?->id)
