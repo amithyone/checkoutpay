@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ProcessedEmail;
 use App\Models\EmailAccount;
+use App\Models\WhitelistedEmailAddress;
+use App\Models\Setting;
 use App\Services\PaymentMatchingService;
 use App\Services\TransactionLogService;
 use App\Services\GtbankTransactionParser;
@@ -22,6 +24,26 @@ class EmailWebhookController extends Controller
     public function receive(Request $request)
     {
         try {
+            // SECURITY: Verify Zapier webhook secret
+            $webhookSecret = Setting::get('zapier_webhook_secret');
+            if ($webhookSecret) {
+                $providedSecret = $request->header('X-Zapier-Secret') ?? $request->input('webhook_secret');
+                
+                if (empty($providedSecret) || $providedSecret !== $webhookSecret) {
+                    Log::warning('Unauthorized webhook request - invalid or missing secret', [
+                        'ip' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'has_secret_header' => $request->hasHeader('X-Zapier-Secret'),
+                    ]);
+                    
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unauthorized: Invalid webhook secret',
+                        'status' => 'unauthorized',
+                    ], 401);
+                }
+            }
+            
             // Zapier sends data in this format:
             // - sender_name
             // - amount
@@ -39,6 +61,7 @@ class EmailWebhookController extends Controller
                     'status' => 'ready',
                     'endpoint' => 'email/webhook',
                     'expected_fields' => ['sender_name', 'amount', 'time_sent', 'email'],
+                    'security_note' => $webhookSecret ? 'Webhook secret authentication is enabled' : 'Webhook secret authentication is disabled - enable it in admin settings',
                 ], 200);
             }
 
@@ -75,9 +98,42 @@ class EmailWebhookController extends Controller
                 $fromEmail = strtolower($matches[1]);
             }
             
-            // Default to GTBank if no email found
+            // SECURITY: Check if email is whitelisted
             if (empty($fromEmail)) {
-                $fromEmail = 'alerts@gtbank.com'; // Default bank email
+                // Try to extract from email content more aggressively
+                if (preg_match('/<([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})>/i', $emailContent, $matches)) {
+                    $fromEmail = strtolower($matches[1]);
+                }
+            }
+            
+            // If still no email found, reject the request
+            if (empty($fromEmail)) {
+                Log::warning('Webhook request rejected - could not extract sender email', [
+                    'ip' => $request->ip(),
+                    'email_content_preview' => substr($emailContent, 0, 200),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Could not extract sender email address from email content',
+                    'status' => 'validation_error',
+                ], 400);
+            }
+            
+            // Check whitelist
+            if (!WhitelistedEmailAddress::isWhitelisted($fromEmail)) {
+                Log::warning('Webhook request rejected - email not whitelisted', [
+                    'from_email' => $fromEmail,
+                    'ip' => $request->ip(),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email address not whitelisted: ' . $fromEmail,
+                    'status' => 'not_whitelisted',
+                    'from_email' => $fromEmail,
+                    'help' => 'Add this email address to the whitelist in admin panel: Settings > Whitelisted Emails',
+                ], 403);
             }
             
             // Extract subject if present

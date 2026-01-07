@@ -77,5 +77,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Email Monitoring
         Route::post('email-monitor/fetch', [\App\Http\Controllers\Admin\EmailMonitorController::class, 'fetchEmails'])->name('email-monitor.fetch');
         Route::post('email-monitor/check-updates', [\App\Http\Controllers\Admin\EmailMonitorController::class, 'checkTransactionUpdates'])->name('email-monitor.check-updates');
+
+        // Whitelisted Email Addresses
+        Route::resource('whitelisted-emails', \App\Http\Controllers\Admin\WhitelistedEmailController::class);
     });
 });

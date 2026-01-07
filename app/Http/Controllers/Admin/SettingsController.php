@@ -17,6 +17,7 @@ class SettingsController extends Controller
             'payment' => 'Payment Settings',
             'email' => 'Email Settings',
             'general' => 'General Settings',
+            'security' => 'Security Settings',
         ];
 
         $settings = [];
@@ -34,6 +35,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'payment_time_window_minutes' => 'required|integer|min:1|max:1440', // Max 24 hours
+            'zapier_webhook_secret' => 'nullable|string|min:16|max:255',
         ]);
 
         // Update payment time window
@@ -44,6 +46,17 @@ class SettingsController extends Controller
             'payment',
             'Maximum time window (in minutes) for matching emails with payment requests. Emails received after this time will not be matched.'
         );
+
+        // Update Zapier webhook secret (if provided)
+        if (isset($validated['zapier_webhook_secret'])) {
+            Setting::set(
+                'zapier_webhook_secret',
+                $validated['zapier_webhook_secret'],
+                'string',
+                'security',
+                'Secret key for authenticating Zapier webhook requests. Add this as a header "X-Zapier-Secret" in your Zapier webhook action.'
+            );
+        }
 
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');

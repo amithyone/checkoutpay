@@ -84,6 +84,11 @@
                     <span>Bank Templates</span>
                 </a>
 
+                <a href="{{ route('admin.whitelisted-emails.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.whitelisted-emails.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-shield-alt w-5 mr-3"></i>
+                    <span>Whitelisted Emails</span>
+                </a>
+
                 <a href="{{ route('admin.settings.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.settings.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-cog w-5 mr-3"></i>
                     <span>Settings</span>
