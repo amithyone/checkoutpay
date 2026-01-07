@@ -57,6 +57,9 @@ class TestTransactionController extends Controller
 
             $payment = $this->paymentService->createPayment($paymentData, $business);
 
+            // Load account number details
+            $payment->load('accountNumberDetails');
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Test payment created successfully',
@@ -66,6 +69,8 @@ class TestTransactionController extends Controller
                     'amount' => $payment->amount,
                     'status' => $payment->status,
                     'account_number' => $payment->account_number,
+                    'account_name' => $payment->accountNumberDetails->account_name ?? null,
+                    'bank_name' => $payment->accountNumberDetails->bank_name ?? null,
                     'created_at' => $payment->created_at->toDateTimeString(),
                 ],
             ]);
@@ -84,7 +89,9 @@ class TestTransactionController extends Controller
     public function getStatus($transactionId)
     {
         try {
-            $payment = Payment::where('transaction_id', $transactionId)->firstOrFail();
+            $payment = Payment::with('accountNumberDetails')
+                ->where('transaction_id', $transactionId)
+                ->firstOrFail();
             
             // Get transaction logs for this payment
             $logs = \App\Models\TransactionLog::where('transaction_id', $transactionId)
@@ -99,6 +106,8 @@ class TestTransactionController extends Controller
                 'amount' => $payment->amount,
                 'payer_name' => $payment->payer_name,
                 'account_number' => $payment->account_number,
+                'account_name' => $payment->accountNumberDetails->account_name ?? null,
+                'bank_name' => $payment->accountNumberDetails->bank_name ?? null,
                 'created_at' => $payment->created_at->toDateTimeString(),
                 'matched_at' => $payment->matched_at?->toDateTimeString(),
                 'approved_at' => $payment->approved_at?->toDateTimeString(),

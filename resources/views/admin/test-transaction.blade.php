@@ -293,7 +293,13 @@ function updateProcessStatus(step, payment) {
                         <strong>Amount:</strong> ₦${parseFloat(payment.amount).toLocaleString()}
                     </div>
                     <div>
-                        <strong>Account Number:</strong> ${payment.account_number || 'Pending...'}
+                        <strong>Account Number:</strong> <span class="font-mono font-semibold">${payment.account_number || 'Pending...'}</span>
+                    </div>
+                    <div>
+                        <strong>Account Name:</strong> <span class="font-semibold">${payment.account_name || 'Pending...'}</span>
+                    </div>
+                    <div>
+                        <strong>Bank Name:</strong> <span class="font-semibold">${payment.bank_name || 'Pending...'}</span>
                     </div>
                     <div>
                         <strong>Status:</strong> <span class="font-semibold">${payment.status.toUpperCase()}</span>
@@ -314,8 +320,15 @@ function updateTransactionDetails(payment) {
             <div><strong>Transaction ID:</strong> ${payment.transaction_id}</div>
             <div><strong>Amount:</strong> ₦${parseFloat(payment.amount).toLocaleString()}</div>
             <div><strong>Payer Name:</strong> ${payment.payer_name || 'N/A'}</div>
-            <div><strong>Account Number:</strong> <span class="font-mono font-semibold text-lg">${payment.account_number || 'Pending...'}</span></div>
             <div><strong>Status:</strong> <span class="px-2 py-1 rounded ${payment.status === 'approved' ? 'bg-green-100 text-green-800' : payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}">${payment.status.toUpperCase()}</span></div>
+            <div class="col-span-2 border-t pt-2 mt-2">
+                <div class="font-semibold text-base mb-2">💰 Payment Details:</div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><strong>Account Number:</strong> <span class="font-mono font-semibold text-lg text-primary">${payment.account_number || 'Pending...'}</span></div>
+                    <div><strong>Account Name:</strong> <span class="font-semibold text-lg">${payment.account_name || 'Pending...'}</span></div>
+                    <div class="col-span-2"><strong>Bank Name:</strong> <span class="font-semibold text-lg">${payment.bank_name || 'Pending...'}</span></div>
+                </div>
+            </div>
             <div><strong>Created:</strong> ${new Date(payment.created_at).toLocaleString()}</div>
             ${payment.matched_at ? `<div><strong>Matched:</strong> ${new Date(payment.matched_at).toLocaleString()}</div>` : ''}
             ${payment.approved_at ? `<div><strong>Approved:</strong> ${new Date(payment.approved_at).toLocaleString()}</div>` : ''}
