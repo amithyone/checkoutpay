@@ -112,25 +112,42 @@ class PaymentMatchingService
         // Also use extracted text as fallback
         $fullText = $subject . ' ' . $text . ' ' . $htmlLower;
 
-        // Extract amount - look for currency patterns
-        // Updated to handle formats like "NGN 1000", "Amount: NGN 1000", etc.
-        $amountPatterns = [
-            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*ngn\s*([\d,]+\.?\d*)/i',
-            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*naira\s*([\d,]+\.?\d*)/i',
-            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*[₦$]?\s*([\d,]+\.?\d*)/i',
-            '/ngn\s*([\d,]+\.?\d*)/i',
-            '/naira\s*([\d,]+\.?\d*)/i',
-            '/[₦$]\s*([\d,]+\.?\d*)/i',
-            '/([\d,]+\.?\d*)\s*(?:naira|ngn|usd|dollar)/i',
-            '/([\d,]+\.?\d*)/i',
-        ];
-
+        // Extract amount - prioritize HTML table structures, then text patterns
+        // First, try to find amount in HTML table cells (most reliable)
         $amount = null;
-        foreach ($amountPatterns as $pattern) {
-            if (preg_match($pattern, $fullText, $matches)) {
-                $amount = (float) str_replace(',', '', $matches[1]);
-                if ($amount > 0) {
-                    break;
+        
+        // Pattern 1: HTML table with "Amount" label
+        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*ngn\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+        }
+        // Pattern 2: HTML table with amount value (no label)
+        elseif (preg_match('/<td[^>]*>[\s]*ngn\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+        }
+        // Pattern 3: HTML with "Amount : NGN 1000" format
+        elseif (preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*ngn\s*([\d,]+\.?\d*)/i', $html, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+        }
+        // Pattern 4: Text patterns (more specific, avoid small numbers)
+        else {
+            $amountPatterns = [
+                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*ngn\s*([\d,]+\.?\d*)/i',
+                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*naira\s*([\d,]+\.?\d*)/i',
+                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*[₦$]\s*([\d,]+\.?\d*)/i',
+                '/ngn\s*([\d,]+\.?\d*)/i',
+                '/naira\s*([\d,]+\.?\d*)/i',
+                '/[₦$]\s*([\d,]+\.?\d*)/i',
+                '/([\d,]+\.?\d*)\s*(?:naira|ngn|usd|dollar)/i',
+            ];
+
+            foreach ($amountPatterns as $pattern) {
+                if (preg_match($pattern, $fullText, $matches)) {
+                    $potentialAmount = (float) str_replace(',', '', $matches[1]);
+                    // Only accept amounts >= 10 to avoid matching dates/times (e.g., "4:50:06 PM" or "2024")
+                    if ($potentialAmount >= 10) {
+                        $amount = $potentialAmount;
+                        break;
+                    }
                 }
             }
         }
@@ -199,8 +216,8 @@ class PaymentMatchingService
     public function matchPayment(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null): array
     {
         // Check time window: email must be received within configured minutes of transaction creation
-        // Get time window from settings (default: 15 minutes)
-        $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 15);
+        // Get time window from settings (default: 120 minutes / 2 hours to account for timezone differences)
+        $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
         
         // Ensure both dates are in the same timezone (Africa/Lagos) for accurate comparison
         if ($emailDate && $payment->created_at) {
@@ -208,13 +225,16 @@ class PaymentMatchingService
             $paymentTime = \Carbon\Carbon::parse($payment->created_at)->setTimezone(config('app.timezone'));
             $emailTime = \Carbon\Carbon::parse($emailDate)->setTimezone(config('app.timezone'));
             
+            // Calculate time difference (allow emails to arrive before OR after payment request)
             $timeDiff = abs($paymentTime->diffInMinutes($emailTime));
+            
             if ($timeDiff > $timeWindowMinutes) {
                 return [
                     'matched' => false,
                     'reason' => sprintf(
-                        'Time window exceeded: email received %d minutes after transaction (max %d minutes). Payment: %s, Email: %s',
+                        'Time window exceeded: email received %d minutes %s transaction (max %d minutes). Payment: %s, Email: %s',
                         $timeDiff,
+                        $emailTime->gt($paymentTime) ? 'after' : 'before',
                         $timeWindowMinutes,
                         $paymentTime->format('Y-m-d H:i:s T'),
                         $emailTime->format('Y-m-d H:i:s T')

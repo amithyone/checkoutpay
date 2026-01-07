@@ -15,7 +15,7 @@ class SettingsSeeder extends Seeder
         // Payment Settings
         Setting::set(
             'payment_time_window_minutes',
-            15,
+            120, // Default 2 hours to account for timezone differences and email delays
             'integer',
             'payment',
             'Maximum time window (in minutes) for matching emails with payment requests. Emails received after this time will not be matched.'
