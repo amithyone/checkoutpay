@@ -335,7 +335,12 @@ class MonitorEmails extends Command
                 }
             }
             
-            $this->info("✅ Stored: " . count($messages) . " total emails | Processed for matching: {$processedCount} (with payment info) | Not processed: {$skippedCount} (no payment info extracted - check inbox to troubleshoot)");
+            // Count actually stored emails
+            $storedCount = ProcessedEmail::where('email_account_id', $emailAccount->id)
+                ->where('created_at', '>=', now()->subMinutes(5))
+                ->count();
+            
+            $this->info("✅ Attempted: " . count($messages) . " emails | Actually stored: {$storedCount} | Processed for matching: {$processedCount} (with payment info) | Not processed: {$skippedCount} (no payment info extracted - check inbox to troubleshoot)");
         } catch (\Exception $e) {
             Log::error('Error monitoring email account with Gmail API', [
                 'email_account_id' => $emailAccount->id,
@@ -529,24 +534,38 @@ class MonitorEmails extends Command
                 ->first();
             
             if ($existing) {
+                $this->line("⏭️  Email already stored: " . ($emailData['subject'] ?? 'No subject'));
                 return; // Already stored
             }
             
             // Store email even if extraction failed or returned null
-            ProcessedEmail::create([
-                'email_account_id' => $emailAccount->id,
-                'message_id' => $messageId,
-                'subject' => $emailData['subject'] ?? '',
-                'from_email' => $fromEmail,
-                'from_name' => $fromName,
-                'text_body' => $emailData['text'] ?? '',
-                'html_body' => $emailData['html'] ?? '',
-                'email_date' => $emailData['date'] ?? now(),
-                'amount' => $extractedInfo['amount'] ?? null,
-                'sender_name' => $extractedInfo['sender_name'] ?? null,
-                'account_number' => $extractedInfo['account_number'] ?? null,
-                'extracted_data' => $extractedInfo,
-            ]);
+            try {
+                $stored = ProcessedEmail::create([
+                    'email_account_id' => $emailAccount->id,
+                    'message_id' => $messageId,
+                    'subject' => $emailData['subject'] ?? '',
+                    'from_email' => $fromEmail,
+                    'from_name' => $fromName,
+                    'text_body' => $emailData['text'] ?? '',
+                    'html_body' => $emailData['html'] ?? '',
+                    'email_date' => $emailData['date'] ?? now(),
+                    'amount' => $extractedInfo['amount'] ?? null,
+                    'sender_name' => $extractedInfo['sender_name'] ?? null,
+                    'account_number' => $extractedInfo['account_number'] ?? null,
+                    'extracted_data' => $extractedInfo,
+                ]);
+                
+                $this->line("✅ Stored email: " . ($emailData['subject'] ?? 'No subject') . " | From: {$fromEmail} | ID: {$stored->id}");
+            } catch (\Exception $e) {
+                $this->error("❌ Failed to store email: " . ($emailData['subject'] ?? 'No subject') . " | Error: {$e->getMessage()}");
+                Log::error('Failed to store Gmail API email in database', [
+                    'error' => $e->getMessage(),
+                    'subject' => $emailData['subject'] ?? '',
+                    'from' => $fromEmail,
+                    'message_id' => $messageId,
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
         } catch (\Exception $e) {
             Log::error('Error storing Gmail API email in database', [
                 'error' => $e->getMessage(),
