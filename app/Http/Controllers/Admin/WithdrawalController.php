@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\WithdrawalRequest;
+use App\Services\TransactionLogService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 class WithdrawalController extends Controller
 {
+    public function __construct(
+        protected TransactionLogService $logService
+    ) {}
+
     public function index(Request $request): View
     {
         $query = WithdrawalRequest::with('business')->latest();
@@ -40,6 +45,9 @@ class WithdrawalController extends Controller
         
         $withdrawal->approve($admin->id);
 
+        // Log withdrawal approved
+        $this->logService->logWithdrawalApproved($withdrawal);
+
         // Deduct from business balance
         $business = $withdrawal->business;
         $business->decrement('balance', $withdrawal->amount);
@@ -58,6 +66,9 @@ class WithdrawalController extends Controller
         
         $withdrawal->reject($request->rejection_reason, $admin->id);
 
+        // Log withdrawal rejected
+        $this->logService->logWithdrawalRejected($withdrawal, $request->rejection_reason);
+
         return redirect()->route('admin.withdrawals.index')
             ->with('success', 'Withdrawal request rejected');
     }
@@ -67,6 +78,9 @@ class WithdrawalController extends Controller
         $admin = auth('admin')->user();
         
         $withdrawal->markAsProcessed($admin->id);
+
+        // Log withdrawal processed
+        $this->logService->logWithdrawalProcessed($withdrawal);
 
         return redirect()->route('admin.withdrawals.index')
             ->with('success', 'Withdrawal marked as processed');

@@ -5,11 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WithdrawalRequest;
 use App\Models\WithdrawalRequest as WithdrawalRequestModel;
+use App\Services\TransactionLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class WithdrawalController extends Controller
 {
+    public function __construct(
+        protected TransactionLogService $logService
+    ) {}
+
     /**
      * Create a withdrawal request
      */
@@ -34,6 +39,9 @@ class WithdrawalController extends Controller
             'bank_name' => $request->bank_name,
             'status' => WithdrawalRequestModel::STATUS_PENDING,
         ]);
+
+        // Log withdrawal request
+        $this->logService->logWithdrawalRequest($withdrawal, $request);
 
         return response()->json([
             'success' => true,

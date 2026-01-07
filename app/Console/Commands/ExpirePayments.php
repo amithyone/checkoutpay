@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Events\PaymentExpired;
 use App\Models\Payment;
+use App\Services\TransactionLogService;
 use Illuminate\Console\Command;
 
 class ExpirePayments extends Command
@@ -25,7 +26,7 @@ class ExpirePayments extends Command
     /**
      * Execute the console command.
      */
-    public function handle(): void
+    public function handle(TransactionLogService $logService): void
     {
         $this->info('Checking for expired payments...');
 
@@ -40,6 +41,9 @@ class ExpirePayments extends Command
 
         foreach ($expiredPayments as $payment) {
             $payment->reject('Payment expired - no matching bank transfer received within time limit');
+            
+            // Log payment expired
+            $logService->logPaymentExpired($payment);
             
             $this->line("Expired payment: {$payment->transaction_id}");
 

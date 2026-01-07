@@ -26,7 +26,8 @@ class PaymentController extends Controller
         
         $payment = $this->paymentService->createPayment(
             $request->validated(),
-            $business
+            $business,
+            $request
         );
 
         return response()->json([

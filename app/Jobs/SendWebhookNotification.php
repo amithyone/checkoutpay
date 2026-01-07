@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Payment;
+use App\Services\TransactionLogService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -35,7 +36,7 @@ class SendWebhookNotification implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(TransactionLogService $logService): void
     {
         if (empty($this->payment->webhook_url)) {
             Log::error('No webhook URL provided for payment', [
@@ -44,16 +45,39 @@ class SendWebhookNotification implements ShouldQueue
             return;
         }
 
-        $payload = [
-            'success' => true,
-            'status' => 'approved',
-            'transaction_id' => $this->payment->transaction_id,
-            'amount' => (float) $this->payment->amount,
-            'payer_name' => $this->payment->payer_name,
-            'bank' => $this->payment->bank,
-            'approved_at' => $this->payment->matched_at->toISOString(),
-            'message' => 'Payment has been verified and approved',
-        ];
+        // Determine payload based on payment status - ALWAYS include transaction_id
+        if ($this->payment->status === 'approved') {
+            $payload = [
+                'success' => true,
+                'status' => 'approved',
+                'transaction_id' => $this->payment->transaction_id, // Always included
+                'amount' => (float) $this->payment->amount,
+                'payer_name' => $this->payment->payer_name,
+                'bank' => $this->payment->bank,
+                'approved_at' => $this->payment->matched_at->toISOString(),
+                'message' => 'Payment has been verified and approved',
+            ];
+        } elseif ($this->payment->status === 'rejected') {
+            $payload = [
+                'success' => false,
+                'status' => 'rejected',
+                'transaction_id' => $this->payment->transaction_id, // Always included
+                'amount' => (float) $this->payment->amount,
+                'payer_name' => $this->payment->payer_name,
+                'rejected_at' => $this->payment->matched_at?->toISOString() ?? now()->toISOString(),
+                'reason' => $this->payment->email_data['rejection_reason'] ?? 'Payment verification failed',
+                'message' => 'Payment has been rejected',
+            ];
+        } else {
+            // Fallback for other statuses (expired, etc.)
+            $payload = [
+                'success' => false,
+                'status' => $this->payment->status,
+                'transaction_id' => $this->payment->transaction_id, // Always included
+                'amount' => (float) $this->payment->amount,
+                'message' => 'Payment status updated',
+            ];
+        }
 
         Log::info('Sending webhook notification', [
             'transaction_id' => $this->payment->transaction_id,
@@ -73,12 +97,21 @@ class SendWebhookNotification implements ShouldQueue
                     'transaction_id' => $this->payment->transaction_id,
                     'status_code' => $response->status(),
                 ]);
+
+                // Log webhook sent
+                $logService->logWebhookSent($this->payment, [
+                    'status_code' => $response->status(),
+                    'response' => $response->json(),
+                ]);
             } else {
                 Log::warning('Webhook sent but received non-success status', [
                     'transaction_id' => $this->payment->transaction_id,
                     'status_code' => $response->status(),
                     'response' => $response->body(),
                 ]);
+
+                // Log webhook failure
+                $logService->logWebhookFailed($this->payment, "HTTP {$response->status()}: {$response->body()}");
 
                 // Retry on client/server errors
                 if ($response->status() >= 500) {
@@ -90,6 +123,9 @@ class SendWebhookNotification implements ShouldQueue
                 'transaction_id' => $this->payment->transaction_id,
                 'error' => $e->getMessage(),
             ]);
+
+            // Log webhook failure
+            $logService->logWebhookFailed($this->payment, $e->getMessage());
 
             throw $e; // Will trigger retry mechanism
         }

@@ -5,19 +5,22 @@ namespace App\Services;
 use App\Models\Payment;
 use App\Models\Business;
 use App\Services\AccountNumberService;
+use App\Services\TransactionLogService;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class PaymentService
 {
     public function __construct(
-        protected AccountNumberService $accountNumberService
+        protected AccountNumberService $accountNumberService,
+        protected TransactionLogService $transactionLogService
     ) {}
 
     /**
      * Create a new payment request
      */
-    public function createPayment(array $data, ?Business $business = null): Payment
+    public function createPayment(array $data, ?Business $business = null, ?Request $request = null): Payment
     {
         // Generate transaction ID if not provided
         if (empty($data['transaction_id'])) {
@@ -35,6 +38,7 @@ class PaymentService
 
         // Assign account number if not provided
         $accountNumber = null;
+        $assignedAccount = null;
         if (empty($data['account_number'])) {
             $assignedAccount = $this->accountNumberService->assignAccountNumber($business);
             if ($assignedAccount) {
@@ -57,6 +61,14 @@ class PaymentService
             'expires_at' => $expiresAt,
         ]);
 
+        // Log payment request
+        $this->transactionLogService->logPaymentRequest($payment, $request);
+
+        // Log account assignment if account was assigned
+        if ($accountNumber && $assignedAccount) {
+            $this->transactionLogService->logAccountAssignment($payment, $assignedAccount);
+        }
+
         \Log::info('Payment request created', [
             'transaction_id' => $payment->transaction_id,
             'amount' => $payment->amount,
@@ -68,9 +80,25 @@ class PaymentService
 
     /**
      * Generate a unique transaction ID
+     * Format: TXN-{timestamp}-{random}
+     * Ensures uniqueness by checking database
      */
     protected function generateTransactionId(): string
     {
-        return 'TXN-' . now()->timestamp . '-' . Str::random(9);
+        $maxAttempts = 10;
+        $attempt = 0;
+
+        do {
+            $transactionId = 'TXN-' . now()->timestamp . '-' . Str::random(9);
+            $exists = Payment::where('transaction_id', $transactionId)->exists();
+            $attempt++;
+        } while ($exists && $attempt < $maxAttempts);
+
+        if ($exists) {
+            // Fallback: add microsecond timestamp for extra uniqueness
+            $transactionId = 'TXN-' . now()->timestamp . '-' . now()->micro . '-' . Str::random(6);
+        }
+
+        return $transactionId;
     }
 }
