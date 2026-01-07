@@ -215,8 +215,8 @@ class PaymentMatchingService
      */
     public function matchPayment(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null): array
     {
-        // Check time window: email must be received within configured minutes of transaction creation
-        // Get time window from settings (default: 120 minutes / 2 hours to account for timezone differences)
+        // Check time window: email must be received AFTER transaction creation and within configured minutes
+        // Get time window from settings (default: 120 minutes / 2 hours)
         $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
         
         // Ensure both dates are in the same timezone (Africa/Lagos) for accurate comparison
@@ -225,16 +225,29 @@ class PaymentMatchingService
             $paymentTime = \Carbon\Carbon::parse($payment->created_at)->setTimezone(config('app.timezone'));
             $emailTime = \Carbon\Carbon::parse($emailDate)->setTimezone(config('app.timezone'));
             
-            // Calculate time difference (allow emails to arrive before OR after payment request)
-            $timeDiff = abs($paymentTime->diffInMinutes($emailTime));
+            // Reject emails that arrived BEFORE the transaction was created
+            if ($emailTime->lt($paymentTime)) {
+                $timeDiff = abs($paymentTime->diffInMinutes($emailTime));
+                return [
+                    'matched' => false,
+                    'reason' => sprintf(
+                        'Email received BEFORE transaction was created (%d minutes before). Payment: %s, Email: %s',
+                        $timeDiff,
+                        $paymentTime->format('Y-m-d H:i:s T'),
+                        $emailTime->format('Y-m-d H:i:s T')
+                    ),
+                ];
+            }
+            
+            // Check if email arrived within the time window AFTER transaction creation
+            $timeDiff = $paymentTime->diffInMinutes($emailTime);
             
             if ($timeDiff > $timeWindowMinutes) {
                 return [
                     'matched' => false,
                     'reason' => sprintf(
-                        'Time window exceeded: email received %d minutes %s transaction (max %d minutes). Payment: %s, Email: %s',
+                        'Time window exceeded: email received %d minutes after transaction (max %d minutes). Payment: %s, Email: %s',
                         $timeDiff,
-                        $emailTime->gt($paymentTime) ? 'after' : 'before',
                         $timeWindowMinutes,
                         $paymentTime->format('Y-m-d H:i:s T'),
                         $emailTime->format('Y-m-d H:i:s T')
