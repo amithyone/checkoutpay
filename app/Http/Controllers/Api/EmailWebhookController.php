@@ -68,9 +68,12 @@ class EmailWebhookController extends Controller
 
             // Extract Zapier payload
             $senderName = $request->input('sender_name', '');
-            $amount = $request->input('amount', '');
+            $amountRaw = $request->input('amount', '');
             $timeSent = $request->input('time_sent', now()->toDateTimeString());
             $emailContent = $request->input('email', ''); // This is the full email body/content
+            
+            // Parse amount - handle formats like "NGN 800", "NGN500", "₦800", "800", etc.
+            $amount = $this->parseAmount($amountRaw);
             
             // LOG: Save all incoming payloads to zapier_logs
             $zapierLog = ZapierLog::create([
@@ -224,16 +227,16 @@ class EmailWebhookController extends Controller
 
             // Use Zapier payload directly - no email extraction needed
             // Zapier payload is the standard: sender_name, amount, time_sent
-            if (empty($amount) || !is_numeric($amount)) {
+            if ($amount === null || $amount <= 0) {
                 $zapierLog->update([
                     'status' => 'rejected',
                     'status_message' => 'Invalid or missing amount in Zapier payload',
-                    'error_details' => 'Amount must be a valid number',
+                    'error_details' => 'Amount must be a valid number. Received: ' . $amountRaw,
                 ]);
                 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Invalid or missing amount in payload',
+                    'message' => 'Invalid or missing amount in payload. Received: ' . $amountRaw,
                     'status' => 'validation_error',
                 ], 400);
             }
@@ -393,5 +396,45 @@ class EmailWebhookController extends Controller
                 'message' => 'Error processing email: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Parse amount from various formats:
+     * - "NGN 800" -> 800
+     * - "NGN500" -> 500
+     * - "₦800" -> 800
+     * - "800" -> 800
+     * - "800.50" -> 800.50
+     * - "1,000.50" -> 1000.50
+     */
+    private function parseAmount($amountRaw): ?float
+    {
+        if (empty($amountRaw)) {
+            return null;
+        }
+
+        // Convert to string and trim
+        $amountStr = trim((string) $amountRaw);
+
+        // Remove currency symbols and prefixes
+        // Remove "NGN", "₦", "N", "$", etc. (case insensitive)
+        $amountStr = preg_replace('/^(NGN|₦|N|USD|\$|EUR|€)\s*/i', '', $amountStr);
+
+        // Remove commas (thousand separators)
+        $amountStr = str_replace(',', '', $amountStr);
+
+        // Remove any remaining non-numeric characters except decimal point and minus sign
+        $amountStr = preg_replace('/[^\d.-]/', '', $amountStr);
+
+        // Trim whitespace
+        $amountStr = trim($amountStr);
+
+        // Try to parse as float
+        if (is_numeric($amountStr)) {
+            $parsedAmount = (float) $amountStr;
+            return $parsedAmount > 0 ? $parsedAmount : null;
+        }
+
+        return null;
     }
 }
