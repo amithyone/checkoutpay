@@ -296,46 +296,87 @@ class EmailWebhookController extends Controller
                 $gtbankParser->parseTransaction($emailData, $processedEmail, $gtbankTemplate);
             }
 
-            // Try to match payment immediately
+            // Try to match payment immediately using Zapier payload
             if ($extractedInfo && $extractedInfo['amount']) {
-                $matchedPayment = $matchingService->matchEmail($emailData);
-
-                if ($matchedPayment) {
-                    // Mark email as matched
-                    $processedEmail->markAsMatched($matchedPayment);
-
-                    // Approve payment
-                    $matchedPayment->approve([
-                        'subject' => $subject,
-                        'from' => $fromEmail,
-                        'text' => $text,
-                        'html' => $html,
-                        'date' => $timeSent,
-                    ]);
-
-                    // Update business balance
-                    if ($matchedPayment->business_id) {
-                        $matchedPayment->business->increment('balance', $matchedPayment->amount);
-                    }
-
-                    // Dispatch event to send webhook
-                    event(new \App\Events\PaymentApproved($matchedPayment));
+                // Get pending payments and match them
+                $pendingPayments = \App\Models\Payment::pending()->get();
+                
+                foreach ($pendingPayments as $payment) {
+                    // Use webhook received time for matching
+                    $webhookTime = \Carbon\Carbon::parse($timeSent)->setTimezone(config('app.timezone'));
                     
-                    // Update Zapier log with payment match
-                    $zapierLog->update([
-                        'payment_id' => $matchedPayment->id,
-                        'status' => 'matched',
-                        'status_message' => 'Payment matched and approved: ' . $matchedPayment->transaction_id,
-                    ]);
+                    $matchResult = $matchingService->matchPayment($payment, $extractedInfo, $webhookTime);
+                    
+                    if ($matchResult['matched']) {
+                        // Mark email as matched
+                        $processedEmail->markAsMatched($payment);
+                        
+                        // Check if this is a mismatch (amount difference < N500)
+                        $isMismatch = $matchResult['is_mismatch'] ?? false;
+                        $receivedAmount = $matchResult['received_amount'] ?? null;
+                        $mismatchReason = $matchResult['mismatch_reason'] ?? null;
+                        
+                        // Approve payment (with mismatch flag if applicable)
+                        $payment->approve([
+                            'subject' => $subject,
+                            'from' => $fromEmail,
+                            'text' => $text,
+                            'html' => $html,
+                            'date' => $timeSent,
+                        ], $isMismatch, $receivedAmount, $mismatchReason);
+                        
+                        // Update business balance - use received amount if mismatch, otherwise expected amount
+                        if ($payment->business_id) {
+                            $balanceAmount = $isMismatch && $receivedAmount ? $receivedAmount : $payment->amount;
+                            $payment->business->increment('balance', $balanceAmount);
+                        }
+                        
+                        // Dispatch event to send webhook
+                        event(new \App\Events\PaymentApproved($payment));
+                        
+                        // Update Zapier log with payment match
+                        $statusMessage = $isMismatch 
+                            ? 'Payment matched with mismatch: ' . $payment->transaction_id . ' - ' . $mismatchReason
+                            : 'Payment matched and approved: ' . $payment->transaction_id;
+                        
+                        $zapierLog->update([
+                            'payment_id' => $payment->id,
+                            'status' => 'matched',
+                            'status_message' => $statusMessage,
+                        ]);
 
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Email received and payment matched',
-                        'matched' => true,
-                        'payment_id' => $matchedPayment->id,
-                        'transaction_id' => $matchedPayment->transaction_id,
-                        'status' => 'matched',
-                    ], 200);
+                        return response()->json([
+                            'success' => true,
+                            'message' => $isMismatch ? 'Payment matched with amount mismatch' : 'Email received and payment matched',
+                            'matched' => true,
+                            'is_mismatch' => $isMismatch,
+                            'payment_id' => $payment->id,
+                            'transaction_id' => $payment->transaction_id,
+                            'status' => 'matched',
+                            'mismatch_reason' => $mismatchReason,
+                        ], 200);
+                    } elseif (isset($matchResult['should_reject']) && $matchResult['should_reject']) {
+                        // Amount difference >= N500, reject payment
+                        $payment->reject($matchResult['reason']);
+                        
+                        $zapierLog->update([
+                            'payment_id' => $payment->id,
+                            'status' => 'rejected',
+                            'status_message' => 'Payment rejected: ' . $matchResult['reason'],
+                            'error_details' => $matchResult['reason'],
+                        ]);
+                        
+                        return response()->json([
+                            'success' => true,
+                            'message' => 'Payment rejected due to amount mismatch (>= N500 difference)',
+                            'matched' => false,
+                            'rejected' => true,
+                            'payment_id' => $payment->id,
+                            'transaction_id' => $payment->transaction_id,
+                            'reason' => $matchResult['reason'],
+                            'status' => 'rejected',
+                        ], 200);
+                    }
                 }
             }
             

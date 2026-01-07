@@ -336,7 +336,10 @@ class PaymentMatchingService
 
         return [
             'matched' => true,
-            'reason' => 'Amount and name match within time window',
+            'reason' => $isMismatch ? $mismatchReason : 'Amount and name match within time window',
+            'is_mismatch' => $isMismatch,
+            'received_amount' => $isMismatch ? $receivedAmount : null,
+            'mismatch_reason' => $mismatchReason,
         ];
     }
 
@@ -358,7 +361,7 @@ class PaymentMatchingService
     }
 
     /**
-     * Check if two names match with 70% similarity
+     * Check if two names match with 65% similarity
      * 
      * Examples:
      * - "amithy one media" matches "amithy one" (2 out of 3 words = 67%, but we check if major words match)
@@ -367,7 +370,7 @@ class PaymentMatchingService
      * 
      * @param string $expectedName The name from payment request (e.g., "amithy one media")
      * @param string $receivedName The name extracted from email (e.g., "amithy one" or longer description)
-     * @return bool True if at least 70% of words match
+     * @return bool True if at least 65% of words match
      */
     protected function namesMatch(string $expectedName, string $receivedName): bool
     {
@@ -413,9 +416,9 @@ class PaymentMatchingService
         $totalExpectedWords = count($expectedWords);
         $similarityPercent = ($matchedWords / $totalExpectedWords) * 100;
 
-        // Match if at least 70% of words match
-        // Example: "amithy one media" (3 words) needs at least 2 words to match (67% rounds to 70%)
-        return $similarityPercent >= 70;
+        // Match if at least 65% of words match
+        // Example: "amithy one media" (3 words) needs at least 2 words to match (67% >= 65%)
+        return $similarityPercent >= 65;
     }
 
     /**

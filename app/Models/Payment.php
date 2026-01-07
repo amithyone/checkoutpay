@@ -27,6 +27,9 @@ class Payment extends Model
         'email_data',
         'matched_at',
         'expires_at',
+        'is_mismatch',
+        'received_amount',
+        'mismatch_reason',
     ];
 
     /**
@@ -36,12 +39,14 @@ class Payment extends Model
      */
     protected $casts = [
         'amount' => 'decimal:2',
+        'received_amount' => 'decimal:2',
         'email_data' => 'array',
         'matched_at' => 'datetime',
         'expires_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'is_mismatch' => 'boolean',
     ];
 
     /**
