@@ -3,6 +3,10 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/logs/*.log
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
 /vendor
 .env
 .env.backup
@@ -19,6 +23,8 @@ yarn-error.log
 /.vscode
 database/database.sqlite
 database/database.sqlite-journal
+bootstrap/cache/*
+!bootstrap/cache/.gitkeep
 
 # Deployment files
 deploy.sh
