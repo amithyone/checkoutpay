@@ -571,27 +571,29 @@ class MonitorEmails extends Command
         try {
             $this->line("🔍 Attempting to store email...");
             
-            $messageId = $message->getUid() ?? $message->getMessageId();
+            $messageId = (string)($message->getUid() ?? $message->getMessageId() ?? '');
             if (!$messageId) {
-                $this->warn("⚠️  No message ID found, skipping email");
-                return;
+                return null;
             }
             
-            $this->line("📧 Message ID: {$messageId}");
+            // FAST CHECK: Skip if already exists (shouldn't happen due to pre-check, but safety)
+            $existing = ProcessedEmail::where('message_id', $messageId)
+                ->where('email_account_id', $emailAccount?->id)
+                ->exists();
+            
+            if ($existing) {
+                return null; // Already stored - skip immediately
+            }
             
             $from = $message->getFrom()[0] ?? null;
             $fromEmail = $from->mail ?? '';
             $fromName = $from->personal ?? '';
-            
             $subject = $message->getSubject() ?? 'No Subject';
             
             // Filter out noreply@xtrapay.ng emails
             if (strtolower($fromEmail) === 'noreply@xtrapay.ng') {
-                $this->line("⏭️  Skipping email from noreply@xtrapay.ng: {$subject}");
-                return;
+                return null;
             }
-            
-            $this->line("📝 Subject: {$subject} | From: {$fromEmail}");
             
             // Extract payment info to store
             $matchingService = new PaymentMatchingService(
@@ -611,19 +613,15 @@ class MonitorEmails extends Command
                 'email_account_id' => $emailAccount?->id,
             ];
             
-            $this->line("🔍 Extracting payment info...");
-            $extractedInfo = $matchingService->extractPaymentInfo($emailData);
-            $this->line("💰 Extracted amount: " . ($extractedInfo['amount'] ?? 'null'));
-            
-            // Check if email already exists
-            $this->line("🔍 Checking if email already exists...");
-            $existing = ProcessedEmail::where('message_id', (string)$messageId)
-                ->where('email_account_id', $emailAccount?->id)
-                ->first();
-            
-            if ($existing) {
-                $this->line("⏭️  Email already stored: {$subject} (ID: {$existing->id})");
-                return; // Already stored
+            // Try to extract payment info, but store email even if extraction fails
+            $extractedInfo = null;
+            try {
+                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+            } catch (\Exception $e) {
+                Log::debug('Payment info extraction failed, storing email anyway', [
+                    'error' => $e->getMessage(),
+                    'subject' => $subject,
+                ]);
             }
             
             // Store email even if extraction failed or returned null
