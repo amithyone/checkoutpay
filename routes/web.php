@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SetupController;
+use App\Http\Controllers\TestEmailController;
 
 Route::get('/', function () {
     return response()->json([
@@ -21,3 +22,7 @@ Route::get('/setup', [SetupController::class, 'index'])->name('setup');
 Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);
 Route::post('/setup/save-database', [SetupController::class, 'saveDatabase']);
 Route::post('/setup/complete', [SetupController::class, 'complete']);
+
+// Standalone email connection test (no auth required)
+Route::get('/test-email', [TestEmailController::class, 'test'])->name('test.email');
+Route::post('/test-email', [TestEmailController::class, 'test']);
