@@ -78,6 +78,11 @@
                     <i class="fas fa-flask w-5 mr-3"></i>
                     <span>Test Transaction</span>
                 </a>
+
+                <a href="{{ route('admin.settings.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.settings.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-cog w-5 mr-3"></i>
+                    <span>Settings</span>
+                </a>
             </nav>
 
             <!-- User Section -->

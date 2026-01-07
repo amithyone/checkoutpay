@@ -198,7 +198,10 @@ class PaymentMatchingService
      */
     public function matchPayment(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null): array
     {
-        // Check time window: email must be received within 15 minutes of transaction creation
+        // Check time window: email must be received within configured minutes of transaction creation
+        // Get time window from settings (default: 15 minutes)
+        $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 15);
+        
         // Ensure both dates are in the same timezone (Africa/Lagos) for accurate comparison
         if ($emailDate && $payment->created_at) {
             // Convert both to Carbon instances and set to app timezone
@@ -206,12 +209,13 @@ class PaymentMatchingService
             $emailTime = \Carbon\Carbon::parse($emailDate)->setTimezone(config('app.timezone'));
             
             $timeDiff = abs($paymentTime->diffInMinutes($emailTime));
-            if ($timeDiff > 15) {
+            if ($timeDiff > $timeWindowMinutes) {
                 return [
                     'matched' => false,
                     'reason' => sprintf(
-                        'Time window exceeded: email received %d minutes after transaction (max 15 minutes). Payment: %s, Email: %s',
+                        'Time window exceeded: email received %d minutes after transaction (max %d minutes). Payment: %s, Email: %s',
                         $timeDiff,
+                        $timeWindowMinutes,
                         $paymentTime->format('Y-m-d H:i:s T'),
                         $emailTime->format('Y-m-d H:i:s T')
                     ),
