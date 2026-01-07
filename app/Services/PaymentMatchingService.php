@@ -563,6 +563,106 @@ class PaymentMatchingService
     }
 
     /**
+     * Find matching bank email template for sender email
+     */
+    protected function findMatchingTemplate(string $fromEmail): ?\App\Models\BankEmailTemplate
+    {
+        // Get active templates ordered by priority
+        $templates = \App\Models\BankEmailTemplate::active()->get();
+        
+        foreach ($templates as $template) {
+            if ($template->matchesEmail($fromEmail)) {
+                return $template;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Extract payment info using bank email template
+     */
+    protected function extractUsingTemplate(array $emailData, \App\Models\BankEmailTemplate $template): ?array
+    {
+        $subject = strtolower($emailData['subject'] ?? '');
+        $text = $emailData['text'] ?? '';
+        $html = $emailData['html'] ?? '';
+        
+        // If text body is empty but HTML exists, extract text from HTML
+        if (empty(trim($text)) && !empty($html)) {
+            $text = $this->htmlToText($html);
+        }
+        
+        $text = strtolower($text);
+        $htmlLower = strtolower($html);
+        $fullText = $subject . ' ' . $text . ' ' . $htmlLower;
+        
+        $amount = null;
+        $senderName = null;
+        $accountNumber = null;
+        
+        // Extract amount using template
+        if ($template->amount_pattern) {
+            // Use custom regex pattern
+            if (preg_match($template->amount_pattern, $html ?: $fullText, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1] ?? $matches[0]);
+            }
+        } elseif ($template->amount_field_label) {
+            // Use field label to find in HTML table
+            $label = preg_quote($template->amount_field_label, '/');
+            if (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)?\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1]);
+            }
+        }
+        
+        // Extract sender name using template
+        if ($template->sender_name_pattern) {
+            // Use custom regex pattern
+            if (preg_match($template->sender_name_pattern, $html ?: $fullText, $matches)) {
+                $senderName = trim(strtolower($matches[1] ?? $matches[0]));
+            }
+        } elseif ($template->sender_name_field_label) {
+            // Use field label to find in HTML table
+            $label = preg_quote($template->sender_name_field_label, '/');
+            // Try Description field with "FROM NAME TO" format
+            if (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+            // Try standard format
+            elseif (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i', $html, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+        }
+        
+        // Extract account number using template
+        if ($template->account_number_pattern) {
+            if (preg_match($template->account_number_pattern, $html ?: $fullText, $matches)) {
+                $accountNumber = trim($matches[1] ?? $matches[0]);
+            }
+        } elseif ($template->account_number_field_label) {
+            $label = preg_quote($template->account_number_field_label, '/');
+            if (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d+)[\s]*<\/td>/i', $html, $matches)) {
+                $accountNumber = trim($matches[1]);
+            }
+        }
+        
+        // If no amount found, return null
+        if (!$amount || $amount < 10) {
+            return null;
+        }
+        
+        return [
+            'amount' => $amount,
+            'sender_name' => $senderName,
+            'account_number' => $accountNumber,
+            'email_subject' => $emailData['subject'] ?? '',
+            'email_from' => $emailData['from'] ?? '',
+            'extracted_at' => now()->toISOString(),
+            'template_used' => $template->bank_name,
+        ];
+    }
+
+    /**
      * Convert HTML to plain text while preserving important structure
      * Handles tables, divs, and other HTML elements banks use
      */
