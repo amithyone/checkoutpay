@@ -22,7 +22,12 @@ class PaymentController extends Controller
      */
     public function store(PaymentRequest $request): JsonResponse
     {
-        $payment = $this->paymentService->createPayment($request->validated());
+        $business = $request->user(); // Get business from API key middleware
+        
+        $payment = $this->paymentService->createPayment(
+            $request->validated(),
+            $business
+        );
 
         return response()->json([
             'success' => true,

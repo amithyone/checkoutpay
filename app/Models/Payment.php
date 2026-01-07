@@ -21,9 +21,12 @@ class Payment extends Model
         'payer_name',
         'bank',
         'webhook_url',
+        'account_number',
+        'business_id',
         'status',
         'email_data',
         'matched_at',
+        'expires_at',
     ];
 
     /**
@@ -35,6 +38,7 @@ class Payment extends Model
         'amount' => 'decimal:2',
         'email_data' => 'array',
         'matched_at' => 'datetime',
+        'expires_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -52,7 +56,28 @@ class Payment extends Model
      */
     public static function pending()
     {
-        return static::where('status', self::STATUS_PENDING);
+        return static::where('status', self::STATUS_PENDING)
+            ->where(function ($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            });
+    }
+
+    /**
+     * Check if payment is expired
+     */
+    public function isExpired(): bool
+    {
+        return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    /**
+     * Scope for expired payments
+     */
+    public function scopeExpired($query)
+    {
+        return $query->where('expires_at', '<=', now())
+            ->where('status', self::STATUS_PENDING);
     }
 
     /**
@@ -101,5 +126,21 @@ class Payment extends Model
             'email_data' => array_merge($this->email_data ?? [], ['rejection_reason' => $reason]),
             'matched_at' => now(),
         ]);
+    }
+
+    /**
+     * Get the business that owns this payment
+     */
+    public function business()
+    {
+        return $this->belongsTo(Business::class);
+    }
+
+    /**
+     * Get account number details
+     */
+    public function accountNumberDetails()
+    {
+        return $this->belongsTo(AccountNumber::class, 'account_number', 'account_number');
     }
 }

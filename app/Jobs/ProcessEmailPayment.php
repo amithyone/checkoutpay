@@ -39,6 +39,11 @@ class ProcessEmailPayment implements ShouldQueue
             // Approve payment
             $payment->approve($this->emailData);
 
+            // Update business balance if payment has a business
+            if ($payment->business_id) {
+                $payment->business->increment('balance', $payment->amount);
+            }
+
             // Dispatch event to send webhook
             event(new PaymentApproved($payment));
         }

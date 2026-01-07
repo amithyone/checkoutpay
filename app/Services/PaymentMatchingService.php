@@ -21,6 +21,16 @@ class PaymentMatchingService
 
         \Log::info('Extracted payment info from email', $extractedInfo);
 
+        // Check for duplicate payments first
+        $duplicate = $this->checkDuplicate($extractedInfo);
+        if ($duplicate) {
+            \Log::warning('Duplicate payment detected', [
+                'existing_transaction_id' => $duplicate->transaction_id,
+                'extracted_info' => $extractedInfo,
+            ]);
+            return null; // Don't process duplicates
+        }
+
         // Get all pending payments
         $pendingPayments = Payment::pending()->get();
 
@@ -163,5 +173,22 @@ class PaymentMatchingService
             'matched' => true,
             'reason' => 'Amount and name match',
         ];
+    }
+
+    /**
+     * Check for duplicate payments
+     */
+    protected function checkDuplicate(array $extractedInfo): ?Payment
+    {
+        // Check for payments with same amount and payer name in last 1 hour
+        $duplicateWindow = now()->subHour();
+
+        $duplicate = Payment::where('amount', $extractedInfo['amount'])
+            ->where('payer_name', $extractedInfo['sender_name'] ?? null)
+            ->where('status', Payment::STATUS_APPROVED)
+            ->where('created_at', '>=', $duplicateWindow)
+            ->first();
+
+        return $duplicate;
     }
 }

@@ -17,6 +17,11 @@ class Kernel extends ConsoleKernel
             ->everyThirtySeconds()
             ->withoutOverlapping()
             ->runInBackground();
+
+        // Expire old payments every hour
+        $schedule->command('payment:expire')
+            ->hourly()
+            ->withoutOverlapping();
     }
 
     /**

@@ -14,11 +14,22 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('v1')->group(function () {
-    // Payment routes
+Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)->group(function () {
+    // Payment routes (require API key)
     Route::post('/payment-request', [PaymentController::class, 'store']);
     Route::get('/payment/{transactionId}', [PaymentController::class, 'show']);
     Route::get('/payments', [PaymentController::class, 'index']);
+    
+    // Withdrawal routes (require API key)
+    Route::post('/withdrawal', [\App\Http\Controllers\Api\WithdrawalController::class, 'store']);
+    Route::get('/withdrawals', [\App\Http\Controllers\Api\WithdrawalController::class, 'index']);
+    Route::get('/balance', [\App\Http\Controllers\Api\WithdrawalController::class, 'balance']);
+});
+
+// Public routes (no API key required)
+Route::prefix('v1')->group(function () {
+    // Statistics routes
+    Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index']);
 });
 
 // Health check

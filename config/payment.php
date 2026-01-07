@@ -28,6 +28,7 @@ return [
     */
 
     'amount_tolerance' => env('PAYMENT_AMOUNT_TOLERANCE', 0.01),
+    'expiration_hours' => env('PAYMENT_EXPIRATION_HOURS', 24),
 
     /*
     |--------------------------------------------------------------------------

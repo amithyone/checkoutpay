@@ -25,6 +25,10 @@ A robust, production-ready email-based payment gateway built with Laravel 10. Au
 - 🎯 **Queue Processing** - Handles emails asynchronously
 - 🔄 **Retry Logic** - Automatic webhook retry on failure
 - 📊 **API Endpoints** - RESTful API for payment management
+- ⏰ **Payment Expiration** - Auto-expire pending payments after 24 hours
+- 🔒 **Duplicate Detection** - Prevents processing same payment twice
+- 📈 **Statistics & Analytics** - Payment statistics and reporting endpoint
+- ⚡ **Performance Optimized** - Database indexes for faster queries
 
 ## 📋 Requirements
 
@@ -174,7 +178,21 @@ Query Parameters:
 - `to_date` - Filter to date (YYYY-MM-DD)
 - `per_page` - Results per page (default: 15)
 
-### 4. Health Check
+### 4. Get Payment Statistics
+
+**GET** `/api/v1/statistics`
+
+Query Parameters:
+- `from_date` - Start date (default: last month)
+- `to_date` - End date (default: now)
+
+Response includes:
+- Payment counts by status (total, pending, approved, rejected, expired)
+- Amount statistics (total, average, min, max)
+- Success rate percentage
+- Daily breakdown for last 30 days
+
+### 5. Health Check
 
 **GET** `/api/health`
 
@@ -254,7 +272,11 @@ All configuration is in `config/payment.php`:
 
 - Email settings (host, port, credentials)
 - Payment matching tolerance
+- Payment expiration hours (default: 24)
 - Webhook timeout and retry attempts
+
+Environment variables:
+- `PAYMENT_EXPIRATION_HOURS` - Hours before payment expires (default: 24)
 
 ## 🧪 Testing
 
@@ -300,9 +322,26 @@ curl -X POST http://localhost:8000/api/v1/payment-request \
 3. **Database**: Use MySQL/PostgreSQL instead of SQLite
 4. **Caching**: Configure Redis/Memcached for better performance
 5. **Logging**: Configure proper log channels
-6. **Security**: Add API authentication (Sanctum/Passport)
+6. **Security**: Add API authentication (Sanctum/Passport) - See `IMPROVEMENTS.md`
 7. **Rate Limiting**: Already configured in API routes
 8. **HTTPS**: Use HTTPS for webhook URLs
+9. **Run Migrations**: Don't forget to run new migrations for indexes and expiration
+
+## 📋 New Features
+
+### Payment Expiration
+Payments automatically expire after 24 hours (configurable). Expired payments are rejected and webhooks are sent.
+
+### Duplicate Detection
+The system prevents processing the same payment twice by checking for approved payments with matching amount and payer name within the last hour.
+
+### Statistics API
+Get comprehensive payment statistics:
+```bash
+GET /api/v1/statistics?from_date=2024-01-01&to_date=2024-01-31
+```
+
+See `IMPROVEMENTS.md` for a complete roadmap of future enhancements.
 
 ## 📝 License
 
