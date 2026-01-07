@@ -11,17 +11,25 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Check if column already exists
+        if (Schema::hasColumn('businesses', 'email_account_id')) {
+            return; // Column already exists, skip migration
+        }
+
         Schema::table('businesses', function (Blueprint $table) {
             $table->unsignedBigInteger('email_account_id')->nullable()->after('webhook_url');
             $table->index('email_account_id');
         });
 
-        Schema::table('businesses', function (Blueprint $table) {
-            $table->foreign('email_account_id')
-                  ->references('id')
-                  ->on('email_accounts')
-                  ->onDelete('set null');
-        });
+        // Only add foreign key if email_accounts table exists
+        if (Schema::hasTable('email_accounts')) {
+            Schema::table('businesses', function (Blueprint $table) {
+                $table->foreign('email_account_id')
+                      ->references('id')
+                      ->on('email_accounts')
+                      ->onDelete('set null');
+            });
+        }
     }
 
     /**

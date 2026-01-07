@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('transaction_logs')) {
+            return; // Table already exists, skip migration
+        }
+
         Schema::create('transaction_logs', function (Blueprint $table) {
             $table->id();
             $table->string('transaction_id')->index();
