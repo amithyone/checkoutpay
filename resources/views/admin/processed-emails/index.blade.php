@@ -335,10 +335,29 @@ function checkMatch(emailId) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
     })
-    .then(response => response.json())
+    .then(response => {
+        // Check if response is OK
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(`HTTP ${response.status}: ${text.substring(0, 200)}`);
+            });
+        }
+        
+        // Check content type
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                throw new Error('Response is not JSON: ' + text.substring(0, 200));
+            });
+        }
+        
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             if (data.matched) {
@@ -354,6 +373,8 @@ function checkMatch(emailId) {
                             message += ` (${match.time_diff_minutes} min difference)`;
                         }
                     });
+                } else {
+                    message += 'No pending payments found to match against.';
                 }
                 alert(message);
             }
@@ -363,7 +384,7 @@ function checkMatch(emailId) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error checking match. Please try again.');
+        alert('Error checking match: ' + error.message + '\n\nCheck browser console (F12) for details.');
     })
     .finally(() => {
         btn.disabled = false;
