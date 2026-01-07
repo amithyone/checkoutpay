@@ -242,12 +242,22 @@ class SetupController extends Controller
         $envContent = File::get($envFile);
 
         foreach ($data as $key => $value) {
-            // For .env files, don't quote values unless they contain spaces
-            // Laravel's env() function handles special characters without quotes
+            // For .env files, quote values that contain special characters
+            // # is treated as comment, so must be quoted
+            // Spaces also need quoting
             $escapedValue = $value;
             
-            // Only quote if value contains spaces and isn't already quoted
-            if (preg_match('/\s/', $value) && !preg_match('/^["\'].*["\']$/', $value)) {
+            // Quote if value contains # (comment), spaces, or other special chars
+            // Don't quote if already quoted or if it's a boolean/number
+            $needsQuoting = false;
+            if (!is_numeric($value) && $value !== 'true' && $value !== 'false' && !empty($value)) {
+                // Quote if contains # (comment character), spaces, or unquoted quotes
+                if (strpos($value, '#') !== false || preg_match('/\s/', $value) || strpos($value, '"') !== false) {
+                    $needsQuoting = true;
+                }
+            }
+            
+            if ($needsQuoting && !preg_match('/^["\'].*["\']$/', $value)) {
                 // Escape quotes and wrap in double quotes
                 $escapedValue = '"' . str_replace('"', '\\"', $value) . '"';
             }
