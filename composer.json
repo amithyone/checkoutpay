@@ -5,7 +5,7 @@
     "keywords": ["laravel", "payment", "gateway", "email", "webhook"],
     "license": "MIT",
     "require": {
-        "php": "^8.1",
+        "php": "^8.1|^8.2",
         "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^10.10",
         "laravel/sanctum": "^3.2",
@@ -20,6 +20,18 @@
         "nunomaduro/collision": "^7.0",
         "phpunit/phpunit": "^10.1",
         "spatie/laravel-ignition": "^2.0"
+    },
+    "config": {
+        "platform": {
+            "php": "8.2"
+        },
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest": true,
+            "php-http/discovery": true
+        }
     },
     "autoload": {
         "psr-4": {
@@ -51,15 +63,6 @@
     "extra": {
         "laravel": {
             "dont-discover": []
-        }
-    },
-    "config": {
-        "optimize-autoloader": true,
-        "preferred-install": "dist",
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest": true,
-            "php-http/discovery": true
         }
     },
     "minimum-stability": "dev",
