@@ -41,11 +41,15 @@
                     <div>
                         <label for="encryption" class="block text-sm font-medium text-gray-700 mb-1">Encryption *</label>
                         <select name="encryption" id="encryption" required
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary">
-                            <option value="ssl" {{ old('encryption', 'ssl') === 'ssl' ? 'selected' : '' }}>SSL</option>
-                            <option value="tls" {{ old('encryption') === 'tls' ? 'selected' : '' }}>TLS</option>
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
+                            onchange="updateEncryptionHint()">
+                            <option value="ssl" {{ old('encryption', 'ssl') === 'ssl' ? 'selected' : '' }}>SSL (Port 993)</option>
+                            <option value="tls" {{ old('encryption') === 'tls' ? 'selected' : '' }}>TLS (Port 587/143)</option>
                             <option value="none" {{ old('encryption') === 'none' ? 'selected' : '' }}>None</option>
                         </select>
+                        <p id="encryption-hint" class="text-xs text-gray-500 mt-1">
+                            For Gmail with port 993, use SSL. For port 587, use TLS.
+                        </p>
                     </div>
                 </div>
 
@@ -54,7 +58,10 @@
                     <input type="password" name="password" id="password" required
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
                         placeholder="Enter email password or app password">
-                    <p class="text-xs text-gray-500 mt-1">For Gmail, use an App Password (not your regular password)</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        For Gmail: Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-blue-600 hover:underline">Google App Passwords</a>, 
+                        create a new app password with any name, and paste the 16-character code here.
+                    </p>
                 </div>
 
                 <div>

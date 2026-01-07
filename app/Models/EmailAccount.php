@@ -89,13 +89,26 @@ class EmailAccount extends Model
                 ];
             }
 
+            // Auto-fix common port/encryption mismatches
+            $port = (int)$this->port;
+            $encryption = $this->encryption;
+            
+            // Gmail port 993 requires SSL, not TLS
+            if ($port === 993 && $encryption === 'tls') {
+                $encryption = 'ssl';
+            }
+            // Port 587 typically uses TLS
+            if ($port === 587 && $encryption === 'ssl') {
+                $encryption = 'tls';
+            }
+            
             $cm = new \Webklex\PHPIMAP\ClientManager([
                 'default' => 'test_' . $this->id,
                 'accounts' => [
                     'test_' . $this->id => [
                         'host' => $this->host,
-                        'port' => (int)$this->port,
-                        'encryption' => $this->encryption,
+                        'port' => $port,
+                        'encryption' => $encryption,
                         'validate_cert' => (bool)$this->validate_cert,
                         'username' => $this->email,
                         'password' => $password,

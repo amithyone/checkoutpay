@@ -60,11 +60,11 @@
 
 ### Step 2: Generate App Password
 1. Go to: https://myaccount.google.com/apppasswords
-2. Select "Mail" as the app
-3. Select "Other (Custom name)" as device
-4. Enter name: "Payment Gateway"
+2. Click "Select app" dropdown → Choose "Mail" (or "Other" if Mail isn't available)
+3. Click "Select device" dropdown → Choose "Other (Custom name)"
+4. Enter a name: "Payment Gateway" (or any name you prefer)
 5. Click "Generate"
-6. Copy the 16-character password (no spaces)
+6. Copy the 16-character password (no spaces) - it will look like: `abcd efgh ijkl mnop`
 
 ### Step 3: Configure in Admin Panel
 1. Go to: `/admin/email-accounts/create`
@@ -73,12 +73,14 @@
    - **Email:** yourname@gmail.com
    - **Host:** imap.gmail.com
    - **Port:** 993
-   - **Encryption:** ssl
-   - **Password:** Paste the 16-character App Password
+   - **Encryption:** SSL (NOT TLS - port 993 requires SSL!)
+   - **Password:** Paste the 16-character App Password (remove spaces if any)
    - **Folder:** INBOX
    - **Validate Certificate:** Unchecked
 3. Click "Test Connection"
 4. If successful, save!
+
+**⚠️ IMPORTANT:** Port 993 MUST use SSL encryption, not TLS!
 
 ## 🔍 Testing Connection
 
