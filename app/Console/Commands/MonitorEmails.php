@@ -149,16 +149,35 @@ class MonitorEmails extends Command
                     }
                     
                     // Filter by keywords - only process payment-related emails
+                    // Expanded keywords to match GTBank and other bank formats
+                    $paymentKeywords = [
+                        'transfer', 'deposit', 'credit', 'payment', 'transaction', 
+                        'alert', 'notification', 'received', 'credited', 'debit',
+                        'gens', 'electronic', 'bank', 'account', 'amount'
+                    ];
+                    
                     $hasPaymentKeyword = false;
-                    foreach ($keywords as $keyword) {
-                        if (strpos($subject, $keyword) !== false || strpos($text, $keyword) !== false) {
+                    $combinedText = strtolower($subject . ' ' . $text);
+                    
+                    foreach ($paymentKeywords as $keyword) {
+                        if (strpos($combinedText, $keyword) !== false) {
                             $hasPaymentKeyword = true;
                             break;
                         }
                     }
                     
-                    // Also check for amount patterns (numbers with currency symbols)
-                    if (!$hasPaymentKeyword && preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $subject . ' ' . $text)) {
+                    // Also check for amount patterns (NGN format, currency symbols, etc.)
+                    if (!$hasPaymentKeyword && (
+                        preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $combinedText) ||
+                        preg_match('/ngn\s*[\d,]+\.?\d*/i', $combinedText) ||
+                        preg_match('/naira\s*[\d,]+\.?\d*/i', $combinedText) ||
+                        preg_match('/amount\s*:?\s*[\d,]+\.?\d*/i', $combinedText)
+                    )) {
+                        $hasPaymentKeyword = true;
+                    }
+                    
+                    // Check for account number patterns (usually 10 digits)
+                    if (!$hasPaymentKeyword && preg_match('/account\s*number\s*:?\s*\d{8,}/i', $combinedText)) {
                         $hasPaymentKeyword = true;
                     }
                     
