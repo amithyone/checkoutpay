@@ -14,10 +14,10 @@ class SetupController extends Controller
      */
     public function index()
     {
-        // Check if already configured
-        if ($this->isConfigured()) {
-            return redirect('/admin');
-        }
+        // Always show setup page for now (remove redirect check temporarily)
+        // if ($this->isConfigured()) {
+        //     return redirect('/admin');
+        // }
 
         return view('setup.index');
     }
