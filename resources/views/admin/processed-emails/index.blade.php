@@ -185,4 +185,120 @@
         @endif
     </div>
 </div>
+
+<script>
+let searchTimeout;
+const searchInput = document.getElementById('searchInput');
+const statusFilter = document.getElementById('statusFilter');
+const emailAccountFilter = document.getElementById('emailAccountFilter');
+const emailRows = document.querySelectorAll('.email-row');
+
+function filterEmails() {
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    const statusValue = statusFilter.value;
+    const emailAccountValue = emailAccountFilter.value;
+    
+    let visibleCount = 0;
+    
+    emailRows.forEach(row => {
+        const subject = row.dataset.subject || '';
+        const fromEmail = row.dataset.fromEmail || '';
+        const fromName = row.dataset.fromName || '';
+        const senderName = row.dataset.senderName || '';
+        const amount = row.dataset.amount || '';
+        const status = row.dataset.status || '';
+        const emailAccountId = row.dataset.emailAccountId || '';
+        
+        // Search filter
+        let matchesSearch = true;
+        if (searchTerm) {
+            matchesSearch = 
+                subject.includes(searchTerm) ||
+                fromEmail.includes(searchTerm) ||
+                fromName.includes(searchTerm) ||
+                senderName.includes(searchTerm) ||
+                (amount && amount.toString().includes(searchTerm.replace(/[^0-9.]/g, '')));
+        }
+        
+        // Status filter
+        let matchesStatus = !statusValue || status === statusValue;
+        
+        // Email account filter
+        let matchesEmailAccount = !emailAccountValue || emailAccountId === emailAccountValue;
+        
+        // Show/hide row
+        if (matchesSearch && matchesStatus && matchesEmailAccount) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Update empty state
+    const emptyRow = document.querySelector('#emailsTableBody tr:last-child');
+    if (emptyRow && emptyRow.classList.contains('no-results')) {
+        if (visibleCount > 0) {
+            emptyRow.style.display = 'none';
+        } else {
+            emptyRow.style.display = '';
+        }
+    } else if (visibleCount === 0 && emailRows.length > 0) {
+        // Show no results message
+        const tbody = document.getElementById('emailsTableBody');
+        let noResultsRow = tbody.querySelector('.no-results-row');
+        if (!noResultsRow) {
+            noResultsRow = document.createElement('tr');
+            noResultsRow.className = 'no-results-row';
+            noResultsRow.innerHTML = `
+                <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                    No emails found matching your search criteria.
+                    <button onclick="clearFilters()" class="text-primary hover:underline ml-2">Clear filters</button>
+                </td>
+            `;
+            tbody.appendChild(noResultsRow);
+        }
+        noResultsRow.style.display = '';
+    } else {
+        // Hide no results row if we have results
+        const noResultsRow = document.querySelector('.no-results-row');
+        if (noResultsRow) {
+            noResultsRow.style.display = 'none';
+        }
+    }
+}
+
+// Real-time search as you type
+if (searchInput) {
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(filterEmails, 300); // Debounce 300ms
+    });
+}
+
+// Filter on status change
+if (statusFilter) {
+    statusFilter.addEventListener('change', filterEmails);
+}
+
+// Filter on email account change
+if (emailAccountFilter) {
+    emailAccountFilter.addEventListener('change', filterEmails);
+}
+
+// Clear filters function
+function clearFilters() {
+    if (searchInput) searchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+    if (emailAccountFilter) emailAccountFilter.value = '';
+    filterEmails();
+    // Optionally reload page to reset pagination
+    window.location.href = '{{ route("admin.processed-emails.index") }}';
+}
+
+// Initial filter on page load
+document.addEventListener('DOMContentLoaded', function() {
+    filterEmails();
+});
+</script>
 @endsection
