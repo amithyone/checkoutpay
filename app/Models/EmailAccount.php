@@ -66,6 +66,53 @@ class EmailAccount extends Model
     }
 
     /**
+     * Test email connection using PHP native IMAP (fallback)
+     */
+    protected function testConnectionNativeImap(string $password): array
+    {
+        if (!function_exists('imap_open')) {
+            return [
+                'success' => false,
+                'message' => 'PHP IMAP extension is not available.',
+            ];
+        }
+
+        try {
+            // Build connection string
+            $encryption = $this->encryption === 'ssl' ? 'ssl' : ($this->encryption === 'tls' ? 'tls' : '');
+            $validateCert = $this->validate_cert ? '' : '/novalidate-cert';
+            $folder = $this->folder ?? 'INBOX';
+            
+            $connectionString = "{{$this->host}:{$this->port}";
+            if ($encryption) {
+                $connectionString .= "/{$encryption}";
+            }
+            $connectionString .= "{$validateCert}}{$folder}";
+            
+            $connection = @imap_open($connectionString, $this->email, $password, OP_HALFOPEN);
+            
+            if ($connection) {
+                imap_close($connection);
+                return [
+                    'success' => true,
+                    'message' => 'Connection successful using native IMAP!',
+                ];
+            } else {
+                $error = imap_last_error();
+                return [
+                    'success' => false,
+                    'message' => 'Native IMAP error: ' . ($error ?: 'Unknown error'),
+                ];
+            }
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Native IMAP exception: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Test email connection
      */
     public function testConnection(): array
@@ -86,6 +133,21 @@ class EmailAccount extends Model
                 return [
                     'success' => false,
                     'message' => 'Host and email are required.',
+                ];
+            }
+            
+            // Try native IMAP first (more reliable for diagnostics)
+            $nativeResult = $this->testConnectionNativeImap($password);
+            if ($nativeResult['success']) {
+                return $nativeResult;
+            }
+            
+            // If native fails with network error, return that
+            if (strpos($nativeResult['message'], 'unreachable') !== false || 
+                strpos($nativeResult['message'], 'Network') !== false) {
+                return [
+                    'success' => false,
+                    'message' => 'Network is unreachable. The server cannot connect to Gmail. Contact your hosting provider to allow outbound IMAP connections on port 993. Native IMAP error: ' . $nativeResult['message'],
                 ];
             }
 
