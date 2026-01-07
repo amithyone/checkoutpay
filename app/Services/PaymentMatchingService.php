@@ -225,4 +225,82 @@ class PaymentMatchingService
 
         return $duplicate;
     }
+
+    /**
+     * Check if two names match, handling order variations and partial matches
+     * 
+     * Examples:
+     * - "innocent solomon" matches "solomon innocent amithy" (all words present)
+     * - "solomon innocent" matches "innocent solomon" (order variation)
+     * - "john doe" matches "john doe smith" (partial match)
+     * 
+     * @param string $expectedName The name from payment request
+     * @param string $receivedName The name extracted from email
+     * @return bool
+     */
+    protected function namesMatch(string $expectedName, string $receivedName): bool
+    {
+        // Exact match
+        if ($expectedName === $receivedName) {
+            return true;
+        }
+
+        // Split names into words
+        $expectedWords = array_filter(explode(' ', $expectedName));
+        $receivedWords = array_filter(explode(' ', $receivedName));
+
+        // If either is empty, no match
+        if (empty($expectedWords) || empty($receivedWords)) {
+            return false;
+        }
+
+        // Check if all words from expected name exist in received name
+        // This handles cases like "innocent solomon" matching "solomon innocent amithy"
+        $allWordsFound = true;
+        foreach ($expectedWords as $word) {
+            $wordFound = false;
+            foreach ($receivedWords as $receivedWord) {
+                // Exact word match
+                if ($word === $receivedWord) {
+                    $wordFound = true;
+                    break;
+                }
+                // Partial match (word is contained in received word or vice versa)
+                // Handles cases like "solomon" matching "solomon" in "solomon innocent"
+                if (strpos($receivedWord, $word) !== false || strpos($word, $receivedWord) !== false) {
+                    $wordFound = true;
+                    break;
+                }
+            }
+            if (!$wordFound) {
+                $allWordsFound = false;
+                break;
+            }
+        }
+
+        // Also check reverse: all words from received name exist in expected name
+        // This handles cases where received name has fewer words
+        $allReceivedWordsFound = true;
+        foreach ($receivedWords as $receivedWord) {
+            $wordFound = false;
+            foreach ($expectedWords as $word) {
+                if ($receivedWord === $word) {
+                    $wordFound = true;
+                    break;
+                }
+                if (strpos($receivedWord, $word) !== false || strpos($word, $receivedWord) !== false) {
+                    $wordFound = true;
+                    break;
+                }
+            }
+            if (!$wordFound) {
+                $allReceivedWordsFound = false;
+                break;
+            }
+        }
+
+        // Match if all expected words are found in received name
+        // OR if all received words are found in expected name (handles shorter names)
+        return $allWordsFound || $allReceivedWordsFound;
+    }
 }
