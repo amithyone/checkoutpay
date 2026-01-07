@@ -45,6 +45,20 @@
                 </div>
 
                 <div>
+                    <label for="email_account_id" class="block text-sm font-medium text-gray-700 mb-1">Email Account</label>
+                    <select name="email_account_id" id="email_account_id"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary">
+                        <option value="">-- Select Email Account --</option>
+                        @foreach($emailAccounts as $emailAccount)
+                            <option value="{{ $emailAccount->id }}" {{ old('email_account_id', $business->email_account_id) == $emailAccount->id ? 'selected' : '' }}>
+                                {{ $emailAccount->name }} ({{ $emailAccount->email }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Select which email account to monitor for this business's payments</p>
+                </div>
+
+                <div>
                     <label class="flex items-center">
                         <input type="checkbox" name="is_active" value="1" {{ old('is_active', $business->is_active) ? 'checked' : '' }} class="mr-2">
                         <span class="text-sm text-gray-700">Active</span>

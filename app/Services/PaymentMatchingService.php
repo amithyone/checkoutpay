@@ -16,44 +16,53 @@ class PaymentMatchingService
         $extractedInfo = $this->extractPaymentInfo($emailData);
 
         if (!$extractedInfo) {
-            \Log::info('Could not extract payment info from email');
+            \Illuminate\Support\Facades\Log::info('Could not extract payment info from email');
             return null;
         }
 
-        \Log::info('Extracted payment info from email', $extractedInfo);
+        \Illuminate\Support\Facades\Log::info('Extracted payment info from email', $extractedInfo);
 
         // Check for duplicate payments first
         $duplicate = $this->checkDuplicate($extractedInfo);
         if ($duplicate) {
-            \Log::warning('Duplicate payment detected', [
+            \Illuminate\Support\Facades\Log::warning('Duplicate payment detected', [
                 'existing_transaction_id' => $duplicate->transaction_id,
                 'extracted_info' => $extractedInfo,
             ]);
             return null; // Don't process duplicates
         }
 
-        // Get all pending payments
-        $pendingPayments = Payment::pending()->get();
+        // Get pending payments, filtered by email account if provided
+        $query = Payment::pending();
+        
+        // If email_account_id is provided, only match payments from businesses using that email account
+        if (!empty($emailData['email_account_id'])) {
+            $query->whereHas('business', function ($q) use ($emailData) {
+                $q->where('email_account_id', $emailData['email_account_id']);
+            });
+        }
+        
+        $pendingPayments = $query->get();
 
         foreach ($pendingPayments as $payment) {
             $match = $this->matchPayment($payment, $extractedInfo);
 
             if ($match['matched']) {
-                \Log::info('Payment matched', [
+                \Illuminate\Support\Facades\Log::info('Payment matched', [
                     'transaction_id' => $payment->transaction_id,
                     'match_reason' => $match['reason'],
                 ]);
 
                 return $payment;
             } else {
-                \Log::debug('Payment mismatch', [
+                \Illuminate\Support\Facades\Log::debug('Payment mismatch', [
                     'transaction_id' => $payment->transaction_id,
                     'reason' => $match['reason'],
                 ]);
             }
         }
 
-        \Log::info('No matching payment found for email');
+        \Illuminate\Support\Facades\Log::info('No matching payment found for email');
         return null;
     }
 

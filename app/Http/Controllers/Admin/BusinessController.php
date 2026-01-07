@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Business;
+use App\Models\EmailAccount;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -25,7 +26,8 @@ class BusinessController extends Controller
 
     public function create(): View
     {
-        return view('admin.businesses.create');
+        $emailAccounts = EmailAccount::where('is_active', true)->get();
+        return view('admin.businesses.create', compact('emailAccounts'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -36,6 +38,7 @@ class BusinessController extends Controller
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'webhook_url' => 'nullable|url',
+            'email_account_id' => 'nullable|exists:email_accounts,id',
             'is_active' => 'boolean',
         ]);
 
@@ -53,7 +56,8 @@ class BusinessController extends Controller
 
     public function edit(Business $business): View
     {
-        return view('admin.businesses.edit', compact('business'));
+        $emailAccounts = EmailAccount::where('is_active', true)->get();
+        return view('admin.businesses.edit', compact('business', 'emailAccounts'));
     }
 
     public function update(Request $request, Business $business): RedirectResponse
@@ -64,6 +68,7 @@ class BusinessController extends Controller
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'webhook_url' => 'nullable|url',
+            'email_account_id' => 'nullable|exists:email_accounts,id',
             'is_active' => 'boolean',
         ]);
 

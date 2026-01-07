@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Protected admin routes
     Route::middleware('auth:admin')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Email Accounts
+        Route::resource('email-accounts', EmailAccountController::class);
+        Route::post('email-accounts/{emailAccount}/test-connection', [EmailAccountController::class, 'testConnection'])
+            ->name('email-accounts.test-connection');
 
         // Account Numbers
         Route::resource('account-numbers', AccountNumberController::class);

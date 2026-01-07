@@ -18,6 +18,7 @@ class Business extends Model
         'address',
         'api_key',
         'webhook_url',
+        'email_account_id',
         'is_active',
         'balance',
     ];
@@ -96,5 +97,13 @@ class Business extends Model
             ->where('is_active', true)
             ->where('is_pool', false)
             ->exists();
+    }
+
+    /**
+     * Get email account for this business
+     */
+    public function emailAccount()
+    {
+        return $this->belongsTo(EmailAccount::class);
     }
 }
