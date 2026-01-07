@@ -97,7 +97,7 @@
                 <tbody id="emailsTableBody" class="divide-y divide-gray-200">
                     @forelse($emails as $email)
                     <tr class="email-row hover:bg-gray-50 {{ !$email->is_matched ? 'bg-yellow-50/30' : '' }}" 
-                        data-subject="{{ strtolower($email->subject ?? '') }}"
+                        data-subject="{{ strtolower($email->subject ?? 'no subject') }}"
                         data-from-email="{{ strtolower($email->from_email ?? '') }}"
                         data-from-name="{{ strtolower($email->from_name ?? '') }}"
                         data-sender-name="{{ strtolower($email->sender_name ?? '') }}"
