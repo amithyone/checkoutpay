@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\ProcessedEmailController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +19,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Protected admin routes
     Route::middleware('auth:admin')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Processed Emails (Inbox)
+        Route::get('processed-emails', [ProcessedEmailController::class, 'index'])->name('processed-emails.index');
+        Route::get('processed-emails/{processedEmail}', [ProcessedEmailController::class, 'show'])->name('processed-emails.show');
 
         // Email Accounts
         Route::resource('email-accounts', EmailAccountController::class);
