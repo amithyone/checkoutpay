@@ -148,40 +148,61 @@ class EmailAccount extends Model
                 'email' => $this->email,
                 'host' => $this->host,
                 'port' => $this->port,
+                'encryption' => $encryption,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             
             $errorMessage = $e->getMessage();
             
             // Provide helpful error messages
-            if (strpos($errorMessage, 'authentication') !== false || strpos($errorMessage, 'password') !== false) {
+            if (strpos($errorMessage, 'authentication') !== false || strpos($errorMessage, 'password') !== false || strpos($errorMessage, 'login') !== false) {
                 return [
                     'success' => false,
-                    'message' => 'Authentication failed. Please check your email and password. For Gmail, make sure you\'re using an App Password, not your regular password.',
+                    'message' => 'Authentication failed. Please check your email and password. For Gmail, make sure you\'re using an App Password (16 characters), not your regular password. Also verify IMAP is enabled in Gmail settings.',
                 ];
             }
             
-            if (strpos($errorMessage, 'connection') !== false || strpos($errorMessage, 'timeout') !== false) {
+            if (strpos($errorMessage, 'connection') !== false || strpos($errorMessage, 'timeout') !== false || strpos($errorMessage, 'refused') !== false) {
+                $detailedMessage = 'Connection failed to ' . $this->host . ':' . $this->port . '. ';
+                $detailedMessage .= 'Possible issues: ';
+                $detailedMessage .= '1) Server firewall blocking outbound connections, ';
+                $detailedMessage .= '2) PHP IMAP extension not installed, ';
+                $detailedMessage .= '3) Network connectivity issue. ';
+                $detailedMessage .= 'Check server logs for details. Error: ' . $errorMessage;
+                
                 return [
                     'success' => false,
-                    'message' => 'Connection failed. Please check your host (' . $this->host . ') and port (' . $this->port . ') settings.',
+                    'message' => $detailedMessage,
                 ];
             }
             
             return [
                 'success' => false,
-                'message' => 'Connection failed: ' . $errorMessage,
+                'message' => 'Connection failed: ' . $errorMessage . '. Check server logs for more details.',
             ];
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Email connection test error', [
                 'email' => $this->email,
+                'host' => $this->host,
+                'port' => $this->port,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
             
+            $errorMessage = $e->getMessage();
+            
+            // Check for PHP extension issues
+            if (strpos($errorMessage, 'imap') !== false || strpos($errorMessage, 'extension') !== false) {
+                return [
+                    'success' => false,
+                    'message' => 'PHP IMAP extension may not be installed. Contact your server administrator to install php-imap extension.',
+                ];
+            }
+            
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: ' . $errorMessage . '. Check server logs for details.',
             ];
         }
     }
