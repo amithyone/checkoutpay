@@ -119,10 +119,12 @@ class PaymentMatchingService
         }
 
         // Extract sender name
+        // Updated to handle formats like "FROM SOLOMON INNOCENT AMITHY TO SQUA"
         $namePatterns = [
-            '/(?:from|sender|payer|depositor|account\s*name|name)[\s:]*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i',
-            '/([A-Z][a-z]+\s+[A-Z][a-z]+)/',
-            '/(?:credited\s+by|from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i',
+            '/from\s+([A-Z][A-Z\s]+?)\s+to/i', // "FROM SOLOMON INNOCENT AMITHY TO"
+            '/(?:from|sender|payer|depositor|account\s*name|name)[\s:]*([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i',
+            '/(?:credited\s+by|from)\s+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i',
+            '/([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/', // Fallback: any capitalized name pattern
         ];
 
         $senderName = null;
