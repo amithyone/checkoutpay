@@ -164,7 +164,7 @@ class PaymentMatchingService
     /**
      * Match payment with extracted email info
      */
-    protected function matchPayment(Payment $payment, array $extractedInfo): array
+    public function matchPayment(Payment $payment, array $extractedInfo): array
     {
         // Check amount match (allow small tolerance for rounding)
         $amountDiff = abs($payment->amount - $extractedInfo['amount']);
