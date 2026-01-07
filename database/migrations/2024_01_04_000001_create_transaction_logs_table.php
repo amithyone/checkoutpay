@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('transaction_logs', function (Blueprint $table) {
             $table->id();
             $table->string('transaction_id')->index();
-            $table->foreignId('payment_id')->nullable()->constrained('payments')->onDelete('cascade');
+            $table->unsignedBigInteger('payment_id')->nullable();
             $table->unsignedBigInteger('business_id')->nullable();
             $table->enum('event_type', [
                 'payment_requested',

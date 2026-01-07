@@ -16,6 +16,11 @@ return new class extends Migration
                   ->references('id')
                   ->on('businesses')
                   ->onDelete('set null');
+            
+            $table->foreign('payment_id')
+                  ->references('id')
+                  ->on('payments')
+                  ->onDelete('cascade');
         });
     }
 
@@ -26,6 +31,7 @@ return new class extends Migration
     {
         Schema::table('transaction_logs', function (Blueprint $table) {
             $table->dropForeign(['business_id']);
+            $table->dropForeign(['payment_id']);
         });
     }
 };
