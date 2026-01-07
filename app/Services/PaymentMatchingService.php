@@ -152,41 +152,45 @@ class PaymentMatchingService
             }
         }
 
-        // Extract sender name
-        // Updated to handle formats like "FROM SOLOMON INNOCENT AMITHY TO SQUA"
-        // Also check HTML for structured name fields
-        $namePatterns = [
-            // GTBank format: "FROM SOLOMON INNOCENT AMITHY TO SQUA"
-            '/from\s+([A-Z][A-Z\s]+?)\s+to/i',
-            // HTML table patterns
-            '/<td[^>]*>[\s]*(?:from|sender|payer|depositor|account\s*name|name)[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i',
-            // Standard patterns
-            '/(?:from|sender|payer|depositor|account\s*name|name)[\s:]*([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i',
-            '/(?:credited\s+by|from)\s+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i',
-            // Fallback: any capitalized name pattern
-            '/([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/',
-        ];
-
+        // Extract sender name - GTBank stores name in Description field
+        // GTBank format: Description field contains "FROM SOLOMON INNOCENT AMITHY TO SQUA"
         $senderName = null;
-        // Try HTML first (more structured)
-        foreach ($namePatterns as $pattern) {
-            if (preg_match($pattern, $htmlLower, $matches)) {
-                $senderName = trim(strtolower($matches[1]));
-                if (strlen($senderName) > 2) { // Valid name
-                    break;
-                }
-            }
+        
+        // Pattern 1: GTBank HTML table - Description field contains sender name
+        // Format: <td>Description</td><td>FROM SOLOMON INNOCENT AMITHY TO SQUA</td>
+        if (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 2: GTBank HTML table - Description in same cell
+        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]+from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 3: GTBank text format "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 4: HTML table with "From" or "Sender" label
+        elseif (preg_match('/<td[^>]*>[\s]*(?:from|sender|payer|depositor|account\s*name|name)[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 5: Standard patterns in HTML
+        elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|<\/)/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 6: Try in text (fallback)
+        elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $fullText, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 7: Other standard patterns in text
+        elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i', $fullText, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
         }
         
-        // If not found in HTML, try full text
-        if (!$senderName) {
-            foreach ($namePatterns as $pattern) {
-                if (preg_match($pattern, $fullText, $matches)) {
-                    $senderName = trim(strtolower($matches[1]));
-                    if (strlen($senderName) > 2) {
-                        break;
-                    }
-                }
+        // Clean up sender name (remove extra spaces, validate length)
+        if ($senderName) {
+            $senderName = preg_replace('/\s+/', ' ', $senderName);
+            if (strlen($senderName) < 3) {
+                $senderName = null; // Too short, invalid
             }
         }
 
