@@ -57,10 +57,15 @@ class EmailAccount extends Model
 
     /**
      * Set encrypted password
+     * Preserves spaces - Gmail App Passwords have spaces (e.g., "hftp gysf vnnl iqlj")
      */
     public function setPasswordAttribute($value)
     {
-        $this->attributes['password'] = Crypt::encryptString($value);
+        // Preserve password exactly as provided (including spaces)
+        // Don't trim - Gmail App Passwords contain spaces
+        if ($value !== null && $value !== '') {
+            $this->attributes['password'] = Crypt::encryptString($value);
+        }
     }
 
     /**

@@ -101,9 +101,12 @@ class EmailAccountController extends Controller
         ]);
 
         // Don't update password if not provided
-        if (empty($validated['password'])) {
+        // Check if password is actually empty (not just whitespace)
+        // But preserve spaces if password is provided (Gmail App Passwords have spaces)
+        if (!isset($validated['password']) || trim($validated['password']) === '') {
             unset($validated['password']);
         }
+        // If password is provided, preserve it exactly as entered (including spaces)
 
         try {
             $emailAccount->update($validated);
