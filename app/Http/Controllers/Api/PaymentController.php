@@ -42,7 +42,9 @@ class PaymentController extends Controller
      */
     public function show(string $transactionId): JsonResponse
     {
-        $payment = Payment::where('transaction_id', $transactionId)->firstOrFail();
+        $payment = Payment::with('accountNumberDetails')
+            ->where('transaction_id', $transactionId)
+            ->firstOrFail();
 
         return response()->json([
             'success' => true,
