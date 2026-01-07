@@ -55,7 +55,7 @@ class TestTransactionController extends Controller
                 'webhook_url' => $business->webhook_url ?? 'https://webhook.site/test',
             ];
 
-            $payment = $this->paymentService->createPayment($paymentData, $business->id);
+            $payment = $this->paymentService->createPayment($paymentData, $business);
 
             return response()->json([
                 'success' => true,
