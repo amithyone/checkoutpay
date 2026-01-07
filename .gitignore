@@ -7,6 +7,7 @@
 .env
 .env.backup
 .env.production
+.env.local
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
@@ -18,3 +19,6 @@ yarn-error.log
 /.vscode
 database/database.sqlite
 database/database.sqlite-journal
+
+# Deployment files
+deploy.sh

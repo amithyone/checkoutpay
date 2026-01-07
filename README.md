@@ -34,7 +34,7 @@ A robust, production-ready email-based payment gateway built with Laravel 10. Au
 
 - PHP >= 8.1
 - Composer
-- SQLite (default) or MySQL/PostgreSQL
+- MySQL 5.7+ or PostgreSQL 10+ (MySQL recommended)
 - Email account (Gmail recommended)
 
 ## 🛠️ Installation
@@ -47,10 +47,15 @@ composer install
 
 ### 2. Configure Environment
 
-Copy `.env.example` to `.env`:
+The `.env` file is already created with MySQL configuration. Edit it with your database credentials:
 
-```bash
-cp .env.example .env
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=payment_gateway
+DB_USERNAME=root
+DB_PASSWORD=your_mysql_password
 ```
 
 Generate application key:
@@ -59,7 +64,36 @@ Generate application key:
 php artisan key:generate
 ```
 
-### 3. Configure Email Settings
+### 3. Create MySQL Database
+
+**Using MySQL Command Line:**
+```bash
+mysql -u root -p
+CREATE DATABASE payment_gateway CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+EXIT;
+```
+
+**Or using phpMyAdmin:**
+- Go to http://localhost/phpmyadmin
+- Create database: `payment_gateway`
+- Collation: `utf8mb4_unicode_ci`
+
+See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed MySQL setup instructions.
+
+### 4. Run Migrations
+
+```bash
+php artisan migrate
+```
+
+### 5. Seed Initial Data
+
+```bash
+php artisan db:seed --class=AdminSeeder
+php artisan db:seed --class=AccountNumberSeeder
+```
+
+### 6. Configure Email Settings
 
 Edit `.env` file:
 
@@ -319,13 +353,14 @@ curl -X POST http://localhost:8000/api/v1/payment-request \
 
 1. **Queue Worker**: Use supervisor/systemd to keep queue worker running
 2. **Scheduler**: Add Laravel scheduler to cron
-3. **Database**: Use MySQL/PostgreSQL instead of SQLite
+3. **Database**: MySQL is configured by default - use strong passwords and dedicated users
 4. **Caching**: Configure Redis/Memcached for better performance
 5. **Logging**: Configure proper log channels
 6. **Security**: Add API authentication (Sanctum/Passport) - See `IMPROVEMENTS.md`
 7. **Rate Limiting**: Already configured in API routes
 8. **HTTPS**: Use HTTPS for webhook URLs
 9. **Run Migrations**: Don't forget to run new migrations for indexes and expiration
+10. **Database Backups**: Set up automated MySQL backups
 
 ## 📋 New Features
 
