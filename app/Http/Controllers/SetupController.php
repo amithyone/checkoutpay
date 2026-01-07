@@ -242,12 +242,25 @@ class SetupController extends Controller
         $envContent = File::get($envFile);
 
         foreach ($data as $key => $value) {
-            $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
+            // For .env files, don't quote values unless they contain spaces
+            // Laravel's env() function handles special characters without quotes
+            $escapedValue = $value;
+            
+            // Only quote if value contains spaces and isn't already quoted
+            if (preg_match('/\s/', $value) && !preg_match('/^["\'].*["\']$/', $value)) {
+                // Escape quotes and wrap in double quotes
+                $escapedValue = '"' . str_replace('"', '\\"', $value) . '"';
+            }
+            
+            // Match the key with optional spaces around =
+            $pattern = '/^' . preg_quote($key, '/') . '\s*=\s*.*/m';
             
             if (preg_match($pattern, $envContent)) {
-                $envContent = preg_replace($pattern, $key . '=' . $value, $envContent);
+                // Replace existing value
+                $envContent = preg_replace($pattern, $key . '=' . $escapedValue, $envContent);
             } else {
-                $envContent .= "\n" . $key . '=' . $value;
+                // Append new key-value pair
+                $envContent .= "\n" . $key . '=' . $escapedValue;
             }
         }
 
