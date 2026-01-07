@@ -249,7 +249,7 @@ class EmailWebhookController extends Controller
                 try {
                     $extractedInfo = $matchingService->extractPaymentInfo($emailData);
                     // Override sender_name with Zapier value if provided
-                    if ($senderName && empty($extractedInfo['sender_name'])) {
+                    if (is_array($extractedInfo) && $senderName && empty($extractedInfo['sender_name'] ?? null)) {
                         $extractedInfo['sender_name'] = strtolower(trim($senderName));
                     }
                 } catch (\Exception $e) {
@@ -257,6 +257,7 @@ class EmailWebhookController extends Controller
                         'error' => $e->getMessage(),
                         'subject' => $subject,
                     ]);
+                    $extractedInfo = null; // Ensure it's null on error
                 }
             }
 
