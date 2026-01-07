@@ -23,6 +23,7 @@ return [
         App\Providers\AppServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
+        Illuminate\View\ViewServiceProvider::class,
     ])->toArray(),
     'aliases' => Facade::defaultAliases()->merge([])->toArray(),
 ];
