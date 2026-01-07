@@ -188,23 +188,28 @@
 
 <script>
 let searchTimeout;
-const searchInput = document.getElementById('searchInput');
-const statusFilter = document.getElementById('statusFilter');
-const emailAccountFilter = document.getElementById('emailAccountFilter');
-const emailRows = document.querySelectorAll('.email-row');
 
 function filterEmails() {
-    const searchTerm = searchInput.value.toLowerCase().trim();
-    const statusValue = statusFilter.value;
-    const emailAccountValue = emailAccountFilter.value;
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const emailAccountFilter = document.getElementById('emailAccountFilter');
+    const emailRows = document.querySelectorAll('.email-row');
+    
+    if (!searchInput || !emailRows.length) {
+        return;
+    }
+    
+    const searchTerm = (searchInput.value || '').toLowerCase().trim();
+    const statusValue = statusFilter ? statusFilter.value : '';
+    const emailAccountValue = emailAccountFilter ? emailAccountFilter.value : '';
     
     let visibleCount = 0;
     
     emailRows.forEach(row => {
-        const subject = row.dataset.subject || '';
-        const fromEmail = row.dataset.fromEmail || '';
-        const fromName = row.dataset.fromName || '';
-        const senderName = row.dataset.senderName || '';
+        const subject = (row.dataset.subject || '').toLowerCase();
+        const fromEmail = (row.dataset.fromEmail || '').toLowerCase();
+        const fromName = (row.dataset.fromName || '').toLowerCase();
+        const senderName = (row.dataset.senderName || '').toLowerCase();
         const amount = row.dataset.amount || '';
         const status = row.dataset.status || '';
         const emailAccountId = row.dataset.emailAccountId || '';
@@ -212,12 +217,13 @@ function filterEmails() {
         // Search filter
         let matchesSearch = true;
         if (searchTerm) {
+            const numericSearch = searchTerm.replace(/[^0-9.]/g, '');
             matchesSearch = 
                 subject.includes(searchTerm) ||
                 fromEmail.includes(searchTerm) ||
                 fromName.includes(searchTerm) ||
                 senderName.includes(searchTerm) ||
-                (amount && amount.toString().includes(searchTerm.replace(/[^0-9.]/g, '')));
+                (amount && numericSearch && amount.toString().includes(numericSearch));
         }
         
         // Status filter
@@ -236,17 +242,13 @@ function filterEmails() {
     });
     
     // Update empty state
-    const emptyRow = document.querySelector('#emailsTableBody tr:last-child');
-    if (emptyRow && emptyRow.classList.contains('no-results')) {
-        if (visibleCount > 0) {
-            emptyRow.style.display = 'none';
-        } else {
-            emptyRow.style.display = '';
-        }
-    } else if (visibleCount === 0 && emailRows.length > 0) {
+    const tbody = document.getElementById('emailsTableBody');
+    if (!tbody) return;
+    
+    let noResultsRow = tbody.querySelector('.no-results-row');
+    
+    if (visibleCount === 0 && emailRows.length > 0) {
         // Show no results message
-        const tbody = document.getElementById('emailsTableBody');
-        let noResultsRow = tbody.querySelector('.no-results-row');
         if (!noResultsRow) {
             noResultsRow = document.createElement('tr');
             noResultsRow.className = 'no-results-row';
@@ -261,7 +263,6 @@ function filterEmails() {
         noResultsRow.style.display = '';
     } else {
         // Hide no results row if we have results
-        const noResultsRow = document.querySelector('.no-results-row');
         if (noResultsRow) {
             noResultsRow.style.display = 'none';
         }
@@ -269,36 +270,47 @@ function filterEmails() {
 }
 
 // Real-time search as you type
-if (searchInput) {
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(filterEmails, 300); // Debounce 300ms
-    });
-}
-
-// Filter on status change
-if (statusFilter) {
-    statusFilter.addEventListener('change', filterEmails);
-}
-
-// Filter on email account change
-if (emailAccountFilter) {
-    emailAccountFilter.addEventListener('change', filterEmails);
-}
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const emailAccountFilter = document.getElementById('emailAccountFilter');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(filterEmails, 200); // Debounce 200ms
+        });
+    }
+    
+    if (statusFilter) {
+        statusFilter.addEventListener('change', filterEmails);
+    }
+    
+    if (emailAccountFilter) {
+        emailAccountFilter.addEventListener('change', filterEmails);
+    }
+    
+    // Initial filter on page load (if there are query params)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('search') || urlParams.has('status') || urlParams.has('email_account_id')) {
+        filterEmails();
+    }
+});
 
 // Clear filters function
 function clearFilters() {
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const emailAccountFilter = document.getElementById('emailAccountFilter');
+    
     if (searchInput) searchInput.value = '';
     if (statusFilter) statusFilter.value = '';
     if (emailAccountFilter) emailAccountFilter.value = '';
+    
     filterEmails();
-    // Optionally reload page to reset pagination
+    
+    // Reload page to reset pagination
     window.location.href = '{{ route("admin.processed-emails.index") }}';
 }
-
-// Initial filter on page load
-document.addEventListener('DOMContentLoaded', function() {
-    filterEmails();
-});
 </script>
 @endsection
