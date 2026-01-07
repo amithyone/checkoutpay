@@ -190,8 +190,8 @@ class PaymentMatchingService
             $receivedName = trim(strtolower($extractedInfo['sender_name']));
             $receivedName = preg_replace('/\s+/', ' ', $receivedName);
 
-            // Exact match required
-            if ($expectedName !== $receivedName) {
+            // Check if names match (handles order variations and partial matches)
+            if (!$this->namesMatch($expectedName, $receivedName)) {
                 return [
                     'matched' => false,
                     'reason' => sprintf(
