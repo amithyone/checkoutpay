@@ -147,8 +147,6 @@ class MonitorEmails extends Command
             
             foreach ($messages as $message) {
                 try {
-                    $subject = strtolower($message->getSubject() ?? '');
-                    $text = strtolower($message->getTextBody() ?? '');
                     $fromEmail = $message->getFrom()[0]->mail ?? '';
                     
                     // Filter by allowed senders if configured
@@ -157,49 +155,31 @@ class MonitorEmails extends Command
                         continue;
                     }
                     
-                    // Filter by keywords - only process payment-related emails
-                    // Expanded keywords to match GTBank and other bank formats
-                    $paymentKeywords = [
-                        'transfer', 'deposit', 'credit', 'payment', 'transaction', 
-                        'alert', 'notification', 'received', 'credited', 'debit',
-                        'gens', 'electronic', 'bank', 'account', 'amount'
-                    ];
-                    
-                    $hasPaymentKeyword = false;
-                    $combinedText = strtolower($subject . ' ' . $text);
-                    
-                    foreach ($paymentKeywords as $keyword) {
-                        if (strpos($combinedText, $keyword) !== false) {
-                            $hasPaymentKeyword = true;
-                            break;
-                        }
-                    }
-                    
-                    // Also check for amount patterns (NGN format, currency symbols, etc.)
-                    if (!$hasPaymentKeyword && (
-                        preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $combinedText) ||
-                        preg_match('/ngn\s*[\d,]+\.?\d*/i', $combinedText) ||
-                        preg_match('/naira\s*[\d,]+\.?\d*/i', $combinedText) ||
-                        preg_match('/amount\s*:?\s*[\d,]+\.?\d*/i', $combinedText)
-                    )) {
-                        $hasPaymentKeyword = true;
-                    }
-                    
-                    // Check for account number patterns (usually 10 digits)
-                    if (!$hasPaymentKeyword && preg_match('/account\s*number\s*:?\s*\d{8,}/i', $combinedText)) {
-                        $hasPaymentKeyword = true;
-                    }
-                    
-                    if (!$hasPaymentKeyword) {
-                        $skippedCount++;
-                        // Don't mark as read - these aren't payment emails, skip them
-                        continue;
-                    }
-                    
-                    // Store email in database first, then process
+                    // Store ALL emails in database (no keyword filtering)
+                    // This helps debug and ensures we don't miss any payment emails
                     $this->storeEmail($message, $emailAccount);
-                    $this->processMessage($message, $emailAccount);
-                    $processedCount++;
+                    
+                    // Try to extract payment info - if it has payment data, process it
+                    $matchingService = new PaymentMatchingService(
+                        new \App\Services\TransactionLogService()
+                    );
+                    $emailData = [
+                        'subject' => $message->getSubject(),
+                        'from' => $fromEmail,
+                        'text' => $message->getTextBody(),
+                        'html' => $message->getHTMLBody(),
+                        'date' => $message->getDate()->toDateTimeString(),
+                        'email_account_id' => $emailAccount?->id,
+                    ];
+                    $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                    
+                    // Only process if we extracted payment info (amount found)
+                    if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+                        $this->processMessage($message, $emailAccount);
+                        $processedCount++;
+                    } else {
+                        $skippedCount++;
+                    }
                 } catch (\Exception $e) {
                     Log::error('Error processing email message', [
                         'error' => $e->getMessage(),

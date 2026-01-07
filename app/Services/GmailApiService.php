@@ -130,12 +130,12 @@ class GmailApiService
             
             // Build Gmail search query
             // Check ALL emails (read and unread) after the payment request date
-            // This ensures emails that arrived before payment request are still checked
+            // No keyword filtering - get all emails
             $query = "after:{$sinceFormatted}";
             
-            // Add keyword filters if provided
-            // Gmail search supports: transaction OR notification OR credit OR amount
-            if (!empty($options['keywords']) && is_array($options['keywords'])) {
+            // Only add keyword filters if keywords are provided and not empty
+            // Empty keywords array means fetch all emails
+            if (!empty($options['keywords']) && is_array($options['keywords']) && count($options['keywords']) > 0) {
                 // Use first few keywords for Gmail search (Gmail has query length limits)
                 $mainKeywords = array_slice($options['keywords'], 0, 5);
                 $keywordQuery = implode(' OR ', $mainKeywords);
