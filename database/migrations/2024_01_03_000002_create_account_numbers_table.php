@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('account_number')->unique();
             $table->string('account_name');
             $table->string('bank_name');
-            $table->foreignId('business_id')->nullable()->constrained('businesses')->onDelete('set null');
+            $table->unsignedBigInteger('business_id')->nullable();
             $table->boolean('is_pool')->default(false); // Pool account or business-specific
             $table->boolean('is_active')->default(true);
             $table->integer('usage_count')->default(0);

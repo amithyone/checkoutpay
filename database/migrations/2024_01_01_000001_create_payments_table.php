@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('bank')->nullable();
             $table->text('webhook_url');
             $table->string('account_number')->nullable();
-            $table->foreignId('business_id')->nullable()->constrained('businesses')->onDelete('set null');
+            $table->unsignedBigInteger('business_id')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->json('email_data')->nullable();
             $table->timestamp('matched_at')->nullable();

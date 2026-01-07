@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('transaction_id')->index();
             $table->foreignId('payment_id')->nullable()->constrained('payments')->onDelete('cascade');
-            $table->foreignId('business_id')->nullable()->constrained('businesses')->onDelete('set null');
+            $table->unsignedBigInteger('business_id')->nullable();
             $table->enum('event_type', [
                 'payment_requested',
                 'account_assigned',
