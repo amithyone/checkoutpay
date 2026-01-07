@@ -3,58 +3,188 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessEmailPayment;
+use App\Models\ProcessedEmail;
+use App\Models\EmailAccount;
+use App\Services\PaymentMatchingService;
+use App\Services\TransactionLogService;
+use App\Services\GtbankTransactionParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class EmailWebhookController extends Controller
 {
     /**
-     * Receive email via webhook (from email forwarding service)
-     * 
-     * This endpoint receives emails forwarded from Gmail via services like:
-     - Zapier
-     - Make.com
-     - Email Parser
-     - Custom email-to-webhook service
+     * Receive forwarded email via webhook
+     * This endpoint receives emails forwarded from email providers
+     * Much faster than IMAP/Gmail API polling!
      */
     public function receive(Request $request)
     {
         try {
-            // Log incoming webhook
-            Log::info('Email webhook received', [
-                'headers' => $request->headers->all(),
-                'body' => $request->all(),
+            // Validate request
+            $validator = Validator::make($request->all(), [
+                'from' => 'required|string',
+                'to' => 'required|string',
+                'subject' => 'nullable|string',
+                'text' => 'nullable|string',
+                'html' => 'nullable|string',
+                'date' => 'nullable|date',
+                'message_id' => 'nullable|string',
             ]);
 
-            // Parse email data from webhook
-            // Different services send different formats, so we handle multiple
-            $emailData = $this->parseWebhookData($request);
-
-            if (empty($emailData['subject']) || empty($emailData['from'])) {
+            if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Missing required email fields (subject, from)',
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
                 ], 400);
             }
 
-            // Dispatch job to process email (same as IMAP flow)
-            ProcessEmailPayment::dispatch($emailData);
+            $from = $request->input('from');
+            $to = $request->input('to');
+            $subject = $request->input('subject', 'No Subject');
+            $text = $request->input('text', '');
+            $html = $request->input('html', '');
+            $date = $request->input('date', now()->toDateTimeString());
+            $messageId = $request->input('message_id', md5($from . $subject . $date));
 
-            Log::info('Email webhook processed successfully', [
-                'subject' => $emailData['subject'],
-                'from' => $emailData['from'],
+            // Extract email address from "Name <email@example.com>" format
+            $fromEmail = $from;
+            $fromName = '';
+            if (preg_match('/<(.+?)>/', $from, $matches)) {
+                $fromEmail = $matches[1];
+                $fromName = trim(str_replace($matches[0], '', $from));
+            } elseif (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+                if (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', $fromEmail, $matches)) {
+                    $fromEmail = $matches[0];
+                }
+            }
+
+            // Filter out noreply@xtrapay.ng emails
+            if (strtolower($fromEmail) === 'noreply@xtrapay.ng') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Skipped noreply@xtrapay.ng email',
+                ]);
+            }
+
+            // Find email account by forwarding address (to field)
+            $emailAccount = EmailAccount::where('email', $to)
+                ->orWhere('email', 'like', '%' . explode('@', $to)[0] . '%')
+                ->first();
+
+            // Check if email already exists
+            $existing = ProcessedEmail::where('message_id', $messageId)
+                ->when($emailAccount, function ($q) use ($emailAccount) {
+                    $q->where('email_account_id', $emailAccount->id);
+                })
+                ->exists();
+
+            if ($existing) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Email already processed',
+                    'duplicate' => true,
+                ]);
+            }
+
+            // Extract payment info
+            $matchingService = new PaymentMatchingService(new TransactionLogService());
+            $emailData = [
+                'subject' => $subject,
+                'from' => $fromEmail,
+                'text' => $text,
+                'html' => $html,
+                'date' => $date,
+                'email_account_id' => $emailAccount?->id,
+            ];
+
+            $extractedInfo = null;
+            try {
+                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+            } catch (\Exception $e) {
+                Log::debug('Payment info extraction failed', [
+                    'error' => $e->getMessage(),
+                    'subject' => $subject,
+                ]);
+            }
+
+            // Store email
+            $processedEmail = ProcessedEmail::create([
+                'email_account_id' => $emailAccount?->id,
+                'message_id' => $messageId,
+                'subject' => $subject,
+                'from_email' => $fromEmail,
+                'from_name' => $fromName,
+                'text_body' => $text,
+                'html_body' => $html,
+                'email_date' => $date,
+                'amount' => $extractedInfo['amount'] ?? null,
+                'sender_name' => $extractedInfo['sender_name'] ?? null,
+                'account_number' => $extractedInfo['account_number'] ?? null,
+                'extracted_data' => $extractedInfo,
             ]);
+
+            // Check if this is a GTBank transaction
+            $gtbankParser = new GtbankTransactionParser();
+            if ($gtbankParser->isGtbankTransaction($emailData)) {
+                $gtbankTemplate = \App\Models\BankEmailTemplate::where('bank_name', 'GTBank')
+                    ->orWhere('bank_name', 'Guaranty Trust Bank')
+                    ->active()
+                    ->orderBy('priority', 'desc')
+                    ->first();
+
+                $gtbankParser->parseTransaction($emailData, $processedEmail, $gtbankTemplate);
+            }
+
+            // Try to match payment immediately
+            if ($extractedInfo && $extractedInfo['amount']) {
+                $matchedPayment = $matchingService->matchEmail($emailData);
+
+                if ($matchedPayment) {
+                    // Mark email as matched
+                    $processedEmail->markAsMatched($matchedPayment);
+
+                    // Approve payment
+                    $matchedPayment->approve([
+                        'subject' => $subject,
+                        'from' => $fromEmail,
+                        'text' => $text,
+                        'html' => $html,
+                        'date' => $date,
+                    ]);
+
+                    // Update business balance
+                    if ($matchedPayment->business_id) {
+                        $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                    }
+
+                    // Dispatch event to send webhook
+                    event(new \App\Events\PaymentApproved($matchedPayment));
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Email received and payment matched',
+                        'matched' => true,
+                        'payment_id' => $matchedPayment->id,
+                        'transaction_id' => $matchedPayment->transaction_id,
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Email received and queued for processing',
+                'message' => 'Email received and stored',
+                'matched' => false,
+                'email_id' => $processedEmail->id,
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error processing email webhook', [
+            Log::error('Error receiving email webhook', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
@@ -62,118 +192,5 @@ class EmailWebhookController extends Controller
                 'message' => 'Error processing email: ' . $e->getMessage(),
             ], 500);
         }
-    }
-
-    /**
-     * Parse webhook data from different services
-     */
-    protected function parseWebhookData(Request $request): array
-    {
-        $data = $request->all();
-
-        // Format 1: Zapier/Make.com format
-        if (isset($data['subject']) && isset($data['from'])) {
-            return [
-                'subject' => $data['subject'] ?? '',
-                'from' => $this->extractEmail($data['from'] ?? ''),
-                'to' => $this->extractEmail($data['to'] ?? ''),
-                'text' => $data['text'] ?? $data['body'] ?? $data['plain'] ?? '',
-                'html' => $data['html'] ?? '',
-                'date' => $data['date'] ?? now()->toDateTimeString(),
-                'source' => 'webhook',
-            ];
-        }
-
-        // Format 2: Email Parser format
-        if (isset($data['email'])) {
-            $email = $data['email'];
-            return [
-                'subject' => $email['subject'] ?? $data['subject'] ?? '',
-                'from' => $this->extractEmail($email['from'] ?? $data['from'] ?? ''),
-                'to' => $this->extractEmail($email['to'] ?? $data['to'] ?? ''),
-                'text' => $email['text'] ?? $email['body'] ?? $data['text'] ?? '',
-                'html' => $email['html'] ?? $data['html'] ?? '',
-                'date' => $email['date'] ?? $data['date'] ?? now()->toDateTimeString(),
-                'source' => 'webhook',
-            ];
-        }
-
-        // Format 3: Raw email format
-        if (isset($data['raw'])) {
-            return $this->parseRawEmail($data['raw']);
-        }
-
-        // Format 4: Generic format (try to extract from any fields)
-        return [
-            'subject' => $data['subject'] ?? $data['Subject'] ?? $data['title'] ?? '',
-            'from' => $this->extractEmail($data['from'] ?? $data['From'] ?? $data['sender'] ?? ''),
-            'to' => $this->extractEmail($data['to'] ?? $data['To'] ?? $data['recipient'] ?? ''),
-            'text' => $data['text'] ?? $data['body'] ?? $data['content'] ?? $data['message'] ?? '',
-            'html' => $data['html'] ?? $data['HTML'] ?? '',
-            'date' => $data['date'] ?? $data['Date'] ?? $data['timestamp'] ?? now()->toDateTimeString(),
-            'source' => 'webhook',
-        ];
-    }
-
-    /**
-     * Extract email address from string
-     */
-    protected function extractEmail(string $string): string
-    {
-        // Extract email from formats like "Name <email@example.com>" or just "email@example.com"
-        if (preg_match('/<(.+?)>/', $string, $matches)) {
-            return $matches[1];
-        }
-        
-        // Check if it's already just an email
-        if (filter_var($string, FILTER_VALIDATE_EMAIL)) {
-            return $string;
-        }
-
-        // Try to find email in string
-        if (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', $string, $matches)) {
-            return $matches[0];
-        }
-
-        return $string;
-    }
-
-    /**
-     * Parse raw email content
-     */
-    protected function parseRawEmail(string $rawEmail): array
-    {
-        // Simple email parsing (for basic cases)
-        // For production, consider using a proper email parser library
-        
-        $lines = explode("\n", $rawEmail);
-        $headers = [];
-        $body = [];
-        $inBody = false;
-
-        foreach ($lines as $line) {
-            if (empty(trim($line)) && !$inBody) {
-                $inBody = true;
-                continue;
-            }
-
-            if (!$inBody) {
-                if (preg_match('/^([^:]+):\s*(.+)$/', $line, $matches)) {
-                    $headers[strtolower(trim($matches[1]))] = trim($matches[2]);
-                }
-            } else {
-                $body[] = $line;
-            }
-        }
-
-        return [
-            'subject' => $headers['subject'] ?? '',
-            'from' => $this->extractEmail($headers['from'] ?? ''),
-            'to' => $this->extractEmail($headers['to'] ?? ''),
-            'text' => implode("\n", $body),
-            'html' => '',
-            'date' => $headers['date'] ?? now()->toDateTimeString(),
-            'source' => 'webhook',
-        ];
     }
 }
