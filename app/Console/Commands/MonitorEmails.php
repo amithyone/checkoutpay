@@ -710,6 +710,7 @@ class MonitorEmails extends Command
             try {
                 return ProcessedEmail::create([
                     'email_account_id' => $emailAccount->id,
+                    'source' => 'gmail_api', // Mark as Gmail API source
                     'message_id' => $messageId,
                     'subject' => $emailData['subject'] ?? '',
                     'from_email' => $fromEmail,
