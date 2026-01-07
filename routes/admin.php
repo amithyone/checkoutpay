@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AccountNumberController;
+use App\Http\Controllers\Admin\BankEmailTemplateController;
 use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmailAccountController;
@@ -68,5 +69,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Settings
         Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
         Route::put('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
+
+        // Bank Email Templates
+        Route::resource('bank-email-templates', BankEmailTemplateController::class);
     });
 });

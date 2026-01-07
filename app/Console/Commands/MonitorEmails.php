@@ -322,6 +322,13 @@ class MonitorEmails extends Command
                         }
                     }
                     
+                    // Filter out noreply@xtrapay.ng emails
+                    if (strtolower($fromEmail) === 'noreply@xtrapay.ng') {
+                        $this->line("⏭️  Skipping email from noreply@xtrapay.ng: " . ($emailData['subject'] ?? 'No subject'));
+                        $skippedCount++;
+                        continue;
+                    }
+                    
                     // Filter by allowed senders if configured
                     if (!$emailAccount->isSenderAllowed($fromEmail)) {
                         $skippedCount++;
@@ -473,6 +480,12 @@ class MonitorEmails extends Command
             $from = $message->getFrom()[0] ?? null;
             $fromEmail = $from->mail ?? '';
             $fromName = $from->personal ?? '';
+            
+            // Filter out noreply@xtrapay.ng emails
+            if (strtolower($fromEmail) === 'noreply@xtrapay.ng') {
+                $this->line("⏭️  Skipping email from noreply@xtrapay.ng: {$subject}");
+                return;
+            }
             
             $subject = $message->getSubject() ?? 'No Subject';
             $this->line("📝 Subject: {$subject} | From: {$fromEmail}");
