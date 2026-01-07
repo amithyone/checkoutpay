@@ -38,6 +38,11 @@
                     <span>Dashboard</span>
                 </a>
 
+                <a href="{{ route('admin.email-accounts.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.email-accounts.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-envelope w-5 mr-3"></i>
+                    <span>Email Accounts</span>
+                </a>
+
                 <a href="{{ route('admin.account-numbers.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.account-numbers.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-credit-card w-5 mr-3"></i>
                     <span>Account Numbers</span>
