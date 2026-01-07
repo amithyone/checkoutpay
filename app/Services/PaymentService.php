@@ -75,6 +75,9 @@ class PaymentService
             'payer_name' => $payment->payer_name,
         ]);
 
+        // Check stored emails for immediate match
+        $this->checkStoredEmailsForMatch($payment);
+
         return $payment;
     }
 

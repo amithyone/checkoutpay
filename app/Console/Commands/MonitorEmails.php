@@ -4,7 +4,9 @@ namespace App\Console\Commands;
 
 use App\Jobs\ProcessEmailPayment;
 use App\Models\EmailAccount;
+use App\Models\ProcessedEmail;
 use App\Services\GmailApiService;
+use App\Services\PaymentMatchingService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Webklex\PHPIMAP\Client;
@@ -89,24 +91,29 @@ class MonitorEmails extends Command
             $client->connect();
             $folder = $client->getFolder($emailAccount ? $emailAccount->folder : 'INBOX');
             
-            // Only check emails after the oldest pending payment was created
-            // This ensures we don't process old emails for new transactions
-            // Check ALL pending payments (including businesses without email accounts)
-            // If business has email account, it will be matched only to that account
-            // If business has NO email account, it can be matched from any email account
+            // Check emails from the last 7 days (or since oldest pending payment if exists)
+            // Store all payment-related emails in database for later matching
             $oldestPendingPayment = \App\Models\Payment::pending()
                 ->orderBy('created_at', 'asc')
                 ->first();
             
-            // If no pending payments, don't check emails (nothing to match against)
-            if (!$oldestPendingPayment) {
-                $this->info("No pending payments found. Skipping email check.");
-                $client->disconnect();
-                return;
+            // Use oldest pending payment date or last 7 days, whichever is older
+            if ($oldestPendingPayment) {
+                $sinceDate = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer
+            } else {
+                // If no pending payments, check last 7 days of emails and store them
+                $sinceDate = now()->subDays(7);
             }
             
-            // Only check emails received after the oldest pending payment was created
-            $sinceDate = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer for email delivery delay
+            // Also check for the most recent email we've already stored
+            $lastStoredEmail = \App\Models\ProcessedEmail::where('email_account_id', $emailAccount?->id)
+                ->orderBy('email_date', 'desc')
+                ->first();
+            
+            // If we have stored emails, only check emails after the last stored one
+            if ($lastStoredEmail && $lastStoredEmail->email_date > $sinceDate) {
+                $sinceDate = $lastStoredEmail->email_date;
+            }
             
             // Check ALL emails (read and unread) after the payment request date
             // This ensures emails that arrived before payment request are still checked
@@ -189,6 +196,8 @@ class MonitorEmails extends Command
                         continue;
                     }
                     
+                    // Store email in database first, then process
+                    $this->storeEmail($message, $emailAccount);
                     $this->processMessage($message, $emailAccount);
                     $processedCount++;
                 } catch (\Exception $e) {
@@ -273,23 +282,29 @@ class MonitorEmails extends Command
         try {
             $gmailService = new GmailApiService($emailAccount);
             
-            // Only check emails after the oldest pending payment was created
-            // This ensures we don't process old emails for new transactions
-            // Check ALL pending payments (including businesses without email accounts)
-            // If business has email account, it will be matched only to that account
-            // If business has NO email account, it can be matched from any email account
+            // Check emails from the last 7 days (or since oldest pending payment if exists)
+            // Store all payment-related emails in database for later matching
             $oldestPendingPayment = \App\Models\Payment::pending()
                 ->orderBy('created_at', 'asc')
                 ->first();
             
-            // If no pending payments, don't check emails (nothing to match against)
-            if (!$oldestPendingPayment) {
-                $this->info("No pending payments found. Skipping email check for {$emailAccount->email}.");
-                return;
+            // Use oldest pending payment date or last 7 days, whichever is older
+            if ($oldestPendingPayment) {
+                $since = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer
+            } else {
+                // If no pending payments, check last 7 days of emails and store them
+                $since = now()->subDays(7);
             }
             
-            // Only check emails received after the oldest pending payment was created
-            $since = $oldestPendingPayment->created_at->subMinutes(5); // 5 min buffer for email delivery delay
+            // Also check for the most recent email we've already stored
+            $lastStoredEmail = ProcessedEmail::where('email_account_id', $emailAccount->id)
+                ->orderBy('email_date', 'desc')
+                ->first();
+            
+            // If we have stored emails, only check emails after the last stored one
+            if ($lastStoredEmail && $lastStoredEmail->email_date > $since) {
+                $since = $lastStoredEmail->email_date;
+            }
             
             // Get messages with keyword filtering
             $messages = $gmailService->getMessagesSince($since, [
@@ -351,6 +366,8 @@ class MonitorEmails extends Command
                         continue;
                     }
                     
+                    // Store email in database first, then process
+                    $this->storeGmailApiEmail($emailData, $emailAccount);
                     $this->processGmailApiMessage($emailData, $emailAccount);
                     $processedCount++;
                     
@@ -451,6 +468,121 @@ class MonitorEmails extends Command
             ]);
 
             $this->warn("Error processing email: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Store IMAP email in database
+     */
+    protected function storeEmail($message, ?EmailAccount $emailAccount): void
+    {
+        try {
+            $messageId = $message->getUid() ?? $message->getMessageId();
+            $from = $message->getFrom()[0] ?? null;
+            $fromEmail = $from->mail ?? '';
+            $fromName = $from->personal ?? '';
+            
+            // Extract payment info to store
+            $matchingService = new PaymentMatchingService(
+                new \App\Services\TransactionLogService()
+            );
+            $emailData = [
+                'subject' => $message->getSubject(),
+                'from' => $fromEmail,
+                'text' => $message->getTextBody(),
+                'html' => $message->getHTMLBody(),
+                'date' => $message->getDate()->toDateTimeString(),
+                'email_account_id' => $emailAccount?->id,
+            ];
+            $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+            
+            // Check if email already exists
+            $existing = ProcessedEmail::where('message_id', (string)$messageId)
+                ->where('email_account_id', $emailAccount?->id)
+                ->first();
+            
+            if ($existing) {
+                return; // Already stored
+            }
+            
+            ProcessedEmail::create([
+                'email_account_id' => $emailAccount?->id,
+                'message_id' => (string)$messageId,
+                'subject' => $message->getSubject(),
+                'from_email' => $fromEmail,
+                'from_name' => $fromName,
+                'text_body' => $message->getTextBody(),
+                'html_body' => $message->getHTMLBody(),
+                'email_date' => $message->getDate(),
+                'amount' => $extractedInfo['amount'] ?? null,
+                'sender_name' => $extractedInfo['sender_name'] ?? null,
+                'account_number' => $extractedInfo['account_number'] ?? null,
+                'extracted_data' => $extractedInfo,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error storing email in database', [
+                'error' => $e->getMessage(),
+                'email_account_id' => $emailAccount?->id,
+            ]);
+        }
+    }
+
+    /**
+     * Store Gmail API email in database
+     */
+    protected function storeGmailApiEmail(array $emailData, EmailAccount $emailAccount): void
+    {
+        try {
+            $messageId = $emailData['id'] ?? null;
+            if (!$messageId) {
+                return;
+            }
+            
+            // Extract email address from "Name <email@example.com>" format
+            $from = $emailData['from'] ?? '';
+            $fromEmail = $from;
+            $fromName = '';
+            if (preg_match('/<(.+?)>/', $from, $matches)) {
+                $fromEmail = $matches[1];
+                $fromName = trim(str_replace($matches[0], '', $from));
+            } elseif (filter_var($from, FILTER_VALIDATE_EMAIL)) {
+                $fromEmail = $from;
+            }
+            
+            // Extract payment info to store
+            $matchingService = new PaymentMatchingService(
+                new \App\Services\TransactionLogService()
+            );
+            $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+            
+            // Check if email already exists
+            $existing = ProcessedEmail::where('message_id', $messageId)
+                ->where('email_account_id', $emailAccount->id)
+                ->first();
+            
+            if ($existing) {
+                return; // Already stored
+            }
+            
+            ProcessedEmail::create([
+                'email_account_id' => $emailAccount->id,
+                'message_id' => $messageId,
+                'subject' => $emailData['subject'] ?? '',
+                'from_email' => $fromEmail,
+                'from_name' => $fromName,
+                'text_body' => $emailData['text'] ?? '',
+                'html_body' => $emailData['html'] ?? '',
+                'email_date' => $emailData['date'] ?? now(),
+                'amount' => $extractedInfo['amount'] ?? null,
+                'sender_name' => $extractedInfo['sender_name'] ?? null,
+                'account_number' => $extractedInfo['account_number'] ?? null,
+                'extracted_data' => $extractedInfo,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error storing Gmail API email in database', [
+                'error' => $e->getMessage(),
+                'email_account_id' => $emailAccount->id,
+            ]);
         }
     }
 }

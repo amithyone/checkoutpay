@@ -32,6 +32,12 @@ class PaymentMatchingService
             return null; // Don't process duplicates
         }
 
+        // Also check stored emails in database for matching
+        $payment = $this->matchFromStoredEmails($extractedInfo, $emailData['email_account_id'] ?? null);
+        if ($payment) {
+            return $payment;
+        }
+
         // Get pending payments
         // Logic:
         // - If business HAS email account assigned → only match if email came from that account
@@ -86,7 +92,7 @@ class PaymentMatchingService
     /**
      * Extract payment information from email
      */
-    protected function extractPaymentInfo(array $emailData): ?array
+    public function extractPaymentInfo(array $emailData): ?array
     {
         $subject = strtolower($emailData['subject'] ?? '');
         $text = strtolower($emailData['text'] ?? '');
@@ -302,5 +308,65 @@ class PaymentMatchingService
         // Match if all expected words are found in received name
         // OR if all received words are found in expected name (handles shorter names)
         return $allWordsFound || $allReceivedWordsFound;
+    }
+
+    /**
+     * Match payment from stored emails in database
+     */
+    protected function matchFromStoredEmails(array $extractedInfo, ?int $emailAccountId): ?Payment
+    {
+        // Get pending payments
+        $query = Payment::pending();
+        
+        // Filter by email account if provided
+        if ($emailAccountId) {
+            $query->where(function ($q) use ($emailAccountId) {
+                $q->whereHas('business', function ($businessQuery) use ($emailAccountId) {
+                    $businessQuery->where('email_account_id', $emailAccountId);
+                })
+                ->orWhereHas('business', function ($businessQuery) {
+                    $businessQuery->whereNull('email_account_id');
+                })
+                ->orWhereNull('business_id');
+            });
+        }
+        
+        $pendingPayments = $query->get();
+        
+        if ($pendingPayments->isEmpty()) {
+            return null;
+        }
+        
+        // Check stored emails for matching amount and name
+        $storedEmails = \App\Models\ProcessedEmail::unmatched()
+            ->withAmount($extractedInfo['amount'])
+            ->when($emailAccountId, function ($q) use ($emailAccountId) {
+                $q->where('email_account_id', $emailAccountId);
+            })
+            ->get();
+        
+        foreach ($storedEmails as $storedEmail) {
+            foreach ($pendingPayments as $payment) {
+                $match = $this->matchPayment($payment, [
+                    'amount' => $storedEmail->amount,
+                    'sender_name' => $storedEmail->sender_name,
+                ]);
+                
+                if ($match['matched']) {
+                    // Mark stored email as matched
+                    $storedEmail->markAsMatched($payment);
+                    
+                    \Illuminate\Support\Facades\Log::info('Payment matched from stored email', [
+                        'transaction_id' => $payment->transaction_id,
+                        'stored_email_id' => $storedEmail->id,
+                        'match_reason' => $match['reason'],
+                    ]);
+                    
+                    return $payment;
+                }
+            }
+        }
+        
+        return null;
     }
 }
