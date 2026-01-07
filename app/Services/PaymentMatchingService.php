@@ -98,6 +98,16 @@ class PaymentMatchingService
         $text = $emailData['text'] ?? '';
         $html = $emailData['html'] ?? '';
         $from = strtolower($emailData['from'] ?? '');
+        
+        // Try to find matching bank email template
+        $template = $this->findMatchingTemplate($from);
+        
+        // If template found, use template-specific extraction
+        if ($template) {
+            return $this->extractUsingTemplate($emailData, $template);
+        }
+        
+        // Fallback to default extraction logic
 
         // If text body is empty but HTML exists, extract text from HTML intelligently
         if (empty(trim($text)) && !empty($html)) {
