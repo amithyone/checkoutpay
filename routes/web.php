@@ -26,3 +26,29 @@ Route::post('/setup/complete', [SetupController::class, 'complete']);
 // Standalone email connection test (no auth required)
 Route::get('/test-email', [TestEmailController::class, 'test'])->name('test.email');
 Route::post('/test-email', [TestEmailController::class, 'test']);
+
+// Cron job endpoint (for external cron services)
+Route::get('/cron/monitor-emails', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('payment:monitor-emails');
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Email monitoring completed',
+            'timestamp' => now()->toDateTimeString(),
+            'output' => $output,
+        ]);
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Cron job error', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage(),
+            'timestamp' => now()->toDateTimeString(),
+        ], 500);
+    }
+})->name('cron.monitor-emails');

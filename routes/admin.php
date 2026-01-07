@@ -72,5 +72,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Bank Email Templates
         Route::resource('bank-email-templates', BankEmailTemplateController::class);
+
+        // Email Monitoring
+        Route::post('email-monitor/fetch', [\App\Http\Controllers\Admin\EmailMonitorController::class, 'fetchEmails'])->name('email-monitor.fetch');
+        Route::post('email-monitor/check-updates', [\App\Http\Controllers\Admin\EmailMonitorController::class, 'checkTransactionUpdates'])->name('email-monitor.check-updates');
     });
 });

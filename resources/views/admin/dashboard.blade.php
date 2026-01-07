@@ -94,6 +94,46 @@
         </div>
     </div>
 
+    <!-- Email Monitoring Actions -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">Email Monitoring</h3>
+                <p class="text-sm text-gray-600 mt-1">Manually trigger email fetching or check for transaction updates</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="fetchEmails()" id="fetch-emails-btn" 
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center">
+                    <i class="fas fa-envelope mr-2"></i> Fetch Emails
+                </button>
+                <button onclick="checkTransactionUpdates()" id="check-updates-btn"
+                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                    <i class="fas fa-sync-alt mr-2"></i> Check Transaction Updates
+                </button>
+            </div>
+        </div>
+        <div id="monitoring-result" class="mt-4 hidden"></div>
+    </div>
+
+    <!-- Cron Job Info -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-2">
+            <i class="fas fa-clock mr-2"></i> Cron Job URL
+        </h3>
+        <p class="text-sm text-blue-800 mb-4">
+            Use this URL in your cron job service (e.g., cron-job.org, EasyCron) to automatically check emails:
+        </p>
+        <div class="bg-white rounded-lg p-4 border border-blue-200">
+            <code class="text-sm text-gray-900 break-all">{{ url('/cron/monitor-emails') }}</code>
+            <button onclick="copyCronUrl()" class="ml-4 text-blue-600 hover:text-blue-800 text-sm">
+                <i class="fas fa-copy mr-1"></i> Copy URL
+            </button>
+        </div>
+        <p class="text-xs text-blue-700 mt-2">
+            <strong>Recommended frequency:</strong> Every 5-10 minutes
+        </p>
+    </div>
+
     <!-- Stored Emails Section -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-6 border-b border-gray-200 flex items-center justify-between">
@@ -260,4 +300,104 @@
         </div>
     </div>
 </div>
+
+<script>
+function fetchEmails() {
+    const btn = document.getElementById('fetch-emails-btn');
+    const resultDiv = document.getElementById('monitoring-result');
+    const originalText = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Fetching...';
+    resultDiv.classList.add('hidden');
+    
+    fetch('{{ route("admin.email-monitor.fetch") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
+            resultDiv.innerHTML = '<strong>Success!</strong> ' + data.message + '<pre class="mt-2 text-xs overflow-auto max-h-40">' + (data.output || '') + '</pre>';
+        } else {
+            resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
+            resultDiv.innerHTML = '<strong>Error!</strong> ' + data.message;
+        }
+        resultDiv.classList.remove('hidden');
+    })
+    .catch(error => {
+        resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
+        resultDiv.innerHTML = '<strong>Error!</strong> ' + error.message;
+        resultDiv.classList.remove('hidden');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+function checkTransactionUpdates() {
+    const btn = document.getElementById('check-updates-btn');
+    const resultDiv = document.getElementById('monitoring-result');
+    const originalText = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Checking...';
+    resultDiv.classList.add('hidden');
+    
+    fetch('{{ route("admin.email-monitor.check-updates") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
+            let output = data.re_extract_output || '';
+            output += '\n' + (data.monitor_output || '');
+            resultDiv.innerHTML = '<strong>Success!</strong> ' + data.message + '<pre class="mt-2 text-xs overflow-auto max-h-40">' + output + '</pre>';
+            // Reload page after 2 seconds to show updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
+            resultDiv.innerHTML = '<strong>Error!</strong> ' + data.message;
+        }
+        resultDiv.classList.remove('hidden');
+    })
+    .catch(error => {
+        resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
+        resultDiv.innerHTML = '<strong>Error!</strong> ' + error.message;
+        resultDiv.classList.remove('hidden');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+function copyCronUrl() {
+    const url = '{{ url("/cron/monitor-emails") }}';
+    navigator.clipboard.writeText(url).then(() => {
+        alert('Cron URL copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('Cron URL copied to clipboard!');
+    });
+}
+</script>
 @endsection

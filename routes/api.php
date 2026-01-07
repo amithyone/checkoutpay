@@ -33,6 +33,10 @@ Route::prefix('v1')->group(function () {
     
     // Email webhook (for email forwarding services)
     Route::post('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']);
+    
+    // Transaction check endpoint (for external sites to trigger email checking)
+    Route::post('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']);
+    Route::get('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']); // Also support GET
 });
 
 // Health check
