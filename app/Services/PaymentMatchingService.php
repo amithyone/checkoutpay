@@ -32,14 +32,31 @@ class PaymentMatchingService
             return null; // Don't process duplicates
         }
 
-        // Get pending payments, filtered by email account if provided
+        // Get pending payments
+        // Logic:
+        // - If business HAS email account assigned → only match if email came from that account
+        // - If business has NO email account → match from ANY email account
         $query = Payment::pending();
         
-        // If email_account_id is provided, only match payments from businesses using that email account
+        // If email_account_id is provided, match payments from:
+        // 1. Businesses using this email account
+        // 2. Businesses with NO email account (null email_account_id)
         if (!empty($emailData['email_account_id'])) {
-            $query->whereHas('business', function ($q) use ($emailData) {
-                $q->where('email_account_id', $emailData['email_account_id']);
+            $query->where(function ($q) use ($emailData) {
+                // Businesses assigned to this email account
+                $q->whereHas('business', function ($businessQuery) use ($emailData) {
+                    $businessQuery->where('email_account_id', $emailData['email_account_id']);
+                })
+                // OR businesses with NO email account (can receive from any email)
+                ->orWhereHas('business', function ($businessQuery) {
+                    $businessQuery->whereNull('email_account_id');
+                })
+                // OR payments without business (fallback)
+                ->orWhereNull('business_id');
             });
+        } else {
+            // If no email_account_id provided, check all payments
+            // This handles the fallback .env email account case
         }
         
         $pendingPayments = $query->get();

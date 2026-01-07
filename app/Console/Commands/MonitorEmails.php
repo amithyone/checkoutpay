@@ -91,12 +91,10 @@ class MonitorEmails extends Command
             
             // Only check emails after the oldest pending payment was created
             // This ensures we don't process old emails for new transactions
+            // Check ALL pending payments (including businesses without email accounts)
+            // If business has email account, it will be matched only to that account
+            // If business has NO email account, it can be matched from any email account
             $oldestPendingPayment = \App\Models\Payment::pending()
-                ->when($emailAccount, function ($query) use ($emailAccount) {
-                    return $query->whereHas('business', function ($q) use ($emailAccount) {
-                        $q->where('email_account_id', $emailAccount->id);
-                    });
-                })
                 ->orderBy('created_at', 'asc')
                 ->first();
             
@@ -200,16 +198,16 @@ class MonitorEmails extends Command
             
             // Only check emails after the oldest pending payment was created
             // This ensures we don't process old emails for new transactions
+            // Check ALL pending payments (including businesses without email accounts)
+            // If business has email account, it will be matched only to that account
+            // If business has NO email account, it can be matched from any email account
             $oldestPendingPayment = \App\Models\Payment::pending()
-                ->whereHas('business', function ($q) use ($emailAccount) {
-                    $q->where('email_account_id', $emailAccount->id);
-                })
                 ->orderBy('created_at', 'asc')
                 ->first();
             
             // If no pending payments, don't check emails (nothing to match against)
             if (!$oldestPendingPayment) {
-                $this->info("No pending payments found for {$emailAccount->email}. Skipping email check.");
+                $this->info("No pending payments found. Skipping email check for {$emailAccount->email}.");
                 return;
             }
             
