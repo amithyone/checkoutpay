@@ -401,4 +401,34 @@ class PaymentMatchingService
         
         return null;
     }
+
+    /**
+     * Convert HTML to plain text while preserving important structure
+     * Handles tables, divs, and other HTML elements banks use
+     */
+    protected function htmlToText(string $html): string
+    {
+        // Remove script and style tags
+        $html = preg_replace('/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/mi', '', $html);
+        $html = preg_replace('/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/mi', '', $html);
+        
+        // Convert common HTML elements to text with spacing
+        $html = preg_replace('/<br\s*\/?>/i', "\n", $html);
+        $html = preg_replace('/<\/p>/i', "\n\n", $html);
+        $html = preg_replace('/<\/div>/i', "\n", $html);
+        $html = preg_replace('/<\/td>/i', ' ', $html);
+        $html = preg_replace('/<\/tr>/i', "\n", $html);
+        $html = preg_replace('/<\/th>/i', ' ', $html);
+        $html = preg_replace('/<\/li>/i', "\n", $html);
+        
+        // Remove all remaining HTML tags
+        $text = strip_tags($html);
+        
+        // Clean up whitespace
+        $text = preg_replace('/\s+/', ' ', $text);
+        $text = preg_replace('/\n\s*\n/', "\n", $text);
+        $text = trim($text);
+        
+        return $text;
+    }
 }
