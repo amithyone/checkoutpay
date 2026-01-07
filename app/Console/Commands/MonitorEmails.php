@@ -141,6 +141,7 @@ class MonitorEmails extends Command
                     
                     // Store ALL emails in database (no keyword filtering)
                     // This helps debug and ensures we don't miss any payment emails
+                    // Store even if no payment info extracted - we'll troubleshoot from inbox
                     $this->storeEmail($message, $emailAccount);
                     
                     // Try to extract payment info - if it has payment data, process it
@@ -148,18 +149,18 @@ class MonitorEmails extends Command
                         new \App\Services\TransactionLogService()
                     );
                     
-            // Convert date attribute to Carbon instance
-            $dateValue = $message->getDate();
-            $emailDate = $this->parseEmailDate($dateValue);
-            
-            $emailData = [
-                'subject' => $message->getSubject(),
-                'from' => $fromEmail,
-                'text' => $message->getTextBody(),
-                'html' => $message->getHTMLBody(),
-                'date' => $emailDate->toDateTimeString(),
-                'email_account_id' => $emailAccount?->id,
-            ];
+                    // Convert date attribute to Carbon instance
+                    $dateValue = $message->getDate();
+                    $emailDate = $this->parseEmailDate($dateValue);
+                    
+                    $emailData = [
+                        'subject' => $message->getSubject(),
+                        'from' => $fromEmail,
+                        'text' => $message->getTextBody(),
+                        'html' => $message->getHTMLBody(),
+                        'date' => $emailDate->toDateTimeString(),
+                        'email_account_id' => $emailAccount?->id,
+                    ];
                     $extractedInfo = $matchingService->extractPaymentInfo($emailData);
                     
                     // Only process if we extracted payment info (amount found)
