@@ -286,9 +286,9 @@ class MonitorEmails extends Command
                 $since = $lastStoredEmail->email_date;
             }
             
-            // Get messages with keyword filtering
+            // Get ALL messages without keyword filtering
             $messages = $gmailService->getMessagesSince($since, [
-                'keywords' => ['transfer', 'deposit', 'credit', 'payment', 'transaction', 'alert', 'notification', 'received', 'credited']
+                'keywords' => [] // Empty keywords = get all emails
             ]);
             
             $this->info("Found " . count($messages) . " email(s) in {$emailAccount->email} (Gmail API) (after {$since->format('Y-m-d H:i:s')})");
@@ -299,8 +299,15 @@ class MonitorEmails extends Command
             foreach ($messages as $emailData) {
                 try {
                     $fromEmail = $emailData['from'] ?? '';
-                    $subject = strtolower($emailData['subject'] ?? '');
-                    $text = strtolower($emailData['text'] ?? '');
+                    
+                    // Extract email address from "Name <email@example.com>" format
+                    if (preg_match('/<(.+?)>/', $fromEmail, $matches)) {
+                        $fromEmail = $matches[1];
+                    } elseif (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+                        if (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', $fromEmail, $matches)) {
+                            $fromEmail = $matches[0];
+                        }
+                    }
                     
                     // Filter by allowed senders if configured
                     if (!$emailAccount->isSenderAllowed($fromEmail)) {
@@ -308,48 +315,22 @@ class MonitorEmails extends Command
                         continue;
                     }
                     
-                    // Additional keyword filtering (Gmail API may not filter perfectly)
-                    $paymentKeywords = [
-                        'transfer', 'deposit', 'credit', 'payment', 'transaction', 
-                        'alert', 'notification', 'received', 'credited', 'debit',
-                        'gens', 'electronic', 'bank', 'account', 'amount'
-                    ];
-                    
-                    $hasPaymentKeyword = false;
-                    $combinedText = strtolower($subject . ' ' . $text);
-                    
-                    foreach ($paymentKeywords as $keyword) {
-                        if (strpos($combinedText, $keyword) !== false) {
-                            $hasPaymentKeyword = true;
-                            break;
-                        }
-                    }
-                    
-                    // Check for amount patterns (NGN format, currency symbols, etc.)
-                    if (!$hasPaymentKeyword && (
-                        preg_match('/[₦$]?\s*[\d,]+\.?\d*/', $combinedText) ||
-                        preg_match('/ngn\s*[\d,]+\.?\d*/i', $combinedText) ||
-                        preg_match('/naira\s*[\d,]+\.?\d*/i', $combinedText) ||
-                        preg_match('/amount\s*:?\s*[\d,]+\.?\d*/i', $combinedText)
-                    )) {
-                        $hasPaymentKeyword = true;
-                    }
-                    
-                    // Check for account number patterns
-                    if (!$hasPaymentKeyword && preg_match('/account\s*number\s*:?\s*\d{8,}/i', $combinedText)) {
-                        $hasPaymentKeyword = true;
-                    }
-                    
-                    if (!$hasPaymentKeyword) {
-                        $skippedCount++;
-                        // Don't mark as read - these aren't payment emails
-                        continue;
-                    }
-                    
-                    // Store email in database first, then process
+                    // Store ALL emails in database (no keyword filtering)
                     $this->storeGmailApiEmail($emailData, $emailAccount);
-                    $this->processGmailApiMessage($emailData, $emailAccount);
-                    $processedCount++;
+                    
+                    // Try to extract payment info - if it has payment data, process it
+                    $matchingService = new PaymentMatchingService(
+                        new \App\Services\TransactionLogService()
+                    );
+                    $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                    
+                    // Only process if we extracted payment info (amount found)
+                    if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+                        $this->processGmailApiMessage($emailData, $emailAccount);
+                        $processedCount++;
+                    } else {
+                        $skippedCount++;
+                    }
                     
                     // Note: Emails are NOT marked as read immediately
                     // They will be checked again on next run until they match a payment or become too old
