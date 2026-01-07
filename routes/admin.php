@@ -80,5 +80,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Whitelisted Email Addresses
         Route::resource('whitelisted-emails', \App\Http\Controllers\Admin\WhitelistedEmailController::class);
+
+        // Zapier Logs
+        Route::get('zapier-logs', [\App\Http\Controllers\Admin\ZapierLogController::class, 'index'])->name('zapier-logs.index');
+        Route::get('zapier-logs/{zapierLog}', [\App\Http\Controllers\Admin\ZapierLogController::class, 'show'])->name('zapier-logs.show');
     });
 });

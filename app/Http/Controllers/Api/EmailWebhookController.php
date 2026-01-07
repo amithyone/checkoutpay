@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ProcessedEmail;
 use App\Models\EmailAccount;
 use App\Models\WhitelistedEmailAddress;
+use App\Models\ZapierLog;
 use App\Models\Setting;
 use App\Services\PaymentMatchingService;
 use App\Services\TransactionLogService;
@@ -71,8 +72,27 @@ class EmailWebhookController extends Controller
             $timeSent = $request->input('time_sent', now()->toDateTimeString());
             $emailContent = $request->input('email', ''); // This is the full email body/content
             
+            // LOG: Save all incoming payloads to zapier_logs
+            $zapierLog = ZapierLog::create([
+                'payload' => $request->all(), // Store full payload
+                'sender_name' => $senderName,
+                'amount' => !empty($amount) && is_numeric($amount) ? (float) $amount : null,
+                'time_sent' => $timeSent,
+                'email_content' => $emailContent,
+                'status' => 'received',
+                'status_message' => 'Payload received from Zapier',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+            
             // Validate required fields
             if (empty($emailContent)) {
+                $zapierLog->update([
+                    'status' => 'error',
+                    'status_message' => 'Validation failed: email field is required',
+                    'error_details' => 'Received fields: ' . implode(', ', array_keys($request->all())),
+                ]);
+                
                 return response()->json([
                     'success' => false,
                     'message' => 'Validation failed: email field is required',
@@ -108,9 +128,16 @@ class EmailWebhookController extends Controller
             
             // If still no email found, reject the request
             if (empty($fromEmail)) {
+                $zapierLog->update([
+                    'status' => 'error',
+                    'status_message' => 'Could not extract sender email address from email content',
+                    'error_details' => 'Email content preview: ' . substr($emailContent, 0, 500),
+                ]);
+                
                 Log::warning('Webhook request rejected - could not extract sender email', [
                     'ip' => $request->ip(),
                     'email_content_preview' => substr($emailContent, 0, 200),
+                    'zapier_log_id' => $zapierLog->id,
                 ]);
                 
                 return response()->json([
@@ -120,11 +147,21 @@ class EmailWebhookController extends Controller
                 ], 400);
             }
             
+            // Update log with extracted email
+            $zapierLog->update(['extracted_from_email' => $fromEmail]);
+            
             // Check whitelist
             if (!WhitelistedEmailAddress::isWhitelisted($fromEmail)) {
+                $zapierLog->update([
+                    'status' => 'rejected',
+                    'status_message' => 'Email address not whitelisted: ' . $fromEmail,
+                    'error_details' => 'Add this email address to the whitelist in admin panel: Settings > Whitelisted Emails',
+                ]);
+                
                 Log::warning('Webhook request rejected - email not whitelisted', [
                     'from_email' => $fromEmail,
                     'ip' => $request->ip(),
+                    'zapier_log_id' => $zapierLog->id,
                 ]);
                 
                 return response()->json([
@@ -152,6 +189,11 @@ class EmailWebhookController extends Controller
 
             // Filter out noreply@xtrapay.ng emails
             if (strtolower($fromEmail) === 'noreply@xtrapay.ng') {
+                $zapierLog->update([
+                    'status' => 'rejected',
+                    'status_message' => 'Skipped noreply@xtrapay.ng email',
+                ]);
+                
                 return response()->json([
                     'success' => true,
                     'message' => 'Skipped noreply@xtrapay.ng email',
@@ -159,32 +201,19 @@ class EmailWebhookController extends Controller
                 ], 200);
             }
 
-            // Find email account (try to match by sender email domain or use first active)
-            $emailAccount = EmailAccount::where('is_active', true)->first();
-            
-            // Try to find account matching sender domain
-            if ($fromEmail) {
-                $domain = '@' . explode('@', $fromEmail)[1] ?? '';
-                $matchedAccount = EmailAccount::where('is_active', true)
-                    ->where(function ($q) use ($fromEmail, $domain) {
-                        $q->where('email', 'like', '%' . $domain)
-                          ->orWhere('email', 'like', '%' . str_replace('@', '', $domain) . '%');
-                    })
-                    ->first();
-                
-                if ($matchedAccount) {
-                    $emailAccount = $matchedAccount;
-                }
-            }
+            // For Zapier webhook, email_account_id is not required (set to null)
+            // We use Zapier logs instead of email accounts for tracking
+            $emailAccount = null;
 
-            // Check if email already exists
-            $existing = ProcessedEmail::where('message_id', $messageId)
-                ->when($emailAccount, function ($q) use ($emailAccount) {
-                    $q->where('email_account_id', $emailAccount->id);
-                })
-                ->exists();
+            // Check if email already exists (by message_id)
+            $existing = ProcessedEmail::where('message_id', $messageId)->exists();
 
             if ($existing) {
+                $zapierLog->update([
+                    'status' => 'rejected',
+                    'status_message' => 'Email already processed (duplicate)',
+                ]);
+                
                 return response()->json([
                     'success' => true,
                     'message' => 'Email already processed',
@@ -231,9 +260,9 @@ class EmailWebhookController extends Controller
                 }
             }
 
-            // Store email (mark as webhook source)
+            // Store email (mark as webhook source, no email_account_id needed for Zapier)
             $processedEmail = ProcessedEmail::create([
-                'email_account_id' => $emailAccount?->id,
+                'email_account_id' => null, // Not needed for Zapier webhook
                 'source' => 'webhook', // Mark as webhook source (Zapier)
                 'message_id' => $messageId,
                 'subject' => $subject,
@@ -246,6 +275,13 @@ class EmailWebhookController extends Controller
                 'sender_name' => $extractedInfo['sender_name'] ?? null,
                 'account_number' => $extractedInfo['account_number'] ?? null,
                 'extracted_data' => $extractedInfo,
+            ]);
+            
+            // Update Zapier log with processed email ID
+            $zapierLog->update([
+                'processed_email_id' => $processedEmail->id,
+                'status' => 'processed',
+                'status_message' => 'Email processed and stored',
             ]);
 
             // Check if this is a GTBank transaction
@@ -274,7 +310,7 @@ class EmailWebhookController extends Controller
                         'from' => $fromEmail,
                         'text' => $text,
                         'html' => $html,
-                        'date' => $date,
+                        'date' => $timeSent,
                     ]);
 
                     // Update business balance
@@ -284,6 +320,13 @@ class EmailWebhookController extends Controller
 
                     // Dispatch event to send webhook
                     event(new \App\Events\PaymentApproved($matchedPayment));
+                    
+                    // Update Zapier log with payment match
+                    $zapierLog->update([
+                        'payment_id' => $matchedPayment->id,
+                        'status' => 'matched',
+                        'status_message' => 'Payment matched and approved: ' . $matchedPayment->transaction_id,
+                    ]);
 
                     return response()->json([
                         'success' => true,
@@ -295,6 +338,12 @@ class EmailWebhookController extends Controller
                     ], 200);
                 }
             }
+            
+            // Update Zapier log status
+            $zapierLog->update([
+                'status' => 'processed',
+                'status_message' => 'Email processed but no payment matched',
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -304,10 +353,20 @@ class EmailWebhookController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            // Log error to Zapier log if it exists
+            if (isset($zapierLog)) {
+                $zapierLog->update([
+                    'status' => 'error',
+                    'status_message' => 'Error processing email: ' . $e->getMessage(),
+                    'error_details' => $e->getTraceAsString(),
+                ]);
+            }
+            
             Log::error('Error receiving email webhook', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'request_data' => $request->all(),
+                'zapier_log_id' => $zapierLog->id ?? null,
             ]);
 
             return response()->json([
