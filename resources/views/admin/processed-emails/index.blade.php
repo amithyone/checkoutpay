@@ -111,11 +111,26 @@
                                     echo strlen($subject) > 50 ? substr($subject, 0, 50) . '...' : $subject;
                                 @endphp
                             </div>
-                            @if($email->emailAccount)
-                                <div class="text-xs text-gray-500 mt-1">
-                                    <i class="fas fa-envelope mr-1"></i>{{ $email->emailAccount->email }}
-                                </div>
-                            @endif
+                            <div class="flex items-center gap-2 mt-1">
+                                @if($email->source === 'webhook')
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                        <i class="fas fa-bolt mr-1"></i> Zapier
+                                    </span>
+                                @elseif($email->source === 'gmail_api')
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                        <i class="fas fa-google mr-1"></i> Gmail API
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                        <i class="fas fa-server mr-1"></i> IMAP
+                                    </span>
+                                @endif
+                                @if($email->emailAccount)
+                                    <span class="text-xs text-gray-500">
+                                        <i class="fas fa-envelope mr-1"></i>{{ $email->emailAccount->email }}
+                                    </span>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
                             {{ $email->from_email }}

@@ -41,6 +41,20 @@ class DashboardController extends Controller
                 'total' => ProcessedEmail::count(),
                 'matched' => ProcessedEmail::where('is_matched', true)->count(),
                 'unmatched' => ProcessedEmail::where('is_matched', false)->count(),
+                'webhook' => ProcessedEmail::where('source', 'webhook')->count(),
+                'imap' => ProcessedEmail::where('source', 'imap')->count(),
+                'gmail_api' => ProcessedEmail::where('source', 'gmail_api')->count(),
+            ],
+            'zapier_status' => [
+                'total_today' => ProcessedEmail::where('source', 'webhook')
+                    ->whereDate('created_at', today())
+                    ->count(),
+                'last_24h' => ProcessedEmail::where('source', 'webhook')
+                    ->where('created_at', '>=', now()->subDay())
+                    ->count(),
+                'last_email' => ProcessedEmail::where('source', 'webhook')
+                    ->latest()
+                    ->first(),
             ],
         ];
 

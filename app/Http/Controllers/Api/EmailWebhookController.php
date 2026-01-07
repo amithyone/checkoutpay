@@ -134,9 +134,10 @@ class EmailWebhookController extends Controller
                 ]);
             }
 
-            // Store email
+            // Store email (mark as webhook source)
             $processedEmail = ProcessedEmail::create([
                 'email_account_id' => $emailAccount?->id,
+                'source' => 'webhook', // Mark as webhook source (Zapier)
                 'message_id' => $messageId,
                 'subject' => $subject,
                 'from_email' => $fromEmail,

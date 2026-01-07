@@ -628,6 +628,7 @@ class MonitorEmails extends Command
             try {
                 return ProcessedEmail::create([
                     'email_account_id' => $emailAccount?->id,
+                    'source' => 'imap', // Mark as IMAP source
                     'message_id' => $messageId,
                     'subject' => $subject,
                     'from_email' => $fromEmail,

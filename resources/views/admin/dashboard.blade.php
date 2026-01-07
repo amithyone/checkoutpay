@@ -91,6 +91,74 @@
                 <span class="mx-2">•</span>
                 <span class="text-yellow-600">Unmatched: {{ $stats['stored_emails']['unmatched'] }}</span>
             </div>
+            <div class="mt-3 pt-3 border-t border-gray-200 flex items-center text-xs text-gray-500">
+                <span><i class="fas fa-bolt text-purple-500 mr-1"></i> Zapier: {{ $stats['stored_emails']['webhook'] }}</span>
+                <span class="mx-2">•</span>
+                <span><i class="fas fa-server text-blue-500 mr-1"></i> IMAP: {{ $stats['stored_emails']['imap'] }}</span>
+                <span class="mx-2">•</span>
+                <span><i class="fas fa-google text-red-500 mr-1"></i> Gmail API: {{ $stats['stored_emails']['gmail_api'] }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zapier Status Widget -->
+    <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg shadow-sm border-2 border-purple-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center">
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                    <i class="fas fa-bolt text-purple-600 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Zapier Status</h3>
+                    <p class="text-sm text-gray-600">Real-time email forwarding via webhook</p>
+                </div>
+            </div>
+            @if($stats['zapier_status']['last_email'])
+                <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
+                    <i class="fas fa-check-circle mr-1"></i> Active
+                </span>
+            @else
+                <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                    <i class="fas fa-exclamation-circle mr-1"></i> No Activity Yet
+                </span>
+            @endif
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white rounded-lg p-4 border border-purple-100">
+                <p class="text-xs text-gray-500 mb-1">Today</p>
+                <p class="text-2xl font-bold text-purple-600">{{ $stats['zapier_status']['total_today'] }}</p>
+                <p class="text-xs text-gray-500 mt-1">emails received</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 border border-purple-100">
+                <p class="text-xs text-gray-500 mb-1">Last 24 Hours</p>
+                <p class="text-2xl font-bold text-indigo-600">{{ $stats['zapier_status']['last_24h'] }}</p>
+                <p class="text-xs text-gray-500 mt-1">emails received</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 border border-purple-100">
+                <p class="text-xs text-gray-500 mb-1">Last Email</p>
+                @if($stats['zapier_status']['last_email'])
+                    <p class="text-sm font-medium text-gray-900">{{ $stats['zapier_status']['last_email']->created_at->diffForHumans() }}</p>
+                    <p class="text-xs text-gray-500 mt-1 truncate" title="{{ $stats['zapier_status']['last_email']->subject }}">
+                        {{ Str::limit($stats['zapier_status']['last_email']->subject ?? 'No Subject', 30) }}
+                    </p>
+                @else
+                    <p class="text-sm text-gray-400">No emails yet</p>
+                @endif
+            </div>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-purple-200">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-gray-600">
+                    <i class="fas fa-link mr-1"></i>
+                    <strong>Webhook URL:</strong> 
+                    <code class="text-xs bg-white px-2 py-1 rounded border border-purple-200">{{ url('/api/v1/email/webhook') }}</code>
+                </div>
+                <button onclick="copyWebhookUrl()" class="text-sm text-purple-600 hover:text-purple-800">
+                    <i class="fas fa-copy mr-1"></i> Copy URL
+                </button>
+            </div>
         </div>
     </div>
 
@@ -169,6 +237,19 @@
                             <div class="text-sm font-medium text-gray-900">
                                 {{ Str::limit($email->subject ?? 'No Subject', 50) }}
                             </div>
+                            @if($email->source === 'webhook')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 mt-1">
+                                    <i class="fas fa-bolt mr-1"></i> Zapier
+                                </span>
+                            @elseif($email->source === 'gmail_api')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
+                                    <i class="fas fa-google mr-1"></i> Gmail API
+                                </span>
+                            @else
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mt-1">
+                                    <i class="fas fa-server mr-1"></i> IMAP
+                                </span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
                             {{ $email->from_email }}
@@ -397,6 +478,22 @@ function copyCronUrl() {
         document.execCommand('copy');
         document.body.removeChild(textarea);
         alert('Cron URL copied to clipboard!');
+    });
+}
+
+function copyWebhookUrl() {
+    const url = '{{ url("/api/v1/email/webhook") }}';
+    navigator.clipboard.writeText(url).then(() => {
+        alert('Webhook URL copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        alert('Webhook URL copied to clipboard!');
     });
 }
 </script>

@@ -12,6 +12,7 @@ class ProcessedEmail extends Model
 
     protected $fillable = [
         'email_account_id',
+        'source', // 'webhook', 'imap', 'gmail_api'
         'message_id',
         'subject',
         'from_email',
