@@ -481,13 +481,14 @@ class MonitorEmails extends Command
             $fromEmail = $from->mail ?? '';
             $fromName = $from->personal ?? '';
             
+            $subject = $message->getSubject() ?? 'No Subject';
+            
             // Filter out noreply@xtrapay.ng emails
             if (strtolower($fromEmail) === 'noreply@xtrapay.ng') {
                 $this->line("⏭️  Skipping email from noreply@xtrapay.ng: {$subject}");
                 return;
             }
             
-            $subject = $message->getSubject() ?? 'No Subject';
             $this->line("📝 Subject: {$subject} | From: {$fromEmail}");
             
             // Extract payment info to store
