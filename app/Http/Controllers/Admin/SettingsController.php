@@ -47,16 +47,14 @@ class SettingsController extends Controller
             'Maximum time window (in minutes) for matching emails with payment requests. Emails received after this time will not be matched.'
         );
 
-        // Update Zapier webhook secret (if provided)
-        if (isset($validated['zapier_webhook_secret'])) {
-            Setting::set(
-                'zapier_webhook_secret',
-                $validated['zapier_webhook_secret'],
-                'string',
-                'security',
-                'Secret key for authenticating Zapier webhook requests. Add this as a header "X-Zapier-Secret" in your Zapier webhook action.'
-            );
-        }
+        // Update Zapier webhook secret (always update, even if empty to allow clearing)
+        Setting::set(
+            'zapier_webhook_secret',
+            $validated['zapier_webhook_secret'] ?? '',
+            'string',
+            'security',
+            'Secret key for authenticating Zapier webhook requests. Add this as a header "X-Zapier-Secret" in your Zapier webhook action.'
+        );
 
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');
