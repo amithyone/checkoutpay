@@ -410,12 +410,34 @@ class MonitorEmails extends Command
     protected function processMessage($message, ?EmailAccount $emailAccount): void
     {
         try {
+            // Convert date attribute to Carbon instance
+            $dateValue = $message->getDate();
+            $emailDate = null;
+            if ($dateValue) {
+                try {
+                    // If it's an Attribute object, get its value
+                    if (is_object($dateValue) && method_exists($dateValue, 'get')) {
+                        $dateValue = $dateValue->get();
+                    }
+                    // If it's an Attribute object, try accessing the value property
+                    if (is_object($dateValue) && property_exists($dateValue, 'value')) {
+                        $dateValue = $dateValue->value;
+                    }
+                    // Convert to Carbon
+                    $emailDate = \Carbon\Carbon::parse($dateValue);
+                } catch (\Exception $e) {
+                    $emailDate = now();
+                }
+            } else {
+                $emailDate = now();
+            }
+            
             $emailData = [
                 'subject' => $message->getSubject(),
                 'from' => $message->getFrom()[0]->mail ?? '',
                 'text' => $message->getTextBody(),
                 'html' => $message->getHTMLBody(),
-                'date' => $message->getDate()->toDateTimeString(),
+                'date' => $emailDate->toDateTimeString(),
                 'email_account_id' => $emailAccount?->id,
             ];
 
