@@ -338,7 +338,7 @@ class PaymentMatchingService
             'matched' => true,
             'reason' => $isMismatch ? $mismatchReason : 'Amount and name match within time window',
             'is_mismatch' => $isMismatch,
-            'received_amount' => $isMismatch ? $receivedAmount : null,
+            'received_amount' => $finalReceivedAmount,
             'mismatch_reason' => $mismatchReason,
         ];
     }
