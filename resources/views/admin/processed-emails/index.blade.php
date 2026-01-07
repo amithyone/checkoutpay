@@ -321,5 +321,54 @@ function clearFilters() {
     // Reload page to reset pagination
     window.location.href = '{{ route("admin.processed-emails.index") }}';
 }
+
+// Check match function
+function checkMatch(emailId) {
+    const btn = document.querySelector(`.check-match-btn[data-email-id="${emailId}"]`);
+    if (!btn) return;
+    
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Checking...';
+    
+    fetch(`/admin/processed-emails/${emailId}/check-match`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.matched) {
+                alert(`✅ Payment matched and approved!\nTransaction ID: ${data.payment.transaction_id}\nAmount: ₦${data.payment.amount.toLocaleString()}`);
+                window.location.reload();
+            } else {
+                let message = '❌ No matching payment found.\n\n';
+                if (data.matches && data.matches.length > 0) {
+                    message += 'Match Results:\n';
+                    data.matches.forEach(match => {
+                        message += `\n• ${match.transaction_id}: ${match.reason}`;
+                        if (match.time_diff_minutes !== null) {
+                            message += ` (${match.time_diff_minutes} min difference)`;
+                        }
+                    });
+                }
+                alert(message);
+            }
+        } else {
+            alert('Error: ' + (data.message || 'Failed to check match'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error checking match. Please try again.');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
 </script>
 @endsection
