@@ -80,7 +80,8 @@ class MonitorEmails extends Command
             $folder = $client->getFolder($emailAccount ? $emailAccount->folder : 'INBOX');
             $messages = $folder->query()->unseen()->since(now()->subDay())->get();
 
-            $this->info("Found {$messages->count()} new email(s) in {$emailAccount?->email ?? 'default account'}");
+            $accountEmail = $emailAccount ? $emailAccount->email : 'default account';
+            $this->info("Found {$messages->count()} new email(s) in {$accountEmail}");
 
             foreach ($messages as $message) {
                 $this->processMessage($message, $emailAccount);
