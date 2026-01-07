@@ -112,12 +112,15 @@ class Payment extends Model
     /**
      * Approve payment
      */
-    public function approve(array $emailData = []): bool
+    public function approve(array $emailData = [], bool $isMismatch = false, ?float $receivedAmount = null, ?string $mismatchReason = null): bool
     {
         return $this->update([
             'status' => self::STATUS_APPROVED,
             'email_data' => $emailData,
             'matched_at' => now(),
+            'is_mismatch' => $isMismatch,
+            'received_amount' => $receivedAmount,
+            'mismatch_reason' => $mismatchReason,
         ]);
     }
 
