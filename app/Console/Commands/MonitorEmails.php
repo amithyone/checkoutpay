@@ -566,7 +566,7 @@ class MonitorEmails extends Command
     /**
      * Store IMAP email in database
      */
-    protected function storeEmail($message, ?EmailAccount $emailAccount): void
+    protected function storeEmail($message, ?EmailAccount $emailAccount): ?ProcessedEmail
     {
         try {
             $this->line("🔍 Attempting to store email...");
