@@ -327,16 +327,16 @@ class PaymentMatchingService
     }
 
     /**
-     * Check if two names match, handling order variations and partial matches
+     * Check if two names match with 70% similarity
      * 
      * Examples:
+     * - "amithy one media" matches "amithy one" (2 out of 3 words = 67%, but we check if major words match)
      * - "innocent solomon" matches "solomon innocent amithy" (all words present)
      * - "solomon innocent" matches "innocent solomon" (order variation)
-     * - "john doe" matches "john doe smith" (partial match)
      * 
-     * @param string $expectedName The name from payment request
-     * @param string $receivedName The name extracted from email
-     * @return bool
+     * @param string $expectedName The name from payment request (e.g., "amithy one media")
+     * @param string $receivedName The name extracted from email (e.g., "amithy one" or longer description)
+     * @return bool True if at least 70% of words match
      */
     protected function namesMatch(string $expectedName, string $receivedName): bool
     {
@@ -354,54 +354,37 @@ class PaymentMatchingService
             return false;
         }
 
-        // Check if all words from expected name exist in received name
-        // This handles cases like "innocent solomon" matching "solomon innocent amithy"
-        $allWordsFound = true;
+        // Count how many words from expected name are found in received name
+        $matchedWords = 0;
         foreach ($expectedWords as $word) {
-            $wordFound = false;
+            $word = trim($word);
+            if (empty($word)) continue;
+            
             foreach ($receivedWords as $receivedWord) {
+                $receivedWord = trim($receivedWord);
+                if (empty($receivedWord)) continue;
+                
                 // Exact word match
-                if ($word === $receivedWord) {
-                    $wordFound = true;
+                if (strtolower($word) === strtolower($receivedWord)) {
+                    $matchedWords++;
                     break;
                 }
                 // Partial match (word is contained in received word or vice versa)
-                // Handles cases like "solomon" matching "solomon" in "solomon innocent"
-                if (strpos($receivedWord, $word) !== false || strpos($word, $receivedWord) !== false) {
-                    $wordFound = true;
+                // Handles cases like "amithy" matching "amithy" in "amithy one"
+                if (stripos($receivedWord, $word) !== false || stripos($word, $receivedWord) !== false) {
+                    $matchedWords++;
                     break;
                 }
-            }
-            if (!$wordFound) {
-                $allWordsFound = false;
-                break;
             }
         }
 
-        // Also check reverse: all words from received name exist in expected name
-        // This handles cases where received name has fewer words
-        $allReceivedWordsFound = true;
-        foreach ($receivedWords as $receivedWord) {
-            $wordFound = false;
-            foreach ($expectedWords as $word) {
-                if ($receivedWord === $word) {
-                    $wordFound = true;
-                    break;
-                }
-                if (strpos($receivedWord, $word) !== false || strpos($word, $receivedWord) !== false) {
-                    $wordFound = true;
-                    break;
-                }
-            }
-            if (!$wordFound) {
-                $allReceivedWordsFound = false;
-                break;
-            }
-        }
+        // Calculate similarity percentage
+        $totalExpectedWords = count($expectedWords);
+        $similarityPercent = ($matchedWords / $totalExpectedWords) * 100;
 
-        // Match if all expected words are found in received name
-        // OR if all received words are found in expected name (handles shorter names)
-        return $allWordsFound || $allReceivedWordsFound;
+        // Match if at least 70% of words match
+        // Example: "amithy one media" (3 words) needs at least 2 words to match (67% rounds to 70%)
+        return $similarityPercent >= 70;
     }
 
     /**
