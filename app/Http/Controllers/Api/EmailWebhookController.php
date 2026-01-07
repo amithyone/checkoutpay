@@ -379,6 +379,7 @@ class EmailWebhookController extends Controller
                             'transaction_id' => $payment->transaction_id,
                             'status' => 'matched',
                             'mismatch_reason' => $mismatchReason,
+                            'match_attempts' => $allMatches, // Include all match attempts for debugging
                         ], 200);
                     } elseif (isset($matchResult['should_reject']) && $matchResult['should_reject']) {
                         // Amount difference >= N500, reject payment
