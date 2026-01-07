@@ -83,6 +83,22 @@
                 </div>
 
                 <div>
+                    <label for="allowed_senders" class="block text-sm font-medium text-gray-700 mb-1">Allowed Senders (Optional)</label>
+                    <textarea name="allowed_senders" id="allowed_senders" rows="4"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary font-mono text-sm"
+                        placeholder="alerts@gtbank.com&#10;notifications@accessbank.com&#10;@zenithbank.com&#10;transactions@uba.com">{{ old('allowed_senders', is_array($emailAccount->allowed_senders) ? implode("\n", $emailAccount->allowed_senders) : (is_array(old('allowed_senders')) ? implode("\n", old('allowed_senders')) : '')) }}</textarea>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <strong>Filter emails by sender:</strong> Enter one email address or domain per line. 
+                        Only emails from these senders will be processed. Leave empty to process all emails.
+                        <br>
+                        <strong>Examples:</strong>
+                        <br>• <code>alerts@gtbank.com</code> - Exact email match
+                        <br>• <code>@gtbank.com</code> - All emails from gtbank.com domain
+                        <br>• <code>notifications@accessbank.com</code> - Specific sender
+                    </p>
+                </div>
+
+                <div>
                     <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                     <textarea name="notes" id="notes" rows="3"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary">{{ old('notes', $emailAccount->notes) }}</textarea>

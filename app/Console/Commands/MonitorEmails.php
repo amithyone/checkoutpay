@@ -115,6 +115,13 @@ class MonitorEmails extends Command
             $this->info("Found {$messages->count()} new email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
 
             foreach ($messages as $message) {
+                // Filter by allowed senders if configured
+                $fromEmail = $message->getFrom()[0]->mail ?? '';
+                if ($emailAccount && !$emailAccount->isSenderAllowed($fromEmail)) {
+                    $this->info("Skipping email from {$fromEmail} (not in allowed senders list)");
+                    continue;
+                }
+                
                 $this->processMessage($message, $emailAccount);
                 
                 // Mark as read
@@ -213,6 +220,13 @@ class MonitorEmails extends Command
             $this->info("Found " . count($messages) . " new email(s) in {$emailAccount->email} (Gmail API) (after {$since->format('Y-m-d H:i:s')})");
             
             foreach ($messages as $emailData) {
+                // Filter by allowed senders if configured
+                $fromEmail = $emailData['from'] ?? '';
+                if (!$emailAccount->isSenderAllowed($fromEmail)) {
+                    $this->info("Skipping email from {$fromEmail} (not in allowed senders list)");
+                    continue;
+                }
+                
                 $this->processGmailApiMessage($emailData, $emailAccount);
                 
                 // Mark as read

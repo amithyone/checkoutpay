@@ -40,6 +40,7 @@ class EmailAccountController extends Controller
             'folder' => 'nullable|string|max:255',
             'is_active' => 'boolean',
             'notes' => 'nullable|string',
+            'allowed_senders' => 'nullable|string', // Will be converted to array
         ];
 
         if ($method === 'imap') {

@@ -23,6 +23,7 @@ class EmailAccount extends Model
         'folder',
         'is_active',
         'notes',
+        'allowed_senders', // Array of allowed sender emails/domains
         'gmail_credentials_path',
         'gmail_token_path',
         'gmail_authorized',
@@ -34,6 +35,7 @@ class EmailAccount extends Model
         'validate_cert' => 'boolean',
         'is_active' => 'boolean',
         'gmail_authorized' => 'boolean',
+        'allowed_senders' => 'array', // JSON array of allowed senders
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
