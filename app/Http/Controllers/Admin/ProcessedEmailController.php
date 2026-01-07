@@ -30,8 +30,8 @@ class ProcessedEmailController extends Controller
             $query->where('email_account_id', $request->email_account_id);
         }
 
-        // Search by multiple fields
-        if ($request->has('search') && !empty(trim($request->search))) {
+        // Search by Subject, From, Amount, and Sender
+        if ($request->filled('search')) {
             $search = trim($request->search);
             $query->where(function ($q) use ($search) {
                 // Search in subject
@@ -41,20 +41,14 @@ class ProcessedEmailController extends Controller
                     // Search in from name
                     ->orWhere('from_name', 'like', "%{$search}%")
                     // Search in sender name
-                    ->orWhere('sender_name', 'like', "%{$search}%")
-                    // Search in account number
-                    ->orWhere('account_number', 'like', "%{$search}%")
-                    // Search in message ID
-                    ->orWhere('message_id', 'like', "%{$search}%")
-                    // Search in text body (first 500 chars for performance)
-                    ->orWhereRaw('SUBSTRING(text_body, 1, 500) LIKE ?', ["%{$search}%"])
-                    // Search in HTML body (first 500 chars for performance)
-                    ->orWhereRaw('SUBSTRING(html_body, 1, 500) LIKE ?', ["%{$search}%"]);
+                    ->orWhere('sender_name', 'like', "%{$search}%");
                 
                 // If search looks like a number, also search in amount
-                if (is_numeric($search)) {
-                    $amount = (float) str_replace(',', '', $search);
-                    $q->orWhere('amount', $amount);
+                $numericSearch = preg_replace('/[^0-9.]/', '', $search);
+                if (is_numeric($numericSearch) && $numericSearch > 0) {
+                    $amount = (float) $numericSearch;
+                    // Allow small tolerance for amount matching (handles formatting like 1000 vs 1000.00)
+                    $q->orWhereBetween('amount', [$amount - 0.01, $amount + 0.01]);
                 }
             });
         }
