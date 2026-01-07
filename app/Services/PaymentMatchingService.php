@@ -112,38 +112,59 @@ class PaymentMatchingService
         // Also use extracted text as fallback
         $fullText = $subject . ' ' . $text . ' ' . $htmlLower;
 
-        // Extract amount - prioritize HTML table structures, then text patterns
-        // First, try to find amount in HTML table cells (most reliable)
+        // Extract amount - prioritize HTML table structures, handle NGN500 (no space)
         $amount = null;
         
-        // Pattern 1: HTML table with "Amount" label
-        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*ngn\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // Pattern 1: GTBank HTML table - Amount in separate cell after label
+        // Format: <td>Amount</td><td>NGN 1,000.00</td> or <td>Amount :</td><td>NGN500</td>
+        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             $amount = (float) str_replace(',', '', $matches[1]);
         }
-        // Pattern 2: HTML table with amount value (no label)
-        elseif (preg_match('/<td[^>]*>[\s]*ngn\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // Pattern 2: GTBank HTML table - Amount in same cell with label (handles NGN500 without space)
+        // Format: <td>Amount : NGN 1,000.00</td> or <td>Amount : NGN500</td>
+        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             $amount = (float) str_replace(',', '', $matches[1]);
         }
-        // Pattern 3: HTML with "Amount : NGN 1000" format
-        elseif (preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*ngn\s*([\d,]+\.?\d*)/i', $html, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
+        // Pattern 3: Description field contains amount (GTBank format: "NGN500" in description)
+        // Format: <td>Description</td><td>...NGN500...</td>
+        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦)\s*([\d,]+\.?\d*).*?<\/td>/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+            }
         }
-        // Pattern 4: Text patterns (more specific, avoid small numbers)
+        // Pattern 4: Any HTML table cell containing NGN/Naira followed by amount (handles NGN500)
+        elseif (preg_match('/<td[^>]*>[\s]*(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+            }
+        }
+        // Pattern 5: HTML with "Amount : NGN 1000" or "NGN500" format (not in table, handles no space)
+        elseif (preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+            }
+        }
+        // Pattern 6: Standalone NGN500 (no space, in description or anywhere in HTML)
+        elseif (preg_match('/(?:ngn|naira|₦)([\d,]+\.?\d*)/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+            }
+        }
+        // Pattern 7: Text patterns (fallback, avoid small numbers)
         else {
             $amountPatterns = [
-                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*ngn\s*([\d,]+\.?\d*)/i',
-                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*naira\s*([\d,]+\.?\d*)/i',
-                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]*[₦$]\s*([\d,]+\.?\d*)/i',
-                '/ngn\s*([\d,]+\.?\d*)/i',
-                '/naira\s*([\d,]+\.?\d*)/i',
-                '/[₦$]\s*([\d,]+\.?\d*)/i',
+                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i',
+                '/(?:ngn|naira|₦)([\d,]+\.?\d*)/i',
                 '/([\d,]+\.?\d*)\s*(?:naira|ngn|usd|dollar)/i',
             ];
 
             foreach ($amountPatterns as $pattern) {
                 if (preg_match($pattern, $fullText, $matches)) {
                     $potentialAmount = (float) str_replace(',', '', $matches[1]);
-                    // Only accept amounts >= 10 to avoid matching dates/times (e.g., "4:50:06 PM" or "2024")
                     if ($potentialAmount >= 10) {
                         $amount = $potentialAmount;
                         break;
