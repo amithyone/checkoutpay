@@ -643,9 +643,9 @@ class MonitorEmails extends Command
         }
 
         try {
-            // If it's already a Carbon instance, return it
+            // If it's already a Carbon instance, ensure it's in app timezone
             if ($dateValue instanceof \Carbon\Carbon) {
-                return $dateValue;
+                return $dateValue->setTimezone(config('app.timezone'));
             }
 
             // If it's an Attribute object, get its value
@@ -678,13 +678,15 @@ class MonitorEmails extends Command
                 }
             }
 
-            // If we have a string value, parse it
+            // If we have a string value, parse it and set to app timezone
             if (is_string($dateValue) && !empty($dateValue)) {
-                return \Carbon\Carbon::parse($dateValue);
+                $carbon = \Carbon\Carbon::parse($dateValue);
+                // Set to app timezone (Africa/Lagos) to ensure consistency
+                return $carbon->setTimezone(config('app.timezone'));
             }
 
-            // Fallback to current time
-            return now();
+            // Fallback to current time in app timezone
+            return now()->setTimezone(config('app.timezone'));
         } catch (\Exception $e) {
             Log::debug('Error parsing email date', [
                 'error' => $e->getMessage(),

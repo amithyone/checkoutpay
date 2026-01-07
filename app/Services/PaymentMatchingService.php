@@ -492,7 +492,10 @@ class PaymentMatchingService
                 'extracted_amount' => $extractedInfo['amount'],
                 'expected_name' => $payment->payer_name,
                 'extracted_name' => $extractedInfo['sender_name'] ?? null,
-                'time_diff_minutes' => $storedEmail->email_date ? abs($payment->created_at->diffInMinutes($storedEmail->email_date)) : null,
+                'time_diff_minutes' => $storedEmail->email_date ? abs(
+                    \Carbon\Carbon::parse($payment->created_at)->setTimezone(config('app.timezone'))
+                        ->diffInMinutes(\Carbon\Carbon::parse($storedEmail->email_date)->setTimezone(config('app.timezone')))
+                ) : null,
             ];
         }
         
