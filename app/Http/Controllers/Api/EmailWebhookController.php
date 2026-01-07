@@ -271,9 +271,9 @@ class EmailWebhookController extends Controller
                 'text_body' => $text,
                 'html_body' => $html,
                 'email_date' => $timeSent,
-                'amount' => ($extractedInfo && isset($extractedInfo['amount'])) ? $extractedInfo['amount'] : null,
-                'sender_name' => ($extractedInfo && isset($extractedInfo['sender_name'])) ? $extractedInfo['sender_name'] : null,
-                'account_number' => ($extractedInfo && isset($extractedInfo['account_number'])) ? $extractedInfo['account_number'] : null,
+                'amount' => (is_array($extractedInfo) && isset($extractedInfo['amount'])) ? $extractedInfo['amount'] : null,
+                'sender_name' => (is_array($extractedInfo) && isset($extractedInfo['sender_name'])) ? $extractedInfo['sender_name'] : null,
+                'account_number' => (is_array($extractedInfo) && isset($extractedInfo['account_number'])) ? $extractedInfo['account_number'] : null,
                 'extracted_data' => $extractedInfo,
             ]);
             
@@ -297,7 +297,7 @@ class EmailWebhookController extends Controller
             }
 
             // Try to match payment immediately using Zapier payload
-            if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+            if (is_array($extractedInfo) && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
                 // Get pending payments and match them
                 $pendingPayments = \App\Models\Payment::pending()->get();
                 
