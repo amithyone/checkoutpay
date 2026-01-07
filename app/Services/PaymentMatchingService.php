@@ -430,6 +430,74 @@ class PaymentMatchingService
     }
 
     /**
+     * Re-check a stored email against pending payments
+     * Used for manual matching from admin panel
+     */
+    public function recheckStoredEmail(\App\Models\ProcessedEmail $storedEmail): array
+    {
+        // Re-extract payment info from html_body
+        $emailData = [
+            'subject' => $storedEmail->subject,
+            'from' => $storedEmail->from_email,
+            'text' => $storedEmail->text_body ?? '',
+            'html' => $storedEmail->html_body ?? '', // Prioritize html_body
+            'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : null,
+        ];
+        
+        $extractedInfo = $this->extractPaymentInfo($emailData);
+        
+        if (!$extractedInfo || !$extractedInfo['amount']) {
+            return [
+                'success' => false,
+                'message' => 'Could not extract payment information from email',
+                'matches' => [],
+            ];
+        }
+        
+        // Get pending payments
+        $query = Payment::pending();
+        
+        // Filter by email account if email has one
+        if ($storedEmail->email_account_id) {
+            $query->where(function ($q) use ($storedEmail) {
+                $q->whereHas('business', function ($businessQuery) use ($storedEmail) {
+                    $businessQuery->where('email_account_id', $storedEmail->email_account_id);
+                })
+                ->orWhereHas('business', function ($businessQuery) {
+                    $businessQuery->whereNull('email_account_id');
+                })
+                ->orWhereNull('business_id');
+            });
+        }
+        
+        $pendingPayments = $query->get();
+        $matches = [];
+        
+        foreach ($pendingPayments as $payment) {
+            $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+            
+            $matches[] = [
+                'payment' => $payment,
+                'matched' => $match['matched'],
+                'reason' => $match['reason'],
+                'transaction_id' => $payment->transaction_id,
+                'expected_amount' => $payment->amount,
+                'extracted_amount' => $extractedInfo['amount'],
+                'expected_name' => $payment->payer_name,
+                'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                'time_diff_minutes' => $storedEmail->email_date ? abs($payment->created_at->diffInMinutes($storedEmail->email_date)) : null,
+            ];
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Re-check completed',
+            'extracted_info' => $extractedInfo,
+            'matches' => $matches,
+        ];
+    }
+
+    /**
      * Convert HTML to plain text while preserving important structure
      * Handles tables, divs, and other HTML elements banks use
      */
