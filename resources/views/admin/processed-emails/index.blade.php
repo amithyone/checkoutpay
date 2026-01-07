@@ -160,7 +160,7 @@
                                     class="text-sm text-primary hover:underline">
                                     <i class="fas fa-eye mr-1"></i> View
                                 </a>
-                                @if(!$email->is_matched && $email->amount)
+                                @if(!$email->is_matched)
                                     <button onclick="checkMatch({{ $email->id }})" 
                                         class="text-sm text-green-600 hover:underline check-match-btn"
                                         data-email-id="{{ $email->id }}">

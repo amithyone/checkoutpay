@@ -64,7 +64,16 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $payment->created_at->format('M d, Y H:i') }}</td>
                         <td class="px-6 py-4">
-                            <a href="{{ route('admin.payments.show', $payment) }}" class="text-primary hover:underline text-sm">View</a>
+                            <div class="flex items-center gap-2">
+                                <a href="{{ route('admin.payments.show', $payment) }}" class="text-primary hover:underline text-sm">View</a>
+                                @if($payment->status === 'pending')
+                                    <button onclick="checkMatchForPayment({{ $payment->id }})" 
+                                        class="text-sm text-green-600 hover:underline check-match-payment-btn"
+                                        data-payment-id="{{ $payment->id }}">
+                                        <i class="fas fa-search mr-1"></i> Check Match
+                                    </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty
@@ -82,4 +91,73 @@
         @endif
     </div>
 </div>
+
+<script>
+function checkMatchForPayment(paymentId) {
+    const btn = document.querySelector(`.check-match-payment-btn[data-payment-id="${paymentId}"]`);
+    if (!btn) return;
+    
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Checking...';
+    
+    fetch(`/admin/payments/${paymentId}/check-match`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(`HTTP ${response.status}: ${text.substring(0, 200)}`);
+            });
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                throw new Error('Response is not JSON: ' + text.substring(0, 200));
+            });
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            if (data.matched) {
+                alert(`✅ Payment matched and approved!\n\nEmail: ${data.email.subject || 'N/A'}\nFrom: ${data.email.from_email || 'N/A'}\nAmount: ₦${data.payment.amount.toLocaleString()}`);
+                window.location.reload();
+            } else {
+                let message = '❌ No matching email found.\n\n';
+                if (data.matches && data.matches.length > 0) {
+                    message += 'Checked Emails:\n';
+                    data.matches.forEach(match => {
+                        message += `\n• ${match.email_subject || 'No Subject'}: ${match.reason}`;
+                        if (match.time_diff_minutes !== null) {
+                            message += ` (${match.time_diff_minutes} min difference)`;
+                        }
+                    });
+                } else {
+                    message += 'No unmatched emails found to check against.';
+                }
+                alert(message);
+            }
+        } else {
+            alert('Error: ' + (data.message || 'Failed to check match'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error checking match: ' + error.message + '\n\nCheck browser console (F12) for details.');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+</script>
 @endsection
