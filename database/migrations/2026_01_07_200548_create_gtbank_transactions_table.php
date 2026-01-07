@@ -17,7 +17,7 @@ return new class extends Migration
 
         Schema::create('gtbank_transactions', function (Blueprint $table) {
             $table->id();
-            $table->string('account_number')->index();
+            $table->string('account_number');
             $table->decimal('amount', 15, 2);
             $table->string('sender_name')->nullable();
             $table->enum('transaction_type', ['CREDIT', 'DEBIT']);
@@ -29,6 +29,7 @@ return new class extends Migration
             $table->unsignedBigInteger('bank_template_id')->nullable()->comment('Reference to bank_email_templates table');
             $table->timestamps();
 
+            // Indexes
             $table->index('account_number');
             $table->index('value_date');
             $table->index('transaction_type');
