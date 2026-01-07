@@ -191,10 +191,6 @@ class MonitorEmails extends Command
                     
                     $this->processMessage($message, $emailAccount);
                     $processedCount++;
-                    
-                    // Note: Emails are NOT marked as read immediately
-                    // They will be checked again on next run until they match a payment or become too old
-                    // This ensures emails that arrive before payment requests are still matched
                 } catch (\Exception $e) {
                     Log::error('Error processing email message', [
                         'error' => $e->getMessage(),
