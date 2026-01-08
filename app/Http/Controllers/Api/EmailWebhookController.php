@@ -94,11 +94,12 @@ class EmailWebhookController extends Controller
      */
     protected function processZapierPayload(Request $request)
     {
-        // Extract Zapier payload
-        $senderName = $request->input('sender_name', '');
-        $amountRaw = $request->input('amount', '');
-        $timeSent = $request->input('time_sent', now()->toDateTimeString());
-        $emailContent = $request->input('email', ''); // This is the full email body/content
+        try {
+            // Extract Zapier payload
+            $senderName = $request->input('sender_name', '');
+            $amountRaw = $request->input('amount', '');
+            $timeSent = $request->input('time_sent', now()->toDateTimeString());
+            $emailContent = $request->input('email', ''); // This is the full email body/content
             
             // Parse amount - handle formats like "NGN 800", "NGN500", "₦800", "800", etc.
             $amount = $this->parseAmount($amountRaw);
