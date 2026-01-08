@@ -55,6 +55,9 @@ class MonitorEmails extends Command
                 
                 if ($method === 'gmail_api') {
                     $this->monitorEmailAccountGmailApi($emailAccount);
+                } elseif ($method === 'native_imap') {
+                    // Use native PHP IMAP functions (faster, direct parsing)
+                    $this->monitorEmailAccountNativeImap($emailAccount);
                 } else {
                     $client = $this->getImapClientForAccount($emailAccount);
                     $this->monitorEmailAccount($client, $emailAccount);
@@ -731,6 +734,239 @@ class MonitorEmails extends Command
                 'email_account_id' => $emailAccount->id,
             ]);
             return null;
+        }
+    }
+
+    /**
+     * Monitor email account using native PHP IMAP functions
+     * This method provides direct IMAP access and GTBank-specific parsing
+     */
+    protected function monitorEmailAccountNativeImap(EmailAccount $emailAccount): void
+    {
+        try {
+            $this->info("Using native IMAP for: {$emailAccount->email}");
+            
+            // Build IMAP connection string
+            $host = $emailAccount->host ?? 'mail.check-outpay.com';
+            $port = $emailAccount->port ?? 993;
+            $encryption = $emailAccount->encryption ?? 'ssl';
+            $folder = $emailAccount->folder ?? 'INBOX';
+            
+            $connectionString = "{{$host}:{$port}/imap/{$encryption}}{$folder}";
+            
+            // Connect to IMAP
+            $imap = @imap_open($connectionString, $emailAccount->email, $emailAccount->password);
+            
+            if (!$imap) {
+                $error = imap_last_error();
+                Log::error('Native IMAP connection failed', [
+                    'email_account_id' => $emailAccount->id,
+                    'email' => $emailAccount->email,
+                    'error' => $error,
+                ]);
+                $this->error("IMAP connection failed: {$error}");
+                return;
+            }
+            
+            // Search for unseen emails
+            $emails = imap_search($imap, 'UNSEEN');
+            
+            if (!$emails) {
+                $this->info("No new emails found for {$emailAccount->email}");
+                imap_close($imap);
+                return;
+            }
+            
+            $this->info("Found " . count($emails) . " new email(s)");
+            
+            foreach ($emails as $emailNumber) {
+                try {
+                    $overview = imap_fetch_overview($imap, $emailNumber, 0)[0];
+                    
+                    // Get email body (try multipart first, then plain)
+                    $body = imap_fetchbody($imap, $emailNumber, 1.1) 
+                        ?: imap_fetchbody($imap, $emailNumber, 1);
+                    
+                    // Decode if needed
+                    $body = imap_base64($body) ?: $body;
+                    $cleanBody = trim(strip_tags($body));
+                    
+                    // Parse GTBank email fields
+                    $payload = $this->parseGtbankEmail($overview, $cleanBody, $body);
+                    
+                    if ($payload) {
+                        // Forward to webhook endpoint (same as Zapier)
+                        $this->forwardToWebhook($payload, $emailAccount);
+                        
+                        // Mark as seen
+                        imap_setflag_full($imap, $emailNumber, "\\Seen");
+                        
+                        $this->info("✓ Processed email: {$overview->subject}");
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error processing native IMAP email', [
+                        'email_account_id' => $emailAccount->id,
+                        'email_number' => $emailNumber,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $this->warn("Error processing email #{$emailNumber}: {$e->getMessage()}");
+                    continue;
+                }
+            }
+            
+            imap_close($imap);
+            $this->info("Native IMAP monitoring completed for {$emailAccount->email}");
+        } catch (\Exception $e) {
+            Log::error('Error in native IMAP monitoring', [
+                'email_account_id' => $emailAccount->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->error("Native IMAP error: {$e->getMessage()}");
+        }
+    }
+    
+    /**
+     * Parse GTBank email and extract payment information
+     */
+    protected function parseGtbankEmail($overview, string $cleanBody, string $htmlBody): ?array
+    {
+        try {
+            $payload = [];
+            
+            // Extract sender email
+            preg_match('/<(.+?)>/', $overview->from ?? '', $emailMatch);
+            $payload['email'] = $emailMatch[1] ?? $overview->from ?? null;
+            
+            if (empty($payload['email'])) {
+                return null; // Can't process without sender email
+            }
+            
+            // Filter out noreply@xtrapay.ng emails
+            if (strtolower($payload['email']) === 'noreply@xtrapay.ng') {
+                return null;
+            }
+            
+            // Amount (handle both "NGN 500" and "₦500" formats)
+            preg_match('/Amount\s*:\s*(NGN|₦|N)\s*([\d,\.]+)/i', $cleanBody, $amountMatch);
+            if (isset($amountMatch[2])) {
+                $amount = str_replace(',', '', $amountMatch[2]);
+                $currency = strtoupper($amountMatch[1] ?? 'NGN');
+                $payload['amount'] = $currency . ' ' . $amount;
+            } else {
+                // Try alternative patterns
+                preg_match('/(NGN|₦|N)\s*([\d,\.]+)/i', $cleanBody, $altAmountMatch);
+                if (isset($altAmountMatch[2])) {
+                    $amount = str_replace(',', '', $altAmountMatch[2]);
+                    $currency = strtoupper($altAmountMatch[1] ?? 'NGN');
+                    $payload['amount'] = $currency . ' ' . $amount;
+                } else {
+                    return null; // Can't process without amount
+                }
+            }
+            
+            // Sender name (from Description field: "FROM <NAME> TO")
+            preg_match('/FROM\s+([A-Z\s]+)\s+TO/i', $cleanBody, $nameMatch);
+            $payload['sender_name'] = trim($nameMatch[1] ?? '');
+            
+            // Time sent
+            preg_match('/Time of Transaction\s*:\s*([\d:APM\s]+)/i', $cleanBody, $timeMatch);
+            if (isset($timeMatch[1])) {
+                $payload['time_sent'] = trim($timeMatch[1]);
+            } else {
+                // Fallback to email date
+                $payload['time_sent'] = date('h:i:s A', strtotime($overview->date ?? 'now'));
+            }
+            
+            // Additional fields for logging/debugging
+            preg_match('/Account Number\s*:\s*(\d+)/i', $cleanBody, $accountMatch);
+            $payload['account_number'] = $accountMatch[1] ?? null;
+            
+            preg_match('/Transaction Location\s*:\s*([\d\w]+)/i', $cleanBody, $locationMatch);
+            $payload['transaction_location'] = $locationMatch[1] ?? null;
+            
+            preg_match('/Description\s*:\s*(.+?)(?:\s{2,}|\n|$)/is', $cleanBody, $descMatch);
+            $payload['description'] = trim($descMatch[1] ?? '');
+            
+            preg_match('/Value Date\s*:\s*([\d\-]+)/i', $cleanBody, $valueDateMatch);
+            $payload['value_date'] = $valueDateMatch[1] ?? null;
+            
+            preg_match('/Remarks\s*:\s*(.+?)(?:\s{2,}|\n|$)/is', $cleanBody, $remarksMatch);
+            $payload['remarks'] = trim($remarksMatch[1] ?? '');
+            
+            preg_match('/Current Balance\s*:\s*(NGN|₦|N)\s*([\d,\.]+)/i', $cleanBody, $curBalMatch);
+            if (isset($curBalMatch[2])) {
+                $balance = str_replace(',', '', $curBalMatch[2]);
+                $currency = strtoupper($curBalMatch[1] ?? 'NGN');
+                $payload['current_balance'] = $currency . ' ' . $balance;
+            }
+            
+            preg_match('/Available Balance\s*:\s*(NGN|₦|N)\s*([\d,\.]+)/i', $cleanBody, $availBalMatch);
+            if (isset($availBalMatch[2])) {
+                $balance = str_replace(',', '', $availBalMatch[2]);
+                $currency = strtoupper($availBalMatch[1] ?? 'NGN');
+                $payload['available_balance'] = $currency . ' ' . $balance;
+            }
+            
+            preg_match('/Document Number\s*:\s*(.+)/i', $cleanBody, $docMatch);
+            $payload['document_number'] = trim($docMatch[1] ?? '');
+            
+            // Include full email content for webhook processing
+            $payload['email_content'] = $htmlBody ?: $cleanBody;
+            
+            return $payload;
+        } catch (\Exception $e) {
+            Log::error('Error parsing GTBank email', [
+                'error' => $e->getMessage(),
+                'subject' => $overview->subject ?? '',
+            ]);
+            return null;
+        }
+    }
+    
+    /**
+     * Forward parsed payload to webhook endpoint
+     */
+    protected function forwardToWebhook(array $payload, EmailAccount $emailAccount): void
+    {
+        try {
+            $webhookUrl = url('/api/v1/email/webhook');
+            
+            // Get webhook secret if configured
+            $webhookSecret = \App\Models\Setting::get('zapier_webhook_secret');
+            
+            $headers = [
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+            ];
+            
+            if ($webhookSecret) {
+                $headers['X-Zapier-Secret'] = $webhookSecret;
+            }
+            
+            $response = \Illuminate\Support\Facades\Http::withHeaders($headers)
+                ->post($webhookUrl, $payload);
+            
+            if ($response->successful()) {
+                $this->info("✓ Webhook forwarded successfully");
+                Log::info('Email forwarded to webhook', [
+                    'email_account_id' => $emailAccount->id,
+                    'sender' => $payload['sender_name'] ?? '',
+                    'amount' => $payload['amount'] ?? '',
+                ]);
+            } else {
+                Log::warning('Webhook forwarding failed', [
+                    'email_account_id' => $emailAccount->id,
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+                $this->warn("⚠ Webhook forwarding failed: {$response->status()}");
+            }
+        } catch (\Exception $e) {
+            Log::error('Error forwarding to webhook', [
+                'email_account_id' => $emailAccount->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->error("Error forwarding to webhook: {$e->getMessage()}");
         }
     }
 
