@@ -25,7 +25,7 @@ class EmailWebhookController extends Controller
     public function receive(Request $request)
     {
         try {
-            // SECURITY: Verify Zapier webhook secret
+            // SECURITY: Verify webhook secret
             $webhookSecret = Setting::get('zapier_webhook_secret');
             if ($webhookSecret) {
                 $providedSecret = $request->header('X-Zapier-Secret') ?? $request->input('webhook_secret');
@@ -45,32 +45,60 @@ class EmailWebhookController extends Controller
                 }
             }
             
-            // Zapier sends data in this format:
-            // - sender_name
-            // - amount
-            // - time_sent
-            // - email (the email body/content)
+            // Detect payload format:
+            // 1. Zapier format: sender_name, amount, time_sent, email
+            // 2. Raw email forward (cPanel): raw email content or email headers/body
             
-            // Handle Zapier test connection (empty request)
-            $isTestRequest = empty($request->input('email')) && empty($request->input('sender_name'));
+            $isZapierFormat = $request->has('sender_name') || $request->has('email');
+            $isRawEmail = $request->has('headers') || $request->has('body') || $request->has('text') || $request->has('html');
             
-            if ($isTestRequest) {
-                // Return success response for Zapier test connection
+            // Handle test connection (empty request)
+            if (!$isZapierFormat && !$isRawEmail && empty($request->getContent())) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Webhook endpoint is ready. Zapier format: sender_name, amount, time_sent, email',
+                    'message' => 'Webhook endpoint is ready',
                     'status' => 'ready',
                     'endpoint' => 'email/webhook',
-                    'expected_fields' => ['sender_name', 'amount', 'time_sent', 'email'],
+                    'supported_formats' => [
+                        'zapier' => ['sender_name', 'amount', 'time_sent', 'email'],
+                        'raw_email' => ['headers', 'body', 'text', 'html', 'from', 'subject', 'date'],
+                    ],
                     'security_note' => $webhookSecret ? 'Webhook secret authentication is enabled' : 'Webhook secret authentication is disabled - enable it in admin settings',
                 ], 200);
             }
 
-            // Extract Zapier payload
-            $senderName = $request->input('sender_name', '');
-            $amountRaw = $request->input('amount', '');
-            $timeSent = $request->input('time_sent', now()->toDateTimeString());
-            $emailContent = $request->input('email', ''); // This is the full email body/content
+            // Process based on format
+            if ($isRawEmail) {
+                // Raw email forward format (from cPanel email forwarding)
+                return $this->processRawEmail($request);
+            } else {
+                // Zapier format
+                return $this->processZapierPayload($request);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error receiving email webhook', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error processing email: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Process Zapier format payload
+     */
+    protected function processZapierPayload(Request $request)
+    {
+        // Extract Zapier payload
+        $senderName = $request->input('sender_name', '');
+        $amountRaw = $request->input('amount', '');
+        $timeSent = $request->input('time_sent', now()->toDateTimeString());
+        $emailContent = $request->input('email', ''); // This is the full email body/content
             
             // Parse amount - handle formats like "NGN 800", "NGN500", "₦800", "800", etc.
             $amount = $this->parseAmount($amountRaw);
