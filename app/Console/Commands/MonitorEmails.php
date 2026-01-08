@@ -33,37 +33,15 @@ class MonitorEmails extends Command
      */
     public function handle(): void
     {
-        // IMAP monitoring is DISABLED - Using Zapier webhook instead for instant email processing
-        $this->info('⚠️  IMAP email monitoring is disabled.');
-        $this->info('✅ Using Zapier webhook for instant email processing instead.');
-        $this->info('📡 Webhook URL: ' . url('/api/v1/email/webhook'));
-        $this->info('');
-        $this->info('💡 To check for emails, use the "Check Transaction Updates" button in admin panel.');
-        $this->info('💡 Or set up Zapier to forward emails to the webhook URL above.');
-        $this->info('');
-        $this->info('📊 Check admin dashboard for Zapier status and recent emails.');
-        
-        // IMAP monitoring code is commented out below
-        // Uncomment if you need to re-enable IMAP monitoring
-        
-        /*
         $this->info('Checking for new emails...');
 
         // Get all active email accounts from database
         $emailAccounts = EmailAccount::where('is_active', true)->get();
 
         if ($emailAccounts->isEmpty()) {
-            // Fallback to .env configuration if no email accounts in database
-            $this->warn('No email accounts found in database. Using .env configuration...');
-            try {
-                $client = $this->getImapClient();
-                $this->monitorEmailAccount($client, null);
-            } catch (\Exception $e) {
-                Log::error('Error monitoring emails from .env', [
-                    'error' => $e->getMessage(),
-                ]);
-                $this->error('Error monitoring emails: ' . $e->getMessage());
-            }
+            $this->warn('No active email accounts found in database.');
+            $this->info('💡 Add email accounts in Admin → Email Accounts');
+            $this->info('💡 Or use Zapier webhook: ' . url('/api/v1/email/webhook'));
             return;
         }
 
@@ -94,7 +72,6 @@ class MonitorEmails extends Command
         }
 
         $this->info('Email monitoring completed');
-        */
     }
 
     /**
