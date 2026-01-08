@@ -513,4 +513,131 @@ class EmailWebhookController extends Controller
 
         return null;
     }
+
+    /**
+     * Process raw email forward (from cPanel email forwarding)
+     */
+    protected function processRawEmail(Request $request)
+    {
+        // Extract email data from raw email forward
+        // cPanel can send emails in different formats, handle both
+        
+        // Format 1: Separate fields (headers, body, etc.)
+        $fromEmail = $request->input('from') ?? $request->input('headers.from') ?? '';
+        $subject = $request->input('subject') ?? $request->input('headers.subject') ?? 'Transaction Notification';
+        $textBody = $request->input('text') ?? $request->input('body') ?? '';
+        $htmlBody = $request->input('html') ?? '';
+        $date = $request->input('date') ?? $request->input('headers.date') ?? now()->toDateTimeString();
+        
+        // Format 2: Raw email content (parse MIME)
+        if (empty($textBody) && empty($htmlBody)) {
+            $rawContent = $request->getContent() ?? $request->input('email') ?? '';
+            if (!empty($rawContent)) {
+                $parsed = $this->parseRawEmail($rawContent);
+                $fromEmail = $parsed['from'] ?? $fromEmail;
+                $subject = $parsed['subject'] ?? $subject;
+                $textBody = $parsed['text'] ?? $textBody;
+                $htmlBody = $parsed['html'] ?? $htmlBody;
+                $date = $parsed['date'] ?? $date;
+            }
+        }
+        
+        // Extract sender name from From header if available
+        $senderName = '';
+        if (preg_match('/^(.+?)\s*<(.+?)>$/', $fromEmail, $matches)) {
+            $senderName = trim($matches[1]);
+            $fromEmail = strtolower(trim($matches[2]));
+        } elseif (preg_match('/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})/', $fromEmail, $matches)) {
+            $fromEmail = strtolower($matches[1]);
+        }
+        
+        // Use PaymentMatchingService to extract payment info from email
+        $matchingService = new PaymentMatchingService(new TransactionLogService());
+        $emailData = [
+            'subject' => $subject,
+            'from' => $fromEmail,
+            'text' => $textBody,
+            'html' => $htmlBody,
+            'date' => $date,
+        ];
+        
+        $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+        
+        if (!$extractedInfo || empty($extractedInfo['amount'])) {
+            // Log the email but don't process if we can't extract payment info
+            ZapierLog::create([
+                'payload' => $request->all(),
+                'status' => 'error',
+                'status_message' => 'Could not extract payment information from raw email',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not extract payment information from email',
+                'status' => 'extraction_failed',
+            ], 400);
+        }
+        
+        // Convert to Zapier format for processing
+        $zapierRequest = new Request([
+            'sender_name' => $senderName ?: ($extractedInfo['sender_name'] ?? ''),
+            'amount' => $extractedInfo['amount'],
+            'time_sent' => $date,
+            'email' => $htmlBody ?: $textBody,
+        ]);
+        
+        // Copy headers for security
+        foreach ($request->headers->all() as $key => $value) {
+            $zapierRequest->headers->set($key, $value[0] ?? '');
+        }
+        
+        // Process using Zapier payload handler
+        return $this->processZapierPayload($zapierRequest);
+    }
+
+    /**
+     * Parse raw email content (MIME format)
+     */
+    protected function parseRawEmail(string $rawContent): array
+    {
+        $result = [
+            'from' => '',
+            'subject' => '',
+            'text' => '',
+            'html' => '',
+            'date' => now()->toDateTimeString(),
+        ];
+        
+        // Extract headers
+        if (preg_match('/From:\s*(.+?)(?:\r?\n|$)/i', $rawContent, $matches)) {
+            $result['from'] = trim($matches[1]);
+        }
+        
+        if (preg_match('/Subject:\s*(.+?)(?:\r?\n|$)/i', $rawContent, $matches)) {
+            $result['subject'] = trim($matches[1]);
+        }
+        
+        if (preg_match('/Date:\s*(.+?)(?:\r?\n|$)/i', $rawContent, $matches)) {
+            $result['date'] = trim($matches[1]);
+        }
+        
+        // Extract body (after first blank line)
+        $parts = preg_split('/\r?\n\r?\n/', $rawContent, 2);
+        if (isset($parts[1])) {
+            $body = $parts[1];
+            
+            // Check if HTML
+            if (stripos($body, '<html') !== false || stripos($body, '<body') !== false) {
+                $result['html'] = $body;
+                $result['text'] = strip_tags($body);
+            } else {
+                $result['text'] = $body;
+                $result['html'] = nl2br(htmlspecialchars($body));
+            }
+        }
+        
+        return $result;
+    }
 }
