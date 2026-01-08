@@ -27,16 +27,26 @@ This setup forwards Gmail emails to your webhook for **instant processing**. The
 
 ### Step 2: Forward cPanel Email to Webhook
 
+**⚠️ Important:** cPanel email forwarders typically forward to email addresses, NOT webhooks directly. 
+
+**Option A: If cPanel supports "Forward to URL" (some versions do):**
 1. **Login to cPanel:**
    - Go to your cPanel dashboard
 
 2. **Set up Email Forwarder:**
    - Go to **Email** → **Forwarders**
    - Click **Add Forwarder**
-   - **Address to Forward:** `alerts@yourdomain.com` (same email from Step 1)
-   - **Destination:** Choose **Forward to URL**
+   - **Address to Forward:** `payment@check-outpay.com` (or create new email)
+   - **Destination:** Look for **"Forward to URL"** option
    - **URL:** `https://check-outpay.com/api/v1/email/webhook`
    - Click **Add Forwarder**
+
+**Option B: If "Forward to URL" is NOT available (most common):**
+Use **IMAP monitoring instead** (simpler and already built-in):
+1. Forward Gmail → `payment@check-outpay.com` (cPanel email)
+2. Add email account in Admin → Email Accounts
+3. System checks every minute automatically
+4. **See CPANEL_WEBHOOK_FORWARDING.md for detailed instructions**
 
 ### Step 3: Configure Webhook Secret (Security)
 
