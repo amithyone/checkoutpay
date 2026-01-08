@@ -140,16 +140,22 @@ docker run -it --rm \
 
 ---
 
-## 🚀 Quick Start: Re-enable IMAP Monitoring
+## 🚀 Quick Start: Use IMAP Monitoring (Already Enabled!)
 
 Since IMAP monitoring is already built into your system, this is the easiest and cheapest option:
 
-1. **The code is already there** - just needs to be uncommented
-2. **No external services** - works directly with your email
+1. ✅ **Already enabled** - Code is active and ready
+2. **No external services** - works directly with Gmail
 3. **FREE forever** - no monthly costs
 4. **Fast enough** - checks every minute (60 seconds)
 
-**Would you like me to re-enable IMAP monitoring?** It's literally just uncommenting the code that's already there!
+**Setup Steps:**
+1. Get Gmail App Password (see GMAIL_IMAP_SETUP.md)
+2. Add email account in Admin → Email Accounts
+3. Enable cron job
+4. Done! No Zapier needed!
+
+See **GMAIL_IMAP_SETUP.md** for detailed setup instructions.
 
 ---
 
