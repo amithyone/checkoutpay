@@ -33,8 +33,10 @@ Route::prefix('v1')->group(function () {
     
     // Email webhook (for email forwarding services like Zapier)
     Route::post('/email/webhook', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']);
+    Route::get('/email/webhook', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck']); // GET for health checks and testing
     Route::post('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']); // Legacy route for backward compatibility
-    Route::get('/email/webhook/health', [\App\Http\Controllers\Api\EmailWebhookController::class, 'health'])->name('email.webhook.health');
+    Route::get('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck']); // GET for legacy route too
+    Route::get('/email/webhook/health', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck'])->name('email.webhook.health');
     
     // Transaction check endpoint (for external sites to trigger email checking)
     Route::post('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']);

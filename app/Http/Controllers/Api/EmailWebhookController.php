@@ -640,4 +640,32 @@ class EmailWebhookController extends Controller
         
         return $result;
     }
+
+    /**
+     * Health check endpoint (for GET requests)
+     */
+    public function healthCheck(Request $request)
+    {
+        $webhookSecret = Setting::get('zapier_webhook_secret');
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Email webhook endpoint is ready',
+            'status' => 'ready',
+            'endpoint' => '/api/v1/email/webhook',
+            'supported_methods' => ['GET', 'POST'],
+            'security' => [
+                'webhook_secret_enabled' => !empty($webhookSecret),
+                'whitelist_enabled' => WhitelistedEmailAddress::where('is_active', true)->exists(),
+            ],
+            'usage' => [
+                'post' => 'Send email data via POST request',
+                'get' => 'Health check (this endpoint)',
+            ],
+            'expected_format' => [
+                'zapier' => ['sender_name', 'amount', 'time_sent', 'email'],
+                'raw_email' => ['from', 'subject', 'text', 'html', 'date'],
+            ],
+        ], 200);
+    }
 }
