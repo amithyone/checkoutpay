@@ -14,7 +14,7 @@ class EmailAccount extends Model
     protected $fillable = [
         'name',
         'email',
-        'method', // 'imap' or 'gmail_api'
+        'method', // 'imap', 'native_imap', or 'gmail_api'
         'host',
         'port',
         'encryption',

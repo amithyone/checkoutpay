@@ -29,11 +29,13 @@
                     <select name="method" id="method" required
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
                         onchange="toggleMethodFields()">
-                        <option value="imap" {{ old('method', 'imap') === 'imap' ? 'selected' : '' }}>IMAP (Traditional)</option>
-                        <option value="gmail_api" {{ old('method') === 'gmail_api' ? 'selected' : '' }}>Gmail API (Recommended - Bypasses Firewall)</option>
+                        <option value="imap" {{ old('method', 'imap') === 'imap' ? 'selected' : '' }}>IMAP (Webklex Library)</option>
+                        <option value="native_imap" {{ old('method') === 'native_imap' ? 'selected' : '' }}>Native IMAP (Fast GTBank Parser)</option>
+                        <option value="gmail_api" {{ old('method') === 'gmail_api' ? 'selected' : '' }}>Gmail API (OAuth 2.0)</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1">
-                        <strong>Gmail API:</strong> Uses HTTPS (port 443), never blocked by firewalls. 
+                        <strong>Native IMAP:</strong> Uses PHP native IMAP functions with GTBank-specific parsing. Fast and direct.
+                        <br><strong>Gmail API:</strong> Uses HTTPS (port 443), never blocked by firewalls. 
                         <a href="{{ url('GMAIL_API_SETUP.md') }}" target="_blank" class="text-blue-600 hover:underline">Setup Guide</a>
                     </p>
                 </div>
