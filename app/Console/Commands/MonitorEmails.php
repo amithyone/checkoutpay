@@ -162,7 +162,8 @@ class MonitorEmails extends Command
                 'timezone' => config('app.timezone'),
             ]);
             
-            $this->info("📧 Fetching emails from folder: {$emailAccount->folder ?? 'INBOX'}");
+            $folderName = $emailAccount ? ($emailAccount->folder ?? 'INBOX') : 'INBOX';
+            $this->info("📧 Fetching emails from folder: {$folderName}");
             $this->info("📅 Fetching emails since: {$sinceDate->format('Y-m-d H:i:s')} ({$sinceDate->diffForHumans()})");
             
             // Check ALL emails (read and unread) after the payment request date
