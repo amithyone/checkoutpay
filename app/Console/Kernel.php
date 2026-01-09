@@ -12,9 +12,16 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Monitor emails every 30 seconds
+        // Monitor emails every 10 seconds (more frequent for faster detection)
         $schedule->command('payment:monitor-emails')
-            ->everyThirtySeconds()
+            ->everyTenSeconds()
+            ->withoutOverlapping()
+            ->runInBackground();
+
+        // Also read emails directly from filesystem every 15 seconds
+        // This ensures we catch emails even if IMAP doesn't work
+        $schedule->command('payment:read-emails-direct --all')
+            ->everyFifteenSeconds()
             ->withoutOverlapping()
             ->runInBackground();
 

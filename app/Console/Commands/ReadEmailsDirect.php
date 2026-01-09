@@ -11,49 +11,81 @@ use Illuminate\Support\Facades\Log;
 
 class ReadEmailsDirect extends Command
 {
-    protected $signature = 'payment:read-emails-direct {--email= : Email account to read}';
+    protected $signature = 'payment:read-emails-direct {--email= : Email account to read (default: notify@check-outpay.com)} {--all : Read from all active email accounts}';
     protected $description = 'Read emails directly from server mail files (bypasses IMAP)';
 
     public function handle(): void
     {
         $this->info('Reading emails directly from server filesystem...');
 
-        // Get email account
-        $emailAddress = $this->option('email') ?? 'notify@check-outpay.com';
-        $emailAccount = EmailAccount::where('email', $emailAddress)->first();
+        // Get email accounts to process
+        if ($this->option('all')) {
+            // Process all active email accounts
+            $emailAccounts = EmailAccount::where('is_active', true)->get();
+            
+            if ($emailAccounts->isEmpty()) {
+                $this->warn('No active email accounts found in database.');
+                return;
+            }
 
-        if (!$emailAccount) {
-            $this->error("Email account not found: {$emailAddress}");
-            return;
+            $this->info("Processing {$emailAccounts->count()} active email account(s)...");
+        } else {
+            // Process specific email account
+            $emailAddress = $this->option('email') ?? 'notify@check-outpay.com';
+            $emailAccount = EmailAccount::where('email', $emailAddress)->first();
+
+            if (!$emailAccount) {
+                $this->error("Email account not found: {$emailAddress}");
+                $this->info("Available email accounts:");
+                EmailAccount::all()->each(function ($account) {
+                    $this->info("  - {$account->email} (Active: " . ($account->is_active ? 'Yes' : 'No') . ")");
+                });
+                return;
+            }
+
+            $emailAccounts = collect([$emailAccount]);
         }
 
-        $this->info("Reading emails for: {$emailAccount->email}");
-
-        // Try to find mail directory
-        $mailPaths = $this->findMailDirectory($emailAccount->email);
-
-        if (empty($mailPaths)) {
-            $this->error('Could not find mail directory. Trying common paths...');
-            $this->info('Common cPanel mail paths:');
-            $this->info('  /home/username/mail/domain.com/email@domain.com/');
-            $this->info('  /var/spool/mail/username');
-            $this->info('  /home/username/mail/domain.com/email@domain.com/Maildir/');
-            return;
-        }
-
-        $this->info('Found mail directory(s):');
-        foreach ($mailPaths as $path) {
-            $this->info("  - {$path}");
-        }
-
-        // Read emails from each path
         $totalRead = 0;
-        foreach ($mailPaths as $mailPath) {
-            $count = $this->readEmailsFromPath($mailPath, $emailAccount);
-            $totalRead += $count;
+
+        foreach ($emailAccounts as $emailAccount) {
+            $this->info("Reading emails for: {$emailAccount->email}");
+
+            // Try to find mail directory
+            $mailPaths = $this->findMailDirectory($emailAccount->email);
+
+            if (empty($mailPaths)) {
+                $this->warn("Could not find mail directory for {$emailAccount->email}");
+                $this->info('Common cPanel mail paths:');
+                $username = $this->getUsername();
+                list($localPart, $domain) = explode('@', $emailAccount->email);
+                $this->info("  /home/{$username}/mail/{$domain}/{$localPart}/Maildir/");
+                $this->info("  /home/{$username}/mail/{$domain}/{$localPart}/");
+                continue;
+            }
+
+            $this->info('Found mail directory(s):');
+            foreach ($mailPaths as $path) {
+                $this->info("  - {$path}");
+            }
+
+            // Read emails from each path
+            foreach ($mailPaths as $mailPath) {
+                $count = $this->readEmailsFromPath($mailPath, $emailAccount);
+                $totalRead += $count;
+            }
+
+            $this->newLine();
         }
 
-        $this->info("✅ Total emails read: {$totalRead}");
+        $this->info("═══════════════════════════════════════════");
+        $this->info("✅ Total emails read across all accounts: {$totalRead}");
+        $this->info("═══════════════════════════════════════════");
+        
+        if ($totalRead > 0) {
+            $this->info("📧 Emails have been processed and matching jobs dispatched!");
+            $this->info("   Check payments in admin panel to see if any were matched.");
+        }
     }
 
     /**
