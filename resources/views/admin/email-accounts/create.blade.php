@@ -51,10 +51,11 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label for="port" class="block text-sm font-medium text-gray-700 mb-1">Port *</label>
+                        <label for="port" class="block text-sm font-medium text-gray-700 mb-1">IMAP Port *</label>
                         <input type="number" name="port" id="port" required
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
                             value="{{ old('port', 993) }}" min="1" max="65535">
+                        <p class="text-xs text-gray-500 mt-1">Common: 993 (SSL) or 143 (TLS)</p>
                     </div>
                     <div>
                         <label for="encryption" class="block text-sm font-medium text-gray-700 mb-1">Encryption *</label>
@@ -62,11 +63,11 @@
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
                             onchange="updateEncryptionHint()">
                             <option value="ssl" {{ old('encryption', 'ssl') === 'ssl' ? 'selected' : '' }}>SSL (Port 993)</option>
-                            <option value="tls" {{ old('encryption') === 'tls' ? 'selected' : '' }}>TLS (Port 587/143)</option>
+                            <option value="tls" {{ old('encryption') === 'tls' ? 'selected' : '' }}>TLS (Port 143)</option>
                             <option value="none" {{ old('encryption') === 'none' ? 'selected' : '' }}>None</option>
                         </select>
                         <p id="encryption-hint" class="text-xs text-gray-500 mt-1">
-                            For Gmail with port 993, use SSL. For port 587, use TLS.
+                            For Gmail with port 993, use SSL. For custom domains, try port 993 with SSL first.
                         </p>
                     </div>
                 </div>
@@ -193,5 +194,56 @@ function toggleMethodFields() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', toggleMethodFields);
+
+function updateEncryptionHint() {
+    const encryption = document.getElementById('encryption').value;
+    const port = parseInt(document.getElementById('port').value);
+    const hint = document.getElementById('encryption-hint');
+    const emailInput = document.getElementById('email').value;
+    const hostInput = document.getElementById('host').value;
+    
+    // Port 465 is SMTP (outgoing), not IMAP (incoming)
+    if (port === 465) {
+        hint.innerHTML = '❌ <strong>Error:</strong> Port 465 is for SMTP (outgoing email), not IMAP (incoming email). For IMAP, use port <strong>993</strong> with <strong>SSL</strong> encryption, or port <strong>143</strong> with <strong>TLS</strong> encryption.';
+        hint.className = 'text-xs text-red-600 mt-1 font-medium bg-red-50 p-2 rounded';
+        return;
+    }
+    
+    // Port 587 and 25 are also SMTP
+    if (port === 587 || port === 25) {
+        hint.innerHTML = '❌ <strong>Error:</strong> Port ' + port + ' is for SMTP (outgoing email), not IMAP (incoming email). For IMAP, use port <strong>993</strong> with <strong>SSL</strong>, or port <strong>143</strong> with <strong>TLS</strong>.';
+        hint.className = 'text-xs text-red-600 mt-1 font-medium bg-red-50 p-2 rounded';
+        return;
+    }
+    
+    // Suggest correct host for custom domain emails
+    if (port === 993 && emailInput && emailInput.includes('@') && !emailInput.includes('gmail.com') && !emailInput.includes('yahoo.com') && !emailInput.includes('outlook.com')) {
+        const domain = emailInput.split('@')[1];
+        if (hostInput === 'imap.gmail.com' || !hostInput.includes(domain)) {
+            hint.innerHTML = '💡 <strong>Tip:</strong> For custom domain emails (' + domain + '), the IMAP host is usually <strong>mail.' + domain + '</strong> or <strong>imap.' + domain + '</strong>. Try changing the host field.';
+            hint.className = 'text-xs text-blue-600 mt-1 font-medium bg-blue-50 p-2 rounded';
+            return;
+        }
+    }
+    
+    if (port == 993 && encryption === 'tls') {
+        hint.textContent = '⚠️ Warning: Port 993 requires SSL encryption, not TLS. Please change to SSL.';
+        hint.className = 'text-xs text-orange-600 mt-1 font-medium bg-orange-50 p-2 rounded';
+    } else if (port == 143 && encryption === 'ssl') {
+        hint.textContent = '⚠️ Warning: Port 143 typically uses TLS encryption. Consider changing to TLS.';
+        hint.className = 'text-xs text-orange-600 mt-1 font-medium bg-orange-50 p-2 rounded';
+    } else {
+        hint.textContent = 'For Gmail with port 993, use SSL. For custom domain emails, use port 993 with SSL (most common) or port 143 with TLS.';
+        hint.className = 'text-xs text-gray-500 mt-1';
+    }
+}
+
+// Update hint when port changes
+document.getElementById('port')?.addEventListener('input', updateEncryptionHint);
+document.getElementById('email')?.addEventListener('input', updateEncryptionHint);
+document.getElementById('host')?.addEventListener('input', updateEncryptionHint);
+document.getElementById('encryption')?.addEventListener('change', updateEncryptionHint);
+// Update hint on page load
+document.addEventListener('DOMContentLoaded', updateEncryptionHint);
 </script>
 @endsection

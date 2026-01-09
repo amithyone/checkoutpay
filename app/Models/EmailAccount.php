@@ -213,16 +213,36 @@ class EmailAccount extends Model
             $port = (int)$this->port;
             $encryption = $this->encryption;
             
+            // Port 465 is SMTP (outgoing email), not IMAP (incoming email)
+            if ($port === 465) {
+                return [
+                    'success' => false,
+                    'message' => 'Port 465 is for SMTP (outgoing email), not IMAP (incoming email). For IMAP, use port 993 with SSL encryption, or port 143 with TLS encryption. Please update your email account settings: Change port from 465 to 993, set encryption to SSL, and ensure host is set to your IMAP server (e.g., mail.check-outpay.com or imap.check-outpay.com for custom domain emails).',
+                ];
+            }
+            
+            // Port 587 is also SMTP
+            if ($port === 587) {
+                return [
+                    'success' => false,
+                    'message' => 'Port 587 is for SMTP (outgoing email), not IMAP (incoming email). For IMAP, use port 993 with SSL encryption, or port 143 with TLS encryption. Please update your email account settings.',
+                ];
+            }
+            
+            // Port 25 is also SMTP
+            if ($port === 25) {
+                return [
+                    'success' => false,
+                    'message' => 'Port 25 is for SMTP (outgoing email), not IMAP (incoming email). For IMAP, use port 993 with SSL encryption, or port 143 with TLS encryption. Please update your email account settings.',
+                ];
+            }
+            
             // Gmail port 993 requires SSL, not TLS
             if ($port === 993 && $encryption === 'tls') {
                 $encryption = 'ssl';
                 \Illuminate\Support\Facades\Log::info('Auto-corrected TLS to SSL for port 993', [
                     'email' => $this->email,
                 ]);
-            }
-            // Port 587 typically uses TLS
-            if ($port === 587 && $encryption === 'ssl') {
-                $encryption = 'tls';
             }
             
             // Warn if using POP settings
