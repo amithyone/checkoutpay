@@ -19,7 +19,7 @@ class MonitorEmails extends Command
      *
      * @var string
      */
-    protected $signature = 'payment:monitor-emails {--since= : Fetch emails since this date (Y-m-d H:i:s)}';
+    protected $signature = 'payment:monitor-emails {--since= : Fetch emails since this date (Y-m-d H:i:s)} {--all : Fetch ALL emails regardless of date} {--days= : Fetch emails from last N days (default: 7)}';
 
     /**
      * The console command description.
@@ -98,9 +98,31 @@ class MonitorEmails extends Command
                     ->orderBy('email_date', 'desc')
                     ->first();
                 
-                if ($lastStoredEmail && $lastStoredEmail->email_date) {
+                // Check if --all flag is set (fetch ALL emails)
+                if ($this->option('all')) {
+                    $sinceDate = now()->subYears(10); // Go way back
+                    $this->info("🔍 Fetching ALL emails (--all flag set)");
+                    Log::info('Using --all flag, fetching all emails');
+                } elseif ($this->option('since')) {
+                    // Use custom --since date
+                    try {
+                        $sinceDate = \Carbon\Carbon::parse($this->option('since'))->setTimezone(config('app.timezone'));
+                        $this->info("🔍 Using custom --since date: {$sinceDate->format('Y-m-d H:i:s')}");
+                        Log::info('Using custom --since date', ['since' => $sinceDate->format('Y-m-d H:i:s')]);
+                    } catch (\Exception $e) {
+                        Log::warning('Invalid --since date, using default logic', ['since' => $this->option('since')]);
+                        $sinceDate = now()->subDays(7);
+                    }
+                } elseif ($this->option('days')) {
+                    // Use --days option
+                    $days = (int)$this->option('days');
+                    $sinceDate = now()->subDays($days);
+                    $this->info("🔍 Fetching emails from last {$days} days");
+                    Log::info('Using --days option', ['days' => $days, 'since' => $sinceDate->format('Y-m-d H:i:s')]);
+                } elseif ($lastStoredEmail && $lastStoredEmail->email_date) {
                     // Fetch emails after the last stored email
                     $sinceDate = $lastStoredEmail->email_date;
+                    $this->info("🔍 Fetching emails after last stored email: {$sinceDate->format('Y-m-d H:i:s')}");
                 } else {
                     // If no stored emails, fetch from oldest pending payment (if exists)
                     $oldestPendingPayment = \App\Models\Payment::pending()
@@ -109,9 +131,13 @@ class MonitorEmails extends Command
                     
                     if ($oldestPendingPayment) {
                         $sinceDate = $oldestPendingPayment->created_at->subMinutes(5);
+                        $this->info("🔍 Fetching emails from oldest pending payment date: {$sinceDate->format('Y-m-d H:i:s')}");
                     } else {
-                        // If no pending payments and no stored emails, fetch last 24 hours
-                        $sinceDate = now()->subDay();
+                        // Default: fetch last 7 days (was 24 hours, too restrictive)
+                        $days = 7;
+                        $sinceDate = now()->subDays($days);
+                        $this->info("🔍 No stored emails or pending payments, fetching last {$days} days: {$sinceDate->format('Y-m-d H:i:s')}");
+                        Log::info('Using default date range (7 days)', ['since' => $sinceDate->format('Y-m-d H:i:s')]);
                     }
                 }
             } else {
@@ -125,6 +151,20 @@ class MonitorEmails extends Command
                     : now()->subDay();
             }
             
+            // Log connection and folder info
+            Log::info('IMAP Email Fetching Started', [
+                'email_account_id' => $emailAccount?->id,
+                'email' => $emailAccount?->email,
+                'host' => $emailAccount?->host,
+                'port' => $emailAccount?->port,
+                'folder' => $emailAccount?->folder ?? 'INBOX',
+                'since_date' => $sinceDate->format('Y-m-d H:i:s'),
+                'timezone' => config('app.timezone'),
+            ]);
+            
+            $this->info("📧 Fetching emails from folder: {$emailAccount->folder ?? 'INBOX'}");
+            $this->info("📅 Fetching emails since: {$sinceDate->format('Y-m-d H:i:s')} ({$sinceDate->diffForHumans()})");
+            
             // Check ALL emails (read and unread) after the payment request date
             // Fetch ALL emails without filtering - store everything for debugging
             $query = $folder->query()->since($sinceDate);
@@ -134,7 +174,24 @@ class MonitorEmails extends Command
             $messages = $query->get();
 
             $accountEmail = $emailAccount ? $emailAccount->email : 'default account';
-            $this->info("Found {$messages->count()} email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
+            $totalEmailsFound = $messages->count();
+            
+            Log::info('IMAP Emails Found', [
+                'email_account_id' => $emailAccount?->id,
+                'total_found' => $totalEmailsFound,
+                'since_date' => $sinceDate->format('Y-m-d H:i:s'),
+            ]);
+            
+            $this->info("✅ Found {$totalEmailsFound} email(s) in {$accountEmail} (after {$sinceDate->format('Y-m-d H:i:s')})");
+            
+            if ($totalEmailsFound === 0) {
+                $this->warn("⚠️  No emails found! This could mean:");
+                $this->warn("   1. All emails are older than {$sinceDate->format('Y-m-d H:i:s')}");
+                $this->warn("   2. Emails are in a different folder");
+                $this->warn("   3. There really are no emails");
+                $this->info("   💡 Try: php artisan payment:monitor-emails --since='" . now()->subDays(7)->format('Y-m-d H:i:s') . "'");
+            }
+            
             $this->line("📧 Starting to process and store emails...");
 
             $processedCount = 0;
@@ -150,44 +207,109 @@ class MonitorEmails extends Command
             $lastProcessedMessageId = $emailAccount?->last_processed_message_id;
             $foundLastProcessed = false;
             
-            foreach ($messages as $message) {
+            foreach ($messages as $index => $message) {
                 try {
                     // Get message ID FIRST (before fetching body - much faster)
                     $messageId = (string)($message->getUid() ?? $message->getMessageId() ?? '');
+                    $subject = $message->getSubject() ?? 'No Subject';
+                    $fromEmail = $message->getFrom()[0]->mail ?? '';
+                    $dateValue = $message->getDate();
+                    $emailDate = $this->parseEmailDate($dateValue);
+                    
+                    Log::info("Processing Email #{$index}", [
+                        'email_account_id' => $emailAccount?->id,
+                        'message_id' => $messageId,
+                        'subject' => $subject,
+                        'from' => $fromEmail,
+                        'date' => $emailDate->format('Y-m-d H:i:s'),
+                        'uid' => $message->getUid(),
+                    ]);
                     
                     if (!$messageId) {
+                        Log::warning('Email skipped: No message ID', [
+                            'subject' => $subject,
+                            'from' => $fromEmail,
+                        ]);
                         $skippedCount++;
+                        $this->warn("  ❌ Skipped email #{$index}: No message ID - Subject: {$subject}");
                         continue;
                     }
                     
                     // FAST CHECK: Skip if already stored (check before fetching body)
                     if (in_array($messageId, $existingMessageIds)) {
+                        Log::debug('Email skipped: Already stored', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                        ]);
                         $alreadyStoredCount++;
+                        $this->line("  ⏭️  Email #{$index} already stored: {$subject}");
                         continue; // Skip immediately - don't fetch body
                     }
                     
                     // FAST CHECK: Skip if we've already processed this message ID
                     if ($lastProcessedMessageId && $messageId === $lastProcessedMessageId) {
+                        Log::debug('Email skipped: Already processed (last processed message)', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                        ]);
                         $foundLastProcessed = true;
+                        $this->line("  ⏭️  Email #{$index} is last processed message: {$subject}");
                         continue;
                     }
                     
                     // If we found the last processed message, skip all previous ones
                     if ($foundLastProcessed) {
+                        Log::debug('Email skipped: Before last processed message', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                        ]);
+                        $this->line("  ⏭️  Email #{$index} skipped (before last processed): {$subject}");
                         continue;
                     }
                     
                     // Only fetch email body if we need to process it
-                    $fromEmail = $message->getFrom()[0]->mail ?? '';
                     
                     // Filter by allowed senders if configured
                     if ($emailAccount && !$emailAccount->isSenderAllowed($fromEmail)) {
+                        Log::warning('Email skipped: Sender not allowed', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                            'from' => $fromEmail,
+                            'allowed_senders' => $emailAccount->allowed_senders,
+                        ]);
                         $skippedCount++;
+                        $this->warn("  ❌ Email #{$index} skipped: Sender not allowed - From: {$fromEmail}, Subject: {$subject}");
                         continue;
                     }
                     
+                    Log::info('Email passed filters, storing...', [
+                        'message_id' => $messageId,
+                        'subject' => $subject,
+                        'from' => $fromEmail,
+                    ]);
+                    $this->info("  ✅ Processing email #{$index}: {$subject} (From: {$fromEmail})");
+                    
                     // Store email in database
-                    $this->storeEmail($message, $emailAccount);
+                    $storedEmail = $this->storeEmail($message, $emailAccount);
+                    
+                    if ($storedEmail) {
+                        Log::info('Email stored successfully', [
+                            'message_id' => $messageId,
+                            'processed_email_id' => $storedEmail->id,
+                            'subject' => $subject,
+                            'from' => $fromEmail,
+                        ]);
+                        $this->info("  ✅ Stored email #{$index} in database (ID: {$storedEmail->id})");
+                    } else {
+                        Log::warning('Email NOT stored (storeEmail returned null)', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                            'from' => $fromEmail,
+                        ]);
+                        $this->warn("  ⚠️  Email #{$index} NOT stored (storeEmail returned null): {$subject}");
+                        $skippedCount++;
+                        continue;
+                    }
                     
                     // Update last processed message ID
                     if ($emailAccount) {
@@ -261,7 +383,34 @@ class MonitorEmails extends Command
                 ->where('created_at', '>=', now()->subMinutes(5))
                 ->count();
             
-            $this->info("✅ Attempted: {$messages->count()} emails | Actually stored: {$storedCount} | Processed for matching: {$processedCount} (with payment info) | Not processed: {$skippedCount} (no payment info extracted - check inbox to troubleshoot)");
+            $summary = [
+                'email_account_id' => $emailAccount?->id,
+                'email' => $emailAccount?->email,
+                'total_found' => $totalEmailsFound,
+                'already_stored' => $alreadyStoredCount,
+                'newly_stored' => $storedCount,
+                'processed_for_matching' => $processedCount,
+                'skipped' => $skippedCount,
+                'since_date' => $sinceDate->format('Y-m-d H:i:s'),
+            ];
+            
+            Log::info('IMAP Email Fetching Summary', $summary);
+            
+            $this->info("═══════════════════════════════════════════");
+            $this->info("📊 Email Fetching Summary for {$accountEmail}");
+            $this->info("═══════════════════════════════════════════");
+            $this->info("📧 Total found: {$totalEmailsFound}");
+            $this->info("✅ Already stored: {$alreadyStoredCount}");
+            $this->info("💾 Newly stored: {$storedCount}");
+            $this->info("💰 Processed for matching: {$processedCount} (with payment info)");
+            $this->info("⏭️  Skipped: {$skippedCount}");
+            $this->info("📅 Fetching since: {$sinceDate->format('Y-m-d H:i:s')}");
+            $this->info("═══════════════════════════════════════════");
+            
+            if ($totalEmailsFound > 0 && $storedCount === 0 && $alreadyStoredCount === 0) {
+                $this->warn("⚠️  WARNING: Found {$totalEmailsFound} emails but NONE were stored!");
+                $this->warn("   Check logs for details on why emails were skipped.");
+            }
 
             $client->disconnect();
         } catch (\Exception $e) {
