@@ -70,11 +70,14 @@ class ReadEmailsDirect extends Command
             }
 
             // Read emails from each path
+            $accountReadCount = 0;
             foreach ($mailPaths as $mailPath) {
                 $count = $this->readEmailsFromPath($mailPath, $emailAccount);
-                $totalRead += $count;
+                $accountReadCount += $count;
             }
-
+            
+            $totalRead += $accountReadCount;
+            $this->info("   Read {$accountReadCount} email(s) for {$emailAccount->email}");
             $this->newLine();
         }
 
@@ -84,7 +87,9 @@ class ReadEmailsDirect extends Command
         
         if ($totalRead > 0) {
             $this->info("📧 Emails have been processed and matching jobs dispatched!");
-            $this->info("   Check payments in admin panel to see if any were matched.");
+            $this->info("   Processing jobs will automatically match payments if found.");
+        } else {
+            $this->info("ℹ️  No new emails found (or all emails already processed).");
         }
     }
 
