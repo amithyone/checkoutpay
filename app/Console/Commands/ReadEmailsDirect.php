@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\EmailAccount;
 use App\Models\ProcessedEmail;
 use App\Services\PaymentMatchingService;
+use App\Jobs\ProcessEmailPayment;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -378,7 +379,7 @@ class ReadEmailsDirect extends Command
             }
 
             // Store in database
-            return ProcessedEmail::create([
+            $processedEmail = ProcessedEmail::create([
                 'email_account_id' => $emailAccount->id,
                 'source' => 'direct_filesystem',
                 'message_id' => $messageId,
@@ -393,6 +394,19 @@ class ReadEmailsDirect extends Command
                 'account_number' => $extractedInfo['account_number'] ?? null,
                 'extracted_data' => $extractedInfo,
             ]);
+
+            // Automatically dispatch job to process email for payment matching
+            // Only dispatch if we extracted payment info (has amount)
+            if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+                ProcessEmailPayment::dispatch($emailData);
+                Log::info('Dispatched ProcessEmailPayment job for filesystem email', [
+                    'processed_email_id' => $processedEmail->id,
+                    'subject' => $parts['subject'] ?? '',
+                    'amount' => $extractedInfo['amount'],
+                ]);
+            }
+
+            return $processedEmail;
 
         } catch (\Exception $e) {
             Log::error('Error parsing email content', [

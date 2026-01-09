@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Payment;
 use App\Models\Business;
 use App\Models\ProcessedEmail;
+use App\Jobs\CheckPaymentEmails;
 use App\Services\AccountNumberService;
 use App\Services\TransactionLogService;
 use App\Services\PaymentMatchingService;
@@ -80,6 +81,16 @@ class PaymentService
 
         // Check stored emails for immediate match
         $this->checkStoredEmailsForMatch($payment);
+
+        // Schedule job to check for matching emails after 1 minute
+        // This allows time for emails to arrive and be processed
+        CheckPaymentEmails::dispatch($payment)
+            ->delay(now()->addMinute());
+
+        \Illuminate\Support\Facades\Log::info('Scheduled email check job for payment', [
+            'transaction_id' => $payment->transaction_id,
+            'scheduled_at' => now()->addMinute()->toDateTimeString(),
+        ]);
 
         return $payment;
     }
