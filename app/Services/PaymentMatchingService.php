@@ -1095,6 +1095,23 @@ class PaymentMatchingService
     }
 
     /**
+     * Decode quoted-printable encoding (e.g., =20 becomes space)
+     */
+    protected function decodeQuotedPrintable(string $text): string
+    {
+        // Decode quoted-printable format: =XX where XX is hex
+        // =20 is space, =0D=0A is CRLF, = is literal =
+        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function ($matches) {
+            return chr(hexdec($matches[1]));
+        }, $text);
+        
+        // Handle soft line breaks (trailing = at end of line)
+        $text = preg_replace('/=\r?\n/', '', $text);
+        
+        return $text;
+    }
+
+    /**
      * Convert HTML to plain text while preserving important structure
      * Handles tables, divs, and other HTML elements banks use
      */
