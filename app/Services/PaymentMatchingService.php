@@ -834,65 +834,125 @@ class PaymentMatchingService
      */
     protected function extractUsingTemplate(array $emailData, \App\Models\BankEmailTemplate $template): ?array
     {
-        $subject = strtolower($emailData['subject'] ?? '');
+        $subject = $emailData['subject'] ?? '';
         $text = $emailData['text'] ?? '';
         $html = $emailData['html'] ?? '';
+        
+        // Decode quoted-printable and HTML entities FIRST
+        $text = $this->decodeQuotedPrintable($text);
+        $html = $this->decodeQuotedPrintable($html);
+        $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         // If text body is empty but HTML exists, extract text from HTML
         if (empty(trim($text)) && !empty($html)) {
             $text = $this->htmlToText($html);
         }
         
-        $text = strtolower($text);
-        $htmlLower = strtolower($html);
-        $fullText = $subject . ' ' . $text . ' ' . $htmlLower;
-        
         $amount = null;
         $senderName = null;
         $accountNumber = null;
         
-        // Extract amount using template
-        if ($template->amount_pattern) {
-            // Use custom regex pattern
-            if (preg_match($template->amount_pattern, $html ?: $fullText, $matches)) {
-                $amount = (float) str_replace(',', '', $matches[1] ?? $matches[0]);
-            }
-        } elseif ($template->amount_field_label) {
-            // Use field label to find in HTML table
-            $label = preg_quote($template->amount_field_label, '/');
-            if (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)?\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // STRATEGY 1: Try TEXT-based extraction first (for forwarded emails in plain text)
+        // GTBank format: "Amount : NGN 1000", "Account Number : 3002156642", etc.
+        if (!empty(trim($text))) {
+            // Extract Amount from text: "Amount : NGN 1000" or "Amount: NGN 1000"
+            if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
                 $amount = (float) str_replace(',', '', $matches[1]);
             }
-        }
-        
-        // Extract sender name using template
-        if ($template->sender_name_pattern) {
-            // Use custom regex pattern
-            if (preg_match($template->sender_name_pattern, $html ?: $fullText, $matches)) {
-                $senderName = trim(strtolower($matches[1] ?? $matches[0]));
+            // Also try: "Amount : NGN 1000" with colon
+            elseif (preg_match('/amount[\s]*:[\s]*(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1]);
             }
-        } elseif ($template->sender_name_field_label) {
-            // Use field label to find in HTML table
-            $label = preg_quote($template->sender_name_field_label, '/');
-            // Try Description field with "FROM NAME TO" format
-            if (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
-                $senderName = trim(strtolower($matches[1]));
-            }
-            // Try standard format
-            elseif (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i', $html, $matches)) {
-                $senderName = trim(strtolower($matches[1]));
-            }
-        }
-        
-        // Extract account number using template
-        if ($template->account_number_pattern) {
-            if (preg_match($template->account_number_pattern, $html ?: $fullText, $matches)) {
-                $accountNumber = trim($matches[1] ?? $matches[0]);
-            }
-        } elseif ($template->account_number_field_label) {
-            $label = preg_quote($template->account_number_field_label, '/');
-            if (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d+)[\s]*<\/td>/i', $html, $matches)) {
+            
+            // Extract Account Number from text: "Account Number : 3002156642"
+            if (preg_match('/account\s*number[\s:]+(\d+)/i', $text, $matches)) {
                 $accountNumber = trim($matches[1]);
+            }
+            
+            // Extract Sender Name from Description: "Description : ...CODE-NAME TRF FOR..." or "Description : ...AMITHY ONE M TRF FOR..."
+            // Pattern: Description field contains "CODE-NAME TRF FOR" format
+            if (preg_match('/description[\s:]+.*?([\d\-]+\s*-\s*)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $text, $matches)) {
+                $potentialName = trim($matches[2] ?? $matches[1] ?? '');
+                // Remove any leading codes/numbers/dashes
+                $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern: Direct "CODE-NAME TRF FOR" in text
+            elseif (preg_match('/[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $text, $matches)) {
+                $potentialName = trim($matches[1]);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern: "FROM NAME TO" format
+            elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $text, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+        }
+        
+        // STRATEGY 2: Try HTML-based extraction (for original HTML emails)
+        if ((!$amount || !$accountNumber) && !empty($html)) {
+            // Extract amount from HTML table
+            if (!$amount && $template->amount_pattern) {
+                if (preg_match($template->amount_pattern, $html, $matches)) {
+                    $amount = (float) str_replace(',', '', $matches[1] ?? $matches[0]);
+                }
+            }
+            
+            if (!$amount && $template->amount_field_label) {
+                $label = preg_quote($template->amount_field_label, '/');
+                // HTML table format: <td>Amount</td><td>:</td><td>NGN 1000</td>
+                if (preg_match('/(?s)<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                    $amount = (float) str_replace(',', '', $matches[1]);
+                }
+                // Same cell format: <td>Amount: NGN 1000</td>
+                elseif (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                    $amount = (float) str_replace(',', '', $matches[1]);
+                }
+            }
+            
+            // Extract account number from HTML
+            if (!$accountNumber && $template->account_number_pattern) {
+                if (preg_match($template->account_number_pattern, $html, $matches)) {
+                    $accountNumber = trim($matches[1] ?? $matches[0]);
+                }
+            }
+            
+            if (!$accountNumber && $template->account_number_field_label) {
+                $label = preg_quote($template->account_number_field_label, '/');
+                // HTML table format: <td>Account Number</td><td>:</td><td>3002156642</td>
+                if (preg_match('/(?s)<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d+)[\s]*<\/td>/i', $html, $matches)) {
+                    $accountNumber = trim($matches[1]);
+                }
+                // Same cell format: <td>Account Number: 3002156642</td>
+                elseif (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]+(\d+)[\s]*<\/td>/i', $html, $matches)) {
+                    $accountNumber = trim($matches[1]);
+                }
+            }
+            
+            // Extract sender name from HTML Description field
+            if (!$senderName && $template->sender_name_pattern) {
+                if (preg_match($template->sender_name_pattern, $html, $matches)) {
+                    $senderName = trim(strtolower($matches[1] ?? $matches[0]));
+                }
+            }
+            
+            if (!$senderName && $template->sender_name_field_label) {
+                $label = preg_quote($template->sender_name_field_label, '/');
+                // Pattern: Description field contains "CODE-NAME TRF FOR"
+                if (preg_match('/(?s)<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>.*?([\d\-]+\s*-\s*)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+                    $potentialName = trim($matches[2] ?? $matches[1] ?? '');
+                    $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+                    if (strlen($potentialName) >= 3) {
+                        $senderName = trim(strtolower($potentialName));
+                    }
+                }
+                // Pattern: "FROM NAME TO" format
+                elseif (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+                    $senderName = trim(strtolower($matches[1]));
+                }
             }
         }
         
