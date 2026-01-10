@@ -102,40 +102,140 @@ class ReadEmailsDirect extends Command
 
         // Extract domain and local part
         list($localPart, $domain) = explode('@', $email);
+        $username = $this->getUsername();
 
-        // Common cPanel mail paths
+        // Common cPanel mail paths (try multiple formats)
         $commonPaths = [
-            // Maildir format (most common on cPanel)
-            "/home/{$this->getUsername()}/mail/{$domain}/{$localPart}/Maildir/cur/",
-            "/home/{$this->getUsername()}/mail/{$domain}/{$localPart}/Maildir/new/",
-            "/home/{$this->getUsername()}/mail/{$domain}/{$localPart}/cur/",
-            "/home/{$this->getUsername()}/mail/{$domain}/{$localPart}/new/",
+            // Standard cPanel Maildir format
+            "/home/{$username}/mail/{$domain}/{$localPart}/Maildir/cur/",
+            "/home/{$username}/mail/{$domain}/{$localPart}/Maildir/new/",
+            "/home/{$username}/mail/{$domain}/{$localPart}/Maildir/",
             
-            // Alternative paths
-            "/home/{$this->getUsername()}/mail/{$domain}/{$localPart}/",
+            // Alternative Maildir formats
+            "/home/{$username}/mail/{$domain}/{$localPart}/cur/",
+            "/home/{$username}/mail/{$domain}/{$localPart}/new/",
+            "/home/{$username}/mail/{$domain}/{$localPart}/",
+            
+            // cPanel sometimes uses domain-localpart format
+            "/home/{$username}/mail/{$domain}/{$localPart}-{$domain}/Maildir/cur/",
+            "/home/{$username}/mail/{$domain}/{$localPart}-{$domain}/Maildir/new/",
+            "/home/{$username}/mail/{$domain}/{$localPart}-{$domain}/Maildir/",
+            
+            // Root mail paths (mbox format)
             "/var/spool/mail/{$localPart}",
             "/var/mail/{$localPart}",
+            "/var/spool/mail/{$username}",
         ];
 
-        // Also try with username from env or server
-        $username = $this->getUsername();
-        if ($username) {
-            $commonPaths[] = "/home/{$username}/mail/{$domain}/{$localPart}/Maildir/";
-            $commonPaths[] = "/home/{$username}/mail/{$domain}/{$localPart}/";
-        }
-
         foreach ($commonPaths as $path) {
-            if (is_dir($path)) {
+            if (is_dir($path) && is_readable($path)) {
                 $this->info("✅ Found mail directory: {$path}");
                 $paths[] = $path;
-            } elseif (is_file($path)) {
+            } elseif (is_file($path) && is_readable($path)) {
                 // mbox format
                 $this->info("✅ Found mail file: {$path}");
                 $paths[] = $path;
             }
         }
 
-        return $paths;
+        // If no paths found, try to search dynamically
+        if (empty($paths)) {
+            $this->warn("Standard paths not found. Attempting dynamic search...");
+            
+            // Search in mail directory
+            $mailBase = "/home/{$username}/mail/";
+            if (is_dir($mailBase) && is_readable($mailBase)) {
+                $foundPaths = $this->searchForEmailDirectory($mailBase, $localPart, $domain);
+                $paths = array_merge($paths, $foundPaths);
+            }
+        }
+
+        // If still nothing, try checking if we need to look at domain differently
+        if (empty($paths)) {
+            // Some hosts store mail differently - check parent mail directory structure
+            $mailParent = "/home/{$username}/mail/";
+            if (is_dir($mailParent) && is_readable($mailParent)) {
+                $this->info("Exploring mail directory structure...");
+                try {
+                    $domains = scandir($mailParent);
+                    foreach ($domains as $foundDomain) {
+                        if ($foundDomain === '.' || $foundDomain === '..') {
+                            continue;
+                        }
+                        $domainPath = $mailParent . $foundDomain;
+                        if (is_dir($domainPath)) {
+                            $this->info("  Found domain directory: {$foundDomain}");
+                            // Check if our email exists in any domain
+                            $emailPath = $domainPath . '/' . $localPart . '/Maildir/';
+                            if (is_dir($emailPath)) {
+                                $this->info("✅ Found email in domain {$foundDomain}: {$emailPath}");
+                                $paths[] = $emailPath . 'cur/';
+                                $paths[] = $emailPath . 'new/';
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::debug('Error exploring mail directory', ['error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        return array_unique($paths); // Remove duplicates
+    }
+
+    /**
+     * Recursively search for email directory
+     */
+    protected function searchForEmailDirectory(string $basePath, string $localPart, string $domain): array
+    {
+        $found = [];
+        
+        try {
+            if (!is_dir($basePath) || !is_readable($basePath)) {
+                return $found;
+            }
+
+            $items = scandir($basePath);
+            if (!$items) {
+                return $found;
+            }
+
+            foreach ($items as $item) {
+                if ($item === '.' || $item === '..') {
+                    continue;
+                }
+
+                $itemPath = $basePath . '/' . $item;
+                
+                // Check if this matches our email structure
+                if (is_dir($itemPath)) {
+                    // Check if it's the domain directory
+                    if ($item === $domain || strpos($item, $domain) !== false) {
+                        $emailPath = $itemPath . '/' . $localPart;
+                        if (is_dir($emailPath)) {
+                            $maildirPath = $emailPath . '/Maildir';
+                            if (is_dir($maildirPath)) {
+                                $found[] = $maildirPath . '/cur/';
+                                $found[] = $maildirPath . '/new/';
+                            } else {
+                                $found[] = $emailPath . '/cur/';
+                                $found[] = $emailPath . '/new/';
+                            }
+                        }
+                    }
+                    
+                    // Recursively search (limit depth to avoid infinite loops)
+                    if (strlen($itemPath) < 200) { // Reasonable path length limit
+                        $subFound = $this->searchForEmailDirectory($itemPath, $localPart, $domain);
+                        $found = array_merge($found, $subFound);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::debug('Error in recursive mail search', ['path' => $basePath, 'error' => $e->getMessage()]);
+        }
+
+        return $found;
     }
 
     /**
@@ -212,52 +312,97 @@ class ReadEmailsDirect extends Command
     {
         $count = 0;
 
-        // Read from 'new' (unread) and 'cur' (read) directories
-        $dirs = ['new', 'cur'];
+        // Handle different path formats
+        // If path already ends with /cur/ or /new/, use it directly
+        // Otherwise, try to find cur/ and new/ subdirectories
         
-        foreach ($dirs as $dir) {
-            $dirPath = is_dir($basePath . '/' . $dir) ? $basePath . '/' . $dir : $basePath;
+        $dirsToCheck = [];
+        
+        if (strpos($basePath, '/cur/') !== false || strpos($basePath, '/new/') !== false) {
+            // Path already points to cur/ or new/ directory
+            $dirsToCheck[] = $basePath;
+        } else {
+            // Check if cur/ and new/ subdirectories exist
+            if (is_dir($basePath . '/cur')) {
+                $dirsToCheck[] = $basePath . '/cur';
+            }
+            if (is_dir($basePath . '/new')) {
+                $dirsToCheck[] = $basePath . '/new';
+            }
             
-            if (!is_dir($dirPath)) {
+            // If no subdirectories, check if basePath itself is a Maildir structure
+            if (empty($dirsToCheck) && is_dir($basePath)) {
+                // Try reading directly from basePath (might be cur/ or new/ already)
+                $dirsToCheck[] = $basePath;
+            }
+        }
+        
+        if (empty($dirsToCheck)) {
+            $this->warn("  ⚠️  No Maildir subdirectories found in: {$basePath}");
+            return 0;
+        }
+
+        foreach ($dirsToCheck as $dirPath) {
+            if (!is_dir($dirPath) || !is_readable($dirPath)) {
+                $this->warn("  ⚠️  Cannot read directory: {$dirPath}");
                 continue;
             }
 
-            $files = scandir($dirPath);
-            if (!$files) {
-                continue;
-            }
-
-            foreach ($files as $file) {
-                if ($file === '.' || $file === '..') {
+            $this->info("  📂 Reading from: {$dirPath}");
+            
+            try {
+                $files = scandir($dirPath);
+                if (!$files) {
+                    $this->warn("  ⚠️  Could not scan directory: {$dirPath}");
                     continue;
                 }
 
-                $filePath = $dirPath . '/' . $file;
-                
-                if (!is_file($filePath)) {
+                $emailFiles = array_filter($files, function($file) use ($dirPath) {
+                    return $file !== '.' && $file !== '..' && is_file($dirPath . '/' . $file);
+                });
+
+                if (empty($emailFiles)) {
+                    $this->info("  ℹ️  No email files found in: {$dirPath}");
                     continue;
                 }
 
-                try {
-                    $emailContent = file_get_contents($filePath);
-                    if (!$emailContent) {
-                        continue;
-                    }
+                $this->info("  📧 Found " . count($emailFiles) . " email file(s)");
 
-                    // Parse email content
-                    $parsed = $this->parseEmailContent($emailContent, $emailAccount, $file);
+                foreach ($emailFiles as $file) {
+                    $filePath = $dirPath . '/' . $file;
                     
-                    if ($parsed) {
-                        $count++;
-                        $this->info("  ✅ Read email: {$parsed['subject']}");
+                    try {
+                        $emailContent = file_get_contents($filePath);
+                        if (empty($emailContent)) {
+                            $this->warn("  ⚠️  Empty file: {$file}");
+                            continue;
+                        }
+
+                        // Parse email content
+                        $processedEmail = $this->parseEmailContent($emailContent, $emailAccount, $file);
+                        
+                        if ($processedEmail) {
+                            $count++;
+                            $subject = $processedEmail->subject ?? 'No Subject';
+                            $this->info("  ✅ Processed: {$subject}");
+                        } else {
+                            $this->warn("  ⚠️  Could not parse email from: {$file}");
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Error reading mail file', [
+                            'file' => $filePath,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                        $this->warn("  ⚠️  Error reading {$file}: {$e->getMessage()}");
                     }
-                } catch (\Exception $e) {
-                    Log::error('Error reading mail file', [
-                        'file' => $filePath,
-                        'error' => $e->getMessage(),
-                    ]);
-                    $this->warn("  ⚠️  Error reading {$file}: {$e->getMessage()}");
                 }
+            } catch (\Exception $e) {
+                Log::error('Error scanning mail directory', [
+                    'path' => $dirPath,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->warn("  ⚠️  Error scanning {$dirPath}: {$e->getMessage()}");
             }
         }
 
