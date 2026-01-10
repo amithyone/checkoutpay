@@ -106,63 +106,10 @@ class PythonExtractionService
             return null;
         }
 
-        // Map Python response to Laravel format
-        return [
-            'data' => [
-                'amount' => $amount,
-                'sender_name' => $data['sender_name'] ?? null,
-                'account_number' => $data['account_number'] ?? null,
-                'currency' => $data['currency'] ?? 'NGN',
-                'direction' => $data['direction'] ?? 'credit',
-                'email_subject' => $emailData['subject'] ?? '',
-                'email_from' => $emailData['from'] ?? '',
-                'extracted_at' => now()->toISOString(),
-            ],
-            'method' => $data['source'] ?? 'python_extractor',
-            'confidence' => $confidence,
-            'diagnostics' => $result['diagnostics'] ?? null,
-        ];
+        // Map Python response to Laravel format - use processResult for consistency
+        return $this->processResult($result, $emailData);
     }
     
-    /**
-     * Check if Python extraction service is available.
-     *
-     * @return bool
-     */
-    public function isAvailable(): bool
-    {
-        $mode = config('services.python_extractor.mode', 'http');
-        
-        if ($mode === 'script') {
-            // Check if script exists
-            $scriptPath = config('services.python_extractor.script_path', base_path('python-extractor/extract_simple.py'));
-            $pythonCommand = config('services.python_extractor.python_command', 'python3');
-            
-            if (!file_exists($scriptPath)) {
-                return false;
-            }
-            
-            // Try to execute Python command
-            $command = sprintf('%s --version 2>&1', escapeshellarg($pythonCommand));
-            $output = shell_exec($command);
-            return !empty($output) && strpos($output, 'Python') !== false;
-        } else {
-            // HTTP mode - check health endpoint
-            return Cache::remember('python_extractor_health', 60, function () {
-                try {
-                    $response = Http::timeout(5)->get("{$this->baseUrl}/health");
-                    return $response->successful();
-                } catch (\Exception $e) {
-                    Log::warning('Python extraction service health check failed', [
-                        'error' => $e->getMessage(),
-                    ]);
-                    return false;
-                }
-            });
-        }
-    }
-}
-
     /**
      * Extract via Python script (shared hosting compatible - no FastAPI needed).
      */
