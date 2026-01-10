@@ -15,26 +15,32 @@ class MatchAttemptLogger
     {
         $startTime = microtime(true);
 
+        // Sanitize details array to fix malformed UTF-8 characters
+        $details = $data['details'] ?? null;
+        if ($details !== null && is_array($details)) {
+            $details = $this->sanitizeArrayForJson($details);
+        }
+
         // Prepare data for storage
         $attemptData = [
             'payment_id' => $data['payment_id'] ?? null,
             'processed_email_id' => $data['processed_email_id'] ?? null,
             'transaction_id' => $data['transaction_id'] ?? null,
             'match_result' => $data['match_result'] ?? MatchAttempt::RESULT_UNMATCHED,
-            'reason' => $data['reason'] ?? 'No reason provided',
+            'reason' => $this->sanitizeUtf8($data['reason'] ?? 'No reason provided'),
             
             // Payment details
             'payment_amount' => $data['payment_amount'] ?? null,
-            'payment_name' => $data['payment_name'] ?? null,
-            'payment_account_number' => $data['payment_account_number'] ?? null,
+            'payment_name' => $this->sanitizeUtf8($data['payment_name'] ?? null),
+            'payment_account_number' => $this->sanitizeUtf8($data['payment_account_number'] ?? null),
             'payment_created_at' => $data['payment_created_at'] ?? null,
             
             // Extracted email details
             'extracted_amount' => $data['extracted_amount'] ?? null,
-            'extracted_name' => $data['extracted_name'] ?? null,
-            'extracted_account_number' => $data['extracted_account_number'] ?? null,
-            'email_subject' => $data['email_subject'] ?? null,
-            'email_from' => $data['email_from'] ?? null,
+            'extracted_name' => $this->sanitizeUtf8($data['extracted_name'] ?? null),
+            'extracted_account_number' => $this->sanitizeUtf8($data['extracted_account_number'] ?? null),
+            'email_subject' => $this->sanitizeUtf8($data['email_subject'] ?? null),
+            'email_from' => $this->sanitizeUtf8($data['email_from'] ?? null),
             'email_date' => $data['email_date'] ?? null,
             
             // Comparison metrics
@@ -43,14 +49,14 @@ class MatchAttemptLogger
             'time_diff_minutes' => $data['time_diff_minutes'] ?? null,
             
             // Extraction method
-            'extraction_method' => $data['extraction_method'] ?? null,
+            'extraction_method' => $this->sanitizeUtf8($data['extraction_method'] ?? null),
             
-            // Details JSON
-            'details' => $data['details'] ?? null,
+            // Details JSON (sanitized)
+            'details' => $details,
             
-            // HTML/text snippets (truncated to 500 chars)
-            'html_snippet' => isset($data['html_snippet']) ? mb_substr($data['html_snippet'], 0, 500) : null,
-            'text_snippet' => isset($data['text_snippet']) ? mb_substr($data['text_snippet'], 0, 500) : null,
+            // HTML/text snippets (truncated to 500 chars and sanitized)
+            'html_snippet' => isset($data['html_snippet']) ? $this->sanitizeUtf8(mb_substr($data['html_snippet'], 0, 500)) : null,
+            'text_snippet' => isset($data['text_snippet']) ? $this->sanitizeUtf8(mb_substr($data['text_snippet'], 0, 500)) : null,
         ];
 
         // Calculate processing time
@@ -130,5 +136,65 @@ class MatchAttemptLogger
 
         // Default: get first 300 chars
         return mb_substr($text, 0, 300);
+    }
+
+    /**
+     * Sanitize UTF-8 string to remove malformed characters
+     * 
+     * @param string|null $string
+     * @return string|null
+     */
+    protected function sanitizeUtf8(?string $string): ?string
+    {
+        if ($string === null || $string === '') {
+            return $string;
+        }
+
+        // Remove invalid UTF-8 sequences
+        $string = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+        
+        // Remove or replace invalid UTF-8 characters
+        $string = filter_var($string, FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH | FILTER_FLAG_STRIP_LOW);
+        
+        // If filter_var returns false, try iconv as fallback
+        if ($string === false || !mb_check_encoding($string, 'UTF-8')) {
+            // Use iconv to convert and ignore invalid characters
+            $string = @iconv('UTF-8', 'UTF-8//IGNORE', $string);
+            
+            // Final fallback: remove non-printable characters except newlines and tabs
+            if ($string === false || !mb_check_encoding($string, 'UTF-8')) {
+                $string = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/u', '', $string);
+            }
+        }
+
+        return $string;
+    }
+
+    /**
+     * Recursively sanitize array for JSON encoding
+     * 
+     * @param array $array
+     * @return array
+     */
+    protected function sanitizeArrayForJson(array $array): array
+    {
+        $sanitized = [];
+        
+        foreach ($array as $key => $value) {
+            $sanitizedKey = is_string($key) ? $this->sanitizeUtf8($key) : $key;
+            
+            if (is_string($value)) {
+                $sanitized[$sanitizedKey] = $this->sanitizeUtf8($value);
+            } elseif (is_array($value)) {
+                $sanitized[$sanitizedKey] = $this->sanitizeArrayForJson($value);
+            } elseif (is_numeric($value) || is_bool($value) || $value === null) {
+                $sanitized[$sanitizedKey] = $value;
+            } else {
+                // For other types, convert to string and sanitize
+                $sanitized[$sanitizedKey] = $this->sanitizeUtf8((string) $value);
+            }
+        }
+        
+        return $sanitized;
     }
 }
