@@ -7,6 +7,27 @@
 <div class="space-y-6">
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Global Match Trigger Button -->
+        <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-6 border-2 border-green-200 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1">
+                        <i class="fas fa-search-dollar text-green-600 mr-2"></i>Global Match
+                    </h3>
+                    <p class="text-xs text-gray-600">Trigger matching for all unmatched items</p>
+                </div>
+            </div>
+            <button onclick="triggerGlobalMatch()" 
+                    id="global-match-btn"
+                    class="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 flex items-center justify-center font-medium transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>
+                <span>Run Global Match</span>
+            </button>
+            <p class="text-xs text-gray-500 mt-3 text-center">
+                Uses new matching logic with full logging
+            </p>
+        </div>
+
         <!-- Total Payments -->
         <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div class="flex items-center justify-between">
@@ -495,6 +516,136 @@ function copyCronUrl() {
         document.execCommand('copy');
         document.body.removeChild(textarea);
         alert('Cron URL copied to clipboard!');
+    });
+}
+
+function triggerGlobalMatch() {
+    const btn = document.getElementById('global-match-btn');
+    const originalHTML = btn.innerHTML;
+    
+    if (!confirm('This will check all unmatched pending payments against all unmatched emails using the new matching logic with full logging. This may take a while. Continue?')) {
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Running Match...';
+    
+    fetch('{{ route("admin.match.trigger-global") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = '✅ ' + data.message + '\n\n';
+            
+            if (data.results.matches_found > 0) {
+                message += 'Matches Found:\n';
+                
+                if (data.results.matched_emails && data.results.matched_emails.length > 0) {
+                    message += '\nFrom Emails:\n';
+                    data.results.matched_emails.forEach(match => {
+                        message += `  • Email #${match.email_id} → Transaction ${match.transaction_id}\n`;
+                    });
+                }
+                
+                if (data.results.matched_payments && data.results.matched_payments.length > 0) {
+                    message += '\nFrom Payments:\n';
+                    data.results.matched_payments.forEach(match => {
+                        message += `  • Transaction ${match.transaction_id} → Email #${match.email_id}\n`;
+                    });
+                }
+            }
+            
+            if (data.results.errors && data.results.errors.length > 0) {
+                message += `\n\n⚠️ Errors: ${data.results.errors.length} error(s) occurred. Check logs for details.`;
+            }
+            
+            alert(message);
+            
+            // Reload page after 2 seconds to show updated stats
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            alert('❌ Error: ' + data.message);
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error triggering global match: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
+}
+
+function triggerGlobalMatch() {
+    const btn = document.getElementById('global-match-btn');
+    const originalHTML = btn.innerHTML;
+    
+    if (!confirm('This will check all unmatched pending payments against all unmatched emails using the new matching logic with full logging. This may take a while. Continue?')) {
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Running Match...';
+    
+    fetch('{{ route("admin.match.trigger-global") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = '✅ ' + data.message + '\n\n';
+            
+            if (data.results.matches_found > 0) {
+                message += 'Matches Found:\n';
+                
+                if (data.results.matched_emails && data.results.matched_emails.length > 0) {
+                    message += '\nFrom Emails:\n';
+                    data.results.matched_emails.forEach(match => {
+                        message += `  • Email #${match.email_id} → Transaction ${match.transaction_id}\n`;
+                    });
+                }
+                
+                if (data.results.matched_payments && data.results.matched_payments.length > 0) {
+                    message += '\nFrom Payments:\n';
+                    data.results.matched_payments.forEach(match => {
+                        message += `  • Transaction ${match.transaction_id} → Email #${match.email_id}\n`;
+                    });
+                }
+            }
+            
+            if (data.results.errors && data.results.errors.length > 0) {
+                message += `\n\n⚠️ Errors: ${data.results.errors.length} error(s) occurred. Check logs for details.`;
+            }
+            
+            alert(message);
+            
+            // Reload page after 2 seconds to show updated stats
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            alert('❌ Error: ' + data.message);
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error triggering global match: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
     });
 }
 
