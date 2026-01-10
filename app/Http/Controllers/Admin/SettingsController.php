@@ -37,8 +37,8 @@ class SettingsController extends Controller
      */
     public function update(Request $request)
     {
-        // Validate payment settings (if provided)
-        if ($request->has('payment_time_window_minutes') || $request->has('transaction_pending_time_minutes')) {
+        // Validate payment settings if they are in the request
+        if ($request->has('payment_time_window_minutes') && $request->has('transaction_pending_time_minutes')) {
             $validated = $request->validate([
                 'payment_time_window_minutes' => 'required|integer|min:1|max:1440', // Max 24 hours
                 'transaction_pending_time_minutes' => 'required|integer|min:5|max:10080', // 5 minutes to 7 days
@@ -63,25 +63,16 @@ class SettingsController extends Controller
             );
         }
 
-        // Update IMAP fetching setting (if provided)
-        if ($request->has('disable_imap_fetching')) {
-            Setting::set(
-                'disable_imap_fetching',
-                $request->has('disable_imap_fetching') ? 1 : 0,
-                'boolean',
-                'email',
-                'Disable IMAP email fetching. When enabled, only direct filesystem reading will be used. Recommended for shared hosting where direct filesystem access is more reliable.'
-            );
-        } elseif ($request->isMethod('PUT')) {
-            // If form is submitted but checkbox is not checked, set to false
-            Setting::set(
-                'disable_imap_fetching',
-                0,
-                'boolean',
-                'email',
-                'Disable IMAP email fetching. When enabled, only direct filesystem reading will be used. Recommended for shared hosting where direct filesystem access is more reliable.'
-            );
-        }
+        // Update IMAP fetching setting
+        // Check if checkbox was submitted (either checked or unchecked)
+        $disableImap = $request->has('disable_imap_fetching') && $request->input('disable_imap_fetching') == '1';
+        Setting::set(
+            'disable_imap_fetching',
+            $disableImap ? 1 : 0,
+            'boolean',
+            'email',
+            'Disable IMAP email fetching. When enabled, only direct filesystem reading will be used. Recommended for shared hosting where direct filesystem access is more reliable.'
+        );
 
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');
