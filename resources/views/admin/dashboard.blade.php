@@ -161,7 +161,7 @@
                                     <span>{{ Str::limit($payment->payer_name, 30) }}</span>
                                 @endif
                                 @if($payment->expires_at)
-                                    <span class="text-{{ $payment->expires_at->diffInHours(now()) < 2 ? 'red' : 'gray' }}-600">
+                                    <span class="text-xs {{ $payment->expires_at->diffInHours(now()) < 2 ? 'text-red-600' : 'text-gray-600' }}">
                                         <i class="fas fa-clock mr-1"></i>Expires {{ $payment->expires_at->diffForHumans() }}
                                     </span>
                                 @endif

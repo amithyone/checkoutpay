@@ -193,8 +193,8 @@
                             <div class="text-gray-600 text-xs mt-1">
                                 Extracted: ₦{{ number_format($attempt->extracted_amount ?? 0, 2) }}
                             </div>
-                            @if($attempt->amount_diff)
-                                <div class="text-{{ $attempt->amount_diff > 0 ? 'red' : 'green' }}-600 text-xs mt-1">
+                            @if($attempt->amount_diff !== null)
+                                <div class="text-xs mt-1 {{ $attempt->amount_diff > 0 ? 'text-red-600' : 'text-green-600' }}">
                                     Diff: ₦{{ number_format(abs($attempt->amount_diff), 2) }}
                                 </div>
                             @endif
