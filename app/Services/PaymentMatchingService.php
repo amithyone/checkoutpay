@@ -394,8 +394,8 @@ class PaymentMatchingService
         ];
         
         // If both text_body and html_body extraction failed, return null
-            return null;
-        }
+        return null;
+    }
 
     /**
      * Store last extraction diagnostics for error reporting
