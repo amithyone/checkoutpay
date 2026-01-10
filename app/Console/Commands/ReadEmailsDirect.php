@@ -407,8 +407,18 @@ class ReadEmailsDirect extends Command
             ];
 
             $extractedInfo = null;
+            $extractionMethod = null;
             try {
-                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                // Handle new format: ['data' => [...], 'method' => '...']
+                if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                    $extractedInfo = $extractionResult['data'];
+                    $extractionMethod = $extractionResult['method'] ?? null;
+                } else {
+                    // Old format fallback (for backward compatibility)
+                    $extractedInfo = $extractionResult;
+                    $extractionMethod = 'unknown';
+                }
             } catch (\Exception $e) {
                 Log::debug('Payment info extraction failed', [
                     'error' => $e->getMessage(),
@@ -430,16 +440,20 @@ class ReadEmailsDirect extends Command
                 'sender_name' => $extractedInfo['sender_name'] ?? null,
                 'account_number' => $extractedInfo['account_number'] ?? null,
                 'extracted_data' => $extractedInfo,
+                'extraction_method' => $extractionMethod,
             ]);
 
             // Automatically dispatch job to process email for payment matching
             // Only dispatch if we extracted payment info (has amount)
             if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+                // Add processed_email_id to emailData for logging
+                $emailData['processed_email_id'] = $processedEmail->id;
                 ProcessEmailPayment::dispatch($emailData);
                 Log::info('Dispatched ProcessEmailPayment job for filesystem email', [
                     'processed_email_id' => $processedEmail->id,
                     'subject' => $parts['subject'] ?? '',
                     'amount' => $extractedInfo['amount'],
+                    'extraction_method' => $extractionMethod,
                 ]);
             }
 

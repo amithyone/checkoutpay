@@ -110,24 +110,76 @@ class PaymentMatchingService
         $pendingPayments = $query->get();
 
         foreach ($pendingPayments as $payment) {
-            $match = $this->matchPayment($payment, $extractedInfo);
+            $match = $this->matchPayment($payment, $extractedInfo, !empty($emailData['date']) ? new \DateTime($emailData['date']) : null);
+
+            // Log match attempt to database
+            try {
+                $this->matchLogger->logAttempt([
+                    'payment_id' => $payment->id,
+                    'processed_email_id' => $processedEmailId,
+                    'transaction_id' => $payment->transaction_id,
+                    'match_result' => $match['matched'] ? MatchAttempt::RESULT_MATCHED : MatchAttempt::RESULT_UNMATCHED,
+                    'reason' => $match['reason'] ?? 'Unknown reason',
+                    'payment_amount' => $payment->amount,
+                    'payment_name' => $payment->payer_name,
+                    'payment_account_number' => $payment->account_number,
+                    'payment_created_at' => $payment->created_at,
+                    'extracted_amount' => $extractedInfo['amount'] ?? null,
+                    'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                    'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                    'email_subject' => $emailData['subject'] ?? null,
+                    'email_from' => $emailData['from'] ?? null,
+                    'email_date' => !empty($emailData['date']) ? new \DateTime($emailData['date']) : null,
+                    'amount_diff' => $match['amount_diff'] ?? null,
+                    'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                    'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                    'extraction_method' => $extractionMethod,
+                    'details' => [
+                        'match_details' => $match,
+                        'extracted_info' => $extractedInfo,
+                        'payment_data' => [
+                            'transaction_id' => $payment->transaction_id,
+                            'amount' => $payment->amount,
+                            'payer_name' => $payment->payer_name,
+                            'account_number' => $payment->account_number,
+                            'created_at' => $payment->created_at->toISOString(),
+                        ],
+                    ],
+                    'html_snippet' => $this->matchLogger->extractHtmlSnippet($emailData['html'] ?? '', $extractedInfo['amount'] ?? null),
+                    'text_snippet' => $this->matchLogger->extractTextSnippet($emailData['text'] ?? '', $extractedInfo['amount'] ?? null),
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to log match attempt', [
+                    'error' => $e->getMessage(),
+                    'transaction_id' => $payment->transaction_id,
+                ]);
+            }
 
             if ($match['matched']) {
                 \Illuminate\Support\Facades\Log::info('Payment matched', [
                     'transaction_id' => $payment->transaction_id,
                     'match_reason' => $match['reason'],
+                    'match_attempt_logged' => true,
                 ]);
 
                 return $payment;
             } else {
-                \Illuminate\Support\Facades\Log::debug('Payment mismatch', [
+                \Illuminate\Support\Facades\Log::info('Payment mismatch - logged to database', [
                     'transaction_id' => $payment->transaction_id,
                     'reason' => $match['reason'],
+                    'match_attempt_logged' => true,
                 ]);
             }
         }
 
-        \Illuminate\Support\Facades\Log::info('No matching payment found for email');
+        // Log that no payment matched
+        \Illuminate\Support\Facades\Log::info('No matching payment found for email', [
+            'processed_email_id' => $processedEmailId,
+            'extracted_amount' => $extractedInfo['amount'] ?? null,
+            'extracted_name' => $extractedInfo['sender_name'] ?? null,
+            'extraction_method' => $extractionMethod,
+        ]);
+
         return null;
     }
 
@@ -141,72 +193,83 @@ class PaymentMatchingService
         $html = $emailData['html'] ?? '';
         $from = strtolower($emailData['from'] ?? '');
         
-        // Try to find matching bank email template
+        // Try to find matching bank email template (highest priority)
         $template = $this->findMatchingTemplate($from);
         
         // If template found, use template-specific extraction
         if ($template) {
-            return $this->extractUsingTemplate($emailData, $template);
+            $result = $this->extractUsingTemplate($emailData, $template);
+            if ($result) {
+                return [
+                    'data' => $result,
+                    'method' => 'template',
+                ];
+            }
         }
         
-        // Fallback to default extraction logic
-
-        // If text body is empty but HTML exists, extract text from HTML intelligently
+        // Fallback to default extraction logic with hybrid approach
+        // Prepare rendered text for fallback
+        $renderedText = null;
         if (empty(trim($text)) && !empty($html)) {
-            // Convert HTML to plain text, preserving structure
-            $text = $this->htmlToText($html);
+            $renderedText = $this->htmlToText($html);
+        } else {
+            $renderedText = $text;
         }
         
-        $text = strtolower($text);
+        $textLower = strtolower($renderedText ?? '');
         $htmlLower = strtolower($html);
-        
-        // Use HTML directly for pattern matching (more accurate for structured emails)
-        // Also use extracted text as fallback
-        $fullText = $subject . ' ' . $text . ' ' . $htmlLower;
+        $fullText = $subject . ' ' . $textLower . ' ' . $htmlLower;
 
-        // Extract amount - prioritize HTML table structures, handle NGN500 (no space)
+        // Extract amount - HYBRID: Try HTML table first (most accurate), then rendered text fallback
         $amount = null;
+        $extractionMethod = null;
         
-        // Pattern 1: GTBank HTML table - Amount in separate cell after label
-        // Format: <td>Amount</td><td>NGN 1,000.00</td> or <td>Amount :</td><td>NGN500</td>
-        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // PRIMARY: HTML table extraction (most accurate for Nigerian banks)
+        // Pattern 1: GTBank HTML table - Amount in separate cell after label (handles &nbsp;)
+        // Format: <td>Amount</td><td>NGN&nbsp;1000</td> or <td>Amount</td><td>NGN 1000</td>
+        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             $amount = (float) str_replace(',', '', $matches[1]);
+            $extractionMethod = 'html_table';
         }
-        // Pattern 2: GTBank HTML table - Amount in same cell with label (handles NGN500 without space)
-        // Format: <td>Amount : NGN 1,000.00</td> or <td>Amount : NGN500</td>
-        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // Pattern 2: GTBank HTML table - Amount in same cell with label (handles &nbsp;)
+        // Format: <td>Amount : NGN&nbsp;1000</td> or <td>Amount : NGN 1000</td>
+        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             $amount = (float) str_replace(',', '', $matches[1]);
+            $extractionMethod = 'html_table';
         }
-        // Pattern 3: Description field contains amount (GTBank format: "NGN500" in description)
-        // Format: <td>Description</td><td>...NGN500...</td>
+        // Pattern 3: Description field contains amount
         elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦)\s*([\d,]+\.?\d*).*?<\/td>/i', $html, $matches)) {
             $potentialAmount = (float) str_replace(',', '', $matches[1]);
             if ($potentialAmount >= 10) {
                 $amount = $potentialAmount;
+                $extractionMethod = 'html_table';
             }
         }
-        // Pattern 4: Any HTML table cell containing NGN/Naira followed by amount (handles NGN500)
+        // Pattern 4: Any HTML table cell containing NGN/Naira
         elseif (preg_match('/<td[^>]*>[\s]*(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             $potentialAmount = (float) str_replace(',', '', $matches[1]);
             if ($potentialAmount >= 10) {
                 $amount = $potentialAmount;
+                $extractionMethod = 'html_table';
             }
         }
-        // Pattern 5: HTML with "Amount : NGN 1000" or "NGN500" format (not in table, handles no space)
+        // Pattern 5: HTML with amount format (not in table)
         elseif (preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i', $html, $matches)) {
             $potentialAmount = (float) str_replace(',', '', $matches[1]);
             if ($potentialAmount >= 10) {
                 $amount = $potentialAmount;
+                $extractionMethod = 'html_text';
             }
         }
-        // Pattern 6: Standalone NGN500 (no space, in description or anywhere in HTML)
+        // Pattern 6: Standalone NGN in HTML
         elseif (preg_match('/(?:ngn|naira|₦)([\d,]+\.?\d*)/i', $html, $matches)) {
             $potentialAmount = (float) str_replace(',', '', $matches[1]);
             if ($potentialAmount >= 10) {
                 $amount = $potentialAmount;
+                $extractionMethod = 'html_text';
             }
         }
-        // Pattern 7: Text patterns (fallback, avoid small numbers)
+        // FALLBACK: Rendered text extraction (if HTML fails)
         else {
             $amountPatterns = [
                 '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i',
@@ -219,6 +282,7 @@ class PaymentMatchingService
                     $potentialAmount = (float) str_replace(',', '', $matches[1]);
                     if ($potentialAmount >= 10) {
                         $amount = $potentialAmount;
+                        $extractionMethod = 'rendered_text';
                         break;
                     }
                 }
@@ -226,35 +290,57 @@ class PaymentMatchingService
         }
 
         // Extract sender name - GTBank stores name in Description field
-        // GTBank format: Description field contains "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        // GTBank format variations:
+        // 1. "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        // 2. "AMITHY ONE M TRF FOR CUSTOMER..." (new format with transaction code)
+        // 3. Description field: "090405260110014006799532206126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
         $senderName = null;
         
-        // Pattern 1: GTBank HTML table - Description field contains sender name
+        // Pattern 1: GTBank HTML table - Description field contains "FROM NAME TO"
         // Format: <td>Description</td><td>FROM SOLOMON INNOCENT AMITHY TO SQUA</td>
         if (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
-        // Pattern 2: GTBank HTML table - Description in same cell
+        // Pattern 2: GTBank HTML table - Description field contains "AMITHY ONE M TRF FOR" (new format)
+        // Format: <td>Description</td><td>...-AMITHY ONE M TRF FOR CUSTOMER...</td>
+        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?[\s\-]*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Remove transaction codes/numbers at start if present
+            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 3: GTBank HTML table - Description in same cell with "FROM"
         elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]+from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
-        // Pattern 3: GTBank text format "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        // Pattern 4: GTBank text format "FROM SOLOMON INNOCENT AMITHY TO SQUA"
         elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
-        // Pattern 4: HTML table with "From" or "Sender" label
+        // Pattern 5: GTBank description text with "NAME TRF FOR" format (text body)
+        // Format: "090405260110014006799532206126-AMITHY ONE M TRF FOR CUSTOMER..."
+        elseif (preg_match('/description[\s:]+.*?[\s\-]*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 6: HTML table with "From" or "Sender" label
         elseif (preg_match('/<td[^>]*>[\s]*(?:from|sender|payer|depositor|account\s*name|name)[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i', $html, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
-        // Pattern 5: Standard patterns in HTML
+        // Pattern 7: Standard patterns in HTML
         elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|<\/)/i', $html, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
-        // Pattern 6: Try in text (fallback)
+        // Pattern 8: Try in text (fallback)
         elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $fullText, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
-        // Pattern 7: Other standard patterns in text
+        // Pattern 9: Other standard patterns in text
         elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i', $fullText, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
@@ -278,12 +364,20 @@ class PaymentMatchingService
             return null;
         }
 
+        // If extraction method not set, default to rendered_text (fallback used)
+        if (!$extractionMethod) {
+            $extractionMethod = 'fallback';
+        }
+
         return [
-            'amount' => $amount,
-            'sender_name' => $senderName,
-            'email_subject' => $emailData['subject'] ?? '',
-            'email_from' => $emailData['from'] ?? '',
-            'extracted_at' => now()->toISOString(),
+            'data' => [
+                'amount' => $amount,
+                'sender_name' => $senderName,
+                'email_subject' => $emailData['subject'] ?? '',
+                'email_from' => $emailData['from'] ?? '',
+                'extracted_at' => now()->toISOString(),
+            ],
+            'method' => $extractionMethod,
         ];
     }
 
@@ -313,6 +407,7 @@ class PaymentMatchingService
                         $paymentTime->format('Y-m-d H:i:s T'),
                         $emailTime->format('Y-m-d H:i:s T')
                     ),
+                    'time_diff_minutes' => -$timeDiff, // Negative indicates before
                 ];
             }
             
@@ -329,8 +424,17 @@ class PaymentMatchingService
                         $paymentTime->format('Y-m-d H:i:s T'),
                         $emailTime->format('Y-m-d H:i:s T')
                     ),
+                    'time_diff_minutes' => $timeDiff,
                 ];
             }
+        }
+        
+        // Calculate time diff for logging (even if match succeeds)
+        $timeDiff = null;
+        if ($emailDate && $payment->created_at) {
+            $paymentTime = \Carbon\Carbon::parse($payment->created_at)->setTimezone(config('app.timezone'));
+            $emailTime = \Carbon\Carbon::parse($emailDate)->setTimezone(config('app.timezone'));
+            $timeDiff = $paymentTime->diffInMinutes($emailTime);
         }
 
         // Check amount match with new rules:
@@ -355,6 +459,7 @@ class PaymentMatchingService
                 ),
                 'should_reject' => true, // Flag to reject payment
                 'amount_diff' => $amountDiff,
+                'time_diff_minutes' => $timeDiff,
             ];
         }
         
@@ -387,11 +492,15 @@ class PaymentMatchingService
         }
 
         // If payer name is provided, check similarity (not exact match)
+        $nameSimilarityPercent = null;
         if ($payment->payer_name) {
             if (empty($extractedInfo['sender_name'])) {
                 return [
                     'matched' => false,
                     'reason' => 'Payer name required but not found in email',
+                    'amount_diff' => $amountDiff,
+                    'time_diff_minutes' => $timeDiff,
+                    'name_similarity_percent' => 0,
                 ];
             }
 
@@ -402,14 +511,21 @@ class PaymentMatchingService
             $receivedName = preg_replace('/\s+/', ' ', $receivedName);
 
             // Check if names match with similarity (handles order variations and partial matches)
-            if (!$this->namesMatch($expectedName, $receivedName)) {
+            $matchResult = $this->namesMatch($expectedName, $receivedName);
+            $nameSimilarityPercent = $matchResult['similarity'];
+            
+            if (!$matchResult['matched']) {
                 return [
                     'matched' => false,
                     'reason' => sprintf(
-                        'Name mismatch: expected "%s", got "%s"',
+                        'Name mismatch: expected "%s", got "%s" (similarity: %d%%)',
                         $expectedName,
-                        $receivedName
+                        $receivedName,
+                        $nameSimilarityPercent
                     ),
+                    'amount_diff' => $amountDiff,
+                    'time_diff_minutes' => $timeDiff,
+                    'name_similarity_percent' => $nameSimilarityPercent,
                 ];
             }
         }
@@ -420,6 +536,9 @@ class PaymentMatchingService
             'is_mismatch' => $isMismatch,
             'received_amount' => $finalReceivedAmount,
             'mismatch_reason' => $mismatchReason,
+            'amount_diff' => $amountDiff,
+            'time_diff_minutes' => $timeDiff,
+            'name_similarity_percent' => $nameSimilarityPercent,
         ];
     }
 
@@ -450,13 +569,13 @@ class PaymentMatchingService
      * 
      * @param string $expectedName The name from payment request (e.g., "amithy one media")
      * @param string $receivedName The name extracted from email (e.g., "amithy one" or longer description)
-     * @return bool True if at least 65% of words match
+     * @return array ['matched' => bool, 'similarity' => int] Returns match result and similarity percentage
      */
-    protected function namesMatch(string $expectedName, string $receivedName): bool
+    protected function namesMatch(string $expectedName, string $receivedName): array
     {
         // Exact match
         if ($expectedName === $receivedName) {
-            return true;
+            return ['matched' => true, 'similarity' => 100];
         }
 
         // Split names into words
@@ -465,7 +584,7 @@ class PaymentMatchingService
 
         // If either is empty, no match
         if (empty($expectedWords) || empty($receivedWords)) {
-            return false;
+            return ['matched' => false, 'similarity' => 0];
         }
 
         // Count how many words from expected name are found in received name
@@ -494,11 +613,13 @@ class PaymentMatchingService
 
         // Calculate similarity percentage
         $totalExpectedWords = count($expectedWords);
-        $similarityPercent = ($matchedWords / $totalExpectedWords) * 100;
+        $similarityPercent = (int) round(($matchedWords / $totalExpectedWords) * 100);
 
         // Match if at least 65% of words match
         // Example: "amithy one media" (3 words) needs at least 2 words to match (67% >= 65%)
-        return $similarityPercent >= 65;
+        $matched = $similarityPercent >= 65;
+        
+        return ['matched' => $matched, 'similarity' => $similarityPercent];
     }
 
     /**

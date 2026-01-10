@@ -109,6 +109,7 @@ class CheckPaymentEmails implements ShouldQueue
                     'html' => $processedEmail->html_body ?? '',
                     'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                     'email_account_id' => $processedEmail->email_account_id,
+                    'processed_email_id' => $processedEmail->id, // CRITICAL: Pass ID for logging
                 ];
 
                 // Use the matching service to match email to payment
