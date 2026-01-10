@@ -142,9 +142,10 @@ class PaymentService
                 ];
                 
                 // Re-extract payment info (will use html_body)
-                $extractedInfo = $this->paymentMatchingService->extractPaymentInfo($emailData);
+                $extractionResult = $this->paymentMatchingService->extractPaymentInfo($emailData);
+                $extractedInfo = $extractionResult['data'] ?? null;
                 
-                if (!$extractedInfo || !$extractedInfo['amount']) {
+                if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
                     continue;
                 }
                 
