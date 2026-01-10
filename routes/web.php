@@ -140,26 +140,188 @@ Route::get('/cron/global-match', function () {
     try {
         $startTime = microtime(true);
         
-        // Use the MatchController logic directly
-        $matchController = new \App\Http\Controllers\Admin\MatchController();
-        
-        // Create a fake request object for the controller method
-        $request = new \Illuminate\Http\Request();
-        
-        // Call the triggerGlobalMatch method
-        $response = $matchController->triggerGlobalMatch($request);
-        $responseData = json_decode($response->getContent(), true);
+        // Extract the logic from MatchController to avoid authentication issues
+        $matchingService = new \App\Services\PaymentMatchingService(
+            new \App\Services\TransactionLogService()
+        );
+
+        $results = [
+            'payments_checked' => 0,
+            'emails_checked' => 0,
+            'matches_found' => 0,
+            'attempts_logged' => 0,
+            'errors' => [],
+            'matched_payments' => [],
+            'matched_emails' => [],
+        ];
+
+        // Get all unmatched pending payments (not expired)
+        $pendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->whereNotExists(function ($query) {
+                $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                    ->from('processed_emails')
+                    ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                    ->where('processed_emails.is_matched', true);
+            })
+            ->with('business')
+            ->get();
+
+        // Get all unmatched processed emails
+        $unmatchedEmails = \App\Models\ProcessedEmail::where('is_matched', false)
+            ->latest()
+            ->get();
+
+        \Illuminate\Support\Facades\Log::info('Global match cron triggered', [
+            'pending_payments_count' => $pendingPayments->count(),
+            'unmatched_emails_count' => $unmatchedEmails->count(),
+        ]);
+
+        // Strategy: For each unmatched email, try to match against all pending payments
+        foreach ($unmatchedEmails as $processedEmail) {
+            try {
+                $processedEmail->refresh();
+                if ($processedEmail->is_matched) {
+                    continue;
+                }
+
+                $results['emails_checked']++;
+
+                $emailData = [
+                    'subject' => $processedEmail->subject,
+                    'from' => $processedEmail->from_email,
+                    'text' => $processedEmail->text_body ?? '',
+                    'html' => $processedEmail->html_body ?? '',
+                    'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                    'email_account_id' => $processedEmail->email_account_id,
+                    'processed_email_id' => $processedEmail->id,
+                ];
+
+                $matchedPayment = $matchingService->matchEmail($emailData);
+
+                if ($matchedPayment) {
+                    $results['matches_found']++;
+                    $results['matched_emails'][] = [
+                        'email_id' => $processedEmail->id,
+                        'email_subject' => $processedEmail->subject,
+                        'transaction_id' => $matchedPayment->transaction_id,
+                        'payment_id' => $matchedPayment->id,
+                    ];
+
+                    \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
+                }
+            } catch (\Exception $e) {
+                $results['errors'][] = [
+                    'type' => 'email_match',
+                    'email_id' => $processedEmail->id ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ];
+                \Illuminate\Support\Facades\Log::error('Error matching email in global match cron', [
+                    'email_id' => $processedEmail->id ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Also check pending payments that weren't matched in the first pass
+        foreach ($pendingPayments as $payment) {
+            try {
+                $payment->refresh();
+                
+                if ($payment->status !== \App\Models\Payment::STATUS_PENDING || $payment->isExpired()) {
+                    continue;
+                }
+
+                if ($payment->status === \App\Models\Payment::STATUS_APPROVED) {
+                    continue;
+                }
+
+                $results['payments_checked']++;
+
+                $checkSince = $payment->created_at->subMinutes(5);
+                $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
+                $checkUntil = $payment->created_at->addMinutes($timeWindowMinutes);
+                
+                $potentialEmails = \App\Models\ProcessedEmail::where('is_matched', false)
+                    ->where(function ($q) use ($payment, $checkSince, $checkUntil) {
+                        $q->where('amount', $payment->amount)
+                            ->where('email_date', '>=', $checkSince)
+                            ->where('email_date', '<=', $checkUntil);
+                    })
+                    ->get();
+
+                foreach ($potentialEmails as $processedEmail) {
+                    try {
+                        $processedEmail->refresh();
+                        if ($processedEmail->is_matched) {
+                            continue;
+                        }
+
+                        $emailData = [
+                            'subject' => $processedEmail->subject,
+                            'from' => $processedEmail->from_email,
+                            'text' => $processedEmail->text_body ?? '',
+                            'html' => $processedEmail->html_body ?? '',
+                            'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                            'email_account_id' => $processedEmail->email_account_id,
+                            'processed_email_id' => $processedEmail->id,
+                        ];
+
+                        $matchedPayment = $matchingService->matchEmail($emailData);
+
+                        if ($matchedPayment && $matchedPayment->id === $payment->id) {
+                            $results['matches_found']++;
+                            $results['matched_payments'][] = [
+                                'transaction_id' => $payment->transaction_id,
+                                'payment_id' => $payment->id,
+                                'email_id' => $processedEmail->id,
+                                'email_subject' => $processedEmail->subject,
+                            ];
+
+                            \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
+                            break;
+                        }
+                    } catch (\Exception $e) {
+                        $results['errors'][] = [
+                            'type' => 'payment_match',
+                            'transaction_id' => $payment->transaction_id,
+                            'email_id' => $processedEmail->id ?? 'unknown',
+                            'error' => $e->getMessage(),
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                $results['errors'][] = [
+                    'type' => 'payment_check',
+                    'transaction_id' => $payment->transaction_id ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        $results['attempts_logged'] = \App\Models\MatchAttempt::where('created_at', '>=', now()->subMinutes(1))->count();
         
         $executionTime = round(microtime(true) - $startTime, 2);
-        
-        // Add execution time to response
-        if (isset($responseData['results'])) {
-            $responseData['results']['execution_time_seconds'] = $executionTime;
-        } else {
-            $responseData['execution_time_seconds'] = $executionTime;
-        }
-        
-        return response()->json($responseData, $response->getStatusCode());
+        $results['execution_time_seconds'] = $executionTime;
+
+        $message = sprintf(
+            'Global match completed! Checked %d emails and %d payments. Found %d matches. Logged %d attempts. Execution time: %s seconds.',
+            $results['emails_checked'],
+            $results['payments_checked'],
+            $results['matches_found'],
+            $results['attempts_logged'],
+            $executionTime
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'method' => 'global_match',
+            'timestamp' => now()->toDateTimeString(),
+            'results' => $results,
+        ]);
     } catch (\Exception $e) {
         \Illuminate\Support\Facades\Log::error('Cron job error (Global Match)', [
             'error' => $e->getMessage(),
