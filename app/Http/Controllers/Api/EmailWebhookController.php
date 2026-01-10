@@ -562,16 +562,15 @@ class EmailWebhookController extends Controller
             'date' => $date,
         ];
         
-        $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+        $extractionResult = $matchingService->extractPaymentInfo($emailData);
+        $extractedInfo = $extractionResult['data'] ?? null;
         
-        if (!$extractedInfo || empty($extractedInfo['amount'])) {
+        if (!$extractedInfo || !isset($extractedInfo['amount']) || empty($extractedInfo['amount'])) {
             // Log the email but don't process if we can't extract payment info
-            ZapierLog::create([
-                'payload' => $request->all(),
-                'status' => 'error',
-                'status_message' => 'Could not extract payment information from raw email',
+            \Illuminate\Support\Facades\Log::warning('Email webhook: Could not extract payment information from raw email', [
+                'subject' => $subject,
+                'from' => $fromEmail,
                 'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
             ]);
             
             return response()->json([
@@ -581,7 +580,7 @@ class EmailWebhookController extends Controller
             ], 400);
         }
         
-        // Convert to Zapier format for processing
+        // Convert to webhook format for processing
         $zapierRequest = new Request([
             'sender_name' => $senderName ?: ($extractedInfo['sender_name'] ?? ''),
             'amount' => $extractedInfo['amount'],

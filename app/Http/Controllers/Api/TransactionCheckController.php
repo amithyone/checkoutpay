@@ -61,9 +61,10 @@ class TransactionCheckController extends Controller
                         'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : null,
                     ];
                     
-                    $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                    $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                    $extractedInfo = $extractionResult['data'] ?? null;
                     
-                    if ($extractedInfo && $extractedInfo['amount']) {
+                    if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount']) {
                         $match = $matchingService->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
                         
                         if ($match['matched']) {
