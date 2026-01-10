@@ -202,21 +202,25 @@
 
     <!-- Email Monitoring Actions -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between mb-4">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Email Monitoring</h3>
                 <p class="text-sm text-gray-600 mt-1">Manually trigger email fetching or check for transaction updates</p>
             </div>
-            <div class="flex items-center gap-4">
-                <button onclick="fetchEmails()" id="fetch-emails-btn" 
-                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center">
-                    <i class="fas fa-envelope mr-2"></i> Fetch Emails
-                </button>
-                <button onclick="checkTransactionUpdates()" id="check-updates-btn"
-                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center">
-                    <i class="fas fa-sync-alt mr-2"></i> Check Transaction Updates
-                </button>
-            </div>
+        </div>
+        <div class="flex items-center gap-4 flex-wrap">
+            <button onclick="fetchEmails()" id="fetch-emails-btn" 
+                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center">
+                <i class="fas fa-envelope mr-2"></i> Fetch Emails (IMAP)
+            </button>
+            <button onclick="fetchEmailsDirect()" id="fetch-emails-direct-btn" 
+                class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                <i class="fas fa-folder-open mr-2"></i> Fetch Emails (Direct)
+            </button>
+            <button onclick="checkTransactionUpdates()" id="check-updates-btn"
+                class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 flex items-center">
+                <i class="fas fa-sync-alt mr-2"></i> Check Transaction Updates
+            </button>
         </div>
         <div id="monitoring-result" class="mt-4 hidden"></div>
     </div>
@@ -224,20 +228,55 @@
     <!-- Cron Job Info -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 class="text-lg font-semibold text-blue-900 mb-2">
-            <i class="fas fa-clock mr-2"></i> Cron Job URL
+            <i class="fas fa-clock mr-2"></i> Cron Job URLs
         </h3>
         <p class="text-sm text-blue-800 mb-4">
-            Use this URL in your cron job service (e.g., cron-job.org, EasyCron) to automatically check emails:
+            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically fetch emails:
         </p>
-        <div class="bg-white rounded-lg p-4 border border-blue-200">
-            <code class="text-sm text-gray-900 break-all">{{ url('/cron/monitor-emails') }}</code>
-            <button onclick="copyCronUrl()" class="ml-4 text-blue-600 hover:text-blue-800 text-sm">
-                <i class="fas fa-copy mr-1"></i> Copy URL
-            </button>
+        
+        <div class="space-y-4">
+            <!-- Direct Filesystem Reading (Recommended) -->
+            <div class="bg-white rounded-lg p-4 border border-green-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-green-700 bg-green-100 px-2 py-1 rounded">RECOMMENDED</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Direct Filesystem Reading</span>
+                    </div>
+                    <button onclick="copyCronUrl('direct')" class="text-green-600 hover:text-green-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/read-emails-direct') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Best for shared hosting.</strong> Reads emails directly from server mail directories (bypasses IMAP).
+                </p>
+            </div>
+
+            <!-- IMAP Email Fetching -->
+            <div class="bg-white rounded-lg p-4 border border-blue-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-sm font-medium text-gray-900">IMAP Email Fetching</span>
+                    </div>
+                    <button onclick="copyCronUrl('imap')" class="text-blue-600 hover:text-blue-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/monitor-emails') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    Requires IMAP to be enabled. Will fail if IMAP fetching is disabled in settings.
+                </p>
+            </div>
         </div>
-        <p class="text-xs text-blue-700 mt-2">
-            <strong>Recommended frequency:</strong> Every 5-10 minutes
-        </p>
+
+        <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <p class="text-xs text-yellow-800">
+                <strong>Recommended frequency:</strong> Every 5-15 minutes (more frequent = faster email detection)
+            </p>
+            <p class="text-xs text-yellow-700 mt-1">
+                <strong>Note:</strong> If IMAP is disabled, only use the "Direct Filesystem Reading" URL above.
+            </p>
+        </div>
     </div>
 
     <!-- Stored Emails Section -->
@@ -427,10 +466,48 @@ function fetchEmails() {
     const originalText = btn.innerHTML;
     
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Fetching...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Fetching (IMAP)...';
     resultDiv.classList.add('hidden');
     
     fetch('{{ route("admin.email-monitor.fetch") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
+            resultDiv.innerHTML = '<strong>Success!</strong> ' + data.message + '<pre class="mt-2 text-xs overflow-auto max-h-40">' + (data.output || '') + '</pre>';
+        } else {
+            resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
+            resultDiv.innerHTML = '<strong>Error!</strong> ' + data.message;
+        }
+        resultDiv.classList.remove('hidden');
+    })
+    .catch(error => {
+        resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
+        resultDiv.innerHTML = '<strong>Error!</strong> ' + error.message;
+        resultDiv.classList.remove('hidden');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+function fetchEmailsDirect() {
+    const btn = document.getElementById('fetch-emails-direct-btn');
+    const resultDiv = document.getElementById('monitoring-result');
+    const originalText = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Reading...';
+    resultDiv.classList.add('hidden');
+    
+    fetch('{{ route("admin.email-monitor.fetch-direct") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -503,7 +580,25 @@ function checkTransactionUpdates() {
     });
 }
 
-function copyCronUrl() {
+function copyCronUrl(type = 'direct') {
+    const url = type === 'direct' 
+        ? '{{ url('/cron/read-emails-direct') }}'
+        : '{{ url('/cron/monitor-emails') }}';
+    
+    navigator.clipboard.writeText(url).then(function() {
+        // Show temporary success message
+        const message = document.createElement('div');
+        message.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+        message.textContent = 'Cron URL copied to clipboard!';
+        document.body.appendChild(message);
+        
+        setTimeout(() => {
+            message.remove();
+        }, 2000);
+    }).catch(function(err) {
+        alert('Failed to copy URL. Please copy manually: ' + url);
+    });
+}
     const url = '{{ url("/cron/monitor-emails") }}';
     navigator.clipboard.writeText(url).then(() => {
         alert('Cron URL copied to clipboard!');

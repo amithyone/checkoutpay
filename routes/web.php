@@ -27,9 +27,22 @@ Route::post('/setup/complete', [SetupController::class, 'complete']);
 Route::get('/test-email', [TestEmailController::class, 'test'])->name('test.email');
 Route::post('/test-email', [TestEmailController::class, 'test']);
 
-// Cron job endpoint (for external cron services)
+// Cron job endpoints (for external cron services)
+
+// IMAP Email Fetching Cron (requires IMAP to be enabled)
 Route::get('/cron/monitor-emails', function () {
     try {
+        // Check if IMAP is disabled
+        $disableImap = \App\Models\Setting::get('disable_imap_fetching', false);
+        
+        if ($disableImap) {
+            return response()->json([
+                'success' => false,
+                'message' => 'IMAP fetching is disabled. Use /cron/read-emails-direct instead.',
+                'timestamp' => now()->toDateTimeString(),
+            ], 400);
+        }
+
         $startTime = microtime(true);
         
         // Get last cron run time from settings
@@ -57,7 +70,7 @@ Route::get('/cron/monitor-emails', function () {
         // Store current cron run time BEFORE processing (so we don't miss emails)
         \App\Models\Setting::set('last_cron_run', now()->toDateTimeString(), 'string', 'system', 'Last time cron job was executed');
         
-        // Call the command with a custom since date
+        // Call the IMAP monitoring command
         \Illuminate\Support\Facades\Artisan::call('payment:monitor-emails', [
             '--since' => $sinceDate->toDateTimeString(),
         ]);
@@ -67,7 +80,8 @@ Route::get('/cron/monitor-emails', function () {
         
         return response()->json([
             'success' => true,
-            'message' => 'Email monitoring completed',
+            'message' => 'Email monitoring (IMAP) completed',
+            'method' => 'imap',
             'timestamp' => now()->toDateTimeString(),
             'last_cron_run' => $lastCronRun,
             'fetched_since' => $sinceDate->toDateTimeString(),
@@ -75,7 +89,7 @@ Route::get('/cron/monitor-emails', function () {
             'output' => $output,
         ]);
     } catch (\Exception $e) {
-        \Illuminate\Support\Facades\Log::error('Cron job error', [
+        \Illuminate\Support\Facades\Log::error('Cron job error (IMAP)', [
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
@@ -87,3 +101,36 @@ Route::get('/cron/monitor-emails', function () {
         ], 500);
     }
 })->name('cron.monitor-emails');
+
+// Direct Filesystem Email Reading Cron (RECOMMENDED for shared hosting)
+Route::get('/cron/read-emails-direct', function () {
+    try {
+        $startTime = microtime(true);
+        
+        // Run direct filesystem email reading command
+        \Illuminate\Support\Facades\Artisan::call('payment:read-emails-direct', ['--all' => true]);
+        
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $executionTime = round(microtime(true) - $startTime, 2);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Direct filesystem email reading completed',
+            'method' => 'direct_filesystem',
+            'timestamp' => now()->toDateTimeString(),
+            'execution_time_seconds' => $executionTime,
+            'output' => $output,
+        ]);
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Cron job error (Direct Filesystem)', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage(),
+            'timestamp' => now()->toDateTimeString(),
+        ], 500);
+    }
+})->name('cron.read-emails-direct');
