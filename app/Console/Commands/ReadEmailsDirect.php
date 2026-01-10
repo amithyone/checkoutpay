@@ -531,35 +531,93 @@ class ReadEmailsDirect extends Command
         $contentType = $parsedHeaders['content-type'] ?? '';
         
         if (strpos($contentType, 'multipart') !== false) {
-            // Simple multipart parsing (basic)
-            if (preg_match('/--([^\r\n]+)/', $contentType . "\n" . $body, $boundaryMatch)) {
-                $boundary = $boundaryMatch[1];
-                $parts = explode('--' . $boundary, $body);
+            // Extract boundary from Content-Type header (handle quoted and unquoted)
+            $boundary = null;
+            if (preg_match('/boundary\s*=\s*["\']?([^"\'\s;]+)["\']?/i', $contentType, $boundaryMatch)) {
+                $boundary = trim($boundaryMatch[1], '"\'');
+            } elseif (preg_match('/--([A-Za-z0-9\'()+_,-.\/:=?]+)/', $body, $boundaryMatch)) {
+                // Fallback: extract from body (first occurrence)
+                $boundary = trim($boundaryMatch[1], '"\'');
+            }
+            
+            if ($boundary) {
+                // Split body by boundary markers (handle both --boundary and --boundary-- formats)
+                // Use preg_split with PREG_SPLIT_DELIM_CAPTURE to keep boundaries for analysis
+                $parts = preg_split('/\r?\n?--' . preg_quote($boundary, '/') . '(?:--)?\r?\n?/', $body, -1, PREG_SPLIT_NO_EMPTY);
                 
-                foreach ($parts as $part) {
+                foreach ($parts as $partIndex => $part) {
+                    // Skip preamble (before first boundary)
+                    if ($partIndex === 0 && !preg_match('/Content-Type:/i', $part)) {
+                        continue;
+                    }
+                    
+                    // Extract part headers and body (split on double newline)
+                    $headerBodySplit = preg_split('/\r?\n\r?\n/', $part, 2);
+                    $partHeaders = $headerBodySplit[0] ?? '';
+                    $partBody = $headerBodySplit[1] ?? $part; // If no double newline, assume entire part is body
+                    
                     // Check for Content-Transfer-Encoding in this part
                     $partTransferEncoding = '7bit';
-                    if (preg_match('/Content-Transfer-Encoding:\s*([^\r\n]+)/i', $part, $encMatch)) {
+                    if (preg_match('/Content-Transfer-Encoding:\s*([^\r\n]+)/i', $partHeaders, $encMatch)) {
                         $partTransferEncoding = strtolower(trim($encMatch[1]));
                     }
                     
-                    if (strpos($part, 'text/plain') !== false) {
-                        if (preg_match('/\r?\n\r?\n(.*)$/s', $part, $textMatch)) {
-                            $textBody = trim($textMatch[1]);
-                            // Decode quoted-printable if needed
-                            if (strpos($partTransferEncoding, 'quoted-printable') !== false) {
-                                $textBody = $this->decodeQuotedPrintable($textBody);
-                            }
+                    // Check Content-Type (can be in header line or separate line)
+                    $partContentType = '';
+                    if (preg_match('/Content-Type:\s*([^\r\n;]+)/i', $partHeaders, $ctMatch)) {
+                        $partContentType = strtolower(trim($ctMatch[1]));
+                    }
+                    
+                    // Determine if this is HTML or plain text part
+                    $isHtml = strpos($partContentType, 'text/html') !== false || 
+                              strpos($partHeaders, 'text/html') !== false;
+                    $isPlain = strpos($partContentType, 'text/plain') !== false || 
+                               (empty($partContentType) && strpos($partHeaders, 'text/plain') !== false);
+                    
+                    // Extract text/plain part
+                    if ($isPlain && !$isHtml) {
+                        // Get full body (everything after headers)
+                        $cleanedBody = $partBody;
+                        // Remove any trailing boundary markers (--boundary--)
+                        $cleanedBody = preg_replace('/--\r?\n?$/', '', $cleanedBody);
+                        $cleanedBody = rtrim($cleanedBody, " \r\n\t");
+                        $textBody = $cleanedBody;
+                        
+                        // Decode quoted-printable if needed
+                        if (strpos($partTransferEncoding, 'quoted-printable') !== false) {
+                            $textBody = $this->decodeQuotedPrintable($textBody);
                         }
-                    } elseif (strpos($part, 'text/html') !== false) {
-                        if (preg_match('/\r?\n\r?\n(.*)$/s', $part, $htmlMatch)) {
-                            $htmlBody = trim($htmlMatch[1]);
-                            // Decode quoted-printable if needed
-                            if (strpos($partTransferEncoding, 'quoted-printable') !== false) {
-                                $htmlBody = $this->decodeQuotedPrintable($htmlBody);
-                            }
-                            // Also decode HTML entities
-                            $htmlBody = html_entity_decode($htmlBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    }
+                    // Extract text/html part (prioritize HTML over plain)
+                    elseif ($isHtml) {
+                        // Get full HTML body (everything after headers, up to next boundary)
+                        $cleanedBody = $partBody;
+                        
+                        // Remove trailing boundary markers but keep all HTML content
+                        // Remove closing boundary (--boundary--) if present at end
+                        $cleanedBody = preg_replace('/\r?\n--[^\r\n]*--\s*$/', '', $cleanedBody);
+                        // Remove any standalone boundary marker at end
+                        $cleanedBody = preg_replace('/--[^\r\n]*\s*$/', '', $cleanedBody);
+                        // Trim only trailing whitespace/newlines, preserve content
+                        $cleanedBody = rtrim($cleanedBody, " \r\n\t");
+                        
+                        // Store the FULL HTML body (don't trim further)
+                        $htmlBody = $cleanedBody;
+                        
+                        // Decode quoted-printable if needed
+                        if (strpos($partTransferEncoding, 'quoted-printable') !== false) {
+                            $htmlBody = $this->decodeQuotedPrintable($htmlBody);
+                        }
+                        
+                        // Also decode HTML entities
+                        $htmlBody = html_entity_decode($htmlBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        
+                        // Log HTML body length for debugging
+                        if (strlen($htmlBody) > 0) {
+                            \Illuminate\Support\Facades\Log::debug('Extracted HTML body from multipart', [
+                                'html_length' => strlen($htmlBody),
+                                'html_preview' => substr($htmlBody, 0, 200),
+                            ]);
                         }
                     }
                 }
