@@ -11,6 +11,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        //
+        // Seed GTBank email template
+        $this->call([
+            GtbankTemplateSeeder::class,
+        ]);
     }
 }
