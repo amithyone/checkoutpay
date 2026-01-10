@@ -1048,36 +1048,40 @@ class PaymentMatchingService
                 $method = 'html_table';
             }
         }
-        // Pattern 3: Description field contains amount
-        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦)\s*([\d,]+\.?\d*).*?<\/td>/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $method = 'html_table';
+        
+        // STRATEGY 3: Fallback patterns (if table extraction failed)
+        if (!$amount) {
+            // Pattern 3: Description field contains amount
+            if (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦|NGN)\s*([\d,]+\.?\d*).*?<\/td>/i', $html, $matches)) {
+                $potentialAmount = (float) str_replace(',', '', $matches[1]);
+                if ($potentialAmount >= 10) {
+                    $amount = $potentialAmount;
+                    $method = 'html_table';
+                }
             }
-        }
-        // Pattern 4: Any HTML table cell containing NGN/Naira
-        elseif (preg_match('/<td[^>]*>[\s]*(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $method = 'html_table';
+            // Pattern 4: Any HTML table cell containing NGN/Naira (broader match)
+            if (!$amount && preg_match('/<td[^>]*>[\s]*(?:ngn|naira|₦|NGN)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                $potentialAmount = (float) str_replace(',', '', $matches[1]);
+                if ($potentialAmount >= 10) {
+                    $amount = $potentialAmount;
+                    $method = 'html_table';
+                }
             }
-        }
-        // Pattern 5: HTML with amount format (not in table)
-        elseif (preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $method = 'html_text';
+            // Pattern 5: HTML text (not in table) - amount format
+            if (!$amount && preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)\s*([\d,]+\.?\d*)/i', $html, $matches)) {
+                $potentialAmount = (float) str_replace(',', '', $matches[1]);
+                if ($potentialAmount >= 10) {
+                    $amount = $potentialAmount;
+                    $method = 'html_text';
+                }
             }
-        }
-        // Pattern 6: Standalone NGN in HTML
-        elseif (preg_match('/(?:ngn|naira|₦)([\d,]+\.?\d*)/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $method = 'html_text';
+            // Pattern 6: Standalone NGN in HTML (last resort)
+            if (!$amount && preg_match('/(?:ngn|naira|₦|NGN)\s*([\d,]+\.?\d*)/i', $html, $matches)) {
+                $potentialAmount = (float) str_replace(',', '', $matches[1]);
+                if ($potentialAmount >= 10) {
+                    $amount = $potentialAmount;
+                    $method = 'html_text';
+                }
             }
         }
         
