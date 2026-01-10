@@ -291,6 +291,9 @@ class PaymentMatchingService
         $subject = strtolower($emailData['subject'] ?? '');
         $text = $this->decodeQuotedPrintable($emailData['text'] ?? '');
         $html = $this->decodeQuotedPrintable($emailData['html'] ?? '');
+        // CRITICAL: Decode HTML entities (like &nbsp; to space) for stored emails
+        // Stored emails may have NGN&nbsp;1000 which should be NGN 1000
+        $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $from = strtolower($emailData['from'] ?? '');
         
         $extractionSteps = [];
