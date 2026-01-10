@@ -463,7 +463,20 @@
 function fetchEmails() {
     const btn = document.getElementById('fetch-emails-btn');
     const resultDiv = document.getElementById('monitoring-result');
+    
+    if (!btn || !resultDiv) {
+        console.error('Required elements not found');
+        alert('Error: Button or result div not found. Please refresh the page.');
+        return;
+    }
+    
     const originalText = btn.innerHTML;
+    const csrfToken = getCsrfToken();
+    
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        return;
+    }
     
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Fetching (IMAP)...';
@@ -473,21 +486,27 @@ function fetchEmails() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            'X-CSRF-TOKEN': csrfToken
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
             resultDiv.innerHTML = '<strong>Success!</strong> ' + data.message + '<pre class="mt-2 text-xs overflow-auto max-h-40">' + (data.output || '') + '</pre>';
         } else {
             resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
-            resultDiv.innerHTML = '<strong>Error!</strong> ' + data.message;
+            resultDiv.innerHTML = '<strong>Error!</strong> ' + (data.message || 'Unknown error');
         }
         resultDiv.classList.remove('hidden');
     })
     .catch(error => {
+        console.error('Error fetching emails:', error);
         resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
         resultDiv.innerHTML = '<strong>Error!</strong> ' + error.message;
         resultDiv.classList.remove('hidden');
@@ -501,7 +520,20 @@ function fetchEmails() {
 function fetchEmailsDirect() {
     const btn = document.getElementById('fetch-emails-direct-btn');
     const resultDiv = document.getElementById('monitoring-result');
+    
+    if (!btn || !resultDiv) {
+        console.error('Required elements not found');
+        alert('Error: Button or result div not found. Please refresh the page.');
+        return;
+    }
+    
     const originalText = btn.innerHTML;
+    const csrfToken = getCsrfToken();
+    
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        return;
+    }
     
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Reading...';
@@ -511,21 +543,27 @@ function fetchEmailsDirect() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            'X-CSRF-TOKEN': csrfToken
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
             resultDiv.innerHTML = '<strong>Success!</strong> ' + data.message + '<pre class="mt-2 text-xs overflow-auto max-h-40">' + (data.output || '') + '</pre>';
         } else {
             resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
-            resultDiv.innerHTML = '<strong>Error!</strong> ' + data.message;
+            resultDiv.innerHTML = '<strong>Error!</strong> ' + (data.message || 'Unknown error');
         }
         resultDiv.classList.remove('hidden');
     })
     .catch(error => {
+        console.error('Error fetching emails direct:', error);
         resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
         resultDiv.innerHTML = '<strong>Error!</strong> ' + error.message;
         resultDiv.classList.remove('hidden');
@@ -539,7 +577,20 @@ function fetchEmailsDirect() {
 function checkTransactionUpdates() {
     const btn = document.getElementById('check-updates-btn');
     const resultDiv = document.getElementById('monitoring-result');
+    
+    if (!btn || !resultDiv) {
+        console.error('Required elements not found');
+        alert('Error: Button or result div not found. Please refresh the page.');
+        return;
+    }
+    
     const originalText = btn.innerHTML;
+    const csrfToken = getCsrfToken();
+    
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        return;
+    }
     
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Checking...';
@@ -549,10 +600,15 @@ function checkTransactionUpdates() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            'X-CSRF-TOKEN': csrfToken
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
@@ -565,11 +621,12 @@ function checkTransactionUpdates() {
             }, 2000);
         } else {
             resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
-            resultDiv.innerHTML = '<strong>Error!</strong> ' + data.message;
+            resultDiv.innerHTML = '<strong>Error!</strong> ' + (data.message || 'Unknown error');
         }
         resultDiv.classList.remove('hidden');
     })
     .catch(error => {
+        console.error('Error checking transaction updates:', error);
         resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
         resultDiv.innerHTML = '<strong>Error!</strong> ' + error.message;
         resultDiv.classList.remove('hidden');
@@ -585,37 +642,43 @@ function copyCronUrl(type = 'direct') {
         ? '{{ url('/cron/read-emails-direct') }}'
         : '{{ url('/cron/monitor-emails') }}';
     
-    navigator.clipboard.writeText(url).then(function() {
-        // Show temporary success message
-        const message = document.createElement('div');
-        message.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-        message.textContent = 'Cron URL copied to clipboard!';
-        document.body.appendChild(message);
-        
-        setTimeout(() => {
-            message.remove();
-        }, 2000);
-    }).catch(function(err) {
-        alert('Failed to copy URL. Please copy manually: ' + url);
-    });
-}
-    const url = '{{ url("/cron/monitor-emails") }}';
-    navigator.clipboard.writeText(url).then(() => {
-        alert('Cron URL copied to clipboard!');
-    }).catch(() => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function() {
+            // Show temporary success message
+            const message = document.createElement('div');
+            message.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+            message.textContent = 'Cron URL copied to clipboard!';
+            document.body.appendChild(message);
+            
+            setTimeout(() => {
+                message.remove();
+            }, 2000);
+        }).catch(function(err) {
+            console.error('Clipboard error:', err);
+            alert('Failed to copy URL. Please copy manually: ' + url);
+        });
+    } else {
         // Fallback for older browsers
         const textarea = document.createElement('textarea');
         textarea.value = url;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
         alert('Cron URL copied to clipboard!');
-    });
+    }
 }
 
 function triggerGlobalMatch() {
     const btn = document.getElementById('global-match-btn');
+    if (!btn) {
+        console.error('Global match button not found');
+        alert('Error: Button not found. Please refresh the page.');
+        return;
+    }
+    
     const originalHTML = btn.innerHTML;
     
     if (!confirm('This will check all unmatched pending payments against all unmatched emails using the new matching logic with full logging. This may take a while. Continue?')) {
@@ -625,20 +688,34 @@ function triggerGlobalMatch() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Running Match...';
     
+    // Get CSRF token with error handling
+    const csrfToken = getCsrfToken();
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+        return;
+    }
+    
     fetch('{{ route("admin.match.trigger-global") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            'X-CSRF-TOKEN': csrfToken
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             let message = '✅ ' + data.message + '\n\n';
             
-            if (data.results.matches_found > 0) {
-                message += 'Matches Found:\n';
+            if (data.results && data.results.matches_found > 0) {
+                message += 'Matches Found: ' + data.results.matches_found + '\n';
                 
                 if (data.results.matched_emails && data.results.matched_emails.length > 0) {
                     message += '\nFrom Emails:\n';
@@ -655,7 +732,7 @@ function triggerGlobalMatch() {
                 }
             }
             
-            if (data.results.errors && data.results.errors.length > 0) {
+            if (data.results && data.results.errors && data.results.errors.length > 0) {
                 message += `\n\n⚠️ Errors: ${data.results.errors.length} error(s) occurred. Check logs for details.`;
             }
             
@@ -666,83 +743,33 @@ function triggerGlobalMatch() {
                 window.location.reload();
             }, 2000);
         } else {
-            alert('❌ Error: ' + data.message);
+            alert('❌ Error: ' + (data.message || 'Unknown error occurred'));
             btn.disabled = false;
             btn.innerHTML = originalHTML;
         }
     })
     .catch(error => {
-        console.error('Error:', error);
+        console.error('Error triggering global match:', error);
         alert('❌ Error triggering global match: ' + error.message);
         btn.disabled = false;
         btn.innerHTML = originalHTML;
     });
 }
 
-function triggerGlobalMatch() {
-    const btn = document.getElementById('global-match-btn');
-    const originalHTML = btn.innerHTML;
-    
-    if (!confirm('This will check all unmatched pending payments against all unmatched emails using the new matching logic with full logging. This may take a while. Continue?')) {
-        return;
+// Helper function to get CSRF token
+function getCsrfToken() {
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    if (metaTag) {
+        return metaTag.getAttribute('content');
     }
-    
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Running Match...';
-    
-    fetch('{{ route("admin.match.trigger-global") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            let message = '✅ ' + data.message + '\n\n';
-            
-            if (data.results.matches_found > 0) {
-                message += 'Matches Found:\n';
-                
-                if (data.results.matched_emails && data.results.matched_emails.length > 0) {
-                    message += '\nFrom Emails:\n';
-                    data.results.matched_emails.forEach(match => {
-                        message += `  • Email #${match.email_id} → Transaction ${match.transaction_id}\n`;
-                    });
-                }
-                
-                if (data.results.matched_payments && data.results.matched_payments.length > 0) {
-                    message += '\nFrom Payments:\n';
-                    data.results.matched_payments.forEach(match => {
-                        message += `  • Transaction ${match.transaction_id} → Email #${match.email_id}\n`;
-                    });
-                }
-            }
-            
-            if (data.results.errors && data.results.errors.length > 0) {
-                message += `\n\n⚠️ Errors: ${data.results.errors.length} error(s) occurred. Check logs for details.`;
-            }
-            
-            alert(message);
-            
-            // Reload page after 2 seconds to show updated stats
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
-        } else {
-            alert('❌ Error: ' + data.message);
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('❌ Error triggering global match: ' + error.message);
-        btn.disabled = false;
-        btn.innerHTML = originalHTML;
-    });
+    console.error('CSRF token meta tag not found');
+    return null;
 }
 
 </script>
 @endsection
+
+
+
+
+
