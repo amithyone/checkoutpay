@@ -32,25 +32,74 @@ class PaymentMatchingService
         $extractionMethod = $extractionResult['method'] ?? 'unknown';
 
         if (!$extractedInfo) {
-            // Log failed extraction attempt
+            // Get detailed extraction diagnostics
+            $diagnostics = $this->getLastExtractionDiagnostics();
+            
+            // Build detailed error reason
+            $detailedReason = 'Could not extract payment info from email.';
+            if ($diagnostics) {
+                $detailedReason .= "\n\nExtraction Steps:\n" . implode("\n", $diagnostics['steps']);
+                $detailedReason .= "\n\nErrors Encountered:\n" . implode("\n", $diagnostics['errors']);
+                $detailedReason .= "\n\nEmail Content Analysis:";
+                $detailedReason .= "\n- Text Body Length: " . ($diagnostics['text_length'] ?? 0) . " chars";
+                $detailedReason .= "\n- HTML Body Length: " . ($diagnostics['html_length'] ?? 0) . " chars";
+                $detailedReason .= "\n- Subject: " . ($diagnostics['subject'] ?? 'N/A');
+                $detailedReason .= "\n- From: " . ($diagnostics['from'] ?? 'N/A');
+                
+                if (!empty($diagnostics['text_preview'])) {
+                    $detailedReason .= "\n\nText Body Preview (first 500 chars):\n" . $diagnostics['text_preview'];
+                }
+                
+                if (!empty($diagnostics['html_preview'])) {
+                    $detailedReason .= "\n\nHTML Body Preview (first 500 chars):\n" . $diagnostics['html_preview'];
+                }
+                
+                // Check for common issues
+                $issues = [];
+                if (empty(trim($emailData['text'] ?? '')) && empty(trim($emailData['html'] ?? ''))) {
+                    $issues[] = "Both text_body and html_body are empty - email may not have been parsed correctly";
+                }
+                if (!empty($emailData['html'] ?? '') && !preg_match('/amount|ngn|naira|payment|transfer|credit|deposit/i', $emailData['html'])) {
+                    $issues[] = "HTML body doesn't contain common payment keywords (amount, ngn, naira, payment, transfer, credit, deposit)";
+                }
+                if (!empty($emailData['text'] ?? '') && !preg_match('/amount|ngn|naira|payment|transfer|credit|deposit/i', $emailData['text'])) {
+                    $issues[] = "Text body doesn't contain common payment keywords (amount, ngn, naira, payment, transfer, credit, deposit)";
+                }
+                if (!empty($diagnostics['html_preview']) && !preg_match('/<td|<tr|<table/i', $diagnostics['html_preview'])) {
+                    $issues[] = "HTML doesn't appear to contain table structures (td, tr, table tags) - may not be bank email format";
+                }
+                
+                if (!empty($issues)) {
+                    $detailedReason .= "\n\nPotential Issues Detected:\n" . implode("\n", array_map(fn($issue) => "- {$issue}", $issues));
+                }
+            }
+            
+            // Log failed extraction attempt with detailed diagnostics
             if ($processedEmailId) {
                 $processedEmail = ProcessedEmail::find($processedEmailId);
                 if ($processedEmail) {
                     $this->matchLogger->logAttempt([
                         'processed_email_id' => $processedEmailId,
                         'match_result' => MatchAttempt::RESULT_UNMATCHED,
-                        'reason' => 'Could not extract payment info from email',
+                        'reason' => $detailedReason,
                         'extraction_method' => $extractionMethod,
                         'email_subject' => $emailData['subject'] ?? null,
                         'email_from' => $emailData['from'] ?? null,
                         'email_date' => $emailData['date'] ?? null,
                         'html_snippet' => $this->matchLogger->extractHtmlSnippet($emailData['html'] ?? ''),
                         'text_snippet' => $this->matchLogger->extractTextSnippet($emailData['text'] ?? ''),
-                        'details' => [
+                        'details' => array_merge([
                             'extraction_failed' => true,
                             'has_html' => !empty($emailData['html']),
                             'has_text' => !empty($emailData['text']),
-                        ],
+                            'text_length' => strlen(trim($emailData['text'] ?? '')),
+                            'html_length' => strlen(trim($emailData['html'] ?? '')),
+                        ], $diagnostics ? [
+                            'extraction_steps' => $diagnostics['steps'],
+                            'extraction_errors' => $diagnostics['errors'],
+                            'text_preview' => $diagnostics['text_preview'] ?? null,
+                            'html_preview' => $diagnostics['html_preview'] ?? null,
+                        ] : []),
                     ]);
                 }
             }
@@ -58,6 +107,7 @@ class PaymentMatchingService
             \Illuminate\Support\Facades\Log::info('Could not extract payment info from email', [
                 'extraction_method' => $extractionMethod,
                 'processed_email_id' => $processedEmailId,
+                'diagnostics' => $diagnostics,
             ]);
             return null;
         }
@@ -194,8 +244,12 @@ class PaymentMatchingService
         $html = $emailData['html'] ?? '';
         $from = strtolower($emailData['from'] ?? '');
         
+        $extractionSteps = [];
+        $extractionErrors = [];
+        
         // Try to find matching bank email template (highest priority)
         $template = $this->findMatchingTemplate($from);
+        $extractionSteps[] = 'Template lookup: ' . ($template ? 'Found (' . $template->bank_name . ')' : 'Not found');
         
         // If template found, use template-specific extraction
         if ($template) {
@@ -205,23 +259,40 @@ class PaymentMatchingService
                     'data' => $result,
                     'method' => 'template',
                 ];
+            } else {
+                $extractionErrors[] = 'Template extraction failed: Amount not found or invalid';
             }
         }
         
         // Strategy: Try text_body first, then html_body
         // STEP 1: Try extraction from text_body (plain text) first
-        if (!empty(trim($text))) {
+        $textTrimmed = trim($text);
+        $textLength = strlen($textTrimmed);
+        $extractionSteps[] = "Text body check: " . ($textLength > 0 ? "Present ({$textLength} chars)" : "Empty or missing");
+        
+        if ($textLength > 0) {
             $extractionResult = $this->extractFromTextBody($text, $subject, $from);
             if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
                 return [
                     'data' => $extractionResult,
                     'method' => 'text_body',
                 ];
+            } else {
+                $amountFound = $extractionResult['amount'] ?? null;
+                $extractionErrors[] = "Text body extraction failed: " . 
+                    ($amountFound === null ? "No amount found in text body" : 
+                     ($amountFound <= 0 ? "Amount found but invalid ({$amountFound})" : "Unknown error"));
             }
+        } else {
+            $extractionErrors[] = "Text body is empty or whitespace only";
         }
         
         // STEP 2: If text_body extraction failed, try html_body
-        if (!empty(trim($html))) {
+        $htmlTrimmed = trim($html);
+        $htmlLength = strlen($htmlTrimmed);
+        $extractionSteps[] = "HTML body check: " . ($htmlLength > 0 ? "Present ({$htmlLength} chars)" : "Empty or missing");
+        
+        if ($htmlLength > 0) {
             // First try HTML table extraction (most accurate for Nigerian banks)
             $extractionResult = $this->extractFromHtmlBody($html, $subject, $from);
             if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
@@ -229,23 +300,65 @@ class PaymentMatchingService
                     'data' => $extractionResult,
                     'method' => $extractionResult['method'] ?? 'html_body',
                 ];
+            } else {
+                $amountFound = $extractionResult['amount'] ?? null;
+                $extractionErrors[] = "HTML body extraction failed: " . 
+                    ($amountFound === null ? "No amount found in HTML (tried table and text patterns)" : 
+                     ($amountFound <= 0 ? "Amount found but invalid ({$amountFound})" : "Unknown error"));
             }
             
             // If HTML table extraction failed, convert HTML to text and try text extraction
             $renderedText = $this->htmlToText($html);
-            if (!empty(trim($renderedText))) {
+            $renderedLength = strlen(trim($renderedText));
+            $extractionSteps[] = "HTML-to-text conversion: {$renderedLength} chars";
+            
+            if ($renderedLength > 0) {
                 $extractionResult = $this->extractFromTextBody($renderedText, $subject, $from);
                 if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
                     return [
                         'data' => $extractionResult,
                         'method' => 'html_rendered_text',
                     ];
+                } else {
+                    $amountFound = $extractionResult['amount'] ?? null;
+                    $extractionErrors[] = "HTML rendered text extraction failed: " . 
+                        ($amountFound === null ? "No amount found after converting HTML to text" : 
+                         ($amountFound <= 0 ? "Amount found but invalid ({$amountFound})" : "Unknown error"));
                 }
+            } else {
+                $extractionErrors[] = "HTML-to-text conversion produced empty result";
             }
+        } else {
+            $extractionErrors[] = "HTML body is empty or whitespace only";
         }
+        
+        // Store extraction diagnostic info for logging
+        $this->lastExtractionDiagnostics = [
+            'steps' => $extractionSteps,
+            'errors' => $extractionErrors,
+            'text_length' => $textLength,
+            'html_length' => $htmlLength,
+            'subject' => $emailData['subject'] ?? '',
+            'from' => $emailData['from'] ?? '',
+            'text_preview' => mb_substr($textTrimmed, 0, 500),
+            'html_preview' => mb_substr($htmlTrimmed, 0, 500),
+        ];
         
         // If both text_body and html_body extraction failed, return null
             return null;
+        }
+
+    /**
+     * Store last extraction diagnostics for error reporting
+     */
+    protected $lastExtractionDiagnostics = null;
+    
+    /**
+     * Get last extraction diagnostics
+     */
+    public function getLastExtractionDiagnostics(): ?array
+    {
+        return $this->lastExtractionDiagnostics;
     }
 
     /**
