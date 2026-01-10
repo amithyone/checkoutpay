@@ -92,74 +92,91 @@
                 <span class="text-yellow-600">Unmatched: {{ $stats['stored_emails']['unmatched'] }}</span>
             </div>
             <div class="mt-3 pt-3 border-t border-gray-200 flex items-center text-xs text-gray-500">
-                <span><i class="fas fa-bolt text-purple-500 mr-1"></i> Zapier: {{ $stats['stored_emails']['webhook'] }}</span>
-                <span class="mx-2">•</span>
                 <span><i class="fas fa-server text-blue-500 mr-1"></i> IMAP: {{ $stats['stored_emails']['imap'] }}</span>
                 <span class="mx-2">•</span>
                 <span><i class="fas fa-google text-red-500 mr-1"></i> Gmail API: {{ $stats['stored_emails']['gmail_api'] }}</span>
+                <span class="mx-2">•</span>
+                <span><i class="fas fa-file-alt text-gray-500 mr-1"></i> Direct: {{ $stats['stored_emails']['direct_filesystem'] }}</span>
             </div>
         </div>
     </div>
 
-    <!-- Zapier Status Widget -->
-    <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg shadow-sm border-2 border-purple-200 p-6">
+    <!-- Unmatched Pending Transactions Widget -->
+    <div class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg shadow-sm border-2 border-yellow-200 p-6">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center">
-                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                    <i class="fas fa-bolt text-purple-600 text-xl"></i>
+                <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 text-xl"></i>
                 </div>
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Zapier Status</h3>
-                    <p class="text-sm text-gray-600">Real-time email forwarding via webhook</p>
+                    <h3 class="text-lg font-semibold text-gray-900">Unmatched Pending Transactions</h3>
+                    <p class="text-sm text-gray-600">Transactions waiting for payment email match</p>
                 </div>
             </div>
-            @if($stats['zapier_status']['last_email'])
-                <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
-                    <i class="fas fa-check-circle mr-1"></i> Active
+            @if($stats['unmatched_pending']['total'] > 0)
+                <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                    <i class="fas fa-clock mr-1"></i> {{ $stats['unmatched_pending']['total'] }} Pending
                 </span>
             @else
-                <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                    <i class="fas fa-exclamation-circle mr-1"></i> No Activity Yet
+                <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
+                    <i class="fas fa-check-circle mr-1"></i> All Matched
                 </span>
             @endif
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-white rounded-lg p-4 border border-purple-100">
-                <p class="text-xs text-gray-500 mb-1">Today</p>
-                <p class="text-2xl font-bold text-purple-600">{{ $stats['zapier_status']['total_today'] }}</p>
-                <p class="text-xs text-gray-500 mt-1">emails received</p>
+            <div class="bg-white rounded-lg p-4 border border-yellow-100">
+                <p class="text-xs text-gray-500 mb-1">Total Unmatched</p>
+                <p class="text-2xl font-bold text-yellow-600">{{ number_format($stats['unmatched_pending']['total']) }}</p>
+                <p class="text-xs text-gray-500 mt-1">pending transactions</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-purple-100">
-                <p class="text-xs text-gray-500 mb-1">Last 24 Hours</p>
-                <p class="text-2xl font-bold text-indigo-600">{{ $stats['zapier_status']['last_24h'] }}</p>
-                <p class="text-xs text-gray-500 mt-1">emails received</p>
+            <div class="bg-white rounded-lg p-4 border border-yellow-100">
+                <p class="text-xs text-gray-500 mb-1">Expiring Soon</p>
+                <p class="text-2xl font-bold text-orange-600">{{ number_format($stats['unmatched_pending']['expiring_soon']) }}</p>
+                <p class="text-xs text-gray-500 mt-1">next 2 hours</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-purple-100">
-                <p class="text-xs text-gray-500 mb-1">Last Email</p>
-                @if($stats['zapier_status']['last_email'])
-                    <p class="text-sm font-medium text-gray-900">{{ $stats['zapier_status']['last_email']->created_at->diffForHumans() }}</p>
-                    <p class="text-xs text-gray-500 mt-1 truncate" title="{{ $stats['zapier_status']['last_email']->subject }}">
-                        {{ Str::limit($stats['zapier_status']['last_email']->subject ?? 'No Subject', 30) }}
-                    </p>
-                @else
-                    <p class="text-sm text-gray-400">No emails yet</p>
-                @endif
+            <div class="bg-white rounded-lg p-4 border border-yellow-100">
+                <p class="text-xs text-gray-500 mb-1">Recent</p>
+                <p class="text-sm font-medium text-gray-900">{{ $stats['unmatched_pending']['recent']->count() }} transactions</p>
+                <a href="{{ route('admin.payments.index', ['status' => 'pending']) }}" class="text-xs text-yellow-600 hover:text-yellow-800 mt-1 inline-block">
+                    View All <i class="fas fa-arrow-right ml-1"></i>
+                </a>
             </div>
         </div>
         
-        <div class="mt-4 pt-4 border-t border-purple-200">
-            <div class="flex items-center justify-between">
-                <div class="text-sm text-gray-600">
-                    <i class="fas fa-link mr-1"></i>
-                    <strong>Webhook URL:</strong> 
-                    <code class="text-xs bg-white px-2 py-1 rounded border border-purple-200">{{ url('/api/v1/email/webhook') }}</code>
+        @if($stats['unmatched_pending']['recent']->count() > 0)
+        <div class="mt-4 pt-4 border-t border-yellow-200">
+            <h4 class="text-sm font-semibold text-gray-900 mb-3">Recent Unmatched Transactions</h4>
+            <div class="space-y-2 max-h-64 overflow-y-auto">
+                @foreach($stats['unmatched_pending']['recent']->take(5) as $payment)
+                <div class="bg-white rounded-lg p-3 border border-yellow-100 hover:border-yellow-200">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <a href="{{ route('admin.payments.show', $payment) }}" class="text-sm font-medium text-primary hover:underline">
+                                {{ $payment->transaction_id }}
+                            </a>
+                            <div class="flex items-center gap-4 mt-1 text-xs text-gray-600">
+                                <span>₦{{ number_format($payment->amount, 2) }}</span>
+                                @if($payment->payer_name)
+                                    <span>{{ Str::limit($payment->payer_name, 30) }}</span>
+                                @endif
+                                @if($payment->expires_at)
+                                    <span class="text-{{ $payment->expires_at->diffInHours(now()) < 2 ? 'red' : 'gray' }}-600">
+                                        <i class="fas fa-clock mr-1"></i>Expires {{ $payment->expires_at->diffForHumans() }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                        <a href="{{ route('admin.match-attempts.index', ['transaction_id' => $payment->transaction_id]) }}" 
+                           class="text-xs text-yellow-600 hover:text-yellow-800 ml-4" title="View Match Attempts">
+                            <i class="fas fa-search-dollar"></i>
+                        </a>
+                    </div>
                 </div>
-                <button onclick="copyWebhookUrl()" class="text-sm text-purple-600 hover:text-purple-800">
-                    <i class="fas fa-copy mr-1"></i> Copy URL
-                </button>
+                @endforeach
             </div>
         </div>
+        @endif
     </div>
 
     <!-- Email Monitoring Actions -->
@@ -237,17 +254,17 @@
                             <div class="text-sm font-medium text-gray-900">
                                 {{ Str::limit($email->subject ?? 'No Subject', 50) }}
                             </div>
-                            @if($email->source === 'webhook')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 mt-1">
-                                    <i class="fas fa-bolt mr-1"></i> Zapier
-                                </span>
-                            @elseif($email->source === 'gmail_api')
+                                @if($email->source === 'gmail_api')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 mt-1">
                                     <i class="fas fa-google mr-1"></i> Gmail API
                                 </span>
-                            @else
+                            @elseif($email->source === 'imap')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mt-1">
                                     <i class="fas fa-server mr-1"></i> IMAP
+                                </span>
+                            @elseif($email->source === 'direct_filesystem')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 mt-1">
+                                    <i class="fas fa-file-alt mr-1"></i> Direct
                                 </span>
                             @endif
                         </td>
@@ -481,20 +498,5 @@ function copyCronUrl() {
     });
 }
 
-function copyWebhookUrl() {
-    const url = '{{ url("/api/v1/email/webhook") }}';
-    navigator.clipboard.writeText(url).then(() => {
-        alert('Webhook URL copied to clipboard!');
-    }).catch(() => {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = url;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        alert('Webhook URL copied to clipboard!');
-    });
-}
 </script>
 @endsection

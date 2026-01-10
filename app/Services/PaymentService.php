@@ -36,9 +36,10 @@ class PaymentService
             $data['payer_name'] = strtolower(trim($data['payer_name']));
         }
 
-        // Set expiration time (default 24 hours, configurable)
-        $expirationHours = config('payment.expiration_hours', 24);
-        $expiresAt = now()->addHours($expirationHours);
+        // Set expiration time from settings (transaction_pending_time_minutes)
+        // Default: 24 hours (1440 minutes) if setting not found
+        $pendingTimeMinutes = \App\Models\Setting::get('transaction_pending_time_minutes', 1440);
+        $expiresAt = now()->addMinutes($pendingTimeMinutes);
 
         // Assign account number if not provided
         $accountNumber = null;

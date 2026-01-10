@@ -66,7 +66,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('test-transaction/create', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createPayment'])->name('test-transaction.create');
         Route::get('test-transaction/status/{transactionId}', [\App\Http\Controllers\Admin\TestTransactionController::class, 'getStatus'])->name('test-transaction.status');
         Route::post('test-transaction/check-email', [\App\Http\Controllers\Admin\TestTransactionController::class, 'checkEmail'])->name('test-transaction.check-email');
-        Route::post('test-transaction/simulate-zapier', [\App\Http\Controllers\Admin\TestTransactionController::class, 'simulateZapierWebhook'])->name('test-transaction.simulate-zapier');
 
         // Settings
         Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
@@ -84,9 +83,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Whitelisted Email Addresses
         Route::resource('whitelisted-emails', \App\Http\Controllers\Admin\WhitelistedEmailController::class);
 
-        // Zapier Logs
-        Route::get('zapier-logs', [\App\Http\Controllers\Admin\ZapierLogController::class, 'index'])->name('zapier-logs.index');
-        Route::get('zapier-logs/{zapierLog}', [\App\Http\Controllers\Admin\ZapierLogController::class, 'show'])->name('zapier-logs.show');
-        Route::post('zapier-logs/{zapierLog}/retry', [\App\Http\Controllers\Admin\ZapierLogController::class, 'retry'])->name('zapier-logs.retry');
+        // Match Attempts (Match Logs)
+        Route::get('match-attempts', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'index'])->name('match-attempts.index');
+        Route::get('match-attempts/{matchAttempt}', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'show'])->name('match-attempts.show');
+        Route::post('match-attempts/{matchAttempt}/retry', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'retry'])->name('match-attempts.retry');
+        Route::post('processed-emails/{processedEmail}/retry-match', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'retryEmail'])->name('processed-emails.retry-match');
     });
 });

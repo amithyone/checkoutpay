@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\WhitelistedEmailAddress;
-use App\Models\ZapierLog;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
@@ -29,17 +28,8 @@ class SettingsController extends Controller
 
         // Get whitelisted emails for display
         $whitelistedEmails = WhitelistedEmailAddress::orderBy('created_at', 'desc')->get();
-        
-        // Get Zapier logs statistics
-        $zapierStats = [
-            'total' => ZapierLog::count(),
-            'today' => ZapierLog::whereDate('created_at', today())->count(),
-            'matched' => ZapierLog::where('status', 'matched')->count(),
-            'error' => ZapierLog::where('status', 'error')->count(),
-            'last_log' => ZapierLog::latest()->first(),
-        ];
 
-        return view('admin.settings.index', compact('settings', 'groups', 'whitelistedEmails', 'zapierStats'));
+        return view('admin.settings.index', compact('settings', 'groups', 'whitelistedEmails'));
     }
 
     /**
@@ -49,10 +39,10 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'payment_time_window_minutes' => 'required|integer|min:1|max:1440', // Max 24 hours
-            'zapier_webhook_secret' => 'nullable|string|min:16|max:255',
+            'transaction_pending_time_minutes' => 'required|integer|min:5|max:10080', // 5 minutes to 7 days
         ]);
 
-        // Update payment time window
+        // Update payment time window (for email matching)
         Setting::set(
             'payment_time_window_minutes',
             $validated['payment_time_window_minutes'],
@@ -61,13 +51,13 @@ class SettingsController extends Controller
             'Maximum time window (in minutes) for matching emails with payment requests. Emails received after this time will not be matched.'
         );
 
-        // Update Zapier webhook secret (always update, even if empty to allow clearing)
+        // Update transaction pending time (expiration time)
         Setting::set(
-            'zapier_webhook_secret',
-            $validated['zapier_webhook_secret'] ?? '',
-            'string',
-            'security',
-            'Secret key for authenticating Zapier webhook requests. Add this as a header "X-Zapier-Secret" in your Zapier webhook action.'
+            'transaction_pending_time_minutes',
+            $validated['transaction_pending_time_minutes'],
+            'integer',
+            'payment',
+            'Time (in minutes) before a pending transaction expires. After expiration, transaction will be automatically marked as expired and cannot be matched.'
         );
 
         return redirect()->route('admin.settings.index')

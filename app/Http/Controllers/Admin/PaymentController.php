@@ -14,7 +14,41 @@ class PaymentController extends Controller
         $query = Payment::with('business')->latest();
 
         if ($request->has('status')) {
-            $query->where('status', $request->status);
+            if ($request->status === 'pending') {
+                // For pending, only show non-expired
+                $query->where('status', Payment::STATUS_PENDING)
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    });
+            } else {
+                $query->where('status', $request->status);
+            }
+        } else {
+            // Default: show all including expired
+            $query->where(function ($q) {
+                // Include all statuses, but for pending, exclude expired
+                $q->where('status', '!=', Payment::STATUS_PENDING)
+                    ->orWhere(function ($pendingQ) {
+                        $pendingQ->where('status', Payment::STATUS_PENDING)
+                            ->where(function ($expQ) {
+                                $expQ->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                            });
+                    });
+            });
+        }
+
+        // Filter for unmatched pending transactions
+        if ($request->has('unmatched') && $request->unmatched === '1') {
+            $query->where('status', Payment::STATUS_PENDING)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->whereNotIn('id', function ($subQuery) {
+                    $subQuery->select('matched_payment_id')
+                        ->from('processed_emails')
+                        ->where('is_matched', true)
+                        ->whereNotNull('matched_payment_id');
+                });
         }
 
         if ($request->has('business_id')) {
@@ -57,6 +91,7 @@ class PaymentController extends Controller
             $matchingService = new \App\Services\PaymentMatchingService(
                 new \App\Services\TransactionLogService()
             );
+            $matchLogger = new \App\Services\MatchAttemptLogger();
 
             // Get unmatched stored emails with matching amount
             $storedEmails = \App\Models\ProcessedEmail::unmatched()
@@ -74,15 +109,73 @@ class PaymentController extends Controller
                     'text' => $storedEmail->text_body ?? '',
                     'html' => $storedEmail->html_body ?? '',
                     'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : null,
+                    'email_account_id' => $storedEmail->email_account_id,
+                    'processed_email_id' => $storedEmail->id, // Pass ID for logging
                 ];
 
-                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                
+                // Handle new format: ['data' => [...], 'method' => '...']
+                $extractedInfo = null;
+                $extractionMethod = null;
+                if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                    $extractedInfo = $extractionResult['data'];
+                    $extractionMethod = $extractionResult['method'] ?? null;
+                } else {
+                    $extractedInfo = $extractionResult; // Old format fallback
+                    $extractionMethod = 'unknown';
+                }
 
-                if (!$extractedInfo || !$extractedInfo['amount']) {
+                if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
                     continue;
                 }
 
-                $match = $matchingService->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+                $emailDate = $storedEmail->email_date ? new \DateTime($storedEmail->email_date->toDateTimeString()) : null;
+                $match = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
+
+                // Log match attempt
+                try {
+                    $matchLogger->logAttempt([
+                        'payment_id' => $payment->id,
+                        'processed_email_id' => $storedEmail->id,
+                        'transaction_id' => $payment->transaction_id,
+                        'match_result' => $match['matched'] ? \App\Models\MatchAttempt::RESULT_MATCHED : \App\Models\MatchAttempt::RESULT_UNMATCHED,
+                        'reason' => $match['reason'] ?? 'Unknown reason',
+                        'payment_amount' => $payment->amount,
+                        'payment_name' => $payment->payer_name,
+                        'payment_account_number' => $payment->account_number,
+                        'payment_created_at' => $payment->created_at,
+                        'extracted_amount' => $extractedInfo['amount'] ?? null,
+                        'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                        'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                        'email_subject' => $storedEmail->subject,
+                        'email_from' => $storedEmail->from_email,
+                        'email_date' => $emailDate,
+                        'amount_diff' => $match['amount_diff'] ?? null,
+                        'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                        'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                        'extraction_method' => $extractionMethod,
+                        'details' => [
+                            'match_details' => $match,
+                            'extracted_info' => $extractedInfo,
+                            'payment_data' => [
+                                'transaction_id' => $payment->transaction_id,
+                                'amount' => $payment->amount,
+                                'payer_name' => $payment->payer_name,
+                                'account_number' => $payment->account_number,
+                                'created_at' => $payment->created_at->toISOString(),
+                            ],
+                        ],
+                        'html_snippet' => $matchLogger->extractHtmlSnippet($storedEmail->html_body ?? '', $extractedInfo['amount'] ?? null),
+                        'text_snippet' => $matchLogger->extractTextSnippet($storedEmail->text_body ?? '', $extractedInfo['amount'] ?? null),
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to log match attempt in checkMatch', [
+                        'error' => $e->getMessage(),
+                        'payment_id' => $payment->id,
+                        'email_id' => $storedEmail->id,
+                    ]);
+                }
 
                 $matches[] = [
                     'email_id' => $storedEmail->id,

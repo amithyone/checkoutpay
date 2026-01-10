@@ -41,20 +41,49 @@ class DashboardController extends Controller
                 'total' => ProcessedEmail::count(),
                 'matched' => ProcessedEmail::where('is_matched', true)->count(),
                 'unmatched' => ProcessedEmail::where('is_matched', false)->count(),
-                'webhook' => ProcessedEmail::where('source', 'webhook')->count(),
                 'imap' => ProcessedEmail::where('source', 'imap')->count(),
                 'gmail_api' => ProcessedEmail::where('source', 'gmail_api')->count(),
+                'direct_filesystem' => ProcessedEmail::where('source', 'direct_filesystem')->count(),
             ],
-            'zapier_status' => [
-                'total_today' => ProcessedEmail::where('source', 'webhook')
-                    ->whereDate('created_at', today())
+            'unmatched_pending' => [
+                // Get pending payments that haven't been matched and are not expired
+                // A payment is considered unmatched if status is pending and no processed_email has matched_payment_id = payment.id
+                'total' => Payment::where('status', Payment::STATUS_PENDING)
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->whereNotIn('id', function ($query) {
+                        $query->select('matched_payment_id')
+                            ->from('processed_emails')
+                            ->where('is_matched', true)
+                            ->whereNotNull('matched_payment_id');
+                    })
                     ->count(),
-                'last_24h' => ProcessedEmail::where('source', 'webhook')
-                    ->where('created_at', '>=', now()->subDay())
+                'expiring_soon' => Payment::where('status', Payment::STATUS_PENDING)
+                    ->whereNotNull('expires_at')
+                    ->where('expires_at', '>', now())
+                    ->where('expires_at', '<=', now()->addHours(2)) // Expiring in next 2 hours
+                    ->whereNotIn('id', function ($query) {
+                        $query->select('matched_payment_id')
+                            ->from('processed_emails')
+                            ->where('is_matched', true)
+                            ->whereNotNull('matched_payment_id');
+                    })
                     ->count(),
-                'last_email' => ProcessedEmail::where('source', 'webhook')
+                'recent' => Payment::where('status', Payment::STATUS_PENDING)
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->whereNotIn('id', function ($query) {
+                        $query->select('matched_payment_id')
+                            ->from('processed_emails')
+                            ->where('is_matched', true)
+                            ->whereNotNull('matched_payment_id');
+                    })
+                    ->with('business')
                     ->latest()
-                    ->first(),
+                    ->limit(10)
+                    ->get(),
             ],
         ];
 

@@ -10,10 +10,17 @@
         <form method="GET" class="flex items-center space-x-4 flex-wrap">
             <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All Status</option>
-                <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
+                <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending (Not Expired)</option>
                 <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
                 <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
             </select>
+            @if(request('status') === 'pending' || !request('status'))
+            <label class="flex items-center space-x-2 text-sm">
+                <input type="checkbox" name="unmatched" value="1" {{ request('unmatched') === '1' ? 'checked' : '' }} 
+                    class="rounded border-gray-300 text-primary focus:ring-primary">
+                <span>Show only unmatched</span>
+            </label>
+            @endif
             <select name="business_id" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All Businesses</option>
                 @foreach(\App\Models\Business::all() as $business)
@@ -41,7 +48,8 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Number</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payer Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                     </tr>
                 </thead>
@@ -57,28 +65,57 @@
                             @if($payment->status === 'approved')
                                 <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
                             @elseif($payment->status === 'pending')
-                                <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
+                                <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                    Pending
+                                    @if($payment->expires_at)
+                                        @if($payment->expires_at->isPast())
+                                            <span class="ml-1 text-red-600">(Expired)</span>
+                                        @elseif($payment->expires_at->diffInHours(now()) < 2)
+                                            <span class="ml-1 text-orange-600">(Expiring Soon)</span>
+                                        @endif
+                                    @endif
+                                </span>
                             @else
                                 <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
                             @endif
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $payment->created_at->format('M d, Y H:i') }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            @if($payment->expires_at)
+                                <div class="{{ $payment->expires_at->isPast() ? 'text-red-600' : ($payment->expires_at->diffInHours(now()) < 2 ? 'text-orange-600' : 'text-gray-600') }}">
+                                    {{ $payment->expires_at->format('M d, Y H:i') }}
+                                </div>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    {{ $payment->expires_at->isPast() ? 'Expired' : 'Expires ' . $payment->expires_at->diffForHumans() }}
+                                </div>
+                            @else
+                                <span class="text-gray-400">No expiration</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-2">
-                                <a href="{{ route('admin.payments.show', $payment) }}" class="text-primary hover:underline text-sm">View</a>
-                                @if($payment->status === 'pending')
+                                <a href="{{ route('admin.payments.show', $payment) }}" class="text-primary hover:underline text-sm" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                @if($payment->status === 'pending' && (!$payment->expires_at || $payment->expires_at->isFuture()))
                                     <button onclick="checkMatchForPayment({{ $payment->id }})" 
-                                        class="text-sm text-green-600 hover:underline check-match-payment-btn"
-                                        data-payment-id="{{ $payment->id }}">
-                                        <i class="fas fa-search mr-1"></i> Check Match
+                                        class="text-sm text-green-600 hover:text-green-800 check-match-payment-btn"
+                                        data-payment-id="{{ $payment->id }}"
+                                        title="Check Match">
+                                        <i class="fas fa-search-dollar"></i>
                                     </button>
+                                    <a href="{{ route('admin.match-attempts.index', ['transaction_id' => $payment->transaction_id]) }}" 
+                                       class="text-sm text-blue-600 hover:text-blue-800"
+                                       title="View Match Attempts">
+                                        <i class="fas fa-list"></i>
+                                    </a>
                                 @endif
                             </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
+                        <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
                     </tr>
                     @endforelse
                 </tbody>

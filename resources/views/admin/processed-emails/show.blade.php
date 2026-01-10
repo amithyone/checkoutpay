@@ -5,11 +5,17 @@
 
 @section('content')
 <div class="space-y-6">
-    <!-- Back Button -->
-    <div>
+    <!-- Back Button and Actions -->
+    <div class="flex items-center justify-between">
         <a href="{{ route('admin.processed-emails.index') }}" class="text-primary hover:underline">
             <i class="fas fa-arrow-left mr-2"></i> Back to Inbox
         </a>
+        @if(!$processedEmail->is_matched)
+            <button onclick="retryEmailMatch({{ $processedEmail->id }})" 
+                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                <i class="fas fa-redo mr-2"></i> Retry Match
+            </button>
+        @endif
     </div>
 
     <!-- Email Details Card -->
@@ -173,5 +179,68 @@
             @endif
         </div>
     </div>
+
+    <!-- Match Attempts -->
+    @if($processedEmail->last_match_reason || $processedEmail->match_attempts_count > 0)
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-search-dollar text-primary mr-2"></i>Match Attempts
+        </h3>
+        @if($processedEmail->last_match_reason)
+        <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p class="text-sm font-medium text-yellow-900 mb-1">Last Match Reason:</p>
+            <p class="text-sm text-yellow-800">{{ $processedEmail->last_match_reason }}</p>
+        </div>
+        @endif
+        @if($processedEmail->match_attempts_count > 0)
+        <div class="text-sm text-gray-600">
+            <i class="fas fa-info-circle mr-1"></i> This email has been attempted {{ $processedEmail->match_attempts_count }} time(s)
+        </div>
+        @endif
+        <div class="mt-4">
+            <a href="{{ route('admin.match-attempts.index', ['processed_email_id' => $processedEmail->id]) }}" 
+               class="text-sm text-primary hover:underline">
+                <i class="fas fa-list mr-1"></i> View All Match Attempts for This Email
+            </a>
+        </div>
+    </div>
+    @endif
 </div>
+
+<script>
+function retryEmailMatch(emailId) {
+    if (!confirm('Are you sure you want to retry matching this email against all pending payments?')) {
+        return;
+    }
+
+    fetch(`/admin/processed-emails/${emailId}/retry-match`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            if (data.payment) {
+                window.location.href = '/admin/payments/' + data.payment.id;
+            } else {
+                window.location.reload();
+            }
+        } else {
+            alert('❌ ' + data.message);
+            if (data.latest_reason) {
+                console.log('Latest reason:', data.latest_reason);
+                alert('Latest reason: ' + data.latest_reason);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error retrying match: ' + error.message);
+    });
+}
+</script>
 @endsection

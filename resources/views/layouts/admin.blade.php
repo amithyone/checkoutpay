@@ -84,9 +84,9 @@
                     <span>Bank Templates</span>
                 </a>
 
-                <a href="{{ route('admin.zapier-logs.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.zapier-logs.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-bolt w-5 mr-3"></i>
-                    <span>Zapier Logs</span>
+                <a href="{{ route('admin.match-attempts.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.match-attempts.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-search-dollar w-5 mr-3"></i>
+                    <span>Match Logs</span>
                 </a>
 
                 <a href="{{ route('admin.whitelisted-emails.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.whitelisted-emails.*') ? 'bg-primary/10 text-primary' : '' }}">
