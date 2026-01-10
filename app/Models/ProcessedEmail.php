@@ -28,6 +28,9 @@ class ProcessedEmail extends Model
         'matched_at',
         'is_matched',
         'processing_notes',
+        'last_match_reason',
+        'match_attempts_count',
+        'extraction_method',
     ];
 
     protected $casts = [

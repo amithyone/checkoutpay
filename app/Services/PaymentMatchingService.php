@@ -3,20 +3,62 @@
 namespace App\Services;
 
 use App\Models\Payment;
+use App\Models\ProcessedEmail;
+use App\Models\MatchAttempt;
 use App\Services\TransactionLogService;
+use App\Services\MatchAttemptLogger;
 use Illuminate\Support\Collection;
 
 class PaymentMatchingService
 {
+    protected MatchAttemptLogger $matchLogger;
+
+    public function __construct(?TransactionLogService $transactionLogService = null)
+    {
+        $this->matchLogger = new MatchAttemptLogger();
+    }
+
     /**
      * Match email data against pending payments
      */
     public function matchEmail(array $emailData): ?Payment
     {
-        $extractedInfo = $this->extractPaymentInfo($emailData);
+        $processedEmailId = $emailData['processed_email_id'] ?? null;
+        $startTime = microtime(true);
+
+        // Extract payment info with hybrid method (HTML primary, rendered fallback)
+        $extractionResult = $this->extractPaymentInfo($emailData);
+        $extractedInfo = $extractionResult['data'] ?? null;
+        $extractionMethod = $extractionResult['method'] ?? 'unknown';
 
         if (!$extractedInfo) {
-            \Illuminate\Support\Facades\Log::info('Could not extract payment info from email');
+            // Log failed extraction attempt
+            if ($processedEmailId) {
+                $processedEmail = ProcessedEmail::find($processedEmailId);
+                if ($processedEmail) {
+                    $this->matchLogger->logAttempt([
+                        'processed_email_id' => $processedEmailId,
+                        'match_result' => MatchAttempt::RESULT_UNMATCHED,
+                        'reason' => 'Could not extract payment info from email',
+                        'extraction_method' => $extractionMethod,
+                        'email_subject' => $emailData['subject'] ?? null,
+                        'email_from' => $emailData['from'] ?? null,
+                        'email_date' => $emailData['date'] ?? null,
+                        'html_snippet' => $this->matchLogger->extractHtmlSnippet($emailData['html'] ?? ''),
+                        'text_snippet' => $this->matchLogger->extractTextSnippet($emailData['text'] ?? ''),
+                        'details' => [
+                            'extraction_failed' => true,
+                            'has_html' => !empty($emailData['html']),
+                            'has_text' => !empty($emailData['text']),
+                        ],
+                    ]);
+                }
+            }
+
+            \Illuminate\Support\Facades\Log::info('Could not extract payment info from email', [
+                'extraction_method' => $extractionMethod,
+                'processed_email_id' => $processedEmailId,
+            ]);
             return null;
         }
 
