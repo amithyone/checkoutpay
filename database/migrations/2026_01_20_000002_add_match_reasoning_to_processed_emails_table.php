@@ -37,8 +37,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('processed_emails', function (Blueprint $table) {
-            $table->dropIndex(['is_matched', 'match_attempts_count', 'email_date']);
-            $table->dropIndex(['extraction_method', 'is_matched']);
+            // Drop indexes using custom names
+            $table->dropIndex('pe_matched_count_date_idx');
+            $table->dropIndex('pe_ext_method_matched_idx');
             
             if (Schema::hasColumn('processed_emails', 'last_match_reason')) {
                 $table->dropColumn('last_match_reason');
