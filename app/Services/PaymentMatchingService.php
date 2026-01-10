@@ -929,21 +929,17 @@ class PaymentMatchingService
             $senderName = trim(strtolower($matches[1]));
         }
         // Pattern 2: GTBank description with "CODE-NAME TRF FOR" format
-        // Format: "090405260110014006799532206126-AMITHY ONE M TRF FOR CUSTOMER..."
-        // Also handles quoted-printable encoding (=20 is space)
-        elseif (preg_match('/description[\s:]+(?:=\d+)?\s*(?:[\d\-\s]+-)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $fullText, $matches)) {
-            $potentialName = trim($matches[1]);
-            // Remove leading numbers, dashes, spaces, and quoted-printable codes
-            $potentialName = preg_replace('/^(?:=\d+|\d+[\-\s])+/i', '', $potentialName);
-            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+        // Format: "Description: =20 090405260110014006799532206126-AMITHY ONE M TRF FOR..."
+        // Note: Text is already decoded from quoted-printable by decodeQuotedPrintable()
+        elseif (preg_match('/description[\s:]+.*?([\d\-]+\s*-\s*)([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[2] ?? '');
             if (strlen($potentialName) >= 3) {
                 $senderName = trim(strtolower($potentialName));
             }
         }
-        // Pattern 2b: Direct format "CODE-NAME TRF FOR" (handles quoted-printable)
-        elseif (preg_match('/(?:[\d\-]+=?\d*\s*-)\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $fullText, $matches)) {
+        // Pattern 2b: Direct format in text "CODE-NAME TRF FOR" (after decode)
+        elseif (preg_match('/[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $fullText, $matches)) {
             $potentialName = trim($matches[1]);
-            $potentialName = preg_replace('/^(?:=\d+|\d+[\-\s])+/i', '', $potentialName);
             if (strlen($potentialName) >= 3) {
                 $senderName = trim(strtolower($potentialName));
             }
@@ -1040,12 +1036,10 @@ class PaymentMatchingService
             $senderName = trim(strtolower($matches[1]));
         }
         // Pattern 2: GTBank HTML table - Description field contains "CODE-NAME TRF FOR" (new format)
-        // Note: HTML is already decoded from quoted-printable
-        // Example: <td>Description:</td><td>090405260110014006799532206126-AMITHY ONE M TRF FOR...</td>
-        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?([\d\-]+\s*-\s*)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
-            $potentialName = trim($matches[2] ?? $matches[1] ?? '');
-            // Remove any leading codes/numbers/dashes that might be captured
-            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+        // Format: <td>Description</td><td>090405260110014006799532206126-AMITHY ONE M TRF FOR...</td>
+        // Note: HTML is already decoded from quoted-printable by decodeQuotedPrintable()
+        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?([\d\-]+\s*-\s*)([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+            $potentialName = trim($matches[2] ?? '');
             if (strlen($potentialName) >= 3) {
                 $senderName = trim(strtolower($potentialName));
             }
