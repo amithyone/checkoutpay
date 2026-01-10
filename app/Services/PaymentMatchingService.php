@@ -12,10 +12,28 @@ use Illuminate\Support\Collection;
 class PaymentMatchingService
 {
     protected MatchAttemptLogger $matchLogger;
+    protected ?PythonExtractionService $pythonExtractor = null;
 
     public function __construct(?TransactionLogService $transactionLogService = null)
     {
         $this->matchLogger = new MatchAttemptLogger();
+        
+        // Initialize Python extraction service if enabled
+        if (config('services.python_extractor.enabled', true)) {
+            try {
+                $this->pythonExtractor = new PythonExtractionService();
+                // Check if service is available (cache result for 1 minute)
+                if (!$this->pythonExtractor->isAvailable()) {
+                    \Illuminate\Support\Facades\Log::warning('Python extraction service is not available, falling back to PHP extraction');
+                    $this->pythonExtractor = null;
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to initialize Python extraction service', [
+                    'error' => $e->getMessage(),
+                ]);
+                $this->pythonExtractor = null;
+            }
+        }
     }
 
     /**
@@ -235,9 +253,40 @@ class PaymentMatchingService
 
     /**
      * Extract payment information from email
-     * Strategy: Try text_body first, then html_body if text_body fails
+     * Strategy: Try Python extraction service first (if available), then fallback to PHP extraction
      */
     public function extractPaymentInfo(array $emailData): ?array
+    {
+        // PRIORITY 1: Try Python extraction service (if enabled and available)
+        if ($this->pythonExtractor !== null) {
+            try {
+                $result = $this->pythonExtractor->extractPaymentInfo($emailData);
+                if ($result) {
+                    \Illuminate\Support\Facades\Log::info('Payment info extracted using Python service', [
+                        'method' => $result['method'] ?? 'python_extractor',
+                        'confidence' => $result['confidence'] ?? null,
+                        'email_id' => $emailData['processed_email_id'] ?? null,
+                    ]);
+                    return $result;
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Python extraction failed, falling back to PHP', [
+                    'error' => $e->getMessage(),
+                    'email_id' => $emailData['processed_email_id'] ?? null,
+                ]);
+                // Fall through to PHP extraction
+            }
+        }
+        
+        // PRIORITY 2: Fallback to PHP extraction (existing logic)
+        return $this->extractPaymentInfoPhp($emailData);
+    }
+
+    /**
+     * Extract payment information using PHP (fallback when Python is unavailable).
+     * Strategy: Try text_body first, then html_body if text_body fails
+     */
+    protected function extractPaymentInfoPhp(array $emailData): ?array
     {
         $subject = strtolower($emailData['subject'] ?? '');
         $text = $emailData['text'] ?? '';
