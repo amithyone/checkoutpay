@@ -756,9 +756,13 @@ class PaymentMatchingService
             'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : null,
         ];
         
-        $extractedInfo = $this->extractPaymentInfo($emailData);
+        $extractionResult = $this->extractPaymentInfo($emailData);
         
-        if (!$extractedInfo || !$extractedInfo['amount']) {
+        // Handle extraction result format: ['data' => [...], 'method' => '...']
+        $extractedInfo = $extractionResult['data'] ?? null;
+        $extractionMethod = $extractionResult['method'] ?? 'unknown';
+        
+        if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
             return [
                 'success' => false,
                 'message' => 'Could not extract payment information from email',
