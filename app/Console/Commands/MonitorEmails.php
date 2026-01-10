@@ -336,8 +336,16 @@ class MonitorEmails extends Command
                         'html' => $message->getHTMLBody(),
                         'date' => $emailDate->toDateTimeString(),
                         'email_account_id' => $emailAccount?->id,
+                        'processed_email_id' => $storedEmail->id, // Pass ID for logging
                     ];
-                    $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                    $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                    // Handle new format: ['data' => [...], 'method' => '...']
+                    $extractedInfo = null;
+                    if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                        $extractedInfo = $extractionResult['data'];
+                    } else {
+                        $extractedInfo = $extractionResult; // Old format fallback
+                    }
                     
                     // Check if this is a GTBank transaction notification
                     $gtbankParser = new \App\Services\GtbankTransactionParser();
@@ -647,6 +655,14 @@ class MonitorEmails extends Command
                 }
             }
             
+            // Find stored email if exists (by message ID from Gmail)
+            $processedEmail = null;
+            if (isset($emailData['message_id'])) {
+                $processedEmail = ProcessedEmail::where('message_id', $emailData['message_id'])
+                    ->where('email_account_id', $emailAccount->id)
+                    ->first();
+            }
+            
             $processedData = [
                 'subject' => $emailData['subject'] ?? '',
                 'from' => $from,
@@ -654,6 +670,7 @@ class MonitorEmails extends Command
                 'html' => $emailData['html'] ?? '',
                 'date' => $emailData['date'] ?? now()->toDateTimeString(),
                 'email_account_id' => $emailAccount->id,
+                'processed_email_id' => $processedEmail?->id, // Pass ID for logging if email was stored
             ];
 
             $this->info("Processing email: {$processedData['subject']}");
@@ -683,6 +700,17 @@ class MonitorEmails extends Command
             $dateValue = $message->getDate();
             $emailDate = $this->parseEmailDate($dateValue);
             
+            // Get message ID to find stored email
+            $messageId = (string)($message->getUid() ?? $message->getMessageId() ?? '');
+            
+            // Find stored email if exists
+            $processedEmail = null;
+            if ($messageId && $emailAccount) {
+                $processedEmail = ProcessedEmail::where('message_id', $messageId)
+                    ->where('email_account_id', $emailAccount->id)
+                    ->first();
+            }
+            
             $emailData = [
                 'subject' => $message->getSubject(),
                 'from' => $message->getFrom()[0]->mail ?? '',
@@ -690,6 +718,7 @@ class MonitorEmails extends Command
                 'html' => $message->getHTMLBody(),
                 'date' => $emailDate->toDateTimeString(),
                 'email_account_id' => $emailAccount?->id,
+                'processed_email_id' => $processedEmail?->id, // Pass ID for logging if email was stored
             ];
 
             $this->info("Processing email: {$emailData['subject']}");
@@ -697,7 +726,7 @@ class MonitorEmails extends Command
             // Dispatch job to process email
             ProcessEmailPayment::dispatch($emailData);
 
-            $this->info("Dispatched job for email: {$emailData['subject']}");
+            $this->info("Dispatched job for email: {$emailData['subject']}" . ($processedEmail ? " (ID: {$processedEmail->id})" : ""));
         } catch (\Exception $e) {
             Log::error('Error processing email message', [
                 'error' => $e->getMessage(),
@@ -760,8 +789,18 @@ class MonitorEmails extends Command
             
             // Try to extract payment info, but store email even if extraction fails
             $extractedInfo = null;
+            $extractionMethod = null;
             try {
-                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                // Handle new format: ['data' => [...], 'method' => '...']
+                if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                    $extractedInfo = $extractionResult['data'];
+                    $extractionMethod = $extractionResult['method'] ?? null;
+                } else {
+                    // Old format fallback
+                    $extractedInfo = $extractionResult;
+                    $extractionMethod = 'unknown';
+                }
             } catch (\Exception $e) {
                 Log::debug('Payment info extraction failed, storing email anyway', [
                     'error' => $e->getMessage(),
@@ -771,7 +810,7 @@ class MonitorEmails extends Command
             
             // Store email even if extraction failed or returned null
             try {
-                return ProcessedEmail::create([
+                $processedEmail = ProcessedEmail::create([
                     'email_account_id' => $emailAccount?->id,
                     'source' => 'imap', // Mark as IMAP source
                     'message_id' => $messageId,
@@ -785,7 +824,16 @@ class MonitorEmails extends Command
                     'sender_name' => $extractedInfo['sender_name'] ?? null,
                     'account_number' => $extractedInfo['account_number'] ?? null,
                     'extracted_data' => $extractedInfo,
+                    'extraction_method' => $extractionMethod,
                 ]);
+                
+                // Dispatch ProcessEmailPayment if extracted info has amount
+                if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+                    $emailData['processed_email_id'] = $processedEmail->id;
+                    ProcessEmailPayment::dispatch($emailData);
+                }
+                
+                return $processedEmail;
             } catch (\Exception $e) {
                 Log::error('Failed to store email in database', [
                     'error' => $e->getMessage(),
