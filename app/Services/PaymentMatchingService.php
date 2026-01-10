@@ -853,41 +853,49 @@ class PaymentMatchingService
         $accountNumber = null;
         
         // STRATEGY 1: Try TEXT-based extraction first (for forwarded emails in plain text)
-        // GTBank format: "Amount : NGN 1000", "Account Number : 3002156642", etc.
+        // GTBank format from processed_emails text_body column:
+        // "Account Number : 3002156642"
+        // "Amount : NGN 1000"
+        // "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
         if (!empty(trim($text))) {
-            // Extract Amount from text: "Amount : NGN 1000" or "Amount: NGN 1000"
-            if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
+            // Normalize whitespace (handle newlines and multiple spaces)
+            $normalizedText = preg_replace('/\s+/', ' ', $text);
+            
+            // Extract Amount from text: "Amount : NGN 1000" format
+            // Pattern handles: "Amount : NGN 1000", "Amount: NGN 1000", "Amount :NGN 1000"
+            if (preg_match('/amount[\s]*:[\s]*(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $normalizedText, $matches)) {
                 $amount = (float) str_replace(',', '', $matches[1]);
             }
-            // Also try: "Amount : NGN 1000" with colon
-            elseif (preg_match('/amount[\s]*:[\s]*(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
+            // Fallback: Just look for "NGN" followed by number after "Amount"
+            elseif (preg_match('/amount[\s:]+.*?(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $normalizedText, $matches)) {
                 $amount = (float) str_replace(',', '', $matches[1]);
             }
             
-            // Extract Account Number from text: "Account Number : 3002156642"
-            if (preg_match('/account\s*number[\s:]+(\d+)/i', $text, $matches)) {
+            // Extract Account Number from text: "Account Number : 3002156642" format
+            if (preg_match('/account\s*number[\s]*:[\s]*(\d+)/i', $normalizedText, $matches)) {
                 $accountNumber = trim($matches[1]);
             }
             
-            // Extract Sender Name from Description: "Description : ...CODE-NAME TRF FOR..." or "Description : ...AMITHY ONE M TRF FOR..."
-            // Pattern: Description field contains "CODE-NAME TRF FOR" format
-            if (preg_match('/description[\s:]+.*?([\d\-]+\s*-\s*)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $text, $matches)) {
-                $potentialName = trim($matches[2] ?? $matches[1] ?? '');
-                // Remove any leading codes/numbers/dashes
+            // Extract Sender Name from Description field
+            // Format: "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
+            // We want to extract "AMITHY ONE M" from this
+            if (preg_match('/description[\s]*:[\s]*.*?[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
+                $potentialName = trim($matches[1]);
+                // Remove any leading codes/numbers/dashes that might be captured
                 $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
                 if (strlen($potentialName) >= 3) {
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern: Direct "CODE-NAME TRF FOR" in text
-            elseif (preg_match('/[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $text, $matches)) {
+            // Pattern: Direct "CODE-NAME TRF FOR" in text (without "Description :" prefix)
+            elseif (preg_match('/[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
                 $potentialName = trim($matches[1]);
                 if (strlen($potentialName) >= 3) {
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern: "FROM NAME TO" format
-            elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $text, $matches)) {
+            // Pattern: "FROM NAME TO" format (fallback)
+            elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $normalizedText, $matches)) {
                 $senderName = trim(strtolower($matches[1]));
             }
         }
