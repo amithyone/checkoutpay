@@ -1213,4 +1213,37 @@ class PaymentMatchingService
         
         return $text;
     }
+
+    /**
+     * Clean UTF-8 string for JSON encoding
+     * Removes or fixes malformed UTF-8 characters
+     * 
+     * @param string $string
+     * @return string
+     */
+    protected function cleanUtf8ForJson(string $string): string
+    {
+        if (empty($string)) {
+            return '';
+        }
+
+        // Remove invalid UTF-8 sequences using iconv
+        $cleaned = @iconv('UTF-8', 'UTF-8//IGNORE', $string);
+        
+        // If iconv failed, use mb_convert_encoding
+        if ($cleaned === false || !mb_check_encoding($cleaned, 'UTF-8')) {
+            $cleaned = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+        }
+        
+        // Remove control characters except newlines, carriage returns, and tabs
+        $cleaned = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/u', '', $cleaned);
+        
+        // Ensure valid UTF-8
+        if (!mb_check_encoding($cleaned, 'UTF-8')) {
+            // Last resort: encode as UTF-8 and ignore invalid
+            $cleaned = mb_convert_encoding($cleaned, 'UTF-8', 'UTF-8');
+        }
+
+        return $cleaned ?: '';
+    }
 }
