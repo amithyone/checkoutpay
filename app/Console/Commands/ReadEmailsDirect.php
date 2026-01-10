@@ -520,9 +520,12 @@ class ReadEmailsDirect extends Command
             $fromEmail = $matches[0];
         }
 
-        // Parse body (handle multipart)
+        // Parse body (handle multipart and quoted-printable encoding)
         $textBody = $body;
         $htmlBody = '';
+
+        // Check Content-Transfer-Encoding for quoted-printable
+        $transferEncoding = strtolower($parsedHeaders['content-transfer-encoding'] ?? '');
 
         // Try to parse Content-Type to determine if multipart
         $contentType = $parsedHeaders['content-type'] ?? '';
@@ -534,20 +537,47 @@ class ReadEmailsDirect extends Command
                 $parts = explode('--' . $boundary, $body);
                 
                 foreach ($parts as $part) {
+                    // Check for Content-Transfer-Encoding in this part
+                    $partTransferEncoding = '7bit';
+                    if (preg_match('/Content-Transfer-Encoding:\s*([^\r\n]+)/i', $part, $encMatch)) {
+                        $partTransferEncoding = strtolower(trim($encMatch[1]));
+                    }
+                    
                     if (strpos($part, 'text/plain') !== false) {
                         if (preg_match('/\r?\n\r?\n(.*)$/s', $part, $textMatch)) {
                             $textBody = trim($textMatch[1]);
+                            // Decode quoted-printable if needed
+                            if (strpos($partTransferEncoding, 'quoted-printable') !== false) {
+                                $textBody = $this->decodeQuotedPrintable($textBody);
+                            }
                         }
                     } elseif (strpos($part, 'text/html') !== false) {
                         if (preg_match('/\r?\n\r?\n(.*)$/s', $part, $htmlMatch)) {
                             $htmlBody = trim($htmlMatch[1]);
+                            // Decode quoted-printable if needed
+                            if (strpos($partTransferEncoding, 'quoted-printable') !== false) {
+                                $htmlBody = $this->decodeQuotedPrintable($htmlBody);
+                            }
+                            // Also decode HTML entities
+                            $htmlBody = html_entity_decode($htmlBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                         }
                     }
                 }
             }
         } elseif (strpos($contentType, 'text/html') !== false) {
             $htmlBody = $body;
-            $textBody = strip_tags($body);
+            // Decode quoted-printable if needed
+            if (strpos($transferEncoding, 'quoted-printable') !== false) {
+                $htmlBody = $this->decodeQuotedPrintable($htmlBody);
+            }
+            // Decode HTML entities
+            $htmlBody = html_entity_decode($htmlBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $textBody = strip_tags($htmlBody);
+        } elseif (strpos($contentType, 'text/plain') !== false) {
+            // Decode quoted-printable if needed
+            if (strpos($transferEncoding, 'quoted-printable') !== false) {
+                $textBody = $this->decodeQuotedPrintable($textBody);
+            }
         }
 
         // Parse date
@@ -575,5 +605,32 @@ class ReadEmailsDirect extends Command
     {
         // Handle =?charset?encoding?encoded-text?= format
         return mb_decode_mimeheader($header) ?: $header;
+    }
+
+    /**
+     * Decode quoted-printable encoding (e.g., =20 becomes space, =3D becomes =)
+     */
+    protected function decodeQuotedPrintable(string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+        
+        // Decode quoted-printable format: =XX where XX is hex
+        // =20 is space, =0D=0A is CRLF, =3D is =, etc.
+        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function ($matches) {
+            $hex = hexdec($matches[1]);
+            // Convert hex to character (0-255)
+            return chr($hex);
+        }, $text);
+        
+        // Handle soft line breaks (trailing = at end of line)
+        // This removes = followed by CRLF or LF
+        $text = preg_replace('/=\r?\n/', '', $text);
+        
+        // Also handle standalone = at end of line (in case CRLF is missing)
+        $text = preg_replace('/=\s*\n/', "\n", $text);
+        
+        return $text;
     }
 }

@@ -989,6 +989,10 @@ class PaymentMatchingService
      */
     protected function extractFromHtmlBody(string $html, string $subject, string $from): ?array
     {
+        // Decode HTML entities FIRST (like &nbsp; becomes space, &amp; becomes &)
+        // This is critical because stored HTML may have entities like NGN&nbsp;1000
+        $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
         $htmlLower = strtolower($html);
         $fullText = $subject . ' ' . $htmlLower;
         
@@ -997,13 +1001,25 @@ class PaymentMatchingService
         $method = null;
         
         // PRIMARY: HTML table extraction (most accurate for Nigerian banks)
-        // Pattern 1: GTBank HTML table - Amount in separate cell after label (handles &nbsp;)
-        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // Pattern 1: GTBank HTML table - Amount in separate cell after label
+        // Format: <td>Amount</td><td>:</td><td>NGN 1000</td>
+        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             $amount = (float) str_replace(',', '', $matches[1]);
             $method = 'html_table';
         }
-        // Pattern 2: GTBank HTML table - Amount in same cell with label (handles &nbsp;)
-        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // Pattern 1b: Amount in next cell (multiple cells in row)
+        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>.*?<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+            $method = 'html_table';
+        }
+        // Pattern 2: GTBank HTML table - Amount in same cell with label
+        // Format: <td>Amount: NGN 1000</td>
+        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+            $method = 'html_table';
+        }
+        // Pattern 2b: More flexible - Amount with colon in same cell
+        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             $amount = (float) str_replace(',', '', $matches[1]);
             $method = 'html_table';
         }
