@@ -716,6 +716,12 @@ class PaymentMatchingService
                 
                 // Re-extract payment info (will use html_body)
                 $extractionResult = $this->extractPaymentInfo($emailData);
+                
+                // extractPaymentInfo can return null if extraction fails
+                if (!$extractionResult || !is_array($extractionResult)) {
+                    continue;
+                }
+                
                 $extractedInfo = $extractionResult['data'] ?? null;
                 
                 if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
@@ -760,6 +766,15 @@ class PaymentMatchingService
         $extractionResult = $this->extractPaymentInfo($emailData);
         
         // Handle extraction result format: ['data' => [...], 'method' => '...']
+        // extractPaymentInfo can return null if extraction fails
+        if (!$extractionResult || !is_array($extractionResult)) {
+            return [
+                'success' => false,
+                'message' => 'Could not extract payment information from email',
+                'matches' => [],
+            ];
+        }
+        
         $extractedInfo = $extractionResult['data'] ?? null;
         $extractionMethod = $extractionResult['method'] ?? 'unknown';
         
