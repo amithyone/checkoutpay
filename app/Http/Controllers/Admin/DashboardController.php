@@ -52,33 +52,33 @@ class DashboardController extends Controller
                     ->where(function ($q) {
                         $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                     })
-                    ->whereNotIn('id', function ($query) {
-                        $query->select('matched_payment_id')
+                    ->whereNotExists(function ($query) {
+                        $query->select(DB::raw(1))
                             ->from('processed_emails')
-                            ->where('is_matched', true)
-                            ->whereNotNull('matched_payment_id');
+                            ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                            ->where('processed_emails.is_matched', true);
                     })
                     ->count(),
                 'expiring_soon' => Payment::where('status', Payment::STATUS_PENDING)
                     ->whereNotNull('expires_at')
                     ->where('expires_at', '>', now())
                     ->where('expires_at', '<=', now()->addHours(2)) // Expiring in next 2 hours
-                    ->whereNotIn('id', function ($query) {
-                        $query->select('matched_payment_id')
+                    ->whereNotExists(function ($query) {
+                        $query->select(DB::raw(1))
                             ->from('processed_emails')
-                            ->where('is_matched', true)
-                            ->whereNotNull('matched_payment_id');
+                            ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                            ->where('processed_emails.is_matched', true);
                     })
                     ->count(),
                 'recent' => Payment::where('status', Payment::STATUS_PENDING)
                     ->where(function ($q) {
                         $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                     })
-                    ->whereNotIn('id', function ($query) {
-                        $query->select('matched_payment_id')
+                    ->whereNotExists(function ($query) {
+                        $query->select(DB::raw(1))
                             ->from('processed_emails')
-                            ->where('is_matched', true)
-                            ->whereNotNull('matched_payment_id');
+                            ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                            ->where('processed_emails.is_matched', true);
                     })
                     ->with('business')
                     ->latest()

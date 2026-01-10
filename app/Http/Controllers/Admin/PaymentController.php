@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PaymentController extends Controller
@@ -43,11 +44,11 @@ class PaymentController extends Controller
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 })
-                ->whereNotIn('id', function ($subQuery) {
-                    $subQuery->select('matched_payment_id')
+                ->whereNotExists(function ($subQuery) {
+                    $subQuery->select(DB::raw(1))
                         ->from('processed_emails')
-                        ->where('is_matched', true)
-                        ->whereNotNull('matched_payment_id');
+                        ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                        ->where('processed_emails.is_matched', true);
                 });
         }
 
