@@ -906,11 +906,15 @@ class PaymentMatchingService
         $amount = null;
         $senderName = null;
         
-        // Extract amount from text
+        // Extract amount from text (case insensitive, flexible patterns)
         $amountPatterns = [
-            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i',
-            '/(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i',
-            '/([\d,]+\.?\d*)\s*(?:naira|ngn|usd|dollar)/i',
+            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)/i',
+            '/(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)/i',
+            '/([\d,]+\.?\d*)[\s]*(?:naira|ngn|usd|dollar|NGN)/i',
+            // Pattern for format: "Amount\t:\tNGN 1000" (tab separated)
+            '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t]*([\d,]+\.?\d*)/i',
+            // Pattern for format: "Amount: NGN  1000" (multiple spaces)
+            '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
         ];
         
         foreach ($amountPatterns as $pattern) {
@@ -1095,18 +1099,28 @@ class PaymentMatchingService
     }
 
     /**
-     * Decode quoted-printable encoding (e.g., =20 becomes space)
+     * Decode quoted-printable encoding (e.g., =20 becomes space, =3D becomes =)
      */
     protected function decodeQuotedPrintable(string $text): string
     {
+        if (empty($text)) {
+            return '';
+        }
+        
         // Decode quoted-printable format: =XX where XX is hex
-        // =20 is space, =0D=0A is CRLF, = is literal =
+        // =20 is space, =0D=0A is CRLF, =3D is =, etc.
         $text = preg_replace_callback('/=([0-9A-F]{2})/i', function ($matches) {
-            return chr(hexdec($matches[1]));
+            $hex = hexdec($matches[1]);
+            // Convert hex to character (0-255)
+            return chr($hex);
         }, $text);
         
         // Handle soft line breaks (trailing = at end of line)
+        // This removes = followed by CRLF or LF
         $text = preg_replace('/=\r?\n/', '', $text);
+        
+        // Also handle standalone = at end of line (in case CRLF is missing)
+        $text = preg_replace('/=\s*\n/', "\n", $text);
         
         return $text;
     }
