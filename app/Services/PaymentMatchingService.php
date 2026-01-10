@@ -381,7 +381,7 @@ class PaymentMatchingService
             $extractionErrors[] = "HTML body is empty or whitespace only";
         }
         
-        // Store extraction diagnostic info for logging
+        // Store extraction diagnostic info for logging (note: text/html are already decoded here)
         $this->lastExtractionDiagnostics = [
             'steps' => $extractionSteps,
             'errors' => $extractionErrors,
@@ -389,8 +389,14 @@ class PaymentMatchingService
             'html_length' => $htmlLength,
             'subject' => $emailData['subject'] ?? '',
             'from' => $emailData['from'] ?? '',
-            'text_preview' => mb_substr($textTrimmed, 0, 500),
-            'html_preview' => mb_substr($htmlTrimmed, 0, 500),
+            'text_preview' => mb_substr($textTrimmed, 0, 1000), // Show more for debugging
+            'html_preview' => mb_substr($htmlTrimmed, 0, 1000), // Show more for debugging
+            // Check if HTML contains table tags (for diagnostics)
+            'html_has_table_tags' => strpos($htmlTrimmed, '<td') !== false || strpos($htmlTrimmed, '<table') !== false,
+            // Check if HTML contains amount keywords
+            'html_has_amount_keywords' => preg_match('/(?:amount|ngn|naira)/i', $htmlTrimmed),
+            // Check if text contains amount keywords
+            'text_has_amount_keywords' => preg_match('/(?:amount|ngn|naira)/i', $textTrimmed),
         ];
         
         // If both text_body and html_body extraction failed, return null
