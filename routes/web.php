@@ -134,3 +134,42 @@ Route::get('/cron/read-emails-direct', function () {
         ], 500);
     }
 })->name('cron.read-emails-direct');
+
+// Global Match Cron (matches all unmatched pending payments with unmatched emails)
+Route::get('/cron/global-match', function () {
+    try {
+        $startTime = microtime(true);
+        
+        // Use the MatchController logic directly
+        $matchController = new \App\Http\Controllers\Admin\MatchController();
+        
+        // Create a fake request object for the controller method
+        $request = new \Illuminate\Http\Request();
+        
+        // Call the triggerGlobalMatch method
+        $response = $matchController->triggerGlobalMatch($request);
+        $responseData = json_decode($response->getContent(), true);
+        
+        $executionTime = round(microtime(true) - $startTime, 2);
+        
+        // Add execution time to response
+        if (isset($responseData['results'])) {
+            $responseData['results']['execution_time_seconds'] = $executionTime;
+        } else {
+            $responseData['execution_time_seconds'] = $executionTime;
+        }
+        
+        return response()->json($responseData, $response->getStatusCode());
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Cron job error (Global Match)', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage(),
+            'timestamp' => now()->toDateTimeString(),
+        ], 500);
+    }
+})->name('cron.global-match');

@@ -231,7 +231,7 @@
             <i class="fas fa-clock mr-2"></i> Cron Job URLs
         </h3>
         <p class="text-sm text-blue-800 mb-4">
-            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically fetch emails:
+            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically process emails and match payments:
         </p>
         
         <div class="space-y-4">
@@ -250,6 +250,29 @@
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Best for shared hosting.</strong> Reads emails directly from server mail directories (bypasses IMAP).
                 </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Frequency:</strong> Every 5-15 minutes
+                </p>
+            </div>
+
+            <!-- Global Match -->
+            <div class="bg-white rounded-lg p-4 border border-purple-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded">MATCHING</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Global Match</span>
+                    </div>
+                    <button onclick="copyCronUrl('global-match')" class="text-purple-600 hover:text-purple-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/global-match') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Matches unmatched payments with unmatched emails.</strong> Runs the global matching process using the new matching logic with full logging.
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Frequency:</strong> Every 10-30 minutes (can be less frequent than email reading)
+                </p>
             </div>
 
             <!-- IMAP Email Fetching -->
@@ -266,14 +289,21 @@
                 <p class="text-xs text-gray-600 mt-2">
                     Requires IMAP to be enabled. Will fail if IMAP fetching is disabled in settings.
                 </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Frequency:</strong> Every 5-15 minutes
+                </p>
             </div>
         </div>
 
         <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-            <p class="text-xs text-yellow-800">
-                <strong>Recommended frequency:</strong> Every 5-15 minutes (more frequent = faster email detection)
+            <p class="text-xs text-yellow-800 font-semibold mb-2">
+                <i class="fas fa-info-circle mr-1"></i> Recommended Setup:
             </p>
-            <p class="text-xs text-yellow-700 mt-1">
+            <ul class="text-xs text-yellow-700 space-y-1 list-disc list-inside">
+                <li><strong>Email Reading:</strong> Every 5-15 minutes (Direct Filesystem or IMAP)</li>
+                <li><strong>Global Matching:</strong> Every 10-30 minutes (matches unmatched items)</li>
+            </ul>
+            <p class="text-xs text-yellow-700 mt-2">
                 <strong>Note:</strong> If IMAP is disabled, only use the "Direct Filesystem Reading" URL above.
             </p>
         </div>
@@ -638,9 +668,17 @@ function checkTransactionUpdates() {
 }
 
 function copyCronUrl(type = 'direct') {
-    const url = type === 'direct' 
-        ? '{{ url('/cron/read-emails-direct') }}'
-        : '{{ url('/cron/monitor-emails') }}';
+    let url;
+    
+    if (type === 'direct') {
+        url = '{{ url('/cron/read-emails-direct') }}';
+    } else if (type === 'imap') {
+        url = '{{ url('/cron/monitor-emails') }}';
+    } else if (type === 'global-match') {
+        url = '{{ url('/cron/global-match') }}';
+    } else {
+        url = '{{ url('/cron/read-emails-direct') }}';
+    }
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(function() {
