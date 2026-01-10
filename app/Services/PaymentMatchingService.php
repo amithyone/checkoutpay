@@ -143,7 +143,7 @@ class PaymentMatchingService
         }
 
         // Also check stored emails in database for matching
-        $payment = $this->matchFromStoredEmails($extractedInfo, $emailData['email_account_id'] ?? null);
+        $payment = $this->matchFromStoredEmails($extractedInfo, $emailData['email_account_id'] ?? null, $processedEmailId, $emailData, $extractionMethod);
         if ($payment) {
             return $payment;
         }
@@ -671,7 +671,7 @@ class PaymentMatchingService
     /**
      * Match payment from stored emails in database
      */
-    protected function matchFromStoredEmails(array $extractedInfo, ?int $emailAccountId): ?Payment
+    protected function matchFromStoredEmails(array $extractedInfo, ?int $emailAccountId = null, ?int $processedEmailId = null, ?array $emailData = null, ?string $extractionMethod = null): ?Payment
     {
         // Get pending payments
         $query = Payment::pending();
@@ -730,6 +730,50 @@ class PaymentMatchingService
                 
                 $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
                 
+                // Log match attempt to database
+                try {
+                    $this->matchLogger->logAttempt([
+                        'payment_id' => $payment->id,
+                        'processed_email_id' => $storedEmail->id,
+                        'transaction_id' => $payment->transaction_id,
+                        'match_result' => $match['matched'] ? MatchAttempt::RESULT_MATCHED : MatchAttempt::RESULT_UNMATCHED,
+                        'reason' => $match['reason'] ?? 'Unknown reason',
+                        'payment_amount' => $payment->amount,
+                        'payment_name' => $payment->payer_name,
+                        'payment_account_number' => $payment->account_number,
+                        'payment_created_at' => $payment->created_at,
+                        'extracted_amount' => $extractedInfo['amount'] ?? null,
+                        'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                        'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                        'email_subject' => $storedEmail->subject,
+                        'email_from' => $storedEmail->from_email,
+                        'email_date' => $storedEmail->email_date,
+                        'amount_diff' => $match['amount_diff'] ?? null,
+                        'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                        'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                        'extraction_method' => $extractionResult['method'] ?? 'unknown',
+                        'details' => [
+                            'match_details' => $match,
+                            'extracted_info' => $extractedInfo,
+                            'payment_data' => [
+                                'transaction_id' => $payment->transaction_id,
+                                'amount' => $payment->amount,
+                                'payer_name' => $payment->payer_name,
+                                'account_number' => $payment->account_number,
+                                'created_at' => $payment->created_at->toISOString(),
+                            ],
+                        ],
+                        'html_snippet' => $this->matchLogger->extractHtmlSnippet($storedEmail->html_body ?? '', $extractedInfo['amount'] ?? null),
+                        'text_snippet' => $this->matchLogger->extractTextSnippet($storedEmail->text_body ?? '', $extractedInfo['amount'] ?? null),
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to log match attempt in matchFromStoredEmails', [
+                        'error' => $e->getMessage(),
+                        'transaction_id' => $payment->transaction_id,
+                        'stored_email_id' => $storedEmail->id,
+                    ]);
+                }
+                
                 if ($match['matched']) {
                     // Mark stored email as matched
                     $storedEmail->markAsMatched($payment);
@@ -738,6 +782,7 @@ class PaymentMatchingService
                         'transaction_id' => $payment->transaction_id,
                         'stored_email_id' => $storedEmail->id,
                         'match_reason' => $match['reason'],
+                        'match_attempt_logged' => true,
                     ]);
                     
                     return $payment;
@@ -807,6 +852,50 @@ class PaymentMatchingService
         
         foreach ($pendingPayments as $payment) {
             $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+            
+            // Log match attempt to database
+            try {
+                $this->matchLogger->logAttempt([
+                    'payment_id' => $payment->id,
+                    'processed_email_id' => $storedEmail->id,
+                    'transaction_id' => $payment->transaction_id,
+                    'match_result' => $match['matched'] ? MatchAttempt::RESULT_MATCHED : MatchAttempt::RESULT_UNMATCHED,
+                    'reason' => $match['reason'] ?? 'Unknown reason',
+                    'payment_amount' => $payment->amount,
+                    'payment_name' => $payment->payer_name,
+                    'payment_account_number' => $payment->account_number,
+                    'payment_created_at' => $payment->created_at,
+                    'extracted_amount' => $extractedInfo['amount'] ?? null,
+                    'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                    'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                    'email_subject' => $storedEmail->subject,
+                    'email_from' => $storedEmail->from_email,
+                    'email_date' => $storedEmail->email_date,
+                    'amount_diff' => $match['amount_diff'] ?? null,
+                    'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                    'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                    'extraction_method' => $extractionMethod,
+                    'details' => [
+                        'match_details' => $match,
+                        'extracted_info' => $extractedInfo,
+                        'payment_data' => [
+                            'transaction_id' => $payment->transaction_id,
+                            'amount' => $payment->amount,
+                            'payer_name' => $payment->payer_name,
+                            'account_number' => $payment->account_number,
+                            'created_at' => $payment->created_at->toISOString(),
+                        ],
+                    ],
+                    'html_snippet' => $this->matchLogger->extractHtmlSnippet($storedEmail->html_body ?? '', $extractedInfo['amount'] ?? null),
+                    'text_snippet' => $this->matchLogger->extractTextSnippet($storedEmail->text_body ?? '', $extractedInfo['amount'] ?? null),
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to log match attempt in recheckStoredEmail', [
+                    'error' => $e->getMessage(),
+                    'transaction_id' => $payment->transaction_id,
+                    'email_id' => $storedEmail->id,
+                ]);
+            }
             
             $matches[] = [
                 'payment' => $payment,
