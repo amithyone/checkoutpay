@@ -74,39 +74,7 @@ class PythonExtractionService
 
         $result = $response->json();
 
-        if (!$result['success'] || !isset($result['data'])) {
-            Log::info('Python extraction returned no data', [
-                'success' => $result['success'] ?? false,
-                'errors' => $result['errors'] ?? [],
-                'email_id' => $emailData['processed_email_id'] ?? null,
-            ]);
-            return null;
-        }
-
-        $data = $result['data'];
-
-        // Validate confidence score
-        $confidence = $data['confidence'] ?? 0.0;
-        if ($confidence < $this->minConfidence) {
-            Log::warning('Python extraction returned low confidence score', [
-                'confidence' => $confidence,
-                'min_required' => $this->minConfidence,
-                'email_id' => $emailData['processed_email_id'] ?? null,
-            ]);
-            return null;
-        }
-
-        // Validate amount (must be >= 10 Naira)
-        $amount = (float) ($data['amount'] ?? 0);
-        if ($amount < 10) {
-            Log::warning('Python extraction returned invalid amount', [
-                'amount' => $amount,
-                'email_id' => $emailData['processed_email_id'] ?? null,
-            ]);
-            return null;
-        }
-
-        // Map Python response to Laravel format - use processResult for consistency
+        // Use processResult to handle validation and formatting (consistent for both modes)
         return $this->processResult($result, $emailData);
     }
     
@@ -205,3 +173,91 @@ class PythonExtractionService
      */
     protected function processResult(array $result, array $emailData): ?array
     {
+        if (!$result['success'] || !isset($result['data'])) {
+            Log::info('Python extraction returned no data', [
+                'success' => $result['success'] ?? false,
+                'errors' => $result['errors'] ?? [],
+                'email_id' => $emailData['processed_email_id'] ?? null,
+            ]);
+            return null;
+        }
+
+        $data = $result['data'];
+
+        // Validate confidence score
+        $confidence = $data['confidence'] ?? 0.0;
+        if ($confidence < $this->minConfidence) {
+            Log::warning('Python extraction returned low confidence score', [
+                'confidence' => $confidence,
+                'min_required' => $this->minConfidence,
+                'email_id' => $emailData['processed_email_id'] ?? null,
+            ]);
+            return null;
+        }
+
+        // Validate amount (must be >= 10 Naira)
+        $amount = (float) ($data['amount'] ?? 0);
+        if ($amount < 10) {
+            Log::warning('Python extraction returned invalid amount', [
+                'amount' => $amount,
+                'email_id' => $emailData['processed_email_id'] ?? null,
+            ]);
+            return null;
+        }
+
+        // Map Python response to Laravel format
+        return [
+            'data' => [
+                'amount' => $amount,
+                'sender_name' => $data['sender_name'] ?? null,
+                'account_number' => $data['account_number'] ?? null,
+                'currency' => $data['currency'] ?? 'NGN',
+                'direction' => $data['direction'] ?? 'credit',
+                'email_subject' => $emailData['subject'] ?? '',
+                'email_from' => $emailData['from'] ?? '',
+                'extracted_at' => now()->toISOString(),
+            ],
+            'method' => $data['source'] ?? 'python_extractor',
+            'confidence' => $confidence,
+            'diagnostics' => $result['diagnostics'] ?? null,
+        ];
+    }
+    
+    /**
+     * Check if Python extraction service is available.
+     *
+     * @return bool
+     */
+    public function isAvailable(): bool
+    {
+        $mode = config('services.python_extractor.mode', 'http');
+        
+        if ($mode === 'script') {
+            // Check if script exists
+            $scriptPath = config('services.python_extractor.script_path', base_path('python-extractor/extract_simple.py'));
+            $pythonCommand = config('services.python_extractor.python_command', 'python3');
+            
+            if (!file_exists($scriptPath)) {
+                return false;
+            }
+            
+            // Try to execute Python command
+            $command = sprintf('%s --version 2>&1', escapeshellarg($pythonCommand));
+            $output = shell_exec($command);
+            return !empty($output) && strpos($output, 'Python') !== false;
+        } else {
+            // HTTP mode - check health endpoint
+            return Cache::remember('python_extractor_health', 60, function () {
+                try {
+                    $response = Http::timeout(5)->get("{$this->baseUrl}/health");
+                    return $response->successful();
+                } catch (\Exception $e) {
+                    Log::warning('Python extraction service health check failed', [
+                        'error' => $e->getMessage(),
+                    ]);
+                    return false;
+                }
+            });
+        }
+    }
+}
