@@ -59,8 +59,76 @@
             <i class="fas fa-info-circle text-primary mr-2"></i>Match Reason
         </h3>
         <div class="bg-gray-50 rounded-lg p-4">
-            <p class="text-sm text-gray-900 whitespace-pre-wrap">{{ $matchAttempt->reason }}</p>
+            <p class="text-sm text-gray-900 whitespace-pre-wrap font-mono">{{ $matchAttempt->reason }}</p>
         </div>
+        @if($matchAttempt->details && isset($matchAttempt->details['extraction_failed']) && $matchAttempt->details['extraction_failed'])
+        <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-yellow-900 mb-2">
+                <i class="fas fa-exclamation-triangle mr-2"></i>Extraction Failed - Diagnostic Information Available
+            </h4>
+            <p class="text-xs text-yellow-700 mb-3">
+                This match attempt failed because payment information could not be extracted from the email. 
+                Check the detailed diagnostics below to identify the issue.
+            </p>
+            @if(isset($matchAttempt->details['extraction_steps']))
+            <div class="mb-3">
+                <h5 class="text-xs font-semibold text-yellow-900 mb-1">Extraction Steps Attempted:</h5>
+                <ul class="text-xs text-yellow-800 list-disc list-inside">
+                    @foreach($matchAttempt->details['extraction_steps'] as $step)
+                    <li>{{ $step }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
+            @if(isset($matchAttempt->details['extraction_errors']))
+            <div class="mb-3">
+                <h5 class="text-xs font-semibold text-yellow-900 mb-1">Errors Encountered:</h5>
+                <ul class="text-xs text-yellow-800 list-disc list-inside">
+                    @foreach($matchAttempt->details['extraction_errors'] as $error)
+                    <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
+            @if(isset($matchAttempt->details['text_length']) || isset($matchAttempt->details['html_length']))
+            <div class="mb-3">
+                <h5 class="text-xs font-semibold text-yellow-900 mb-1">Content Lengths:</h5>
+                <ul class="text-xs text-yellow-800 list-disc list-inside">
+                    @if(isset($matchAttempt->details['text_length']))
+                    <li>Text Body: {{ $matchAttempt->details['text_length'] }} chars</li>
+                    @endif
+                    @if(isset($matchAttempt->details['html_length']))
+                    <li>HTML Body: {{ $matchAttempt->details['html_length'] }} chars</li>
+                    @endif
+                </ul>
+            </div>
+            @endif
+            @if(isset($matchAttempt->details['text_preview']))
+            <div class="mb-3">
+                <h5 class="text-xs font-semibold text-yellow-900 mb-1">Text Body Preview (first 500 chars):</h5>
+                <div class="bg-white rounded p-2 max-h-32 overflow-auto">
+                    <pre class="text-xs text-gray-700 whitespace-pre-wrap font-mono">{{ $matchAttempt->details['text_preview'] }}</pre>
+                </div>
+            </div>
+            @endif
+            @if(isset($matchAttempt->details['html_preview']))
+            <div class="mb-3">
+                <h5 class="text-xs font-semibold text-yellow-900 mb-1">HTML Body Preview (first 500 chars):</h5>
+                <div class="bg-white rounded p-2 max-h-32 overflow-auto">
+                    <pre class="text-xs text-gray-700 whitespace-pre-wrap font-mono">{{ $matchAttempt->details['html_preview'] }}</pre>
+                </div>
+            </div>
+            @endif
+            @if($matchAttempt->processedEmail)
+            <div class="mt-4 pt-3 border-t border-yellow-300">
+                <a href="{{ route('admin.processed-emails.show', $matchAttempt->processedEmail) }}" 
+                   class="text-xs text-yellow-900 hover:text-yellow-700 underline">
+                    <i class="fas fa-envelope mr-1"></i> View Full Email Content (#{{ $matchAttempt->processedEmail->id }})
+                </a>
+            </div>
+            @endif
+        </div>
+        @endif
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
