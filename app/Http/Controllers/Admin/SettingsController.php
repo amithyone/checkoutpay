@@ -37,28 +37,51 @@ class SettingsController extends Controller
      */
     public function update(Request $request)
     {
-        $validated = $request->validate([
-            'payment_time_window_minutes' => 'required|integer|min:1|max:1440', // Max 24 hours
-            'transaction_pending_time_minutes' => 'required|integer|min:5|max:10080', // 5 minutes to 7 days
-        ]);
+        // Validate payment settings (if provided)
+        if ($request->has('payment_time_window_minutes') || $request->has('transaction_pending_time_minutes')) {
+            $validated = $request->validate([
+                'payment_time_window_minutes' => 'required|integer|min:1|max:1440', // Max 24 hours
+                'transaction_pending_time_minutes' => 'required|integer|min:5|max:10080', // 5 minutes to 7 days
+            ]);
 
-        // Update payment time window (for email matching)
-        Setting::set(
-            'payment_time_window_minutes',
-            $validated['payment_time_window_minutes'],
-            'integer',
-            'payment',
-            'Maximum time window (in minutes) for matching emails with payment requests. Emails received after this time will not be matched.'
-        );
+            // Update payment time window (for email matching)
+            Setting::set(
+                'payment_time_window_minutes',
+                $validated['payment_time_window_minutes'],
+                'integer',
+                'payment',
+                'Maximum time window (in minutes) for matching emails with payment requests. Emails received after this time will not be matched.'
+            );
 
-        // Update transaction pending time (expiration time)
-        Setting::set(
-            'transaction_pending_time_minutes',
-            $validated['transaction_pending_time_minutes'],
-            'integer',
-            'payment',
-            'Time (in minutes) before a pending transaction expires. After expiration, transaction will be automatically marked as expired and cannot be matched.'
-        );
+            // Update transaction pending time (expiration time)
+            Setting::set(
+                'transaction_pending_time_minutes',
+                $validated['transaction_pending_time_minutes'],
+                'integer',
+                'payment',
+                'Time (in minutes) before a pending transaction expires. After expiration, transaction will be automatically marked as expired and cannot be matched.'
+            );
+        }
+
+        // Update IMAP fetching setting (if provided)
+        if ($request->has('disable_imap_fetching')) {
+            Setting::set(
+                'disable_imap_fetching',
+                $request->has('disable_imap_fetching') ? 1 : 0,
+                'boolean',
+                'email',
+                'Disable IMAP email fetching. When enabled, only direct filesystem reading will be used. Recommended for shared hosting where direct filesystem access is more reliable.'
+            );
+        } elseif ($request->isMethod('PUT')) {
+            // If form is submitted but checkbox is not checked, set to false
+            Setting::set(
+                'disable_imap_fetching',
+                0,
+                'boolean',
+                'email',
+                'Disable IMAP email fetching. When enabled, only direct filesystem reading will be used. Recommended for shared hosting where direct filesystem access is more reliable.'
+            );
+        }
 
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');

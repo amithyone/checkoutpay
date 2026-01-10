@@ -12,14 +12,19 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Monitor emails every 10 seconds (more frequent for faster detection)
-        $schedule->command('payment:monitor-emails')
-            ->everyTenSeconds()
-            ->withoutOverlapping()
-            ->runInBackground();
+        // Check if IMAP fetching is disabled
+        $disableImap = \App\Models\Setting::get('disable_imap_fetching', false);
 
-        // Also read emails directly from filesystem every 15 seconds
-        // This ensures we catch emails even if IMAP doesn't work
+        // Monitor emails via IMAP (only if not disabled)
+        if (!$disableImap) {
+            $schedule->command('payment:monitor-emails')
+                ->everyTenSeconds()
+                ->withoutOverlapping()
+                ->runInBackground();
+        }
+
+        // Always read emails directly from filesystem (more reliable)
+        // This is the primary method when IMAP is disabled
         $schedule->command('payment:read-emails-direct --all')
             ->everyFifteenSeconds()
             ->withoutOverlapping()
