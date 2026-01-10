@@ -9,12 +9,20 @@
         <a href="{{ route('admin.match-attempts.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
             <i class="fas fa-arrow-left mr-1"></i> Back to Match Logs
         </a>
-        @if($matchAttempt->match_result === 'unmatched' && $matchAttempt->payment)
-            <button onclick="retryMatch({{ $matchAttempt->id }})" 
-                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center">
-                <i class="fas fa-redo mr-2"></i> Retry Match
-            </button>
-        @endif
+        <div class="flex gap-3">
+            @if($matchAttempt->processedEmail && $matchAttempt->match_result === 'unmatched')
+                <button onclick="reExtractAndMatch({{ $matchAttempt->processedEmail->id }})" 
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center">
+                    <i class="fas fa-sync-alt mr-2"></i> Re-extract & Match
+                </button>
+            @endif
+            @if($matchAttempt->match_result === 'unmatched' && $matchAttempt->payment)
+                <button onclick="retryMatch({{ $matchAttempt->id }})" 
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                    <i class="fas fa-redo mr-2"></i> Retry Match
+                </button>
+            @endif
+        </div>
     </div>
 
     <!-- Match Result Banner -->
@@ -294,6 +302,58 @@ function retryMatch(attemptId) {
     .catch(error => {
         console.error('Error:', error);
         alert('❌ Error retrying match: ' + error.message);
+    });
+}
+
+function reExtractAndMatch(processedEmailId) {
+    if (!confirm('This will re-extract payment info from the email\'s text_body first, then html_body if needed, and try to match again. Continue?')) {
+        return;
+    }
+
+    fetch(`/admin/processed-emails/${processedEmailId}/re-extract-match`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = '✅ ' + data.message;
+            if (data.extraction_info) {
+                message += '\n\nExtraction Details:';
+                message += '\n- Text Body Used: ' + (data.extraction_info.text_body_used ? 'Yes' : 'No');
+                message += '\n- HTML Body Used: ' + (data.extraction_info.html_body_used ? 'Yes' : 'No');
+            }
+            alert(message);
+            if (data.payment) {
+                window.location.href = '/admin/payments/' + data.payment.id;
+            } else {
+                window.location.reload();
+            }
+        } else {
+            let message = '❌ ' + data.message;
+            if (data.latest_reason) {
+                message += '\n\nReason: ' + data.latest_reason;
+            }
+            if (data.latest_attempt) {
+                message += '\n\nExtraction Method: ' + (data.latest_attempt.extraction_method || 'unknown');
+            }
+            if (data.email_info) {
+                message += '\n\nEmail Info:';
+                message += '\n- Text Body Length: ' + data.email_info.text_body_length + ' chars';
+                message += '\n- HTML Body Length: ' + data.email_info.html_body_length + ' chars';
+            }
+            alert(message);
+            if (data.latest_attempt) {
+                console.log('Latest attempt:', data.latest_attempt);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error re-extracting and matching: ' + error.message);
     });
 }
 </script>

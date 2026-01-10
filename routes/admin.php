@@ -88,6 +88,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('match-attempts/{matchAttempt}', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'show'])->name('match-attempts.show');
         Route::post('match-attempts/{matchAttempt}/retry', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'retry'])->name('match-attempts.retry');
         Route::post('processed-emails/{processedEmail}/retry-match', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'retryEmail'])->name('processed-emails.retry-match');
+        Route::post('processed-emails/{processedEmail}/re-extract-match', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'reExtractAndMatch'])->name('processed-emails.re-extract-match');
         
         // Global Match Trigger
         Route::post('match/trigger-global', [\App\Http\Controllers\Admin\MatchController::class, 'triggerGlobalMatch'])->name('match.trigger-global');

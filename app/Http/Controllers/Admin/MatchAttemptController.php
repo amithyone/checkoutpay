@@ -189,6 +189,84 @@ class MatchAttemptController extends Controller
     }
 
     /**
+     * Re-extract from ProcessedEmail and match again
+     * This will try text_body first, then html_body if text_body fails
+     */
+    public function reExtractAndMatch(ProcessedEmail $processedEmail, PaymentMatchingService $matchingService)
+    {
+        try {
+            // Rebuild email data from ProcessedEmail (will try text_body first, then html_body)
+            $emailData = [
+                'subject' => $processedEmail->subject,
+                'from' => $processedEmail->from_email,
+                'text' => $processedEmail->text_body ?? '', // Try text_body first
+                'html' => $processedEmail->html_body ?? '', // Fallback to html_body if text_body fails
+                'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                'email_account_id' => $processedEmail->email_account_id,
+                'processed_email_id' => $processedEmail->id,
+            ];
+
+            // Re-extract using new logic (tries text_body first, then html_body)
+            $matchedPayment = $matchingService->matchEmail($emailData);
+
+            if ($matchedPayment) {
+                // Process the email payment (approve payment)
+                \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
+
+                Log::info('Re-extraction and match successful', [
+                    'processed_email_id' => $processedEmail->id,
+                    'transaction_id' => $matchedPayment->transaction_id,
+                    'text_body_length' => strlen($processedEmail->text_body ?? ''),
+                    'html_body_length' => strlen($processedEmail->html_body ?? ''),
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Email re-extracted and matched successfully!',
+                    'payment' => $matchedPayment->fresh(),
+                    'extraction_info' => [
+                        'text_body_used' => !empty(trim($processedEmail->text_body ?? '')),
+                        'html_body_used' => empty(trim($processedEmail->text_body ?? '')) && !empty(trim($processedEmail->html_body ?? '')),
+                    ],
+                ]);
+            } else {
+                // Check latest match attempt for this email to see what extraction method was used
+                $latestAttempt = MatchAttempt::where('processed_email_id', $processedEmail->id)
+                    ->latest()
+                    ->first();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email still does not match any pending payment after re-extraction. Check match attempts for details.',
+                    'latest_reason' => $latestAttempt ? $latestAttempt->reason : 'No match attempt found',
+                    'latest_attempt' => $latestAttempt ? [
+                        'id' => $latestAttempt->id,
+                        'transaction_id' => $latestAttempt->payment_id,
+                        'reason' => $latestAttempt->reason,
+                        'extraction_method' => $latestAttempt->extraction_method,
+                        'created_at' => $latestAttempt->created_at->format('Y-m-d H:i:s'),
+                    ] : null,
+                    'email_info' => [
+                        'text_body_length' => strlen($processedEmail->text_body ?? ''),
+                        'html_body_length' => strlen($processedEmail->html_body ?? ''),
+                    ],
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error re-extracting and matching email', [
+                'processed_email_id' => $processedEmail->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error re-extracting and matching: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Retry matching for a processed email
      */
     public function retryEmail(ProcessedEmail $processedEmail, PaymentMatchingService $matchingService)

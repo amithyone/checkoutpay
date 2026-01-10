@@ -185,6 +185,7 @@ class PaymentMatchingService
 
     /**
      * Extract payment information from email
+     * Strategy: Try text_body first, then html_body if text_body fails
      */
     public function extractPaymentInfo(array $emailData): ?array
     {
@@ -199,7 +200,7 @@ class PaymentMatchingService
         // If template found, use template-specific extraction
         if ($template) {
             $result = $this->extractUsingTemplate($emailData, $template);
-            if ($result) {
+            if ($result && isset($result['amount']) && $result['amount'] > 0) {
                 return [
                     'data' => $result,
                     'method' => 'template',
@@ -207,178 +208,44 @@ class PaymentMatchingService
             }
         }
         
-        // Fallback to default extraction logic with hybrid approach
-        // Prepare rendered text for fallback
-        $renderedText = null;
-        if (empty(trim($text)) && !empty($html)) {
+        // Strategy: Try text_body first, then html_body
+        // STEP 1: Try extraction from text_body (plain text) first
+        if (!empty(trim($text))) {
+            $extractionResult = $this->extractFromTextBody($text, $subject, $from);
+            if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
+                return [
+                    'data' => $extractionResult,
+                    'method' => 'text_body',
+                ];
+            }
+        }
+        
+        // STEP 2: If text_body extraction failed, try html_body
+        if (!empty(trim($html))) {
+            // First try HTML table extraction (most accurate for Nigerian banks)
+            $extractionResult = $this->extractFromHtmlBody($html, $subject, $from);
+            if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
+                return [
+                    'data' => $extractionResult,
+                    'method' => $extractionResult['method'] ?? 'html_body',
+                ];
+            }
+            
+            // If HTML table extraction failed, convert HTML to text and try text extraction
             $renderedText = $this->htmlToText($html);
-        } else {
-            $renderedText = $text;
-        }
-        
-        $textLower = strtolower($renderedText ?? '');
-        $htmlLower = strtolower($html);
-        $fullText = $subject . ' ' . $textLower . ' ' . $htmlLower;
-
-        // Extract amount - HYBRID: Try HTML table first (most accurate), then rendered text fallback
-        $amount = null;
-        $extractionMethod = null;
-        
-        // PRIMARY: HTML table extraction (most accurate for Nigerian banks)
-        // Pattern 1: GTBank HTML table - Amount in separate cell after label (handles &nbsp;)
-        // Format: <td>Amount</td><td>NGN&nbsp;1000</td> or <td>Amount</td><td>NGN 1000</td>
-        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
-            $extractionMethod = 'html_table';
-        }
-        // Pattern 2: GTBank HTML table - Amount in same cell with label (handles &nbsp;)
-        // Format: <td>Amount : NGN&nbsp;1000</td> or <td>Amount : NGN 1000</td>
-        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
-            $extractionMethod = 'html_table';
-        }
-        // Pattern 3: Description field contains amount
-        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦)\s*([\d,]+\.?\d*).*?<\/td>/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $extractionMethod = 'html_table';
-            }
-        }
-        // Pattern 4: Any HTML table cell containing NGN/Naira
-        elseif (preg_match('/<td[^>]*>[\s]*(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $extractionMethod = 'html_table';
-            }
-        }
-        // Pattern 5: HTML with amount format (not in table)
-        elseif (preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $extractionMethod = 'html_text';
-            }
-        }
-        // Pattern 6: Standalone NGN in HTML
-        elseif (preg_match('/(?:ngn|naira|₦)([\d,]+\.?\d*)/i', $html, $matches)) {
-            $potentialAmount = (float) str_replace(',', '', $matches[1]);
-            if ($potentialAmount >= 10) {
-                $amount = $potentialAmount;
-                $extractionMethod = 'html_text';
-            }
-        }
-        // FALLBACK: Rendered text extraction (if HTML fails)
-        else {
-            $amountPatterns = [
-                '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i',
-                '/(?:ngn|naira|₦)([\d,]+\.?\d*)/i',
-                '/([\d,]+\.?\d*)\s*(?:naira|ngn|usd|dollar)/i',
-            ];
-
-            foreach ($amountPatterns as $pattern) {
-                if (preg_match($pattern, $fullText, $matches)) {
-                    $potentialAmount = (float) str_replace(',', '', $matches[1]);
-                    if ($potentialAmount >= 10) {
-                        $amount = $potentialAmount;
-                        $extractionMethod = 'rendered_text';
-                        break;
-                    }
+            if (!empty(trim($renderedText))) {
+                $extractionResult = $this->extractFromTextBody($renderedText, $subject, $from);
+                if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
+                    return [
+                        'data' => $extractionResult,
+                        'method' => 'html_rendered_text',
+                    ];
                 }
             }
         }
-
-        // Extract sender name - GTBank stores name in Description field
-        // GTBank format variations:
-        // 1. "FROM SOLOMON INNOCENT AMITHY TO SQUA"
-        // 2. "AMITHY ONE M TRF FOR CUSTOMER..." (new format with transaction code)
-        // 3. Description field: "090405260110014006799532206126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
-        $senderName = null;
         
-        // Pattern 1: GTBank HTML table - Description field contains "FROM NAME TO"
-        // Format: <td>Description</td><td>FROM SOLOMON INNOCENT AMITHY TO SQUA</td>
-        if (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
-            $senderName = trim(strtolower($matches[1]));
-        }
-        // Pattern 2: GTBank HTML table - Description field contains "AMITHY ONE M TRF FOR" (new format)
-        // Format: <td>Description</td><td>...-AMITHY ONE M TRF FOR CUSTOMER...</td>
-        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?[\s\-]*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
-            $potentialName = trim($matches[1]);
-            // Remove transaction codes/numbers at start if present
-            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
-            if (strlen($potentialName) >= 3) {
-                $senderName = trim(strtolower($potentialName));
-            }
-        }
-        // Pattern 3: GTBank HTML table - Description in same cell with "FROM"
-        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]+from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
-            $senderName = trim(strtolower($matches[1]));
-        }
-        // Pattern 4: GTBank text format "FROM SOLOMON INNOCENT AMITHY TO SQUA"
-        elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
-            $senderName = trim(strtolower($matches[1]));
-        }
-        // Pattern 5: GTBank description text with "NAME TRF FOR" format (text body)
-        // Format: "090405260110014006799532206126-AMITHY ONE M TRF FOR CUSTOMER..."
-        elseif (preg_match('/description[\s:]+.*?[\s\-]*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $fullText, $matches)) {
-            $potentialName = trim($matches[1]);
-            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
-            if (strlen($potentialName) >= 3) {
-                $senderName = trim(strtolower($potentialName));
-            }
-        }
-        // Pattern 6: HTML table with "From" or "Sender" label
-        elseif (preg_match('/<td[^>]*>[\s]*(?:from|sender|payer|depositor|account\s*name|name)[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i', $html, $matches)) {
-            $senderName = trim(strtolower($matches[1]));
-        }
-        // Pattern 7: Standard patterns in HTML
-        elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|<\/)/i', $html, $matches)) {
-            $senderName = trim(strtolower($matches[1]));
-        }
-        // Pattern 8: Try in text (fallback)
-        elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $fullText, $matches)) {
-            $senderName = trim(strtolower($matches[1]));
-        }
-        // Pattern 9: Other standard patterns in text
-        elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i', $fullText, $matches)) {
-            $senderName = trim(strtolower($matches[1]));
-        }
-        
-        // Clean up sender name (remove extra spaces, validate length)
-        if ($senderName) {
-            $senderName = preg_replace('/\s+/', ' ', $senderName);
-            if (strlen($senderName) < 3) {
-                $senderName = null; // Too short, invalid
-            }
-        }
-
-        // If no name found in body, try extracting from email sender
-        if (!$senderName && $from) {
-            if (preg_match('/([^<]+)/', $from, $matches)) {
-                $senderName = trim(strtolower($matches[1]));
-            }
-        }
-
-        if (!$amount) {
+        // If both text_body and html_body extraction failed, return null
             return null;
-        }
-
-        // If extraction method not set, default to rendered_text (fallback used)
-        if (!$extractionMethod) {
-            $extractionMethod = 'fallback';
-        }
-
-        return [
-            'data' => [
-                'amount' => $amount,
-                'sender_name' => $senderName,
-                'email_subject' => $emailData['subject'] ?? '',
-                'email_from' => $emailData['from'] ?? '',
-                'extracted_at' => now()->toISOString(),
-            ],
-            'method' => $extractionMethod,
-        ];
     }
 
     /**
@@ -863,6 +730,190 @@ class PaymentMatchingService
             'email_from' => $emailData['from'] ?? '',
             'extracted_at' => now()->toISOString(),
             'template_used' => $template->bank_name,
+        ];
+    }
+
+    /**
+     * Extract payment info from text_body (plain text)
+     */
+    protected function extractFromTextBody(string $text, string $subject, string $from): ?array
+    {
+        $textLower = strtolower($text);
+        $fullText = $subject . ' ' . $textLower;
+        
+        $amount = null;
+        $senderName = null;
+        
+        // Extract amount from text
+        $amountPatterns = [
+            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i',
+            '/(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i',
+            '/([\d,]+\.?\d*)\s*(?:naira|ngn|usd|dollar)/i',
+        ];
+        
+        foreach ($amountPatterns as $pattern) {
+            if (preg_match($pattern, $fullText, $matches)) {
+                $potentialAmount = (float) str_replace(',', '', $matches[1]);
+                if ($potentialAmount >= 10) {
+                    $amount = $potentialAmount;
+                    break;
+                }
+            }
+        }
+        
+        // Extract sender name from text
+        // Pattern 1: "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        if (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $text, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 2: GTBank description with "NAME TRF FOR" format
+        // Format: "090405260110014006799532206126-AMITHY ONE M TRF FOR CUSTOMER..."
+        elseif (preg_match('/description[\s:]+.*?[\s\-]*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 3: Other standard patterns in text
+        elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i', $fullText, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        
+        // Clean up sender name
+        if ($senderName) {
+            $senderName = preg_replace('/\s+/', ' ', $senderName);
+            if (strlen($senderName) < 3) {
+                $senderName = null;
+            }
+        }
+        
+        // Try extracting from email sender if no name found
+        if (!$senderName && $from) {
+            if (preg_match('/([^<]+)/', $from, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+        }
+        
+        if (!$amount) {
+            return null;
+        }
+        
+        return [
+            'amount' => $amount,
+            'sender_name' => $senderName,
+        ];
+    }
+    
+    /**
+     * Extract payment info from html_body
+     */
+    protected function extractFromHtmlBody(string $html, string $subject, string $from): ?array
+    {
+        $htmlLower = strtolower($html);
+        $fullText = $subject . ' ' . $htmlLower;
+        
+        $amount = null;
+        $senderName = null;
+        $method = null;
+        
+        // PRIMARY: HTML table extraction (most accurate for Nigerian banks)
+        // Pattern 1: GTBank HTML table - Amount in separate cell after label (handles &nbsp;)
+        if (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+            $method = 'html_table';
+        }
+        // Pattern 2: GTBank HTML table - Amount in same cell with label (handles &nbsp;)
+        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦)[\s&nbsp;]*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+            $method = 'html_table';
+        }
+        // Pattern 3: Description field contains amount
+        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦)\s*([\d,]+\.?\d*).*?<\/td>/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+                $method = 'html_table';
+            }
+        }
+        // Pattern 4: Any HTML table cell containing NGN/Naira
+        elseif (preg_match('/<td[^>]*>[\s]*(?:ngn|naira|₦)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+                $method = 'html_table';
+            }
+        }
+        // Pattern 5: HTML with amount format (not in table)
+        elseif (preg_match('/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦)\s*([\d,]+\.?\d*)/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+                $method = 'html_text';
+            }
+        }
+        // Pattern 6: Standalone NGN in HTML
+        elseif (preg_match('/(?:ngn|naira|₦)([\d,]+\.?\d*)/i', $html, $matches)) {
+            $potentialAmount = (float) str_replace(',', '', $matches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+                $method = 'html_text';
+            }
+        }
+        
+        // Extract sender name from HTML
+        // Pattern 1: GTBank HTML table - Description field contains "FROM NAME TO"
+        if (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 2: GTBank HTML table - Description field contains "AMITHY ONE M TRF FOR" (new format)
+        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?[\s\-]*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+            $potentialName = trim($matches[1]);
+            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 3: GTBank HTML table - Description in same cell with "FROM"
+        elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]+from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 4: GTBank text format "FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 5: HTML table with "From" or "Sender" label
+        elseif (preg_match('/<td[^>]*>[\s]*(?:from|sender|payer|depositor|account\s*name|name)[\s:]*<\/td>\s*<td[^>]*>[\s]*([A-Z][A-Z\s]+?)[\s]*<\/td>/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 6: Standard patterns in HTML
+        elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|<\/)/i', $html, $matches)) {
+            $senderName = trim(strtolower($matches[1]));
+        }
+        
+        // Clean up sender name
+        if ($senderName) {
+            $senderName = preg_replace('/\s+/', ' ', $senderName);
+            if (strlen($senderName) < 3) {
+                $senderName = null;
+            }
+        }
+        
+        // Try extracting from email sender if no name found
+        if (!$senderName && $from) {
+            if (preg_match('/([^<]+)/', $from, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+        }
+        
+        if (!$amount) {
+            return null;
+        }
+        
+        return [
+            'amount' => $amount,
+            'sender_name' => $senderName,
+            'method' => $method ?? 'html_body',
         ];
     }
 
