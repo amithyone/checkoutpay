@@ -119,11 +119,20 @@ def extract_sender_name(html, text):
         if len(name) >= 3:
             return name
     
-    # Pattern 2: NAME TRF FOR
-    match = re.search(r'description[\s:]+.*?[\s\-]*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)', content, re.IGNORECASE)
+    # Pattern 2: CODE-NAME TRF FOR (handles quoted-printable =20 spaces)
+    match = re.search(r'description[\s:]+(?:=\d+)?\s*(?:[\d\-\s]+-)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)', content, re.IGNORECASE)
     if match:
         name = match.group(1).strip().lower()
+        # Remove leading numbers, dashes, spaces, and quoted-printable codes
+        name = re.sub(r'^(?:=\d+|\d+[\-\s])+', '', name)
         name = re.sub(r'^[\d\-\s]+', '', name)
+        if len(name) >= 3:
+            return name
+    # Pattern 2b: Direct format "CODE-NAME TRF FOR" (handles quoted-printable)
+    match = re.search(r'(?:[\d\-]+=?\d*\s*-)\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)', content, re.IGNORECASE)
+    if match:
+        name = match.group(1).strip().lower()
+        name = re.sub(r'^(?:=\d+|\d+[\-\s])+', '', name)
         if len(name) >= 3:
             return name
     
