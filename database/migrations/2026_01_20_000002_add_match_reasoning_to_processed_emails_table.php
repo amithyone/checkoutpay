@@ -25,9 +25,9 @@ return new class extends Migration
                 $table->string('extraction_method')->nullable()->after('extracted_data')->comment('Method used to extract data: html_table, html_text, rendered_text, template');
             }
             
-            // Add index for faster queries on unmatched emails
-            $table->index(['is_matched', 'match_attempts_count', 'email_date']);
-            $table->index(['extraction_method', 'is_matched']);
+            // Add index for faster queries on unmatched emails (shortened name to avoid MySQL 64 char limit)
+            $table->index(['is_matched', 'match_attempts_count', 'email_date'], 'pe_matched_count_date_idx');
+            $table->index(['extraction_method', 'is_matched'], 'pe_ext_method_matched_idx');
         });
     }
 
