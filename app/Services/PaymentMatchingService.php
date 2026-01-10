@@ -385,6 +385,14 @@ class PaymentMatchingService
         }
         
         // Store extraction diagnostic info for logging (note: text/html are already decoded here)
+        // Sanitize previews to ensure valid UTF-8 for JSON encoding
+        $textPreview = mb_substr($textTrimmed, 0, 1000);
+        $htmlPreview = mb_substr($htmlTrimmed, 0, 1000);
+        
+        // Clean UTF-8 for previews (they'll be stored in JSON)
+        $textPreview = $this->cleanUtf8ForJson($textPreview);
+        $htmlPreview = $this->cleanUtf8ForJson($htmlPreview);
+        
         $this->lastExtractionDiagnostics = [
             'steps' => $extractionSteps,
             'errors' => $extractionErrors,
@@ -392,8 +400,8 @@ class PaymentMatchingService
             'html_length' => $htmlLength,
             'subject' => $emailData['subject'] ?? '',
             'from' => $emailData['from'] ?? '',
-            'text_preview' => mb_substr($textTrimmed, 0, 1000), // Show more for debugging
-            'html_preview' => mb_substr($htmlTrimmed, 0, 1000), // Show more for debugging
+            'text_preview' => $textPreview, // Sanitized for JSON
+            'html_preview' => $htmlPreview, // Sanitized for JSON
             // Check if HTML contains table tags (for diagnostics)
             'html_has_table_tags' => strpos($htmlTrimmed, '<td') !== false || strpos($htmlTrimmed, '<table') !== false,
             // Check if HTML contains amount keywords

@@ -150,24 +150,38 @@ class MatchAttemptLogger
             return $string;
         }
 
-        // Remove invalid UTF-8 sequences
-        $string = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
-        
-        // Remove or replace invalid UTF-8 characters
-        $string = filter_var($string, FILTER_SANITIZE_STRING, FILTER_FLAG_STRIP_HIGH | FILTER_FLAG_STRIP_LOW);
-        
-        // If filter_var returns false, try iconv as fallback
-        if ($string === false || !mb_check_encoding($string, 'UTF-8')) {
-            // Use iconv to convert and ignore invalid characters
-            $string = @iconv('UTF-8', 'UTF-8//IGNORE', $string);
-            
-            // Final fallback: remove non-printable characters except newlines and tabs
-            if ($string === false || !mb_check_encoding($string, 'UTF-8')) {
-                $string = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/u', '', $string);
+        // First, try to fix encoding using mb_convert_encoding
+        if (!mb_check_encoding($string, 'UTF-8')) {
+            // Try to convert from various encodings
+            $encodings = ['ISO-8859-1', 'Windows-1252', 'UTF-8'];
+            foreach ($encodings as $encoding) {
+                $converted = @mb_convert_encoding($string, 'UTF-8', $encoding);
+                if (mb_check_encoding($converted, 'UTF-8')) {
+                    $string = $converted;
+                    break;
+                }
             }
         }
+        
+        // Use iconv to remove invalid UTF-8 sequences
+        $string = @iconv('UTF-8', 'UTF-8//IGNORE//TRANSLIT', $string);
+        
+        // If iconv failed, use mb_convert_encoding with IGNORE flag
+        if ($string === false || !mb_check_encoding($string, 'UTF-8')) {
+            $string = mb_convert_encoding($string ?: '', 'UTF-8', 'UTF-8');
+        }
+        
+        // Remove control characters except newlines, carriage returns, and tabs
+        $string = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/u', '', $string);
+        
+        // Final check: ensure valid UTF-8
+        if (!mb_check_encoding($string, 'UTF-8')) {
+            // Last resort: remove any remaining invalid bytes
+            $string = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+            $string = filter_var($string, FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH);
+        }
 
-        return $string;
+        return $string ?: null;
     }
 
     /**
