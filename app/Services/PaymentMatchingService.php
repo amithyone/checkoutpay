@@ -1003,30 +1003,50 @@ class PaymentMatchingService
         $senderName = null;
         $method = null;
         
-        // PRIMARY: HTML table extraction (most accurate for Nigerian banks)
-        // Pattern 1: GTBank HTML table - Amount in separate cell after label and colon
-        // Format from SQL dump: <td>Amount</td><td>:</td><td colspan="8">NGN 1000</td>
-        // Uses DOTALL flag (?s) to handle newlines/whitespace between tags
-        if (preg_match('/(?s)<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
-            $method = 'html_table';
+        // STRATEGY 1: Convert HTML to plain text and try text extraction (simplest, most reliable)
+        // This handles complex HTML structures by stripping tags first
+        $plainText = strip_tags($html);
+        $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
+        if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $plainText, $textMatches)) {
+            $potentialAmount = (float) str_replace(',', '', $textMatches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+                $method = 'html_rendered_text';
+                // Continue to extract sender name below
+            }
         }
-        // Pattern 1b: Amount in next cell (multiple cells in row, flexible whitespace)
-        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>\s*<td[^>]*>.*?<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
-            $method = 'html_table';
-        }
-        // Pattern 2: GTBank HTML table - Amount in same cell with label
-        // Format: <td>Amount: NGN 1000</td> (after HTML entity decode)
-        elseif (preg_match('/<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
-            $method = 'html_table';
-        }
-        // Pattern 3: Look for any table cell containing "NGN" followed by a number (broader match)
-        // This catches cases like <td colspan="8">NGN 1000</td> anywhere in a table row
-        elseif (preg_match('/(?s)<tr[^>]*>.*?<td[^>]*>[\s]*(?:amount|sum|value|total|paid|payment)[\s:]*<\/td>.*?<td[^>]*>.*?(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
-            $method = 'html_table';
+        
+        // STRATEGY 2: HTML table extraction (more precise but can fail with complex structures)
+        if (!$amount) {
+            // Pattern 1: GTBank HTML table - Amount in separate cell after label and colon
+            // Format from SQL dump: <td>Amount</td><td>:</td><td colspan="8">NGN 1000</td>
+            // Uses DOTALL flag (?s) and non-greedy (.*?) to handle newlines/whitespace
+            if (preg_match('/(?s)<td[^>]*>[\s]*amount[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1]);
+                $method = 'html_table';
+            }
+            // Pattern 1b: Amount in next cell (multiple cells in row, flexible whitespace)
+            elseif (preg_match('/(?s)<td[^>]*>[\s]*amount[\s:]*<\/td>\s*<td[^>]*>.*?<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1]);
+                $method = 'html_table';
+            }
+            // Pattern 2: GTBank HTML table - Amount in same cell with label
+            // Format: <td>Amount: NGN 1000</td> (after HTML entity decode)
+            elseif (preg_match('/<td[^>]*>[\s]*amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1]);
+                $method = 'html_table';
+            }
+            // Pattern 3: Look for any table row containing "Amount" label followed by NGN amount
+            // This catches cases like <tr><td>Amount</td><td>:</td><td>NGN 1000</td></tr>
+            elseif (preg_match('/(?s)<tr[^>]*>.*?<td[^>]*>[\s]*amount[\s:]*<\/td>.*?<td[^>]*>.*?(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1]);
+                $method = 'html_table';
+            }
+            // Pattern 4: Very flexible - any table cell after "Amount" cell containing NGN
+            elseif (preg_match('/(?s)<td[^>]*>[\s]*amount[\s:]*<\/td>.*?<td[^>]*>.*?(?:ngn|naira|₦|NGN)\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+                $amount = (float) str_replace(',', '', $matches[1]);
+                $method = 'html_table';
+            }
         }
         // Pattern 3: Description field contains amount
         elseif (preg_match('/<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>.*?(?:ngn|naira|₦)\s*([\d,]+\.?\d*).*?<\/td>/i', $html, $matches)) {
