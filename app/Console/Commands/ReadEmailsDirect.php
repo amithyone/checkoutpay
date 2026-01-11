@@ -570,6 +570,22 @@ class ReadEmailsDirect extends Command
                 ]);
             }
 
+            // Parse description field to extract account numbers if available
+            $descriptionField = $extractedInfo['description_field'] ?? null;
+            $parsedFromDescription = $this->parseDescriptionField($descriptionField);
+            
+            // Use account_number from description field if not already set (description field is PRIMARY source)
+            $accountNumber = $extractedInfo['account_number'] ?? $parsedFromDescription['account_number'] ?? null;
+            
+            // Update extracted_data to include parsed description field data
+            if ($descriptionField) {
+                $extractedInfo['description_field'] = $descriptionField;
+                $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
+                $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
+                $extractedInfo['amount_from_description'] = $parsedFromDescription['amount'] ?? null;
+                $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
+            }
+            
             // Store in database
             $processedEmail = ProcessedEmail::create([
                 'email_account_id' => $emailAccount->id,
@@ -581,10 +597,10 @@ class ReadEmailsDirect extends Command
                 'text_body' => $parts['text_body'] ?? '',
                 'html_body' => $parts['html_body'] ?? '',
                 'email_date' => $parts['date'] ?? now(),
-                'amount' => $extractedInfo['amount'] ?? null,
+                'amount' => $extractedInfo['amount'] ?? $parsedFromDescription['amount'] ?? null,
                 'sender_name' => $extractedInfo['sender_name'] ?? null,
-                'account_number' => $extractedInfo['account_number'] ?? null,
-                'description_field' => $extractedInfo['description_field'] ?? null, // Store the 43-digit description field
+                'account_number' => $accountNumber, // Use from description field if available (PRIMARY source)
+                'description_field' => $descriptionField, // Store the 43-digit description field
                 'extracted_data' => $extractedInfo,
                 'extraction_method' => $extractionMethod,
             ]);
