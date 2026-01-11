@@ -57,10 +57,39 @@ class MatchController extends Controller
                 'unmatched_emails_count' => $unmatchedEmails->count(),
             ]);
 
-            // STEP 1: Parse description fields for emails that have them but missing account_number
+            // STEP 1: Extract missing sender_name and description_field from text_body
+            // This runs ONLY before global match to fill in missing data
+            $textBodyExtractedCount = 0;
+            foreach ($unmatchedEmails as $processedEmail) {
+                // Only extract if sender_name is null OR description_field is null
+                if (!$processedEmail->sender_name || !$processedEmail->description_field) {
+                    try {
+                        $extracted = $matchingService->extractMissingFromTextBody($processedEmail);
+                        if ($extracted) {
+                            $textBodyExtractedCount++;
+                            // Refresh the model to get updated data
+                            $processedEmail->refresh();
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Failed to extract from text_body in global match', [
+                            'email_id' => $processedEmail->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+            
+            if ($textBodyExtractedCount > 0) {
+                Log::info("Extracted {$textBodyExtractedCount} missing fields from text_body before matching");
+            }
+            
+            // STEP 2: Parse description fields for emails that have them but missing account_number
             // This ensures account numbers are extracted before matching
             $parsedCount = 0;
             foreach ($unmatchedEmails as $processedEmail) {
+                // Refresh to get latest data (might have been updated by text_body extraction)
+                $processedEmail->refresh();
+                
                 if ($processedEmail->description_field && !$processedEmail->account_number) {
                     try {
                         $parsedData = $this->parseDescriptionField($processedEmail->description_field);

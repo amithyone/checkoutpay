@@ -335,38 +335,11 @@ class PaymentMatchingService
         $extractionSteps[] = "Text body check: " . ($textLength > 0 ? "Present ({$textLength} chars)" : "Empty or missing");
         
         if ($textLength > 0) {
-            // FIRST: Run dedicated text_body extraction for sender name and description field
-            $textBodyExtraction = $this->extractFromTextBodyDedicated($text, $subject, $from);
-            
-            // THEN: Run full text_body extraction
             $extractionResult = $this->extractFromTextBody($text, $subject, $from);
-            
-            // Merge dedicated extraction results into main extraction result
-            if ($textBodyExtraction) {
-                if (!$extractionResult) {
-                    $extractionResult = [];
-                }
-                // Merge sender name (dedicated extraction takes priority)
-                if (isset($textBodyExtraction['sender_name']) && $textBodyExtraction['sender_name']) {
-                    $extractionResult['sender_name'] = $textBodyExtraction['sender_name'];
-                }
-                // Merge description field (dedicated extraction takes priority)
-                if (isset($textBodyExtraction['description_field']) && $textBodyExtraction['description_field']) {
-                    $extractionResult['description_field'] = $textBodyExtraction['description_field'];
-                }
-                // Merge account numbers if not already set
-                if (isset($textBodyExtraction['account_number']) && $textBodyExtraction['account_number'] && !isset($extractionResult['account_number'])) {
-                    $extractionResult['account_number'] = $textBodyExtraction['account_number'];
-                }
-                if (isset($textBodyExtraction['payer_account_number']) && $textBodyExtraction['payer_account_number'] && !isset($extractionResult['payer_account_number'])) {
-                    $extractionResult['payer_account_number'] = $textBodyExtraction['payer_account_number'];
-                }
-            }
-            
-            // IMPORTANT: Return even if amount is not found but description field or sender name is extracted
-            // Description field and sender name extraction is valuable and should not be skipped
+            // IMPORTANT: Return even if amount is not found but description field is extracted
+            // Description field extraction is valuable and should not be skipped
             // This prioritizes clean text_body over HTML
-            if ($extractionResult && ((isset($extractionResult['amount']) && $extractionResult['amount'] > 0) || isset($extractionResult['description_field']) || isset($extractionResult['sender_name']))) {
+            if ($extractionResult && ((isset($extractionResult['amount']) && $extractionResult['amount'] > 0) || isset($extractionResult['description_field']))) {
                 return [
                     'data' => $extractionResult,
                     'method' => $extractionResult['method'] ?? 'text_body',
@@ -374,12 +347,10 @@ class PaymentMatchingService
             } else {
                 $amountFound = $extractionResult['amount'] ?? null;
                 $hasDescriptionField = isset($extractionResult['description_field']);
-                $hasSenderName = isset($extractionResult['sender_name']);
                 $extractionErrors[] = "Text body extraction failed: " . 
                     ($hasDescriptionField ? "Description field found but extraction incomplete" :
-                     ($hasSenderName ? "Sender name found but extraction incomplete" :
-                      ($amountFound === null ? "No amount, description field, or sender name found in text body" : 
-                       ($amountFound <= 0 ? "Amount found but invalid ({$amountFound})" : "Unknown error"))));
+                     ($amountFound === null ? "No amount or description field found in text body" : 
+                      ($amountFound <= 0 ? "Amount found but invalid ({$amountFound})" : "Unknown error")));
             }
         } else {
             $extractionErrors[] = "Text body is empty or whitespace only";
