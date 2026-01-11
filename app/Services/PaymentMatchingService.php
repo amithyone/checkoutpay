@@ -1522,6 +1522,25 @@ class PaymentMatchingService
         // This handles complex HTML structures by stripping tags first
         $plainText = strip_tags($html);
         $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
+        
+        // Also try extracting account number from plain text description field (backup if HTML patterns failed)
+        if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $plainText, $textMatches)) {
+            $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account (first 10 digits)
+            $payerAccountNumber = trim($textMatches[2]);
+            $amountFromDesc = (float) ($textMatches[3] / 100);
+            if (!$amount && $amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+                $method = 'html_rendered_text';
+            }
+            $dateStr = $textMatches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            if (!$senderName) {
+                $senderName = trim(strtolower($textMatches[6]));
+            }
+        }
+        
         if (!$amount && preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $plainText, $textMatches)) {
             $potentialAmount = (float) str_replace(',', '', $textMatches[1]);
             if ($potentialAmount >= 10) {
