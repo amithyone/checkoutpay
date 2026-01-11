@@ -1828,7 +1828,8 @@ class PaymentMatchingService
         ];
         
         // Add description field to extracted data for debugging
-        if ($descriptionField) {
+        // This is the 43-digit value: "900877121002100859959000020260111094651392"
+        if (isset($descriptionField) && $descriptionField) {
             $result['description_field'] = $descriptionField;
         }
         
