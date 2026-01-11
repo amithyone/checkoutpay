@@ -1630,20 +1630,20 @@ class PaymentMatchingService
         
         // STRATEGY 1: Convert HTML to plain text and try text extraction (simplest, most reliable)
         // This handles complex HTML structures by stripping tags first
+        // CRITICAL: Do this FIRST before any HTML parsing - plain text is more reliable!
         $plainText = strip_tags($html);
         $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
         
-        // Also try extracting account number from plain text description field (backup if HTML patterns failed)
-        // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
-        // This should match: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON..."
+        // PRIORITY: Extract account number from plain text description field FIRST
+        // This is the MOST RELIABLE method - plain text is easier to parse than HTML
+        // This should match: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
         // CRITICAL: Make TO optional - text might be truncated or not have TO
-        // CRITICAL: This is a KEY fallback - if HTML patterns failed, this MUST catch it
-        // CRITICAL: Extract the full description field for debugging
-        if (!$accountNumber && preg_match('/description[\s]*:[\s]*([^\\n\\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[^\\n\\r]*FROM[^\\n\\r]*)/i', $plainText, $descFieldMatches)) {
+        // CRITICAL: This MUST run before any other extraction to ensure account number is found
+        if (preg_match('/description[\s]*:[\s]*([^\\n\\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[^\\n\\r]*FROM[^\\n\\r]*)/i', $plainText, $descFieldMatches)) {
             // Extract the full description field content (for debugging)
             $descriptionField = trim($descFieldMatches[1]);
-            // Now extract the actual values
-            if (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $descriptionField, $textMatches)) {
+            // Now extract the actual values - ULTRA-SIMPLE pattern
+            if (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s*FROM\s*([A-Z\s]+?)(?:\s+TO|$)/i', $descriptionField, $textMatches)) {
                 $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account (first 10 digits)
                 $payerAccountNumber = trim($textMatches[2]);
                 $amountFromDesc = (float) ($textMatches[3] / 100);
