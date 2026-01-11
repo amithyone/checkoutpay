@@ -23,6 +23,7 @@ class ProcessedEmail extends Model
         'amount',
         'sender_name',
         'account_number',
+        'description_field', // The 43-digit description field value
         'extracted_data',
         'matched_payment_id',
         'matched_at',

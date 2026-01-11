@@ -584,6 +584,7 @@ class ReadEmailsDirect extends Command
                 'amount' => $extractedInfo['amount'] ?? null,
                 'sender_name' => $extractedInfo['sender_name'] ?? null,
                 'account_number' => $extractedInfo['account_number'] ?? null,
+                'description_field' => $extractedInfo['description_field'] ?? null, // Store the 43-digit description field
                 'extracted_data' => $extractedInfo,
                 'extraction_method' => $extractionMethod,
             ]);
