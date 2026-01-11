@@ -121,8 +121,86 @@ if ($textLength > 0) {
     }
 }
 
+// DETAILED PATTERN TESTING
+echo "\n=== Testing Patterns Directly ===\n";
+
+// Test 1: Direct pattern match on text_body
+if ($email->text_body) {
+    $textBody = $email->text_body;
+    echo "\n--- Pattern Test 1: text_body ---\n";
+    echo "Text body snippet: " . substr($textBody, 0, 200) . "...\n";
+    
+    // Test our 43-digit pattern
+    if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $textBody, $matches)) {
+        echo "✅ Pattern MATCHED! Found: " . $matches[1] . "\n";
+        echo "   Length: " . strlen($matches[1]) . " digits\n";
+        
+        // Parse the 43 digits
+        if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $matches[1], $digits)) {
+            echo "   ✅ Parsed successfully:\n";
+            echo "      Recipient Account: " . $digits[1] . "\n";
+            echo "      Payer Account: " . $digits[2] . "\n";
+            echo "      Amount: " . ($digits[3] / 100) . "\n";
+            echo "      Date: " . $digits[4] . "\n";
+        } else {
+            echo "   ❌ Failed to parse 43 digits\n";
+        }
+    } else {
+        echo "❌ Pattern did NOT match on text_body\n";
+        
+        // Try alternative patterns
+        if (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $textBody, $altMatches)) {
+            echo "   Found description field: " . substr($altMatches[1], 0, 100) . "...\n";
+        }
+        
+        // Try finding just the 43 digits
+        if (preg_match('/(\d{43})/', $textBody, $digitMatches)) {
+            echo "   Found 43 digits somewhere: " . $digitMatches[1] . "\n";
+        }
+    }
+}
+
+// Test 2: Pattern match on HTML converted to plain text
+if ($email->html_body) {
+    $htmlBody = $email->html_body;
+    $plainText = strip_tags($htmlBody);
+    $plainText = preg_replace('/\s+/', ' ', $plainText);
+    
+    echo "\n--- Pattern Test 2: html_body (converted to plain text) ---\n";
+    echo "Plain text snippet: " . substr($plainText, 0, 200) . "...\n";
+    
+    // Test our 43-digit pattern
+    if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $plainText, $matches)) {
+        echo "✅ Pattern MATCHED! Found: " . $matches[1] . "\n";
+        echo "   Length: " . strlen($matches[1]) . " digits\n";
+        
+        // Parse the 43 digits
+        if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $matches[1], $digits)) {
+            echo "   ✅ Parsed successfully:\n";
+            echo "      Recipient Account: " . $digits[1] . "\n";
+            echo "      Payer Account: " . $digits[2] . "\n";
+            echo "      Amount: " . ($digits[3] / 100) . "\n";
+            echo "      Date: " . $digits[4] . "\n";
+        } else {
+            echo "   ❌ Failed to parse 43 digits\n";
+        }
+    } else {
+        echo "❌ Pattern did NOT match on plain text\n";
+        
+        // Try alternative patterns
+        if (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $plainText, $altMatches)) {
+            echo "   Found description field: " . substr($altMatches[1], 0, 100) . "...\n";
+        }
+        
+        // Try finding just the 43 digits
+        if (preg_match('/(\d{43})/', $plainText, $digitMatches)) {
+            echo "   Found 43 digits somewhere: " . $digitMatches[1] . "\n";
+        }
+    }
+}
+
 // Now try extraction with PaymentMatchingService
-echo "=== Testing Extraction with PaymentMatchingService ===\n";
+echo "\n=== Testing Extraction with PaymentMatchingService ===\n";
 $matchingService = app(PaymentMatchingService::class);
 
 $emailData = [
@@ -149,6 +227,10 @@ try {
         echo "  Extracted Date: " . ($result['data']['extracted_date'] ?? 'NULL') . "\n";
         echo "  Transaction Time: " . ($result['data']['transaction_time'] ?? 'NULL') . "\n";
         
+        if (isset($result['data']['description_field'])) {
+            echo "  Description Field: " . $result['data']['description_field'] . "\n";
+        }
+        
         if (isset($result['diagnostics'])) {
             echo "\nDiagnostics:\n";
             echo "  Steps: " . implode(', ', $result['diagnostics']['steps'] ?? []) . "\n";
@@ -158,30 +240,6 @@ try {
         }
     } else {
         echo "❌ Extraction failed - no data returned\n";
-        
-        // Check diagnostics
-        $diagnostics = $matchingService->getLastExtractionDiagnostics();
-        if ($diagnostics) {
-            echo "\nExtraction Diagnostics:\n";
-            echo "  Steps:\n";
-            foreach ($diagnostics['steps'] ?? [] as $step) {
-                echo "    - {$step}\n";
-            }
-            if (!empty($diagnostics['errors'])) {
-                echo "  Errors:\n";
-                foreach ($diagnostics['errors'] as $error) {
-                    echo "    - {$error}\n";
-                }
-            }
-            if (isset($diagnostics['html_preview'])) {
-                echo "\n  HTML Preview (first 500 chars):\n";
-                echo "    " . substr($diagnostics['html_preview'], 0, 500) . "...\n";
-            }
-            if (isset($diagnostics['text_preview'])) {
-                echo "\n  Text Preview (first 500 chars):\n";
-                echo "    " . substr($diagnostics['text_preview'], 0, 500) . "...\n";
-            }
-        }
     }
 } catch (\Exception $e) {
     echo "❌ Error during extraction: " . $e->getMessage() . "\n";
