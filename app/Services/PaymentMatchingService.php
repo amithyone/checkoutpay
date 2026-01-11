@@ -1497,6 +1497,7 @@ class PaymentMatchingService
         $transactionTime = null;
         $extractedDate = null;
         $method = null;
+        $descriptionField = null; // Store the full description field for debugging
         
         // PRIORITY: Extract account number from Description field FIRST (before any other extraction)
         // Description field format: <td>Description</td><td>:</td><td colspan="8">900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO SQUAD</td>
@@ -1629,20 +1630,26 @@ class PaymentMatchingService
         // This should match: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON..."
         // CRITICAL: Make TO optional - text might be truncated or not have TO
         // CRITICAL: This is a KEY fallback - if HTML patterns failed, this MUST catch it
-        if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $plainText, $textMatches)) {
-            $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account (first 10 digits)
-            $payerAccountNumber = trim($textMatches[2]);
-            $amountFromDesc = (float) ($textMatches[3] / 100);
-            if (!$amount && $amountFromDesc >= 10) {
-                $amount = $amountFromDesc;
-                $method = $method ?: 'html_rendered_text';
-            }
-            $dateStr = $textMatches[4];
-            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
-                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
-            }
-            if (!$senderName) {
-                $senderName = trim(strtolower($textMatches[6]));
+        // CRITICAL: Extract the full description field for debugging
+        if (!$accountNumber && preg_match('/description[\s]*:[\s]*([^\\n\\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[^\\n\\r]*FROM[^\\n\\r]*)/i', $plainText, $descFieldMatches)) {
+            // Extract the full description field content (for debugging)
+            $descriptionField = trim($descFieldMatches[1]);
+            // Now extract the actual values
+            if (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $descriptionField, $textMatches)) {
+                $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account (first 10 digits)
+                $payerAccountNumber = trim($textMatches[2]);
+                $amountFromDesc = (float) ($textMatches[3] / 100);
+                if (!$amount && $amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
+                    $method = $method ?: 'html_rendered_text';
+                }
+                $dateStr = $textMatches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+                if (!$senderName) {
+                    $senderName = trim(strtolower($textMatches[6]));
+                }
             }
         }
         // Last resort: Look for the digit pattern anywhere in plain text (ultra-flexible)
@@ -1801,7 +1808,7 @@ class PaymentMatchingService
             return null;
         }
         
-        return [
+        $result = [
             'amount' => $amount,
             'account_number' => $accountNumber,
             'sender_name' => $senderName,
@@ -1810,6 +1817,13 @@ class PaymentMatchingService
             'extracted_date' => $extractedDate,
             'method' => $method ?? 'html_body',
         ];
+        
+        // Add description field to extracted data for debugging
+        if ($descriptionField) {
+            $result['description_field'] = $descriptionField;
+        }
+        
+        return $result;
     }
 
     /**
