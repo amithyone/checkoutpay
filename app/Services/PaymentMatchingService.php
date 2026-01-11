@@ -1618,13 +1618,15 @@ class PaymentMatchingService
         $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
         
         // Also try extracting account number from plain text description field (backup if HTML patterns failed)
-        if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $plainText, $textMatches)) {
+        // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
+        // This should match: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON..."
+        if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?).*?TO/i', $plainText, $textMatches)) {
             $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($textMatches[2]);
             $amountFromDesc = (float) ($textMatches[3] / 100);
             if (!$amount && $amountFromDesc >= 10) {
                 $amount = $amountFromDesc;
-                $method = 'html_rendered_text';
+                $method = $method ?: 'html_rendered_text';
             }
             $dateStr = $textMatches[4];
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
