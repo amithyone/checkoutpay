@@ -1340,21 +1340,78 @@ class PaymentMatchingService
         $fullText = $subject . ' ' . $htmlLower;
         
         $amount = null;
+        $accountNumber = null;
         $senderName = null;
         $payerAccountNumber = null;
         $transactionTime = null;
         $extractedDate = null;
         $method = null;
         
+        // PRIORITY: Extract account number from Description field FIRST (before any other extraction)
+        // Description field format: <td>Description</td><td colspan="8">900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO SQUAD</td>
+        // Format: recipient_account(10) sender_account(10) amount(6) date(8) unknown(9) FROM NAME TO NAME
+        // IMPORTANT: First 10 digits is ALWAYS the recipient account number (where payment was sent TO)
+        // Pattern 1: Description field with space between accounts (NEW format)
+        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
+            $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
+            $amountFromDesc = (float) ($matches[3] / 100);
+            if (!$amount && $amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+                $method = 'html_table_description';
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            $senderName = trim(strtolower($matches[6]));
+        }
+        // Pattern 2: Description field WITHOUT space between accounts (format in user's HTML snippet)
+        // Format: <td>Description</td><td>900877121002100859959000020260111094651392 FROM...</td>
+        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
+            $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
+            $amountFromDesc = (float) ($matches[3] / 100);
+            if (!$amount && $amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+                $method = 'html_table_description';
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            $senderName = trim(strtolower($matches[6]));
+        }
+        // Pattern 3: Description field with dash separator (old format)
+        // Format: <td>Description</td><td>090405260110001723439231932126-AMITHY ONE M TRF FOR...</td>
+        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
+            $payerAccountNumber = trim($matches[2]);
+            $amountFromDesc = (float) ($matches[3] / 100);
+            if (!$amount && $amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+                $method = 'html_table_description';
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            $potentialName = trim($matches[6]);
+            $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        
         // STRATEGY 1: Convert HTML to plain text and try text extraction (simplest, most reliable)
         // This handles complex HTML structures by stripping tags first
         $plainText = strip_tags($html);
         $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
-        if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $plainText, $textMatches)) {
+        if (!$amount && preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $plainText, $textMatches)) {
             $potentialAmount = (float) str_replace(',', '', $textMatches[1]);
             if ($potentialAmount >= 10) {
                 $amount = $potentialAmount;
-                $method = 'html_rendered_text';
+                $method = $method ?: 'html_rendered_text';
                 // Continue to extract sender name below
             }
         }
