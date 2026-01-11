@@ -500,44 +500,10 @@ class PaymentMatchingService
             $timeDiff = $paymentTime->diffInMinutes($emailTime);
         }
 
-        // CRITICAL: Validate account number match - payment account_number must match recipient account from description field
-        // The recipient account is the account number where the payment was sent TO (positions 0-9 in description field)
-        // IMPORTANT: The first 10 digits of description field is ALWAYS the recipient account, even if Account Number field is missing
-        if ($payment->account_number) {
-            $expectedAccount = trim($payment->account_number);
-            
-            // Check if account_number was extracted (from Account Number field or description field)
-            if (isset($extractedInfo['account_number']) && $extractedInfo['account_number']) {
-                $extractedRecipientAccount = trim($extractedInfo['account_number']);
-                
-                if ($expectedAccount !== $extractedRecipientAccount) {
-                    return [
-                        'matched' => false,
-                        'reason' => sprintf(
-                            'Account number mismatch: payment expects account "%s", but email shows recipient account "%s". Payment cannot be approved.',
-                            $expectedAccount,
-                            $extractedRecipientAccount
-                        ),
-                        'account_number_mismatch' => true,
-                        'expected_account' => $expectedAccount,
-                        'extracted_account' => $extractedRecipientAccount,
-                    ];
-                }
-            } else {
-                // Account number not found in email - this should not happen if description field exists
-                // But we should still try to extract from description field if it wasn't extracted yet
-                // This is a fallback safety check
-                return [
-                    'matched' => false,
-                    'reason' => sprintf(
-                        'Account number required but not found in email. Payment expects account "%s". Description field should contain recipient account as first 10 digits.',
-                        $expectedAccount
-                    ),
-                    'account_number_missing' => true,
-                    'expected_account' => $expectedAccount,
-                ];
-            }
-        }
+        // ACCOUNT NUMBER VALIDATION DISABLED - Temporarily removed as validator
+        // We still extract account numbers for logging/storage, but don't use them for matching validation
+        // This allows matching to proceed based on amount, name, and time only
+        // TODO: Re-enable account number validation once extraction is more reliable
 
         // Calculate amount difference
         $expectedAmount = $payment->amount;
