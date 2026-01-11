@@ -8,6 +8,10 @@ Route::get('/', function () {
     return view('home');
 })->name('home');
 
+Route::get('/pricing', function () {
+    return view('pricing');
+})->name('pricing');
+
 // Setup routes (must be before any middleware that requires database)
 Route::get('/setup', [SetupController::class, 'index'])->name('setup');
 Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);
