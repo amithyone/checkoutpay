@@ -16,7 +16,7 @@ class ApiDocumentationController extends Controller
         $business = auth('business')->user();
         
         // Read the API documentation markdown file
-        $docPath = base_path('API_DOCUMENTATION.md');
+        $docPath = base_path('docs/API_DOCUMENTATION.md');
         $documentation = File::exists($docPath) ? File::get($docPath) : 'API Documentation not available.';
         
         return view('business.api-documentation.index', compact('business', 'documentation'));

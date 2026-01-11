@@ -28,3 +28,6 @@ bootstrap/cache/*
 
 # Deployment files
 deploy.sh
+
+# Documentation files
+docs/
