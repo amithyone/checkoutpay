@@ -1424,8 +1424,15 @@ class PaymentMatchingService
             
             if (!$senderName && $template->sender_name_field_label) {
                 $label = preg_quote($template->sender_name_field_label, '/');
+                // Pattern: Description field contains "CODE-TRANSFER FROM NAME"
+                if (preg_match('/(?s)<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>.*?<td[^>]*>.*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z][A-Z\s]+?)(?:-|<\/td>|$)/i', $html, $matches)) {
+                    $potentialName = trim($matches[1]);
+                    if (strlen($potentialName) >= 3) {
+                        $senderName = trim(strtolower($potentialName));
+                    }
+                }
                 // Pattern: Description field contains "CODE-NAME TRF FOR"
-                if (preg_match('/(?s)<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>.*?([\d\-]+\s*-\s*)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+                elseif (preg_match('/(?s)<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>.*?([\d\-]+\s*-\s*)?([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
                     $potentialName = trim($matches[2] ?? $matches[1] ?? '');
                     $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
                     if (strlen($potentialName) >= 3) {
@@ -1438,7 +1445,17 @@ class PaymentMatchingService
                 }
             }
             
-            // FALLBACK: Extract sender name from Remark field in HTML if not found
+            // FALLBACK: Extract sender name from Remark field in HTML if not found (just the name, no FROM)
+            if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:remark|remarks)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>[\s]*([A-Z][A-Z\s]{2,}?)[\s]*<\/td>/i', $html, $matches)) {
+                $potentialName = trim($matches[1]);
+                // Remove common prefixes like "NT", "MR", "MRS", "MS", etc.
+                $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA)\s+/i', '', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            
+            // FALLBACK: Extract sender name from Remark field with FROM (if previous didn't match)
             if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:remark|remarks)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $html, $matches)) {
                 $senderName = trim(strtolower($matches[1]));
             }
