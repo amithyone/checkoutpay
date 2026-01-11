@@ -35,6 +35,16 @@ class MonitorEmails extends Command
     {
         $this->info('Checking for new emails...');
 
+        // Check if IMAP fetching is disabled
+        $disableImap = \App\Models\Setting::get('disable_imap_fetching', false);
+        
+        if ($disableImap) {
+            $this->warn('IMAP fetching is disabled. Skipping IMAP email monitoring.');
+            $this->info('💡 Use "payment:read-emails-direct" command instead for filesystem-based email reading');
+            $this->info('💡 Or use Zapier webhook: ' . url('/api/v1/email/webhook'));
+            return;
+        }
+
         // Get all active email accounts from database
         $emailAccounts = EmailAccount::where('is_active', true)->get();
 
@@ -52,6 +62,12 @@ class MonitorEmails extends Command
                 
                 // Check which method to use
                 $method = $emailAccount->method ?? 'imap';
+                
+                // Skip IMAP methods if IMAP is disabled (shouldn't happen due to early return, but double-check)
+                if ($disableImap && ($method === 'imap' || $method === 'native_imap')) {
+                    $this->warn("Skipping {$emailAccount->email} - IMAP method is disabled");
+                    continue;
+                }
                 
                 if ($method === 'gmail_api') {
                     $this->monitorEmailAccountGmailApi($emailAccount);
