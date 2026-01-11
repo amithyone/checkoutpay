@@ -181,6 +181,20 @@ class ReExtractDescriptionFields extends Command
                 } else {
                     if ($debug) {
                         $this->line("  ❌ Failed: " . ($descriptionField ? "Found but length is " . strlen($descriptionField) : "Not found"));
+                        // Show what we're working with
+                        $textLen = strlen($email->text_body ?? '');
+                        $htmlLen = strlen($email->html_body ?? '');
+                        $this->line("  📄 text_body length: {$textLen}, html_body length: {$htmlLen}");
+                        
+                        // Try to find ANY digits in text_body
+                        if ($email->text_body && preg_match('/(\d{20,})/', $email->text_body, $anyDigits)) {
+                            $this->line("  🔍 Found " . strlen($anyDigits[1]) . " consecutive digits in text_body: " . substr($anyDigits[1], 0, 30) . "...");
+                        }
+                        
+                        // Check if description field exists but in different format
+                        if ($email->text_body && preg_match('/description[\s]*:[\s]*([^\n\r]{20,})/i', $email->text_body, $descLine)) {
+                            $this->line("  📝 Description line found: " . substr(trim($descLine[1]), 0, 60) . "...");
+                        }
                     }
                     $failedCount++;
                 }
