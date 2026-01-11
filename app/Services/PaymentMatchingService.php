@@ -1781,7 +1781,7 @@ class PaymentMatchingService
         }
         // Pattern 3: Description field with space between accounts
         // Format: <td>Description</td><td>9008771210 021008599511000020260111080847554 FROM...</td>
-        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100);
