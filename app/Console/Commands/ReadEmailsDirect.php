@@ -453,7 +453,7 @@ class ReadEmailsDirect extends Command
             }
         }
 
-        return $count;
+        return ['processed' => $processed, 'skipped' => $skipped, 'failed' => $failed];
     }
 
     /**
