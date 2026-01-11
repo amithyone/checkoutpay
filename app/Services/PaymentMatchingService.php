@@ -1501,11 +1501,12 @@ class PaymentMatchingService
         // IMPORTANT: First 10 digits is ALWAYS the recipient account number (where payment was sent TO)
         // Note: HTML structure may have a colon cell (<td>:</td>) between label and value
         
-        // Pattern 1: Description field WITHOUT space between accounts, with optional colon cell (FLEXIBLE)
+        // Pattern 1: Description field WITHOUT space between accounts, with optional colon cell (ULTRA-FLEXIBLE)
         // Format: <td>Description</td><td>:</td><td colspan="8">900877121002100859959000020260111094651392 FROM...</td>
         // This is the most common format in GTBank HTML emails
-        // Uses .*? for flexible matching between cells to handle any HTML attributes/whitespace
-        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\s\n\r]+FROM[\s\n\r]+([A-Z\s]+?)[\s\n\r]+TO/i', $html, $matches)) {
+        // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
+        // Changed from [\s\n\r]+FROM to .*?FROM to handle any formatting variations
+        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?).*?TO/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1519,9 +1520,10 @@ class PaymentMatchingService
             }
             $senderName = trim(strtolower($matches[6]));
         }
-        // Pattern 2: Description field WITHOUT colon cell (direct next cell) - FLEXIBLE
+        // Pattern 2: Description field WITHOUT colon cell (direct next cell) - ULTRA-FLEXIBLE
         // Format: <td>Description</td><td>900877121002100859959000020260111094651392 FROM...</td>
-        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\s\n\r]+FROM[\s\n\r]+([A-Z\s]+?)[\s\n\r]+TO/i', $html, $matches)) {
+        // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
+        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?).*?TO/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1573,7 +1575,8 @@ class PaymentMatchingService
         }
         // Pattern 5: Fallback - Extract from any cell containing the description pattern (very flexible)
         // This catches cases where the HTML structure is slightly different
-        elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\s\n\r]+FROM[\s\n\r]+([A-Z\s]+?)[\s\n\r]+TO/i', $html, $matches)) {
+        // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
+        elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?).*?TO/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1591,7 +1594,8 @@ class PaymentMatchingService
         }
         // Pattern 6: Ultra-flexible - Just look for the digit pattern followed by FROM in description context
         // This is a last resort that should catch almost any format
-        elseif (!$accountNumber && preg_match('/(?s)description[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s*FROM\s*([A-Z\s]+?)\s*TO/i', $html, $matches)) {
+        // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
+        elseif (!$accountNumber && preg_match('/(?s)description[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?).*?TO/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1632,7 +1636,8 @@ class PaymentMatchingService
         }
         // Last resort: Look for the digit pattern anywhere in plain text (ultra-flexible)
         // Pattern: 10 digits, 10 digits, 6 digits, 8 digits, 9 digits followed by FROM ... TO
-        elseif (!$accountNumber && preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $plainText, $textMatches)) {
+        // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
+        elseif (!$accountNumber && preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?).*?TO/i', $plainText, $textMatches)) {
             $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($textMatches[2]);
             $amountFromDesc = (float) ($textMatches[3] / 100);
