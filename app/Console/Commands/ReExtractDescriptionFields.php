@@ -227,4 +227,98 @@ class ReExtractDescriptionFields extends Command
 
         return 0;
     }
+
+    /**
+     * Extract description field directly from text/html (fallback method)
+     * This is a SIMPLE, DIRECT extraction - just find 43 consecutive digits after "Description :"
+     */
+    protected function extractDescriptionFieldDirectly(?string $textBody, ?string $htmlBody): ?string
+    {
+        // Try text_body first (cleaner)
+        if ($textBody) {
+            // Decode quoted-printable first (e.g., =20 becomes space)
+            $textBody = $this->decodeQuotedPrintable($textBody);
+            
+            // Pattern 1: Direct match - "Description : " followed by exactly 43 digits
+            // This is the SIMPLEST pattern - just match the digits
+            if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $textBody, $matches)) {
+                return trim($matches[1]);
+            }
+            
+            // Pattern 2: Find description line, then extract 43 consecutive digits from anywhere in that line
+            if (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $textBody, $lineMatches)) {
+                $descLine = trim($lineMatches[1]);
+                // Find exactly 43 consecutive digits anywhere in the description line
+                if (preg_match('/(\d{43})/', $descLine, $digitMatches)) {
+                    $found = trim($digitMatches[1]);
+                    // Verify it's exactly 43 digits
+                    if (strlen($found) === 43 && ctype_digit($found)) {
+                        return $found;
+                    }
+                }
+            }
+            
+            // Pattern 3: Ultra-simple - just find 43 consecutive digits anywhere in text_body
+            // This is a last resort fallback
+            if (preg_match('/(\d{43})/', $textBody, $digitMatches)) {
+                $found = trim($digitMatches[1]);
+                if (strlen($found) === 43 && ctype_digit($found)) {
+                    return $found;
+                }
+            }
+        }
+
+        // Try html_body (convert to plain text first)
+        if ($htmlBody) {
+            // Decode quoted-printable first
+            $htmlBody = $this->decodeQuotedPrintable($htmlBody);
+            // Decode HTML entities
+            $htmlBody = html_entity_decode($htmlBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            // Convert to plain text
+            $plainText = strip_tags($htmlBody);
+            $plainText = preg_replace('/\s+/', ' ', $plainText);
+
+            // Pattern 1: Direct match - "Description : " followed by exactly 43 digits
+            if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $plainText, $matches)) {
+                return trim($matches[1]);
+            }
+            
+            // Pattern 2: Find description line, then extract 43 consecutive digits
+            if (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $plainText, $lineMatches)) {
+                $descLine = trim($lineMatches[1]);
+                if (preg_match('/(\d{43})/', $descLine, $digitMatches)) {
+                    $found = trim($digitMatches[1]);
+                    if (strlen($found) === 43 && ctype_digit($found)) {
+                        return $found;
+                    }
+                }
+            }
+            
+            // Pattern 3: Ultra-simple - just find 43 consecutive digits anywhere
+            if (preg_match('/(\d{43})/', $plainText, $digitMatches)) {
+                $found = trim($digitMatches[1]);
+                if (strlen($found) === 43 && ctype_digit($found)) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Decode quoted-printable encoding
+     */
+    protected function decodeQuotedPrintable(string $text): string
+    {
+        // Replace =XX with corresponding character (where XX is hex)
+        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function ($matches) {
+            return chr(hexdec($matches[1]));
+        }, $text);
+        
+        // Replace soft line breaks (= at end of line)
+        $text = preg_replace('/=\r?\n/', '', $text);
+        
+        return $text;
+    }
 }
