@@ -47,6 +47,8 @@ class ReadEmailsDirect extends Command
         }
 
         $totalRead = 0;
+        $totalSkipped = 0;
+        $totalFailed = 0;
 
         foreach ($emailAccounts as $emailAccount) {
             $this->info("Reading emails for: {$emailAccount->email}");
