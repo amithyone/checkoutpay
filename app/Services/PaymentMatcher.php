@@ -74,16 +74,17 @@ class PaymentMatcher
         // If payer name is provided, check similarity first
         if ($payment->payer_name) {
             if (empty($extractedInfo['sender_name'])) {
-                // Name required but not found - check amount strictly
-                if (abs($amountDiff) > $amountTolerance) {
-                    return [
-                        'matched' => false,
-                        'reason' => 'Payer name required but not found in email, and amount mismatch',
-                        'amount_diff' => $amountDiff,
-                        'time_diff_minutes' => $timeDiff,
-                        'name_similarity_percent' => 0,
-                    ];
-                }
+                // Name required but not found - REJECT (cannot approve without name match)
+                return [
+                    'matched' => false,
+                    'reason' => sprintf(
+                        'Payer name required but not found in email. Expected "%s", but sender_name is empty. Cannot approve without name match.',
+                        $payment->payer_name
+                    ),
+                    'amount_diff' => $amountDiff,
+                    'time_diff_minutes' => $timeDiff,
+                    'name_similarity_percent' => 0,
+                ];
             } else {
                 // Normalize names for comparison
                 $expectedName = trim(strtolower($payment->payer_name));
