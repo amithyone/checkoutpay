@@ -1607,7 +1607,8 @@ class PaymentMatchingService
         // OR: "900877121002100859959000020260111094651392 FROM SOLOMON..." (without space)
         // CRITICAL: This pattern allows ANY characters (including spaces, dashes, etc.) between digits and FROM
         // CRITICAL: Make TO optional - text might be truncated or not have TO
-        elseif (preg_match('/(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $text, $matches)) {
+        // Use 'if' instead of 'elseif' so it runs even if previous patterns didn't find a match
+        if (!$accountNumber && preg_match('/(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1618,7 +1619,9 @@ class PaymentMatchingService
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                 $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
             }
-            $senderName = trim(strtolower($matches[6]));
+            if (!$senderName) {
+                $senderName = trim(strtolower($matches[6]));
+            }
         }
         
         // Extract amount from text (case insensitive, flexible patterns) - only if not already extracted
