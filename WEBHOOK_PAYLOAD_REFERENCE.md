@@ -42,6 +42,7 @@ When a payment is successfully matched and approved:
   "payer_name": "John Doe",
   "bank": "GTBank",
   "account_number": "3002156642",
+  "payer_account_number": "1000172343",
   "approved_at": "2026-01-10T12:30:45.000000Z",
   "is_mismatch": false,
   "message": "Payment has been verified and approved"
@@ -58,7 +59,8 @@ When a payment is successfully matched and approved:
 | `amount` | float | Expected payment amount (e.g., `5000.00`) | ✅ Yes |
 | `payer_name` | string\|null | Name of the person who made the payment (may be null if not extracted) | ⚠️ Optional |
 | `bank` | string\|null | Bank name (may be null if not extracted) | ⚠️ Optional |
-| `account_number` | string\|null | Account number where payment was received (may be null if not specified) | ⚠️ Optional |
+| `account_number` | string\|null | Recipient account number where payment was received (extracted from GTBank description field, positions 0-9) | ⚠️ Optional |
+| `payer_account_number` | string\|null | Sender account number where payment was sent from (extracted from GTBank description field, positions 10-19) | ⚠️ Optional |
 | `approved_at` | string | ISO 8601 timestamp when payment was approved (e.g., `2026-01-10T12:30:45.000000Z`) | ✅ Yes |
 | `is_mismatch` | boolean | `true` if received amount differs from expected amount (but name matches) | ✅ Yes |
 | `received_amount` | float\|null | Actual amount received (only present if `is_mismatch` is `true`) | ⚠️ Conditional |
@@ -159,6 +161,7 @@ When a payment expires (sent via `SendExpiredPaymentWebhook`):
   "payer_name": "John Doe",
   "bank": "GTBank",
   "account_number": "3002156642",
+  "payer_account_number": "1000172343",
   "approved_at": "2026-01-10T15:35:05.789012Z",
   "is_mismatch": true,
   "received_amount": 4500.00,
@@ -178,6 +181,7 @@ When a payment expires (sent via `SendExpiredPaymentWebhook`):
   "payer_name": null,
   "bank": null,
   "account_number": "3002156642",
+  "payer_account_number": null,
   "approved_at": "2026-01-10T16:13:15.456789Z",
   "is_mismatch": false,
   "message": "Payment has been verified and approved"
@@ -195,6 +199,7 @@ When a payment expires (sent via `SendExpiredPaymentWebhook`):
   "payer_name": "Jane Smith",
   "bank": "Access Bank",
   "account_number": "3002156642",
+  "payer_account_number": "1000172343",
   "approved_at": "2026-01-10T17:00:30.789012Z",
   "is_mismatch": true,
   "received_amount": 12000.00,

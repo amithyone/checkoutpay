@@ -1158,6 +1158,7 @@ class PaymentMatchingService
         
         $amount = null;
         $senderName = null;
+        $payerAccountNumber = null;
         
         // Extract amount from text (case insensitive, flexible patterns)
         $amountPatterns = [
@@ -1245,6 +1246,7 @@ class PaymentMatchingService
         
         $amount = null;
         $senderName = null;
+        $payerAccountNumber = null;
         $method = null;
         
         // STRATEGY 1: Convert HTML to plain text and try text extraction (simplest, most reliable)
