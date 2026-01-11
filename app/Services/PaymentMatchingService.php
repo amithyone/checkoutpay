@@ -1142,6 +1142,7 @@ class PaymentMatchingService
         $payerAccountNumber = null;
         $transactionTime = null;
         $extractedDate = null;
+        $descriptionField = null;
         
         // STRATEGY 1: Try TEXT-based extraction first (for forwarded emails in plain text)
         // GTBank format from processed_emails text_body column:
