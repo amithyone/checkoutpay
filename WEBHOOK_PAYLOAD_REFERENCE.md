@@ -78,6 +78,7 @@ When a payment is rejected (rarely used, typically payments expire instead):
   "transaction_id": "TXN-20260110123456-abc123",
   "amount": 5000.00,
   "payer_name": "John Doe",
+  "account_number": "3002156642",
   "rejected_at": "2026-01-10T12:30:45.000000Z",
   "reason": "Payment verification failed",
   "message": "Payment has been rejected"
@@ -93,6 +94,7 @@ When a payment is rejected (rarely used, typically payments expire instead):
 | `transaction_id` | string | Unique transaction identifier | ✅ Yes |
 | `amount` | float | Payment amount | ✅ Yes |
 | `payer_name` | string\|null | Name of the payer (may be null) | ⚠️ Optional |
+| `account_number` | string\|null | Account number where payment was expected | ⚠️ Optional |
 | `rejected_at` | string | ISO 8601 timestamp when payment was rejected | ✅ Yes |
 | `reason` | string | Reason for rejection (e.g., `"Payment verification failed"`) | ✅ Yes |
 | `message` | string | Human-readable message: `"Payment has been rejected"` | ✅ Yes |
