@@ -1304,6 +1304,9 @@ class PaymentMatchingService
             // Format: <td>Description</td><td>:</td><td colspan="8">900877121002100859959000020260111094651392 FROM...</td>
             // Uses .*? for flexible matching to handle any HTML attributes/whitespace
             if (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\s\n\r]+FROM[\s\n\r]+([A-Z\s]+?)[\s\n\r]+TO/i', $html, $matches)) {
+                // Store the full 43-digit description field
+                $descriptionField = trim($matches[1] . $matches[2] . $matches[3] . $matches[4] . $matches[5]);
+                
                 $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
                 $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
                 $amountFromDesc = (float) ($matches[3] / 100);
@@ -1316,6 +1319,27 @@ class PaymentMatchingService
                 }
                 if (!$senderName) {
                     $senderName = trim(strtolower($matches[6]));
+                }
+            }
+            // Pattern 1b: Try to extract just the 43 digits first from HTML (more flexible)
+            elseif (!$descriptionField && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*(\d{43})(?:\s|FROM|$)/i', $html, $descMatches)) {
+                $descriptionField = trim($descMatches[1]);
+                // Parse the 43 digits
+                if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
+                    $accountNumber = trim($digitMatches[1]);
+                    $payerAccountNumber = trim($digitMatches[2]);
+                    $amountFromDesc = (float) ($digitMatches[3] / 100);
+                    if (!$amount && $amountFromDesc >= 10) {
+                        $amount = $amountFromDesc;
+                    }
+                    $dateStr = $digitMatches[4];
+                    if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                        $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                    }
+                    // Extract sender name separately
+                    if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*\d{43}[\s\n\r]+FROM[\s\n\r]+([A-Z\s]+?)(?:[\s\n\r]+TO|$)/i', $html, $nameMatches)) {
+                        $senderName = trim(strtolower($nameMatches[1]));
+                    }
                 }
             }
             // Pattern 2: Description field WITHOUT colon cell (direct next cell) - FLEXIBLE
@@ -1439,7 +1463,7 @@ class PaymentMatchingService
             return null;
         }
         
-        return [
+        $result = [
             'amount' => $amount,
             'sender_name' => $senderName,
             'account_number' => $accountNumber,
@@ -1451,6 +1475,13 @@ class PaymentMatchingService
             'extracted_at' => now()->toISOString(),
             'template_used' => $template->bank_name,
         ];
+        
+        // Add description field if extracted
+        if ($descriptionField) {
+            $result['description_field'] = $descriptionField;
+        }
+        
+        return $result;
     }
 
     /**
