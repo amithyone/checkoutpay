@@ -1509,7 +1509,8 @@ class PaymentMatchingService
         // This is the most common format in GTBank HTML emails
         // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
         // Changed from [\s\n\r]+FROM to .*?FROM to handle any formatting variations
-        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?).*?TO/i', $html, $matches)) {
+        // CRITICAL: Make TO optional - HTML might be truncated or not have TO (like: FROM SOLOMON with no TO)
+        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100);
