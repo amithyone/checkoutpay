@@ -1160,11 +1160,14 @@ class PaymentMatchingService
         // STRATEGY 2: Try HTML-based extraction (for original HTML emails)
         if ((!$amount || !$accountNumber) && !empty($html)) {
             // PRIORITY: Extract account number from Description field FIRST in HTML (before Account Number field)
-            // Description field format: <td>Description</td><td colspan="8">900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO SQUAD</td>
+            // Description field format: <td>Description</td><td>:</td><td colspan="8">900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO SQUAD</td>
             // Format: recipient_account(10) sender_account(10) amount(6) date(8) unknown(9) FROM NAME TO NAME
             // IMPORTANT: First 10 digits is ALWAYS the recipient account number (where payment was sent TO)
-            // Pattern 1: Description field with space between accounts (NEW format)
-            if (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+            // Note: HTML structure may have a colon cell (<td>:</td>) between label and value
+            
+            // Pattern 1: Description field WITHOUT space between accounts, with optional colon cell (MOST COMMON)
+            // Format: <td>Description</td><td>:</td><td>900877121002100859959000020260111094651392 FROM...</td>
+            if (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
                 $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
                 $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
                 $amountFromDesc = (float) ($matches[3] / 100);
@@ -1179,7 +1182,7 @@ class PaymentMatchingService
                     $senderName = trim(strtolower($matches[6]));
                 }
             }
-            // Pattern 2: Description field WITHOUT space between accounts (format in user's HTML snippet)
+            // Pattern 2: Description field WITHOUT colon cell (direct next cell)
             // Format: <td>Description</td><td>900877121002100859959000020260111094651392 FROM...</td>
             elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
                 $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
@@ -1196,8 +1199,24 @@ class PaymentMatchingService
                     $senderName = trim(strtolower($matches[6]));
                 }
             }
-            // Pattern 3: Description field with dash separator (old format)
-            elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+            // Pattern 3: Description field with space between accounts
+            elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+                $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
+                $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
+                $amountFromDesc = (float) ($matches[3] / 100);
+                if (!$amount && $amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
+                }
+                $dateStr = $matches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+                if (!$senderName) {
+                    $senderName = trim(strtolower($matches[6]));
+                }
+            }
+            // Pattern 4: Description field with dash separator (old format)
+            elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
                 $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
                 $payerAccountNumber = trim($matches[2]);
                 $amountFromDesc = (float) ($matches[3] / 100);
@@ -1406,11 +1425,15 @@ class PaymentMatchingService
         $method = null;
         
         // PRIORITY: Extract account number from Description field FIRST (before any other extraction)
-        // Description field format: <td>Description</td><td colspan="8">900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO SQUAD</td>
+        // Description field format: <td>Description</td><td>:</td><td colspan="8">900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO SQUAD</td>
         // Format: recipient_account(10) sender_account(10) amount(6) date(8) unknown(9) FROM NAME TO NAME
         // IMPORTANT: First 10 digits is ALWAYS the recipient account number (where payment was sent TO)
-        // Pattern 1: Description field with space between accounts (NEW format)
-        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+        // Note: HTML structure may have a colon cell (<td>:</td>) between label and value
+        
+        // Pattern 1: Description field WITHOUT space between accounts, with optional colon cell
+        // Format: <td>Description</td><td>:</td><td>900877121002100859959000020260111094651392 FROM...</td>
+        // This is the most common format in GTBank HTML emails
+        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1424,7 +1447,7 @@ class PaymentMatchingService
             }
             $senderName = trim(strtolower($matches[6]));
         }
-        // Pattern 2: Description field WITHOUT space between accounts (format in user's HTML snippet)
+        // Pattern 2: Description field WITHOUT colon cell (direct next cell)
         // Format: <td>Description</td><td>900877121002100859959000020260111094651392 FROM...</td>
         elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
@@ -1440,9 +1463,25 @@ class PaymentMatchingService
             }
             $senderName = trim(strtolower($matches[6]));
         }
-        // Pattern 3: Description field with dash separator (old format)
+        // Pattern 3: Description field with space between accounts
+        // Format: <td>Description</td><td>9008771210 021008599511000020260111080847554 FROM...</td>
+        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
+            $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
+            $amountFromDesc = (float) ($matches[3] / 100);
+            if (!$amount && $amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+                $method = 'html_table_description';
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            $senderName = trim(strtolower($matches[6]));
+        }
+        // Pattern 4: Description field with dash separator (old format)
         // Format: <td>Description</td><td>090405260110001723439231932126-AMITHY ONE M TRF FOR...</td>
-        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
+        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
