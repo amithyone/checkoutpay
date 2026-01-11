@@ -1343,7 +1343,10 @@ class PaymentMatchingService
         // Description field format: "Description : 9008771210 021008599511000020260111080847554 FROM SOLOMON INNOCENT AMITHY TO SQUA"
         // Format: recipient_account(10) sender_account(10) amount_without_decimal(6) date_YYYYMMDD(8) unknown(9) FROM NAME TO NAME
         // IMPORTANT: First 10 digits is ALWAYS the recipient account number (where payment was sent TO)
-        if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+        // CRITICAL: Use flexible pattern that handles space or no space between account numbers
+        // Pattern 1: With space between first and second 10-digit numbers (MOST COMMON)
+        // Format: "Description : 9008771210 021008599511000020260111080847554 FROM..."
+        if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100); // Divide by 100 to get actual amount
@@ -1356,7 +1359,7 @@ class PaymentMatchingService
             }
             $senderName = trim(strtolower($matches[6]));
         }
-        // Alternative format: without space between accounts
+        // Pattern 2: Without space between accounts (all 43 digits together)
         // Format: "Description : 900877121002100859959000020260111094651392 FROM..."
         elseif (preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
@@ -1371,9 +1374,10 @@ class PaymentMatchingService
             }
             $senderName = trim(strtolower($matches[6]));
         }
-        // Pattern: Direct format without "Description :" prefix
-        // Format: "900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO..."
-        elseif (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+        // Pattern 3: Direct format without "Description :" prefix (fallback - very flexible)
+        // Format: "9008771210 021008599511000020260111080847554 FROM SOLOMON INNOCENT AMITHY TO..." (with space)
+        // OR: "900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO..." (without space)
+        elseif (preg_match('/(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
