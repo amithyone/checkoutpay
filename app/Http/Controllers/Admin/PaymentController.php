@@ -203,6 +203,11 @@ class PaymentController extends Controller
                         'html' => $storedEmail->html_body,
                         'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                     ]);
+                    
+                    // Update payer_account_number if extracted
+                    if (isset($match['extracted_info']['payer_account_number']) && $match['extracted_info']['payer_account_number']) {
+                        $payment->update(['payer_account_number' => $match['extracted_info']['payer_account_number']]);
+                    }
 
                     // Update business balance
                     if ($payment->business_id) {

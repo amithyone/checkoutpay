@@ -54,7 +54,8 @@ class SendWebhookNotification implements ShouldQueue
                 'amount' => (float) $this->payment->amount,
                 'payer_name' => $this->payment->payer_name,
                 'bank' => $this->payment->bank,
-                'account_number' => $this->payment->account_number, // Added account number
+                'account_number' => $this->payment->account_number, // Recipient account number (where money was sent TO)
+                'payer_account_number' => $this->payment->payer_account_number, // Sender account number (where money was sent FROM)
                 'approved_at' => $this->payment->matched_at->toISOString(),
                 'message' => 'Payment has been verified and approved',
             ];

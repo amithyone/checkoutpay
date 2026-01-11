@@ -229,6 +229,12 @@ class PaymentMatchingService
                     'match_reason' => $match['reason'],
                     'match_attempt_logged' => true,
                 ]);
+                
+                // Update payer_account_number if extracted
+                if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
+                    $payment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
+                    $payment->refresh(); // Refresh to get updated data
+                }
 
                 return $payment;
             } else {
@@ -807,6 +813,12 @@ class PaymentMatchingService
                     // Mark stored email as matched
                     $storedEmail->markAsMatched($payment);
                     
+                    // Update payer_account_number if extracted
+                    if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
+                        $payment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
+                        $payment->refresh(); // Refresh to get updated data
+                    }
+                    
                     \Illuminate\Support\Facades\Log::info('Payment matched from stored email', [
                         'transaction_id' => $payment->transaction_id,
                         'stored_email_id' => $storedEmail->id,
@@ -989,12 +1001,14 @@ class PaymentMatchingService
         $amount = null;
         $senderName = null;
         $accountNumber = null;
+        $payerAccountNumber = null;
         
         // STRATEGY 1: Try TEXT-based extraction first (for forwarded emails in plain text)
         // GTBank format from processed_emails text_body column:
         // "Account Number : 3002156642"
         // "Amount : NGN 1000"
         // "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
+        // Note: Description field contains: first 10 digits = recipient account (TO), next 10 digits = sender account (FROM)
         if (!empty(trim($text))) {
             // Normalize whitespace (handle newlines and multiple spaces)
             $normalizedText = preg_replace('/\s+/', ' ', $text);
@@ -1014,20 +1028,36 @@ class PaymentMatchingService
                 $accountNumber = trim($matches[1]);
             }
             
-            // Extract Sender Name from Description field
+            // Extract Account Numbers and Sender Name from Description field
             // Format: "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
-            // We want to extract "AMITHY ONE M" from this
-            if (preg_match('/description[\s]*:[\s]*.*?[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
-                $potentialName = trim($matches[1]);
+            // First 10 digits (0904052601) = recipient account (TO) - matches account_number
+            // Next 10 digits (1000172343) = sender account (FROM) - payer_account_number
+            if (preg_match('/description[\s]*:[\s]*([\d]{10})([\d]{10})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
+                // First 10 digits = recipient account (already extracted from Account Number field)
+                // Second 10 digits = sender/payer account number
+                $payerAccountNumber = trim($matches[2]);
+                
+                // Extract sender name (third match)
+                $potentialName = trim($matches[3]);
                 // Remove any leading codes/numbers/dashes that might be captured
                 $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
                 if (strlen($potentialName) >= 3) {
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern: Direct "CODE-NAME TRF FOR" in text (without "Description :" prefix)
-            elseif (preg_match('/[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
-                $potentialName = trim($matches[1]);
+            // Pattern with flexible code length before name (fallback)
+            elseif (preg_match('/description[\s]*:[\s]*.*?([\d]{10})([\d]{10})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
+                $payerAccountNumber = trim($matches[2]);
+                $potentialName = trim($matches[3]);
+                $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern: Direct "CODE-NAME TRF FOR" in text (without "Description :" prefix) - try to extract account numbers
+            elseif (preg_match('/[\d]{10}([\d]{10})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
+                $payerAccountNumber = trim($matches[1]);
+                $potentialName = trim($matches[2]);
                 if (strlen($potentialName) >= 3) {
                     $senderName = trim(strtolower($potentialName));
                 }

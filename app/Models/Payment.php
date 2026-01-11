@@ -22,6 +22,7 @@ class Payment extends Model
         'bank',
         'webhook_url',
         'account_number',
+        'payer_account_number',
         'business_id',
         'status',
         'email_data',
