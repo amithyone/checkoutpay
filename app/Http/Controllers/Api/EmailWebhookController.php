@@ -294,6 +294,13 @@ class EmailWebhookController extends Controller
             }
             
             // Store email (mark as webhook source, no email_account_id needed for Zapier)
+            // CRITICAL: Normalize text_body - ensure it's always stripped from HTML and never empty
+            $emailExtractor = new \App\Services\EmailExtractionService();
+            $normalizedTextBody = $emailExtractor->normalizeTextBody($text, $html);
+            
+            // Validate sender_name - cannot be an email address
+            $validatedSenderName = $emailExtractor->validateSenderName($extractedInfo['sender_name'] ?? null);
+            
             $processedEmail = ProcessedEmail::create([
                 'email_account_id' => null, // Not needed for Zapier webhook
                 'source' => 'webhook', // Mark as webhook source (Zapier)
@@ -301,11 +308,11 @@ class EmailWebhookController extends Controller
                 'subject' => $subject,
                 'from_email' => $fromEmail,
                 'from_name' => $fromName,
-                'text_body' => $text,
+                'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                 'html_body' => $html,
                 'email_date' => $timeSent,
                 'amount' => $extractedInfo['amount'],
-                'sender_name' => $extractedInfo['sender_name'],
+                'sender_name' => $validatedSenderName, // Validated (no email addresses)
                 'account_number' => $extractedInfo['account_number'],
                 'extracted_data' => $extractedInfo,
             ]);

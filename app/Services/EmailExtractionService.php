@@ -185,13 +185,18 @@ class EmailExtractionService
             }
         }
         
+        // Validate sender name before returning (filter out email addresses)
+        if ($senderName) {
+            $senderName = $this->validateSenderName($senderName);
+        }
+        
         // ALWAYS return results if we found ANY data (amount, account number, sender name, or description field)
         // This ensures we extract as much as possible from text_body even if description field extraction failed
         // Description field extraction is valuable even if amount extraction from other fields failed
         if ($amount || $accountNumber || $senderName || $descriptionField) {
             $result = [
                 'amount' => $amount,
-                'sender_name' => $senderName,
+                'sender_name' => $senderName, // Already validated
                 'account_number' => $accountNumber, // CRITICAL: Recipient account number (where payment was sent TO)
                 'payer_account_number' => $payerAccountNumber,
                 'transaction_time' => $transactionTime,
@@ -478,5 +483,76 @@ class EmailExtractionService
         $text = preg_replace('/=\s*\n/', "\n", $text);
         
         return $text;
+    }
+    
+    /**
+     * Normalize text_body: ensure it's always stripped from HTML and never empty
+     * If text_body is empty, extract from html_body
+     * 
+     * @param string|null $textBody
+     * @param string|null $htmlBody
+     * @return string
+     */
+    public function normalizeTextBody(?string $textBody, ?string $htmlBody = null): string
+    {
+        // If text_body is empty but html_body exists, extract text from HTML
+        if (empty(trim($textBody ?? '')) && !empty(trim($htmlBody ?? ''))) {
+            $textBody = $this->htmlToText($htmlBody);
+        }
+        
+        // If still empty, return empty string (but at least we tried)
+        if (empty(trim($textBody ?? ''))) {
+            return '';
+        }
+        
+        // Ensure text_body is clean (no HTML tags, normalized whitespace)
+        // Decode any HTML entities first
+        $textBody = html_entity_decode($textBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // Remove any remaining HTML tags (in case text_body had some HTML)
+        $textBody = strip_tags($textBody);
+        
+        // Normalize whitespace
+        $textBody = preg_replace('/\s+/', ' ', $textBody);
+        $textBody = trim($textBody);
+        
+        return $textBody;
+    }
+    
+    /**
+     * Validate and filter sender name - cannot be an email address
+     * 
+     * @param string|null $senderName
+     * @return string|null
+     */
+    public function validateSenderName(?string $senderName): ?string
+    {
+        if (empty($senderName)) {
+            return null;
+        }
+        
+        $senderName = trim($senderName);
+        
+        // FILTER OUT EMAIL ADDRESSES - sender name cannot be an email
+        if (preg_match('/@/', $senderName) || filter_var($senderName, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        
+        // Filter out common email patterns
+        if (preg_match('/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i', $senderName)) {
+            return null;
+        }
+        
+        // Filter out email-like patterns (e.g., "gens@gtbank.com")
+        if (preg_match('/@[a-z0-9.-]+/i', $senderName)) {
+            return null;
+        }
+        
+        // Must be at least 3 characters
+        if (strlen($senderName) < 3) {
+            return null;
+        }
+        
+        return $senderName;
     }
 }

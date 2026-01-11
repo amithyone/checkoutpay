@@ -684,6 +684,16 @@ class ReadEmailsDirect extends Command
                         $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
                     }
             
+            // CRITICAL: Normalize text_body - ensure it's always stripped from HTML and never empty
+            $emailExtractor = new \App\Services\EmailExtractionService();
+            $normalizedTextBody = $emailExtractor->normalizeTextBody(
+                $parts['text_body'] ?? '',
+                $parts['html_body'] ?? ''
+            );
+            
+            // Validate sender_name - cannot be an email address
+            $validatedSenderName = $emailExtractor->validateSenderName($extractedInfo['sender_name'] ?? null);
+            
             // Store in database
             $processedEmail = ProcessedEmail::create([
                 'email_account_id' => $emailAccount->id,
@@ -692,11 +702,11 @@ class ReadEmailsDirect extends Command
                 'subject' => $parts['subject'] ?? 'No Subject',
                 'from_email' => $fromEmail,
                 'from_name' => $fromName,
-                'text_body' => $parts['text_body'] ?? '',
+                'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                 'html_body' => $parts['html_body'] ?? '',
                 'email_date' => $parts['date'] ?? now(),
                 'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction, not from description field
-                'sender_name' => $extractedInfo['sender_name'] ?? null,
+                'sender_name' => $validatedSenderName, // Validated (no email addresses)
                 'account_number' => $accountNumber, // Use from description field if available (PRIMARY source)
                 'description_field' => $descriptionField, // Store the 43-digit description field
                 'extracted_data' => $extractedInfo,

@@ -842,19 +842,23 @@ class MonitorEmails extends Command
             
             // Store email even if extraction failed or returned null
             try {
-                // CRITICAL: Ensure text_body is always filled - extract from html_body if needed
                 $textBody = $message->getTextBody() ?? '';
                 $htmlBody = $message->getHTMLBody() ?? '';
                 
-                // If text_body is empty but html_body exists, extract text from HTML
+                // CRITICAL: Normalize text_body - ensure it's always stripped from HTML and never empty
+                $emailExtractor = new \App\Services\EmailExtractionService();
+                $normalizedTextBody = $emailExtractor->normalizeTextBody($textBody, $htmlBody);
+                
                 if (empty(trim($textBody)) && !empty(trim($htmlBody))) {
-                    $textBody = $this->htmlToText($htmlBody);
                     Log::debug('Extracted text_body from html_body in MonitorEmails', [
-                        'text_length' => strlen($textBody),
+                        'text_length' => strlen($normalizedTextBody),
                         'html_length' => strlen($htmlBody),
                         'message_id' => $messageId,
                     ]);
                 }
+                
+                // Validate sender_name - cannot be an email address
+                $validatedSenderName = $emailExtractor->validateSenderName($extractedInfo['sender_name'] ?? null);
                 
                 $processedEmail = ProcessedEmail::create([
                     'email_account_id' => $emailAccount?->id,
@@ -863,11 +867,11 @@ class MonitorEmails extends Command
                     'subject' => $subject,
                     'from_email' => $fromEmail,
                     'from_name' => $fromName,
-                    'text_body' => $textBody,
+                    'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                     'html_body' => $htmlBody,
                     'email_date' => $emailDate,
                     'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction, not from description field
-                    'sender_name' => $extractedInfo['sender_name'] ?? null,
+                    'sender_name' => $validatedSenderName, // Validated (no email addresses)
                     'account_number' => $accountNumber, // Use from description field if available (PRIMARY source)
                     'description_field' => $descriptionField, // Store the 43-digit description field
                     'extracted_data' => $extractedInfo,
@@ -962,6 +966,13 @@ class MonitorEmails extends Command
                     ]);
                 }
                 
+                // CRITICAL: Normalize text_body - ensure it's always stripped from HTML and never empty
+                $emailExtractor = new \App\Services\EmailExtractionService();
+                $normalizedTextBody = $emailExtractor->normalizeTextBody($textBody, $htmlBody);
+                
+                // Validate sender_name - cannot be an email address
+                $validatedSenderName = $emailExtractor->validateSenderName($extractedInfo['sender_name'] ?? null);
+                
                 return ProcessedEmail::create([
                     'email_account_id' => $emailAccount->id,
                     'source' => 'gmail_api', // Mark as Gmail API source
@@ -969,11 +980,11 @@ class MonitorEmails extends Command
                     'subject' => $emailData['subject'] ?? '',
                     'from_email' => $fromEmail,
                     'from_name' => $fromName,
-                    'text_body' => $textBody,
+                    'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                     'html_body' => $htmlBody,
                     'email_date' => $emailData['date'] ?? now(),
                     'amount' => $extractedInfo['amount'] ?? null,
-                    'sender_name' => $extractedInfo['sender_name'] ?? null,
+                    'sender_name' => $validatedSenderName, // Validated (no email addresses)
                     'account_number' => $extractedInfo['account_number'] ?? null,
                     'extracted_data' => $extractedInfo,
                 ]);

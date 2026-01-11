@@ -2286,10 +2286,13 @@ class PaymentMatchingService
         $updates = [];
         $extractedData = $email->extracted_data ?? [];
         
-        // Update sender_name if missing
+        // Update sender_name if missing (validate to ensure it's not an email address)
         if (!$email->sender_name && !empty($extractionResult['sender_name'])) {
-            $updates['sender_name'] = $extractionResult['sender_name'];
-            $extractedData['sender_name'] = $extractionResult['sender_name'];
+            $validatedSenderName = $this->emailExtractor->validateSenderName($extractionResult['sender_name']);
+            if ($validatedSenderName) {
+                $updates['sender_name'] = $validatedSenderName;
+                $extractedData['sender_name'] = $validatedSenderName;
+            }
         }
         
         // Update description_field if missing

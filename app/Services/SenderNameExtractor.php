@@ -55,6 +55,22 @@ class SenderNameExtractor
         // Clean up sender name
         if ($senderName) {
             $senderName = preg_replace('/\s+/', ' ', $senderName);
+            
+            // FILTER OUT EMAIL ADDRESSES - sender name cannot be an email
+            if (preg_match('/@/', $senderName) || filter_var($senderName, FILTER_VALIDATE_EMAIL)) {
+                $senderName = null;
+            }
+            
+            // Filter out common email patterns
+            if (preg_match('/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i', $senderName)) {
+                $senderName = null;
+            }
+            
+            // Filter out email-like patterns (e.g., "gens@gtbank.com")
+            if (preg_match('/@[a-z0-9.-]+/i', $senderName)) {
+                $senderName = null;
+            }
+            
             if (strlen($senderName) < 3) {
                 $senderName = null;
             }
@@ -117,6 +133,22 @@ class SenderNameExtractor
         // Clean up sender name
         if ($senderName) {
             $senderName = preg_replace('/\s+/', ' ', $senderName);
+            
+            // FILTER OUT EMAIL ADDRESSES - sender name cannot be an email
+            if (preg_match('/@/', $senderName) || filter_var($senderName, FILTER_VALIDATE_EMAIL)) {
+                $senderName = null;
+            }
+            
+            // Filter out common email patterns
+            if (preg_match('/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i', $senderName)) {
+                $senderName = null;
+            }
+            
+            // Filter out email-like patterns (e.g., "gens@gtbank.com")
+            if (preg_match('/@[a-z0-9.-]+/i', $senderName)) {
+                $senderName = null;
+            }
+            
             if (strlen($senderName) < 3) {
                 $senderName = null;
             }
