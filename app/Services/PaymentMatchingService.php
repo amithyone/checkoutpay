@@ -1542,14 +1542,27 @@ class PaymentMatchingService
         $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
         
         // PRIORITY 2: Extract description field from plain text (REVAMPED METHOD)
-        // Pattern: Match "Description : " followed by exactly 43 digits (where number ends)
-        // This is SIMPLER and MORE RELIABLE than HTML parsing
-        // CRITICAL: Pattern allows optional spaces/newlines/tabs after 43 digits before FROM or end
-        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s+|FROM|\s|$)/i', $plainText, $descMatches)) {
+        // Use fallback approach - find description line, then extract 43 digits from it
+        // This is SIMPLER and MORE RELIABLE than complex patterns
+        $descriptionField = null;
+        
+        // Try simple pattern first: description : (43 digits) followed by space or FROM or end
+        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $plainText, $descMatches)) {
             $descriptionField = trim($descMatches[1]);
-            
+        } 
+        // Fallback: Match description : ... then find 43 consecutive digits anywhere in that line
+        elseif (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $plainText, $descLineMatches)) {
+            $descLine = $descLineMatches[1];
+            // Find exactly 43 consecutive digits in the description line
+            if (preg_match('/(\d{43})/', $descLine, $digitMatches)) {
+                $descriptionField = trim($digitMatches[1]);
+            }
+        }
+        
+        // Now parse the 43 digits if we found them
+        if ($descriptionField && strlen($descriptionField) === 43) {
             // Parse the 43 digits: recipient(10) + payer(10) + amount(6) + date(8) + unknown(9)
-            if (strlen($descriptionField) === 43 && preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
+            if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
                 $accountNumber = trim($digitMatches[1]); // PRIMARY: recipient account (first 10 digits)
                 $payerAccountNumber = trim($digitMatches[2]); // Sender account (next 10 digits)
                 $amountFromDesc = (float) ($digitMatches[3] / 100); // Amount (6 digits, divide by 100)
@@ -1563,11 +1576,11 @@ class PaymentMatchingService
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
                 }
-            }
-            
-            // Extract sender name separately (after the 43 digits)
-            if (!$senderName && preg_match('/description[\s]*:[\s]*\d{43}\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $plainText, $nameMatches)) {
-                $senderName = trim(strtolower($nameMatches[1]));
+                
+                // Extract sender name separately (after the 43 digits)
+                if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*\d{43}\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $plainText, $nameMatches)) {
+                    $senderName = trim(strtolower($nameMatches[1]));
+                }
             }
         }
         
