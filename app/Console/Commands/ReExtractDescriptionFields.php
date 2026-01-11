@@ -104,7 +104,23 @@ class ReExtractDescriptionFields extends Command
                     // Try to extract description field directly from text/html as fallback
                     $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
                     if ($descriptionField && strlen($descriptionField) >= 30 && strlen($descriptionField) <= 43) {
-                        $email->update(['description_field' => $descriptionField]);
+                        // Parse and update with account numbers
+                        $parsedData = $this->parseDescriptionField($descriptionField);
+                        $updates = [
+                            'description_field' => $descriptionField,
+                        ];
+                        if ($parsedData['account_number']) {
+                            $updates['account_number'] = $parsedData['account_number'];
+                        }
+                        // Update extracted_data
+                        $currentExtractedData = $email->extracted_data ?? [];
+                        $currentExtractedData['description_field'] = $descriptionField;
+                        $currentExtractedData['account_number'] = $parsedData['account_number'] ?? null;
+                        $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'] ?? null;
+                        $currentExtractedData['amount_from_description'] = $parsedData['amount'] ?? null;
+                        $currentExtractedData['date_from_description'] = $parsedData['extracted_date'] ?? null;
+                        $updates['extracted_data'] = $currentExtractedData;
+                        $email->update($updates);
                         $successCount++;
                     } else {
                         $failedCount++;
@@ -119,7 +135,23 @@ class ReExtractDescriptionFields extends Command
                     // Try to extract description field directly from text/html as fallback
                     $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
                     if ($descriptionField && strlen($descriptionField) >= 30 && strlen($descriptionField) <= 43) {
-                        $email->update(['description_field' => $descriptionField]);
+                        // Parse and update with account numbers
+                        $parsedData = $this->parseDescriptionField($descriptionField);
+                        $updates = [
+                            'description_field' => $descriptionField,
+                        ];
+                        if ($parsedData['account_number']) {
+                            $updates['account_number'] = $parsedData['account_number'];
+                        }
+                        // Update extracted_data
+                        $currentExtractedData = $email->extracted_data ?? [];
+                        $currentExtractedData['description_field'] = $descriptionField;
+                        $currentExtractedData['account_number'] = $parsedData['account_number'] ?? null;
+                        $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'] ?? null;
+                        $currentExtractedData['amount_from_description'] = $parsedData['amount'] ?? null;
+                        $currentExtractedData['date_from_description'] = $parsedData['extracted_date'] ?? null;
+                        $updates['extracted_data'] = $currentExtractedData;
+                        $email->update($updates);
                         $successCount++;
                     } else {
                         $failedCount++;
@@ -149,34 +181,58 @@ class ReExtractDescriptionFields extends Command
                     if ($debug) {
                         $this->line("  ✅ Success! Description field: {$descriptionField}");
                     }
-                    // Update the email with the description field
-                    $email->update([
+                    
+                    // Parse the description field to extract account numbers
+                    $parsedData = $this->parseDescriptionField($descriptionField);
+                    
+                    // Prepare updates
+                    $updates = [
                         'description_field' => $descriptionField,
-                    ]);
-
-                    // Also update other fields if they're missing but were extracted
-                    $updates = [];
+                    ];
                     
-                    if (!$email->account_number && isset($extractedInfo['account_number'])) {
-                        $updates['account_number'] = $extractedInfo['account_number'];
+                    // Extract account numbers from description field
+                    // First 10 digits = recipient account number (where payment was sent TO)
+                    // Next 10 digits = sender/payer account number (where payment was sent FROM)
+                    if ($parsedData['account_number']) {
+                        $updates['account_number'] = $parsedData['account_number'];
+                        if ($debug) {
+                            $this->line("  📝 Extracted recipient account: {$parsedData['account_number']}");
+                        }
                     }
                     
-                    if (!$email->payer_account_number && isset($extractedInfo['payer_account_number'])) {
-                        // Note: payer_account_number might not be a column, but we'll try
-                        // Actually, we don't have this column in processed_emails, so skip
+                    // Note: payer_account_number is not a column in processed_emails table
+                    // But we can store it in extracted_data
+                    if ($parsedData['payer_account_number']) {
+                        if ($debug) {
+                            $this->line("  📝 Extracted payer account: {$parsedData['payer_account_number']}");
+                        }
                     }
                     
-                    if (!$email->amount && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
-                        $updates['amount'] = $extractedInfo['amount'];
+                    // Also update amount and date if parsed from description field
+                    if ($parsedData['amount'] && (!$email->amount || $email->amount == 0)) {
+                        $updates['amount'] = $parsedData['amount'];
                     }
                     
+                    // Update extracted_data to include parsed description field data
+                    $currentExtractedData = $email->extracted_data ?? [];
+                    $currentExtractedData['description_field'] = $descriptionField;
+                    $currentExtractedData['account_number'] = $parsedData['account_number'] ?? null;
+                    $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'] ?? null;
+                    $currentExtractedData['amount_from_description'] = $parsedData['amount'] ?? null;
+                    $currentExtractedData['date_from_description'] = $parsedData['extracted_date'] ?? null;
+                    $updates['extracted_data'] = $currentExtractedData;
+                    
+                    // Also update other fields if they're missing but were extracted from PaymentMatchingService
                     if (!$email->sender_name && isset($extractedInfo['sender_name'])) {
                         $updates['sender_name'] = $extractedInfo['sender_name'];
                     }
-
-                    if (!empty($updates)) {
-                        $email->update($updates);
+                    
+                    if (!$updates['amount'] && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+                        $updates['amount'] = $extractedInfo['amount'];
                     }
+
+                    // Update the email
+                    $email->update($updates);
 
                     $successCount++;
                 } else {
