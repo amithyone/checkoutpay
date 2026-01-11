@@ -1179,6 +1179,9 @@ class PaymentMatchingService
             'amount' => $amount,
             'sender_name' => $senderName,
             'account_number' => $accountNumber,
+            'payer_account_number' => $payerAccountNumber,
+            'transaction_time' => $transactionTime,
+            'extracted_date' => $extractedDate,
             'email_subject' => $emailData['subject'] ?? '',
             'email_from' => $emailData['from'] ?? '',
             'extracted_at' => now()->toISOString(),
@@ -1267,6 +1270,9 @@ class PaymentMatchingService
         return [
             'amount' => $amount,
             'sender_name' => $senderName,
+            'payer_account_number' => $payerAccountNumber,
+            'transaction_time' => $transactionTime,
+            'extracted_date' => $extractedDate,
         ];
     }
     
