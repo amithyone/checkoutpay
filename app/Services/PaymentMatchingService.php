@@ -1511,19 +1511,27 @@ class PaymentMatchingService
         // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
         // Changed from [\s\n\r]+FROM to .*?FROM to handle any formatting variations
         // CRITICAL: Make TO optional - HTML might be truncated or not have TO (like: FROM SOLOMON with no TO)
-        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $html, $matches)) {
-            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
-            $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
-            $amountFromDesc = (float) ($matches[3] / 100);
-            if (!$amount && $amountFromDesc >= 10) {
-                $amount = $amountFromDesc;
-                $method = 'html_table_description';
+        // CRITICAL: First extract the full description field content, then parse it
+        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>([^<]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[^<]*FROM[^<]*)/i', $html, $matches)) {
+            // Extract the full description field content (for debugging)
+            $descriptionField = trim(strip_tags($matches[1]));
+            // Now extract the actual values
+            if (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $descriptionField, $descMatches)) {
+                $accountNumber = trim($descMatches[1]); // PRIMARY source: recipient account (first 10 digits)
+                $payerAccountNumber = trim($descMatches[2]); // Sender account (next 10 digits)
+                $amountFromDesc = (float) ($descMatches[3] / 100);
+                if (!$amount && $amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
+                    $method = 'html_table_description';
+                }
+                $dateStr = $descMatches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+                if (!$senderName) {
+                    $senderName = trim(strtolower($descMatches[6]));
+                }
             }
-            $dateStr = $matches[4];
-            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
-                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
-            }
-            $senderName = trim(strtolower($matches[6]));
         }
         // Pattern 2: Description field WITHOUT colon cell (direct next cell) - ULTRA-FLEXIBLE
         // Format: <td>Description</td><td>900877121002100859959000020260111094651392 FROM...</td>
