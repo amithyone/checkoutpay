@@ -130,8 +130,8 @@ if ($email->text_body) {
     echo "\n--- Pattern Test 1: text_body ---\n";
     echo "Text body snippet: " . substr($textBody, 0, 200) . "...\n";
     
-    // Test our 43-digit pattern
-    if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $textBody, $matches)) {
+    // Test our 43-digit pattern - FIXED: Allow multiple spaces or FROM after 43 digits
+    if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s+|FROM|\s|$)/i', $textBody, $matches)) {
         echo "✅ Pattern MATCHED! Found: " . $matches[1] . "\n";
         echo "   Length: " . strlen($matches[1]) . " digits\n";
         
@@ -169,8 +169,8 @@ if ($email->html_body) {
     echo "\n--- Pattern Test 2: html_body (converted to plain text) ---\n";
     echo "Plain text snippet: " . substr($plainText, 0, 200) . "...\n";
     
-    // Test our 43-digit pattern
-    if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $plainText, $matches)) {
+    // Test our 43-digit pattern - FIXED: Allow multiple spaces or FROM after 43 digits
+    if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s+|FROM|\s|$)/i', $plainText, $matches)) {
         echo "✅ Pattern MATCHED! Found: " . $matches[1] . "\n";
         echo "   Length: " . strlen($matches[1]) . " digits\n";
         

@@ -1350,8 +1350,9 @@ class PaymentMatchingService
         // SIMPLE PATTERN: Match "Description : " followed by exactly 43 digits (where number ends)
         // Text format: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
         // This is CLEANER than HTML - we should prioritize this!
+        // CRITICAL: Pattern allows optional spaces after colon and before/after 43 digits
         $descriptionField = null;
-        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $text, $descMatches)) {
+        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s+|FROM|\s|$)/i', $text, $descMatches)) {
             $descriptionField = trim($descMatches[1]);
             
             // Parse the 43 digits: recipient(10) + payer(10) + amount(6) + date(8) + unknown(9)
