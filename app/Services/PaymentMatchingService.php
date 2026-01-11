@@ -1333,10 +1333,61 @@ class PaymentMatchingService
         $fullText = $subject . ' ' . $textLower;
         
         $amount = null;
+        $accountNumber = null;
         $senderName = null;
         $payerAccountNumber = null;
+        $transactionTime = null;
+        $extractedDate = null;
         
-        // Extract amount from text (case insensitive, flexible patterns)
+        // PRIORITY: Extract account number from Description field FIRST (before any other extraction)
+        // Description field format: "Description : 9008771210 021008599511000020260111080847554 FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        // Format: recipient_account(10) sender_account(10) amount_without_decimal(6) date_YYYYMMDD(8) unknown(9) FROM NAME TO NAME
+        // IMPORTANT: First 10 digits is ALWAYS the recipient account number (where payment was sent TO)
+        if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
+            $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
+            $amountFromDesc = (float) ($matches[3] / 100); // Divide by 100 to get actual amount
+            if ($amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            $senderName = trim(strtolower($matches[6]));
+        }
+        // Alternative format: without space between accounts
+        // Format: "Description : 900877121002100859959000020260111094651392 FROM..."
+        elseif (preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
+            $payerAccountNumber = trim($matches[2]);
+            $amountFromDesc = (float) ($matches[3] / 100);
+            if ($amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            $senderName = trim(strtolower($matches[6]));
+        }
+        // Pattern: Direct format without "Description :" prefix
+        // Format: "900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO..."
+        elseif (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
+            $payerAccountNumber = trim($matches[2]);
+            $amountFromDesc = (float) ($matches[3] / 100);
+            if ($amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            $senderName = trim(strtolower($matches[6]));
+        }
+        
+        // Extract amount from text (case insensitive, flexible patterns) - only if not already extracted
         $amountPatterns = [
             '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)/i',
             '/(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)/i',
@@ -1405,6 +1456,7 @@ class PaymentMatchingService
         return [
             'amount' => $amount,
             'sender_name' => $senderName,
+            'account_number' => $accountNumber, // CRITICAL: Recipient account number (where payment was sent TO)
             'payer_account_number' => $payerAccountNumber,
             'transaction_time' => $transactionTime,
             'extracted_date' => $extractedDate,
