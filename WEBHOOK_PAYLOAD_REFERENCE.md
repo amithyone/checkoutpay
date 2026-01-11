@@ -109,6 +109,7 @@ When a payment expires (sent via `SendExpiredPaymentWebhook`):
   "status": "expired",
   "transaction_id": "TXN-20260110123456-abc123",
   "amount": 5000.00,
+  "account_number": "3002156642",
   "message": "Payment status updated"
 }
 ```
@@ -121,6 +122,7 @@ When a payment expires (sent via `SendExpiredPaymentWebhook`):
 | `status` | string | Payment status: `"expired"` | ✅ Yes |
 | `transaction_id` | string | Unique transaction identifier | ✅ Yes |
 | `amount` | float | Payment amount | ✅ Yes |
+| `account_number` | string\|null | Account number where payment was expected | ⚠️ Optional |
 | `message` | string | Human-readable message: `"Payment status updated"` | ✅ Yes |
 
 ---

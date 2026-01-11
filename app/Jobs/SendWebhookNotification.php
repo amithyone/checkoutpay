@@ -75,6 +75,7 @@ class SendWebhookNotification implements ShouldQueue
                 'transaction_id' => $this->payment->transaction_id, // Always included
                 'amount' => (float) $this->payment->amount,
                 'payer_name' => $this->payment->payer_name,
+                'account_number' => $this->payment->account_number, // Added account number
                 'rejected_at' => $this->payment->matched_at?->toISOString() ?? now()->toISOString(),
                 'reason' => $this->payment->email_data['rejection_reason'] ?? 'Payment verification failed',
                 'message' => 'Payment has been rejected',
