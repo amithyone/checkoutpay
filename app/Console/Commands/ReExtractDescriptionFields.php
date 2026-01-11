@@ -16,7 +16,8 @@ class ReExtractDescriptionFields extends Command
      */
     protected $signature = 'payment:re-extract-description-fields 
                             {--limit=100 : Maximum number of emails to process}
-                            {--force : Process all emails, even if description_field already exists}';
+                            {--force : Process all emails, even if description_field already exists}
+                            {--verbose : Show detailed output for each email}';
 
     /**
      * The console command description.
@@ -72,8 +73,13 @@ class ReExtractDescriptionFields extends Command
         $successCount = 0;
         $failedCount = 0;
         $skippedCount = 0;
+        $verbose = $this->option('verbose');
 
         foreach ($emailsToProcess as $email) {
+            if ($verbose) {
+                $this->newLine();
+                $this->line("Processing Email ID: {$email->id} | Subject: " . substr($email->subject ?? 'No Subject', 0, 50));
+            }
             try {
                 // Skip if description_field already exists and not forcing
                 if (!$force && $email->description_field) {
@@ -127,10 +133,21 @@ class ReExtractDescriptionFields extends Command
 
                 // If not in extractedInfo, try to extract directly from text/html
                 if (!$descriptionField || strlen($descriptionField) !== 43) {
+                    if ($verbose) {
+                        $this->line("  ⚠️  description_field not in extractedInfo, trying direct extraction...");
+                    }
                     $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
+                    if ($verbose && $descriptionField) {
+                        $this->line("  ✅ Found via direct extraction: " . substr($descriptionField, 0, 20) . "...");
+                    } elseif ($verbose) {
+                        $this->line("  ❌ Direct extraction also failed");
+                    }
                 }
 
                 if ($descriptionField && strlen($descriptionField) === 43) {
+                    if ($verbose) {
+                        $this->line("  ✅ Success! Description field: {$descriptionField}");
+                    }
                     // Update the email with the description field
                     $email->update([
                         'description_field' => $descriptionField,
@@ -162,6 +179,9 @@ class ReExtractDescriptionFields extends Command
 
                     $successCount++;
                 } else {
+                    if ($verbose) {
+                        $this->line("  ❌ Failed: " . ($descriptionField ? "Found but length is " . strlen($descriptionField) : "Not found"));
+                    }
                     $failedCount++;
                 }
 
