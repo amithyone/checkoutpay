@@ -1634,30 +1634,31 @@ class PaymentMatchingService
         $plainText = strip_tags($html);
         $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
         
-        // PRIORITY: Extract account number from plain text description field FIRST
-        // This is the MOST RELIABLE method - plain text is easier to parse than HTML
-        // This should match: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
-        // CRITICAL: Make TO optional - text might be truncated or not have TO
-        // CRITICAL: This MUST run before any other extraction to ensure account number is found
-        if (preg_match('/description[\s]*:[\s]*([^\\n\\r]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[^\\n\\r]*FROM[^\\n\\r]*)/i', $plainText, $descFieldMatches)) {
-            // Extract the full description field content (for debugging)
-            $descriptionField = trim($descFieldMatches[1]);
-            // Now extract the actual values - ULTRA-SIMPLE pattern
-            if (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s*FROM\s*([A-Z\s]+?)(?:\s+TO|$)/i', $descriptionField, $textMatches)) {
-                $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account (first 10 digits)
-                $payerAccountNumber = trim($textMatches[2]);
-                $amountFromDesc = (float) ($textMatches[3] / 100);
+        // PRIORITY: Extract description field FIRST - Target: "Description : 900877121002100859959000020260111094651392"
+        // SIMPLE PATTERN: Match "Description : " followed by exactly 43 digits (where the number ends)
+        // This is the MOST RELIABLE method - we target ONLY the description field value
+        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $plainText, $descMatches)) {
+            // Extract the full 43-digit description field value
+            $descriptionField = trim($descMatches[1]);
+            
+            // Now parse the 43 digits: recipient(10) + payer(10) + amount(6) + date(8) + unknown(9)
+            if (strlen($descriptionField) === 43 && preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
+                $accountNumber = trim($digitMatches[1]); // PRIMARY source: recipient account (first 10 digits)
+                $payerAccountNumber = trim($digitMatches[2]); // Sender account (next 10 digits)
+                $amountFromDesc = (float) ($digitMatches[3] / 100); // Amount (6 digits, divide by 100)
                 if (!$amount && $amountFromDesc >= 10) {
                     $amount = $amountFromDesc;
                     $method = $method ?: 'html_rendered_text';
                 }
-                $dateStr = $textMatches[4];
+                $dateStr = $digitMatches[4]; // Date YYYYMMDD (8 digits)
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
                 }
-                if (!$senderName) {
-                    $senderName = trim(strtolower($textMatches[6]));
-                }
+            }
+            
+            // Also try to extract sender name from the text after the description field
+            if (!$senderName && preg_match('/description[\s]*:[\s]*\d{43}\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $plainText, $nameMatches)) {
+                $senderName = trim(strtolower($nameMatches[1]));
             }
         }
         // Last resort: Look for the digit pattern anywhere in plain text (ultra-flexible)
