@@ -413,11 +413,18 @@ class EmailExtractionService
             $senderName = $nameExtractor->extractFromHtml($html);
         }
         
-        // Try extracting from email sender if no name found
+        // Try extracting from email sender if no name found (but validate it's not an email)
         if (!$senderName && $from) {
             if (preg_match('/([^<]+)/', $from, $matches)) {
-                $senderName = trim(strtolower($matches[1]));
+                $potentialName = trim(strtolower($matches[1]));
+                // Validate it's not an email address
+                $senderName = $this->validateSenderName($potentialName);
             }
+        }
+        
+        // Validate sender name before returning (filter out email addresses)
+        if ($senderName) {
+            $senderName = $this->validateSenderName($senderName);
         }
         
         if (!$amount) {
@@ -427,7 +434,7 @@ class EmailExtractionService
         $result = [
             'amount' => $amount,
             'account_number' => $accountNumber,
-            'sender_name' => $senderName,
+            'sender_name' => $senderName, // Already validated
             'payer_account_number' => $payerAccountNumber,
             'transaction_time' => $transactionTime,
             'extracted_date' => $extractedDate,
