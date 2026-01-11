@@ -483,91 +483,120 @@ class PaymentMatchingService
             $timeDiff = $paymentTime->diffInMinutes($emailTime);
         }
 
-        // Check amount match with new rules:
-        // - If received amount is N500 or more LOWER than expected → FAIL (reject)
-        // - If received amount is less than N500 lower → Approve but mark as mismatch
+        // Calculate amount difference
         $expectedAmount = $payment->amount;
         $receivedAmount = $extractedInfo['amount'];
         $amountDiff = $expectedAmount - $receivedAmount; // Positive if received is lower
+        $amountTolerance = 0.01; // Small tolerance for rounding (1 kobo)
         
-        // Small tolerance for rounding (1 kobo)
-        $amountTolerance = 0.01;
+        // NEW STRATEGY: Check name first, then amount
+        // If name matches, we're more lenient with amount mismatches
+        $nameSimilarityPercent = null;
+        $nameMatches = false;
         
-        // If received amount is significantly lower (N500 or more)
-        if ($amountDiff >= 500) {
-            return [
-                'matched' => false,
-                'reason' => sprintf(
-                    'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Manual resettlement required.',
-                    number_format($expectedAmount, 2),
-                    number_format($receivedAmount, 2),
-                    number_format($amountDiff, 2)
-                ),
-                'should_reject' => true, // Flag to reject payment
-                'amount_diff' => $amountDiff,
-                'time_diff_minutes' => $timeDiff,
-            ];
+        // If payer name is provided, check similarity first
+        if ($payment->payer_name) {
+            if (empty($extractedInfo['sender_name'])) {
+                // Name required but not found - check amount strictly
+                if (abs($amountDiff) > $amountTolerance) {
+                    return [
+                        'matched' => false,
+                        'reason' => 'Payer name required but not found in email, and amount mismatch',
+                        'amount_diff' => $amountDiff,
+                        'time_diff_minutes' => $timeDiff,
+                        'name_similarity_percent' => 0,
+                    ];
+                }
+            } else {
+                // Normalize names for comparison
+                $expectedName = trim(strtolower($payment->payer_name));
+                $expectedName = preg_replace('/\s+/', ' ', $expectedName);
+                $receivedName = trim(strtolower($extractedInfo['sender_name']));
+                $receivedName = preg_replace('/\s+/', ' ', $receivedName);
+
+                // Check if names match with similarity
+                $matchResult = $this->namesMatch($expectedName, $receivedName);
+                $nameSimilarityPercent = $matchResult['similarity'];
+                $nameMatches = $matchResult['matched'];
+                
+                if (!$nameMatches) {
+                    // Name doesn't match - require exact amount match
+                    if (abs($amountDiff) > $amountTolerance) {
+                        return [
+                            'matched' => false,
+                            'reason' => sprintf(
+                                'Name mismatch: expected "%s", got "%s" (similarity: %d%%) and amount mismatch',
+                                $expectedName,
+                                $receivedName,
+                                $nameSimilarityPercent
+                            ),
+                            'amount_diff' => $amountDiff,
+                            'time_diff_minutes' => $timeDiff,
+                            'name_similarity_percent' => $nameSimilarityPercent,
+                        ];
+                    }
+                }
+            }
         }
         
-        // If received amount is higher or difference is less than N500
-        // We'll approve but mark as mismatch if difference > tolerance
+        // If name matches (or no name required), handle amount matching with lenient rules
         $isMismatch = false;
         $mismatchReason = null;
         $finalReceivedAmount = null;
         
-        if ($amountDiff > $amountTolerance && $amountDiff < 500) {
-            // Amount is lower but within tolerance (less than N500 difference)
-            $isMismatch = true;
-            $finalReceivedAmount = $receivedAmount;
-            $mismatchReason = sprintf(
-                'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Payment approved with mismatch flag.',
-                number_format($expectedAmount, 2),
-                number_format($receivedAmount, 2),
-                number_format($amountDiff, 2)
-            );
-        } elseif ($receivedAmount > $expectedAmount + $amountTolerance) {
-            // Received more than expected (overpayment)
-            $isMismatch = true;
-            $finalReceivedAmount = $receivedAmount;
-            $mismatchReason = sprintf(
-                'Amount mismatch: expected ₦%s, received ₦%s (overpayment: ₦%s). Payment approved with mismatch flag.',
-                number_format($expectedAmount, 2),
-                number_format($receivedAmount, 2),
-                number_format($receivedAmount - $expectedAmount, 2)
-            );
-        }
-
-        // If payer name is provided, check similarity (not exact match)
-        $nameSimilarityPercent = null;
-        if ($payment->payer_name) {
-            if (empty($extractedInfo['sender_name'])) {
-                return [
-                    'matched' => false,
-                    'reason' => 'Payer name required but not found in email',
-                    'amount_diff' => $amountDiff,
-                    'time_diff_minutes' => $timeDiff,
-                    'name_similarity_percent' => 0,
-                ];
-            }
-
-            // Normalize names for comparison
-            $expectedName = trim(strtolower($payment->payer_name));
-            $expectedName = preg_replace('/\s+/', ' ', $expectedName);
-            $receivedName = trim(strtolower($extractedInfo['sender_name']));
-            $receivedName = preg_replace('/\s+/', ' ', $receivedName);
-
-            // Check if names match with similarity (handles order variations and partial matches)
-            $matchResult = $this->namesMatch($expectedName, $receivedName);
-            $nameSimilarityPercent = $matchResult['similarity'];
+        // If name matches, we allow larger amount differences
+        // If name doesn't match (or not provided), we require exact amount match
+        if ($nameMatches) {
+            // Name matches - be lenient with amount (allow up to N5000 difference)
+            $maxAmountDiff = 5000; // Allow up to N5000 difference when name matches
             
-            if (!$matchResult['matched']) {
+            if ($amountDiff >= $maxAmountDiff) {
+                // Amount is too low even with name match
                 return [
                     'matched' => false,
                     'reason' => sprintf(
-                        'Name mismatch: expected "%s", got "%s" (similarity: %d%%)',
-                        $expectedName,
-                        $receivedName,
-                        $nameSimilarityPercent
+                        'Amount mismatch too large: expected ₦%s, received ₦%s (difference: ₦%s). Name matches but amount difference exceeds limit.',
+                        number_format($expectedAmount, 2),
+                        number_format($receivedAmount, 2),
+                        number_format($amountDiff, 2)
+                    ),
+                    'amount_diff' => $amountDiff,
+                    'time_diff_minutes' => $timeDiff,
+                    'name_similarity_percent' => $nameSimilarityPercent,
+                ];
+            } elseif (abs($amountDiff) > $amountTolerance) {
+                // Amount differs but within acceptable range - approve with mismatch flag
+                $isMismatch = true;
+                $finalReceivedAmount = $receivedAmount;
+                
+                if ($amountDiff > 0) {
+                    // Received less than expected
+                    $mismatchReason = sprintf(
+                        'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Payment approved because name matches.',
+                        number_format($expectedAmount, 2),
+                        number_format($receivedAmount, 2),
+                        number_format($amountDiff, 2)
+                    );
+                } else {
+                    // Received more than expected (overpayment)
+                    $mismatchReason = sprintf(
+                        'Amount mismatch: expected ₦%s, received ₦%s (overpayment: ₦%s). Payment approved because name matches.',
+                        number_format($expectedAmount, 2),
+                        number_format($receivedAmount, 2),
+                        number_format(abs($amountDiff), 2)
+                    );
+                }
+            }
+        } else {
+            // Name doesn't match or not provided - require exact amount match
+            if (abs($amountDiff) > $amountTolerance) {
+                return [
+                    'matched' => false,
+                    'reason' => sprintf(
+                        'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Name does not match, so exact amount required.',
+                        number_format($expectedAmount, 2),
+                        number_format($receivedAmount, 2),
+                        number_format(abs($amountDiff), 2)
                     ),
                     'amount_diff' => $amountDiff,
                     'time_diff_minutes' => $timeDiff,

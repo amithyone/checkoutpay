@@ -41,7 +41,9 @@ When a payment is successfully matched and approved:
   "amount": 5000.00,
   "payer_name": "John Doe",
   "bank": "GTBank",
+  "account_number": "3002156642",
   "approved_at": "2026-01-10T12:30:45.000000Z",
+  "is_mismatch": false,
   "message": "Payment has been verified and approved"
 }
 ```
@@ -53,11 +55,15 @@ When a payment is successfully matched and approved:
 | `success` | boolean | Always `true` for approved payments | ✅ Yes |
 | `status` | string | Payment status: `"approved"` | ✅ Yes |
 | `transaction_id` | string | Unique transaction identifier (format: `TXN-{timestamp}-{random}`) | ✅ Yes |
-| `amount` | float | Payment amount (e.g., `5000.00`) | ✅ Yes |
+| `amount` | float | Expected payment amount (e.g., `5000.00`) | ✅ Yes |
 | `payer_name` | string\|null | Name of the person who made the payment (may be null if not extracted) | ⚠️ Optional |
 | `bank` | string\|null | Bank name (may be null if not extracted) | ⚠️ Optional |
+| `account_number` | string\|null | Account number where payment was received (may be null if not specified) | ⚠️ Optional |
 | `approved_at` | string | ISO 8601 timestamp when payment was approved (e.g., `2026-01-10T12:30:45.000000Z`) | ✅ Yes |
-| `message` | string | Human-readable message: `"Payment has been verified and approved"` | ✅ Yes |
+| `is_mismatch` | boolean | `true` if received amount differs from expected amount (but name matches) | ✅ Yes |
+| `received_amount` | float\|null | Actual amount received (only present if `is_mismatch` is `true`) | ⚠️ Conditional |
+| `mismatch_reason` | string\|null | Explanation of the mismatch (only present if `is_mismatch` is `true`) | ⚠️ Conditional |
+| `message` | string | Human-readable message | ✅ Yes |
 
 ---
 
@@ -121,7 +127,7 @@ When a payment expires (sent via `SendExpiredPaymentWebhook`):
 
 ## Example Real-World Payloads
 
-### Example 1: GTBank Payment Approved
+### Example 1: GTBank Payment Approved (Perfect Match)
 
 ```json
 {
@@ -131,38 +137,65 @@ When a payment expires (sent via `SendExpiredPaymentWebhook`):
   "amount": 15000.50,
   "payer_name": "AMITHY ONE M",
   "bank": "GTBank",
+  "account_number": "3002156642",
   "approved_at": "2026-01-10T15:25:10.123456Z",
+  "is_mismatch": false,
   "message": "Payment has been verified and approved"
 }
 ```
 
-### Example 2: Payment with Missing Payer Name
+### Example 2: Payment with Amount Mismatch (Name Matches)
 
 ```json
 {
   "success": true,
   "status": "approved",
   "transaction_id": "TXN-20260110153422-def456",
-  "amount": 2500.00,
-  "payer_name": null,
-  "bank": null,
+  "amount": 5000.00,
+  "payer_name": "John Doe",
+  "bank": "GTBank",
+  "account_number": "3002156642",
   "approved_at": "2026-01-10T15:35:05.789012Z",
-  "message": "Payment has been verified and approved"
+  "is_mismatch": true,
+  "received_amount": 4500.00,
+  "mismatch_reason": "Amount mismatch: expected ₦5,000.00, received ₦4,500.00 (difference: ₦500.00). Payment approved because name matches.",
+  "message": "Payment has been verified and approved (amount mismatch detected)"
 }
 ```
 
-### Example 3: Small Amount Payment
+### Example 3: Payment with Missing Payer Name
 
 ```json
 {
   "success": true,
   "status": "approved",
   "transaction_id": "TXN-20260110161233-ghi789",
-  "amount": 500.00,
+  "amount": 2500.00,
+  "payer_name": null,
+  "bank": null,
+  "account_number": "3002156642",
+  "approved_at": "2026-01-10T16:13:15.456789Z",
+  "is_mismatch": false,
+  "message": "Payment has been verified and approved"
+}
+```
+
+### Example 4: Overpayment (Name Matches)
+
+```json
+{
+  "success": true,
+  "status": "approved",
+  "transaction_id": "TXN-20260110170000-jkl012",
+  "amount": 10000.00,
   "payer_name": "Jane Smith",
   "bank": "Access Bank",
-  "approved_at": "2026-01-10T16:13:15.456789Z",
-  "message": "Payment has been verified and approved"
+  "account_number": "3002156642",
+  "approved_at": "2026-01-10T17:00:30.789012Z",
+  "is_mismatch": true,
+  "received_amount": 12000.00,
+  "mismatch_reason": "Amount mismatch: expected ₦10,000.00, received ₦12,000.00 (overpayment: ₦2,000.00). Payment approved because name matches.",
+  "message": "Payment has been verified and approved (amount mismatch detected)"
 }
 ```
 

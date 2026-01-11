@@ -54,9 +54,20 @@ class SendWebhookNotification implements ShouldQueue
                 'amount' => (float) $this->payment->amount,
                 'payer_name' => $this->payment->payer_name,
                 'bank' => $this->payment->bank,
+                'account_number' => $this->payment->account_number, // Added account number
                 'approved_at' => $this->payment->matched_at->toISOString(),
                 'message' => 'Payment has been verified and approved',
             ];
+            
+            // Add mismatch information if payment was approved with amount mismatch
+            if ($this->payment->is_mismatch) {
+                $payload['is_mismatch'] = true;
+                $payload['received_amount'] = $this->payment->received_amount ? (float) $this->payment->received_amount : null;
+                $payload['mismatch_reason'] = $this->payment->mismatch_reason;
+                $payload['message'] = 'Payment has been verified and approved (amount mismatch detected)';
+            } else {
+                $payload['is_mismatch'] = false;
+            }
         } elseif ($this->payment->status === 'rejected') {
             $payload = [
                 'success' => false,
