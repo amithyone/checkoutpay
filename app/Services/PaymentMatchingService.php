@@ -1472,18 +1472,28 @@ class PaymentMatchingService
             }
         }
         
-        if (!$amount) {
-            return null;
+        // Return results if we found amount OR if we found description field (even without amount)
+        // Description field extraction is valuable even if amount extraction from other fields failed
+        if ($amount || $descriptionField) {
+            $result = [
+                'amount' => $amount,
+                'sender_name' => $senderName,
+                'account_number' => $accountNumber, // CRITICAL: Recipient account number (where payment was sent TO)
+                'payer_account_number' => $payerAccountNumber,
+                'transaction_time' => $transactionTime,
+                'extracted_date' => $extractedDate,
+                'method' => 'text_body',
+            ];
+            
+            // Add description field to result for debugging
+            if ($descriptionField) {
+                $result['description_field'] = $descriptionField;
+            }
+            
+            return $result;
         }
         
-        return [
-            'amount' => $amount,
-            'sender_name' => $senderName,
-            'account_number' => $accountNumber, // CRITICAL: Recipient account number (where payment was sent TO)
-            'payer_account_number' => $payerAccountNumber,
-            'transaction_time' => $transactionTime,
-            'extracted_date' => $extractedDate,
-        ];
+        return null;
     }
     
     /**
