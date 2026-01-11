@@ -117,7 +117,7 @@ class ReExtractDescriptionFields extends Command
                         $currentExtractedData['description_field'] = $descriptionField;
                         $currentExtractedData['account_number'] = $parsedData['account_number'] ?? null;
                         $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'] ?? null;
-                        $currentExtractedData['amount_from_description'] = $parsedData['amount'] ?? null;
+                        // SKIP amount_from_description - not reliable, use amount field instead
                         $currentExtractedData['date_from_description'] = $parsedData['extracted_date'] ?? null;
                         $updates['extracted_data'] = $currentExtractedData;
                         $email->update($updates);
@@ -148,7 +148,7 @@ class ReExtractDescriptionFields extends Command
                         $currentExtractedData['description_field'] = $descriptionField;
                         $currentExtractedData['account_number'] = $parsedData['account_number'] ?? null;
                         $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'] ?? null;
-                        $currentExtractedData['amount_from_description'] = $parsedData['amount'] ?? null;
+                        // SKIP amount_from_description - not reliable, use amount field instead
                         $currentExtractedData['date_from_description'] = $parsedData['extracted_date'] ?? null;
                         $updates['extracted_data'] = $currentExtractedData;
                         $email->update($updates);
@@ -208,10 +208,8 @@ class ReExtractDescriptionFields extends Command
                         }
                     }
                     
-                    // Also update amount and date if parsed from description field
-                    if ($parsedData['amount'] && (!$email->amount || $email->amount == 0)) {
-                        $updates['amount'] = $parsedData['amount'];
-                    }
+                    // SKIP updating amount from description field - not reliable
+                    // Use amount field from email extraction instead
                     
                     // Update extracted_data to include parsed description field data
                     $currentExtractedData = $email->extracted_data ?? [];
