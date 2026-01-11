@@ -1593,8 +1593,16 @@ class PaymentMatchingService
         
         // Extract sender name from text
         // Pattern 1: "FROM SOLOMON INNOCENT AMITHY TO SQUA"
-        if (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $text, $matches)) {
+        if (preg_match('/from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $text, $matches)) {
             $senderName = trim(strtolower($matches[1]));
+        }
+        // Pattern 1b: "TRANSFER FROM NAME" format in Description
+        // Format: "Description: CODE-TRANSFER FROM INNOCENT AMITHY SOLOMON-..."
+        elseif (preg_match('/description[\s:]+.*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z][A-Z\s]+?)(?:-|$)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
         }
         // Pattern 2: GTBank description with "CODE-NAME TRF FOR" format
         // Format: "Description: =20 090405260110014006799532206126-AMITHY ONE M TRF FOR..."
@@ -1612,7 +1620,17 @@ class PaymentMatchingService
                 $senderName = trim(strtolower($potentialName));
             }
         }
-        // Pattern 3: Other standard patterns in text
+        // Pattern 3: Extract from Remarks field (just the name, no FROM)
+        // Format: "Remarks: NT AMITHY SOLOMON" or "Remarks: AMITHY SOLOMON"
+        elseif (preg_match('/(?:remark|remarks)[\s:]+([A-Z][A-Z\s]{2,}?)(?:\s|$)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Remove common prefixes like "NT", "MR", "MRS", "MS", etc.
+            $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA)\s+/i', '', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 4: Other standard patterns in text
         elseif (preg_match('/(?:from|sender|payer|depositor|account\s*name|name)[\s:]+([A-Z][A-Z\s]+?)(?:\s+to|\s+account|\s+:|$)/i', $fullText, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
