@@ -595,6 +595,11 @@ class ReadEmailsDirect extends Command
             $parts = $this->parseEmail($content);
             
             if (!$parts) {
+                Log::debug('parseEmailContent: parseEmail returned null', [
+                    'filename' => $filename,
+                    'content_length' => strlen($content),
+                    'content_preview' => substr($content, 0, 300),
+                ]);
                 return null;
             }
 
@@ -717,6 +722,8 @@ class ReadEmailsDirect extends Command
                 'error' => $e->getMessage(),
                 'filename' => $filename,
                 'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
             return null;
         }
