@@ -161,7 +161,27 @@ class PaymentMatcher
                 }
             }
         } else {
-            // Name doesn't match or not provided - require exact amount match
+            // Name doesn't match or not provided - require exact amount match AND minimum name similarity
+            // CRITICAL: If payer_name is provided, we MUST have at least 65% name similarity
+            if ($payment->payer_name) {
+                // Payer name is required - check if we have name similarity
+                if ($nameSimilarityPercent === null || $nameSimilarityPercent < 65) {
+                    return [
+                        'matched' => false,
+                        'reason' => sprintf(
+                            'Name similarity too low: %d%% (minimum 65%% required). Expected "%s", got "%s". Payment requires name match.',
+                            $nameSimilarityPercent ?? 0,
+                            $payment->payer_name,
+                            $extractedInfo['sender_name'] ?? 'not found'
+                        ),
+                        'amount_diff' => $amountDiff,
+                        'time_diff_minutes' => $timeDiff,
+                        'name_similarity_percent' => $nameSimilarityPercent ?? 0,
+                    ];
+                }
+            }
+            
+            // If amount doesn't match exactly, reject
             if (abs($amountDiff) > $amountTolerance) {
                 return [
                     'matched' => false,
@@ -173,9 +193,24 @@ class PaymentMatcher
                     ),
                     'amount_diff' => $amountDiff,
                     'time_diff_minutes' => $timeDiff,
-                    'name_similarity_percent' => $nameSimilarityPercent,
+                    'name_similarity_percent' => $nameSimilarityPercent ?? 0,
                 ];
             }
+        }
+
+        // FINAL VALIDATION: Ensure name similarity is acceptable before approving
+        // If payer_name is provided, name similarity must be at least 65%
+        if ($payment->payer_name && ($nameSimilarityPercent === null || $nameSimilarityPercent < 65)) {
+            return [
+                'matched' => false,
+                'reason' => sprintf(
+                    'Name similarity validation failed: %d%% (minimum 65%% required). Cannot approve payment with name mismatch.',
+                    $nameSimilarityPercent ?? 0
+                ),
+                'amount_diff' => $amountDiff,
+                'time_diff_minutes' => $timeDiff,
+                'name_similarity_percent' => $nameSimilarityPercent ?? 0,
+            ];
         }
 
         return [
@@ -186,7 +221,7 @@ class PaymentMatcher
             'mismatch_reason' => $mismatchReason,
             'amount_diff' => $amountDiff,
             'time_diff_minutes' => $timeDiff,
-            'name_similarity_percent' => $nameSimilarityPercent,
+            'name_similarity_percent' => $nameSimilarityPercent ?? 0,
         ];
     }
     
