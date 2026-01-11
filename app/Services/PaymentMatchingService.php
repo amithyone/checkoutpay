@@ -1508,31 +1508,32 @@ class PaymentMatchingService
         $extractedDate = null;
         
         // PRIORITY 1: Extract description field FIRST - This is the MOST RELIABLE source
-        // SIMPLE PATTERN: Match "Description : " followed by exactly 43 digits (where number ends)
+        // FLEXIBLE PATTERN: Match "Description : " followed by digits (20+ digits, not just 43)
         // Text format: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
+        // OR: "Description : 100004260111113119149684166825-TRANSFER FROM INNOCENT AMITHY SOLOMON"
         // This is CLEANER than HTML - we should prioritize this!
-        // CRITICAL: Pattern allows any whitespace after colon and after 43 digits
-        // We match the 43 digits and parse them, regardless of what comes after
+        // CRITICAL: Pattern is flexible - accepts 20+ consecutive digits (not just 43)
         $descriptionField = null;
         
-        // Try simple pattern first: description : (43 digits) followed by space or FROM or end
-        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $text, $descMatches)) {
+        // Try flexible pattern: description : (20+ digits) followed by space, FROM, dash, or end
+        // This handles both 43-digit format and other formats like CODE-TRANSFER FROM
+        if (preg_match('/description[\s]*:[\s]*(\d{20,})(?:\s|FROM|-|$)/i', $text, $descMatches)) {
             $descriptionField = trim($descMatches[1]);
         } 
-        // Fallback: Match description : ... then find 43 consecutive digits anywhere in that line
+        // Fallback: Match description : ... then find longest digit sequence (20+) in that line
         elseif (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $text, $descLineMatches)) {
             $descLine = $descLineMatches[1];
-            // Find exactly 43 consecutive digits in the description line
-            if (preg_match('/(\d{43})/', $descLine, $digitMatches)) {
+            // Find longest digit sequence (at least 20 digits) in the description line
+            if (preg_match('/(\d{20,})/', $descLine, $digitMatches)) {
                 $descriptionField = trim($digitMatches[1]);
             }
         }
         
-        // Now parse the 43 digits if we found them
+        // Now parse the digits if we found them
+        // Try 43-digit format first (most common)
         if ($descriptionField && strlen($descriptionField) === 43) {
-            
             // Parse the 43 digits: recipient(10) + payer(10) + amount(6) + date(8) + unknown(9)
-            if (strlen($descriptionField) === 43 && preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
+            if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
                 $accountNumber = trim($digitMatches[1]); // PRIMARY: recipient account (first 10 digits)
                 $payerAccountNumber = trim($digitMatches[2]); // Sender account (next 10 digits)
                 $amountFromDesc = (float) ($digitMatches[3] / 100); // Amount (6 digits, divide by 100)
@@ -1550,6 +1551,36 @@ class PaymentMatchingService
             // Extract sender name separately (after the 43 digits)
             if (preg_match('/description[\s]*:[\s]*\d{43}\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $text, $nameMatches)) {
                 $senderName = trim(strtolower($nameMatches[1]));
+            }
+        }
+        // Try 42-digit format (pad with 0)
+        elseif ($descriptionField && strlen($descriptionField) === 42) {
+            $padded = $descriptionField . '0';
+            if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $padded, $digitMatches)) {
+                $accountNumber = trim($digitMatches[1]);
+                $payerAccountNumber = trim($digitMatches[2]);
+                $amountFromDesc = (float) ($digitMatches[3] / 100);
+                if ($amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
+                }
+                $dateStr = $digitMatches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+            }
+        }
+        // Try 30-41 digit format (extract first 20 digits as account numbers)
+        elseif ($descriptionField && strlen($descriptionField) >= 30 && strlen($descriptionField) <= 41) {
+            // Extract first 10 digits as recipient account, next 10 as payer account
+            if (preg_match('/^(\d{10})(\d{10})/', $descriptionField, $digitMatches)) {
+                $accountNumber = trim($digitMatches[1]);
+                $payerAccountNumber = trim($digitMatches[2]);
+            }
+        }
+        // For any other length (20+), try to extract first 10 digits as account number
+        elseif ($descriptionField && strlen($descriptionField) >= 20) {
+            if (preg_match('/^(\d{10})/', $descriptionField, $digitMatches)) {
+                $accountNumber = trim($digitMatches[1]);
             }
         }
         // Pattern 2: Without space between accounts (all 43 digits together) - also flexible
