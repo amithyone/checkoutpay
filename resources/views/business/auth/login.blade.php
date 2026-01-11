@@ -34,7 +34,7 @@
                     Access your payment gateway dashboard
                 </p>
             </div>
-            <form class="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-sm border border-gray-200" action="{{ route('business.login') }}" method="POST">
+            <form class="mt-8 space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200" action="{{ route('business.login') }}" method="POST">
                 @csrf
                 @if($errors->any())
                     <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
@@ -71,7 +71,7 @@
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div class="flex items-center">
                         <input id="remember" name="remember" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
                         <label for="remember" class="ml-2 block text-sm text-gray-900">Remember me</label>
