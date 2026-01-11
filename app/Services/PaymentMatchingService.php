@@ -1529,7 +1529,8 @@ class PaymentMatchingService
         // PRIORITY 2: Extract description field from plain text (REVAMPED METHOD)
         // Pattern: Match "Description : " followed by exactly 43 digits (where number ends)
         // This is SIMPLER and MORE RELIABLE than HTML parsing
-        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $plainText, $descMatches)) {
+        // CRITICAL: Pattern allows optional spaces/newlines/tabs after 43 digits before FROM or end
+        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s+|FROM|\s|$)/i', $plainText, $descMatches)) {
             $descriptionField = trim($descMatches[1]);
             
             // Parse the 43 digits: recipient(10) + payer(10) + amount(6) + date(8) + unknown(9)
