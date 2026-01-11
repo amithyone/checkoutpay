@@ -40,9 +40,25 @@
         </div>
     </div>
 
+    <!-- Documentation Link -->
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 lg:p-6">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <i class="fas fa-book text-blue-600 text-xl"></i>
+            </div>
+            <div class="ml-3 flex-1">
+                <h3 class="text-base font-semibold text-blue-900 mb-1">Complete API Documentation</h3>
+                <p class="text-sm text-blue-700 mb-3">View detailed API documentation with examples, endpoints, and integration guides.</p>
+                <a href="{{ route('business.api-documentation.index') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                    <i class="fas fa-arrow-right mr-2"></i> View Documentation
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- Integration Guide -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-6">Integration Guide</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-6">Quick Integration Guide</h3>
         
         <div class="space-y-6">
             <!-- API Endpoint -->

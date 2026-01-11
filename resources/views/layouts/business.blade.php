@@ -80,6 +80,11 @@
                     <span>API Keys</span>
                 </a>
 
+                <a href="{{ route('business.api-documentation.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.api-documentation.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-book w-5 mr-3"></i>
+                    <span>API Documentation</span>
+                </a>
+
                 <a href="{{ route('business.team.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.team.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-users w-5 mr-3"></i>
                     <span>Team</span>
