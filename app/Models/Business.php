@@ -6,11 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Support\Str;
 
-class Business extends Authenticatable
+class Business extends Authenticatable implements CanResetPasswordContract
 {
-    use HasFactory, SoftDeletes, Notifiable;
+    use HasFactory, SoftDeletes, Notifiable, CanResetPassword;
 
     protected $fillable = [
         'name',
@@ -116,5 +118,61 @@ class Business extends Authenticatable
     public function emailAccount()
     {
         return $this->belongsTo(EmailAccount::class);
+    }
+
+    /**
+     * Get the email address that should be used for password reset
+     */
+    public function getEmailForPasswordReset()
+    {
+        return $this->email;
+    }
+
+    /**
+     * Send the password reset notification.
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $this->notify(new \App\Notifications\BusinessResetPasswordNotification($token));
+    }
+
+    /**
+     * Get verifications for this business
+     */
+    public function verifications()
+    {
+        return $this->hasMany(BusinessVerification::class);
+    }
+
+    /**
+     * Get activity logs for this business
+     */
+    public function activityLogs()
+    {
+        return $this->hasMany(BusinessActivityLog::class);
+    }
+
+    /**
+     * Get notifications for this business
+     */
+    public function notifications()
+    {
+        return $this->hasMany(BusinessNotification::class);
+    }
+
+    /**
+     * Get unread notifications
+     */
+    public function unreadNotifications()
+    {
+        return $this->notifications()->where('is_read', false);
+    }
+
+    /**
+     * Get support tickets for this business
+     */
+    public function supportTickets()
+    {
+        return $this->hasMany(SupportTicket::class);
     }
 }

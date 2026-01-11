@@ -20,6 +20,12 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+    // Password reset routes
+    Route::get('/password/reset', [\App\Http\Controllers\Business\Auth\ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
+    Route::post('/password/email', [\App\Http\Controllers\Business\Auth\ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
+    Route::get('/password/reset/{token}', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/password/reset', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'reset'])->name('password.update');
+
     // Protected business routes
     Route::middleware('auth:business')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -53,5 +59,26 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         // API Keys & Integration
         Route::get('/keys', [KeysController::class, 'index'])->name('keys.index');
         Route::post('/keys/request-account-number', [KeysController::class, 'requestAccountNumber'])->name('keys.request-account-number');
+
+        // Verification/KYC
+        Route::get('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'index'])->name('verification.index');
+        Route::post('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'store'])->name('verification.store');
+        Route::get('/verification/{verification}/download', [\App\Http\Controllers\Business\VerificationController::class, 'download'])->name('verification.download');
+
+        // Activity Logs
+        Route::get('/activity', [\App\Http\Controllers\Business\ActivityLogController::class, 'index'])->name('activity.index');
+
+        // Notifications
+        Route::get('/notifications', [\App\Http\Controllers\Business\NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/{notification}/read', [\App\Http\Controllers\Business\NotificationController::class, 'markAsRead'])->name('notifications.read');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\Business\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+        Route::get('/notifications/unread-count', [\App\Http\Controllers\Business\NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+
+        // Support
+        Route::get('/support', [\App\Http\Controllers\Business\SupportController::class, 'index'])->name('support.index');
+        Route::get('/support/create', [\App\Http\Controllers\Business\SupportController::class, 'create'])->name('support.create');
+        Route::post('/support', [\App\Http\Controllers\Business\SupportController::class, 'store'])->name('support.store');
+        Route::get('/support/{ticket}', [\App\Http\Controllers\Business\SupportController::class, 'show'])->name('support.show');
+        Route::post('/support/{ticket}/reply', [\App\Http\Controllers\Business\SupportController::class, 'reply'])->name('support.reply');
     });
 });

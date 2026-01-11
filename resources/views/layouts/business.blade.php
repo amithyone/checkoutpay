@@ -69,6 +69,32 @@
                     <span>Team</span>
                 </a>
 
+                <a href="{{ route('business.verification.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.verification.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-id-card w-5 mr-3"></i>
+                    <span>Verification</span>
+                </a>
+
+                <a href="{{ route('business.notifications.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.notifications.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-bell w-5 mr-3"></i>
+                    <span>Notifications</span>
+                    @php
+                        $unreadCount = auth('business')->user()->unreadNotifications()->count();
+                    @endphp
+                    @if($unreadCount > 0)
+                        <span class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">{{ $unreadCount }}</span>
+                    @endif
+                </a>
+
+                <a href="{{ route('business.support.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.support.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-headset w-5 mr-3"></i>
+                    <span>Support</span>
+                </a>
+
+                <a href="{{ route('business.activity.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.activity.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-history w-5 mr-3"></i>
+                    <span>Activity Logs</span>
+                </a>
+
                 <a href="{{ route('business.settings.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.settings.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-cog w-5 mr-3"></i>
                     <span>Settings</span>
