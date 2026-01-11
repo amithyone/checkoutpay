@@ -1247,7 +1247,17 @@ class PaymentMatchingService
                 $senderName = trim(strtolower($matches[6]));
             }
             // Pattern: "FROM NAME TO" format (fallback)
-            elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $normalizedText, $matches)) {
+            elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $normalizedText, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+            
+            // FALLBACK: Extract sender name from Remark field if not found in Description
+            if (!$senderName && preg_match('/(?:remark|remarks)[\s]*:[\s]*.*?from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $normalizedText, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+            
+            // FALLBACK: Extract sender name from any field that contains "FROM NAME"
+            if (!$senderName && preg_match('/(?:description|remark|remarks|details|narration)[\s]*:[\s]*.*?from\s+([A-Z][A-Z\s]{2,}?)(?:\s+to|$)/i', $normalizedText, $matches)) {
                 $senderName = trim(strtolower($matches[1]));
             }
             
