@@ -1093,4 +1093,62 @@ class ReadEmailsDirect extends Command
         
         return $text;
     }
+
+    /**
+     * Parse description field to extract account numbers and date
+     */
+    protected function parseDescriptionField(?string $descriptionField): array
+    {
+        $result = [
+            'account_number' => null,        // First 10 digits - recipient account (where payment was sent TO)
+            'payer_account_number' => null, // Next 10 digits - sender account (where payment was sent FROM)
+            'amount' => null,
+            'extracted_date' => null,
+        ];
+
+        if (!$descriptionField) {
+            return $result;
+        }
+
+        $length = strlen($descriptionField);
+
+        // Handle 43-digit format (current format)
+        if ($length >= 43) {
+            if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $descriptionField, $matches)) {
+                $result['account_number'] = trim($matches[1]);        // First 10 digits
+                $result['payer_account_number'] = trim($matches[2]);  // Next 10 digits
+                $result['amount'] = (float) ($matches[3] / 100);      // Amount (6 digits, divide by 100)
+                $dateStr = $matches[4];                                // Date YYYYMMDD (8 digits)
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+            }
+        }
+        // Handle 42-digit format (missing 1 digit - pad with 0)
+        elseif ($length == 42) {
+            $padded = $descriptionField . '0';
+            if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $padded, $matches)) {
+                $result['account_number'] = trim($matches[1]);
+                $result['payer_account_number'] = trim($matches[2]);
+                $result['amount'] = (float) ($matches[3] / 100);
+                $dateStr = $matches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+            }
+        }
+        // Handle 30-digit format (old format - just extract first 20 digits as account numbers)
+        elseif ($length >= 30) {
+            if (preg_match('/^(\d{10})(\d{10})/', $descriptionField, $matches)) {
+                $result['account_number'] = trim($matches[1]);
+                $result['payer_account_number'] = trim($matches[2]);
+                // Try to extract amount if available (next 6 digits)
+                if (preg_match('/^(\d{10})(\d{10})(\d{6})/', $descriptionField, $amountMatches)) {
+                    $result['amount'] = (float) ($amountMatches[3] / 100);
+                }
+            }
+        }
+
+        return $result;
+    }
 }
