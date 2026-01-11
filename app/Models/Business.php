@@ -3,19 +3,23 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 
-class Business extends Model
+class Business extends Authenticatable
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
+        'password',
         'phone',
         'address',
+        'website',
+        'website_approved',
         'api_key',
         'webhook_url',
         'email_account_id',
@@ -23,9 +27,16 @@ class Business extends Model
         'balance',
     ];
 
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
+        'website_approved' => 'boolean',
         'balance' => 'decimal:2',
+        'password' => 'hashed',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',

@@ -31,6 +31,18 @@
                 <p class="text-sm font-medium text-gray-900">{{ $business->phone ?? 'N/A' }}</p>
             </div>
             <div>
+                <label class="text-sm text-gray-600">Website</label>
+                @if($business->website)
+                    <p class="text-sm font-medium text-gray-900">
+                        <a href="{{ $business->website }}" target="_blank" class="text-primary hover:underline">
+                            {{ $business->website }} <i class="fas fa-external-link-alt text-xs"></i>
+                        </a>
+                    </p>
+                @else
+                    <p class="text-sm text-gray-500">Not provided</p>
+                @endif
+            </div>
+            <div>
                 <label class="text-sm text-gray-600">Balance</label>
                 <p class="text-lg font-bold text-gray-900">₦{{ number_format($business->balance, 2) }}</p>
             </div>
@@ -55,6 +67,47 @@
             </div>
         </div>
     </div>
+
+    <!-- Website Approval -->
+    @if($business->website)
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Website Approval</h3>
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600 mb-2">Website Status</p>
+                @if($business->website_approved)
+                    <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
+                        <i class="fas fa-check-circle mr-2"></i> Approved
+                    </span>
+                    <p class="text-xs text-gray-500 mt-2">Business can request account numbers</p>
+                @else
+                    <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                        <i class="fas fa-clock mr-2"></i> Pending Approval
+                    </span>
+                    <p class="text-xs text-gray-500 mt-2">Business cannot request account numbers until approved</p>
+                @endif
+            </div>
+            <div class="flex items-center space-x-3">
+                @if(!$business->website_approved)
+                    <form action="{{ route('admin.businesses.approve-website', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-check mr-2"></i> Approve Website
+                        </button>
+                    </form>
+                @else
+                    <form action="{{ route('admin.businesses.reject-website', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            onclick="return confirm('Are you sure you want to revoke website approval? This will prevent the business from requesting account numbers.')">
+                            <i class="fas fa-times mr-2"></i> Revoke Approval
+                        </button>
+                    </form>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Account Numbers -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

@@ -21,6 +21,7 @@ class WithdrawalRequest extends Model
         'account_number',
         'account_name',
         'bank_name',
+        'notes',
         'status',
         'rejection_reason',
         'processed_at',

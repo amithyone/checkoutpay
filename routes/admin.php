@@ -44,6 +44,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('businesses', BusinessController::class);
         Route::post('businesses/{business}/regenerate-api-key', [BusinessController::class, 'regenerateApiKey'])
             ->name('businesses.regenerate-api-key');
+        Route::post('businesses/{business}/approve-website', [BusinessController::class, 'approveWebsite'])
+            ->name('businesses.approve-website');
+        Route::post('businesses/{business}/reject-website', [BusinessController::class, 'rejectWebsite'])
+            ->name('businesses.reject-website');
 
         // Payments
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');

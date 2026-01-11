@@ -37,6 +37,7 @@ class BusinessController extends Controller
             'email' => 'required|email|unique:businesses,email',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
+            'website' => 'nullable|url|max:500',
             'webhook_url' => 'nullable|url',
             'email_account_id' => 'nullable|exists:email_accounts,id',
             'is_active' => 'boolean',
@@ -67,6 +68,7 @@ class BusinessController extends Controller
             'email' => 'required|email|unique:businesses,email,' . $business->id,
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
+            'website' => 'nullable|url|max:500',
             'webhook_url' => 'nullable|url',
             'email_account_id' => 'nullable|exists:email_accounts,id',
             'is_active' => 'boolean',
@@ -85,5 +87,21 @@ class BusinessController extends Controller
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'API key regenerated successfully');
+    }
+
+    public function approveWebsite(Business $business): RedirectResponse
+    {
+        $business->update(['website_approved' => true]);
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Website approved successfully');
+    }
+
+    public function rejectWebsite(Business $business): RedirectResponse
+    {
+        $business->update(['website_approved' => false]);
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Website approval revoked');
     }
 }

@@ -22,7 +22,12 @@ class Authenticate extends Middleware
             return route('admin.login');
         }
 
-        // Default to admin login (no regular login route exists)
+        // Check if business route
+        if ($request->is('dashboard/*')) {
+            return route('business.login');
+        }
+
+        // Default to admin login
         return route('admin.login');
     }
 }
