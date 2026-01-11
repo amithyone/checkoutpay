@@ -368,4 +368,63 @@ Route::get('/cron/global-match', function () {
             'timestamp' => now()->toDateTimeString(),
         ], 500);
     }
+    
+    /**
+     * Helper function to parse description field
+     */
+    if (!function_exists('parseDescriptionFieldHelper')) {
+        function parseDescriptionFieldHelper(?string $descriptionField): array
+        {
+            $result = [
+                'account_number' => null,
+                'payer_account_number' => null,
+                'amount' => null,
+                'extracted_date' => null,
+            ];
+
+            if (!$descriptionField) {
+                return $result;
+            }
+
+            $length = strlen($descriptionField);
+
+            // Handle 43-digit format
+            if ($length >= 43) {
+                if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $descriptionField, $matches)) {
+                    $result['account_number'] = trim($matches[1]);
+                    $result['payer_account_number'] = trim($matches[2]);
+                    $result['amount'] = (float) ($matches[3] / 100);
+                    $dateStr = $matches[4];
+                    if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                        $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                    }
+                }
+            }
+            // Handle 42-digit format
+            elseif ($length == 42) {
+                $padded = $descriptionField . '0';
+                if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $padded, $matches)) {
+                    $result['account_number'] = trim($matches[1]);
+                    $result['payer_account_number'] = trim($matches[2]);
+                    $result['amount'] = (float) ($matches[3] / 100);
+                    $dateStr = $matches[4];
+                    if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                        $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                    }
+                }
+            }
+            // Handle 30-digit format
+            elseif ($length >= 30) {
+                if (preg_match('/^(\d{10})(\d{10})/', $descriptionField, $matches)) {
+                    $result['account_number'] = trim($matches[1]);
+                    $result['payer_account_number'] = trim($matches[2]);
+                    if (preg_match('/^(\d{10})(\d{10})(\d{6})/', $descriptionField, $amountMatches)) {
+                        $result['amount'] = (float) ($amountMatches[3] / 100);
+                    }
+                }
+            }
+
+            return $result;
+        }
+    }
 })->name('cron.global-match');
