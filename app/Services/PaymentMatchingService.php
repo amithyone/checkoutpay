@@ -1312,8 +1312,12 @@ class PaymentMatchingService
                     if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                         $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
                     }
-                    // Extract sender name separately
-                    if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*\d{43}[\s\n\r]+FROM[\s\n\r]+([A-Z\s]+?)(?:[\s\n\r]+TO|$)/i', $html, $nameMatches)) {
+                    // Extract sender name separately - try description field first
+                    if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>[\s\n\r]*\d{43}[\s\n\r]+FROM[\s\n\r]+([A-Z\s]+?)(?:[\s\n\r]+TO|$)/i', $html, $nameMatches)) {
+                        $senderName = trim(strtolower($nameMatches[1]));
+                    }
+                    // If not found, try remark field specifically
+                    if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:remark|remarks)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $html, $nameMatches)) {
                         $senderName = trim(strtolower($nameMatches[1]));
                     }
                 }
@@ -1427,10 +1431,20 @@ class PaymentMatchingService
                         $senderName = trim(strtolower($potentialName));
                     }
                 }
-                // Pattern: "FROM NAME TO" format
-                elseif (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)\s+to/i', $html, $matches)) {
+                // Pattern: "FROM NAME TO" format (make TO optional)
+                elseif (preg_match('/<td[^>]*>[\s]*' . $label . '[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $html, $matches)) {
                     $senderName = trim(strtolower($matches[1]));
                 }
+            }
+            
+            // FALLBACK: Extract sender name from Remark field in HTML if not found
+            if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:remark|remarks)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $html, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
+            }
+            
+            // FALLBACK: Extract sender name from any description/remark field that contains "FROM NAME"
+            if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remark|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?from\s+([A-Z][A-Z\s]{2,}?)(?:\s+to|$)/i', $html, $matches)) {
+                $senderName = trim(strtolower($matches[1]));
             }
         }
         
