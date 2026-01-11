@@ -1347,7 +1347,8 @@ class PaymentMatchingService
         // Pattern 1: Flexible - handles space OR no space between first and second 10-digit numbers
         // Format: "Description : 9008771210 021008599511000020260111080847554 FROM..." (with space)
         // OR: "Description : 900877121002100859959000020260111094651392 FROM..." (without space)
-        if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+        // CRITICAL: Allow flexible spacing/characters between digits and FROM to handle formatting variations
+        if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100); // Divide by 100 to get actual amount
@@ -1360,9 +1361,9 @@ class PaymentMatchingService
             }
             $senderName = trim(strtolower($matches[6]));
         }
-        // Pattern 2: Without space between accounts (all 43 digits together)
+        // Pattern 2: Without space between accounts (all 43 digits together) - also flexible
         // Format: "Description : 900877121002100859959000020260111094651392 FROM..."
-        elseif (preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+        elseif (preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
