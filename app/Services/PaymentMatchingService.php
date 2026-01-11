@@ -1416,7 +1416,11 @@ class PaymentMatchingService
      */
     protected function extractFromHtmlBody(string $html, string $subject, string $from): ?array
     {
-        // Decode HTML entities FIRST (like &nbsp; becomes space, &amp; becomes &)
+        // CRITICAL: Decode quoted-printable FIRST (e.g., =3D becomes =, =20 becomes space)
+        // This is essential because database may have stored HTML with quoted-printable encoding
+        $html = $this->decodeQuotedPrintable($html);
+        
+        // Decode HTML entities SECOND (like &nbsp; becomes space, &amp; becomes &)
         // This is critical because stored HTML may have entities like NGN&nbsp;1000
         $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
