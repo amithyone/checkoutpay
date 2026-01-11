@@ -192,9 +192,12 @@ class PaymentMatchingService
         }
         
         $pendingPayments = $query->get();
+        
+        // Count pending payments with same amount (for flexible matching)
+        $sameAmountCount = $pendingPayments->where('amount', $extractedInfo['amount'])->count();
 
         foreach ($pendingPayments as $payment) {
-            $match = $this->matchPayment($payment, $extractedInfo, !empty($emailData['date']) ? new \DateTime($emailData['date']) : null);
+            $match = $this->matchPayment($payment, $extractedInfo, !empty($emailData['date']) ? new \DateTime($emailData['date']) : null, $sameAmountCount);
 
             // Log match attempt to database
             try {
@@ -774,6 +777,9 @@ class PaymentMatchingService
             })
             ->get();
         
+        // Count pending payments with the same amount (for flexible matching)
+        $pendingPaymentsWithSameAmount = $pendingPayments->where('amount', $extractedInfo['amount'])->count();
+        
         foreach ($storedEmails as $storedEmail) {
             foreach ($pendingPayments as $payment) {
                 // Re-extract from html_body if available
@@ -799,7 +805,10 @@ class PaymentMatchingService
                     continue;
                 }
                 
-                $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+                // Count pending payments with same amount for this specific payment
+                $sameAmountCount = $pendingPayments->where('amount', $extractedInfo['amount'])->count();
+                
+                $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date, $sameAmountCount);
                 
                 // Log match attempt to database
                 try {
@@ -924,10 +933,14 @@ class PaymentMatchingService
                 }
                 
                 $pendingPayments = $query->get();
+                
+                // Count pending payments with same amount (for flexible matching)
+                $sameAmountCount = $pendingPayments->where('amount', $extractedInfo['amount'])->count();
+                
                 $matches = [];
                 
                 foreach ($pendingPayments as $payment) {
-                    $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+                    $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date, $sameAmountCount);
                     
                     // Log match attempt to database
                     try {
@@ -1047,10 +1060,14 @@ class PaymentMatchingService
         }
         
         $pendingPayments = $query->get();
+        
+        // Count pending payments with same amount (for flexible matching)
+        $sameAmountCount = $pendingPayments->where('amount', $extractedInfo['amount'])->count();
+        
         $matches = [];
         
         foreach ($pendingPayments as $payment) {
-            $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+            $match = $this->matchPayment($payment, $extractedInfo, $storedEmail->email_date, $sameAmountCount);
             
             // Log match attempt to database
             try {

@@ -385,11 +385,24 @@ class EmailWebhookController extends Controller
                         
                         // Check if this is a mismatch (amount difference < N500)
                         $isMismatch = $matchResult['is_mismatch'] ?? false;
+                        $nameMismatch = $matchResult['name_mismatch'] ?? false;
                         $receivedAmount = $matchResult['received_amount'] ?? null;
                         $mismatchReason = $matchResult['mismatch_reason'] ?? null;
                         
+                        // Add name_mismatch to email_data for webhook payload
+                        $emailDataWithMismatch = array_merge([
+                            'subject' => $processedEmail->subject,
+                            'from' => $processedEmail->from_email,
+                            'text' => $processedEmail->text_body,
+                            'html' => $processedEmail->html_body,
+                            'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                        ], [
+                            'name_mismatch' => $nameMismatch,
+                            'name_similarity_percent' => $matchResult['name_similarity_percent'] ?? null,
+                        ]);
+                        
                         // Approve payment (with mismatch flag if applicable)
-                        $payment->approve([
+                        $payment->approve($emailDataWithMismatch, $isMismatch, $receivedAmount, $mismatchReason);
                             'subject' => $subject,
                             'from' => $fromEmail,
                             'text' => $text,

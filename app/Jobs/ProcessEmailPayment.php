@@ -43,8 +43,21 @@ class ProcessEmailPayment implements ShouldQueue
             // Log payment matched
             $logService->logPaymentMatched($payment, $this->emailData);
 
-            // Approve payment
-            $payment->approve($this->emailData);
+            // Get match result details (including name_mismatch) if stored
+            $matchResult = $payment->getAttribute('_match_result');
+            $nameMismatch = $matchResult['name_mismatch'] ?? false;
+            $isMismatch = $matchResult['is_mismatch'] ?? false;
+            $receivedAmount = $matchResult['received_amount'] ?? null;
+            $mismatchReason = $matchResult['mismatch_reason'] ?? null;
+            
+            // Add name_mismatch to email_data for webhook payload
+            $emailDataWithMismatch = array_merge($this->emailData, [
+                'name_mismatch' => $nameMismatch,
+                'name_similarity_percent' => $matchResult['name_similarity_percent'] ?? null,
+            ]);
+
+            // Approve payment with mismatch flags
+            $payment->approve($emailDataWithMismatch, $isMismatch, $receivedAmount, $mismatchReason);
 
             // Log payment approved
             $logService->logPaymentApproved($payment);

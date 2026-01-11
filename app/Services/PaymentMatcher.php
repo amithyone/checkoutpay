@@ -9,8 +9,13 @@ class PaymentMatcher
     /**
      * Match payment against extracted email info
      * This is the full matching logic from PaymentMatchingService
+     * 
+     * @param Payment $payment The payment to match
+     * @param array $extractedInfo Extracted info from email
+     * @param \DateTime|null $emailDate Email date
+     * @param int|null $pendingPaymentsWithSameAmount Number of pending payments with the same amount (for flexible matching)
      */
-    public function matchPayment(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null): array
+    public function matchPayment(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null, ?int $pendingPaymentsWithSameAmount = null): array
     {
         // Check time window: email must be received AFTER transaction creation and within configured minutes
         $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
@@ -162,35 +167,85 @@ class PaymentMatcher
                 }
             }
         } else {
-            // Name doesn't match or not provided - require exact amount match AND minimum name similarity
-            // CRITICAL: If payer_name is provided, we MUST have at least 65% name similarity
-            if ($payment->payer_name) {
-                // Payer name is required - check if we have name similarity
-                if ($nameSimilarityPercent === null || $nameSimilarityPercent < 65) {
+            // Name doesn't match or not provided
+            // FLEXIBLE MATCHING: Check if multiple payments exist with same amount
+            $hasMultiplePaymentsWithSameAmount = ($pendingPaymentsWithSameAmount !== null && $pendingPaymentsWithSameAmount > 1);
+            
+            if ($hasMultiplePaymentsWithSameAmount) {
+                // Multiple payments with same amount - MUST have name match
+                if ($payment->payer_name) {
+                    if ($nameSimilarityPercent === null || $nameSimilarityPercent < 65) {
+                        return [
+                            'matched' => false,
+                            'reason' => sprintf(
+                                'Multiple pending payments with same amount (%d found). Name similarity too low: %d%% (minimum 65%% required). Expected "%s", got "%s". Name match required to distinguish between payments.',
+                                $pendingPaymentsWithSameAmount,
+                                $nameSimilarityPercent ?? 0,
+                                $payment->payer_name,
+                                $extractedInfo['sender_name'] ?? 'not found'
+                            ),
+                            'amount_diff' => $amountDiff,
+                            'time_diff_minutes' => $timeDiff,
+                            'name_similarity_percent' => $nameSimilarityPercent ?? 0,
+                        ];
+                    }
+                } else {
+                    // No payer_name but multiple payments - cannot distinguish
                     return [
                         'matched' => false,
                         'reason' => sprintf(
-                            'Name similarity too low: %d%% (minimum 65%% required). Expected "%s", got "%s". Payment requires name match.',
-                            $nameSimilarityPercent ?? 0,
-                            $payment->payer_name,
-                            $extractedInfo['sender_name'] ?? 'not found'
+                            'Multiple pending payments with same amount (%d found). Cannot match without payer_name to distinguish between payments.',
+                            $pendingPaymentsWithSameAmount
                         ),
                         'amount_diff' => $amountDiff,
                         'time_diff_minutes' => $timeDiff,
                         'name_similarity_percent' => $nameSimilarityPercent ?? 0,
                     ];
                 }
+            } else {
+                // Single payment with this amount - allow approval with name mismatch (but flag it)
+                // Still require exact amount match
+                if (abs($amountDiff) > $amountTolerance) {
+                    return [
+                        'matched' => false,
+                        'reason' => sprintf(
+                            'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Exact amount required.',
+                            number_format($expectedAmount, 2),
+                            number_format($receivedAmount, 2),
+                            number_format(abs($amountDiff), 2)
+                        ),
+                        'amount_diff' => $amountDiff,
+                        'time_diff_minutes' => $timeDiff,
+                        'name_similarity_percent' => $nameSimilarityPercent ?? 0,
+                    ];
+                }
+                
+                // Amount matches exactly - approve but flag name mismatch if applicable
+                if ($payment->payer_name && ($nameSimilarityPercent === null || $nameSimilarityPercent < 65)) {
+                    // Flag as name mismatch but allow approval (single payment scenario)
+                    $isMismatch = true;
+                    $mismatchReason = sprintf(
+                        'Name mismatch: expected "%s", got "%s" (similarity: %d%%). Approved because only one pending payment with this amount. Amount matches exactly.',
+                        $payment->payer_name,
+                        $extractedInfo['sender_name'] ?? 'not found',
+                        $nameSimilarityPercent ?? 0
+                    );
+                }
             }
-            
-            // If amount doesn't match exactly, reject
-            if (abs($amountDiff) > $amountTolerance) {
+        }
+
+        // FINAL VALIDATION: Check if multiple payments exist with same amount
+        $hasMultiplePaymentsWithSameAmount = ($pendingPaymentsWithSameAmount !== null && $pendingPaymentsWithSameAmount > 1);
+        
+        if ($hasMultiplePaymentsWithSameAmount && $payment->payer_name) {
+            // Multiple payments with same amount - require name match
+            if ($nameSimilarityPercent === null || $nameSimilarityPercent < 65) {
                 return [
                     'matched' => false,
                     'reason' => sprintf(
-                        'Amount mismatch: expected ₦%s, received ₦%s (difference: ₦%s). Name does not match, so exact amount required.',
-                        number_format($expectedAmount, 2),
-                        number_format($receivedAmount, 2),
-                        number_format(abs($amountDiff), 2)
+                        'Multiple pending payments with same amount (%d found). Name similarity too low: %d%% (minimum 65%% required). Cannot approve without name match.',
+                        $pendingPaymentsWithSameAmount,
+                        $nameSimilarityPercent ?? 0
                     ),
                     'amount_diff' => $amountDiff,
                     'time_diff_minutes' => $timeDiff,
@@ -199,25 +254,11 @@ class PaymentMatcher
             }
         }
 
-        // FINAL VALIDATION: Ensure name similarity is acceptable before approving
-        // If payer_name is provided, name similarity must be at least 65%
-        if ($payment->payer_name && ($nameSimilarityPercent === null || $nameSimilarityPercent < 65)) {
-            return [
-                'matched' => false,
-                'reason' => sprintf(
-                    'Name similarity validation failed: %d%% (minimum 65%% required). Cannot approve payment with name mismatch.',
-                    $nameSimilarityPercent ?? 0
-                ),
-                'amount_diff' => $amountDiff,
-                'time_diff_minutes' => $timeDiff,
-                'name_similarity_percent' => $nameSimilarityPercent ?? 0,
-            ];
-        }
-
         return [
             'matched' => true,
             'reason' => $isMismatch ? $mismatchReason : 'Amount and name match within time window',
             'is_mismatch' => $isMismatch,
+            'name_mismatch' => ($payment->payer_name && ($nameSimilarityPercent === null || $nameSimilarityPercent < 65)) ? true : false, // Flag name mismatch in payload
             'received_amount' => $finalReceivedAmount,
             'mismatch_reason' => $mismatchReason,
             'amount_diff' => $amountDiff,
