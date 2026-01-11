@@ -1,8 +1,8 @@
 {
-    "name": "email-payment-gateway/laravel",
+    "name": "checkoutpay/laravel",
     "type": "project",
-    "description": "Email-based payment gateway built with Laravel",
-    "keywords": ["laravel", "payment", "gateway", "email", "webhook"],
+    "description": "Intelligent payment gateway built with Laravel",
+    "keywords": ["laravel", "payment", "gateway", "intelligent", "webhook"],
     "license": "MIT",
     "require": {
         "php": "^8.1|^8.2",
