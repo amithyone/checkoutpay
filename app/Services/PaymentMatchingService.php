@@ -1524,8 +1524,8 @@ class PaymentMatchingService
         // Pattern 2: Description field WITHOUT colon cell (direct next cell) - ULTRA-FLEXIBLE
         // Format: <td>Description</td><td>900877121002100859959000020260111094651392 FROM...</td>
         // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
-        // CRITICAL: Make TO optional - HTML might be truncated or not have TO
-        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:.*?TO|$)/i', $html, $matches)) {
+        // CRITICAL: Make TO optional - HTML might be truncated or not have TO (like: FROM SOLOMON with no TO)
+        elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1578,8 +1578,8 @@ class PaymentMatchingService
         // Pattern 5: Fallback - Extract from any cell containing the description pattern (very flexible)
         // This catches cases where the HTML structure is slightly different
         // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
-        // CRITICAL: Make TO optional - HTML might be truncated or not have TO
-        elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:.*?TO|$)/i', $html, $matches)) {
+        // CRITICAL: Make TO optional - HTML might be truncated or not have TO (like: FROM SOLOMON with no TO)
+        elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1598,8 +1598,8 @@ class PaymentMatchingService
         // Pattern 6: Ultra-flexible - Just look for the digit pattern followed by FROM in description context
         // This is a last resort that should catch almost any format
         // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
-        // CRITICAL: Make TO optional - HTML might be truncated or not have TO
-        elseif (!$accountNumber && preg_match('/(?s)description[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:.*?TO|$)/i', $html, $matches)) {
+        // CRITICAL: Make TO optional - HTML might be truncated or not have TO (like: FROM SOLOMON with no TO)
+        elseif (!$accountNumber && preg_match('/(?s)description[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $html, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1644,8 +1644,8 @@ class PaymentMatchingService
         // Last resort: Look for the digit pattern anywhere in plain text (ultra-flexible)
         // Pattern: 10 digits, 10 digits, 6 digits, 8 digits, 9 digits followed by FROM ... TO
         // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
-        // CRITICAL: Make TO optional - text might be truncated or not have TO
-        elseif (!$accountNumber && preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:.*?TO|$)/i', $plainText, $textMatches)) {
+        // CRITICAL: Make TO optional - text might be truncated or not have TO (like: FROM SOLOMON with no TO)
+        elseif (!$accountNumber && preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $plainText, $textMatches)) {
             $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($textMatches[2]);
             $amountFromDesc = (float) ($textMatches[3] / 100);
