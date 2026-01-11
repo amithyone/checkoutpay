@@ -130,7 +130,13 @@ class PaymentMatchingService
             return null;
         }
 
-        \Illuminate\Support\Facades\Log::info('Extracted payment info from email', $extractedInfo);
+        \Illuminate\Support\Facades\Log::info('Extracted payment info from email', array_merge($extractedInfo, [
+            'extraction_method' => $extractionMethod,
+            'has_account_number' => !empty($extractedInfo['account_number'] ?? null),
+            'account_number' => $extractedInfo['account_number'] ?? 'NULL',
+            'has_payer_account_number' => !empty($extractedInfo['payer_account_number'] ?? null),
+            'payer_account_number' => $extractedInfo['payer_account_number'] ?? 'NULL',
+        ]));
 
         // Check for duplicate payments first
         $duplicate = $this->checkDuplicate($extractedInfo);
@@ -1551,6 +1557,24 @@ class PaymentMatchingService
             if (!$amount && $amountFromDesc >= 10) {
                 $amount = $amountFromDesc;
                 $method = 'html_rendered_text';
+            }
+            $dateStr = $textMatches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            if (!$senderName) {
+                $senderName = trim(strtolower($textMatches[6]));
+            }
+        }
+        // Last resort: Look for the digit pattern anywhere in plain text (ultra-flexible)
+        // Pattern: 10 digits, 10 digits, 6 digits, 8 digits, 9 digits followed by FROM ... TO
+        elseif (!$accountNumber && preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $plainText, $textMatches)) {
+            $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account
+            $payerAccountNumber = trim($textMatches[2]);
+            $amountFromDesc = (float) ($textMatches[3] / 100);
+            if (!$amount && $amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+                $method = $method ?: 'html_rendered_text';
             }
             $dateStr = $textMatches[4];
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
