@@ -23,9 +23,22 @@ class Kernel extends ConsoleKernel
                 ->runInBackground();
         }
 
-        // Always read emails directly from filesystem (more reliable)
+        // Master email processing cron (3 sequential steps):
+        // STEP 1: Fetch emails from filesystem
+        // STEP 2: Fill sender_name from text_body if null
+        // STEP 3: Match transactions
         // This is the primary method when IMAP is disabled
-        $schedule->command('payment:read-emails-direct --all')
+        $schedule->call(function () {
+            // Use HTTP client to call the master cron route
+            try {
+                $url = url('/cron/process-emails');
+                \Illuminate\Support\Facades\Http::timeout(300)->get($url);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Master email processing cron failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        })
             ->everyFifteenSeconds()
             ->withoutOverlapping()
             ->runInBackground();
