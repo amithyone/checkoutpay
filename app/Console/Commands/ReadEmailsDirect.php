@@ -386,7 +386,18 @@ class ReadEmailsDirect extends Command
                             $subject = $processedEmail->subject ?? 'No Subject';
                             $this->info("  ✅ Processed: {$subject}");
                         } else {
+                            // Log more details about why parsing failed
+                            $hasHeaders = preg_match('/^(From|Subject|Date|To|Message-ID|Content-Type):/mi', $emailContent);
                             $this->warn("  ⚠️  Could not parse email from: {$file}");
+                            if (!$hasHeaders) {
+                                $this->line("     (No recognizable email headers found)");
+                            }
+                            Log::debug('Email parsing failed', [
+                                'file' => $file,
+                                'content_length' => strlen($emailContent),
+                                'has_headers' => $hasHeaders,
+                                'content_preview' => substr($emailContent, 0, 200),
+                            ]);
                         }
                     } catch (\Exception $e) {
                         Log::error('Error reading mail file', [
@@ -636,12 +647,66 @@ class ReadEmailsDirect extends Command
      */
     protected function parseEmail(string $content): ?array
     {
-        // Split headers and body
+        if (empty(trim($content))) {
+            return null;
+        }
+
+        // Try multiple methods to split headers and body
+        $headers = '';
+        $body = '';
+        
+        // Method 1: Standard RFC 822 format (double CRLF)
         if (strpos($content, "\r\n\r\n") !== false) {
             list($headers, $body) = explode("\r\n\r\n", $content, 2);
-        } elseif (strpos($content, "\n\n") !== false) {
+        }
+        // Method 2: Unix format (double LF)
+        elseif (strpos($content, "\n\n") !== false) {
             list($headers, $body) = explode("\n\n", $content, 2);
-        } else {
+        }
+        // Method 3: Try to find first blank line (more flexible)
+        elseif (preg_match('/^(.+?)(\r?\n\r?\n)(.+)$/s', $content, $matches)) {
+            $headers = $matches[1];
+            $body = $matches[3];
+        }
+        // Method 4: Look for first header-like pattern, then find body
+        elseif (preg_match('/^([A-Za-z-]+:\s*.+?)(\r?\n\r?\n|\r?\n)(.+)$/s', $content, $matches)) {
+            $headers = $matches[1];
+            $body = $matches[3];
+        }
+        // Method 5: If content starts with "From " (mbox format), try to parse it
+        elseif (preg_match('/^From\s+.+?\r?\n(.+?)(\r?\n\r?\n|\r?\n)(.+)$/s', $content, $matches)) {
+            $headers = $matches[1];
+            $body = $matches[3];
+        }
+        // Method 6: Last resort - assume first 2000 chars are headers if they contain colons
+        else {
+            // Check if content looks like it has headers (contains "From:", "Subject:", etc.)
+            $headerPattern = '/^(From|Subject|Date|To|Message-ID|Content-Type):/mi';
+            if (preg_match($headerPattern, substr($content, 0, 2000))) {
+                // Try to find where headers end by looking for pattern: header: value followed by blank line
+                if (preg_match('/^(.+?)(\r?\n\r?\n|\r?\n)(.+)$/s', $content, $matches)) {
+                    $headers = $matches[1];
+                    $body = $matches[3];
+                } else {
+                    // If we can't find separator, assume first 2000 chars are headers
+                    $headers = substr($content, 0, 2000);
+                    $body = substr($content, 2000);
+                }
+            } else {
+                // No recognizable headers - log for debugging
+                Log::debug('Email parsing failed: no recognizable headers', [
+                    'content_preview' => substr($content, 0, 500),
+                    'content_length' => strlen($content),
+                ]);
+                return null;
+            }
+        }
+        
+        // Validate that we have headers
+        if (empty(trim($headers))) {
+            Log::debug('Email parsing failed: empty headers', [
+                'content_preview' => substr($content, 0, 500),
+            ]);
             return null;
         }
 
