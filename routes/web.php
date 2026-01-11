@@ -179,6 +179,40 @@ Route::get('/cron/global-match', function () {
             'unmatched_emails_count' => $unmatchedEmails->count(),
         ]);
 
+        // STEP 1: Parse description fields for emails that have them but missing account_number
+        // This ensures account numbers are extracted before matching
+        $parsedCount = 0;
+        foreach ($unmatchedEmails as $processedEmail) {
+            if ($processedEmail->description_field && !$processedEmail->account_number) {
+                try {
+                    $parsedData = parseDescriptionFieldHelper($processedEmail->description_field);
+                    if ($parsedData['account_number']) {
+                        $currentExtractedData = $processedEmail->extracted_data ?? [];
+                        $currentExtractedData['description_field'] = $processedEmail->description_field;
+                        $currentExtractedData['account_number'] = $parsedData['account_number'];
+                        $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'];
+                        $currentExtractedData['amount_from_description'] = $parsedData['amount'];
+                        $currentExtractedData['date_from_description'] = $parsedData['extracted_date'];
+                        
+                        $processedEmail->update([
+                            'account_number' => $parsedData['account_number'],
+                            'extracted_data' => $currentExtractedData,
+                        ]);
+                        $parsedCount++;
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to parse description field in global match cron', [
+                        'email_id' => $processedEmail->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+        
+        if ($parsedCount > 0) {
+            \Illuminate\Support\Facades\Log::info("Parsed {$parsedCount} description fields before matching");
+        }
+
         // Strategy: For each unmatched email, try to match against all pending payments
         foreach ($unmatchedEmails as $processedEmail) {
             try {
