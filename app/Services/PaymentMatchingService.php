@@ -1499,6 +1499,24 @@ class PaymentMatchingService
                 $senderName = trim(strtolower($potentialName));
             }
         }
+        // Pattern 5: Fallback - Extract from any cell containing the description pattern (very flexible)
+        // This catches cases where the HTML structure is slightly different
+        elseif (!$accountNumber && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $html, $matches)) {
+            $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
+            $payerAccountNumber = trim($matches[2]);
+            $amountFromDesc = (float) ($matches[3] / 100);
+            if (!$amount && $amountFromDesc >= 10) {
+                $amount = $amountFromDesc;
+                $method = 'html_table_description';
+            }
+            $dateStr = $matches[4];
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+            }
+            if (!$senderName) {
+                $senderName = trim(strtolower($matches[6]));
+            }
+        }
         
         // STRATEGY 1: Convert HTML to plain text and try text extraction (simplest, most reliable)
         // This handles complex HTML structures by stripping tags first
