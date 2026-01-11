@@ -69,7 +69,7 @@ class MatchController extends Controller
                             $currentExtractedData['description_field'] = $processedEmail->description_field;
                             $currentExtractedData['account_number'] = $parsedData['account_number'];
                             $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'];
-                            $currentExtractedData['amount_from_description'] = $parsedData['amount'];
+                            // SKIP amount_from_description - not reliable, use amount field instead
                             $currentExtractedData['date_from_description'] = $parsedData['extracted_date'];
                             
                             $processedEmail->update([

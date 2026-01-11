@@ -577,14 +577,14 @@ class ReadEmailsDirect extends Command
             // Use account_number from description field if not already set (description field is PRIMARY source)
             $accountNumber = $extractedInfo['account_number'] ?? $parsedFromDescription['account_number'] ?? null;
             
-            // Update extracted_data to include parsed description field data
-            if ($descriptionField) {
-                $extractedInfo['description_field'] = $descriptionField;
-                $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
-                $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
-                $extractedInfo['amount_from_description'] = $parsedFromDescription['amount'] ?? null;
-                $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
-            }
+                    // Update extracted_data to include parsed description field data
+                    if ($descriptionField) {
+                        $extractedInfo['description_field'] = $descriptionField;
+                        $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
+                        $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
+                        // SKIP amount_from_description - not reliable, use amount field instead
+                        $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
+                    }
             
             // Store in database
             $processedEmail = ProcessedEmail::create([
@@ -597,7 +597,7 @@ class ReadEmailsDirect extends Command
                 'text_body' => $parts['text_body'] ?? '',
                 'html_body' => $parts['html_body'] ?? '',
                 'email_date' => $parts['date'] ?? now(),
-                'amount' => $extractedInfo['amount'] ?? $parsedFromDescription['amount'] ?? null,
+                'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction, not from description field
                 'sender_name' => $extractedInfo['sender_name'] ?? null,
                 'account_number' => $accountNumber, // Use from description field if available (PRIMARY source)
                 'description_field' => $descriptionField, // Store the 43-digit description field

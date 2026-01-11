@@ -820,7 +820,7 @@ class MonitorEmails extends Command
                 $extractedInfo['description_field'] = $descriptionField;
                 $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
                 $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
-                $extractedInfo['amount_from_description'] = $parsedFromDescription['amount'] ?? null;
+                // SKIP amount_from_description - not reliable, use amount field instead
                 $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
             }
             
@@ -836,7 +836,7 @@ class MonitorEmails extends Command
                     'text_body' => $message->getTextBody(),
                     'html_body' => $message->getHTMLBody(),
                     'email_date' => $emailDate,
-                    'amount' => $extractedInfo['amount'] ?? $parsedFromDescription['amount'] ?? null,
+                    'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction, not from description field
                     'sender_name' => $extractedInfo['sender_name'] ?? null,
                     'account_number' => $accountNumber, // Use from description field if available (PRIMARY source)
                     'description_field' => $descriptionField, // Store the 43-digit description field

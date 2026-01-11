@@ -83,7 +83,7 @@ class ParseDescriptionFields extends Command
                     $currentExtractedData['description_field'] = $email->description_field;
                     $currentExtractedData['account_number'] = $parsedData['account_number'];
                     $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'];
-                    $currentExtractedData['amount_from_description'] = $parsedData['amount'];
+                    // SKIP amount_from_description - not reliable, use amount field instead
                     $currentExtractedData['date_from_description'] = $parsedData['extracted_date'];
 
                     // Prepare updates
@@ -92,10 +92,8 @@ class ParseDescriptionFields extends Command
                         'extracted_data' => $currentExtractedData,
                     ];
 
-                    // Also update amount if missing
-                    if (!$email->amount && $parsedData['amount']) {
-                        $updates['amount'] = $parsedData['amount'];
-                    }
+                    // SKIP updating amount from description field - not reliable
+                    // Use amount field from email extraction instead
 
                     $email->update($updates);
                     $successCount++;
@@ -143,6 +141,12 @@ class ParseDescriptionFields extends Command
     /**
      * Parse description field to extract account numbers, amount, date
      * Format: recipient_account(10) + payer_account(10) + amount(6) + date(8) + unknown(9) = 43 digits
+     * 
+     * IMPORTANT: Amount extraction from description field is NOT reliable
+     * - The 6 digits after account numbers may not always be the amount
+     * - We already have a reliable amount field from email extraction
+     * - So we'll skip amount extraction from description field to avoid incorrect values
+     * 
      * Also handles 30-digit and 42-digit formats
      */
     protected function parseDescriptionField(?string $descriptionField): array
@@ -150,7 +154,7 @@ class ParseDescriptionFields extends Command
         $result = [
             'account_number' => null,        // First 10 digits - recipient account (where payment was sent TO)
             'payer_account_number' => null, // Next 10 digits - sender account (where payment was sent FROM)
-            'amount' => null,
+            'amount' => null,                // NOT extracted from description - use amount field instead
             'extracted_date' => null,
         ];
 
@@ -165,7 +169,8 @@ class ParseDescriptionFields extends Command
             if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $descriptionField, $matches)) {
                 $result['account_number'] = trim($matches[1]);        // First 10 digits
                 $result['payer_account_number'] = trim($matches[2]);  // Next 10 digits
-                $result['amount'] = (float) ($matches[3] / 100);      // Amount (6 digits, divide by 100)
+                // SKIP amount extraction - not reliable, use amount field instead
+                // $result['amount'] = (float) ($matches[3] / 100);      // Amount (6 digits, divide by 100)
                 $dateStr = $matches[4];                                // Date YYYYMMDD (8 digits)
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
@@ -178,7 +183,7 @@ class ParseDescriptionFields extends Command
             if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $padded, $matches)) {
                 $result['account_number'] = trim($matches[1]);
                 $result['payer_account_number'] = trim($matches[2]);
-                $result['amount'] = (float) ($matches[3] / 100);
+                // SKIP amount extraction - not reliable
                 $dateStr = $matches[4];
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
@@ -190,10 +195,7 @@ class ParseDescriptionFields extends Command
             if (preg_match('/^(\d{10})(\d{10})/', $descriptionField, $matches)) {
                 $result['account_number'] = trim($matches[1]);
                 $result['payer_account_number'] = trim($matches[2]);
-                // Try to extract amount if available (next 6 digits)
-                if (preg_match('/^(\d{10})(\d{10})(\d{6})/', $descriptionField, $amountMatches)) {
-                    $result['amount'] = (float) ($amountMatches[3] / 100);
-                }
+                // SKIP amount extraction - not reliable for 30-digit format either
             }
         }
 

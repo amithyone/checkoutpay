@@ -191,7 +191,7 @@ Route::get('/cron/global-match', function () {
                         $currentExtractedData['description_field'] = $processedEmail->description_field;
                         $currentExtractedData['account_number'] = $parsedData['account_number'];
                         $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'];
-                        $currentExtractedData['amount_from_description'] = $parsedData['amount'];
+                        // SKIP amount_from_description - not reliable, use amount field instead
                         $currentExtractedData['date_from_description'] = $parsedData['extracted_date'];
                         
                         $processedEmail->update([
@@ -378,7 +378,7 @@ Route::get('/cron/global-match', function () {
             $result = [
                 'account_number' => null,
                 'payer_account_number' => null,
-                'amount' => null,
+                'amount' => null,                // NOT extracted from description - use amount field instead
                 'extracted_date' => null,
             ];
 
@@ -416,11 +416,9 @@ Route::get('/cron/global-match', function () {
             // Handle 30-digit format
             elseif ($length >= 30) {
                 if (preg_match('/^(\d{10})(\d{10})/', $descriptionField, $matches)) {
-                    $result['account_number'] = trim($matches[1]);
-                    $result['payer_account_number'] = trim($matches[2]);
-                    if (preg_match('/^(\d{10})(\d{10})(\d{6})/', $descriptionField, $amountMatches)) {
-                        $result['amount'] = (float) ($amountMatches[3] / 100);
-                    }
+                $result['account_number'] = trim($matches[1]);
+                $result['payer_account_number'] = trim($matches[2]);
+                // SKIP amount extraction - not reliable for 30-digit format either
                 }
             }
 
