@@ -826,6 +826,20 @@ class MonitorEmails extends Command
             
             // Store email even if extraction failed or returned null
             try {
+                // CRITICAL: Ensure text_body is always filled - extract from html_body if needed
+                $textBody = $message->getTextBody() ?? '';
+                $htmlBody = $message->getHTMLBody() ?? '';
+                
+                // If text_body is empty but html_body exists, extract text from HTML
+                if (empty(trim($textBody)) && !empty(trim($htmlBody))) {
+                    $textBody = $this->htmlToText($htmlBody);
+                    Log::debug('Extracted text_body from html_body in MonitorEmails', [
+                        'text_length' => strlen($textBody),
+                        'html_length' => strlen($htmlBody),
+                        'message_id' => $messageId,
+                    ]);
+                }
+                
                 $processedEmail = ProcessedEmail::create([
                     'email_account_id' => $emailAccount?->id,
                     'source' => 'imap', // Mark as IMAP source
@@ -833,8 +847,8 @@ class MonitorEmails extends Command
                     'subject' => $subject,
                     'from_email' => $fromEmail,
                     'from_name' => $fromName,
-                    'text_body' => $message->getTextBody(),
-                    'html_body' => $message->getHTMLBody(),
+                    'text_body' => $textBody,
+                    'html_body' => $htmlBody,
                     'email_date' => $emailDate,
                     'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction, not from description field
                     'sender_name' => $extractedInfo['sender_name'] ?? null,
@@ -918,6 +932,20 @@ class MonitorEmails extends Command
             
             // Store email even if extraction failed or returned null
             try {
+                // CRITICAL: Ensure text_body is always filled - extract from html_body if needed
+                $textBody = $emailData['text'] ?? '';
+                $htmlBody = $emailData['html'] ?? '';
+                
+                // If text_body is empty but html_body exists, extract text from HTML
+                if (empty(trim($textBody)) && !empty(trim($htmlBody))) {
+                    $textBody = $this->htmlToText($htmlBody);
+                    Log::debug('Extracted text_body from html_body in Gmail API section', [
+                        'text_length' => strlen($textBody),
+                        'html_length' => strlen($htmlBody),
+                        'message_id' => $messageId,
+                    ]);
+                }
+                
                 return ProcessedEmail::create([
                     'email_account_id' => $emailAccount->id,
                     'source' => 'gmail_api', // Mark as Gmail API source
@@ -925,8 +953,8 @@ class MonitorEmails extends Command
                     'subject' => $emailData['subject'] ?? '',
                     'from_email' => $fromEmail,
                     'from_name' => $fromName,
-                    'text_body' => $emailData['text'] ?? '',
-                    'html_body' => $emailData['html'] ?? '',
+                    'text_body' => $textBody,
+                    'html_body' => $htmlBody,
                     'email_date' => $emailData['date'] ?? now(),
                     'amount' => $extractedInfo['amount'] ?? null,
                     'sender_name' => $extractedInfo['sender_name'] ?? null,
@@ -1307,5 +1335,39 @@ class MonitorEmails extends Command
         }
 
         return $result;
+    }
+
+    /**
+     * Convert HTML to plain text while preserving important structure
+     * Handles tables, divs, and other HTML elements banks use
+     */
+    protected function htmlToText(string $html): string
+    {
+        if (empty($html)) {
+            return '';
+        }
+
+        // Remove script and style tags
+        $html = preg_replace('/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/mi', '', $html);
+        $html = preg_replace('/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/mi', '', $html);
+        
+        // Convert common HTML elements to text with spacing
+        $html = preg_replace('/<br\s*\/?>/i', "\n", $html);
+        $html = preg_replace('/<\/p>/i', "\n\n", $html);
+        $html = preg_replace('/<\/div>/i', "\n", $html);
+        $html = preg_replace('/<\/td>/i', ' ', $html);
+        $html = preg_replace('/<\/tr>/i', "\n", $html);
+        $html = preg_replace('/<\/th>/i', ' ', $html);
+        $html = preg_replace('/<\/li>/i', "\n", $html);
+        
+        // Remove all remaining HTML tags
+        $text = strip_tags($html);
+        
+        // Clean up whitespace
+        $text = preg_replace('/\s+/', ' ', $text);
+        $text = preg_replace('/\n\s*\n/', "\n", $text);
+        $text = trim($text);
+        
+        return $text;
     }
 }

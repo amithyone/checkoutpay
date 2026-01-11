@@ -282,6 +282,17 @@ class EmailWebhookController extends Controller
             // Initialize matching service for payment matching
             $matchingService = new PaymentMatchingService(new TransactionLogService());
 
+            // CRITICAL: Ensure text_body is always filled - extract from html_body if needed
+            // If text_body is empty but html_body exists, extract text from HTML
+            if (empty(trim($text)) && !empty(trim($html))) {
+                $text = $this->htmlToText($html);
+                Log::debug('Extracted text_body from html_body in webhook', [
+                    'text_length' => strlen($text),
+                    'html_length' => strlen($html),
+                    'message_id' => $messageId,
+                ]);
+            }
+            
             // Store email (mark as webhook source, no email_account_id needed for Zapier)
             $processedEmail = ProcessedEmail::create([
                 'email_account_id' => null, // Not needed for Zapier webhook
@@ -639,6 +650,40 @@ class EmailWebhookController extends Controller
         }
         
         return $result;
+    }
+
+    /**
+     * Convert HTML to plain text while preserving important structure
+     * Handles tables, divs, and other HTML elements banks use
+     */
+    protected function htmlToText(string $html): string
+    {
+        if (empty($html)) {
+            return '';
+        }
+
+        // Remove script and style tags
+        $html = preg_replace('/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/mi', '', $html);
+        $html = preg_replace('/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/mi', '', $html);
+        
+        // Convert common HTML elements to text with spacing
+        $html = preg_replace('/<br\s*\/?>/i', "\n", $html);
+        $html = preg_replace('/<\/p>/i', "\n\n", $html);
+        $html = preg_replace('/<\/div>/i', "\n", $html);
+        $html = preg_replace('/<\/td>/i', ' ', $html);
+        $html = preg_replace('/<\/tr>/i', "\n", $html);
+        $html = preg_replace('/<\/th>/i', ' ', $html);
+        $html = preg_replace('/<\/li>/i', "\n", $html);
+        
+        // Remove all remaining HTML tags
+        $text = strip_tags($html);
+        
+        // Clean up whitespace
+        $text = preg_replace('/\s+/', ' ', $text);
+        $text = preg_replace('/\n\s*\n/', "\n", $text);
+        $text = trim($text);
+        
+        return $text;
     }
 
     /**
