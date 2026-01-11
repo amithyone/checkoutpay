@@ -1499,6 +1499,39 @@ class PaymentMatchingService
         $method = null;
         $descriptionField = null; // Store the full description field for debugging
         
+        // PRIORITY 1: Convert HTML to plain text FIRST - this is the most reliable method
+        $plainText = strip_tags($html);
+        $plainText = preg_replace('/\s+/', ' ', $plainText); // Normalize whitespace
+        
+        // PRIORITY 2: Extract description field from plain text (REVAMPED METHOD)
+        // Pattern: Match "Description : " followed by exactly 43 digits (where number ends)
+        // This is SIMPLER and MORE RELIABLE than HTML parsing
+        if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $plainText, $descMatches)) {
+            $descriptionField = trim($descMatches[1]);
+            
+            // Parse the 43 digits: recipient(10) + payer(10) + amount(6) + date(8) + unknown(9)
+            if (strlen($descriptionField) === 43 && preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
+                $accountNumber = trim($digitMatches[1]); // PRIMARY: recipient account (first 10 digits)
+                $payerAccountNumber = trim($digitMatches[2]); // Sender account (next 10 digits)
+                $amountFromDesc = (float) ($digitMatches[3] / 100); // Amount (6 digits, divide by 100)
+                
+                if ($amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
+                    $method = $method ?: 'html_description_43digits';
+                }
+                
+                $dateStr = $digitMatches[4]; // Date YYYYMMDD (8 digits)
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+            }
+            
+            // Extract sender name separately (after the 43 digits)
+            if (!$senderName && preg_match('/description[\s]*:[\s]*\d{43}\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $plainText, $nameMatches)) {
+                $senderName = trim(strtolower($nameMatches[1]));
+            }
+        }
+        
         // PRIORITY: Extract account number from Description field FIRST (before any other extraction)
         // Description field format: <td>Description</td><td>:</td><td colspan="8">900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO SQUAD</td>
         // Format: recipient_account(10) sender_account(10) amount(6) date(8) unknown(9) FROM NAME TO NAME
