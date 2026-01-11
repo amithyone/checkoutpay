@@ -345,7 +345,8 @@ class PaymentMatchingService
         $extractionSteps[] = "Text body check: " . ($textLength > 0 ? "Present ({$textLength} chars)" : "Empty or missing");
         
         if ($textLength > 0) {
-            $extractionResult = $this->extractFromTextBody($text, $subject, $from);
+            // Use EmailExtractionService to extract from text_body (prioritizes text_body for sender_name and description_field)
+            $extractionResult = $this->emailExtractor->extractFromTextBody($text, $subject, $from);
             // IMPORTANT: Return even if amount is not found but description field is extracted
             // Description field extraction is valuable and should not be skipped
             // This prioritizes clean text_body over HTML
@@ -372,8 +373,8 @@ class PaymentMatchingService
         $extractionSteps[] = "HTML body check: " . ($htmlLength > 0 ? "Present ({$htmlLength} chars)" : "Empty or missing");
         
         if ($htmlLength > 0) {
-            // First try HTML table extraction (most accurate for Nigerian banks)
-            $extractionResult = $this->extractFromHtmlBody($html, $subject, $from);
+            // Use EmailExtractionService to extract from html_body
+            $extractionResult = $this->emailExtractor->extractFromHtmlBody($html, $subject, $from, $this->descExtractor, $this->nameExtractor);
             if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
                 return [
                     'data' => $extractionResult,
@@ -387,12 +388,13 @@ class PaymentMatchingService
             }
             
             // If HTML table extraction failed, convert HTML to text and try text extraction
-            $renderedText = $this->htmlToText($html);
+            $renderedText = $this->emailExtractor->htmlToText($html);
             $renderedLength = strlen(trim($renderedText));
             $extractionSteps[] = "HTML-to-text conversion: {$renderedLength} chars";
             
             if ($renderedLength > 0) {
-                $extractionResult = $this->extractFromTextBody($renderedText, $subject, $from);
+                // Use EmailExtractionService to extract from rendered text
+                $extractionResult = $this->emailExtractor->extractFromTextBody($renderedText, $subject, $from);
                 if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
                     return [
                         'data' => $extractionResult,

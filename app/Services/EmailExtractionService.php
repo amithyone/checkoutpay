@@ -268,15 +268,6 @@ class EmailExtractionService
     }
     
     /**
-     * Decode quoted-printable encoding
-     */
-    public function decodeQuotedPrintable(string $text): string
-    {
-        // Replace =XX with corresponding character (where XX is hex)
-        return quoted_printable_decode($text);
-    }
-    
-    /**
      * Extract payment info from html_body
      */
     public function extractFromHtmlBody(string $html, string $subject, string $from, DescriptionFieldExtractor $descExtractor, SenderNameExtractor $nameExtractor): ?array
