@@ -95,7 +95,14 @@ class ReExtractDescriptionFields extends Command
                 $extractionResult = $this->matchingService->extractPaymentInfo($emailData);
 
                 if (!$extractionResult || !is_array($extractionResult)) {
-                    $failedCount++;
+                    // Try to extract description field directly from text/html as fallback
+                    $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
+                    if ($descriptionField && strlen($descriptionField) === 43) {
+                        $email->update(['description_field' => $descriptionField]);
+                        $successCount++;
+                    } else {
+                        $failedCount++;
+                    }
                     $bar->advance();
                     continue;
                 }
@@ -103,13 +110,25 @@ class ReExtractDescriptionFields extends Command
                 $extractedInfo = $extractionResult['data'] ?? null;
 
                 if (!$extractedInfo) {
-                    $failedCount++;
+                    // Try to extract description field directly from text/html as fallback
+                    $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
+                    if ($descriptionField && strlen($descriptionField) === 43) {
+                        $email->update(['description_field' => $descriptionField]);
+                        $successCount++;
+                    } else {
+                        $failedCount++;
+                    }
                     $bar->advance();
                     continue;
                 }
 
                 // Extract description_field from the result
                 $descriptionField = $extractedInfo['description_field'] ?? null;
+
+                // If not in extractedInfo, try to extract directly from text/html
+                if (!$descriptionField || strlen($descriptionField) !== 43) {
+                    $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
+                }
 
                 if ($descriptionField && strlen($descriptionField) === 43) {
                     // Update the email with the description field
