@@ -1586,7 +1586,8 @@ class PaymentMatchingService
         // Pattern 2: Without space between accounts (all 43 digits together) - also flexible
         // Format: "Description : 900877121002100859959000020260111094651392 FROM..."
         // CRITICAL: Make TO optional - text might be truncated or not have TO
-        elseif (preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $text, $matches)) {
+        // Use 'if' instead of 'elseif' so it runs even if description field extraction didn't find a match
+        if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
@@ -1597,7 +1598,9 @@ class PaymentMatchingService
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                 $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
             }
-            $senderName = trim(strtolower($matches[6]));
+            if (!$senderName) {
+                $senderName = trim(strtolower($matches[6]));
+            }
         }
         // Pattern 3: Direct format without "Description :" prefix (fallback - very flexible)
         // Format: "9008771210 021008599511000020260111080847554 FROM SOLOMON..." (with space)
