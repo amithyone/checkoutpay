@@ -85,7 +85,7 @@ php artisan db:seed --class=AccountNumberSeeder
 ```
 
 2. **Access Admin Panel**:
-   - URL: `http://localhost:8000/admin`
+   - URL: `https://check-outpay.com/admin`
    - Email: `admin@paymentgateway.com`
    - Password: `password` (⚠️ Change in production!)
 

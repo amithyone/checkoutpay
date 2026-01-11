@@ -5,18 +5,21 @@
 1. [Overview](#overview)
 2. [Authentication](#authentication)
 3. [Base URL](#base-url)
-4. [Account Number Request](#account-number-request)
-5. [Transaction Updates](#transaction-updates)
-6. [Webhook Notifications](#webhook-notifications)
-7. [Error Handling](#error-handling)
-8. [Rate Limits](#rate-limits)
-9. [Sample Integration](#sample-integration)
+4. [Account Number Request (API Integration)](#account-number-request)
+5. [Hosted Checkout Page (Alternative Option)](#hosted-checkout-page-alternative-option)
+6. [Transaction Updates](#transaction-updates)
+7. [Webhook Notifications](#webhook-notifications)
+8. [Error Handling](#error-handling)
+9. [Rate Limits](#rate-limits)
+10. [Sample Integration](#sample-integration)
 
 ---
 
 ## Overview
 
 The Payment Gateway API allows businesses to integrate payment collection into their applications. When a customer needs to make a payment, your application requests an account number from the gateway, displays it to the customer, and receives webhook notifications when the payment is verified.
+
+**Production API Base URL:** `https://check-outpay.com/api/v1`
 
 ### Key Features
 
@@ -33,10 +36,10 @@ All API requests require authentication using an API key provided when your busi
 
 ### Getting Your API Key
 
-1. Register your business account through the admin panel
-2. Provide your callback URL (must be approved before you can make requests)
-3. Once approved, your API key will be generated automatically
-4. Find your API key in your business dashboard under Settings
+1. Register your business account at `https://check-outpay.com/dashboard/register`
+2. Provide your website URL (must be approved before you can make requests)
+3. Once your website is approved, your API key will be generated automatically
+4. Find your API key in your business dashboard at `https://check-outpay.com/dashboard/keys` or under Settings
 
 ### Using Your API Key
 
@@ -53,7 +56,7 @@ X-API-Key: pk_your_api_key_here
 ## Base URL
 
 ```
-Production: https://your-domain.com/api/v1
+Production: https://check-outpay.com/api/v1
 Development: http://localhost:8000/api/v1
 ```
 
@@ -160,6 +163,127 @@ X-API-Key: pk_your_api_key_here
 | `status` | string | Payment status: `pending`, `approved`, `rejected` |
 | `expires_at` | string | ISO 8601 timestamp when payment request expires |
 | `created_at` | string | ISO 8601 timestamp when request was created |
+
+---
+
+## Hosted Checkout Page (Alternative Option)
+
+Instead of integrating the API directly, you can redirect customers to CheckoutPay's hosted payment page. This option is simpler to implement and doesn't require API integration.
+
+### How It Works
+
+1. **Redirect customer** to CheckoutPay's payment page with payment parameters
+2. **Customer enters** their name on CheckoutPay's page
+3. **Customer sees** account details and completes payment via bank transfer
+4. **Automatic redirect** back to your website once payment is verified
+
+### Endpoint
+
+```
+GET https://check-outpay.com/pay
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `business_id` | integer | Yes | Your business ID (found in your dashboard) |
+| `amount` | number | Yes | Payment amount (minimum: 0.01) |
+| `return_url` | string | Yes | URL to redirect customer after payment (must be from approved domain) |
+| `service` | string | No | Service/product identifier (for your internal tracking) |
+| `cancel_url` | string | No | URL to redirect if customer cancels (defaults to return_url) |
+
+### Example Redirect URL
+
+```
+https://check-outpay.com/pay?business_id=1&amount=5000.00&return_url=https://yourwebsite.com/payment/success&service=ORDER-123
+```
+
+### Return URL Parameters
+
+When the customer is redirected back to your `return_url`, the following parameters are appended:
+
+**Success:**
+```
+?status=success&transaction_id=TXN-1234567890-abc123&amount=5000.00
+```
+
+**Failed/Rejected:**
+```
+?status=failed&transaction_id=TXN-1234567890-abc123&reason=Payment+was+rejected
+```
+
+### Example Implementation
+
+**HTML/JavaScript:**
+```html
+<a href="https://check-outpay.com/pay?business_id=1&amount=5000.00&return_url=https://yourwebsite.com/payment/success&service=ORDER-123">
+    Pay with CheckoutPay
+</a>
+```
+
+**PHP:**
+```php
+$businessId = 1;
+$amount = 5000.00;
+$returnUrl = urlencode('https://yourwebsite.com/payment/success');
+$service = 'ORDER-123';
+
+$checkoutUrl = "https://check-outpay.com/pay?business_id={$businessId}&amount={$amount}&return_url={$returnUrl}&service={$service}";
+
+header("Location: {$checkoutUrl}");
+exit;
+```
+
+**JavaScript/Node.js:**
+```javascript
+const businessId = 1;
+const amount = 5000.00;
+const returnUrl = encodeURIComponent('https://yourwebsite.com/payment/success');
+const service = 'ORDER-123';
+
+const checkoutUrl = `https://check-outpay.com/pay?business_id=${businessId}&amount=${amount}&return_url=${returnUrl}&service=${service}`;
+
+window.location.href = checkoutUrl;
+```
+
+### Handling the Return
+
+When customer is redirected back to your website:
+
+```php
+// Handle return from CheckoutPay
+if (isset($_GET['status']) && $_GET['status'] === 'success') {
+    $transactionId = $_GET['transaction_id'];
+    $amount = $_GET['amount'];
+    
+    // Update order status, send confirmation email, etc.
+    // Payment is automatically credited to your business account
+} else {
+    // Payment failed or was rejected
+    $reason = $_GET['reason'] ?? 'Payment failed';
+    // Handle failure
+}
+```
+
+### Advantages of Hosted Checkout
+
+- **No API integration required** - Just redirect customers
+- **Secure** - Payment processing happens on CheckoutPay's servers
+- **Automatic redirect** - Customers are redirected back automatically
+- **Account credited automatically** - Balance updates without webhook handling
+
+### When to Use Hosted Checkout vs API
+
+**Use Hosted Checkout if:**
+- You want a quick, simple integration
+- You don't need custom payment UI
+- You want CheckoutPay to handle the payment flow
+
+**Use API if:**
+- You need a custom payment UI
+- You want to embed payment in your checkout process
+- You need more control over the payment flow
 
 ---
 
@@ -466,7 +590,7 @@ use Illuminate\Support\Facades\Http;
 class PaymentService
 {
     private $apiKey = 'pk_your_api_key_here';
-    private $baseUrl = 'https://your-domain.com/api/v1';
+    private $baseUrl = 'https://check-outpay.com/api/v1';
 
     public function createPaymentRequest($name, $amount, $service = null)
     {
@@ -523,7 +647,7 @@ Route::post('/webhook/payment-status', function (Request $request) {
 const axios = require('axios');
 
 class PaymentService {
-    constructor(apiKey, baseUrl = 'https://your-domain.com/api/v1') {
+    constructor(apiKey, baseUrl = 'https://check-outpay.com/api/v1') {
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
     }
@@ -589,7 +713,7 @@ app.post('/webhook/payment-status', (req, res) => {
 import requests
 
 class PaymentService:
-    def __init__(self, api_key, base_url='https://your-domain.com/api/v1'):
+    def __init__(self, api_key, base_url='https://check-outpay.com/api/v1'):
         self.api_key = api_key
         self.base_url = base_url
         self.headers = {
@@ -645,12 +769,13 @@ def payment_webhook():
 
 3. Once approved, you'll receive a confirmation email and can start making API requests
 
-4. You can check your approval status in the business dashboard
+4. You can check your approval status in the business dashboard at `https://check-outpay.com/dashboard/settings`
 
 ### Important Notes
 
 - Only approved domains can be used in webhook URLs
-- You can request domain approval from your business dashboard
+- You can check your website approval status at `https://check-outpay.com/dashboard/settings`
+- Only businesses with approved websites can request account numbers
 - Changes to your domain require re-approval
 - Use HTTPS URLs for security
 
@@ -659,6 +784,6 @@ def payment_webhook():
 ## Support
 
 For API support, please contact:
-- Email: support@your-domain.com
-- Documentation: https://your-domain.com/docs
-- Status Page: https://status.your-domain.com
+- Email: support@check-outpay.com
+- Documentation: https://check-outpay.com/docs
+- Status Page: https://status.check-outpay.com

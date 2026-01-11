@@ -4,12 +4,7 @@
 
 ### URL
 ```
-http://yourdomain.com/admin
-```
-
-Or if setup is complete:
-```
-http://check-outpay.com/admin
+https://check-outpay.com/admin
 ```
 
 ## 🔐 Default Login Credentials
@@ -39,7 +34,7 @@ php artisan db:seed --class=AdminSeeder --force
 
 ### Step 2: Access Admin Panel
 
-1. **Visit:** `http://yourdomain.com/admin`
+1. **Visit:** `https://check-outpay.com/admin`
 2. **Login with:**
    - Email: `admin@paymentgateway.com`
    - Password: `password`
@@ -53,7 +48,7 @@ After logging in, go to your profile settings and change the password!
 ### Issue 1: Setup Not Complete
 
 If you see an error or redirect to setup:
-- Visit: `http://yourdomain.com/setup`
+- Visit: `https://check-outpay.com/setup`
 - Complete the database configuration
 - Run migrations and seeders
 
@@ -104,7 +99,7 @@ exit
 
 ## 🎯 Quick Access
 
-1. Go to: `http://yourdomain.com/admin`
+1. Go to: `https://check-outpay.com/admin`
 2. Login with default credentials
 3. Change password immediately
 4. Start managing your payment gateway!

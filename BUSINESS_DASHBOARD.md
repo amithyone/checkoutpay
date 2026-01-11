@@ -93,21 +93,23 @@ exit
 
 ### 3. Access Business Dashboard
 
-- **URL**: `http://localhost:8000/dashboard/login`
+- **URL**: `https://check-outpay.com/dashboard/login`
 - **Login with**: Business email and password
 
 ## 📍 Routes
 
 All business routes are prefixed with `/dashboard`:
 
-- **Login**: `/dashboard/login`
-- **Dashboard**: `/dashboard`
-- **Transactions**: `/dashboard/transactions`
-- **Withdrawals**: `/dashboard/withdrawals`
-- **Statistics**: `/dashboard/statistics`
-- **Profile**: `/dashboard/profile`
-- **Team**: `/dashboard/team`
-- **Settings**: `/dashboard/settings`
+- **Registration**: `https://check-outpay.com/dashboard/register`
+- **Login**: `https://check-outpay.com/dashboard/login`
+- **Dashboard**: `https://check-outpay.com/dashboard`
+- **Transactions**: `https://check-outpay.com/dashboard/transactions`
+- **Withdrawals**: `https://check-outpay.com/dashboard/withdrawals`
+- **Statistics**: `https://check-outpay.com/dashboard/statistics`
+- **API Keys**: `https://check-outpay.com/dashboard/keys`
+- **Profile**: `https://check-outpay.com/dashboard/profile`
+- **Team**: `https://check-outpay.com/dashboard/team`
+- **Settings**: `https://check-outpay.com/dashboard/settings`
 
 ## 🔒 Security Notes
 

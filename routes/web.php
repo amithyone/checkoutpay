@@ -27,6 +27,12 @@ Route::post('/setup/complete', [SetupController::class, 'complete']);
 Route::get('/test-email', [TestEmailController::class, 'test'])->name('test.email');
 Route::post('/test-email', [TestEmailController::class, 'test']);
 
+// Hosted checkout page routes (public)
+Route::get('/pay', [\App\Http\Controllers\CheckoutController::class, 'show'])->name('checkout.show');
+Route::post('/pay', [\App\Http\Controllers\CheckoutController::class, 'store'])->name('checkout.store');
+Route::get('/pay/{transactionId}', [\App\Http\Controllers\CheckoutController::class, 'payment'])->name('checkout.payment');
+Route::get('/pay/{transactionId}/status', [\App\Http\Controllers\CheckoutController::class, 'checkStatus'])->name('checkout.status');
+
 // Cron job endpoints (for external cron services)
 
 // IMAP Email Fetching Cron (requires IMAP to be enabled)
