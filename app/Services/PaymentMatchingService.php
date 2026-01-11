@@ -1002,13 +1002,16 @@ class PaymentMatchingService
         $senderName = null;
         $accountNumber = null;
         $payerAccountNumber = null;
+        $transactionTime = null;
+        $extractedDate = null;
         
         // STRATEGY 1: Try TEXT-based extraction first (for forwarded emails in plain text)
         // GTBank format from processed_emails text_body column:
         // "Account Number : 3002156642"
         // "Amount : NGN 1000"
-        // "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
-        // Note: Description field contains: first 10 digits = recipient account (TO), next 10 digits = sender account (FROM)
+        // "Time of Transaction : 12:17:27 AM"
+        // "Description : 9008771210 021008599511000020260111080847554 FROM SOLOMON INNOCENT AMITHY TO SQUA"
+        // Description field format: recipient_account(10) sender_account(10) amount_without_decimal(6) date_YYYYMMDD(8) unknown(9) FROM NAME TO NAME
         if (!empty(trim($text))) {
             // Normalize whitespace (handle newlines and multiple spaces)
             $normalizedText = preg_replace('/\s+/', ' ', $text);
@@ -1028,25 +1031,55 @@ class PaymentMatchingService
                 $accountNumber = trim($matches[1]);
             }
             
-            // Extract Account Numbers and Sender Name from Description field
-            // Format: "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
-            // First 10 digits (0904052601) = recipient account (TO) - matches account_number
-            // Next 10 digits (1000172343) = sender account (FROM) - payer_account_number
-            if (preg_match('/description[\s]*:[\s]*([\d]{10})([\d]{10})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
-                // First 10 digits = recipient account (already extracted from Account Number field)
-                // Second 10 digits = sender/payer account number
+            // Extract Time of Transaction: "Time of Transaction : 12:17:27 AM" format
+            if (preg_match('/time\s+of\s+transaction[\s]*:[\s]*([\d:APM\s]+)/i', $normalizedText, $matches)) {
+                $transactionTime = trim($matches[1]);
+            }
+            
+            // Extract from Description field - NEW FORMAT with all information
+            // Format: "Description : 9008771210 021008599511000020260111080847554 FROM SOLOMON INNOCENT AMITHY TO SQUA"
+            // Structure: recipient_account(10) [space] sender_account(10)amount(6)date(8)unknown(9) FROM NAME TO NAME
+            // Or without space: recipient_account(10)sender_account(10)amount(6)date(8)unknown(9) FROM NAME TO NAME
+            if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $normalizedText, $matches)) {
+                // Match 1: recipient account (10 digits) - already extracted from Account Number field
+                // Match 2: sender/payer account (10 digits)
                 $payerAccountNumber = trim($matches[2]);
                 
-                // Extract sender name (third match)
-                $potentialName = trim($matches[3]);
-                // Remove any leading codes/numbers/dashes that might be captured
+                // Match 3: amount without decimal (6 digits) - backup extraction
+                $amountFromDesc = (float) ($matches[3] / 100); // Divide by 100 to get actual amount
+                if (!$amount && $amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
+                }
+                
+                // Match 4: date YYYYMMDD (8 digits) - backup extraction
+                $dateStr = $matches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3]; // Format: YYYY-MM-DD
+                }
+                
+                // Match 5: sender name (FROM NAME TO)
+                $senderName = trim(strtolower($matches[6]));
+            }
+            // Alternative format: with dash/separator before FROM
+            // Format: "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
+            elseif (preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
+                $payerAccountNumber = trim($matches[2]);
+                $amountFromDesc = (float) ($matches[3] / 100);
+                if (!$amount && $amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
+                }
+                $dateStr = $matches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+                $potentialName = trim($matches[6]);
                 $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
                 if (strlen($potentialName) >= 3) {
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern with flexible code length before name (fallback)
-            elseif (preg_match('/description[\s]*:[\s]*.*?([\d]{10})([\d]{10})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
+            // Pattern with flexible code length before name (fallback - old format)
+            elseif (preg_match('/description[\s]*:[\s]*.*?(\d{10})(\d{10})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
                 $payerAccountNumber = trim($matches[2]);
                 $potentialName = trim($matches[3]);
                 $potentialName = preg_replace('/^[\d\-\s]+/i', '', $potentialName);
@@ -1054,13 +1087,18 @@ class PaymentMatchingService
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern: Direct "CODE-NAME TRF FOR" in text (without "Description :" prefix) - try to extract account numbers
-            elseif (preg_match('/[\d]{10}([\d]{10})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
-                $payerAccountNumber = trim($matches[1]);
-                $potentialName = trim($matches[2]);
-                if (strlen($potentialName) >= 3) {
-                    $senderName = trim(strtolower($potentialName));
+            // Pattern: Direct format in text (without "Description :" prefix) - try to extract account numbers
+            elseif (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $normalizedText, $matches)) {
+                $payerAccountNumber = trim($matches[2]);
+                $amountFromDesc = (float) ($matches[3] / 100);
+                if (!$amount && $amountFromDesc >= 10) {
+                    $amount = $amountFromDesc;
                 }
+                $dateStr = $matches[4];
+                if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
+                    $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
+                }
+                $senderName = trim(strtolower($matches[6]));
             }
             // Pattern: "FROM NAME TO" format (fallback)
             elseif (preg_match('/from\s+([A-Z][A-Z\s]+?)\s+to/i', $normalizedText, $matches)) {
@@ -1247,6 +1285,8 @@ class PaymentMatchingService
         $amount = null;
         $senderName = null;
         $payerAccountNumber = null;
+        $transactionTime = null;
+        $extractedDate = null;
         $method = null;
         
         // STRATEGY 1: Convert HTML to plain text and try text extraction (simplest, most reliable)
@@ -1391,6 +1431,9 @@ class PaymentMatchingService
         return [
             'amount' => $amount,
             'sender_name' => $senderName,
+            'payer_account_number' => $payerAccountNumber,
+            'transaction_time' => $transactionTime,
+            'extracted_date' => $extractedDate,
             'method' => $method ?? 'html_body',
         ];
     }
