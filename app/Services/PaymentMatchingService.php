@@ -1344,9 +1344,10 @@ class PaymentMatchingService
         // Format: recipient_account(10) sender_account(10) amount_without_decimal(6) date_YYYYMMDD(8) unknown(9) FROM NAME TO NAME
         // IMPORTANT: First 10 digits is ALWAYS the recipient account number (where payment was sent TO)
         // CRITICAL: Use flexible pattern that handles space or no space between account numbers
-        // Pattern 1: With space between first and second 10-digit numbers (MOST COMMON)
-        // Format: "Description : 9008771210 021008599511000020260111080847554 FROM..."
-        if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+        // Pattern 1: Flexible - handles space OR no space between first and second 10-digit numbers
+        // Format: "Description : 9008771210 021008599511000020260111080847554 FROM..." (with space)
+        // OR: "Description : 900877121002100859959000020260111094651392 FROM..." (without space)
+        if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($matches[2]); // Sender account (next 10 digits)
             $amountFromDesc = (float) ($matches[3] / 100); // Divide by 100 to get actual amount
