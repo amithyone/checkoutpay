@@ -23,12 +23,12 @@
         }
     </script>
     <style>
-        @media (max-width: 768px) {
-            .sidebar-open {
-                transform: translateX(0);
-            }
-            .sidebar-closed {
+        @media (max-width: 1023px) {
+            #sidebar.sidebar-closed {
                 transform: translateX(-100%);
+            }
+            #sidebar.sidebar-open {
+                transform: translateX(0);
             }
         }
     </style>
@@ -39,7 +39,7 @@
         <div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden hidden" onclick="closeSidebar()"></div>
 
         <!-- Sidebar -->
-        <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 sidebar-closed lg:sidebar-open transition-transform duration-300 ease-in-out">
+        <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 transform transition-transform duration-300 ease-in-out lg:transform-none sidebar-closed">
             <!-- Logo -->
             <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200">
                 <h1 class="text-xl font-bold text-primary">CheckoutPay</h1>
