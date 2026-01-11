@@ -150,12 +150,35 @@ if ($email->text_body) {
         
         // Try alternative patterns
         if (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $textBody, $altMatches)) {
-            echo "   Found description field: " . substr($altMatches[1], 0, 100) . "...\n";
+            $descText = trim($altMatches[1]);
+            echo "   Found description field: " . substr($descText, 0, 100) . "...\n";
+            echo "   Description field length: " . strlen($descText) . " chars\n";
+            
+            // Check if first 43 chars are all digits
+            if (strlen($descText) >= 43 && preg_match('/^(\d{43})/', $descText, $first43)) {
+                echo "   ✅ First 43 chars are digits: " . $first43[1] . "\n";
+                echo "   Why pattern didn't match: Checking exact format...\n";
+                
+                // Test the exact pattern we're using
+                if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s+|FROM|\s|$)/i', $textBody, $testMatches)) {
+                    echo "   ✅ Pattern DOES match when tested directly!\n";
+                } else {
+                    echo "   ❌ Pattern still doesn't match. Trying simpler pattern...\n";
+                    // Try even simpler pattern - just match the digits
+                    if (preg_match('/description[\s]*:[^\d]*(\d{43})/', $textBody, $simpleMatches)) {
+                        echo "   ✅ Simpler pattern matches: " . $simpleMatches[1] . "\n";
+                    }
+                }
+            }
         }
         
         // Try finding just the 43 digits
         if (preg_match('/(\d{43})/', $textBody, $digitMatches)) {
             echo "   Found 43 digits somewhere: " . $digitMatches[1] . "\n";
+            // Show context
+            $pos = strpos($textBody, $digitMatches[1]);
+            $context = substr($textBody, max(0, $pos - 50), 100);
+            echo "   Context around digits: ..." . $context . "...\n";
         }
     }
 }
