@@ -103,7 +103,7 @@ class ReExtractDescriptionFields extends Command
                 if (!$extractionResult || !is_array($extractionResult)) {
                     // Try to extract description field directly from text/html as fallback
                     $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
-                    if ($descriptionField && strlen($descriptionField) === 43) {
+                    if ($descriptionField && strlen($descriptionField) >= 30 && strlen($descriptionField) <= 43) {
                         $email->update(['description_field' => $descriptionField]);
                         $successCount++;
                     } else {
@@ -118,7 +118,7 @@ class ReExtractDescriptionFields extends Command
                 if (!$extractedInfo) {
                     // Try to extract description field directly from text/html as fallback
                     $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
-                    if ($descriptionField && strlen($descriptionField) === 43) {
+                    if ($descriptionField && strlen($descriptionField) >= 30 && strlen($descriptionField) <= 43) {
                         $email->update(['description_field' => $descriptionField]);
                         $successCount++;
                     } else {
@@ -132,19 +132,20 @@ class ReExtractDescriptionFields extends Command
                 $descriptionField = $extractedInfo['description_field'] ?? null;
 
                 // If not in extractedInfo, try to extract directly from text/html
-                if (!$descriptionField || strlen($descriptionField) !== 43) {
+                if (!$descriptionField || (strlen($descriptionField) < 30 || strlen($descriptionField) > 43)) {
                     if ($debug) {
                         $this->line("  ⚠️  description_field not in extractedInfo, trying direct extraction...");
                     }
                     $descriptionField = $this->extractDescriptionFieldDirectly($email->text_body ?? '', $email->html_body ?? '');
                     if ($debug && $descriptionField) {
-                        $this->line("  ✅ Found via direct extraction: " . substr($descriptionField, 0, 20) . "...");
+                        $this->line("  ✅ Found via direct extraction: " . substr($descriptionField, 0, 20) . "... (length: " . strlen($descriptionField) . ")");
                     } elseif ($debug) {
                         $this->line("  ❌ Direct extraction also failed");
                     }
                 }
 
-                if ($descriptionField && strlen($descriptionField) === 43) {
+                // Accept description field if it's 30-43 digits (handles different formats)
+                if ($descriptionField && strlen($descriptionField) >= 30 && strlen($descriptionField) <= 43) {
                     if ($debug) {
                         $this->line("  ✅ Success! Description field: {$descriptionField}");
                     }
@@ -244,7 +245,8 @@ class ReExtractDescriptionFields extends Command
 
     /**
      * Extract description field directly from text/html (fallback method)
-     * This is a SIMPLE, DIRECT extraction - just find 43 consecutive digits after "Description :"
+     * This is a SIMPLE, DIRECT extraction - find 30-43 consecutive digits after "Description :"
+     * Handles different formats: 30 digits (old), 42 digits (missing 1), 43 digits (current)
      */
     protected function extractDescriptionFieldDirectly(?string $textBody, ?string $htmlBody): ?string
     {
@@ -253,30 +255,55 @@ class ReExtractDescriptionFields extends Command
             // Decode quoted-printable first (e.g., =20 becomes space)
             $textBody = $this->decodeQuotedPrintable($textBody);
             
-            // Pattern 1: Direct match - "Description : " followed by exactly 43 digits
-            // This is the SIMPLEST pattern - just match the digits
+            // Pattern 1: Direct match - "Description : " followed by 30-43 digits
+            // Try 43 first (most common), then 42, then 30
             if (preg_match('/description[\s]*:[\s]*(\d{43})(?:\s|FROM|$)/i', $textBody, $matches)) {
                 return trim($matches[1]);
             }
+            if (preg_match('/description[\s]*:[\s]*(\d{42})(?:\s|FROM|$)/i', $textBody, $matches)) {
+                // Pad with 0 if 42 digits (might be missing last digit)
+                return trim($matches[1]) . '0';
+            }
+            if (preg_match('/description[\s]*:[\s]*(\d{30,41})(?:\s|FROM|-|$)/i', $textBody, $matches)) {
+                // For 30-41 digits, check if it's a valid format
+                $found = trim($matches[1]);
+                // If it's 30 digits, it might be an old format - return as-is for now
+                // We'll handle parsing differently based on length
+                if (strlen($found) >= 30) {
+                    return $found;
+                }
+            }
             
-            // Pattern 2: Find description line, then extract 43 consecutive digits from anywhere in that line
+            // Pattern 2: Find description line, then extract longest digit sequence (30-43 digits)
             if (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $textBody, $lineMatches)) {
                 $descLine = trim($lineMatches[1]);
-                // Find exactly 43 consecutive digits anywhere in the description line
+                // Find longest digit sequence (30-43 digits)
                 if (preg_match('/(\d{43})/', $descLine, $digitMatches)) {
+                    return trim($digitMatches[1]);
+                }
+                if (preg_match('/(\d{42})/', $descLine, $digitMatches)) {
+                    // Pad with 0 if 42 digits
+                    return trim($digitMatches[1]) . '0';
+                }
+                if (preg_match('/(\d{30,41})/', $descLine, $digitMatches)) {
                     $found = trim($digitMatches[1]);
-                    // Verify it's exactly 43 digits
-                    if (strlen($found) === 43 && ctype_digit($found)) {
+                    if (strlen($found) >= 30) {
                         return $found;
                     }
                 }
             }
             
-            // Pattern 3: Ultra-simple - just find 43 consecutive digits anywhere in text_body
+            // Pattern 3: Ultra-simple - just find longest digit sequence (30-43) anywhere in text_body
             // This is a last resort fallback
             if (preg_match('/(\d{43})/', $textBody, $digitMatches)) {
+                return trim($digitMatches[1]);
+            }
+            if (preg_match('/(\d{42})/', $textBody, $digitMatches)) {
+                return trim($digitMatches[1]) . '0';
+            }
+            if (preg_match('/(\d{30,41})/', $textBody, $digitMatches)) {
                 $found = trim($digitMatches[1]);
-                if (strlen($found) === 43 && ctype_digit($found)) {
+                if (strlen($found) >= 30) {
                     return $found;
                 }
             }
