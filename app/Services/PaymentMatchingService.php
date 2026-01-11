@@ -336,16 +336,21 @@ class PaymentMatchingService
         
         if ($textLength > 0) {
             $extractionResult = $this->extractFromTextBody($text, $subject, $from);
-            if ($extractionResult && isset($extractionResult['amount']) && $extractionResult['amount'] > 0) {
+            // IMPORTANT: Return even if amount is not found but description field is extracted
+            // Description field extraction is valuable and should not be skipped
+            // This prioritizes clean text_body over HTML
+            if ($extractionResult && ((isset($extractionResult['amount']) && $extractionResult['amount'] > 0) || isset($extractionResult['description_field']))) {
                 return [
                     'data' => $extractionResult,
-                    'method' => 'text_body',
+                    'method' => $extractionResult['method'] ?? 'text_body',
                 ];
             } else {
                 $amountFound = $extractionResult['amount'] ?? null;
+                $hasDescriptionField = isset($extractionResult['description_field']);
                 $extractionErrors[] = "Text body extraction failed: " . 
-                    ($amountFound === null ? "No amount found in text body" : 
-                     ($amountFound <= 0 ? "Amount found but invalid ({$amountFound})" : "Unknown error"));
+                    ($hasDescriptionField ? "Description field found but extraction incomplete" :
+                     ($amountFound === null ? "No amount or description field found in text body" : 
+                      ($amountFound <= 0 ? "Amount found but invalid ({$amountFound})" : "Unknown error")));
             }
         } else {
             $extractionErrors[] = "Text body is empty or whitespace only";
