@@ -489,6 +489,38 @@ class PaymentMatchingService
             $timeDiff = $paymentTime->diffInMinutes($emailTime);
         }
 
+        // CRITICAL: Validate account number match - payment account_number must match recipient account from description field
+        // The recipient account is the account number where the payment was sent TO (positions 0-9 in description field)
+        if ($payment->account_number && isset($extractedInfo['account_number']) && $extractedInfo['account_number']) {
+            $expectedAccount = trim($payment->account_number);
+            $extractedRecipientAccount = trim($extractedInfo['account_number']);
+            
+            if ($expectedAccount !== $extractedRecipientAccount) {
+                return [
+                    'matched' => false,
+                    'reason' => sprintf(
+                        'Account number mismatch: payment expects account "%s", but email shows recipient account "%s". Payment cannot be approved.',
+                        $expectedAccount,
+                        $extractedRecipientAccount
+                    ),
+                    'account_number_mismatch' => true,
+                    'expected_account' => $expectedAccount,
+                    'extracted_account' => $extractedRecipientAccount,
+                ];
+            }
+        } elseif ($payment->account_number && empty($extractedInfo['account_number'])) {
+            // Account number is required for payment but not found in email
+            return [
+                'matched' => false,
+                'reason' => sprintf(
+                    'Account number required but not found in email. Payment expects account "%s".',
+                    $payment->account_number
+                ),
+                'account_number_missing' => true,
+                'expected_account' => $payment->account_number,
+            ];
+        }
+
         // Calculate amount difference
         $expectedAmount = $payment->amount;
         $receivedAmount = $extractedInfo['amount'];
@@ -1041,7 +1073,12 @@ class PaymentMatchingService
             // Structure: recipient_account(10) [space] sender_account(10)amount(6)date(8)unknown(9) FROM NAME TO NAME
             // Or without space: recipient_account(10)sender_account(10)amount(6)date(8)unknown(9) FROM NAME TO NAME
             if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $normalizedText, $matches)) {
-                // Match 1: recipient account (10 digits) - already extracted from Account Number field
+                // Match 1: recipient account (10 digits) - verify/update account_number from description
+                $recipientAccountFromDesc = trim($matches[1]);
+                // Use description field account as backup or validation if account_number is not already set
+                if (!$accountNumber) {
+                    $accountNumber = $recipientAccountFromDesc;
+                }
                 // Match 2: sender/payer account (10 digits)
                 $payerAccountNumber = trim($matches[2]);
                 
@@ -1063,6 +1100,12 @@ class PaymentMatchingService
             // Alternative format: with dash/separator before FROM
             // Format: "Description : 090405260110001723439231932126-AMITHY ONE M TRF FOR CUSTOMERAT126TRF2MPT4E0RT200"
             elseif (preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})[\d\-]*\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $normalizedText, $matches)) {
+                // Match 1: recipient account (10 digits)
+                $recipientAccountFromDesc = trim($matches[1]);
+                if (!$accountNumber) {
+                    $accountNumber = $recipientAccountFromDesc;
+                }
+                // Match 2: sender/payer account (10 digits)
                 $payerAccountNumber = trim($matches[2]);
                 $amountFromDesc = (float) ($matches[3] / 100);
                 if (!$amount && $amountFromDesc >= 10) {
@@ -1089,6 +1132,12 @@ class PaymentMatchingService
             }
             // Pattern: Direct format in text (without "Description :" prefix) - try to extract account numbers
             elseif (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $normalizedText, $matches)) {
+                // Match 1: recipient account (10 digits)
+                $recipientAccountFromDesc = trim($matches[1]);
+                if (!$accountNumber) {
+                    $accountNumber = $recipientAccountFromDesc;
+                }
+                // Match 2: sender/payer account (10 digits)
                 $payerAccountNumber = trim($matches[2]);
                 $amountFromDesc = (float) ($matches[3] / 100);
                 if (!$amount && $amountFromDesc >= 10) {
