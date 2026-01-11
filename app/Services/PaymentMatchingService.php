@@ -1628,7 +1628,8 @@ class PaymentMatchingService
         // CRITICAL: Use .*? for flexible matching - allows ANY characters between digits and FROM
         // This should match: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON..."
         // CRITICAL: Make TO optional - text might be truncated or not have TO
-        if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:.*?TO|$)/i', $plainText, $textMatches)) {
+        // CRITICAL: This is a KEY fallback - if HTML patterns failed, this MUST catch it
+        if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $plainText, $textMatches)) {
             $accountNumber = trim($textMatches[1]); // PRIMARY source: recipient account (first 10 digits)
             $payerAccountNumber = trim($textMatches[2]);
             $amountFromDesc = (float) ($textMatches[3] / 100);
