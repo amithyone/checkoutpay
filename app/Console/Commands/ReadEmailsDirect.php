@@ -71,25 +71,53 @@ class ReadEmailsDirect extends Command
 
             // Read emails from each path
             $accountReadCount = 0;
+            $accountSkippedCount = 0;
+            $accountFailedCount = 0;
             foreach ($mailPaths as $mailPath) {
-                $count = $this->readEmailsFromPath($mailPath, $emailAccount);
-                $accountReadCount += $count;
+                $result = $this->readEmailsFromPath($mailPath, $emailAccount);
+                if (is_array($result)) {
+                    $accountReadCount += $result['processed'] ?? 0;
+                    $accountSkippedCount += $result['skipped'] ?? 0;
+                    $accountFailedCount += $result['failed'] ?? 0;
+                } else {
+                    // Backward compatibility
+                    $accountReadCount += $result;
+                }
             }
             
             $totalRead += $accountReadCount;
-            $this->info("   Read {$accountReadCount} email(s) for {$emailAccount->email}");
+            $totalSkipped += $accountSkippedCount;
+            $totalFailed += $accountFailedCount;
+            
+            $this->info("   ✅ Processed: {$accountReadCount} email(s)");
+            if ($accountSkippedCount > 0) {
+                $this->warn("   ⏭️  Skipped: {$accountSkippedCount} email(s) (duplicates or sender not allowed)");
+            }
+            if ($accountFailedCount > 0) {
+                $this->error("   ❌ Failed: {$accountFailedCount} email(s) (parsing errors)");
+            }
             $this->newLine();
         }
 
         $this->info("═══════════════════════════════════════════");
-        $this->info("✅ Total emails read across all accounts: {$totalRead}");
+        $this->info("✅ Total processed: {$totalRead} email(s)");
+        if ($totalSkipped > 0) {
+            $this->warn("⏭️  Total skipped: {$totalSkipped} email(s)");
+        }
+        if ($totalFailed > 0) {
+            $this->error("❌ Total failed: {$totalFailed} email(s)");
+        }
         $this->info("═══════════════════════════════════════════");
         
         if ($totalRead > 0) {
             $this->info("📧 Emails have been processed and matching jobs dispatched!");
             $this->info("   Processing jobs will automatically match payments if found.");
         } else {
-            $this->info("ℹ️  No new emails found (or all emails already processed).");
+            if ($totalSkipped > 0 || $totalFailed > 0) {
+                $this->warn("ℹ️  No new emails processed. Check skipped/failed counts above.");
+            } else {
+                $this->info("ℹ️  No new emails found (or all emails already processed).");
+            }
         }
     }
 
@@ -308,9 +336,11 @@ class ReadEmailsDirect extends Command
     /**
      * Read Maildir format emails
      */
-    protected function readMaildirFormat(string $basePath, EmailAccount $emailAccount): int
+    protected function readMaildirFormat(string $basePath, EmailAccount $emailAccount): array
     {
-        $count = 0;
+        $processed = 0;
+        $skipped = 0;
+        $failed = 0;
 
         // Handle different path formats
         // If path already ends with /cur/ or /new/, use it directly
@@ -339,7 +369,7 @@ class ReadEmailsDirect extends Command
         
         if (empty($dirsToCheck)) {
             $this->warn("  ⚠️  No Maildir subdirectories found in: {$basePath}");
-            return 0;
+            return ['processed' => 0, 'skipped' => 0, 'failed' => 0];
         }
 
         foreach ($dirsToCheck as $dirPath) {
@@ -379,14 +409,18 @@ class ReadEmailsDirect extends Command
                         }
 
                         // Parse email content
-                        $processedEmail = $this->parseEmailContent($emailContent, $emailAccount, $file);
+                        $result = $this->parseEmailContentWithStats($emailContent, $emailAccount, $file);
                         
-                        if ($processedEmail) {
-                            $count++;
-                            $subject = $processedEmail->subject ?? 'No Subject';
+                        if ($result['status'] === 'processed') {
+                            $processed++;
+                            $subject = $result['email']->subject ?? 'No Subject';
                             $this->info("  ✅ Processed: {$subject}");
+                        } elseif ($result['status'] === 'skipped') {
+                            $skipped++;
+                            $reason = $result['reason'] ?? 'unknown';
+                            $this->line("  ⏭️  Skipped: {$file} ({$reason})");
                         } else {
-                            // Log more details about why parsing failed
+                            $failed++;
                             $hasHeaders = preg_match('/^(From|Subject|Date|To|Message-ID|Content-Type):/mi', $emailContent);
                             $this->warn("  ⚠️  Could not parse email from: {$file}");
                             if (!$hasHeaders) {
@@ -512,6 +546,44 @@ class ReadEmailsDirect extends Command
     }
 
     /**
+     * Parse email content with detailed statistics
+     */
+    protected function parseEmailContentWithStats(string $content, EmailAccount $emailAccount, string $filename): array
+    {
+        $result = $this->parseEmailContent($content, $emailAccount, $filename);
+        
+        if ($result) {
+            return ['status' => 'processed', 'email' => $result];
+        }
+        
+        // Try to determine why it was skipped
+        try {
+            $parts = $this->parseEmail($content);
+            if (!$parts) {
+                return ['status' => 'failed', 'reason' => 'parsing_error'];
+            }
+            
+            $messageId = $parts['message_id'] ?? md5($content . $filename);
+            $existing = ProcessedEmail::where('message_id', $messageId)
+                ->where('email_account_id', $emailAccount->id)
+                ->first();
+            
+            if ($existing) {
+                return ['status' => 'skipped', 'reason' => 'duplicate'];
+            }
+            
+            $fromEmail = $parts['from_email'] ?? '';
+            if (!$emailAccount->isSenderAllowed($fromEmail)) {
+                return ['status' => 'skipped', 'reason' => 'sender_not_allowed'];
+            }
+        } catch (\Exception $e) {
+            // Ignore errors in stats collection
+        }
+        
+        return ['status' => 'failed', 'reason' => 'unknown'];
+    }
+
+    /**
      * Parse email content and store in database
      */
     protected function parseEmailContent(string $content, EmailAccount $emailAccount, string $filename): ?ProcessedEmail
@@ -533,6 +605,11 @@ class ReadEmailsDirect extends Command
                 ->first();
 
             if ($existing) {
+                Log::debug('Email skipped: already stored', [
+                    'message_id' => $messageId,
+                    'subject' => $parts['subject'] ?? '',
+                    'existing_id' => $existing->id,
+                ]);
                 return null; // Already stored
             }
 
@@ -541,9 +618,10 @@ class ReadEmailsDirect extends Command
 
             // Filter by allowed senders
             if (!$emailAccount->isSenderAllowed($fromEmail)) {
-                Log::debug('Email skipped: sender not allowed', [
+                Log::info('Email skipped: sender not allowed', [
                     'from' => $fromEmail,
                     'subject' => $parts['subject'] ?? '',
+                    'email_account' => $emailAccount->email,
                 ]);
                 return null;
             }
