@@ -107,8 +107,11 @@ Route::get('/cron/read-emails-direct', function () {
     try {
         $startTime = microtime(true);
         
-        // Run direct filesystem email reading command
-        \Illuminate\Support\Facades\Artisan::call('payment:read-emails-direct', ['--all' => true]);
+        // STEP 1: Run direct filesystem email reading command (ONLY fetch emails, no matching)
+        \Illuminate\Support\Facades\Artisan::call('payment:read-emails-direct', [
+            '--all' => true,
+            '--no-match' => true, // Skip matching in this step
+        ]);
         
         $output = \Illuminate\Support\Facades\Artisan::output();
         $executionTime = round(microtime(true) - $startTime, 2);
@@ -134,6 +137,324 @@ Route::get('/cron/read-emails-direct', function () {
         ], 500);
     }
 })->name('cron.read-emails-direct');
+
+// Fill Sender Names from text_body Cron (STEP 2)
+Route::get('/cron/fill-sender-names', function () {
+    try {
+        $startTime = microtime(true);
+        
+        // STEP 2: Fill in sender_name from text_body if it's null
+        \Illuminate\Support\Facades\Artisan::call('payment:re-extract-text-body', [
+            '--missing-only' => true,
+        ]);
+        
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $executionTime = round(microtime(true) - $startTime, 2);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Sender name extraction from text_body completed',
+            'method' => 'fill_sender_names',
+            'timestamp' => now()->toDateTimeString(),
+            'execution_time_seconds' => $executionTime,
+            'output' => $output,
+        ]);
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Cron job error (Fill Sender Names)', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage(),
+            'timestamp' => now()->toDateTimeString(),
+        ], 500);
+    }
+})->name('cron.fill-sender-names');
+
+// Master Email Processing Cron (All 3 Steps Sequentially)
+Route::get('/cron/process-emails', function () {
+    try {
+        $overallStartTime = microtime(true);
+        $results = [
+            'step1_fetch' => ['success' => false, 'message' => '', 'execution_time' => 0],
+            'step2_fill_sender' => ['success' => false, 'message' => '', 'execution_time' => 0],
+            'step3_match' => ['success' => false, 'message' => '', 'execution_time' => 0],
+        ];
+        
+        // ============================================
+        // STEP 1: Fetch emails from filesystem
+        // ============================================
+        \Illuminate\Support\Facades\Log::info('STEP 1: Starting email fetch from filesystem');
+        $step1Start = microtime(true);
+        try {
+            \Illuminate\Support\Facades\Artisan::call('payment:read-emails-direct', [
+                '--all' => true,
+                '--no-match' => true, // Skip matching in this step
+            ]);
+            $step1Output = \Illuminate\Support\Facades\Artisan::output();
+            $results['step1_fetch'] = [
+                'success' => true,
+                'message' => 'Emails fetched from filesystem',
+                'execution_time' => round(microtime(true) - $step1Start, 2),
+                'output' => $step1Output,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('STEP 1 failed: Email fetch', [
+                'error' => $e->getMessage(),
+            ]);
+            $results['step1_fetch'] = [
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+                'execution_time' => round(microtime(true) - $step1Start, 2),
+            ];
+        }
+        
+        // ============================================
+        // STEP 2: Fill sender_name from text_body if null
+        // ============================================
+        \Illuminate\Support\Facades\Log::info('STEP 2: Starting sender_name extraction from text_body');
+        $step2Start = microtime(true);
+        try {
+            \Illuminate\Support\Facades\Artisan::call('payment:re-extract-text-body', [
+                '--missing-only' => true,
+            ]);
+            $step2Output = \Illuminate\Support\Facades\Artisan::output();
+            $results['step2_fill_sender'] = [
+                'success' => true,
+                'message' => 'Sender names extracted from text_body',
+                'execution_time' => round(microtime(true) - $step2Start, 2),
+                'output' => $step2Output,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('STEP 2 failed: Fill sender names', [
+                'error' => $e->getMessage(),
+            ]);
+            $results['step2_fill_sender'] = [
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+                'execution_time' => round(microtime(true) - $step2Start, 2),
+            ];
+        }
+        
+        // ============================================
+        // STEP 3: Match transactions
+        // ============================================
+        \Illuminate\Support\Facades\Log::info('STEP 3: Starting transaction matching');
+        $step3Start = microtime(true);
+        try {
+            $matchingService = new \App\Services\PaymentMatchingService(
+                new \App\Services\TransactionLogService()
+            );
+
+            $matchResults = [
+                'payments_checked' => 0,
+                'emails_checked' => 0,
+                'matches_found' => 0,
+                'attempts_logged' => 0,
+                'errors' => [],
+                'matched_payments' => [],
+                'matched_emails' => [],
+            ];
+
+            // Get all unmatched pending payments (not expired)
+            $pendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->whereNotExists(function ($query) {
+                    $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                        ->from('processed_emails')
+                        ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                        ->where('processed_emails.is_matched', true);
+                })
+                ->with('business')
+                ->get();
+
+            // Get all unmatched processed emails
+            $unmatchedEmails = \App\Models\ProcessedEmail::where('is_matched', false)
+                ->latest()
+                ->get();
+
+            // STEP 3a: Extract missing sender_name and description_field from text_body (if still needed)
+            $textBodyExtractedCount = 0;
+            foreach ($unmatchedEmails as $processedEmail) {
+                if (!$processedEmail->sender_name || !$processedEmail->description_field) {
+                    try {
+                        $extracted = $matchingService->extractMissingFromTextBody($processedEmail);
+                        if ($extracted) {
+                            $textBodyExtractedCount++;
+                            $processedEmail->refresh();
+                        }
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('Failed to extract from text_body in step 3', [
+                            'email_id' => $processedEmail->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            // STEP 3b: Parse description fields for emails that have them but missing account_number
+            $parsedCount = 0;
+            foreach ($unmatchedEmails as $processedEmail) {
+                $processedEmail->refresh();
+                if ($processedEmail->description_field && !$processedEmail->account_number) {
+                    try {
+                        $parsedData = parseDescriptionFieldHelper($processedEmail->description_field);
+                        if ($parsedData['account_number']) {
+                            $currentExtractedData = $processedEmail->extracted_data ?? [];
+                            $currentExtractedData['description_field'] = $processedEmail->description_field;
+                            $currentExtractedData['account_number'] = $parsedData['account_number'];
+                            $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'];
+                            $currentExtractedData['date_from_description'] = $parsedData['extracted_date'];
+                            
+                            $processedEmail->update([
+                                'account_number' => $parsedData['account_number'],
+                                'extracted_data' => $currentExtractedData,
+                            ]);
+                            $parsedCount++;
+                        }
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('Failed to parse description field in step 3', [
+                            'email_id' => $processedEmail->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            // STEP 3c: Match emails to payments
+            foreach ($unmatchedEmails as $processedEmail) {
+                try {
+                    $processedEmail->refresh();
+                    if ($processedEmail->is_matched) {
+                        continue;
+                    }
+
+                    $matchResults['emails_checked']++;
+
+                    $emailData = [
+                        'subject' => $processedEmail->subject,
+                        'from' => $processedEmail->from_email,
+                        'text' => $processedEmail->text_body ?? '',
+                        'html' => $processedEmail->html_body ?? '',
+                        'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                        'email_account_id' => $processedEmail->email_account_id,
+                        'processed_email_id' => $processedEmail->id,
+                    ];
+
+                    $matchedPayment = $matchingService->matchEmail($emailData);
+
+                    if ($matchedPayment) {
+                        $matchResults['matches_found']++;
+                        $matchResults['matched_emails'][] = [
+                            'email_id' => $processedEmail->id,
+                            'email_subject' => $processedEmail->subject,
+                            'transaction_id' => $matchedPayment->transaction_id,
+                            'payment_id' => $matchedPayment->id,
+                        ];
+
+                        \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
+                    }
+                } catch (\Exception $e) {
+                    $matchResults['errors'][] = [
+                        'type' => 'email_match',
+                        'email_id' => $processedEmail->id ?? 'unknown',
+                        'error' => $e->getMessage(),
+                    ];
+                    \Illuminate\Support\Facades\Log::error('Error matching email in step 3', [
+                        'email_id' => $processedEmail->id ?? 'unknown',
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Also check pending payments
+            foreach ($pendingPayments as $payment) {
+                try {
+                    $payment->refresh();
+                    
+                    if ($payment->status !== \App\Models\Payment::STATUS_PENDING || $payment->isExpired()) {
+                        continue;
+                    }
+
+                    $matchResults['payments_checked']++;
+                    $matchedEmail = $matchingService->matchPaymentToStoredEmail($payment);
+                    
+                    if ($matchedEmail) {
+                        $matchResults['matches_found']++;
+                        $matchResults['matched_payments'][] = [
+                            'transaction_id' => $payment->transaction_id,
+                            'payment_id' => $payment->id,
+                            'email_id' => $matchedEmail->id,
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    $matchResults['errors'][] = [
+                        'type' => 'payment_match',
+                        'transaction_id' => $payment->transaction_id,
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            $matchResults['attempts_logged'] = \App\Models\MatchAttempt::where('created_at', '>=', now()->subMinutes(1))->count();
+            
+            $results['step3_match'] = [
+                'success' => true,
+                'message' => sprintf(
+                    'Matching completed: %d emails checked, %d payments checked, %d matches found, %d attempts logged',
+                    $matchResults['emails_checked'],
+                    $matchResults['payments_checked'],
+                    $matchResults['matches_found'],
+                    $matchResults['attempts_logged']
+                ),
+                'execution_time' => round(microtime(true) - $step3Start, 2),
+                'results' => $matchResults,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('STEP 3 failed: Transaction matching', [
+                'error' => $e->getMessage(),
+            ]);
+            $results['step3_match'] = [
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+                'execution_time' => round(microtime(true) - $step3Start, 2),
+            ];
+        }
+        
+        $totalExecutionTime = round(microtime(true) - $overallStartTime, 2);
+        
+        \Illuminate\Support\Facades\Log::info('Master email processing cron completed', [
+            'total_time' => $totalExecutionTime,
+            'step1' => $results['step1_fetch']['success'],
+            'step2' => $results['step2_fill_sender']['success'],
+            'step3' => $results['step3_match']['success'],
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Email processing completed (3 steps)',
+            'method' => 'process_emails_master',
+            'timestamp' => now()->toDateTimeString(),
+            'total_execution_time_seconds' => $totalExecutionTime,
+            'steps' => $results,
+        ]);
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Master email processing cron error', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage(),
+            'timestamp' => now()->toDateTimeString(),
+        ], 500);
+    }
+})->name('cron.process-emails');
 
 // Global Match Cron (matches all unmatched pending payments with unmatched emails)
 Route::get('/cron/global-match', function () {

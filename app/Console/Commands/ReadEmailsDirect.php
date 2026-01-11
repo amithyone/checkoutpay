@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Log;
 
 class ReadEmailsDirect extends Command
 {
-    protected $signature = 'payment:read-emails-direct {--email= : Email account to read (default: notify@check-outpay.com)} {--all : Read from all active email accounts}';
+    protected $signature = 'payment:read-emails-direct 
+                            {--email= : Email account to read (default: notify@check-outpay.com)} 
+                            {--all : Read from all active email accounts}
+                            {--no-match : Skip payment matching (only fetch and store emails)}';
     protected $description = 'Read emails directly from server mail files (bypasses IMAP)';
 
     public function handle(): void
@@ -714,8 +717,8 @@ class ReadEmailsDirect extends Command
             ]);
 
             // Automatically dispatch job to process email for payment matching
-            // Only dispatch if we extracted payment info (has amount)
-            if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+            // Only dispatch if we extracted payment info (has amount) AND --no-match flag is not set
+            if (!$this->option('no-match') && $extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
                 // Add processed_email_id to emailData for logging
                 $emailData['processed_email_id'] = $processedEmail->id;
                 ProcessEmailPayment::dispatch($emailData);
