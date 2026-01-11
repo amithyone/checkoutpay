@@ -1082,7 +1082,8 @@ class PaymentMatchingService
             // Structure: recipient_account(10) [space] sender_account(10)amount(6)date(8)unknown(9) FROM NAME TO NAME
             // Or without space: recipient_account(10)sender_account(10)amount(6)date(8)unknown(9) FROM NAME TO NAME
             // IMPORTANT: Description field is MORE RELIABLE than "Account Number" field, so we prioritize it
-            if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $normalizedText, $matches)) {
+            // CRITICAL: Make TO optional - text might be truncated or not have TO (like: FROM SOLOMON with no TO)
+            if (preg_match('/description[\s]*:[\s]*(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $normalizedText, $matches)) {
                 // Match 1: recipient account (10 digits) - PRIMARY source for account_number
                 $accountNumber = trim($matches[1]); // Always use description field as PRIMARY source
                 // Match 2: sender/payer account (10 digits)
@@ -1100,7 +1101,7 @@ class PaymentMatchingService
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3]; // Format: YYYY-MM-DD
                 }
                 
-                // Match 5: sender name (FROM NAME TO)
+                // Match 5: sender name (FROM NAME [TO])
                 $senderName = trim(strtolower($matches[6]));
             }
             // Alternative format: with dash/separator before FROM
@@ -1136,7 +1137,8 @@ class PaymentMatchingService
             }
             // Pattern: Direct format in text (without "Description :" prefix) - try to extract account numbers
             // IMPORTANT: First 10 digits is the recipient account number - PRIMARY source
-            elseif (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $normalizedText, $matches)) {
+            // CRITICAL: Make TO optional - text might be truncated or not have TO (like: FROM SOLOMON with no TO)
+            elseif (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $normalizedText, $matches)) {
                 // Match 1: recipient account (10 digits) - PRIMARY source for account_number
                 $accountNumber = trim($matches[1]); // Always use description field as PRIMARY source
                 // Match 2: sender/payer account (10 digits)
