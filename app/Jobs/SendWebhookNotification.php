@@ -69,6 +69,20 @@ class SendWebhookNotification implements ShouldQueue
             } else {
                 $payload['is_mismatch'] = false;
             }
+            
+            // Add name mismatch information if applicable (from email_data)
+            $emailData = $this->payment->email_data ?? [];
+            if (isset($emailData['name_mismatch']) && $emailData['name_mismatch']) {
+                $payload['name_mismatch'] = true;
+                $payload['name_similarity_percent'] = $emailData['name_similarity_percent'] ?? null;
+                if (!$this->payment->is_mismatch) {
+                    $payload['message'] = 'Payment has been verified and approved (name mismatch detected)';
+                } else {
+                    $payload['message'] = 'Payment has been verified and approved (amount and name mismatch detected)';
+                }
+            } else {
+                $payload['name_mismatch'] = false;
+            }
         } elseif ($this->payment->status === 'rejected') {
             $payload = [
                 'success' => false,

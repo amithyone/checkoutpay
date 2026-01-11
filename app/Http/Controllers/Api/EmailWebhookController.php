@@ -403,12 +403,6 @@ class EmailWebhookController extends Controller
                         
                         // Approve payment (with mismatch flag if applicable)
                         $payment->approve($emailDataWithMismatch, $isMismatch, $receivedAmount, $mismatchReason);
-                            'subject' => $subject,
-                            'from' => $fromEmail,
-                            'text' => $text,
-                            'html' => $html,
-                            'date' => $timeSent,
-                        ], $isMismatch, $receivedAmount, $mismatchReason);
                         
                         // Update business balance - use received amount if mismatch, otherwise expected amount
                         if ($payment->business_id) {
