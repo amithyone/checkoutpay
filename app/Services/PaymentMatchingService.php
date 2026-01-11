@@ -2246,4 +2246,83 @@ class PaymentMatchingService
 
         return $cleaned ?: '';
     }
+    
+    /**
+     * Extract missing sender_name and description_field from text_body
+     * This method runs ONLY before global matching to fill missing data
+     * 
+     * @param \App\Models\ProcessedEmail $email
+     * @return array|null Extracted data or null if nothing was extracted
+     */
+    public function extractMissingFromTextBody(\App\Models\ProcessedEmail $email): ?array
+    {
+        // Only run if sender_name OR description_field is null
+        if ($email->sender_name && $email->description_field) {
+            return null; // Nothing to extract
+        }
+        
+        $textBody = $email->text_body;
+        
+        // If text_body is empty but html_body exists, extract text from HTML
+        if (empty(trim($textBody)) && !empty(trim($email->html_body ?? ''))) {
+            $textBody = $this->emailExtractor->htmlToText($email->html_body);
+        }
+        
+        if (empty(trim($textBody))) {
+            return null; // No text to extract from
+        }
+        
+        // Use EmailExtractionService to extract from text_body
+        $extractionResult = $this->emailExtractor->extractFromTextBody(
+            $textBody,
+            $email->subject ?? '',
+            $email->from_email ?? ''
+        );
+        
+        if (!$extractionResult) {
+            return null;
+        }
+        
+        $updates = [];
+        $extractedData = $email->extracted_data ?? [];
+        
+        // Update sender_name if missing
+        if (!$email->sender_name && !empty($extractionResult['sender_name'])) {
+            $updates['sender_name'] = $extractionResult['sender_name'];
+            $extractedData['sender_name'] = $extractionResult['sender_name'];
+        }
+        
+        // Update description_field if missing
+        if (!$email->description_field && !empty($extractionResult['description_field'])) {
+            $updates['description_field'] = $extractionResult['description_field'];
+            $extractedData['description_field'] = $extractionResult['description_field'];
+            
+            // Parse description field to extract account numbers
+            $parsed = $this->descExtractor->parseDescriptionField($extractionResult['description_field']);
+            if ($parsed['account_number']) {
+                $updates['account_number'] = $parsed['account_number'];
+                $extractedData['account_number'] = $parsed['account_number'];
+            }
+            if ($parsed['payer_account_number']) {
+                $extractedData['payer_account_number'] = $parsed['payer_account_number'];
+            }
+            if ($parsed['extracted_date']) {
+                $extractedData['date_from_description'] = $parsed['extracted_date'];
+            }
+        }
+        
+        // Update extracted_data
+        if (!empty($updates)) {
+            $updates['extracted_data'] = $extractedData;
+            $email->update($updates);
+            
+            return [
+                'sender_name' => $updates['sender_name'] ?? null,
+                'description_field' => $updates['description_field'] ?? null,
+                'account_number' => $updates['account_number'] ?? null,
+            ];
+        }
+        
+        return null;
+    }
 }
