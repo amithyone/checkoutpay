@@ -5,6 +5,22 @@
 
 @section('content')
 <div class="space-y-6">
+    <!-- Header with Clear Button -->
+    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200 flex items-center justify-between">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-900">Match Attempts Log</h2>
+            <p class="text-sm text-gray-600 mt-1">View and manage all payment matching attempts</p>
+        </div>
+        <button 
+            id="clearLogsBtn" 
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors duration-200 flex items-center gap-2"
+            onclick="confirmClearLogs()"
+        >
+            <i class="fas fa-trash-alt"></i>
+            <span>Clear Match Logs</span>
+        </button>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
@@ -302,6 +318,68 @@ function retryMatch(attemptId) {
     .catch(error => {
         console.error('Error:', error);
         alert('❌ Error retrying match: ' + error.message);
+    });
+}
+
+function confirmClearLogs() {
+    // Get current filter values to show what will be deleted
+    const urlParams = new URLSearchParams(window.location.search);
+    const result = urlParams.get('result') || 'all';
+    const extractionMethod = urlParams.get('extraction_method') || 'all';
+    const dateFrom = urlParams.get('date_from') || 'all';
+    const dateTo = urlParams.get('date_to') || 'all';
+    
+    let message = 'Are you sure you want to delete match logs?\n\n';
+    message += 'This will delete:\n';
+    if (result !== 'all') message += `- Match result: ${result}\n`;
+    if (extractionMethod !== 'all') message += `- Extraction method: ${extractionMethod}\n`;
+    if (dateFrom !== 'all') message += `- From date: ${dateFrom}\n`;
+    if (dateTo !== 'all') message += `- To date: ${dateTo}\n`;
+    if (result === 'all' && extractionMethod === 'all' && dateFrom === 'all' && dateTo === 'all') {
+        message += '- ALL match logs\n';
+    }
+    message += '\n⚠️ This action cannot be undone!';
+    
+    if (!confirm(message)) {
+        return;
+    }
+    
+    // Disable button and show loading
+    const btn = document.getElementById('clearLogsBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Clearing...</span>';
+    
+    // Build URL with current filters
+    const clearUrl = new URL('/admin/match-attempts/clear', window.location.origin);
+    if (result !== 'all') clearUrl.searchParams.set('result', result);
+    if (extractionMethod !== 'all') clearUrl.searchParams.set('extraction_method', extractionMethod);
+    if (dateFrom !== 'all') clearUrl.searchParams.set('date_from', dateFrom);
+    if (dateTo !== 'all') clearUrl.searchParams.set('date_to', dateTo);
+    
+    fetch(clearUrl.toString(), {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            window.location.reload();
+        } else {
+            alert('❌ ' + data.message);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error clearing match logs: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     });
 }
 </script>

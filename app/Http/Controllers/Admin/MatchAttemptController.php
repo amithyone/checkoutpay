@@ -330,4 +330,59 @@ class MatchAttemptController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Clear all match logs
+     */
+    public function clear(Request $request)
+    {
+        try {
+            $query = MatchAttempt::query();
+
+            // If filters are provided, only delete matching records
+            if ($request->filled('result')) {
+                $query->where('match_result', $request->result);
+            }
+
+            if ($request->filled('extraction_method')) {
+                $query->where('extraction_method', $request->extraction_method);
+            }
+
+            if ($request->filled('date_from')) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->filled('date_to')) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
+
+            // Count before deletion
+            $count = $query->count();
+
+            // Delete the records
+            $query->delete();
+
+            Log::info('Match logs cleared', [
+                'count' => $count,
+                'filters' => $request->all(),
+                'user_id' => auth('admin')->id(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully deleted {$count} match log(s).",
+                'deleted_count' => $count,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error clearing match logs', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error clearing match logs: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }
