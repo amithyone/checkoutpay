@@ -786,8 +786,19 @@ class ReadEmailsDirect extends Command
         if (empty(trim($headers))) {
             Log::debug('Email parsing failed: empty headers', [
                 'content_preview' => substr($content, 0, 500),
+                'content_length' => strlen($content),
             ]);
             return null;
+        }
+        
+        // Validate that we have body
+        if (empty(trim($body))) {
+            Log::debug('Email parsing failed: empty body after header split', [
+                'headers_length' => strlen($headers),
+                'headers_preview' => substr($headers, 0, 500),
+                'content_length' => strlen($content),
+            ]);
+            // Don't return null - some emails might have empty bodies, but we should still try to parse headers
         }
 
         // Parse headers
@@ -795,11 +806,27 @@ class ReadEmailsDirect extends Command
         $parsedHeaders = [];
 
         foreach ($headerLines as $line) {
+            // Skip empty lines
+            if (empty(trim($line))) {
+                continue;
+            }
+            
+            // Handle continuation lines (start with space or tab)
+            if (preg_match('/^\s+/', $line)) {
+                // This is a continuation of the previous header
+                if (!empty($parsedHeaders) && !empty($lastKey)) {
+                    $parsedHeaders[$lastKey] .= ' ' . trim($line);
+                }
+                continue;
+            }
+            
+            // Match header: value format
             if (preg_match('/^([^:]+):\s*(.+)$/', $line, $matches)) {
                 $key = strtolower(trim($matches[1]));
                 $value = trim($matches[2]);
+                $lastKey = $key; // Store for continuation lines
                 
-                // Handle multi-line headers
+                // Handle multi-line headers (same key appears multiple times)
                 if (isset($parsedHeaders[$key])) {
                     $parsedHeaders[$key] .= ' ' . $value;
                 } else {
@@ -813,18 +840,32 @@ class ReadEmailsDirect extends Command
         $date = $parsedHeaders['date'] ?? now()->toDateTimeString();
         $messageId = $parsedHeaders['message-id'] ?? null;
 
-        // Parse From header
-        $from = $parsedHeaders['from'] ?? '';
+        // Parse From header - try multiple sources
+        // Maildir format might have Return-Path or envelope-from, try those if From is missing
+        $from = $parsedHeaders['from'] ?? $parsedHeaders['return-path'] ?? $parsedHeaders['envelope-from'] ?? '';
         $fromEmail = '';
         $fromName = '';
         
+        // Remove angle brackets and clean up
+        $from = trim($from, '<>');
+        
         if (preg_match('/<(.+?)>/', $from, $matches)) {
-            $fromEmail = $matches[1];
+            $fromEmail = strtolower(trim($matches[1]));
             $fromName = trim(str_replace($matches[0], '', $from));
         } elseif (filter_var($from, FILTER_VALIDATE_EMAIL)) {
-            $fromEmail = $from;
-        } elseif (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/', $from, $matches)) {
-            $fromEmail = $matches[0];
+            $fromEmail = strtolower(trim($from));
+        } elseif (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/i', $from, $matches)) {
+            $fromEmail = strtolower(trim($matches[0]));
+        }
+        
+        // If still no from email, try to extract from other headers
+        if (empty($fromEmail)) {
+            // Check envelope-from in Received headers
+            if (isset($parsedHeaders['received'])) {
+                if (preg_match('/envelope-from\s+<([^>]+)>/i', $parsedHeaders['received'], $matches)) {
+                    $fromEmail = strtolower(trim($matches[1]));
+                }
+            }
         }
 
         // Parse body (handle multipart and quoted-printable encoding)
