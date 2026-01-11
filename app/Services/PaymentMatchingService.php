@@ -13,10 +13,20 @@ class PaymentMatchingService
 {
     protected MatchAttemptLogger $matchLogger;
     protected ?PythonExtractionService $pythonExtractor = null;
+    protected EmailExtractionService $emailExtractor;
+    protected DescriptionFieldExtractor $descExtractor;
+    protected SenderNameExtractor $nameExtractor;
+    protected PaymentMatcher $paymentMatcher;
 
     public function __construct(?TransactionLogService $transactionLogService = null)
     {
         $this->matchLogger = new MatchAttemptLogger();
+        
+        // Initialize specialized services
+        $this->emailExtractor = new EmailExtractionService();
+        $this->descExtractor = new DescriptionFieldExtractor();
+        $this->nameExtractor = new SenderNameExtractor();
+        $this->paymentMatcher = new PaymentMatcher();
         
         // Initialize Python extraction service if enabled
         if (config('services.python_extractor.enabled', true)) {
@@ -301,8 +311,8 @@ class PaymentMatchingService
     protected function extractPaymentInfoPhp(array $emailData): ?array
     {
         $subject = strtolower($emailData['subject'] ?? '');
-        $text = $this->decodeQuotedPrintable($emailData['text'] ?? '');
-        $html = $this->decodeQuotedPrintable($emailData['html'] ?? '');
+        $text = $this->emailExtractor->decodeQuotedPrintable($emailData['text'] ?? '');
+        $html = $this->emailExtractor->decodeQuotedPrintable($emailData['html'] ?? '');
         // CRITICAL: Decode HTML entities (like &nbsp; to space) for stored emails
         // Stored emails may have NGN&nbsp;1000 which should be NGN 1000
         $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -448,6 +458,14 @@ class PaymentMatchingService
      * Match payment with extracted email info
      */
     public function matchPayment(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null): array
+    {
+        return $this->paymentMatcher->matchPayment($payment, $extractedInfo, $emailDate);
+    }
+    
+    /**
+     * @deprecated Use PaymentMatcher::matchPayment() directly
+     */
+    protected function matchPaymentOld(Payment $payment, array $extractedInfo, ?\DateTime $emailDate = null): array
     {
         // Check time window: email must be received AFTER transaction creation and within configured minutes
         // Get time window from settings (default: 120 minutes / 2 hours)
@@ -1127,13 +1145,13 @@ class PaymentMatchingService
         $html = $emailData['html'] ?? '';
         
         // Decode quoted-printable and HTML entities FIRST
-        $text = $this->decodeQuotedPrintable($text);
-        $html = $this->decodeQuotedPrintable($html);
+        $text = $this->emailExtractor->decodeQuotedPrintable($text);
+        $html = $this->emailExtractor->decodeQuotedPrintable($html);
         $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         // If text body is empty but HTML exists, extract text from HTML
         if (empty(trim($text)) && !empty($html)) {
-            $text = $this->htmlToText($html);
+            $text = $this->emailExtractor->htmlToText($html);
         }
         
         $amount = null;
@@ -1493,7 +1511,7 @@ class PaymentMatchingService
     }
 
     /**
-     * Extract payment info from text_body (plain text)
+     * @deprecated Use EmailExtractionService::extractFromTextBody() instead
      */
     protected function extractFromTextBody(string $text, string $subject, string $from): ?array
     {
@@ -1730,7 +1748,7 @@ class PaymentMatchingService
     }
     
     /**
-     * Extract payment info from html_body
+     * @deprecated Use EmailExtractionService::extractFromHtmlBody() instead
      */
     protected function extractFromHtmlBody(string $html, string $subject, string $from): ?array
     {
@@ -2139,7 +2157,7 @@ class PaymentMatchingService
     }
 
     /**
-     * Decode quoted-printable encoding (e.g., =20 becomes space, =3D becomes =)
+     * @deprecated Use EmailExtractionService::decodeQuotedPrintable() instead
      */
     protected function decodeQuotedPrintable(string $text): string
     {
@@ -2166,8 +2184,7 @@ class PaymentMatchingService
     }
 
     /**
-     * Convert HTML to plain text while preserving important structure
-     * Handles tables, divs, and other HTML elements banks use
+     * @deprecated Use EmailExtractionService::htmlToText() instead
      */
     protected function htmlToText(string $html): string
     {
