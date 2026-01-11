@@ -1698,9 +1698,10 @@ class PaymentMatchingService
             }
         }
         
-        // Return results if we found amount OR if we found description field (even without amount)
+        // ALWAYS return results if we found ANY data (amount, account number, sender name, or description field)
+        // This ensures we extract as much as possible from text_body even if description field extraction failed
         // Description field extraction is valuable even if amount extraction from other fields failed
-        if ($amount || $descriptionField) {
+        if ($amount || $accountNumber || $senderName || $descriptionField) {
             $result = [
                 'amount' => $amount,
                 'sender_name' => $senderName,
