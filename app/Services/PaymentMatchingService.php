@@ -1378,7 +1378,9 @@ class PaymentMatchingService
         // Pattern 3: Direct format without "Description :" prefix (fallback - very flexible)
         // Format: "9008771210 021008599511000020260111080847554 FROM SOLOMON INNOCENT AMITHY TO..." (with space)
         // OR: "900877121002100859959000020260111094651392 FROM SOLOMON INNOCENT AMITHY TO..." (without space)
-        elseif (preg_match('/(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
+        // CRITICAL: This pattern allows ANY characters (including spaces, dashes, etc.) between digits and FROM
+        // This catches cases where there might be formatting or extra characters
+        elseif (preg_match('/(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM\s+([A-Z\s]+?)\s+TO/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
             $amountFromDesc = (float) ($matches[3] / 100);
