@@ -307,10 +307,10 @@ class ReadEmailsDirect extends Command
     /**
      * Read emails from Maildir format
      */
-    protected function readEmailsFromPath(string $path, EmailAccount $emailAccount): int
+    protected function readEmailsFromPath(string $path, EmailAccount $emailAccount)
     {
         if (!is_dir($path) && !is_file($path)) {
-            return 0;
+            return ['processed' => 0, 'skipped' => 0, 'failed' => 0];
         }
 
         $this->info("Reading from: {$path}");
@@ -322,15 +322,17 @@ class ReadEmailsDirect extends Command
 
         // Check if it's mbox format (single file)
         if (is_file($path)) {
-            return $this->readMboxFormat($path, $emailAccount);
+            $count = $this->readMboxFormat($path, $emailAccount);
+            return ['processed' => $count, 'skipped' => 0, 'failed' => 0];
         }
 
         // Try reading files directly from path
         if (is_dir($path)) {
-            return $this->readDirectory($path, $emailAccount);
+            $count = $this->readDirectory($path, $emailAccount);
+            return ['processed' => $count, 'skipped' => 0, 'failed' => 0];
         }
 
-        return 0;
+        return ['processed' => 0, 'skipped' => 0, 'failed' => 0];
     }
 
     /**
