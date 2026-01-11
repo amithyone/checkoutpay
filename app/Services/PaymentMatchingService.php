@@ -1544,6 +1544,7 @@ class PaymentMatchingService
         
         return [
             'amount' => $amount,
+            'account_number' => $accountNumber,
             'sender_name' => $senderName,
             'payer_account_number' => $payerAccountNumber,
             'transaction_time' => $transactionTime,
