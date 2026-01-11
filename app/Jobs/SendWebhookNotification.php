@@ -76,7 +76,9 @@ class SendWebhookNotification implements ShouldQueue
                 'transaction_id' => $this->payment->transaction_id, // Always included
                 'amount' => (float) $this->payment->amount,
                 'payer_name' => $this->payment->payer_name,
-                'account_number' => $this->payment->account_number, // Added account number
+                'bank' => $this->payment->bank,
+                'account_number' => $this->payment->account_number, // Recipient account number (where money was sent TO)
+                'payer_account_number' => $this->payment->payer_account_number, // Sender account number (where money was sent FROM)
                 'rejected_at' => $this->payment->matched_at?->toISOString() ?? now()->toISOString(),
                 'reason' => $this->payment->email_data['rejection_reason'] ?? 'Payment verification failed',
                 'message' => 'Payment has been rejected',
@@ -88,6 +90,8 @@ class SendWebhookNotification implements ShouldQueue
                 'status' => $this->payment->status,
                 'transaction_id' => $this->payment->transaction_id, // Always included
                 'amount' => (float) $this->payment->amount,
+                'account_number' => $this->payment->account_number, // Recipient account number
+                'payer_account_number' => $this->payment->payer_account_number, // Sender account number
                 'message' => 'Payment status updated',
             ];
         }
