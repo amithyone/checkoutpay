@@ -224,22 +224,29 @@ class ProcessedEmailController extends Controller
                 }
             }
             
+            // If still no sender name, use existing one from email or proceed without it
+            if (empty($senderName) && !empty($processedEmail->sender_name)) {
+                $senderName = $processedEmail->sender_name;
+            }
+            
             // Get current extracted_data or initialize empty array
             $extractedData = $processedEmail->extracted_data ?? [];
             
-            // Update sender_name in extracted_data
-            $extractedData['sender_name'] = $senderName;
+            // Update sender_name in extracted_data if we have one
+            if (!empty($senderName)) {
+                $extractedData['sender_name'] = $senderName;
             
             // Also update if it's nested in a 'data' key (some extraction methods use this structure)
             if (isset($extractedData['data']) && is_array($extractedData['data'])) {
                 $extractedData['data']['sender_name'] = $senderName;
             }
             
-            // Update the sender name and extracted_data
-            $processedEmail->update([
-                'sender_name' => $senderName,
-                'extracted_data' => $extractedData,
-            ]);
+            // Update the sender name and extracted_data (only if we have a sender name)
+            $updateData = ['extracted_data' => $extractedData];
+            if (!empty($senderName)) {
+                $updateData['sender_name'] = $senderName;
+            }
+            $processedEmail->update($updateData);
 
             // Refresh to get updated data
             $processedEmail->refresh();
