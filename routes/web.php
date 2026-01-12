@@ -4,13 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\TestEmailController;
 
-Route::get('/', function () {
-    return view('home');
-})->name('home');
+Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
-Route::get('/pricing', function () {
-    return view('pricing');
-})->name('pricing');
+Route::get('/pricing', [\App\Http\Controllers\PricingController::class, 'index'])->name('pricing');
 
 // Dynamic pages (Privacy Policy, Terms, etc.)
 Route::get('/page/{slug}', [\App\Http\Controllers\PageController::class, 'show'])->name('page.show');
