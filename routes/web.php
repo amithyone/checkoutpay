@@ -199,8 +199,9 @@ Route::get('/cron/extract-missing-names', function () {
     try {
         $startTime = microtime(true);
         
-        // Extract missing sender names using AdvancedNameExtractor
-        \Illuminate\Support\Facades\Artisan::call('payment:extract-missing-names', [
+        // Extract missing sender names and description fields from text_body
+        \Illuminate\Support\Facades\Artisan::call('payment:re-extract-text-body', [
+            '--missing-only' => true,
             '--limit' => 100,
         ]);
         
@@ -647,12 +648,40 @@ Route::get('/cron/global-match', function () {
                     'processed_email_id' => $processedEmail->id,
                 ];
 
-                // matchEmail() will:
-                // 1. Extract payment info from email
-                // 2. Filter payments by amount (within tolerance)
-                // 3. Filter payments by time (payment created before email received)
-                // 4. Try to match using matchPayment() with proper priority: amount → name → time
+                // Try matchEmail first (uses extraction)
                 $matchedPayment = $matchingService->matchEmail($emailData);
+                
+                // If matchEmail fails (extraction might have failed), try direct matching with stored values
+                if (!$matchedPayment && $processedEmail->amount && $processedEmail->amount > 0) {
+                    // Use stored values as fallback
+                    $extractedInfo = [
+                        'amount' => $processedEmail->amount,
+                        'sender_name' => $processedEmail->sender_name,
+                        'account_number' => $processedEmail->account_number,
+                    ];
+                    
+                    // Find payments with matching amount and time constraints
+                    $potentialPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                        })
+                        ->whereBetween('amount', [
+                            $processedEmail->amount - 1,
+                            $processedEmail->amount + 1
+                        ])
+                        ->where('created_at', '<=', $processedEmail->email_date)
+                        ->get();
+                    
+                    foreach ($potentialPayments as $potentialPayment) {
+                        $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
+                        $matchResult = $matchingService->matchPayment($potentialPayment, $extractedInfo, $emailDate);
+                        
+                        if ($matchResult['matched']) {
+                            $matchedPayment = $potentialPayment;
+                            break;
+                        }
+                    }
+                }
 
                 if ($matchedPayment) {
                     $results['matches_found']++;
@@ -731,11 +760,25 @@ Route::get('/cron/global-match', function () {
 
                         // Extract payment info from email
                         $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                        
+                        // Use stored values as fallback if extraction fails
                         if (!$extractionResult || !isset($extractionResult['data'])) {
-                            continue;
+                            // Fallback to stored values from database
+                            $extractedInfo = [
+                                'amount' => $processedEmail->amount,
+                                'sender_name' => $processedEmail->sender_name,
+                                'account_number' => $processedEmail->account_number,
+                            ];
+                        } else {
+                            $extractedInfo = $extractionResult['data'];
+                            // Merge stored values if extraction didn't provide them
+                            if (!isset($extractedInfo['amount']) && $processedEmail->amount) {
+                                $extractedInfo['amount'] = $processedEmail->amount;
+                            }
+                            if (!isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
+                                $extractedInfo['sender_name'] = $processedEmail->sender_name;
+                            }
                         }
-
-                        $extractedInfo = $extractionResult['data'];
                         
                         // Use matchPayment directly to check this specific payment
                         $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;

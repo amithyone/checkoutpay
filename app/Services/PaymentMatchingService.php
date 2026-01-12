@@ -212,7 +212,7 @@ class PaymentMatchingService
             
             if ($timeDiffMinutes <= $maxTimeWindow) {
                 $result['time_match'] = true;
-                } else {
+            } else {
                 // Time mismatch, but if amount+name match, we can still consider it
                 if ($result['amount_match'] && $result['name_match']) {
                     $result['time_match'] = true; // Override: amount+name match is strong enough
@@ -249,10 +249,10 @@ class PaymentMatchingService
                     $result['reason'] = 'Matched: Amount and time match (name mismatch)';
                     $result['is_mismatch'] = true;
                     $result['mismatch_reason'] = 'Name mismatch but amount and time match';
-            } else {
+                } else {
                     $result['reason'] = 'Amount matches but name and account do not match, and time window too large';
                 }
-                } else {
+            } else {
                 $result['reason'] = 'Amount matches but name, account, and time do not match';
             }
         }
@@ -268,6 +268,7 @@ class PaymentMatchingService
     /**
      * Match names with fuzzy matching
      * Handles spacing variations, partial matches, etc.
+     * Excludes bank names (GTBank, OPay, etc.) from matching
      */
     protected function matchNames(?string $paymentName, ?string $emailName): array
     {
@@ -279,11 +280,75 @@ class PaymentMatchingService
         $paymentNameNorm = strtolower(trim(preg_replace('/\s+/', ' ', $paymentName)));
         $emailNameNorm = strtolower(trim(preg_replace('/\s+/', ' ', $emailName)));
         
-        // Exact match
+        // Bank names list for exclusion
+        $bankNames = [
+            'gtbank', 'guaranty trust bank', 'guaranty trust', 'gt bank',
+            'opay', 'opay digital', 'opay limited',
+            'access bank', 'access',
+            'zenith bank', 'zenith',
+            'uba', 'united bank for africa',
+            'first bank', 'firstbank', 'first bank of nigeria',
+            'fidelity bank', 'fidelity',
+            'union bank', 'union',
+            'stanbic', 'stanbic ibtc',
+            'ecobank', 'eco bank',
+            'wema bank', 'wema',
+            'sterling bank', 'sterling',
+            'providus bank', 'providus',
+            'kuda', 'kuda bank',
+            'palmpay', 'palm pay',
+            'carbon', 'carbon bank',
+            'rubies', 'rubies bank',
+            'vfd', 'vfd bank',
+            'moniepoint', 'moniepoint bank',
+            'xtrapay', 'xtra pay', 'xtrapay limited',
+        ];
+        
+        // CRITICAL: Check if the name IS a bank name (not just contains bank name)
+        // If the entire name is a bank name, exclude it (check BEFORE exact match)
+        $paymentIsBankOnly = false;
+        $emailIsBankOnly = false;
+        
+        foreach ($bankNames as $bankName) {
+            // Check if the name equals the bank name (exact match)
+            if ($paymentNameNorm === strtolower($bankName)) {
+                $paymentIsBankOnly = true;
+            }
+            if ($emailNameNorm === strtolower($bankName)) {
+                $emailIsBankOnly = true;
+            }
+        }
+        
+        // If the name IS a bank name (not just contains it), don't match
+        if ($paymentIsBankOnly || $emailIsBankOnly) {
+            return ['matched' => false, 'similarity' => 0, 'reason' => 'Name is a bank name'];
+        }
+        
+        // Exact match (after bank name check)
         if ($paymentNameNorm === $emailNameNorm) {
             return ['matched' => true, 'similarity' => 100];
         }
         
+        // CRITICAL: Check if expected name is contained in the other name
+        // This handles cases like "john doe" vs "john doe from opay" or "john doe via gtbank"
+        // Remove spaces for better matching
+        $paymentNoSpace = str_replace(' ', '', $paymentNameNorm);
+        $emailNoSpace = str_replace(' ', '', $emailNameNorm);
+        
+        // If payment name is contained in email name (or vice versa), it's a match
+        // This allows "john doe" to match "john doe from opay" or "via gtbank john doe"
+        // IMPORTANT: Only match if the contained name is at least 3 characters (to avoid false matches)
+        if (strlen($paymentNoSpace) >= 3 && strlen($emailNoSpace) >= 3) {
+            if (strpos($emailNoSpace, $paymentNoSpace) !== false) {
+                // Payment name found in email name - MATCH (even if email has additional words like bank names)
+                return ['matched' => true, 'similarity' => 90, 'reason' => 'Payment name contained in email name'];
+            }
+            if (strpos($paymentNoSpace, $emailNoSpace) !== false) {
+                // Email name found in payment name - MATCH (even if payment has additional words)
+                return ['matched' => true, 'similarity' => 90, 'reason' => 'Email name contained in payment name'];
+            }
+        }
+
         // Remove all spaces and compare
         $paymentNoSpace = str_replace(' ', '', $paymentNameNorm);
         $emailNoSpace = str_replace(' ', '', $emailNameNorm);
@@ -504,7 +569,7 @@ class PaymentMatchingService
             }
         }
         
-        return null;
+            return null;
     }
     
     /**
