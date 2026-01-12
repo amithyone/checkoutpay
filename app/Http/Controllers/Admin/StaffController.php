@@ -12,11 +12,6 @@ use Illuminate\Validation\Rule;
 
 class StaffController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('super_admin');
-    }
-
     public function index(Request $request): View
     {
         $query = Admin::query();
