@@ -64,6 +64,25 @@
                     <span>Payments</span>
                 </a>
 
+                <a href="{{ route('admin.payments.needs-review') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.payments.needs-review') ? 'bg-red-50 text-red-700 border-l-4 border-red-600' : '' }}">
+                    <i class="fas fa-exclamation-triangle w-5 mr-3"></i>
+                    <span>Needs Review</span>
+                    @php
+                        $needsReviewCount = \App\Models\Payment::withCount(['matchAttempts' => function($q) {
+                            $q->where('match_result', \App\Models\MatchAttempt::RESULT_UNMATCHED);
+                        }])
+                        ->where('status', \App\Models\Payment::STATUS_PENDING)
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                        })
+                        ->having('match_attempts_count', '>=', 3)
+                        ->count();
+                    @endphp
+                    @if($needsReviewCount > 0)
+                        <span class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">{{ $needsReviewCount }}</span>
+                    @endif
+                </a>
+
                 <a href="{{ route('admin.withdrawals.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.withdrawals.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-hand-holding-usd w-5 mr-3"></i>
                     <span>Withdrawals</span>
