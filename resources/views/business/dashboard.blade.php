@@ -5,6 +5,20 @@
 
 @section('content')
 <div class="space-y-4 lg:space-y-6 pb-20 lg:pb-0">
+    <!-- Business ID Card -->
+    <div class="bg-gradient-to-r from-primary to-primary/90 rounded-xl shadow-sm p-5 lg:p-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-xs lg:text-sm text-white/80 mb-1">Business ID</p>
+                <h3 class="text-xl lg:text-2xl font-bold">{{ auth('business')->user()->id }}</h3>
+                <p class="text-xs text-white/70 mt-2">Use this ID for API integrations and support requests</p>
+            </div>
+            <div class="w-12 h-12 lg:w-16 lg:h-16 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-id-card text-white text-xl lg:text-2xl"></i>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         <!-- Total Revenue -->
