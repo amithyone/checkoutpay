@@ -138,8 +138,10 @@ class PaymentService
     {
         try {
             // Get unmatched stored emails with matching amount
+            // CRITICAL: Only check emails received AFTER transaction creation
             $storedEmails = ProcessedEmail::unmatched()
                 ->withAmount($payment->amount)
+                ->where('email_date', '>=', $payment->created_at) // Email must be AFTER transaction creation
                 ->get();
             
             foreach ($storedEmails as $storedEmail) {

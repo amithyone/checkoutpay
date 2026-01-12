@@ -680,14 +680,14 @@ Route::get('/cron/global-match', function () {
 
                 $results['payments_checked']++;
 
-                $checkSince = $payment->created_at->subMinutes(5);
+                // CRITICAL: Only check emails received AFTER transaction creation
                 $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
-                $checkUntil = $payment->created_at->addMinutes($timeWindowMinutes);
+                $checkUntil = $payment->created_at->copy()->addMinutes($timeWindowMinutes);
                 
                 $potentialEmails = \App\Models\ProcessedEmail::where('is_matched', false)
-                    ->where(function ($q) use ($payment, $checkSince, $checkUntil) {
+                    ->where(function ($q) use ($payment, $checkUntil) {
                         $q->where('amount', $payment->amount)
-                            ->where('email_date', '>=', $checkSince)
+                            ->where('email_date', '>=', $payment->created_at) // Email must be AFTER transaction creation
                             ->where('email_date', '<=', $checkUntil);
                     })
                     ->get();
