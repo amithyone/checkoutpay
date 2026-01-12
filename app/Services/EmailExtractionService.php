@@ -41,6 +41,18 @@ class EmailExtractionService
             }
         }
         
+        // PRIORITY: Extract sender name from description field FIRST (regardless of digit count)
+        // This is the PRIMARY source for sender name - must come from description field
+        // Format: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
+        // OR: "Description : 100004260111113119149684166825-TRANSFER FROM INNOCENT AMITHY SOLOMON"
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $text, $nameMatches)) {
+            $senderName = trim(strtolower($nameMatches[1]));
+        }
+        // Also try "TRANSFER FROM NAME" format in description
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z\s]+?)(?:-|$)/i', $text, $nameMatches)) {
+            $senderName = trim(strtolower($nameMatches[1]));
+        }
+        
         // Now parse the digits if we found them
         // Try 43-digit format first (most common)
         if ($descriptionField && strlen($descriptionField) === 43) {
@@ -58,11 +70,6 @@ class EmailExtractionService
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
                 }
-            }
-            
-            // Extract sender name separately (after the 43 digits)
-            if (preg_match('/description[\s]*:[\s]*\d{43}\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $text, $nameMatches)) {
-                $senderName = trim(strtolower($nameMatches[1]));
             }
         }
         // Try 42-digit format (pad with 0)
@@ -157,7 +164,8 @@ class EmailExtractionService
             }
         }
         
-        // Extract sender name from text (if not already extracted)
+        // Extract sender name from text (if not already extracted from description field)
+        // Only use fallback patterns if we didn't get the name from description field
         if (!$senderName) {
             $senderName = $this->extractSenderNameFromText($text, $fullText);
         }
@@ -297,6 +305,18 @@ class EmailExtractionService
         // Extract description field from plain text
         $descriptionField = $descExtractor->extractFromHtml($html);
         
+        // PRIORITY: Extract sender name from description field FIRST (regardless of digit count)
+        // This is the PRIMARY source for sender name - must come from description field
+        // Format: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
+        // OR: "Description : 100004260111113119149684166825-TRANSFER FROM INNOCENT AMITHY SOLOMON"
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $plainText, $nameMatches)) {
+            $senderName = trim(strtolower($nameMatches[1]));
+        }
+        // Also try "TRANSFER FROM NAME" format in description
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z\s]+?)(?:-|$)/i', $plainText, $nameMatches)) {
+            $senderName = trim(strtolower($nameMatches[1]));
+        }
+        
         // Parse description field if found
         if ($descriptionField) {
             $parsed = $descExtractor->parseDescriptionField($descriptionField);
@@ -408,7 +428,8 @@ class EmailExtractionService
             }
         }
         
-        // Extract sender name using SenderNameExtractor
+        // Extract sender name using SenderNameExtractor (only if not already extracted from description field)
+        // Only use fallback patterns if we didn't get the name from description field
         if (!$senderName) {
             $senderName = $nameExtractor->extractFromHtml($html);
         }
