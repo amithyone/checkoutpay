@@ -161,13 +161,27 @@ class ProcessedEmailController extends Controller
         ]);
 
         try {
+            $senderName = strtolower(trim($request->sender_name));
+            
+            // Get current extracted_data or initialize empty array
+            $extractedData = $processedEmail->extracted_data ?? [];
+            
+            // Update sender_name in extracted_data
+            $extractedData['sender_name'] = $senderName;
+            
+            // Also update if it's nested in a 'data' key (some extraction methods use this structure)
+            if (isset($extractedData['data']) && is_array($extractedData['data'])) {
+                $extractedData['data']['sender_name'] = $senderName;
+            }
+            
             $processedEmail->update([
-                'sender_name' => strtolower(trim($request->sender_name)),
+                'sender_name' => $senderName,
+                'extracted_data' => $extractedData,
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Sender name updated successfully',
+                'message' => 'Sender name and extracted data updated successfully',
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Error updating sender name', [
@@ -192,9 +206,23 @@ class ProcessedEmailController extends Controller
         ]);
 
         try {
-            // Update the sender name
+            $senderName = strtolower(trim($request->sender_name));
+            
+            // Get current extracted_data or initialize empty array
+            $extractedData = $processedEmail->extracted_data ?? [];
+            
+            // Update sender_name in extracted_data
+            $extractedData['sender_name'] = $senderName;
+            
+            // Also update if it's nested in a 'data' key (some extraction methods use this structure)
+            if (isset($extractedData['data']) && is_array($extractedData['data'])) {
+                $extractedData['data']['sender_name'] = $senderName;
+            }
+            
+            // Update the sender name and extracted_data
             $processedEmail->update([
-                'sender_name' => strtolower(trim($request->sender_name)),
+                'sender_name' => $senderName,
+                'extracted_data' => $extractedData,
             ]);
 
             // Refresh to get updated data
