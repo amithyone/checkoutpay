@@ -87,35 +87,57 @@
             </div>
 
             <!-- Extracted Payment Info -->
-            @if($processedEmail->amount || $processedEmail->sender_name || $processedEmail->account_number)
-                <div class="border-t border-gray-200 pt-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Extracted Payment Information</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        @if($processedEmail->amount)
-                            <div>
-                                <label class="text-sm font-medium text-gray-500">Amount</label>
-                                <p class="mt-1 text-lg font-bold text-gray-900">
-                                    ₦{{ number_format($processedEmail->amount, 2) }}
-                                </p>
-                            </div>
-                        @endif
+            <div class="border-t border-gray-200 pt-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Extracted Payment Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    @if($processedEmail->amount)
+                        <div>
+                            <label class="text-sm font-medium text-gray-500">Amount</label>
+                            <p class="mt-1 text-lg font-bold text-gray-900">
+                                ₦{{ number_format($processedEmail->amount, 2) }}
+                            </p>
+                        </div>
+                    @else
+                        <div>
+                            <label class="text-sm font-medium text-gray-500">Amount</label>
+                            <p class="mt-1 text-sm text-gray-400">Not extracted</p>
+                        </div>
+                    @endif
 
-                        @if($processedEmail->sender_name)
-                            <div>
-                                <label class="text-sm font-medium text-gray-500">Sender Name</label>
-                                <p class="mt-1 text-sm text-gray-900">{{ $processedEmail->sender_name }}</p>
-                            </div>
-                        @endif
-
-                        @if($processedEmail->account_number)
-                            <div>
-                                <label class="text-sm font-medium text-gray-500">Account Number</label>
-                                <p class="mt-1 text-sm text-gray-900 font-mono">{{ $processedEmail->account_number }}</p>
-                            </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Sender Name</label>
+                        <div class="mt-1 flex items-center gap-2">
+                            <input type="text" 
+                                   id="sender-name-input" 
+                                   value="{{ $processedEmail->sender_name ?? '' }}" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
+                                   placeholder="Enter sender name">
+                            <button onclick="updateSenderName({{ $processedEmail->id }})" 
+                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-save mr-1"></i> Update
+                            </button>
+                        </div>
+                        @if(!$processedEmail->is_matched)
+                            <button onclick="updateAndRematch({{ $processedEmail->id }})" 
+                                    class="mt-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center justify-center">
+                                <i class="fas fa-redo mr-2"></i> Update Name & Rematch
+                            </button>
                         @endif
                     </div>
+
+                    @if($processedEmail->account_number)
+                        <div>
+                            <label class="text-sm font-medium text-gray-500">Account Number</label>
+                            <p class="mt-1 text-sm text-gray-900 font-mono">{{ $processedEmail->account_number }}</p>
+                        </div>
+                    @else
+                        <div>
+                            <label class="text-sm font-medium text-gray-500">Account Number</label>
+                            <p class="mt-1 text-sm text-gray-400">Not extracted</p>
+                        </div>
+                    @endif
                 </div>
-            @endif
+            </div>
 
             <!-- Matched Payment -->
             @if($processedEmail->is_matched && $processedEmail->matchedPayment)
@@ -208,6 +230,86 @@
 </div>
 
 <script>
+function updateSenderName(emailId) {
+    const input = document.getElementById('sender-name-input');
+    const senderName = input.value.trim();
+    
+    if (!senderName) {
+        alert('Please enter a sender name');
+        return;
+    }
+
+    fetch(`/admin/processed-emails/${emailId}/update-name`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            sender_name: senderName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            window.location.reload();
+        } else {
+            alert('❌ ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error updating name: ' + error.message);
+    });
+}
+
+function updateAndRematch(emailId) {
+    const input = document.getElementById('sender-name-input');
+    const senderName = input.value.trim();
+    
+    if (!senderName) {
+        alert('Please enter a sender name before rematching');
+        return;
+    }
+
+    if (!confirm('Update the sender name and retry matching this email against all pending payments?')) {
+        return;
+    }
+
+    fetch(`/admin/processed-emails/${emailId}/update-and-rematch`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            sender_name: senderName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            if (data.payment) {
+                window.location.href = '/admin/payments/' + data.payment.id;
+            } else {
+                window.location.reload();
+            }
+        } else {
+            alert('❌ ' + data.message);
+            if (data.latest_reason) {
+                console.log('Latest reason:', data.latest_reason);
+                alert('Latest reason: ' + data.latest_reason);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error updating and rematching: ' + error.message);
+    });
+}
+
 function retryEmailMatch(emailId) {
     if (!confirm('Are you sure you want to retry matching this email against all pending payments?')) {
         return;

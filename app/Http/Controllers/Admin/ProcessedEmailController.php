@@ -150,4 +150,131 @@ class ProcessedEmailController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Update sender name for a processed email
+     */
+    public function updateName(Request $request, ProcessedEmail $processedEmail)
+    {
+        $request->validate([
+            'sender_name' => 'required|string|max:255',
+        ]);
+
+        try {
+            $processedEmail->update([
+                'sender_name' => strtolower(trim($request->sender_name)),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sender name updated successfully',
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error updating sender name', [
+                'email_id' => $processedEmail->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating sender name: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update sender name and rematch the email
+     */
+    public function updateAndRematch(Request $request, ProcessedEmail $processedEmail)
+    {
+        $request->validate([
+            'sender_name' => 'required|string|max:255',
+        ]);
+
+        try {
+            // Update the sender name
+            $processedEmail->update([
+                'sender_name' => strtolower(trim($request->sender_name)),
+            ]);
+
+            // Refresh to get updated data
+            $processedEmail->refresh();
+
+            // Now rematch using the matching service
+            $matchingService = new \App\Services\PaymentMatchingService(
+                new \App\Services\TransactionLogService()
+            );
+            
+            $result = $matchingService->recheckStoredEmail($processedEmail);
+            
+            // If a match is found, approve the payment
+            $matchedPayment = null;
+            if (isset($result['matches']) && is_array($result['matches'])) {
+                foreach ($result['matches'] as $match) {
+                    if (isset($match['matched']) && $match['matched'] && isset($match['payment']) && $match['payment']) {
+                        $matchedPayment = $match['payment'];
+                        
+                        // Mark email as matched
+                        $processedEmail->markAsMatched($matchedPayment);
+                        
+                        // Approve payment
+                        $matchedPayment->approve([
+                            'subject' => $processedEmail->subject,
+                            'from' => $processedEmail->from_email,
+                            'text' => $processedEmail->text_body,
+                            'html' => $processedEmail->html_body,
+                            'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                            'sender_name' => $processedEmail->sender_name,
+                        ]);
+                        
+                        // Update business balance
+                        if ($matchedPayment->business_id) {
+                            $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                        }
+                        
+                        // Dispatch event to send webhook
+                        event(new \App\Events\PaymentApproved($matchedPayment));
+                        
+                        break;
+                    }
+                }
+            }
+
+            // Get latest match reason if no match found
+            $latestReason = null;
+            if (!$matchedPayment && isset($result['matches']) && is_array($result['matches'])) {
+                foreach ($result['matches'] as $match) {
+                    if (isset($match['reason'])) {
+                        $latestReason = $match['reason'];
+                        break;
+                    }
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'matched' => $matchedPayment !== null,
+                'payment' => $matchedPayment ? [
+                    'id' => $matchedPayment->id,
+                    'transaction_id' => $matchedPayment->transaction_id,
+                    'amount' => $matchedPayment->amount,
+                ] : null,
+                'message' => $matchedPayment 
+                    ? 'Sender name updated and payment matched successfully!' 
+                    : 'Sender name updated. No matching payment found.',
+                'latest_reason' => $latestReason,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error updating and rematching', [
+                'email_id' => $processedEmail->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating and rematching: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }
