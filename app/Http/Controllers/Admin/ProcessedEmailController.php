@@ -203,11 +203,11 @@ class ProcessedEmailController extends Controller
     public function updateAndRematch(Request $request, ProcessedEmail $processedEmail)
     {
         $request->validate([
-            'sender_name' => 'required|string|max:255',
+            'sender_name' => 'nullable|string|max:255',
         ]);
 
         try {
-            $senderName = strtolower(trim($request->sender_name));
+            $senderName = !empty($request->sender_name) ? strtolower(trim($request->sender_name)) : null;
             
             // SECONDARY TRY: If sender_name is empty or not provided, try extracting from text snippet (first 500 chars)
             if (empty($senderName) && !empty($processedEmail->text_body)) {
