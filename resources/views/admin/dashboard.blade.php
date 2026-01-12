@@ -6,7 +6,7 @@
 @section('content')
 <div class="space-y-6">
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <!-- Global Match Trigger Button -->
         <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-6 border-2 border-green-200 hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
@@ -25,6 +25,27 @@
             </button>
             <p class="text-xs text-gray-500 mt-3 text-center">
                 Uses new matching logic with full logging
+            </p>
+        </div>
+
+        <!-- Extract Missing Names Button -->
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm p-6 border-2 border-blue-200 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1">
+                        <i class="fas fa-user-edit text-blue-600 mr-2"></i>Extract Names
+                    </h3>
+                    <p class="text-xs text-gray-600">Extract missing names from emails</p>
+                </div>
+            </div>
+            <button onclick="extractMissingNames()" 
+                    id="extract-names-btn"
+                    class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center font-medium transition-colors">
+                <i class="fas fa-magic mr-2"></i>
+                <span>Extract Missing Names</span>
+            </button>
+            <p class="text-xs text-gray-500 mt-3 text-center">
+                Extracts from description field pattern
             </p>
         </div>
 
@@ -707,6 +728,68 @@ function copyCronUrl(type = 'direct') {
         document.body.removeChild(textarea);
         alert('Cron URL copied to clipboard!');
     }
+}
+
+function extractMissingNames() {
+    const btn = document.getElementById('extract-names-btn');
+    if (!btn) {
+        console.error('Extract names button not found');
+        alert('Error: Button not found. Please refresh the page.');
+        return;
+    }
+    
+    const originalHTML = btn.innerHTML;
+    
+    if (!confirm('This will extract missing sender names from processed emails using the description field pattern. This may take a while. Continue?')) {
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Extracting Names...';
+    
+    // Get CSRF token
+    const csrfToken = getCsrfToken();
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+        return;
+    }
+    
+    fetch('{{ route("admin.extract-missing-names") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            limit: 50
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message + '\n\nCheck the console for detailed output.');
+            if (data.output) {
+                console.log('Extraction Output:', data.output);
+            }
+            // Reload page to show updated stats
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            alert('❌ ' + data.message);
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error extracting names: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
 }
 
 function triggerGlobalMatch() {

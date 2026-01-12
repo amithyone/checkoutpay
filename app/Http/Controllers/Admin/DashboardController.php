@@ -108,4 +108,36 @@ class DashboardController extends Controller
 
         return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails'));
     }
+
+    /**
+     * Trigger extract missing names cron job
+     */
+    public function extractMissingNames(Request $request)
+    {
+        try {
+            $limit = (int) $request->input('limit', 50);
+            
+            // Run the command
+            \Illuminate\Support\Facades\Artisan::call('payment:extract-missing-names', [
+                '--limit' => $limit,
+            ]);
+            
+            $output = \Illuminate\Support\Facades\Artisan::output();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Name extraction completed successfully',
+                'output' => $output,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error running extract missing names', [
+                'error' => $e->getMessage(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

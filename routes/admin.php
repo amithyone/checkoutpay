@@ -20,6 +20,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Protected admin routes
     Route::middleware('auth:admin')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::post('/extract-missing-names', [DashboardController::class, 'extractMissingNames'])->name('extract-missing-names');
 
         // Processed Emails (Inbox)
         Route::get('processed-emails', [ProcessedEmailController::class, 'index'])->name('processed-emails.index');
