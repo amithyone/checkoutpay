@@ -66,9 +66,11 @@
                 <label class="text-xs text-gray-600">Balance</label>
                 <div class="flex items-center justify-between mt-1">
                     <p class="text-lg font-bold text-gray-900">₦{{ number_format($business->balance, 2) }}</p>
+                    @if(auth('admin')->user()->canUpdateBusinessBalance())
                     <button onclick="showBalanceModal()" class="text-xs text-primary hover:underline">
                         <i class="fas fa-edit mr-1"></i> Update
                     </button>
+                    @endif
                 </div>
             </div>
             <div>
@@ -488,6 +490,7 @@
     </div>
 </div>
 
+@if(auth('admin')->user()->canUpdateBusinessBalance())
 <!-- Update Balance Modal -->
 <div id="balanceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">

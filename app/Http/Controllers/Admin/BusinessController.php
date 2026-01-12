@@ -187,6 +187,12 @@ class BusinessController extends Controller
 
     public function updateBalance(Request $request, Business $business): RedirectResponse
     {
+        $admin = auth('admin')->user();
+        
+        if (!$admin->canUpdateBusinessBalance()) {
+            abort(403, 'Only super admins can update business balances.');
+        }
+
         $request->validate([
             'balance' => 'required|numeric|min:0',
             'notes' => 'nullable|string|max:500',

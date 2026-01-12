@@ -26,19 +26,21 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('processed-emails/{processedEmail}', [ProcessedEmailController::class, 'show'])->name('processed-emails.show');
         Route::post('processed-emails/{processedEmail}/check-match', [ProcessedEmailController::class, 'checkMatch'])->name('processed-emails.check-match');
 
-        // Email Accounts
-        Route::resource('email-accounts', EmailAccountController::class);
-        Route::post('email-accounts/{emailAccount}/test-connection', [EmailAccountController::class, 'testConnection'])
-            ->name('email-accounts.test-connection');
-        
-        // Gmail API Authorization
-        Route::get('email-accounts/{emailAccount}/gmail/authorize', [GmailAuthController::class, 'authorize'])
-            ->name('email-accounts.gmail.authorize');
-        Route::get('email-accounts/{emailAccount}/gmail/callback', [GmailAuthController::class, 'callback'])
-            ->name('email-accounts.gmail.callback');
+        // Email Accounts (Admin/Super Admin only)
+        Route::middleware('admin_or_super')->group(function () {
+            Route::resource('email-accounts', EmailAccountController::class);
+            Route::post('email-accounts/{emailAccount}/test-connection', [EmailAccountController::class, 'testConnection'])
+                ->name('email-accounts.test-connection');
+            
+            // Gmail API Authorization
+            Route::get('email-accounts/{emailAccount}/gmail/authorize', [GmailAuthController::class, 'authorize'])
+                ->name('email-accounts.gmail.authorize');
+            Route::get('email-accounts/{emailAccount}/gmail/callback', [GmailAuthController::class, 'callback'])
+                ->name('email-accounts.gmail.callback');
 
-        // Account Numbers
-        Route::resource('account-numbers', AccountNumberController::class);
+            // Account Numbers
+            Route::resource('account-numbers', AccountNumberController::class);
+        });
 
         // Businesses
         Route::resource('businesses', BusinessController::class);
@@ -51,6 +53,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('businesses/{business}/toggle-status', [BusinessController::class, 'toggleStatus'])
             ->name('businesses.toggle-status');
         Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
+            ->middleware('super_admin')
             ->name('businesses.update-balance');
         
         // Business KYC Management
@@ -87,12 +90,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('test-transaction/status/{transactionId}', [\App\Http\Controllers\Admin\TestTransactionController::class, 'getStatus'])->name('test-transaction.status');
         Route::post('test-transaction/check-email', [\App\Http\Controllers\Admin\TestTransactionController::class, 'checkEmail'])->name('test-transaction.check-email');
 
-        // Settings
-        Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
-        Route::put('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
-        Route::post('settings/general', [\App\Http\Controllers\Admin\SettingsController::class, 'updateGeneral'])->name('settings.update-general');
-        Route::post('settings/whitelisted-emails', [\App\Http\Controllers\Admin\SettingsController::class, 'addWhitelistedEmail'])->name('settings.add-whitelisted-email');
-        Route::delete('settings/whitelisted-emails/{whitelistedEmail}', [\App\Http\Controllers\Admin\SettingsController::class, 'removeWhitelistedEmail'])->name('settings.remove-whitelisted-email');
+        // Settings (Admin/Super Admin only)
+        Route::middleware('admin_or_super')->group(function () {
+            Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
+            Route::put('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
+            Route::post('settings/general', [\App\Http\Controllers\Admin\SettingsController::class, 'updateGeneral'])->name('settings.update-general');
+            Route::post('settings/whitelisted-emails', [\App\Http\Controllers\Admin\SettingsController::class, 'addWhitelistedEmail'])->name('settings.add-whitelisted-email');
+            Route::delete('settings/whitelisted-emails/{whitelistedEmail}', [\App\Http\Controllers\Admin\SettingsController::class, 'removeWhitelistedEmail'])->name('settings.remove-whitelisted-email');
+        });
 
         // Pages Management
         Route::resource('pages', \App\Http\Controllers\Admin\PageController::class);
@@ -125,5 +130,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         
         // Global Match Trigger
         Route::post('match/trigger-global', [\App\Http\Controllers\Admin\MatchController::class, 'triggerGlobalMatch'])->name('match.trigger-global');
+
+        // Staff Management (Super Admin only)
+        Route::middleware('super_admin')->group(function () {
+            Route::resource('staff', \App\Http\Controllers\Admin\StaffController::class);
+            Route::post('staff/{staff}/toggle-status', [\App\Http\Controllers\Admin\StaffController::class, 'toggleStatus'])
+                ->name('staff.toggle-status');
+        });
     });
 });

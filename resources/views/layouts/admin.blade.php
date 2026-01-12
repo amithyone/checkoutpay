@@ -44,15 +44,19 @@
                     <span>Inbox</span>
                 </a>
 
+                @if(auth('admin')->user()->canManageEmailAccounts())
                 <a href="{{ route('admin.email-accounts.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.email-accounts.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-envelope w-5 mr-3"></i>
                     <span>Email Accounts</span>
                 </a>
+                @endif
 
+                @if(auth('admin')->user()->canManageAccountNumbers())
                 <a href="{{ route('admin.account-numbers.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.account-numbers.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-credit-card w-5 mr-3"></i>
                     <span>Account Numbers</span>
                 </a>
+                @endif
 
                 <a href="{{ route('admin.businesses.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.businesses.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-building w-5 mr-3"></i>
@@ -106,16 +110,21 @@
                     <span>Match Logs</span>
                 </a>
 
+                @if(auth('admin')->user()->canManageSettings())
                 <a href="{{ route('admin.whitelisted-emails.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.whitelisted-emails.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-shield-alt w-5 mr-3"></i>
                     <span>Whitelisted Emails</span>
                 </a>
+                @endif
 
+                @if(auth('admin')->user()->canManageSettings())
                 <a href="{{ route('admin.pages.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.pages.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-file-alt w-5 mr-3"></i>
                     <span>Pages</span>
                 </a>
+                @endif
 
+                @if(auth('admin')->user()->canManageSupportTickets())
                 <a href="{{ route('admin.support.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.support.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-comments w-5 mr-3"></i>
                     <span>Support Tickets</span>
@@ -126,11 +135,21 @@
                         <span class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">{{ $openTickets }}</span>
                     @endif
                 </a>
+                @endif
 
+                @if(auth('admin')->user()->canManageSettings())
                 <a href="{{ route('admin.settings.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.settings.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-cog w-5 mr-3"></i>
                     <span>Settings</span>
                 </a>
+                @endif
+
+                @if(auth('admin')->user()->canManageAdmins())
+                <a href="{{ route('admin.staff.index') }}" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.staff.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-users-cog w-5 mr-3"></i>
+                    <span>Staff Management</span>
+                </a>
+                @endif
             </nav>
 
             <!-- User Section -->
@@ -142,6 +161,7 @@
                     <div class="ml-3 flex-1">
                         <p class="text-sm font-medium text-gray-900">{{ auth('admin')->user()->name }}</p>
                         <p class="text-xs text-gray-500">{{ auth('admin')->user()->email }}</p>
+                        <p class="text-xs text-primary font-medium capitalize">{{ str_replace('_', ' ', auth('admin')->user()->role) }}</p>
                     </div>
                 </div>
                 <form action="{{ route('admin.logout') }}" method="POST" class="mt-3">
