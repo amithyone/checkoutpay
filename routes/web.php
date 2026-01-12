@@ -546,8 +546,10 @@ Route::get('/cron/global-match', function () {
             ->with('business')
             ->get();
 
-        // Get all unmatched processed emails
+        // Get all unmatched processed emails that have amounts (required for matching)
         $unmatchedEmails = \App\Models\ProcessedEmail::where('is_matched', false)
+            ->whereNotNull('amount')
+            ->where('amount', '>', 0)
             ->latest()
             ->get();
 
@@ -620,10 +622,16 @@ Route::get('/cron/global-match', function () {
         }
 
         // Strategy: For each unmatched email, try to match against all pending payments
+        // CRITICAL: matchEmail() already filters by time (email must be after payment creation)
         foreach ($unmatchedEmails as $processedEmail) {
             try {
                 $processedEmail->refresh();
                 if ($processedEmail->is_matched) {
+                    continue;
+                }
+
+                // Skip emails without amount (can't match without amount)
+                if (!$processedEmail->amount || $processedEmail->amount <= 0) {
                     continue;
                 }
 
@@ -639,6 +647,11 @@ Route::get('/cron/global-match', function () {
                     'processed_email_id' => $processedEmail->id,
                 ];
 
+                // matchEmail() will:
+                // 1. Extract payment info from email
+                // 2. Filter payments by amount (within tolerance)
+                // 3. Filter payments by time (payment created before email received)
+                // 4. Try to match using matchPayment() with proper priority: amount → name → time
                 $matchedPayment = $matchingService->matchEmail($emailData);
 
                 if ($matchedPayment) {
@@ -650,6 +663,7 @@ Route::get('/cron/global-match', function () {
                         'payment_id' => $matchedPayment->id,
                     ];
 
+                    // Process the email payment (approve payment)
                     \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
                 }
             } catch (\Exception $e) {
@@ -661,6 +675,7 @@ Route::get('/cron/global-match', function () {
                 \Illuminate\Support\Facades\Log::error('Error matching email in global match cron', [
                     'email_id' => $processedEmail->id ?? 'unknown',
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
             }
         }
@@ -684,12 +699,16 @@ Route::get('/cron/global-match', function () {
                 $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
                 $checkUntil = $payment->created_at->copy()->addMinutes($timeWindowMinutes);
                 
+                // Filter emails by amount (within 1 naira tolerance) and time window
                 $potentialEmails = \App\Models\ProcessedEmail::where('is_matched', false)
-                    ->where(function ($q) use ($payment, $checkUntil) {
-                        $q->where('amount', $payment->amount)
-                            ->where('email_date', '>=', $payment->created_at) // Email must be AFTER transaction creation
-                            ->where('email_date', '<=', $checkUntil);
-                    })
+                    ->whereNotNull('amount')
+                    ->where('amount', '>', 0)
+                    ->whereBetween('amount', [
+                        $payment->amount - 1,
+                        $payment->amount + 1
+                    ])
+                    ->where('email_date', '>=', $payment->created_at) // Email must be AFTER transaction creation
+                    ->where('email_date', '<=', $checkUntil)
                     ->get();
 
                 foreach ($potentialEmails as $processedEmail) {
@@ -699,6 +718,7 @@ Route::get('/cron/global-match', function () {
                             continue;
                         }
 
+                        // Extract payment info from email
                         $emailData = [
                             'subject' => $processedEmail->subject,
                             'from' => $processedEmail->from_email,
@@ -709,17 +729,29 @@ Route::get('/cron/global-match', function () {
                             'processed_email_id' => $processedEmail->id,
                         ];
 
-                        $matchedPayment = $matchingService->matchEmail($emailData);
+                        // Extract payment info from email
+                        $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                        if (!$extractionResult || !isset($extractionResult['data'])) {
+                            continue;
+                        }
 
-                        if ($matchedPayment && $matchedPayment->id === $payment->id) {
+                        $extractedInfo = $extractionResult['data'];
+                        
+                        // Use matchPayment directly to check this specific payment
+                        $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
+                        $matchResult = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
+
+                        if ($matchResult['matched']) {
                             $results['matches_found']++;
                             $results['matched_payments'][] = [
                                 'transaction_id' => $payment->transaction_id,
                                 'payment_id' => $payment->id,
                                 'email_id' => $processedEmail->id,
                                 'email_subject' => $processedEmail->subject,
+                                'match_reason' => $matchResult['reason'] ?? 'Matched',
                             ];
 
+                            // Process the email payment (approve payment)
                             \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
                             break;
                         }
@@ -730,6 +762,11 @@ Route::get('/cron/global-match', function () {
                             'email_id' => $processedEmail->id ?? 'unknown',
                             'error' => $e->getMessage(),
                         ];
+                        \Illuminate\Support\Facades\Log::error('Error matching payment to email in global match cron', [
+                            'transaction_id' => $payment->transaction_id,
+                            'email_id' => $processedEmail->id ?? 'unknown',
+                            'error' => $e->getMessage(),
+                        ]);
                     }
                 }
             } catch (\Exception $e) {

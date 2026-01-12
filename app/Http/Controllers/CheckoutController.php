@@ -189,6 +189,20 @@ class CheckoutController extends Controller
             ->where('transaction_id', $transactionId)
             ->firstOrFail();
 
+        // If payment is pending, trigger global match in background to check for matching emails
+        if ($payment->status === Payment::STATUS_PENDING) {
+            try {
+                // Use dispatch to run in background (non-blocking)
+                \Illuminate\Support\Facades\Http::timeout(1)->get(url('/cron/global-match'))->throw();
+            } catch (\Exception $e) {
+                // Silently fail - don't block the response if global match fails
+                \Illuminate\Support\Facades\Log::debug('Global match trigger failed (non-critical)', [
+                    'transaction_id' => $transactionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $shouldRedirect = false;
         $redirectUrl = null;
         $redirectParams = [];

@@ -82,9 +82,9 @@ class PaymentMatchingService
             // Extract payment info from email
             $extractionResult = $this->extractPaymentInfo($emailData);
             if (!$extractionResult || !isset($extractionResult['data'])) {
-                return null;
-            }
-            
+            return null;
+        }
+
             $extractedInfo = $extractionResult['data'];
             $emailDate = isset($emailData['date']) ? Carbon::parse($emailData['date']) : null;
             
@@ -142,16 +142,16 @@ class PaymentMatchingService
                 if ($matchResult['matched']) {
                     // Store match result on payment for later use
                     $payment->setAttribute('_match_result', $matchResult);
-                    return $payment;
+                return $payment;
                 }
             }
-            
-            return null;
-        } catch (\Exception $e) {
+
+        return null;
+            } catch (\Exception $e) {
             Log::error('Error matching email', [
-                'error' => $e->getMessage(),
-                'email_id' => $emailData['processed_email_id'] ?? null,
-            ]);
+                    'error' => $e->getMessage(),
+                    'email_id' => $emailData['processed_email_id'] ?? null,
+                ]);
             return null;
         }
     }
@@ -212,11 +212,11 @@ class PaymentMatchingService
             
             if ($timeDiffMinutes <= $maxTimeWindow) {
                 $result['time_match'] = true;
-            } else {
+                } else {
                 // Time mismatch, but if amount+name match, we can still consider it
                 if ($result['amount_match'] && $result['name_match']) {
                     $result['time_match'] = true; // Override: amount+name match is strong enough
-                } else {
+            } else {
                     $result['reason'] = "Time window exceeded: {$timeDiffMinutes} minutes (max: {$maxTimeWindow})";
                     return $result;
                 }
@@ -249,10 +249,10 @@ class PaymentMatchingService
                     $result['reason'] = 'Matched: Amount and time match (name mismatch)';
                     $result['is_mismatch'] = true;
                     $result['mismatch_reason'] = 'Name mismatch but amount and time match';
-                } else {
+            } else {
                     $result['reason'] = 'Amount matches but name and account do not match, and time window too large';
                 }
-            } else {
+                } else {
                 $result['reason'] = 'Amount matches but name, account, and time do not match';
             }
         }
@@ -274,7 +274,7 @@ class PaymentMatchingService
         if (!$paymentName || !$emailName) {
             return ['matched' => false, 'similarity' => 0];
         }
-        
+
         // Normalize names: lowercase, trim, remove extra spaces
         $paymentNameNorm = strtolower(trim(preg_replace('/\s+/', ' ', $paymentName)));
         $emailNameNorm = strtolower(trim(preg_replace('/\s+/', ' ', $emailName)));
@@ -362,39 +362,242 @@ class PaymentMatchingService
             }
             
             return $updated;
-        } catch (\Exception $e) {
+            } catch (\Exception $e) {
             Log::error('Error extracting from text body', [
                 'email_id' => $email->id,
-                'error' => $e->getMessage(),
+                    'error' => $e->getMessage(),
             ]);
             return false;
         }
     }
 
     /**
-     * Simple sender name extraction from text
+     * Advanced sender name extraction from text and HTML
+     * Handles multiple formats including quoted-printable encoding
      */
     protected function extractSenderNameFromText(string $textBody, string $htmlBody): ?string
     {
-        $combined = strip_tags($htmlBody) . ' ' . $textBody;
+        // Decode quoted-printable encoding first
+        $textBody = $this->decodeQuotedPrintable($textBody);
+        $htmlBody = $this->decodeQuotedPrintable($htmlBody);
         
-        // Try common patterns
+        // Try HTML first (more structured)
+        if (!empty($htmlBody)) {
+            $htmlName = $this->extractFromHtml($htmlBody);
+            if ($htmlName) {
+                return $htmlName;
+            }
+        }
+        
+        // Then try text body
+        if (!empty($textBody)) {
+            $textName = $this->extractFromText($textBody);
+            if ($textName) {
+                return $textName;
+            }
+        }
+        
+        // Fallback: combine both
+        $htmlText = strip_tags($htmlBody);
+        $combined = $htmlText . ' ' . $textBody;
+        
+        // Normalize whitespace
+        $combined = preg_replace('/\s+/', ' ', $combined);
+        
+        return $this->extractFromText($combined);
+    }
+    
+    /**
+     * Extract from HTML content
+     */
+    protected function extractFromHtml(string $html): ?string
+    {
+        // Try HTML table patterns first
+        $htmlPatterns = [
+            // Pattern: <td>Description:</td><td>FROM NAME TO</td>
+            '/<td[^>]*>[\s]*(?:description|remarks|from)[\s:]*<\/td>\s*<td[^>]*>[\s]*from\s+([A-Z][A-Z\s\-]{2,50}?)\s+to/i',
+            // Pattern: <td>FROM NAME TO</td>
+            '/<td[^>]*>[\s]*from\s+([A-Z][A-Z\s\-]{2,50}?)\s+to/i',
+            // Pattern: Description: ... FROM NAME
+            '/description[\s:]+.*?from\s+([A-Z][A-Z\s\-]{2,50}?)(?:\s+to|\s*<\/td>)/i',
+        ];
+        
+        foreach ($htmlPatterns as $pattern) {
+            if (preg_match($pattern, $html, $matches)) {
+                $name = trim($matches[1]);
+                $name = $this->cleanExtractedName($name);
+                if ($this->isValidExtractedName($name)) {
+                    return $name;
+                }
+            }
+        }
+        
+        // Strip HTML and try text patterns
+        $text = strip_tags($html);
+        return $this->extractFromText($text);
+    }
+    
+    /**
+     * Extract from text content
+     */
+    protected function extractFromText(string $text): ?string
+    {
+        // Normalize whitespace
+        $text = preg_replace('/\s+/', ' ', $text);
+        
+        // Try patterns in priority order (most specific first)
         $patterns = [
-            '/from\s+([A-Z][A-Z\s]{2,30}?)(?:\s+to|\s+account|$)/i',
-            '/transfer\s+from\s+([A-Z][A-Z\s]{2,30}?)(?:\s+to|\s+account|$)/i',
-            '/sender[:\s]+([A-Z][A-Z\s]{2,30}?)(?:\s|$)/i',
+            // Pattern 1: "TRANSFER FROM: NAME TO ..." format
+            '/transfer\s+from[\s:]+([A-Z][A-Z\s\-]{3,50}?)\s+to/i',
+            
+            // Pattern 2: "Description : CODE-TRANSFER FROM: NAME TO ..."
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TRANSFER\s+FROM[\s:]+([A-Z][A-Z\s\-]{3,50}?)\s+TO/i',
+            
+            // Pattern 3: "TRANSFER FROM NAME-OPAY-..." or "TRANSFER FROM NAME-BANK-..."
+            '/transfer\s+from\s+([A-Z][A-Z\s\-]{3,50}?)(?:\s*-\s*(?:OPAY|GTBANK|ACCESS|ZENITH|UBA|FIRST\s+BANK|INNOCE))/i',
+            
+            // Pattern 4: "Description : CODE-TRANSFER FROM NAME-..."
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TRANSFER\s+FROM\s+([A-Z][A-Z\s\-]{3,50}?)(?:\s*-\s*(?:OPAY|GTBANK|ACCESS|ZENITH|UBA|FIRST\s+BANK|INNOCE))/i',
+            
+            // Pattern 5: "Description : CODE-TXN-CODE-CODE-NAME" format (handles quoted-printable)
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TXN-[\d\-]+-[A-Z]+=\s*[A-Z\-]*-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount)/i',
+            
+            // Pattern 3: "FROM OPAY/ NAME" or "FROM BANK/ NAME"
+            '/from\s+(?:[A-Z]+\/|OPAY\/|GTBANK\/|ACCESS\/|ZENITH\/|UBA\/|FIRST\s+BANK\/)\s*([A-Z][A-Z\s\-]{3,50}?)(?:\s*\/|\s*Support|\s*\||\s*$)/i',
+            
+            // Pattern 4: "received from NAME"
+            '/received\s+from\s+([A-Z][A-Z\s\-]{3,50}?)(?:\s*\||\s*$)/i',
+            
+            // Pattern 5: "FROM NAME TO" (standard format)
+            '/from\s+([A-Z][A-Z\s\-]{3,50}?)\s+to/i',
+            
+            // Pattern 6: "TRANSFER FROM NAME" (general)
+            '/transfer\s+from\s+([A-Z][A-Z\s\-]{3,50}?)(?:\s+to|\s+account|\s*$)/i',
+            
+            // Pattern 7: "Remarks : ... NAME" (extract name from remarks)
+            '/remark[s]?[\s:]+(?:NT|FROM|TRANSFER\s+FROM)?\s*([A-Z][A-Z\s\-]{3,50}?)(?:\s*\||\s*$)/i',
+            
+            // Pattern 8: Description field with code-name format "CODE-NAME TRF"
+            '/description[\s:]+(?:=\d+)?\s*(?:[\d\-\s]+-)?([A-Z][A-Z\s\-]{3,50}?)\s+(?:TRF|TRANSFER|FOR|TO)/i',
+            
+            // Pattern 9: Direct "CODE-NAME TRF" format
+            '/(?:[\d\-]+=?\d*\s*-)\s*([A-Z][A-Z\s\-]{3,50}?)\s+(?:TRF|TRANSFER|FOR|TO)/i',
+            
+            // Pattern 10: "Sender: NAME" or "Sender NAME"
+            '/sender[:\s]+([A-Z][A-Z\s\-]{3,50}?)(?:\s|$)/i',
+            
+            // Pattern 11: "Payer: NAME" or "Payer NAME"
+            '/payer[:\s]+([A-Z][A-Z\s\-]{3,50}?)(?:\s|$)/i',
         ];
         
         foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $combined, $matches)) {
+            if (preg_match($pattern, $text, $matches)) {
                 $name = trim($matches[1]);
-                if (strlen($name) >= 3 && strlen($name) <= 50 && !preg_match('/@/', $name)) {
+                
+                // Clean up the name
+                $name = $this->cleanExtractedName($name);
+                
+                // Validate name
+                if ($this->isValidExtractedName($name)) {
                     return $name;
                 }
             }
         }
         
         return null;
+    }
+    
+    /**
+     * Decode quoted-printable encoding
+     */
+    protected function decodeQuotedPrintable(string $text): string
+    {
+        // Decode quoted-printable encoding (=XX format)
+        $text = quoted_printable_decode($text);
+        
+        // Also handle =20 (space) and other common encodings
+        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function($matches) {
+            return chr(hexdec($matches[1]));
+        }, $text);
+        
+        // Handle =E2=80=AF (non-breaking space) and similar
+        $text = preg_replace('/=E2=80=AF/', ' ', $text);
+        $text = preg_replace('/=C2=A0/', ' ', $text);
+        
+        return $text;
+    }
+
+    /**
+     * Clean extracted name
+     */
+    protected function cleanExtractedName(string $name): string
+    {
+        // Remove leading/trailing dashes, numbers, and special chars
+        $name = preg_replace('/^[\d\-\s\/\|]+/', '', $name);
+        $name = preg_replace('/[\d\-\s\/\|]+$/', '', $name);
+        
+        // Remove quoted-printable artifacts
+        $name = preg_replace('/=\d+/', '', $name);
+        
+        // Remove email addresses
+        $name = preg_replace('/\S+@\S+/', '', $name);
+        
+        // Remove account numbers (long digit sequences)
+        $name = preg_replace('/\d{10,}/', '', $name);
+        
+        // Clean up multiple spaces
+        $name = preg_replace('/\s+/', ' ', $name);
+        
+        return trim($name);
+    }
+    
+    /**
+     * Validate extracted name
+     */
+    protected function isValidExtractedName(?string $name): bool
+    {
+        if (!$name || strlen($name) < 3 || strlen($name) > 100) {
+            return false;
+        }
+        
+        // Must not be an email address
+        if (preg_match('/@/', $name)) {
+            return false;
+        }
+        
+        // Must contain at least one letter
+        if (!preg_match('/[A-Za-z]/', $name)) {
+            return false;
+        }
+        
+        // Must not be just numbers or special chars
+        if (preg_match('/^[\d\s\-\/\|]+$/', $name)) {
+            return false;
+        }
+        
+        // Must not be common invalid patterns
+        $invalidPatterns = [
+            '/^(OPAY|GTBANK|ACCESS|ZENITH|UBA|FIRST\s+BANK|WEB|LOCATION|ACCOUNT|NUMBER)$/i',
+            '/^(SUPPORT|TRANSFER|TRF|FROM|TO|DESCRIPTION|REMARK)$/i',
+            '/thank\s+you\s+for\s+choosing/i',
+            '/guaranty\s+trust\s+bank/i',
+            '/limited$/i',
+            '/^thank\s+you/i',
+            '/regards/i',
+        ];
+        
+        foreach ($invalidPatterns as $pattern) {
+            if (preg_match($pattern, $name)) {
+                return false;
+            }
+        }
+        
+        // Must not be too long (likely not a name)
+        if (strlen($name) > 60) {
+            return false;
+        }
+        
+        return true;
     }
 
     /**
