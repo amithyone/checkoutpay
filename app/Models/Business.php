@@ -27,6 +27,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'email_account_id',
         'is_active',
         'balance',
+        'business_id',
     ];
 
     protected $hidden = [
@@ -53,6 +54,24 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
+     * Generate a unique 5-character business ID
+     */
+    public static function generateBusinessId(): string
+    {
+        do {
+            // Generate 5 random alphanumeric characters (uppercase letters and numbers)
+            $businessId = strtoupper(Str::random(5));
+            // Ensure it contains both letters and numbers
+            if (!preg_match('/[A-Z]/', $businessId) || !preg_match('/[0-9]/', $businessId)) {
+                // If it doesn't have both, regenerate
+                continue;
+            }
+        } while (self::where('business_id', $businessId)->exists());
+
+        return $businessId;
+    }
+
+    /**
      * Boot the model
      */
     protected static function boot()
@@ -62,6 +81,9 @@ class Business extends Authenticatable implements CanResetPasswordContract
         static::creating(function ($business) {
             if (empty($business->api_key)) {
                 $business->api_key = self::generateApiKey();
+            }
+            if (empty($business->business_id)) {
+                $business->business_id = self::generateBusinessId();
             }
         });
     }

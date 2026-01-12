@@ -10,7 +10,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-xs lg:text-sm text-white/80 mb-1">Business ID</p>
-                <h3 class="text-xl lg:text-2xl font-bold">{{ auth('business')->user()->id }}</h3>
+                <h3 class="text-xl lg:text-2xl font-bold font-mono">{{ auth('business')->user()->business_id ?? auth('business')->user()->id }}</h3>
                 <p class="text-xs text-white/70 mt-2">Use this ID for API integrations and support requests</p>
             </div>
             <div class="w-12 h-12 lg:w-16 lg:h-16 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
