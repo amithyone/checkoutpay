@@ -48,6 +48,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('businesses.approve-website');
         Route::post('businesses/{business}/reject-website', [BusinessController::class, 'rejectWebsite'])
             ->name('businesses.reject-website');
+        Route::post('businesses/{business}/toggle-status', [BusinessController::class, 'toggleStatus'])
+            ->name('businesses.toggle-status');
+        Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
+            ->name('businesses.update-balance');
+        
+        // Business KYC Management
+        Route::post('businesses/{business}/verification/{verification}/approve', [BusinessController::class, 'approveVerification'])
+            ->name('businesses.verification.approve');
+        Route::post('businesses/{business}/verification/{verification}/reject', [BusinessController::class, 'rejectVerification'])
+            ->name('businesses.verification.reject');
+        Route::get('businesses/{business}/verification/{verification}/download', [BusinessController::class, 'downloadVerificationDocument'])
+            ->name('businesses.verification.download');
 
         // Payments
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');

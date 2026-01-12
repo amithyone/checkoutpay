@@ -5,13 +5,29 @@
 
 @section('content')
 <div class="space-y-6">
-    <!-- Business Info -->
+    <!-- Business Info Card -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-semibold text-gray-900">{{ $business->name }}</h3>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">{{ $business->name }}</h3>
+                <p class="text-sm text-gray-500 mt-1">Registered: {{ $business->created_at->format('M d, Y') }}</p>
+            </div>
             <div class="flex items-center space-x-3">
+                <form action="{{ route('admin.businesses.toggle-status', $business) }}" method="POST" class="inline">
+                    @csrf
+                    @if($business->is_active)
+                        <button type="submit" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
+                            onclick="return confirm('Are you sure you want to deactivate this business?')">
+                            <i class="fas fa-ban mr-2"></i> Deactivate
+                        </button>
+                    @else
+                        <button type="submit" class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm">
+                            <i class="fas fa-check mr-2"></i> Activate
+                        </button>
+                    @endif
+                </form>
                 <a href="{{ route('admin.businesses.edit', $business) }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                    Edit
+                    <i class="fas fa-edit mr-2"></i> Edit
                 </a>
                 @if($business->is_active)
                     <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">Active</span>
@@ -21,34 +37,43 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-                <label class="text-sm text-gray-600">Email</label>
-                <p class="text-sm font-medium text-gray-900">{{ $business->email }}</p>
+                <label class="text-xs text-gray-600">Email</label>
+                <p class="text-sm font-medium text-gray-900 mt-1">{{ $business->email }}</p>
             </div>
             <div>
-                <label class="text-sm text-gray-600">Phone</label>
-                <p class="text-sm font-medium text-gray-900">{{ $business->phone ?? 'N/A' }}</p>
+                <label class="text-xs text-gray-600">Phone</label>
+                <p class="text-sm font-medium text-gray-900 mt-1">{{ $business->phone ?? 'N/A' }}</p>
             </div>
             <div>
-                <label class="text-sm text-gray-600">Website</label>
+                <label class="text-xs text-gray-600">Address</label>
+                <p class="text-sm font-medium text-gray-900 mt-1">{{ $business->address ?? 'N/A' }}</p>
+            </div>
+            <div>
+                <label class="text-xs text-gray-600">Website</label>
                 @if($business->website)
-                    <p class="text-sm font-medium text-gray-900">
+                    <p class="text-sm font-medium text-gray-900 mt-1">
                         <a href="{{ $business->website }}" target="_blank" class="text-primary hover:underline">
                             {{ $business->website }} <i class="fas fa-external-link-alt text-xs"></i>
                         </a>
                     </p>
                 @else
-                    <p class="text-sm text-gray-500">Not provided</p>
+                    <p class="text-sm text-gray-500 mt-1">Not provided</p>
                 @endif
             </div>
             <div>
-                <label class="text-sm text-gray-600">Balance</label>
-                <p class="text-lg font-bold text-gray-900">₦{{ number_format($business->balance, 2) }}</p>
+                <label class="text-xs text-gray-600">Balance</label>
+                <div class="flex items-center justify-between mt-1">
+                    <p class="text-lg font-bold text-gray-900">₦{{ number_format($business->balance, 2) }}</p>
+                    <button onclick="showBalanceModal()" class="text-xs text-primary hover:underline">
+                        <i class="fas fa-edit mr-1"></i> Update
+                    </button>
+                </div>
             </div>
             <div>
-                <label class="text-sm text-gray-600">Webhook URL</label>
-                <p class="text-sm font-medium text-gray-900">{{ $business->webhook_url ?? 'N/A' }}</p>
+                <label class="text-xs text-gray-600">Webhook URL</label>
+                <p class="text-sm font-medium text-gray-900 mt-1 break-all">{{ $business->webhook_url ?? 'N/A' }}</p>
             </div>
         </div>
 
@@ -61,57 +86,179 @@
                     @csrf
                     <button type="submit" class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 text-sm"
                         onclick="return confirm('Are you sure? This will invalidate the current API key.')">
-                        Regenerate
+                        <i class="fas fa-sync-alt mr-2"></i> Regenerate
                     </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Website Approval -->
+    <!-- Website Approval Section -->
     @if($business->website)
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Website Approval</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-globe mr-2 text-primary"></i> Website Approval
+        </h3>
         <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600 mb-2">Website Status</p>
-                @if($business->website_approved)
-                    <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
-                        <i class="fas fa-check-circle mr-2"></i> Approved
-                    </span>
-                    <p class="text-xs text-gray-500 mt-2">Business can request account numbers</p>
-                @else
-                    <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                        <i class="fas fa-clock mr-2"></i> Pending Approval
-                    </span>
-                    <p class="text-xs text-gray-500 mt-2">Business cannot request account numbers until approved</p>
-                @endif
+            <div class="flex-1">
+                <div class="mb-3">
+                    <p class="text-sm text-gray-600 mb-2">Website URL</p>
+                    <a href="{{ $business->website }}" target="_blank" class="text-sm text-primary hover:underline">
+                        {{ $business->website }} <i class="fas fa-external-link-alt text-xs"></i>
+                    </a>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600 mb-2">Approval Status</p>
+                    @if($business->website_approved)
+                        <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
+                            <i class="fas fa-check-circle mr-2"></i> Approved
+                        </span>
+                        <p class="text-xs text-gray-500 mt-2">Business can request account numbers and use API</p>
+                    @else
+                        <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                            <i class="fas fa-clock mr-2"></i> Pending Approval
+                        </span>
+                        <p class="text-xs text-gray-500 mt-2">Business cannot request account numbers until approved</p>
+                    @endif
+                </div>
             </div>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-3 ml-6">
                 @if(!$business->website_approved)
-                    <form action="{{ route('admin.businesses.approve-website', $business) }}" method="POST" class="inline">
-                        @csrf
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                            <i class="fas fa-check mr-2"></i> Approve Website
-                        </button>
-                    </form>
+                    <button onclick="showApproveWebsiteModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-check mr-2"></i> Approve Website
+                    </button>
                 @else
-                    <form action="{{ route('admin.businesses.reject-website', $business) }}" method="POST" class="inline">
-                        @csrf
-                        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            onclick="return confirm('Are you sure you want to revoke website approval? This will prevent the business from requesting account numbers.')">
-                            <i class="fas fa-times mr-2"></i> Revoke Approval
-                        </button>
-                    </form>
+                    <button onclick="showRejectWebsiteModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                        <i class="fas fa-times mr-2"></i> Revoke Approval
+                    </button>
                 @endif
             </div>
         </div>
     </div>
+    @else
+    <div class="bg-gray-50 rounded-lg border border-gray-200 p-6">
+        <p class="text-sm text-gray-600">
+            <i class="fas fa-info-circle mr-2"></i> No website provided by this business.
+        </p>
+    </div>
     @endif
+
+    <!-- KYC Verification Section -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-id-card mr-2 text-primary"></i> KYC Verification
+            </h3>
+            <div>
+                @if($business->verifications->count() > 0)
+                    @php
+                        $latestVerification = $business->verifications->first();
+                    @endphp
+                    @if($latestVerification->status === 'approved')
+                        <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
+                            <i class="fas fa-check-circle mr-1"></i> Verified
+                        </span>
+                    @elseif(in_array($latestVerification->status, ['pending', 'under_review']))
+                        <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                            <i class="fas fa-clock mr-1"></i> Under Review
+                        </span>
+                    @else
+                        <span class="px-3 py-1 text-sm font-medium bg-red-100 text-red-800 rounded-full">
+                            <i class="fas fa-times-circle mr-1"></i> Rejected
+                        </span>
+                    @endif
+                @else
+                    <span class="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">
+                        <i class="fas fa-exclamation-circle mr-1"></i> Not Submitted
+                    </span>
+                @endif
+            </div>
+        </div>
+
+        @if($business->verifications->count() > 0)
+            <div class="space-y-4">
+                @foreach($business->verifications as $verification)
+                <div class="border border-gray-200 rounded-lg p-4 {{ $verification->status === 'approved' ? 'bg-green-50' : ($verification->status === 'rejected' ? 'bg-red-50' : 'bg-yellow-50') }}">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3 mb-2">
+                                <h4 class="text-sm font-semibold text-gray-900">
+                                    {{ ucfirst(str_replace('_', ' ', $verification->verification_type)) }} Verification
+                                </h4>
+                                @if($verification->status === 'approved')
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
+                                @elseif($verification->status === 'rejected')
+                                    <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
+                                @elseif($verification->status === 'under_review')
+                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Under Review</span>
+                                @else
+                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Pending</span>
+                                @endif
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
+                                <div>
+                                    <span class="font-medium">Document Type:</span> {{ ucfirst(str_replace('_', ' ', $verification->document_type ?? 'N/A')) }}
+                                </div>
+                                <div>
+                                    <span class="font-medium">Submitted:</span> {{ $verification->created_at->format('M d, Y H:i') }}
+                                </div>
+                                @if($verification->reviewed_at)
+                                <div>
+                                    <span class="font-medium">Reviewed:</span> {{ $verification->reviewed_at->format('M d, Y H:i') }}
+                                </div>
+                                @if($verification->reviewer)
+                                <div>
+                                    <span class="font-medium">Reviewed By:</span> {{ $verification->reviewer->name }}
+                                </div>
+                                @endif
+                                @endif
+                            </div>
+                            @if($verification->admin_notes)
+                            <div class="mt-2 p-2 bg-white rounded border border-gray-200">
+                                <p class="text-xs text-gray-600"><strong>Admin Notes:</strong> {{ $verification->admin_notes }}</p>
+                            </div>
+                            @endif
+                            @if($verification->rejection_reason)
+                            <div class="mt-2 p-2 bg-red-100 rounded border border-red-200">
+                                <p class="text-xs text-red-800"><strong>Rejection Reason:</strong> {{ $verification->rejection_reason }}</p>
+                            </div>
+                            @endif
+                        </div>
+                        <div class="ml-4 flex flex-col space-y-2">
+                            @if($verification->document_path)
+                                <a href="{{ route('admin.businesses.verification.download', [$business, $verification]) }}" 
+                                   class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs text-center">
+                                    <i class="fas fa-download mr-1"></i> Download
+                                </a>
+                            @endif
+                            @if(in_array($verification->status, ['pending', 'under_review']))
+                                <button onclick="showApproveKYCModal({{ $verification->id }})" 
+                                        class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs">
+                                    <i class="fas fa-check mr-1"></i> Approve
+                                </button>
+                                <button onclick="showRejectKYCModal({{ $verification->id }})" 
+                                        class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs">
+                                    <i class="fas fa-times mr-1"></i> Reject
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        @else
+            <div class="text-center py-8">
+                <i class="fas fa-id-card text-gray-300 text-4xl mb-3"></i>
+                <p class="text-sm text-gray-500">No KYC verification documents submitted yet.</p>
+            </div>
+        @endif
+    </div>
 
     <!-- Account Numbers -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Account Numbers</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-credit-card mr-2 text-primary"></i> Account Numbers
+        </h3>
         @if($business->accountNumbers->count() > 0)
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -121,6 +268,7 @@
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Account Name</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bank</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Usage</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
@@ -130,6 +278,13 @@
                             <td class="px-4 py-2 text-sm text-gray-600">{{ $account->account_name }}</td>
                             <td class="px-4 py-2 text-sm text-gray-600">{{ $account->bank_name }}</td>
                             <td class="px-4 py-2 text-sm text-gray-600">{{ $account->usage_count }}</td>
+                            <td class="px-4 py-2">
+                                @if($account->is_active)
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>
+                                @else
+                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Inactive</span>
+                                @endif
+                            </td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -142,7 +297,14 @@
 
     <!-- Recent Payments -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Payments</h3>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-exchange-alt mr-2 text-primary"></i> Recent Payments
+            </h3>
+            <a href="{{ route('admin.payments.index', ['business_id' => $business->id]) }}" class="text-sm text-primary hover:underline">
+                View All
+            </a>
+        </div>
         @if($business->payments->count() > 0)
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -182,5 +344,236 @@
             <p class="text-sm text-gray-500">No payments yet.</p>
         @endif
     </div>
+
+    <!-- Recent Withdrawals -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-hand-holding-usd mr-2 text-primary"></i> Recent Withdrawals
+            </h3>
+            <a href="{{ route('admin.withdrawals.index', ['business_id' => $business->id]) }}" class="text-sm text-primary hover:underline">
+                View All
+            </a>
+        </div>
+        @if($business->withdrawalRequests->count() > 0)
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        @foreach($business->withdrawalRequests->take(10) as $withdrawal)
+                        <tr>
+                            <td class="px-4 py-2 text-sm font-medium text-gray-900">₦{{ number_format($withdrawal->amount, 2) }}</td>
+                            <td class="px-4 py-2">
+                                @if($withdrawal->status === 'approved')
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
+                                @elseif($withdrawal->status === 'pending')
+                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
+                                @elseif($withdrawal->status === 'rejected')
+                                    <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
+                                @else
+                                    <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Processed</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-600">{{ $withdrawal->created_at->format('M d, Y') }}</td>
+                            <td class="px-4 py-2">
+                                <a href="{{ route('admin.withdrawals.show', $withdrawal) }}" class="text-sm text-primary hover:underline">View</a>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="text-sm text-gray-500">No withdrawals yet.</p>
+        @endif
+    </div>
 </div>
+
+<!-- Approve Website Modal -->
+<div id="approveWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Approve Website</h3>
+        <form action="{{ route('admin.businesses.approve-website', $business) }}" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Admin Notes (Optional)</label>
+                <textarea name="notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Add any notes about this approval..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeApproveWebsiteModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    Approve Website
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Reject Website Modal -->
+<div id="rejectWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Revoke Website Approval</h3>
+        <form action="{{ route('admin.businesses.reject-website', $business) }}" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Rejection Reason <span class="text-red-500">*</span></label>
+                <textarea name="rejection_reason" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Please provide a reason for revoking approval..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeRejectWebsiteModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    Revoke Approval
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Approve KYC Modal -->
+<div id="approveKYCModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Approve KYC Verification</h3>
+        <form id="approveKYCForm" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Admin Notes (Optional)</label>
+                <textarea name="admin_notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Add any notes about this approval..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeApproveKYCModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    Approve Verification
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Reject KYC Modal -->
+<div id="rejectKYCModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Reject KYC Verification</h3>
+        <form id="rejectKYCForm" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Rejection Reason <span class="text-red-500">*</span></label>
+                <textarea name="rejection_reason" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Please provide a reason for rejection..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeRejectKYCModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    Reject Verification
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Update Balance Modal -->
+<div id="balanceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Update Balance</h3>
+        <form action="{{ route('admin.businesses.update-balance', $business) }}" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Current Balance</label>
+                <p class="text-lg font-bold text-gray-900">₦{{ number_format($business->balance, 2) }}</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">New Balance <span class="text-red-500">*</span></label>
+                <input type="number" name="balance" step="0.01" min="0" required value="{{ $business->balance }}"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Reason for balance update..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeBalanceModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    Update Balance
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+function showApproveWebsiteModal() {
+    document.getElementById('approveWebsiteModal').classList.remove('hidden');
+}
+
+function closeApproveWebsiteModal() {
+    document.getElementById('approveWebsiteModal').classList.add('hidden');
+}
+
+function showRejectWebsiteModal() {
+    document.getElementById('rejectWebsiteModal').classList.remove('hidden');
+}
+
+function closeRejectWebsiteModal() {
+    document.getElementById('rejectWebsiteModal').classList.add('hidden');
+}
+
+function showApproveKYCModal(verificationId) {
+    const form = document.getElementById('approveKYCForm');
+    form.action = '{{ route("admin.businesses.verification.approve", [$business, ":id"]) }}'.replace(':id', verificationId);
+    document.getElementById('approveKYCModal').classList.remove('hidden');
+}
+
+function closeApproveKYCModal() {
+    document.getElementById('approveKYCModal').classList.add('hidden');
+}
+
+function showRejectKYCModal(verificationId) {
+    const form = document.getElementById('rejectKYCForm');
+    form.action = '{{ route("admin.businesses.verification.reject", [$business, ":id"]) }}'.replace(':id', verificationId);
+    document.getElementById('rejectKYCModal').classList.remove('hidden');
+}
+
+function closeRejectKYCModal() {
+    document.getElementById('rejectKYCModal').classList.add('hidden');
+}
+
+function showBalanceModal() {
+    document.getElementById('balanceModal').classList.remove('hidden');
+}
+
+function closeBalanceModal() {
+    document.getElementById('balanceModal').classList.add('hidden');
+}
+
+// Close modals when clicking outside
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('bg-black')) {
+        document.querySelectorAll('[id$="Modal"]').forEach(modal => {
+            modal.classList.add('hidden');
+        });
+    }
+});
+</script>
+@endpush
 @endsection
