@@ -125,8 +125,14 @@ class Payment extends Model
         ];
 
         // Update payer_name, bank, and payer_account_number from email_data if provided
-        if (!empty($emailData['payer_name'])) {
-            $updateData['payer_name'] = $emailData['payer_name'];
+        // Map sender_name to payer_name if payer_name is not set (they are the same)
+        $payerName = $emailData['payer_name'] ?? $emailData['sender_name'] ?? null;
+        if (!empty($payerName)) {
+            $updateData['payer_name'] = strtolower(trim($payerName));
+        }
+        // If payment doesn't have payer_name but email has sender_name, use it
+        if (empty($this->payer_name) && !empty($emailData['sender_name'])) {
+            $updateData['payer_name'] = strtolower(trim($emailData['sender_name']));
         }
         if (!empty($emailData['bank'])) {
             $updateData['bank'] = $emailData['bank'];

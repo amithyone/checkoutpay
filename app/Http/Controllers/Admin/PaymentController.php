@@ -245,6 +245,7 @@ class PaymentController extends Controller
                         'text' => $storedEmail->text_body,
                         'html' => $storedEmail->html_body,
                         'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                        'sender_name' => $storedEmail->sender_name, // Map sender_name to payer_name
                     ]);
                     
                     // Update payer_account_number if extracted

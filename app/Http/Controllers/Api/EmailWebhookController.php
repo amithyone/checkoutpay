@@ -396,6 +396,7 @@ class EmailWebhookController extends Controller
                             'text' => $processedEmail->text_body,
                             'html' => $processedEmail->html_body,
                             'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                            'sender_name' => $processedEmail->sender_name, // Map sender_name to payer_name
                         ], [
                             'name_mismatch' => $nameMismatch,
                             'name_similarity_percent' => $matchResult['name_similarity_percent'] ?? null,
