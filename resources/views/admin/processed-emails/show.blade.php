@@ -268,11 +268,7 @@ function updateAndRematch(emailId) {
     const input = document.getElementById('sender-name-input');
     const senderName = input.value.trim();
     
-    if (!senderName) {
-        alert('Please enter a sender name before rematching');
-        return;
-    }
-
+    // Allow empty - system will try to extract from text snippet
     if (!confirm('Update the sender name and retry matching this email against all pending payments?')) {
         return;
     }
@@ -284,16 +280,18 @@ function updateAndRematch(emailId) {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
         body: JSON.stringify({
-            sender_name: senderName
+            sender_name: senderName || null
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             alert('✅ ' + data.message);
-            if (data.payment) {
-                window.location.href = '/admin/payments/' + data.payment.id;
+            if (data.payment && data.redirect_url) {
+                // Redirect to payment page if matched (payment will show as approved)
+                window.location.href = data.redirect_url;
             } else {
+                // Reload page to show updated status
                 window.location.reload();
             }
         } else {
