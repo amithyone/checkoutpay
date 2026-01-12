@@ -198,6 +198,33 @@
                 </label>
             </div>
             <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Link Email (Optional)</label>
+                <select name="email_id" id="email-select-{{ $payment->id }}"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm">
+                    <option value="">-- No email link --</option>
+                    @php
+                        // Get unmatched emails for this payment
+                        $unmatchedEmails = \App\Models\ProcessedEmail::unmatched()
+                            ->where(function($q) use ($payment) {
+                                $q->where('amount', $payment->amount)
+                                  ->orWhereBetween('amount', [$payment->amount - 50, $payment->amount + 50]);
+                            })
+                            ->when($payment->business && $payment->business->email_account_id, function($q) use ($payment) {
+                                $q->where('email_account_id', $payment->business->email_account_id);
+                            })
+                            ->latest()
+                            ->limit(10)
+                            ->get();
+                    @endphp
+                    @foreach($unmatchedEmails as $email)
+                        <option value="{{ $email->id }}">
+                            {{ Str::limit($email->subject, 40) }} - ₦{{ number_format($email->amount ?? 0, 2) }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Select an email to link to this transaction. This will include email data in the webhook sent to the business.</p>
+            </div>
+            <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Admin Notes</label>
                 <textarea name="admin_notes" rows="3" 
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 

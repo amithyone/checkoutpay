@@ -264,6 +264,22 @@
                 </label>
             </div>
             <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Link Email (Optional)</label>
+                <select name="email_id" id="email-select"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm">
+                    <option value="">-- No email link --</option>
+                    @if(isset($unmatchedEmails) && $unmatchedEmails->count() > 0)
+                        @foreach($unmatchedEmails as $email)
+                            <option value="{{ $email->id }}">
+                                {{ $email->subject }} - {{ $email->from_email }} - ₦{{ number_format($email->amount ?? 0, 2) }} 
+                                ({{ $email->email_date ? $email->email_date->format('M d, Y H:i') : 'No date' }})
+                            </option>
+                        @endforeach
+                    @endif
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Select an email to link to this transaction. This will include email data in the webhook sent to the business.</p>
+            </div>
+            <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Admin Notes</label>
                 <textarea name="admin_notes" rows="3" 
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 

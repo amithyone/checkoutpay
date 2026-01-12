@@ -99,8 +99,23 @@ class PaymentController extends Controller
         $statusChecksCount = \App\Models\PaymentStatusCheck::where('payment_id', $payment->id)
             ->where('payment_status', Payment::STATUS_PENDING)
             ->count();
+
+        // Get unmatched emails that could be linked to this payment (same amount, same email account if applicable)
+        $unmatchedEmails = \App\Models\ProcessedEmail::unmatched()
+            ->where(function($q) use ($payment) {
+                // Match by amount (within reasonable range)
+                $q->where('amount', $payment->amount)
+                  ->orWhereBetween('amount', [$payment->amount - 50, $payment->amount + 50]);
+            })
+            ->when($payment->business && $payment->business->email_account_id, function($q) use ($payment) {
+                // Filter by email account if business has one assigned
+                $q->where('email_account_id', $payment->business->email_account_id);
+            })
+            ->latest()
+            ->limit(20)
+            ->get();
             
-        return view('admin.payments.show', compact('payment', 'statusChecksCount'));
+        return view('admin.payments.show', compact('payment', 'statusChecksCount', 'unmatchedEmails'));
     }
 
     /**
@@ -292,6 +307,7 @@ class PaymentController extends Controller
             'admin_notes' => 'nullable|string|max:1000',
             'received_amount' => 'nullable|numeric|min:0',
             'is_mismatch' => 'boolean',
+            'email_id' => 'nullable|exists:processed_emails,id',
         ]);
 
         // Only allow manual approval for pending payments
@@ -303,14 +319,62 @@ class PaymentController extends Controller
         $receivedAmount = $request->received_amount ?? $payment->amount;
         $isMismatch = $request->is_mismatch ?? ($receivedAmount != $payment->amount);
 
+        // Get email data if email is linked
+        $emailData = $payment->email_data ?? [];
+        $linkedEmail = null;
+
+        if ($request->email_id) {
+            $linkedEmail = \App\Models\ProcessedEmail::find($request->email_id);
+            if ($linkedEmail && !$linkedEmail->is_matched) {
+                // Link email to payment
+                $linkedEmail->markAsMatched($payment);
+
+                // Extract payment info from email for webhook
+                $matchingService = new \App\Services\PaymentMatchingService(
+                    new \App\Services\TransactionLogService()
+                );
+                
+                $emailDataForExtraction = [
+                    'subject' => $linkedEmail->subject,
+                    'from' => $linkedEmail->from_email,
+                    'text' => $linkedEmail->text_body ?? '',
+                    'html' => $linkedEmail->html_body ?? '',
+                    'date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : null,
+                ];
+
+                $extractionResult = $matchingService->extractPaymentInfo($emailDataForExtraction);
+                $extractedInfo = is_array($extractionResult) && isset($extractionResult['data']) 
+                    ? $extractionResult['data'] 
+                    : $extractionResult;
+
+                // Build email data for approval
+                $emailData = array_merge([
+                    'subject' => $linkedEmail->subject,
+                    'from' => $linkedEmail->from_email,
+                    'text' => $linkedEmail->text_body ?? '',
+                    'html' => $linkedEmail->html_body ?? '',
+                    'date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                    'payer_name' => $extractedInfo['sender_name'] ?? $payment->payer_name,
+                    'bank' => $extractedInfo['bank'] ?? null,
+                    'payer_account_number' => $extractedInfo['account_number'] ?? null,
+                    'transaction_date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                ], $extractedInfo ?? []);
+            }
+        }
+
+        // Merge with manual approval metadata
+        $emailData = array_merge($emailData, [
+            'manual_approval' => true,
+            'approved_by' => auth('admin')->user()->id,
+            'approved_by_name' => auth('admin')->user()->name,
+            'approved_at' => now()->toDateTimeString(),
+            'admin_notes' => $request->admin_notes,
+            'linked_email_id' => $linkedEmail?->id,
+        ]);
+
         // Approve payment
         $payment->approve(
-            emailData: array_merge($payment->email_data ?? [], [
-                'manual_approval' => true,
-                'approved_by' => auth('admin')->user()->id,
-                'approved_at' => now()->toDateTimeString(),
-                'admin_notes' => $request->admin_notes,
-            ]),
+            emailData: $emailData,
             isMismatch: $isMismatch,
             receivedAmount: $receivedAmount,
             mismatchReason: $isMismatch ? ($request->admin_notes ?? 'Manual approval with amount mismatch') : null
@@ -328,13 +392,14 @@ class PaymentController extends Controller
             'admin_id' => auth('admin')->id(),
             'received_amount' => $receivedAmount,
             'expected_amount' => $payment->amount,
+            'linked_email_id' => $linkedEmail?->id,
         ]);
 
-        // Dispatch event to send webhook
+        // Dispatch event to send webhook to business
         event(new \App\Events\PaymentApproved($payment));
 
         return redirect()->route('admin.payments.show', $payment)
-            ->with('success', 'Payment manually approved and business credited successfully.');
+            ->with('success', 'Payment manually approved, business credited, and webhook sent successfully.');
     }
 
     /**
@@ -347,6 +412,7 @@ class PaymentController extends Controller
                 $q->latest()
                   ->limit(5);
             }])
+            ->with('accountNumberDetails')
             ->where('status', Payment::STATUS_PENDING)
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
