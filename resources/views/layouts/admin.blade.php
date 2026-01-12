@@ -68,14 +68,12 @@
                     <i class="fas fa-exclamation-triangle w-5 mr-3"></i>
                     <span>Needs Review</span>
                     @php
-                        $needsReviewCount = \App\Models\Payment::withCount(['matchAttempts' => function($q) {
-                            $q->where('match_result', \App\Models\MatchAttempt::RESULT_UNMATCHED);
-                        }])
+                        $needsReviewCount = \App\Models\Payment::withCount('statusChecks')
                         ->where('status', \App\Models\Payment::STATUS_PENDING)
                         ->where(function ($q) {
                             $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                         })
-                        ->having('match_attempts_count', '>=', 3)
+                        ->having('status_checks_count', '>=', 3)
                         ->count();
                     @endphp
                     @if($needsReviewCount > 0)

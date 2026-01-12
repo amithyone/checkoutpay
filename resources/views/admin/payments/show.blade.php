@@ -9,10 +9,10 @@
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Transaction: {{ $payment->transaction_id }}</h3>
-                @if($matchAttemptsCount >= 3)
+                @if($statusChecksCount >= 3)
                     <div class="mt-2 flex items-center space-x-2">
                         <span class="px-3 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-                            <i class="fas fa-exclamation-triangle mr-1"></i> Needs Review ({{ $matchAttemptsCount }} failed attempts)
+                            <i class="fas fa-exclamation-triangle mr-1"></i> Needs Review ({{ $statusChecksCount }} API checks)
                         </span>
                         <a href="{{ route('admin.payments.needs-review') }}" class="text-xs text-primary hover:underline">
                             View All Needing Review
@@ -95,6 +95,47 @@
             @endif
         </div>
 
+        <!-- API Status Checks Section -->
+        @if($payment->statusChecks->count() > 0)
+        <div class="mt-6 pt-6 border-t border-gray-200">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-md font-semibold text-gray-900">
+                    <i class="fas fa-sync-alt text-primary mr-2"></i>API Status Checks ({{ $payment->statusChecks->count() }})
+                </h4>
+                @if($statusChecksCount >= 3)
+                    <span class="px-3 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                        Needs Review
+                    </span>
+                @endif
+            </div>
+            <div class="space-y-3">
+                @foreach($payment->statusChecks->take(5) as $check)
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-3">
+                            <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                <i class="fas fa-api mr-1"></i> API Check
+                            </span>
+                            @if($check->business)
+                                <span class="text-xs text-gray-600">
+                                    Business: {{ $check->business->name }}
+                                </span>
+                            @endif
+                            @if($check->ip_address)
+                                <span class="text-xs text-gray-500">
+                                    IP: {{ $check->ip_address }}
+                                </span>
+                            @endif
+                        </div>
+                        <span class="text-xs text-gray-500">{{ $check->created_at->format('M d, H:i') }}</span>
+                    </div>
+                    <p class="text-xs text-gray-600">Status at check: <span class="font-medium">{{ ucfirst($check->payment_status) }}</span></p>
+                </div>
+                @endforeach
+            </div>
+        </div>
+        @endif
+
         <!-- Match Attempts Section -->
         @if($payment->matchAttempts->count() > 0)
         <div class="mt-6 pt-6 border-t border-gray-200">
@@ -140,14 +181,6 @@
                     <p class="text-sm text-gray-700">{{ Str::limit($attempt->reason, 150) }}</p>
                 </div>
                 @endforeach
-            </div>
-        </div>
-        @elseif($payment->status === 'pending')
-        <div class="mt-6 pt-6 border-t border-gray-200">
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p class="text-sm text-yellow-800">
-                    <i class="fas fa-info-circle mr-2"></i> No match attempts yet. The system will automatically check for matching emails.
-                </p>
             </div>
         </div>
         @endif

@@ -160,4 +160,12 @@ class Payment extends Model
     {
         return $this->hasMany(MatchAttempt::class);
     }
+
+    /**
+     * Get status checks for this payment (API calls by business)
+     */
+    public function statusChecks()
+    {
+        return $this->hasMany(PaymentStatusCheck::class);
+    }
 }

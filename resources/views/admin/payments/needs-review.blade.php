@@ -12,7 +12,7 @@
             <div class="flex-1">
                 <h3 class="text-lg font-semibold text-yellow-900 mb-2">Transactions Requiring Manual Review</h3>
                 <p class="text-sm text-yellow-800">
-                    These transactions have been checked 3 or more times but still haven't matched automatically. 
+                    These transactions have been checked 3 or more times by the business via API but are still pending. 
                     Please review them manually and approve if the payment was received.
                 </p>
             </div>
@@ -60,7 +60,7 @@
                     <div class="flex items-center space-x-3 mb-2">
                         <h3 class="text-lg font-semibold text-gray-900">{{ $payment->transaction_id }}</h3>
                         <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-                            {{ $payment->match_attempts_count }} Failed Attempts
+                            {{ $payment->status_checks_count }} API Checks
                         </span>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -94,20 +94,23 @@
                 </div>
             </div>
 
-            <!-- Recent Match Attempts -->
-            @if($payment->matchAttempts->count() > 0)
+            <!-- Recent API Status Checks -->
+            @if($payment->statusChecks->count() > 0)
             <div class="mt-4 pt-4 border-t border-gray-200">
-                <h4 class="text-sm font-semibold text-gray-900 mb-3">Recent Match Attempts</h4>
+                <h4 class="text-sm font-semibold text-gray-900 mb-3">Recent API Status Checks</h4>
                 <div class="space-y-2">
-                    @foreach($payment->matchAttempts->take(3) as $attempt)
+                    @foreach($payment->statusChecks->take(3) as $check)
                     <div class="bg-gray-50 rounded p-3 text-xs">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="font-medium text-gray-700">{{ $attempt->created_at->format('M d, H:i') }}</span>
-                            <span class="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded">Unmatched</span>
+                            <span class="font-medium text-gray-700">{{ $check->created_at->format('M d, H:i') }}</span>
+                            <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded">API Check</span>
                         </div>
-                        <p class="text-gray-600">{{ Str::limit($attempt->reason, 100) }}</p>
-                        @if($attempt->amount_diff)
-                            <p class="text-gray-500 mt-1">Amount difference: ₦{{ number_format(abs($attempt->amount_diff), 2) }}</p>
+                        <p class="text-gray-600">
+                            Business: {{ $check->business->name ?? 'N/A' }} | 
+                            Status: <span class="font-medium">{{ ucfirst($check->payment_status) }}</span>
+                        </p>
+                        @if($check->ip_address)
+                            <p class="text-gray-500 mt-1">IP: {{ $check->ip_address }}</p>
                         @endif
                     </div>
                     @endforeach

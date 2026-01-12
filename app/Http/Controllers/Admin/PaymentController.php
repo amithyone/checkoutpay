@@ -15,7 +15,7 @@ class PaymentController extends Controller
     public function index(Request $request): View
     {
         $query = Payment::with('business')
-            ->withCount('matchAttempts')
+            ->withCount(['matchAttempts', 'statusChecks'])
             ->latest();
 
         if ($request->has('status')) {
@@ -56,13 +56,14 @@ class PaymentController extends Controller
                 });
         }
 
-        // Filter for transactions needing review (multiple failed match attempts)
+        // Filter for transactions needing review (multiple API status checks)
         if ($request->has('needs_review') && $request->needs_review === '1') {
             $query->where('status', Payment::STATUS_PENDING)
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 })
-                ->having('match_attempts_count', '>=', 3); // 3 or more failed attempts
+                ->withCount('statusChecks')
+                ->having('status_checks_count', '>=', 3); // 3 or more API checks
         }
 
         if ($request->has('business_id')) {
@@ -89,14 +90,17 @@ class PaymentController extends Controller
             'accountNumberDetails',
             'matchAttempts' => function($q) {
                 $q->latest()->limit(10);
+            },
+            'statusChecks' => function($q) {
+                $q->latest()->limit(10);
             }
         ]);
         
-        $matchAttemptsCount = MatchAttempt::where('payment_id', $payment->id)
-            ->where('match_result', MatchAttempt::RESULT_UNMATCHED)
+        $statusChecksCount = \App\Models\PaymentStatusCheck::where('payment_id', $payment->id)
+            ->where('payment_status', Payment::STATUS_PENDING)
             ->count();
             
-        return view('admin.payments.show', compact('payment', 'matchAttemptsCount'));
+        return view('admin.payments.show', compact('payment', 'statusChecksCount'));
     }
 
     /**
@@ -334,24 +338,21 @@ class PaymentController extends Controller
     }
 
     /**
-     * Show transactions needing review (multiple failed match attempts)
+     * Show transactions needing review (multiple API status checks by business)
      */
     public function needsReview(Request $request): View
     {
-        // Get payments with 3+ failed match attempts that are still pending
-        $query = Payment::with(['business', 'matchAttempts' => function($q) {
-                $q->where('match_result', MatchAttempt::RESULT_UNMATCHED)
-                  ->latest()
+        // Get payments with 3+ API status checks by business that are still pending
+        $query = Payment::with(['business', 'statusChecks' => function($q) {
+                $q->latest()
                   ->limit(5);
             }])
             ->where('status', Payment::STATUS_PENDING)
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
-            ->withCount(['matchAttempts' => function($q) {
-                $q->where('match_result', MatchAttempt::RESULT_UNMATCHED);
-            }])
-            ->having('match_attempts_count', '>=', 3)
+            ->withCount('statusChecks')
+            ->having('status_checks_count', '>=', 3)
             ->latest();
 
         // Filter by business

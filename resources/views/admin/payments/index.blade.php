@@ -14,14 +14,12 @@
         <a href="{{ route('admin.payments.needs-review') }}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center">
             <i class="fas fa-exclamation-triangle mr-2"></i> Needs Review
             @php
-                $needsReviewCount = \App\Models\Payment::withCount(['matchAttempts' => function($q) {
-                    $q->where('match_result', \App\Models\MatchAttempt::RESULT_UNMATCHED);
-                }])
+                $needsReviewCount = \App\Models\Payment::withCount('statusChecks')
                 ->where('status', \App\Models\Payment::STATUS_PENDING)
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 })
-                ->having('match_attempts_count', '>=', 3)
+                ->having('status_checks_count', '>=', 3)
                 ->count();
             @endphp
             @if($needsReviewCount > 0)
@@ -134,8 +132,8 @@
                                         title="Check Match">
                                         <i class="fas fa-search-dollar"></i>
                                     </button>
-                                    @if($payment->match_attempts_count >= 3)
-                                        <span class="text-xs text-red-600 font-medium" title="{{ $payment->match_attempts_count }} failed attempts">
+                                    @if($payment->status_checks_count >= 3)
+                                        <span class="text-xs text-red-600 font-medium" title="{{ $payment->status_checks_count }} API checks">
                                             <i class="fas fa-exclamation-triangle"></i>
                                         </span>
                                     @endif

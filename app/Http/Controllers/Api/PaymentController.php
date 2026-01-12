@@ -43,11 +43,25 @@ class PaymentController extends Controller
     /**
      * Get a specific payment by transaction ID
      */
-    public function show(string $transactionId): JsonResponse
+    public function show(Request $request, string $transactionId): JsonResponse
     {
+        $business = $request->user(); // Get business from API key middleware
+        
         $payment = Payment::with('accountNumberDetails')
             ->where('transaction_id', $transactionId)
             ->firstOrFail();
+
+        // Log the status check request (only if payment is still pending)
+        if ($payment->status === Payment::STATUS_PENDING) {
+            \App\Models\PaymentStatusCheck::create([
+                'payment_id' => $payment->id,
+                'transaction_id' => $transactionId,
+                'business_id' => $business->id,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'payment_status' => $payment->status,
+            ]);
+        }
 
         return response()->json([
             'success' => true,
