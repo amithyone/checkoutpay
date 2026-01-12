@@ -115,13 +115,19 @@ class SendWebhookNotification implements ShouldQueue
             'webhook_url' => $this->payment->webhook_url,
         ]);
 
+        // Normalize webhook URL to prevent double slashes
+        $webhookUrl = $this->payment->webhook_url;
+        if ($webhookUrl) {
+            $webhookUrl = preg_replace('#([^:])//+#', '$1/', $webhookUrl); // Fix double slashes but preserve http:// or https://
+        }
+
         try {
             $response = Http::timeout(30)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                     'User-Agent' => 'EmailPaymentGateway/1.0',
                 ])
-                ->post($this->payment->webhook_url, $payload);
+                ->post($webhookUrl, $payload);
 
             if ($response->successful()) {
                 Log::info('Webhook sent successfully', [

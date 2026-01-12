@@ -99,12 +99,15 @@ class CheckoutController extends Controller
         }
 
         try {
+            // Normalize return_url to prevent double slashes
+            $returnUrl = preg_replace('#([^:])//+#', '$1/', $validated['return_url']);
+            
             // Create payment request
             $paymentData = [
                 'amount' => $validated['amount'],
                 'payer_name' => $validated['payer_name'],
                 'service' => $validated['service'] ?? null,
-                'webhook_url' => $validated['return_url'], // Use return_url as webhook_url for redirect-based flow
+                'webhook_url' => $returnUrl, // Use return_url as webhook_url for redirect-based flow
             ];
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);

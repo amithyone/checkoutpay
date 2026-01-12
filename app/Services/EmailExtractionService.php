@@ -9,6 +9,10 @@ class EmailExtractionService
      */
     public function extractFromTextBody(string $text, string $subject, string $from): ?array
     {
+        // CRITICAL: Decode quoted-printable encoding FIRST (e.g., =20 becomes space, =3D becomes =)
+        // This is essential because text_body may have quoted-printable encoding from email parsing
+        $text = $this->decodeQuotedPrintable($text);
+        
         $textLower = strtolower($text);
         $fullText = $subject . ' ' . $textLower;
         
@@ -45,12 +49,24 @@ class EmailExtractionService
         // This is the PRIMARY source for sender name - must come from description field
         // Format: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
         // OR: "Description : 100004260111113119149684166825-TRANSFER FROM INNOCENT AMITHY SOLOMON"
-        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $text, $nameMatches)) {
-            $senderName = trim(strtolower($nameMatches[1]));
+        // CRITICAL: Handle quoted-printable encoding in description field (=20 for space, = for =)
+        // Pattern must allow for = characters that might be part of quoted-printable encoding
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?(?:=20\s*)?[\d\-]+(?:-|\s+)TRANSFER\s+FROM\s+([A-Z][A-Z\s=]+?)(?:-|OPAY|TO|$)/i', $text, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            // Clean up quoted-printable artifacts (=20 becomes space, = becomes space if standalone)
+            $potentialName = preg_replace('/=20/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $senderName = trim(strtolower($potentialName));
         }
-        // Also try "TRANSFER FROM NAME" format in description
-        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z\s]+?)(?:-|$)/i', $text, $nameMatches)) {
-            $senderName = trim(strtolower($nameMatches[1]));
+        // Also try simpler "FROM NAME" format (without TRANSFER)
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?(?:=20\s*)?[\d\-]+\s+FROM\s+([A-Z][A-Z\s=]+?)(?:\s+TO|\s+OPAY|-|$)/i', $text, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            // Clean up quoted-printable artifacts
+            $potentialName = preg_replace('/=20/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $senderName = trim(strtolower($potentialName));
         }
         
         // Now parse the digits if we found them
@@ -165,7 +181,13 @@ class EmailExtractionService
         }
         
         // Extract sender name from text (if not already extracted from description field)
-        // Only use fallback patterns if we didn't get the name from description field
+        // Use AdvancedNameExtractor for comprehensive extraction
+        if (!$senderName) {
+            $advancedExtractor = new \App\Services\AdvancedNameExtractor();
+            $senderName = $advancedExtractor->extract($text, '', $subject);
+        }
+        
+        // Fallback to old method if AdvancedNameExtractor didn't work
         if (!$senderName) {
             $senderName = $this->extractSenderNameFromText($text, $fullText);
         }
@@ -428,8 +450,13 @@ class EmailExtractionService
             }
         }
         
-        // Extract sender name using SenderNameExtractor (only if not already extracted from description field)
-        // Only use fallback patterns if we didn't get the name from description field
+        // Extract sender name using AdvancedNameExtractor (only if not already extracted from description field)
+        if (!$senderName) {
+            $advancedExtractor = new \App\Services\AdvancedNameExtractor();
+            $senderName = $advancedExtractor->extract($plainText, $html, $subject);
+        }
+        
+        // Fallback to SenderNameExtractor if AdvancedNameExtractor didn't work
         if (!$senderName) {
             $senderName = $nameExtractor->extractFromHtml($html);
         }
@@ -562,17 +589,29 @@ class EmailExtractionService
         $senderName = trim($senderName);
         
         // FILTER OUT EMAIL ADDRESSES - sender name cannot be an email
-        if (preg_match('/@/', $senderName) || filter_var($senderName, FILTER_VALIDATE_EMAIL)) {
+        // Check for @ symbol anywhere in the string
+        if (strpos($senderName, '@') !== false) {
             return null;
         }
         
-        // Filter out common email patterns
+        // Validate as email address (catches full email addresses)
+        if (filter_var($senderName, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+        
+        // Filter out common email patterns (more strict)
         if (preg_match('/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i', $senderName)) {
             return null;
         }
         
-        // Filter out email-like patterns (e.g., "gens@gtbank.com")
-        if (preg_match('/@[a-z0-9.-]+/i', $senderName)) {
+        // Filter out email-like patterns (e.g., "gens@gtbank.com", "amithyone@gmail.com")
+        // This catches any string containing @ followed by domain-like pattern
+        if (preg_match('/[a-z0-9._%+-]*@[a-z0-9.-]+\.[a-z]{2,}/i', $senderName)) {
+            return null;
+        }
+        
+        // Filter out strings that are just email domains or email-like (e.g., "@gtbank.com")
+        if (preg_match('/^@[a-z0-9.-]+/i', $senderName)) {
             return null;
         }
         

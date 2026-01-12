@@ -15,6 +15,21 @@ class SenderNameExtractor
      */
     public function extractFromText(string $text, string $subject = ''): ?string
     {
+        // Use AdvancedNameExtractor for comprehensive extraction
+        $advancedExtractor = new AdvancedNameExtractor();
+        return $advancedExtractor->extract($text, '', $subject);
+    }
+    
+    /**
+     * Legacy method - kept for backward compatibility
+     * @deprecated Use AdvancedNameExtractor instead
+     */
+    public function extractFromTextLegacy(string $text, string $subject = ''): ?string
+    {
+        // CRITICAL: Decode quoted-printable encoding FIRST (e.g., =20 becomes space)
+        // This is essential because text may have quoted-printable encoding from email parsing
+        $text = $this->decodeQuotedPrintable($text);
+        
         $text = $this->normalizeText($text);
         $fullText = $this->normalizeText($subject . ' ' . $text);
         $senderName = null;
@@ -24,9 +39,82 @@ class SenderNameExtractor
         // Or: "Description : 43digits FROM SOLOMON INNOCENT -"
         // Or: "Description : 43digits FROM SOLOMON INNOCENT"
         // Pattern: description : numbers FROM name (with optional dash, TO, or end)
-        if (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $text, $matches)) {
+        // CRITICAL: Handle quoted-printable encoding (=20 for space, = for =)
+        // Pattern 1a: TRANSFER FROM = NAME (with equals sign)
+        if (preg_match('/description[\s]*:[\s]*(?:=20\s*)?[\d\-]+\s*-\s*TRANSFER\s+FROM\s*=\s*([A-Z][A-Z\s=]+?)(?:-|OPAY|TO|$)/i', $text, $matches)) {
             $potentialName = trim($matches[1]);
-            // Remove trailing dash if captured
+            // Clean up quoted-printable artifacts (=20 becomes space, = becomes space if standalone)
+            $potentialName = preg_replace('/=20/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $potentialName = rtrim($potentialName, '- ');
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // Pattern 1b: TRANSFER FROM NAME (without equals sign)
+        if (!$senderName && preg_match('/description[\s]*:[\s]*(?:=20\s*)?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z][A-Z\s=]+?)(?:-|OPAY|TO|$)/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Clean up quoted-printable artifacts
+            $potentialName = preg_replace('/=20/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $potentialName = rtrim($potentialName, '- ');
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // Also try simpler "FROM NAME" format (without TRANSFER) - handle quoted-printable =20
+        if (!$senderName && preg_match('/description[\s]*:[\s]*(?:=20\s*)?[\d\-]+\s+TRANSFER\s+FROM\s*=\s*([A-Z][A-Z\s=]+?)(?:-|OPAY|TO|$)/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Clean up quoted-printable artifacts (=20 becomes space, = becomes space if standalone)
+            $potentialName = preg_replace('/=20/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $potentialName = rtrim($potentialName, '- ');
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // Try "FROM NAME" format with =20 spaces
+        if (!$senderName && preg_match('/description[\s]*:[\s]*(?:=20\s*)?[\d\-]+\s+FROM\s+([A-Z][A-Z\s=]+?)(?:\s+TO|\s+OPAY|-|$)/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Clean up quoted-printable artifacts
+            $potentialName = preg_replace('/=20/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $potentialName = rtrim($potentialName, '- ');
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // Try Remarks field as fallback (some emails have name only in Remarks)
+        // Handle "NT AMITHY SOLOMON" format (with prefix)
+        if (!$senderName && preg_match('/remarks[\s]*:[\s]*(?:NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA|MALLAM|MALAM)[\s]+([A-Z][A-Z\s]{2,}?)(?:\s|\.|$)/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            $potentialName = rtrim($potentialName, '. ');
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // Try Remarks without prefix
+        if (!$senderName && preg_match('/remarks[\s]*:[\s]*([A-Z][A-Z\s]{2,}?)(?:\s|\.|$)/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            $potentialName = rtrim($potentialName, '. ');
+            // Remove common prefixes if present
+            $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA|MALLAM|MALAM)\s+/i', '', $potentialName);
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // Try extracting from HTML text_body (email 600 has HTML in text_body)
+        if (!$senderName && preg_match('/TRANSFER\s+FROM\s+([A-Z][A-Z\s=]+?)(?:-|OPAY|TO|$)/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Clean up quoted-printable and HTML artifacts
+            $potentialName = preg_replace('/=20/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $potentialName = strip_tags($potentialName); // Remove any HTML tags
             $potentialName = rtrim($potentialName, '- ');
             if ($this->isValidName($potentialName)) {
                 $senderName = strtolower($potentialName);
@@ -102,6 +190,17 @@ class SenderNameExtractor
      * Extract sender name from HTML using multiple patterns (IMPROVED VERSION)
      */
     public function extractFromHtml(string $html): ?string
+    {
+        // Use AdvancedNameExtractor for comprehensive extraction
+        $advancedExtractor = new AdvancedNameExtractor();
+        return $advancedExtractor->extract('', $html, '');
+    }
+    
+    /**
+     * Legacy method - kept for backward compatibility
+     * @deprecated Use AdvancedNameExtractor instead
+     */
+    public function extractFromHtmlLegacy(string $html): ?string
     {
         $html = $this->normalizeText($html);
         $senderName = null;
@@ -282,5 +381,26 @@ class SenderNameExtractor
         }
         
         return true;
+    }
+    
+    /**
+     * Decode quoted-printable encoding (e.g., =20 becomes space, =3D becomes =)
+     */
+    protected function decodeQuotedPrintable(string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+        
+        // Decode quoted-printable format: =XX where XX is hex
+        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function ($matches) {
+            return chr(hexdec($matches[1]));
+        }, $text);
+        
+        // Handle soft line breaks (trailing = at end of line)
+        $text = preg_replace('/=\r?\n/', '', $text);
+        $text = preg_replace('/=\s*\n/', "\n", $text);
+        
+        return $text;
     }
 }

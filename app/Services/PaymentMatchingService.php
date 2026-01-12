@@ -680,24 +680,57 @@ class PaymentMatchingService
     }
 
     /**
-     * Check if two names match with 65% similarity
+     * Check if two names match with flexible similarity matching
+     * Handles spacing variations: "amithy" matches "amithy one m", "amithyone", "ami thy"
+     * 
+     * Strategy:
+     * 1. Exact match (with normalized spacing)
+     * 2. Check if user's name (without spaces) is contained in extracted name (without spaces)
+     * 3. Word-based matching for multi-word names
      * 
      * Examples:
-     * - "amithy one media" matches "amithy one" (2 out of 3 words = 67%, but we check if major words match)
+     * - "amithy" matches "amithy one m" (user's name found in extracted name)
+     * - "amithy" matches "amithyone" (spacing removed, still matches)
+     * - "amithy" matches "ami thy" (spacing variations handled)
      * - "innocent solomon" matches "solomon innocent amithy" (all words present)
-     * - "solomon innocent" matches "innocent solomon" (order variation)
      * 
-     * @param string $expectedName The name from payment request (e.g., "amithy one media")
-     * @param string $receivedName The name extracted from email (e.g., "amithy one" or longer description)
+     * @param string $expectedName The name from payment request (e.g., "amithy")
+     * @param string $receivedName The name extracted from email (e.g., "amithy one m", "amithyone", "ami thy")
      * @return array ['matched' => bool, 'similarity' => int] Returns match result and similarity percentage
      */
     protected function namesMatch(string $expectedName, string $receivedName): array
     {
-        // Exact match
+        // Normalize: remove extra spaces and convert to lowercase
+        $expectedName = trim(strtolower($expectedName));
+        $receivedName = trim(strtolower($receivedName));
+        $expectedName = preg_replace('/\s+/', ' ', $expectedName);
+        $receivedName = preg_replace('/\s+/', ' ', $receivedName);
+        
+        // Exact match (after normalization)
         if ($expectedName === $receivedName) {
             return ['matched' => true, 'similarity' => 100];
         }
 
+        // STRATEGY 1: Check if user's name (without spaces) is contained in extracted name (without spaces)
+        // This handles: "amithy" matches "amithyone", "amithy one m", "ami thy"
+        $expectedNoSpaces = str_replace(' ', '', $expectedName);
+        $receivedNoSpaces = str_replace(' ', '', $receivedName);
+        
+        // If user's name (no spaces) is found in extracted name (no spaces), it's a match
+        if (!empty($expectedNoSpaces) && stripos($receivedNoSpaces, $expectedNoSpaces) !== false) {
+            // Calculate similarity based on how much of the user's name is found
+            $similarityPercent = min(100, (int) round((strlen($expectedNoSpaces) / max(strlen($receivedNoSpaces), 1)) * 100));
+            return ['matched' => true, 'similarity' => $similarityPercent];
+        }
+        
+        // STRATEGY 2: Check if extracted name (no spaces) is contained in user's name (no spaces)
+        // This handles: "amithyone" matches "amithy" (if user entered longer name)
+        if (!empty($receivedNoSpaces) && stripos($expectedNoSpaces, $receivedNoSpaces) !== false) {
+            $similarityPercent = min(100, (int) round((strlen($receivedNoSpaces) / max(strlen($expectedNoSpaces), 1)) * 100));
+            return ['matched' => true, 'similarity' => $similarityPercent];
+        }
+
+        // STRATEGY 3: Word-based matching (for multi-word names)
         // Split names into words
         $expectedWords = array_filter(explode(' ', $expectedName));
         $receivedWords = array_filter(explode(' ', $receivedName));
@@ -718,7 +751,7 @@ class PaymentMatchingService
                 if (empty($receivedWord)) continue;
                 
                 // Exact word match
-                if (strtolower($word) === strtolower($receivedWord)) {
+                if ($word === $receivedWord) {
                     $matchedWords++;
                     break;
                 }

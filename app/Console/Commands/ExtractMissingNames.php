@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ProcessedEmail;
 use App\Services\SenderNameExtractor;
+use App\Services\AdvancedNameExtractor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -35,9 +36,8 @@ class ExtractMissingNames extends Command
         
         $this->info("Starting name extraction from processed emails...");
         
-        // Get emails without sender_name or with single-word names
-        $query = ProcessedEmail::where('is_matched', false)
-            ->whereNotNull('text_body')
+        // Get ALL emails without sender_name (not just unmatched ones)
+        $query = ProcessedEmail::whereNotNull('text_body')
             ->where('text_body', '!=', '');
         
         if (!$force) {
@@ -56,35 +56,19 @@ class ExtractMissingNames extends Command
         $updated = 0;
         $failed = 0;
         
-        $nameExtractor = new SenderNameExtractor();
+        $advancedExtractor = new AdvancedNameExtractor();
         
         foreach ($emails as $email) {
             try {
                 $originalName = $email->sender_name;
                 $extractedName = null;
                 
-                // PRIORITY 1: Extract from description field pattern (MOST RELIABLE)
-                // Format: "Description : 43digits FROM FULL NAME -" or "Description : 43digits FROM FULL NAME TO"
-                // Pattern: description : random numbers FROM name (with optional dash or TO after)
-                if (!empty($email->text_body)) {
-                    // Pattern 1: description : numbers FROM name - (dash after name)
-                    if (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s\-]+/i', $email->text_body, $matches)) {
-                        $extractedName = trim(strtolower($matches[1]));
-                    }
-                    // Pattern 2: description : numbers FROM name TO (TO after name)
-                    elseif (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s]+TO/i', $email->text_body, $matches)) {
-                        $extractedName = trim(strtolower($matches[1]));
-                    }
-                    // Pattern 3: description : numbers FROM name (end of line or space)
-                    elseif (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:\s*$|[\s]+)/i', $email->text_body, $matches)) {
-                        $extractedName = trim(strtolower($matches[1]));
-                    }
-                }
-                
-                // PRIORITY 2: Use SenderNameExtractor if description pattern didn't work
-                if (empty($extractedName) && !empty($email->text_body)) {
-                    $extractedName = $nameExtractor->extractFromText($email->text_body, $email->subject ?? '');
-                }
+                // Use AdvancedNameExtractor for comprehensive extraction
+                $extractedName = $advancedExtractor->extract(
+                    $email->text_body ?? '',
+                    $email->html_body ?? '',
+                    $email->subject ?? ''
+                );
                 
                 // Only update if we found a name and it's different/better than existing
                 if (!empty($extractedName)) {

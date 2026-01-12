@@ -59,12 +59,18 @@ class PaymentService
             $accountNumber = $data['account_number'];
         }
 
+        // Normalize webhook URL to prevent double slashes
+        $webhookUrl = $data['webhook_url'] ?? null;
+        if ($webhookUrl) {
+            $webhookUrl = preg_replace('#([^:])//+#', '$1/', $webhookUrl); // Fix double slashes but preserve http:// or https://
+        }
+
         $payment = Payment::create([
             'transaction_id' => $data['transaction_id'],
             'amount' => $data['amount'],
             'payer_name' => $data['payer_name'] ?? null,
             'bank' => $data['bank'] ?? null,
-            'webhook_url' => $data['webhook_url'],
+            'webhook_url' => $webhookUrl,
             'account_number' => $accountNumber,
             'business_id' => $business?->id,
             'status' => Payment::STATUS_PENDING,
