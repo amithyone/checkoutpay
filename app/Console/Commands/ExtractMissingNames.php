@@ -63,15 +63,20 @@ class ExtractMissingNames extends Command
                 $originalName = $email->sender_name;
                 $extractedName = null;
                 
-                // PRIORITY 1: Extract from description field pattern
-                // Format: "Description : 43digits FROM FULL NAME -" or "Description : 43digits FROM FULL NAME"
+                // PRIORITY 1: Extract from description field pattern (MOST RELIABLE)
+                // Format: "Description : 43digits FROM FULL NAME -" or "Description : 43digits FROM FULL NAME TO"
+                // Pattern: description : random numbers FROM name (with optional dash or TO after)
                 if (!empty($email->text_body)) {
-                    // Pattern: description : numbers FROM name (with optional dash after)
-                    if (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]|$)/i', $email->text_body, $matches)) {
+                    // Pattern 1: description : numbers FROM name - (dash after name)
+                    if (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s\-]+/i', $email->text_body, $matches)) {
                         $extractedName = trim(strtolower($matches[1]));
                     }
-                    // Pattern: description : numbers FROM name TO
+                    // Pattern 2: description : numbers FROM name TO (TO after name)
                     elseif (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s]+TO/i', $email->text_body, $matches)) {
+                        $extractedName = trim(strtolower($matches[1]));
+                    }
+                    // Pattern 3: description : numbers FROM name (end of line or space)
+                    elseif (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:\s*$|[\s]+)/i', $email->text_body, $matches)) {
                         $extractedName = trim(strtolower($matches[1]));
                     }
                 }
