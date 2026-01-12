@@ -903,13 +903,30 @@ class PaymentMatchingService
                 }
                 
                 // Create extracted info from stored description field
+                $senderName = $storedEmail->sender_name;
+                
+                // SECONDARY TRY: If sender_name is missing, try extracting from text snippet (first 500 chars)
+                if (empty($senderName) && !empty($storedEmail->text_body)) {
+                    $textSnippet = mb_substr($storedEmail->text_body, 0, 500);
+                    $extractedName = $this->nameExtractor->extractFromText($textSnippet, $storedEmail->subject ?? '');
+                    
+                    if (!empty($extractedName)) {
+                        $senderName = $extractedName;
+                        $storedEmail->update(['sender_name' => $extractedName]);
+                        \Illuminate\Support\Facades\Log::info('Extracted sender name from text snippet in recheckStoredEmail (description field path)', [
+                            'email_id' => $storedEmail->id,
+                            'extracted_name' => $extractedName,
+                        ]);
+                    }
+                }
+                
                 $extractedInfo = [
                     'amount' => $amountFromDesc >= 10 ? $amountFromDesc : ($storedEmail->amount ?? null),
                     'account_number' => $accountNumber,
                     'payer_account_number' => $payerAccountNumber,
                     'extracted_date' => $extractedDate,
                     'description_field' => $descriptionField,
-                    'sender_name' => $storedEmail->sender_name,
+                    'sender_name' => $senderName,
                 ];
                 
                 // Continue with matching logic using this extracted info
@@ -1041,6 +1058,26 @@ class PaymentMatchingService
                 'message' => 'Could not extract payment information from email',
                 'matches' => [],
             ];
+        }
+        
+        // SECONDARY TRY: If sender_name is missing, try extracting from text snippet (first 500 chars)
+        if (empty($extractedInfo['sender_name']) && empty($storedEmail->sender_name) && !empty($storedEmail->text_body)) {
+            $textSnippet = mb_substr($storedEmail->text_body, 0, 500);
+            $extractedName = $this->nameExtractor->extractFromText($textSnippet, $storedEmail->subject ?? '');
+            
+            if (!empty($extractedName)) {
+                $extractedInfo['sender_name'] = $extractedName;
+                $storedEmail->update(['sender_name' => $extractedName]);
+                \Illuminate\Support\Facades\Log::info('Extracted sender name from text snippet in recheckStoredEmail', [
+                    'email_id' => $storedEmail->id,
+                    'extracted_name' => $extractedName,
+                ]);
+            }
+        }
+        
+        // Use stored sender_name if extractedInfo doesn't have it
+        if (empty($extractedInfo['sender_name']) && !empty($storedEmail->sender_name)) {
+            $extractedInfo['sender_name'] = $storedEmail->sender_name;
         }
         
         // Get pending payments

@@ -209,6 +209,21 @@ class ProcessedEmailController extends Controller
         try {
             $senderName = strtolower(trim($request->sender_name));
             
+            // SECONDARY TRY: If sender_name is empty or not provided, try extracting from text snippet (first 500 chars)
+            if (empty($senderName) && !empty($processedEmail->text_body)) {
+                $textSnippet = mb_substr($processedEmail->text_body, 0, 500);
+                $nameExtractor = new \App\Services\SenderNameExtractor();
+                $extractedName = $nameExtractor->extractFromText($textSnippet, $processedEmail->subject ?? '');
+                
+                if (!empty($extractedName)) {
+                    $senderName = $extractedName;
+                    \Illuminate\Support\Facades\Log::info('Extracted sender name from text snippet on rematch', [
+                        'email_id' => $processedEmail->id,
+                        'extracted_name' => $extractedName,
+                    ]);
+                }
+            }
+            
             // Get current extracted_data or initialize empty array
             $extractedData = $processedEmail->extracted_data ?? [];
             
