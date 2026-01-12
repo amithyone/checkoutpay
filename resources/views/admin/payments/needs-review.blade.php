@@ -91,6 +91,16 @@
                             class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
                         <i class="fas fa-check-circle mr-2"></i> Manual Approve
                     </button>
+                    @if(!$payment->expires_at || $payment->expires_at->isFuture())
+                        <button onclick="markAsExpired({{ $payment->id }})" 
+                                class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm">
+                            <i class="fas fa-clock mr-2"></i> Mark as Expired
+                        </button>
+                    @endif
+                    <button onclick="showDeleteModal({{ $payment->id }}, '{{ $payment->transaction_id }}')" 
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
+                        <i class="fas fa-trash mr-2"></i> Delete
+                    </button>
                 </div>
             </div>
 
@@ -133,6 +143,31 @@
         {{ $payments->links() }}
     </div>
     @endif
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Delete Transaction</h3>
+        <p class="text-sm text-gray-700 mb-6">
+            Are you sure you want to delete transaction <span id="delete-transaction-id" class="font-mono font-semibold"></span>? 
+            This action cannot be undone.
+        </p>
+        <form id="deleteForm" method="POST">
+            @csrf
+            @method('DELETE')
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeDeleteModal()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" 
+                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    <i class="fas fa-trash mr-2"></i> Delete Transaction
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Manual Approve Modal -->
@@ -184,6 +219,45 @@
 
 @push('scripts')
 <script>
+function markAsExpired(paymentId) {
+    if (!confirm('Are you sure you want to mark this transaction as expired? This will stop all matching attempts.')) {
+        return;
+    }
+
+    fetch(`/admin/payments/${paymentId}/mark-expired`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json().catch(() => ({ success: true }));
+        }
+        return response.json().then(data => Promise.reject(data));
+    })
+    .then(() => {
+        window.location.reload();
+    })
+    .catch(error => {
+        alert('Error: ' + (error.message || 'Failed to mark as expired'));
+    });
+}
+
+function showDeleteModal(paymentId, transactionId) {
+    const form = document.getElementById('deleteForm');
+    form.action = `/admin/payments/${paymentId}`;
+    document.getElementById('delete-transaction-id').textContent = transactionId;
+    document.getElementById('deleteModal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+}
+
 function showManualApproveModal(paymentId, transactionId, expectedAmount) {
     const form = document.getElementById('manualApproveForm');
     form.action = `/admin/payments/${paymentId}/manual-approve`;
@@ -216,6 +290,13 @@ document.getElementById('modal-received-amount')?.addEventListener('input', func
 document.getElementById('manualApproveModal')?.addEventListener('click', function(e) {
     if (e.target === this) {
         closeManualApproveModal();
+    }
+});
+
+// Close delete modal when clicking outside
+document.getElementById('deleteModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
     }
 });
 </script>

@@ -373,4 +373,51 @@ class PaymentController extends Controller
 
         return view('admin.payments.needs-review', compact('payments'));
     }
+
+    /**
+     * Mark a payment as expired (stops matching attempts)
+     */
+    public function markAsExpired(Payment $payment): RedirectResponse
+    {
+        if ($payment->status !== Payment::STATUS_PENDING) {
+            return redirect()->route('admin.payments.show', $payment)
+                ->with('error', 'Only pending payments can be marked as expired.');
+        }
+
+        // Set expires_at to now to stop matching attempts
+        $payment->update([
+            'expires_at' => now(),
+        ]);
+
+        // Log the action
+        \Illuminate\Support\Facades\Log::info('Payment marked as expired by admin', [
+            'payment_id' => $payment->id,
+            'transaction_id' => $payment->transaction_id,
+            'admin_id' => auth('admin')->id(),
+        ]);
+
+        return redirect()->route('admin.payments.show', $payment)
+            ->with('success', 'Payment marked as expired. Matching attempts will stop.');
+    }
+
+    /**
+     * Delete a payment
+     */
+    public function destroy(Payment $payment): RedirectResponse
+    {
+        $transactionId = $payment->transaction_id;
+
+        // Soft delete the payment
+        $payment->delete();
+
+        // Log the deletion
+        \Illuminate\Support\Facades\Log::info('Payment deleted by admin', [
+            'payment_id' => $payment->id,
+            'transaction_id' => $transactionId,
+            'admin_id' => auth('admin')->id(),
+        ]);
+
+        return redirect()->route('admin.payments.index')
+            ->with('success', "Payment {$transactionId} has been deleted successfully.");
+    }
 }

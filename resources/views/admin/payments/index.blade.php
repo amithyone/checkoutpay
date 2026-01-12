@@ -143,6 +143,18 @@
                                         <i class="fas fa-list"></i>
                                     </a>
                                 @endif
+                                @if($payment->status === 'pending' && (!$payment->expires_at || $payment->expires_at->isFuture()))
+                                    <button onclick="markAsExpired({{ $payment->id }})" 
+                                        class="text-sm text-orange-600 hover:text-orange-800"
+                                        title="Mark as Expired">
+                                        <i class="fas fa-clock"></i>
+                                    </button>
+                                @endif
+                                <button onclick="showDeleteModal({{ $payment->id }}, '{{ $payment->transaction_id }}')" 
+                                    class="text-sm text-red-600 hover:text-red-800"
+                                    title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -228,6 +240,59 @@ function checkMatchForPayment(paymentId) {
         btn.disabled = false;
         btn.innerHTML = originalText;
     });
+}
+
+function markAsExpired(paymentId) {
+    if (!confirm('Are you sure you want to mark this transaction as expired? This will stop all matching attempts.')) {
+        return;
+    }
+
+    fetch(`/admin/payments/${paymentId}/mark-expired`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json().catch(() => ({ success: true }));
+        }
+        return response.json().then(data => Promise.reject(data));
+    })
+    .then(() => {
+        window.location.reload();
+    })
+    .catch(error => {
+        alert('Error: ' + (error.message || 'Failed to mark as expired'));
+    });
+}
+
+function showDeleteModal(paymentId, transactionId) {
+    if (!confirm(`Are you sure you want to delete transaction ${transactionId}? This action cannot be undone.`)) {
+        return;
+    }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/admin/payments/${paymentId}`;
+    
+    const csrfToken = document.createElement('input');
+    csrfToken.type = 'hidden';
+    csrfToken.name = '_token';
+    csrfToken.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+    form.appendChild(csrfToken);
+    
+    const methodField = document.createElement('input');
+    methodField.type = 'hidden';
+    methodField.name = '_method';
+    methodField.value = 'DELETE';
+    form.appendChild(methodField);
+    
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 @endsection
