@@ -199,28 +199,9 @@
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Link Email (Optional)</label>
-                <select name="email_id" id="email-select-{{ $payment->id }}"
+                <select name="email_id" id="email-select"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm">
-                    <option value="">-- No email link --</option>
-                    @php
-                        // Get unmatched emails for this payment
-                        $unmatchedEmails = \App\Models\ProcessedEmail::unmatched()
-                            ->where(function($q) use ($payment) {
-                                $q->where('amount', $payment->amount)
-                                  ->orWhereBetween('amount', [$payment->amount - 50, $payment->amount + 50]);
-                            })
-                            ->when($payment->business && $payment->business->email_account_id, function($q) use ($payment) {
-                                $q->where('email_account_id', $payment->business->email_account_id);
-                            })
-                            ->latest()
-                            ->limit(10)
-                            ->get();
-                    @endphp
-                    @foreach($unmatchedEmails as $email)
-                        <option value="{{ $email->id }}">
-                            {{ Str::limit($email->subject, 40) }} - ₦{{ number_format($email->amount ?? 0, 2) }}
-                        </option>
-                    @endforeach
+                    <option value="">-- Loading emails... --</option>
                 </select>
                 <p class="text-xs text-gray-500 mt-1">Select an email to link to this transaction. This will include email data in the webhook sent to the business.</p>
             </div>
@@ -293,7 +274,41 @@ function showManualApproveModal(paymentId, transactionId, expectedAmount) {
     document.getElementById('modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
     document.getElementById('modal-received-amount').value = expectedAmount;
     
+    // Load unmatched emails for this payment
+    loadUnmatchedEmails(paymentId, expectedAmount);
+    
     document.getElementById('manualApproveModal').classList.remove('hidden');
+}
+
+function loadUnmatchedEmails(paymentId, amount) {
+    const select = document.getElementById('email-select');
+    select.innerHTML = '<option value="">-- Loading emails... --</option>';
+    
+    fetch(`/admin/payments/${paymentId}/unmatched-emails?amount=${amount}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        select.innerHTML = '<option value="">-- No email link --</option>';
+        if (data.emails && data.emails.length > 0) {
+            data.emails.forEach(email => {
+                const option = document.createElement('option');
+                option.value = email.id;
+                option.textContent = email.subject.substring(0, 40) + ' - ₦' + parseFloat(email.amount || 0).toLocaleString('en-NG', {minimumFractionDigits: 2});
+                select.appendChild(option);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error loading emails:', error);
+        select.innerHTML = '<option value="">-- Error loading emails --</option>';
+    });
 }
 
 function closeManualApproveModal() {

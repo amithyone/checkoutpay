@@ -404,6 +404,38 @@ class PaymentController extends Controller
     }
 
     /**
+     * Get unmatched emails for a payment (AJAX endpoint)
+     */
+    public function getUnmatchedEmails(Request $request, Payment $payment): \Illuminate\Http\JsonResponse
+    {
+        $amount = $request->query('amount', $payment->amount);
+        
+        $unmatchedEmails = \App\Models\ProcessedEmail::unmatched()
+            ->where(function($q) use ($amount) {
+                $q->where('amount', $amount)
+                  ->orWhereBetween('amount', [$amount - 50, $amount + 50]);
+            })
+            ->when($payment->business && $payment->business->email_account_id, function($q) use ($payment) {
+                $q->where('email_account_id', $payment->business->email_account_id);
+            })
+            ->latest()
+            ->limit(10)
+            ->get(['id', 'subject', 'from_email', 'amount', 'email_date']);
+
+        return response()->json([
+            'emails' => $unmatchedEmails->map(function($email) {
+                return [
+                    'id' => $email->id,
+                    'subject' => $email->subject,
+                    'from_email' => $email->from_email,
+                    'amount' => $email->amount,
+                    'email_date' => $email->email_date?->format('M d, Y H:i'),
+                ];
+            }),
+        ]);
+    }
+
+    /**
      * Show transactions needing review (multiple API status checks by business)
      */
     public function needsReview(Request $request): View
