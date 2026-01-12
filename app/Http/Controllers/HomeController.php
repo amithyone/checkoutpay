@@ -15,7 +15,8 @@ class HomeController extends Controller
             abort(404, 'Home page not found. Please run: php artisan db:seed --class=PageSeeder');
         }
 
-        $content = json_decode($page->content, true) ?? [];
+        // Content is already cast to array by the model
+        $content = is_array($page->content) ? $page->content : (json_decode($page->content, true) ?? []);
         
         return view('home', [
             'page' => $page,

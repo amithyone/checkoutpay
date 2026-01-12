@@ -26,12 +26,17 @@ class PageController extends Controller
         $validated = $request->validate([
             'slug' => 'required|string|max:255|unique:pages,slug',
             'title' => 'required|string|max:255',
-            'content' => 'nullable|string',
+            'content' => 'nullable',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:500',
             'is_published' => 'boolean',
             'order' => 'nullable|integer|min:0',
         ]);
+
+        // If content is array, encode it to JSON
+        if (is_array($validated['content'] ?? null)) {
+            $validated['content'] = json_encode($validated['content']);
+        }
 
         Page::create($validated);
 
@@ -49,12 +54,17 @@ class PageController extends Controller
         $validated = $request->validate([
             'slug' => 'required|string|max:255|unique:pages,slug,' . $page->id,
             'title' => 'required|string|max:255',
-            'content' => 'nullable|string',
+            'content' => 'nullable',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:500',
             'is_published' => 'boolean',
             'order' => 'nullable|integer|min:0',
         ]);
+
+        // If content is array, encode it to JSON
+        if (is_array($validated['content'] ?? null)) {
+            $validated['content'] = json_encode($validated['content']);
+        }
 
         $page->update($validated);
 

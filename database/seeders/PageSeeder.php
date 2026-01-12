@@ -67,6 +67,7 @@ class PageSeeder extends Seeder
 
     private function getHomeContent(): string
     {
+        // Return as JSON string - Laravel will auto-cast to array when retrieved
         return json_encode([
             'hero' => [
                 'badge_text' => 'Cheapest Rates in the Market',
@@ -165,6 +166,7 @@ class PageSeeder extends Seeder
 
     private function getPricingContent(): string
     {
+        // Return as JSON string - Laravel will auto-cast to array when retrieved
         return json_encode([
             'hero' => [
                 'badge_text' => 'Cheapest Rates in Nigeria',
