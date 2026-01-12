@@ -310,11 +310,13 @@ class ProcessedEmailController extends Controller
                     'id' => $matchedPayment->id,
                     'transaction_id' => $matchedPayment->transaction_id,
                     'amount' => $matchedPayment->amount,
+                    'status' => $matchedPayment->status, // Include status so frontend can refresh
                 ] : null,
                 'message' => $matchedPayment 
                     ? 'Sender name updated and payment matched successfully!' 
                     : 'Sender name updated. No matching payment found.',
                 'latest_reason' => $latestReason,
+                'redirect_url' => $matchedPayment ? route('admin.payments.show', $matchedPayment) : null,
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Error updating and rematching', [

@@ -21,9 +21,13 @@ class SenderNameExtractor
         
         // PRIORITY 1: Description field with "FROM NAME" pattern (MOST RELIABLE)
         // Format: "Description : 43digits FROM SOLOMON INNOCENT TO SQUA"
+        // Or: "Description : 43digits FROM SOLOMON INNOCENT -"
         // Or: "Description : 43digits FROM SOLOMON INNOCENT"
-        if (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:\s+TO|\s*$|[\s\-])/i', $text, $matches)) {
+        // Pattern: description : numbers FROM name (with optional dash, TO, or end)
+        if (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $text, $matches)) {
             $potentialName = trim($matches[1]);
+            // Remove trailing dash if captured
+            $potentialName = rtrim($potentialName, '- ');
             if ($this->isValidName($potentialName)) {
                 $senderName = strtolower($potentialName);
             }
