@@ -522,6 +522,7 @@
         </form>
     </div>
 </div>
+@endif
 
 @push('scripts')
 <script>
