@@ -115,14 +115,27 @@ class Payment extends Model
      */
     public function approve(array $emailData = [], bool $isMismatch = false, ?float $receivedAmount = null, ?string $mismatchReason = null): bool
     {
-        return $this->update([
+        $updateData = [
             'status' => self::STATUS_APPROVED,
             'email_data' => $emailData,
             'matched_at' => now(),
             'is_mismatch' => $isMismatch,
             'received_amount' => $receivedAmount,
             'mismatch_reason' => $mismatchReason,
-        ]);
+        ];
+
+        // Update payer_name, bank, and payer_account_number from email_data if provided
+        if (!empty($emailData['payer_name'])) {
+            $updateData['payer_name'] = $emailData['payer_name'];
+        }
+        if (!empty($emailData['bank'])) {
+            $updateData['bank'] = $emailData['bank'];
+        }
+        if (!empty($emailData['payer_account_number'])) {
+            $updateData['payer_account_number'] = $emailData['payer_account_number'];
+        }
+
+        return $this->update($updateData);
     }
 
     /**

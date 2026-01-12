@@ -359,6 +359,7 @@ class PaymentController extends Controller
                     'payer_account_number' => $extractedInfo['account_number'] ?? null,
                     'transaction_date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                 ], $extractedInfo ?? []);
+
             }
         }
 
@@ -372,7 +373,7 @@ class PaymentController extends Controller
             'linked_email_id' => $linkedEmail?->id,
         ]);
 
-        // Approve payment
+        // Approve payment (this will update payer_name, bank, payer_account_number from email_data if provided)
         $payment->approve(
             emailData: $emailData,
             isMismatch: $isMismatch,
