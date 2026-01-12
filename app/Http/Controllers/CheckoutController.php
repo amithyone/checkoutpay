@@ -33,8 +33,11 @@ class CheckoutController extends Controller
             ]);
         }
 
-        // Validate business exists and is active
-        $business = Business::where('id', $businessId)
+        // Validate business exists and is active (try business_id first, fallback to id for backward compatibility)
+        $business = Business::where(function($query) use ($businessId) {
+                $query->where('business_id', $businessId)
+                      ->orWhere('id', $businessId);
+            })
             ->where('is_active', true)
             ->first();
 
@@ -74,7 +77,7 @@ class CheckoutController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'business_id' => 'required|exists:businesses,id',
+            'business_id' => 'required',
             'amount' => 'required|numeric|min:0.01',
             'payer_name' => 'required|string|max:255',
             'service' => 'nullable|string|max:255',
@@ -82,8 +85,11 @@ class CheckoutController extends Controller
             'cancel_url' => 'nullable|url',
         ]);
 
-        // Get business
-        $business = Business::where('id', $validated['business_id'])
+        // Get business (try business_id first, fallback to id for backward compatibility)
+        $business = Business::where(function($query) use ($validated) {
+                $query->where('business_id', $validated['business_id'])
+                      ->orWhere('id', $validated['business_id']);
+            })
             ->where('is_active', true)
             ->firstOrFail();
 
