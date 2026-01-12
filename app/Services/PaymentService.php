@@ -31,6 +31,11 @@ class PaymentService
             $data['transaction_id'] = $this->generateTransactionId();
         }
 
+        // Normalize payer name (ensure it's set from 'name' field if provided)
+        if (!empty($data['name']) && empty($data['payer_name'])) {
+            $data['payer_name'] = $data['name'];
+        }
+        
         // Normalize payer name
         if (!empty($data['payer_name'])) {
             $data['payer_name'] = strtolower(trim($data['payer_name']));

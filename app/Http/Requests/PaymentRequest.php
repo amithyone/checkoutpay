@@ -24,9 +24,11 @@ class PaymentRequest extends FormRequest
     {
         return [
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'payer_name' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'], // Accept 'name' from API
+            'payer_name' => ['nullable', 'string', 'max:255'], // Also accept 'payer_name' for backward compatibility
             'bank' => ['nullable', 'string', 'max:255'],
             'webhook_url' => ['required', 'url', 'max:500'],
+            'service' => ['nullable', 'string', 'max:255'], // Accept service field
             'transaction_id' => ['nullable', 'string', 'max:255', 'unique:payments,transaction_id'],
         ];
     }
@@ -53,7 +55,14 @@ class PaymentRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Normalize payer name if provided
+        // Map 'name' field to 'payer_name' if provided (API uses 'name', internal uses 'payer_name')
+        if ($this->has('name') && $this->name) {
+            $this->merge([
+                'payer_name' => trim($this->name),
+            ]);
+        }
+        
+        // Normalize payer name if provided directly
         if ($this->has('payer_name') && $this->payer_name) {
             $this->merge([
                 'payer_name' => trim($this->payer_name),
