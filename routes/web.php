@@ -194,6 +194,41 @@ Route::get('/cron/fill-sender-names', function () {
     }
 })->name('cron.fill-sender-names');
 
+// Extract Missing Names Cron (Advanced Name Extraction)
+Route::get('/cron/extract-missing-names', function () {
+    try {
+        $startTime = microtime(true);
+        
+        // Extract missing sender names using AdvancedNameExtractor
+        \Illuminate\Support\Facades\Artisan::call('payment:extract-missing-names', [
+            '--limit' => 100,
+        ]);
+        
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        $executionTime = round(microtime(true) - $startTime, 2);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Missing name extraction completed',
+            'method' => 'extract_missing_names',
+            'timestamp' => now()->toDateTimeString(),
+            'execution_time_seconds' => $executionTime,
+            'output' => $output,
+        ]);
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Cron job error (Extract Missing Names)', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage(),
+            'timestamp' => now()->toDateTimeString(),
+        ], 500);
+    }
+})->name('cron.extract-missing-names');
+
 // Master Email Processing Cron (All 3 Steps Sequentially)
 Route::get('/cron/process-emails', function () {
     try {
