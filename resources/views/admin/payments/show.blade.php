@@ -7,7 +7,19 @@
 <div class="space-y-6">
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-semibold text-gray-900">Transaction: {{ $payment->transaction_id }}</h3>
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">Transaction: {{ $payment->transaction_id }}</h3>
+                @if($matchAttemptsCount >= 3)
+                    <div class="mt-2 flex items-center space-x-2">
+                        <span class="px-3 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                            <i class="fas fa-exclamation-triangle mr-1"></i> Needs Review ({{ $matchAttemptsCount }} failed attempts)
+                        </span>
+                        <a href="{{ route('admin.payments.needs-review') }}" class="text-xs text-primary hover:underline">
+                            View All Needing Review
+                        </a>
+                    </div>
+                @endif
+            </div>
             <div class="flex items-center gap-3">
                 @if($payment->status === 'pending')
                     <button onclick="checkMatchForPayment({{ $payment->id }})" 
@@ -15,6 +27,10 @@
                         class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center check-match-payment-btn"
                         data-payment-id="{{ $payment->id }}">
                         <i class="fas fa-search mr-2"></i> Check Match
+                    </button>
+                    <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i> Manual Approve
                     </button>
                 @endif
                 @if($payment->status === 'approved')
@@ -80,18 +96,11 @@
         </div>
 
         <!-- Match Attempts Section -->
-        @php
-            $matchAttempts = \App\Models\MatchAttempt::where('transaction_id', $payment->transaction_id)
-                ->orWhere('payment_id', $payment->id)
-                ->latest()
-                ->limit(10)
-                ->get();
-        @endphp
-        @if($matchAttempts->count() > 0)
+        @if($payment->matchAttempts->count() > 0)
         <div class="mt-6 pt-6 border-t border-gray-200">
             <div class="flex items-center justify-between mb-4">
                 <h4 class="text-md font-semibold text-gray-900">
-                    <i class="fas fa-search-dollar text-primary mr-2"></i>Recent Match Attempts
+                    <i class="fas fa-search-dollar text-primary mr-2"></i>Match Attempts ({{ $payment->matchAttempts->count() }})
                 </h4>
                 <a href="{{ route('admin.match-attempts.index', ['transaction_id' => $payment->transaction_id]) }}" 
                    class="text-sm text-primary hover:underline">
@@ -99,7 +108,7 @@
                 </a>
             </div>
             <div class="space-y-3">
-                @foreach($matchAttempts as $attempt)
+                @foreach($payment->matchAttempts->take(5) as $attempt)
                 <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-3">
@@ -120,22 +129,15 @@
                                     Similarity: {{ $attempt->name_similarity_percent }}%
                                 </span>
                             @endif
+                            @if($attempt->amount_diff)
+                                <span class="text-xs text-gray-600">
+                                    Amount diff: ₦{{ number_format(abs($attempt->amount_diff), 2) }}
+                                </span>
+                            @endif
                         </div>
                         <span class="text-xs text-gray-500">{{ $attempt->created_at->format('M d, H:i') }}</span>
                     </div>
                     <p class="text-sm text-gray-700">{{ Str::limit($attempt->reason, 150) }}</p>
-                    @if($attempt->match_result === 'unmatched' && $attempt->payment_id === $payment->id)
-                        <div class="mt-2">
-                            <button onclick="retryMatchAttempt({{ $attempt->id }})" 
-                                    class="text-xs text-green-600 hover:text-green-800">
-                                <i class="fas fa-redo mr-1"></i> Retry Match
-                            </button>
-                            <a href="{{ route('admin.match-attempts.show', $attempt) }}" 
-                               class="text-xs text-blue-600 hover:text-blue-800 ml-3">
-                                <i class="fas fa-eye mr-1"></i> View Details
-                            </a>
-                        </div>
-                    @endif
                 </div>
                 @endforeach
             </div>
@@ -146,13 +148,6 @@
                 <p class="text-sm text-yellow-800">
                     <i class="fas fa-info-circle mr-2"></i> No match attempts yet. The system will automatically check for matching emails.
                 </p>
-                @if($payment->expires_at && $payment->expires_at->isFuture())
-                    <p class="text-xs text-yellow-700 mt-2">
-                        Payment expires {{ $payment->expires_at->diffForHumans() }}. 
-                        <a href="{{ route('admin.match-attempts.index', ['transaction_id' => $payment->transaction_id]) }}" 
-                           class="underline hover:no-underline">Check match attempts</a> to see matching progress.
-                    </p>
-                @endif
             </div>
         </div>
         @endif
@@ -163,6 +158,53 @@
             <pre class="bg-gray-50 p-4 rounded-lg text-xs overflow-x-auto">{{ json_encode($payment->email_data, JSON_PRETTY_PRINT) }}</pre>
         </div>
         @endif
+    </div>
+</div>
+
+<!-- Manual Approve Modal -->
+<div id="manualApproveModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Manually Approve Transaction</h3>
+        <form id="manualApproveForm" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Transaction ID</label>
+                <p class="text-sm font-mono text-gray-900 bg-gray-50 p-2 rounded" id="modal-transaction-id"></p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Expected Amount</label>
+                <p class="text-lg font-bold text-gray-900" id="modal-expected-amount"></p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Received Amount <span class="text-red-500">*</span></label>
+                <input type="number" name="received_amount" step="0.01" min="0" required id="modal-received-amount"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                <p class="text-xs text-gray-500 mt-1">Enter the actual amount received if different from expected</p>
+            </div>
+            <div class="mb-4">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="is_mismatch" id="is-mismatch-checkbox" 
+                        class="rounded border-gray-300 text-primary focus:ring-primary">
+                    <span class="text-sm text-gray-700">Mark as amount mismatch</span>
+                </label>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Admin Notes</label>
+                <textarea name="admin_notes" rows="3" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Add notes about why this is being manually approved..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeManualApproveModal()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" 
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    <i class="fas fa-check-circle mr-2"></i> Approve & Credit Business
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -234,34 +276,48 @@ function checkMatchForPayment(paymentId) {
     });
 }
 
-function retryMatchAttempt(attemptId) {
-    if (!confirm('Are you sure you want to retry matching this transaction?')) {
-        return;
-    }
-
-    fetch(`/admin/match-attempts/${attemptId}/retry`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('✅ ' + data.message);
-            window.location.reload();
-        } else {
-            alert('❌ ' + data.message);
-            if (data.latest_reason) {
-                console.log('Latest reason:', data.latest_reason);
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('❌ Error retrying match: ' + error.message);
-    });
+function showManualApproveModal(paymentId, transactionId, expectedAmount) {
+    const form = document.getElementById('manualApproveForm');
+    form.action = `/admin/payments/${paymentId}/manual-approve`;
+    
+    document.getElementById('modal-transaction-id').textContent = transactionId;
+    document.getElementById('modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
+    document.getElementById('modal-received-amount').value = expectedAmount;
+    
+    document.getElementById('manualApproveModal').classList.remove('hidden');
 }
+
+function closeManualApproveModal() {
+    document.getElementById('manualApproveModal').classList.add('hidden');
+}
+
+// Auto-check mismatch if amounts differ
+document.addEventListener('DOMContentLoaded', function() {
+    const receivedAmountInput = document.getElementById('modal-received-amount');
+    if (receivedAmountInput) {
+        receivedAmountInput.addEventListener('input', function() {
+            const expectedText = document.getElementById('modal-expected-amount').textContent;
+            const expected = parseFloat(expectedText.replace(/[₦,]/g, '')) || 0;
+            const received = parseFloat(this.value) || 0;
+            const mismatchCheckbox = document.getElementById('is-mismatch-checkbox');
+            
+            if (mismatchCheckbox && Math.abs(expected - received) > 0.01) {
+                mismatchCheckbox.checked = true;
+            } else if (mismatchCheckbox) {
+                mismatchCheckbox.checked = false;
+            }
+        });
+    }
+    
+    // Close modal when clicking outside
+    const modal = document.getElementById('manualApproveModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeManualApproveModal();
+            }
+        });
+    }
+});
 </script>
 @endsection

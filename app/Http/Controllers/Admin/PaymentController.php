@@ -4,15 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Models\MatchAttempt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class PaymentController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Payment::with('business')->latest();
+        $query = Payment::with('business')
+            ->withCount('matchAttempts')
+            ->latest();
 
         if ($request->has('status')) {
             if ($request->status === 'pending') {
@@ -52,6 +56,15 @@ class PaymentController extends Controller
                 });
         }
 
+        // Filter for transactions needing review (multiple failed match attempts)
+        if ($request->has('needs_review') && $request->needs_review === '1') {
+            $query->where('status', Payment::STATUS_PENDING)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->having('match_attempts_count', '>=', 3); // 3 or more failed attempts
+        }
+
         if ($request->has('business_id')) {
             $query->where('business_id', $request->business_id);
         }
@@ -64,15 +77,26 @@ class PaymentController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
 
-        $payments = $query->paginate(20);
+        $payments = $query->paginate(20)->withQueryString();
 
         return view('admin.payments.index', compact('payments'));
     }
 
     public function show(Payment $payment): View
     {
-        $payment->load('business', 'accountNumberDetails');
-        return view('admin.payments.show', compact('payment'));
+        $payment->load([
+            'business', 
+            'accountNumberDetails',
+            'matchAttempts' => function($q) {
+                $q->latest()->limit(10);
+            }
+        ]);
+        
+        $matchAttemptsCount = MatchAttempt::where('payment_id', $payment->id)
+            ->where('match_result', MatchAttempt::RESULT_UNMATCHED)
+            ->count();
+            
+        return view('admin.payments.show', compact('payment', 'matchAttemptsCount'));
     }
 
     /**
@@ -140,7 +164,7 @@ class PaymentController extends Controller
                         'payment_id' => $payment->id,
                         'processed_email_id' => $storedEmail->id,
                         'transaction_id' => $payment->transaction_id,
-                        'match_result' => $match['matched'] ? \App\Models\MatchAttempt::RESULT_MATCHED : \App\Models\MatchAttempt::RESULT_UNMATCHED,
+                        'match_result' => $match['matched'] ? MatchAttempt::RESULT_MATCHED : MatchAttempt::RESULT_UNMATCHED,
                         'reason' => $match['reason'] ?? 'Unknown reason',
                         'payment_amount' => $payment->amount,
                         'payment_name' => $payment->payer_name,
@@ -253,5 +277,99 @@ class PaymentController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Manually approve a payment (even if it doesn't match)
+     */
+    public function manualApprove(Request $request, Payment $payment): RedirectResponse
+    {
+        $request->validate([
+            'admin_notes' => 'nullable|string|max:1000',
+            'received_amount' => 'nullable|numeric|min:0',
+            'is_mismatch' => 'boolean',
+        ]);
+
+        // Only allow manual approval for pending payments
+        if ($payment->status !== Payment::STATUS_PENDING) {
+            return redirect()->route('admin.payments.show', $payment)
+                ->with('error', 'Payment is already ' . $payment->status);
+        }
+
+        $receivedAmount = $request->received_amount ?? $payment->amount;
+        $isMismatch = $request->is_mismatch ?? ($receivedAmount != $payment->amount);
+
+        // Approve payment
+        $payment->approve(
+            emailData: array_merge($payment->email_data ?? [], [
+                'manual_approval' => true,
+                'approved_by' => auth('admin')->user()->id,
+                'approved_at' => now()->toDateTimeString(),
+                'admin_notes' => $request->admin_notes,
+            ]),
+            isMismatch: $isMismatch,
+            receivedAmount: $receivedAmount,
+            mismatchReason: $isMismatch ? ($request->admin_notes ?? 'Manual approval with amount mismatch') : null
+        );
+
+        // Update business balance
+        if ($payment->business_id) {
+            $payment->business->increment('balance', $receivedAmount);
+        }
+
+        // Log the manual approval
+        \Illuminate\Support\Facades\Log::info('Payment manually approved by admin', [
+            'payment_id' => $payment->id,
+            'transaction_id' => $payment->transaction_id,
+            'admin_id' => auth('admin')->id(),
+            'received_amount' => $receivedAmount,
+            'expected_amount' => $payment->amount,
+        ]);
+
+        // Dispatch event to send webhook
+        event(new \App\Events\PaymentApproved($payment));
+
+        return redirect()->route('admin.payments.show', $payment)
+            ->with('success', 'Payment manually approved and business credited successfully.');
+    }
+
+    /**
+     * Show transactions needing review (multiple failed match attempts)
+     */
+    public function needsReview(Request $request): View
+    {
+        // Get payments with 3+ failed match attempts that are still pending
+        $query = Payment::with(['business', 'matchAttempts' => function($q) {
+                $q->where('match_result', MatchAttempt::RESULT_UNMATCHED)
+                  ->latest()
+                  ->limit(5);
+            }])
+            ->where('status', Payment::STATUS_PENDING)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->withCount(['matchAttempts' => function($q) {
+                $q->where('match_result', MatchAttempt::RESULT_UNMATCHED);
+            }])
+            ->having('match_attempts_count', '>=', 3)
+            ->latest();
+
+        // Filter by business
+        if ($request->has('business_id')) {
+            $query->where('business_id', $request->business_id);
+        }
+
+        // Filter by date range
+        if ($request->has('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->has('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $payments = $query->paginate(20)->withQueryString();
+
+        return view('admin.payments.needs-review', compact('payments'));
     }
 }

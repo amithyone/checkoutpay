@@ -152,4 +152,12 @@ class Payment extends Model
     {
         return $this->belongsTo(AccountNumber::class, 'account_number', 'account_number');
     }
+
+    /**
+     * Get match attempts for this payment
+     */
+    public function matchAttempts()
+    {
+        return $this->hasMany(MatchAttempt::class);
+    }
 }

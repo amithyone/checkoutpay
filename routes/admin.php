@@ -63,8 +63,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Payments
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
+        Route::get('payments/needs-review', [PaymentController::class, 'needsReview'])->name('payments.needs-review');
         Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
         Route::post('payments/{payment}/check-match', [PaymentController::class, 'checkMatch'])->name('payments.check-match');
+        Route::post('payments/{payment}/manual-approve', [PaymentController::class, 'manualApprove'])->name('payments.manual-approve');
 
         // Withdrawals
         Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');

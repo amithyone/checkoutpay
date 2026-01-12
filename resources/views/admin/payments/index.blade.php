@@ -5,6 +5,31 @@
 
 @section('content')
 <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900">Payments</h3>
+            <p class="text-sm text-gray-600 mt-1">Manage all payment transactions</p>
+        </div>
+        <a href="{{ route('admin.payments.needs-review') }}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center">
+            <i class="fas fa-exclamation-triangle mr-2"></i> Needs Review
+            @php
+                $needsReviewCount = \App\Models\Payment::withCount(['matchAttempts' => function($q) {
+                    $q->where('match_result', \App\Models\MatchAttempt::RESULT_UNMATCHED);
+                }])
+                ->where('status', \App\Models\Payment::STATUS_PENDING)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->having('match_attempts_count', '>=', 3)
+                ->count();
+            @endphp
+            @if($needsReviewCount > 0)
+                <span class="ml-2 bg-white text-red-600 rounded-full px-2 py-0.5 text-xs font-bold">{{ $needsReviewCount }}</span>
+            @endif
+        </a>
+    </div>
+
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <form method="GET" class="flex items-center space-x-4 flex-wrap">
@@ -19,6 +44,11 @@
                 <input type="checkbox" name="unmatched" value="1" {{ request('unmatched') === '1' ? 'checked' : '' }} 
                     class="rounded border-gray-300 text-primary focus:ring-primary">
                 <span>Show only unmatched</span>
+            </label>
+            <label class="flex items-center space-x-2 text-sm">
+                <input type="checkbox" name="needs_review" value="1" {{ request('needs_review') === '1' ? 'checked' : '' }} 
+                    class="rounded border-gray-300 text-primary focus:ring-primary">
+                <span>Needs Review (3+ attempts)</span>
             </label>
             @endif
             <select name="business_id" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
@@ -104,6 +134,11 @@
                                         title="Check Match">
                                         <i class="fas fa-search-dollar"></i>
                                     </button>
+                                    @if($payment->match_attempts_count >= 3)
+                                        <span class="text-xs text-red-600 font-medium" title="{{ $payment->match_attempts_count }} failed attempts">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </span>
+                                    @endif
                                     <a href="{{ route('admin.match-attempts.index', ['transaction_id' => $payment->transaction_id]) }}" 
                                        class="text-sm text-blue-600 hover:text-blue-800"
                                        title="View Match Attempts">
