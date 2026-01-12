@@ -129,7 +129,117 @@
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
             <i class="fas fa-cog mr-2 text-primary"></i>General Settings
         </h3>
-        <p class="text-sm text-gray-600">More settings coming soon...</p>
+
+        <form action="{{ route('admin.settings.update-general') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            @csrf
+
+            <!-- Site Name -->
+            <div>
+                <label for="site_name" class="block text-sm font-medium text-gray-700 mb-2">
+                    Site Name
+                </label>
+                <input 
+                    type="text" 
+                    id="site_name" 
+                    name="site_name" 
+                    value="{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+            </div>
+
+            <!-- Logo Upload -->
+            <div>
+                <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">
+                    Site Logo
+                </label>
+                @if(\App\Models\Setting::get('site_logo'))
+                    <div class="mb-3">
+                        <img src="{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}" alt="Current Logo" class="h-16 object-contain">
+                        <p class="text-xs text-gray-500 mt-1">Current logo</p>
+                    </div>
+                @endif
+                <input 
+                    type="file" 
+                    id="logo" 
+                    name="logo" 
+                    accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">Recommended: PNG, JPG, or SVG. Max size: 2MB</p>
+            </div>
+
+            <!-- Favicon Upload -->
+            <div>
+                <label for="favicon" class="block text-sm font-medium text-gray-700 mb-2">
+                    Favicon
+                </label>
+                @if(\App\Models\Setting::get('site_favicon'))
+                    <div class="mb-3">
+                        <img src="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}" alt="Current Favicon" class="h-8 w-8 object-contain">
+                        <p class="text-xs text-gray-500 mt-1">Current favicon</p>
+                    </div>
+                @endif
+                <input 
+                    type="file" 
+                    id="favicon" 
+                    name="favicon" 
+                    accept="image/png,image/x-icon"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">Recommended: PNG or ICO. Max size: 512KB</p>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="border-t border-gray-200 pt-6">
+                <h4 class="text-md font-semibold text-gray-900 mb-4">Contact Information</h4>
+
+                <div class="space-y-4">
+                    <div>
+                        <label for="contact_email" class="block text-sm font-medium text-gray-700 mb-2">
+                            Contact Email
+                        </label>
+                        <input 
+                            type="email" 
+                            id="contact_email" 
+                            name="contact_email" 
+                            value="{{ \App\Models\Setting::get('contact_email', '') }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="contact_phone" class="block text-sm font-medium text-gray-700 mb-2">
+                            Contact Phone
+                        </label>
+                        <input 
+                            type="text" 
+                            id="contact_phone" 
+                            name="contact_phone" 
+                            value="{{ \App\Models\Setting::get('contact_phone', '') }}"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="contact_address" class="block text-sm font-medium text-gray-700 mb-2">
+                            Contact Address
+                        </label>
+                        <textarea 
+                            id="contact_address" 
+                            name="contact_address" 
+                            rows="3"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        >{{ \App\Models\Setting::get('contact_address', '') }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save General Settings
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection

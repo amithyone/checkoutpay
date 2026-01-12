@@ -108,4 +108,50 @@ class SettingsController extends Controller
         return redirect()->route('admin.settings.index')
             ->with('success', 'Whitelisted email removed successfully!');
     }
+
+    /**
+     * Update general settings (logo, favicon, contact info)
+     */
+    public function updateGeneral(Request $request)
+    {
+        $validated = $request->validate([
+            'site_name' => 'nullable|string|max:255',
+            'contact_email' => 'nullable|email|max:255',
+            'contact_phone' => 'nullable|string|max:50',
+            'contact_address' => 'nullable|string|max:500',
+            'logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
+            'favicon' => 'nullable|image|mimes:png,ico|max:512',
+        ]);
+
+        // Handle logo upload
+        if ($request->hasFile('logo')) {
+            $logo = $request->file('logo');
+            $logoPath = $logo->store('settings', 'public');
+            Setting::set('site_logo', $logoPath, 'string', 'general', 'Site logo');
+        }
+
+        // Handle favicon upload
+        if ($request->hasFile('favicon')) {
+            $favicon = $request->file('favicon');
+            $faviconPath = $favicon->store('settings', 'public');
+            Setting::set('site_favicon', $faviconPath, 'string', 'general', 'Site favicon');
+        }
+
+        // Update contact information
+        if (isset($validated['site_name'])) {
+            Setting::set('site_name', $validated['site_name'], 'string', 'general', 'Site name');
+        }
+        if (isset($validated['contact_email'])) {
+            Setting::set('contact_email', $validated['contact_email'], 'string', 'general', 'Contact email');
+        }
+        if (isset($validated['contact_phone'])) {
+            Setting::set('contact_phone', $validated['contact_phone'], 'string', 'general', 'Contact phone');
+        }
+        if (isset($validated['contact_address'])) {
+            Setting::set('contact_address', $validated['contact_address'], 'string', 'general', 'Contact address');
+        }
+
+        return redirect()->route('admin.settings.index')
+            ->with('success', 'General settings updated successfully!');
+    }
 }

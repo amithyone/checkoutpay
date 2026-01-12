@@ -90,8 +90,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Settings
         Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
         Route::put('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
+        Route::post('settings/general', [\App\Http\Controllers\Admin\SettingsController::class, 'updateGeneral'])->name('settings.update-general');
         Route::post('settings/whitelisted-emails', [\App\Http\Controllers\Admin\SettingsController::class, 'addWhitelistedEmail'])->name('settings.add-whitelisted-email');
         Route::delete('settings/whitelisted-emails/{whitelistedEmail}', [\App\Http\Controllers\Admin\SettingsController::class, 'removeWhitelistedEmail'])->name('settings.remove-whitelisted-email');
+
+        // Pages Management
+        Route::resource('pages', \App\Http\Controllers\Admin\PageController::class);
+
+        // Support Tickets (Live Chat Style)
+        Route::get('support', [\App\Http\Controllers\Admin\SupportController::class, 'index'])->name('support.index');
+        Route::get('support/{ticket}', [\App\Http\Controllers\Admin\SupportController::class, 'show'])->name('support.show');
+        Route::post('support/{ticket}/reply', [\App\Http\Controllers\Admin\SupportController::class, 'reply'])->name('support.reply');
+        Route::post('support/{ticket}/update-status', [\App\Http\Controllers\Admin\SupportController::class, 'updateStatus'])->name('support.update-status');
+        Route::post('support/{ticket}/assign', [\App\Http\Controllers\Admin\SupportController::class, 'assign'])->name('support.assign');
 
         // Bank Email Templates
         Route::resource('bank-email-templates', BankEmailTemplateController::class);

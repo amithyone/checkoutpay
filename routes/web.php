@@ -12,6 +12,30 @@ Route::get('/pricing', function () {
     return view('pricing');
 })->name('pricing');
 
+// Dynamic pages (Privacy Policy, Terms, etc.)
+Route::get('/page/{slug}', [\App\Http\Controllers\PageController::class, 'show'])->name('page.show');
+
+// Static page routes for common pages
+Route::get('/privacy-policy', function () {
+    $page = \App\Models\Page::getBySlug('privacy-policy');
+    if (!$page) {
+        abort(404);
+    }
+    return view('page', compact('page'));
+})->name('privacy-policy');
+
+Route::get('/terms-and-conditions', function () {
+    $page = \App\Models\Page::getBySlug('terms-and-conditions');
+    if (!$page) {
+        abort(404);
+    }
+    return view('page', compact('page'));
+})->name('terms');
+
+Route::get('/contact', function () {
+    return view('contact');
+})->name('contact');
+
 // Setup routes (must be before any middleware that requires database)
 Route::get('/setup', [SetupController::class, 'index'])->name('setup');
 Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);
