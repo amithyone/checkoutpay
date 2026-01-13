@@ -16,27 +16,32 @@ class Kernel extends ConsoleKernel
         $disableImap = \App\Models\Setting::get('disable_imap_fetching', false);
 
         // Monitor emails via IMAP (only if not disabled)
+        // IMPROVED: Add rate limiting to prevent API throttling
         if (!$disableImap) {
             $schedule->command('payment:monitor-emails')
                 ->everyTenSeconds()
                 ->withoutOverlapping()
-                ->runInBackground();
+                ->runInBackground()
+                ->throttle(6); // Max 6 runs per minute (every 10 seconds = 6/min)
         }
 
         // Master email processing cron (3 sequential steps):
         // STEP 1: Fetch emails from filesystem (no matching)
+        // IMPROVED: Add rate limiting
         $schedule->command('payment:read-emails-direct --all --no-match')
             ->everyFifteenSeconds()
             ->withoutOverlapping()
             ->runInBackground()
-            ->name('step1-fetch-emails');
+            ->name('step1-fetch-emails')
+            ->throttle(4); // Max 4 runs per minute (every 15 seconds = 4/min)
         
         // STEP 2: Fill sender_name from text_body if null
         $schedule->command('payment:re-extract-text-body --missing-only')
             ->everyFifteenSeconds()
             ->withoutOverlapping()
             ->runInBackground()
-            ->name('step2-fill-sender-names');
+            ->name('step2-fill-sender-names')
+            ->throttle(4); // Max 4 runs per minute
         
         // STEP 3: Match transactions (global match)
         $schedule->call(function () {

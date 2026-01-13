@@ -626,7 +626,7 @@ Route::get('/cron/global-match', function () {
         }
 
         // Strategy: For each unmatched email, try to match against all pending payments
-        // CRITICAL: matchEmail() already filters by time (email must be after payment creation)
+        // FIXED: Use same approach as admin checkMatch - use matchPayment() directly instead of matchEmail()
         foreach ($unmatchedEmails as $processedEmail) {
             try {
                 $processedEmail->refresh();
@@ -651,38 +651,61 @@ Route::get('/cron/global-match', function () {
                     'processed_email_id' => $processedEmail->id,
                 ];
 
-                // Try matchEmail first (uses extraction)
-                $matchedPayment = $matchingService->matchEmail($emailData);
+                // Extract payment info from email (same as admin checkMatch)
+                $extractionResult = $matchingService->extractPaymentInfo($emailData);
                 
-                // If matchEmail fails (extraction might have failed), try direct matching with stored values
-                if (!$matchedPayment && $processedEmail->amount && $processedEmail->amount > 0) {
-                    // Use stored values as fallback
+                // Handle new format: ['data' => [...], 'method' => '...']
+                $extractedInfo = null;
+                if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                    $extractedInfo = $extractionResult['data'];
+                } else {
+                    $extractedInfo = $extractionResult; // Old format fallback
+                }
+
+                // Use stored values as fallback if extraction fails (same as admin checkMatch)
+                if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
                     $extractedInfo = [
                         'amount' => $processedEmail->amount,
                         'sender_name' => $processedEmail->sender_name,
                         'account_number' => $processedEmail->account_number,
                     ];
+                } else {
+                    // Merge stored values if extraction didn't provide them
+                    if (!isset($extractedInfo['amount']) && $processedEmail->amount) {
+                        $extractedInfo['amount'] = $processedEmail->amount;
+                    }
+                    if (!isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
+                        $extractedInfo['sender_name'] = $processedEmail->sender_name;
+                    }
+                    if (!isset($extractedInfo['account_number']) && $processedEmail->account_number) {
+                        $extractedInfo['account_number'] = $processedEmail->account_number;
+                    }
+                }
+
+                // Find payments with matching amount and time constraints (same as admin checkMatch)
+                $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
+                
+                // CRITICAL: Only check payments created BEFORE email was received
+                $potentialPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->whereBetween('amount', [
+                        $extractedInfo['amount'] - 1,
+                        $extractedInfo['amount'] + 1
+                    ])
+                    ->where('created_at', '<=', $emailDate ?? now()) // Payment must be created BEFORE email
+                    ->orderBy('created_at', 'desc') // Check newest payments first
+                    ->get();
+                
+                $matchedPayment = null;
+                foreach ($potentialPayments as $potentialPayment) {
+                    // Use matchPayment() directly (same as admin checkMatch)
+                    $matchResult = $matchingService->matchPayment($potentialPayment, $extractedInfo, $emailDate);
                     
-                    // Find payments with matching amount and time constraints
-                    $potentialPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
-                        ->where(function ($q) {
-                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                        })
-                        ->whereBetween('amount', [
-                            $processedEmail->amount - 1,
-                            $processedEmail->amount + 1
-                        ])
-                        ->where('created_at', '<=', $processedEmail->email_date)
-                        ->get();
-                    
-                    foreach ($potentialPayments as $potentialPayment) {
-                        $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
-                        $matchResult = $matchingService->matchPayment($potentialPayment, $extractedInfo, $emailDate);
-                        
-                        if ($matchResult['matched']) {
-                            $matchedPayment = $potentialPayment;
-                            break;
-                        }
+                    if ($matchResult['matched']) {
+                        $matchedPayment = $potentialPayment;
+                        break;
                     }
                 }
 

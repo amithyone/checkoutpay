@@ -612,19 +612,32 @@ class ReadEmailsDirect extends Command
             // Extract message ID from filename or headers
             $messageId = $parts['message_id'] ?? md5($content . $filename);
 
-            // Check if already stored
-            $existing = ProcessedEmail::where('message_id', $messageId)
-                ->where('email_account_id', $emailAccount->id)
-                ->first();
-
-            if ($existing) {
+            // IMPROVED: Optimize duplicate checking - load existing IDs once per batch
+            // Note: This is called per email, so we cache existing IDs at command level
+            static $cachedExistingIds = [];
+            static $cachedAccountId = null;
+            
+            // Load existing IDs once per account
+            if ($cachedAccountId !== $emailAccount->id) {
+                $cachedAccountId = $emailAccount->id;
+                $cachedExistingIds = ProcessedEmail::where('email_account_id', $emailAccount->id)
+                    ->whereNotNull('message_id')
+                    ->pluck('message_id')
+                    ->toArray();
+                $cachedExistingIds = array_flip($cachedExistingIds); // O(1) lookup
+            }
+            
+            // Fast O(1) duplicate check
+            if (isset($cachedExistingIds[$messageId])) {
                 Log::debug('Email skipped: already stored', [
                     'message_id' => $messageId,
                     'subject' => $parts['subject'] ?? '',
-                    'existing_id' => $existing->id,
                 ]);
                 return null; // Already stored
             }
+            
+            // Add to cache to prevent duplicates in same batch
+            $cachedExistingIds[$messageId] = true;
 
             $fromEmail = $parts['from_email'] ?? '';
             $fromName = $parts['from_name'] ?? '';

@@ -107,12 +107,9 @@ class MonitorEmails extends Command
             $sinceDate = null;
             
             if ($emailAccount) {
-                // Check if email account has a last_fetched_at timestamp
-                // We'll store this in a notes field or add a column later
-                // For now, use the most recent stored email date
-                $lastStoredEmail = \App\Models\ProcessedEmail::where('email_account_id', $emailAccount->id)
-                    ->orderBy('email_date', 'desc')
-                    ->first();
+                // IMPROVED: Use last_processed_message_id for incremental sync instead of date-based
+                // This is more reliable and prevents re-processing emails
+                $lastProcessedMessageId = $emailAccount->last_processed_message_id;
                 
                 // Check if --all flag is set (fetch ALL emails)
                 if ($this->option('all')) {
@@ -135,12 +132,38 @@ class MonitorEmails extends Command
                     $sinceDate = now()->subDays($days);
                     $this->info("🔍 Fetching emails from last {$days} days");
                     Log::info('Using --days option', ['days' => $days, 'since' => $sinceDate->format('Y-m-d H:i:s')]);
-                } elseif ($lastStoredEmail && $lastStoredEmail->email_date) {
-                    // Fetch emails after the last stored email
-                    $sinceDate = $lastStoredEmail->email_date;
-                    $this->info("🔍 Fetching emails after last stored email: {$sinceDate->format('Y-m-d H:i:s')}");
+                } elseif ($lastProcessedMessageId) {
+                    // IMPROVED: Use last processed message ID for incremental sync
+                    // Fetch emails with UID > lastProcessedMessageId (IMAP)
+                    // Note: This requires IMAP UID support, fallback to date if not available
+                    $lastStoredEmail = \App\Models\ProcessedEmail::where('email_account_id', $emailAccount->id)
+                        ->where('message_id', $lastProcessedMessageId)
+                        ->first();
+                    
+                    if ($lastStoredEmail && $lastStoredEmail->email_date) {
+                        // Use date from last processed email as fallback
+                        $sinceDate = $lastStoredEmail->email_date->subMinutes(1);
+                        $this->info("🔍 Using incremental sync from last processed message ID: {$lastProcessedMessageId} (date: {$sinceDate->format('Y-m-d H:i:s')})");
+                        Log::info('Using incremental sync with message ID', [
+                            'message_id' => $lastProcessedMessageId,
+                            'since_date' => $sinceDate->format('Y-m-d H:i:s'),
+                        ]);
+                    } else {
+                        // Fallback: use date-based fetching
+                        $lastStoredEmail = \App\Models\ProcessedEmail::where('email_account_id', $emailAccount->id)
+                            ->orderBy('email_date', 'desc')
+                            ->first();
+                        
+                        if ($lastStoredEmail && $lastStoredEmail->email_date) {
+                            $sinceDate = $lastStoredEmail->email_date->subMinutes(1);
+                            $this->info("🔍 Fetching emails after last stored email: {$sinceDate->format('Y-m-d H:i:s')}");
+                        } else {
+                            $sinceDate = now()->subDays(7);
+                            $this->info("🔍 No stored emails found, fetching last 7 days: {$sinceDate->format('Y-m-d H:i:s')}");
+                        }
+                    }
                 } else {
-                    // If no stored emails, fetch from oldest pending payment (if exists)
+                    // If no last processed message ID, fetch from oldest pending payment (if exists)
                     $oldestPendingPayment = \App\Models\Payment::pending()
                         ->orderBy('created_at', 'asc')
                         ->first();
@@ -182,9 +205,30 @@ class MonitorEmails extends Command
             $this->info("📧 Fetching emails from folder: {$folderName}");
             $this->info("📅 Fetching emails since: {$sinceDate->format('Y-m-d H:i:s')} ({$sinceDate->diffForHumans()})");
             
-            // Check ALL emails (read and unread) after the payment request date
-            // Fetch ALL emails without filtering - store everything for debugging
-            $query = $folder->query()->since($sinceDate);
+            // IMPROVED: Try to use UID-based incremental sync if available
+            // This is more efficient than date-based fetching
+            $query = $folder->query();
+            
+            // If we have last_processed_message_id and it's numeric (IMAP UID), use UID range
+            if ($emailAccount && $emailAccount->last_processed_message_id && is_numeric($emailAccount->last_processed_message_id)) {
+                try {
+                    // Fetch emails with UID > lastProcessedMessageId
+                    $lastUid = (int)$emailAccount->last_processed_message_id;
+                    $query = $query->uid($lastUid + 1);
+                    $this->info("📧 Using UID-based incremental sync (UID > {$lastUid})");
+                    Log::info('Using UID-based incremental sync', ['last_uid' => $lastUid]);
+                } catch (\Exception $e) {
+                    // Fallback to date-based if UID query fails
+                    Log::warning('UID-based sync failed, falling back to date-based', [
+                        'error' => $e->getMessage(),
+                        'since_date' => $sinceDate->format('Y-m-d H:i:s'),
+                    ]);
+                    $query = $query->since($sinceDate);
+                }
+            } else {
+                // Fallback to date-based fetching
+                $query = $query->since($sinceDate);
+            }
             
             // Get ALL emails without keyword filtering
             // This ensures we don't miss any emails that might contain payment info
@@ -216,13 +260,20 @@ class MonitorEmails extends Command
             $alreadyStoredCount = 0;
             
             // Get all existing message IDs for this account (fast lookup)
+            // Use array_flip for O(1) lookup instead of O(n) in_array
             $existingMessageIds = \App\Models\ProcessedEmail::where('email_account_id', $emailAccount?->id)
+                ->whereNotNull('message_id')
                 ->pluck('message_id')
                 ->toArray();
+            $existingMessageIds = array_flip($existingMessageIds); // Convert to hash map for O(1) lookup
             
             // Get last processed message ID for fast skipping
             $lastProcessedMessageId = $emailAccount?->last_processed_message_id;
             $foundLastProcessed = false;
+            
+            // Performance tracking
+            $startTime = microtime(true);
+            $emailsProcessed = 0;
             
             foreach ($messages as $index => $message) {
                 try {
@@ -253,7 +304,8 @@ class MonitorEmails extends Command
                     }
                     
                     // FAST CHECK: Skip if already stored (check before fetching body)
-                    if (in_array($messageId, $existingMessageIds)) {
+                    // Use isset() for O(1) lookup instead of in_array() O(n)
+                    if (isset($existingMessageIds[$messageId])) {
                         Log::debug('Email skipped: Already stored', [
                             'message_id' => $messageId,
                             'subject' => $subject,
@@ -306,17 +358,27 @@ class MonitorEmails extends Command
                     ]);
                     $this->info("  ✅ Processing email #{$index}: {$subject} (From: {$fromEmail})");
                     
+                    // Track processing time for this email
+                    $emailStartTime = microtime(true);
+                    
                     // Store email in database
                     $storedEmail = $this->storeEmail($message, $emailAccount);
                     
                     if ($storedEmail) {
+                        $emailProcessingTime = round((microtime(true) - $emailStartTime) * 1000, 2);
+                        $emailsProcessed++;
+                        
+                        // Add to existing message IDs to prevent duplicate processing in same batch
+                        $existingMessageIds[$messageId] = true;
+                        
                         Log::info('Email stored successfully', [
                             'message_id' => $messageId,
                             'processed_email_id' => $storedEmail->id,
                             'subject' => $subject,
                             'from' => $fromEmail,
+                            'processing_time_ms' => $emailProcessingTime,
                         ]);
-                        $this->info("  ✅ Stored email #{$index} in database (ID: {$storedEmail->id})");
+                        $this->info("  ✅ Stored email #{$index} in database (ID: {$storedEmail->id}) [{$emailProcessingTime}ms]");
                     } else {
                         Log::warning('Email NOT stored (storeEmail returned null)', [
                             'message_id' => $messageId,
@@ -328,13 +390,9 @@ class MonitorEmails extends Command
                         continue;
                     }
                     
-                    // Update last processed message ID
-                    if ($emailAccount) {
-                        $emailAccount->update([
-                            'last_processed_message_id' => $messageId,
-                            'last_processed_at' => now(),
-                        ]);
-                    }
+                    // Update last processed message ID (batch update at end for better performance)
+                    // Store in variable to update once at the end
+                    $lastProcessedMessageId = $messageId;
                     
                     // Try to extract payment info - if it has payment data, process it
                     $matchingService = new PaymentMatchingService(
@@ -403,10 +461,22 @@ class MonitorEmails extends Command
                 }
             }
             
+            // Update last processed message ID once at the end (batch update)
+            if ($emailAccount && isset($lastProcessedMessageId)) {
+                $emailAccount->update([
+                    'last_processed_message_id' => $lastProcessedMessageId,
+                    'last_processed_at' => now(),
+                ]);
+            }
+            
             // Count actually stored emails
             $storedCount = ProcessedEmail::where('email_account_id', $emailAccount?->id)
                 ->where('created_at', '>=', now()->subMinutes(5))
                 ->count();
+            
+            // Calculate total processing time
+            $totalProcessingTime = round((microtime(true) - $startTime) * 1000, 2);
+            $avgProcessingTime = $emailsProcessed > 0 ? round($totalProcessingTime / $emailsProcessed, 2) : 0;
             
             $summary = [
                 'email_account_id' => $emailAccount?->id,
@@ -417,6 +487,9 @@ class MonitorEmails extends Command
                 'processed_for_matching' => $processedCount,
                 'skipped' => $skippedCount,
                 'since_date' => $sinceDate->format('Y-m-d H:i:s'),
+                'total_processing_time_ms' => $totalProcessingTime,
+                'avg_processing_time_ms' => $avgProcessingTime,
+                'emails_processed' => $emailsProcessed,
             ];
             
             Log::info('IMAP Email Fetching Summary', $summary);
@@ -430,6 +503,7 @@ class MonitorEmails extends Command
             $this->info("💰 Processed for matching: {$processedCount} (with payment info)");
             $this->info("⏭️  Skipped: {$skippedCount}");
             $this->info("📅 Fetching since: {$sinceDate->format('Y-m-d H:i:s')}");
+            $this->info("⏱️  Total time: {$totalProcessingTime}ms | Avg: {$avgProcessingTime}ms per email");
             $this->info("═══════════════════════════════════════════");
             
             if ($totalEmailsFound > 0 && $storedCount === 0 && $alreadyStoredCount === 0) {
