@@ -524,28 +524,46 @@ class PaymentMatchingService
             // Pattern 4: "Description : CODE-TRANSFER FROM NAME-..."
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TRANSFER\s+FROM\s+([A-Z][A-Z\s\-]{3,50}?)(?:\s*-\s*(?:OPAY|GTBANK|ACCESS|ZENITH|UBA|FIRST\s+BANK|INNOCE))/i',
             
-            // Pattern 5: "Description : CODE-TXN-CODE-CODE-NAME" format (handles quoted-printable)
+            // Pattern 5: "Description : CODE-TXN-CODE-CODE-PALMPAY-NAME" format (PALMPAY/OPAY specific - high priority)
+            // Handles: ...-TXN-CODE-CODE-PALMPAY-OKWUDIRI RICHARD Amount
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TXN-[\d\-]+-[A-Z]+[\s=]*[A-Z\-]*[\s=]*-[\s=]*(?:PALMPAY|OPAY|KUD|KUDABANK)[\s=]*-[\s=]*([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value)/i',
+            
+            // Pattern 5b: "Description : ...-PALMPAY-NAME" format (simpler pattern for PALMPAY)
+            // Handles: ...-PALMPAY-OKWUDIRI RICHARD Amount
+            '/description[\s:]+.*?-(?:PALMPAY|OPAY|KUD|KUDABANK)-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value)/i',
+            
+            // Pattern 5c: "Description : ...-INTERNET-KMB-NAME" or "...-KMB-NAME" format (KMB specific)
+            // Handles: ...-INTERNET-KMB-AKINDEINDE, OLAYINKA H Amount
+            '/description[\s:]+.*?-(?:INTERNET-)?KMB-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value|\s*H\s*=)/i',
+            
+            // Pattern 6: "Description : CODE-TXN-CODE-CODE-NAME" format (handles quoted-printable)
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TXN-[\d\-]+-[A-Z]+=\s*[A-Z\-]*-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount)/i',
             
-            // Pattern 6: "Description : CODE-BBBB-KMB-NAME" format (handles quoted-printable)
+            // Pattern 7: "Description : CODE-BBBB-KMB-NAME" format (handles quoted-printable)
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-BBBB-KMB-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*\.)/i',
             
-            // Pattern 7: "Description : CODE-CODE-CODE-NAME" format (generic pattern)
+            // Pattern 8: "Description : CODE-CODE-CODE-NAME" format (generic pattern)
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-[A-Z]+-[A-Z]+-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*\.)/i',
             
-            // Pattern 8: "Description : CODE-NAME = PHONE-BANK" format (name before phone number)
+            // Pattern 9: "Description : CODE-NAME = PHONE-BANK" format (name before phone number)
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-([A-Z][A-Z\s\-,]{3,50}?)\s*=\s*[\d]+-[A-Z]+/i',
             
-            // Pattern 9: "Description : CODE-NAME-BANK-NAME" format (extract first name before bank)
+            // Pattern 10: "Description : CODE-NAME-BANK-NAME" format (extract first name before bank)
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-([A-Z][A-Z\s\-,]{3,50}?)-(?:OPAY|GTBANK|ACCESS|ZENITH|UBA|FIRST\s+BANK|PALMPAY|KUD|BBBB|KMB)/i',
             
-            // Pattern 10: "Remarks : NAME" (extract name from remarks field)
+            // Pattern 11: "Description : ...-PALMPAY-NAME" or "...-OPAY-NAME" format (payment provider followed by name)
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TXN-[\d\-]+-[A-Z]+[\s=]*[A-Z\-]*[\s=]*-[\s=]*(?:PALMPAY|OPAY|KUD|KUDABANK)[\s=]*-[\s=]*([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value)/i',
+            
+            // Pattern 12: "Description : ...-PALMPAY NAME" format (space instead of hyphen)
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TXN-[\d\-]+-[A-Z]+[\s=]*[A-Z\-]*[\s=]*-[\s=]*(?:PALMPAY|OPAY|KUD|KUDABANK)[\s=]+([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value)/i',
+            
+            // Pattern 13: "Remarks : NAME" (extract name from remarks field)
             '/remark[s]?[\s:]+([A-Z][A-Z\s\-,]{3,50}?)(?:\s*\||\s*$|\s*Time)/i',
             
-            // Pattern 3: "FROM OPAY/ NAME" or "FROM BANK/ NAME"
+            // Pattern 14: "FROM OPAY/ NAME" or "FROM BANK/ NAME"
             '/from\s+(?:[A-Z]+\/|OPAY\/|GTBANK\/|ACCESS\/|ZENITH\/|UBA\/|FIRST\s+BANK\/)\s*([A-Z][A-Z\s\-]{3,50}?)(?:\s*\/|\s*Support|\s*\||\s*$)/i',
             
-            // Pattern 4: "received from NAME"
+            // Pattern 15: "received from NAME"
             '/received\s+from\s+([A-Z][A-Z\s\-]{3,50}?)(?:\s*\||\s*$)/i',
             
             // Pattern 5: "FROM NAME TO" (standard format)

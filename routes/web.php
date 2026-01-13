@@ -123,17 +123,35 @@ Route::get('/cron/monitor-emails', function () {
     }
 })->name('cron.monitor-emails');
 
-// Direct Filesystem Email Reading Cron (RECOMMENDED for shared hosting)
+// Direct Filesystem Email Reading Cron (PUBLIC ENDPOINT - for cron job websites)
 // FIXED: Use same logic as admin dashboard button - calls the same controller method
 // Reads from filesystem regardless of email account method setting
-Route::get('/cron/read-emails-direct', function () {
+// Optional security: Add ?token=YOUR_SECRET_TOKEN to protect the endpoint
+Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $request) {
     try {
+        // Optional security: Check for secret token if configured
+        $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
+        if ($requiredToken) {
+            $providedToken = $request->query('token') ?? $request->header('X-Cron-Token');
+            if ($providedToken !== $requiredToken) {
+                \Illuminate\Support\Facades\Log::warning('Unauthorized cron access attempt', [
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: Invalid or missing token',
+                    'timestamp' => now()->toDateTimeString(),
+                ], 401);
+            }
+        }
+        
         $startTime = microtime(true);
         
         // Use the same controller method as the admin dashboard button
         // This ensures emails are processed and matched exactly like the dashboard button
         $controller = new \App\Http\Controllers\Admin\EmailMonitorController();
-        $request = new \Illuminate\Http\Request();
         
         $response = $controller->fetchEmailsDirect($request);
         $responseData = json_decode($response->getContent(), true);
@@ -198,27 +216,53 @@ Route::get('/cron/fill-sender-names', function () {
 })->name('cron.fill-sender-names');
 
 // Extract Missing Names Cron (Advanced Name Extraction)
-Route::get('/cron/extract-missing-names', function () {
+// Extract Missing Names Cron (PUBLIC ENDPOINT - for cron job websites)
+// Extracts sender names from emails that don't have names yet
+// Uses same logic as admin dashboard button - calls the same controller method
+// Optional security: Add ?token=YOUR_SECRET_TOKEN to protect the endpoint
+Route::get('/cron/extract-missing-names', function (\Illuminate\Http\Request $request) {
     try {
+        // Optional security: Check for secret token if configured
+        $requiredToken = env('CRON_EMAIL_FETCH_TOKEN'); // Reuse same token as email fetch
+        if ($requiredToken) {
+            $providedToken = $request->query('token') ?? $request->header('X-Cron-Token');
+            if ($providedToken !== $requiredToken) {
+                \Illuminate\Support\Facades\Log::warning('Unauthorized cron access attempt (Extract Names)', [
+                    'ip' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: Invalid or missing token',
+                    'timestamp' => now()->toDateTimeString(),
+                ], 401);
+            }
+        }
+        
         $startTime = microtime(true);
         
-        // Extract missing sender names and description fields from text_body
-        \Illuminate\Support\Facades\Artisan::call('payment:re-extract-text-body', [
-            '--missing-only' => true,
-            '--limit' => 100,
-        ]);
+        // Use the same controller method as the admin dashboard button
+        // This ensures name extraction works exactly like the dashboard button
+        $controller = new \App\Http\Controllers\Admin\DashboardController();
         
-        $output = \Illuminate\Support\Facades\Artisan::output();
+        // Get limit from query parameter (default 50, same as dashboard button)
+        $limit = (int) $request->query('limit', 50);
+        $request->merge(['limit' => $limit]);
+        
+        $response = $controller->extractMissingNames($request);
+        $responseData = json_decode($response->getContent(), true);
+        
         $executionTime = round(microtime(true) - $startTime, 2);
         
-        return response()->json([
-            'success' => true,
-            'message' => 'Missing name extraction completed',
-            'method' => 'extract_missing_names',
-            'timestamp' => now()->toDateTimeString(),
-            'execution_time_seconds' => $executionTime,
-            'output' => $output,
-        ]);
+        // Add execution time to response
+        if ($responseData) {
+            $responseData['execution_time_seconds'] = $executionTime;
+            $responseData['method'] = 'extract_missing_names';
+            $responseData['timestamp'] = now()->toDateTimeString();
+        }
+        
+        return response()->json($responseData, $response->getStatusCode());
     } catch (\Exception $e) {
         \Illuminate\Support\Facades\Log::error('Cron job error (Extract Missing Names)', [
             'error' => $e->getMessage(),
