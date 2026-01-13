@@ -174,7 +174,7 @@ class PaymentController extends Controller
                     continue;
                 }
 
-                $emailDate = $storedEmail->email_date ? new \DateTime($storedEmail->email_date->toDateTimeString()) : null;
+                $emailDate = $storedEmail->email_date ? \Carbon\Carbon::parse($storedEmail->email_date) : null;
                 $match = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
 
                 // Log match attempt

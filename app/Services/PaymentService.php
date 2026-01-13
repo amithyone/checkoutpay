@@ -162,7 +162,8 @@ class PaymentService
                     continue;
                 }
                 
-                $match = $this->paymentMatchingService->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+                $emailDate = $storedEmail->email_date ? Carbon::parse($storedEmail->email_date) : null;
+                $match = $this->paymentMatchingService->matchPayment($payment, $extractedInfo, $emailDate);
                 
                 if ($match['matched']) {
                     // Mark stored email as matched

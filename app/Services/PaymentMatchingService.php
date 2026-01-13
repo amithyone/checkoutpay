@@ -701,7 +701,8 @@ class PaymentMatchingService
                 }
                 
                 $extractedInfo = $extractionResult['data'];
-                $matchResult = $this->matchPayment($payment, $extractedInfo, $email->email_date);
+                $emailDate = $email->email_date ? Carbon::parse($email->email_date) : null;
+                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate);
                 
                 if ($matchResult['matched']) {
                     return $email;

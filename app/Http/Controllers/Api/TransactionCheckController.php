@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\PaymentMatchingService;
 use App\Services\TransactionLogService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -65,7 +66,8 @@ class TransactionCheckController extends Controller
                     $extractedInfo = $extractionResult['data'] ?? null;
                     
                     if ($extractedInfo && isset($extractedInfo['amount']) && $extractedInfo['amount']) {
-                        $match = $matchingService->matchPayment($payment, $extractedInfo, $storedEmail->email_date);
+                        $emailDate = $storedEmail->email_date ? Carbon::parse($storedEmail->email_date) : null;
+                        $match = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
                         
                         if ($match['matched']) {
                             // Mark email as matched
