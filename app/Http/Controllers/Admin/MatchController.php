@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
 use App\Services\DescriptionFieldExtractor;
+use App\Services\MatchAttemptLogger;
 use App\Services\PaymentMatchingService;
 use App\Services\TransactionLogService;
 use Illuminate\Http\Request;
@@ -122,8 +123,10 @@ class MatchController extends Controller
                 Log::info("Parsed {$parsedCount} description fields before matching");
             }
 
-            // Strategy: For each unmatched email, try to match against all pending payments
-            // This uses the PaymentMatchingService.matchEmail which automatically logs all attempts
+            // Strategy: Use same logic as PaymentController::checkMatch (which works!)
+            // For each unmatched email, extract info and match against pending payments
+            $matchLogger = new \App\Services\MatchAttemptLogger();
+            
             foreach ($unmatchedEmails as $processedEmail) {
                 try {
                     // Skip if already matched (in case it was matched in this run)
@@ -132,9 +135,14 @@ class MatchController extends Controller
                         continue;
                     }
 
+                    // Skip emails without amount (can't match without amount)
+                    if (!$processedEmail->amount || $processedEmail->amount <= 0) {
+                        continue;
+                    }
+
                     $results['emails_checked']++;
 
-                    // Rebuild email data
+                    // Rebuild email data (same as PaymentController::checkMatch)
                     $emailData = [
                         'subject' => $processedEmail->subject,
                         'from' => $processedEmail->from_email,
@@ -145,9 +153,97 @@ class MatchController extends Controller
                         'processed_email_id' => $processedEmail->id,
                     ];
 
-                    // Try to match email against all pending payments
-                    // This will use matchEmail which logs attempts automatically for each payment tried
-                    $matchedPayment = $matchingService->matchEmail($emailData);
+                    // Extract payment info from email (same as PaymentController::checkMatch)
+                    $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                    
+                    // Handle new format: ['data' => [...], 'method' => '...']
+                    $extractedInfo = null;
+                    $extractionMethod = null;
+                    if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                        $extractedInfo = $extractionResult['data'];
+                        $extractionMethod = $extractionResult['method'] ?? null;
+                    } else {
+                        $extractedInfo = $extractionResult; // Old format fallback
+                        $extractionMethod = 'unknown';
+                    }
+
+                    // Use stored values as fallback if extraction fails (same as PaymentController::checkMatch)
+                    if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
+                        $extractedInfo = [
+                            'amount' => $processedEmail->amount,
+                            'sender_name' => $processedEmail->sender_name,
+                            'account_number' => $processedEmail->account_number,
+                        ];
+                    } else {
+                        // Merge stored values if extraction didn't provide them
+                        if (!isset($extractedInfo['amount']) && $processedEmail->amount) {
+                            $extractedInfo['amount'] = $processedEmail->amount;
+                        }
+                        if (!isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
+                            $extractedInfo['sender_name'] = $processedEmail->sender_name;
+                        }
+                        if (!isset($extractedInfo['account_number']) && $processedEmail->account_number) {
+                            $extractedInfo['account_number'] = $processedEmail->account_number;
+                        }
+                    }
+
+                    // Get unmatched stored emails with matching amount (same as PaymentController::checkMatch)
+                    $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
+                    
+                    // Find payments with matching amount (same as PaymentController::checkMatch)
+                    $potentialPayments = Payment::where('status', Payment::STATUS_PENDING)
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                        })
+                        ->whereBetween('amount', [
+                            $extractedInfo['amount'] - 1,
+                            $extractedInfo['amount'] + 1
+                        ])
+                        ->where('created_at', '<=', $emailDate ?? now()) // Payment must be created BEFORE email
+                        ->orderBy('created_at', 'desc')
+                        ->get();
+
+                    $matchedPayment = null;
+                    foreach ($potentialPayments as $potentialPayment) {
+                        // Use matchPayment() directly (same as PaymentController::checkMatch)
+                        $match = $matchingService->matchPayment($potentialPayment, $extractedInfo, $emailDate);
+
+                        // Log match attempt (same as PaymentController::checkMatch)
+                        try {
+                            $matchLogger->logAttempt([
+                                'payment_id' => $potentialPayment->id,
+                                'processed_email_id' => $processedEmail->id,
+                                'transaction_id' => $potentialPayment->transaction_id,
+                                'match_result' => $match['matched'] ? \App\Models\MatchAttempt::RESULT_MATCHED : \App\Models\MatchAttempt::RESULT_UNMATCHED,
+                                'reason' => $match['reason'] ?? 'Unknown reason',
+                                'payment_amount' => $potentialPayment->amount,
+                                'payment_name' => $potentialPayment->payer_name,
+                                'payment_account_number' => $potentialPayment->account_number,
+                                'payment_created_at' => $potentialPayment->created_at,
+                                'extracted_amount' => $extractedInfo['amount'] ?? null,
+                                'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                                'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                                'email_subject' => $processedEmail->subject,
+                                'email_from' => $processedEmail->from_email,
+                                'email_date' => $emailDate,
+                                'amount_diff' => $match['amount_diff'] ?? null,
+                                'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                                'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                                'extraction_method' => $extractionMethod,
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::error('Failed to log match attempt in global match', [
+                                'error' => $e->getMessage(),
+                                'payment_id' => $potentialPayment->id,
+                                'email_id' => $processedEmail->id,
+                            ]);
+                        }
+
+                        if ($match['matched']) {
+                            $matchedPayment = $potentialPayment;
+                            break;
+                        }
+                    }
 
                     if ($matchedPayment) {
                         $results['matches_found']++;
@@ -158,9 +254,31 @@ class MatchController extends Controller
                             'payment_id' => $matchedPayment->id,
                         ];
 
-                        // Process the email payment (approve payment)
-                        // This will also update the email as matched and approve the payment
-                        \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
+                        // Mark email as matched (same as PaymentController::checkMatch)
+                        $processedEmail->markAsMatched($matchedPayment);
+
+                        // Approve payment (same as PaymentController::checkMatch)
+                        $matchedPayment->approve([
+                            'subject' => $processedEmail->subject,
+                            'from' => $processedEmail->from_email,
+                            'text' => $processedEmail->text_body,
+                            'html' => $processedEmail->html_body,
+                            'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                            'sender_name' => $processedEmail->sender_name,
+                        ]);
+                        
+                        // Update payer_account_number if extracted (same as PaymentController::checkMatch)
+                        if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
+                            $matchedPayment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
+                        }
+
+                        // Update business balance (same as PaymentController::checkMatch)
+                        if ($matchedPayment->business_id) {
+                            $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                        }
+
+                        // Dispatch event to send webhook (same as PaymentController::checkMatch)
+                        event(new \App\Events\PaymentApproved($matchedPayment));
 
                         Log::info('Global match: Email matched to payment', [
                             'email_id' => $processedEmail->id,
@@ -181,7 +299,7 @@ class MatchController extends Controller
             }
 
             // Also check pending payments that weren't matched in the first pass
-            // This ensures we catch any payments that were created but no email was found yet
+            // Use same logic as PaymentController::checkMatch (which works!)
             foreach ($pendingPayments as $payment) {
                 try {
                     // Refresh to get latest status
@@ -199,74 +317,128 @@ class MatchController extends Controller
 
                     $results['payments_checked']++;
 
-                    // Get unmatched emails that could potentially match this payment
-                    // CRITICAL: Only check emails received AFTER transaction creation
-                    $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
-                    $checkUntil = $payment->created_at->copy()->addMinutes($timeWindowMinutes);
-                    
-                    $potentialEmails = ProcessedEmail::where('is_matched', false)
-                        ->where(function ($q) use ($payment, $checkUntil) {
-                            $q->where('amount', $payment->amount)
-                                ->where('email_date', '>=', $payment->created_at) // Email must be AFTER transaction creation
-                                ->where('email_date', '<=', $checkUntil);
-                        })
+                    // Get unmatched stored emails with matching amount (same as PaymentController::checkMatch)
+                    $storedEmails = ProcessedEmail::where('is_matched', false)
+                        ->whereBetween('amount', [
+                            $payment->amount - 1,
+                            $payment->amount + 1
+                        ])
+                        ->where('email_date', '>=', $payment->created_at) // Email must be AFTER transaction creation
                         ->get();
 
-                    foreach ($potentialEmails as $processedEmail) {
+                    $matchedEmail = null;
+                    foreach ($storedEmails as $storedEmail) {
+                        // Skip if already matched (from first pass)
+                        $storedEmail->refresh();
+                        if ($storedEmail->is_matched) {
+                            continue;
+                        }
+
+                        // Re-extract payment info from html_body (same as PaymentController::checkMatch)
+                        $emailData = [
+                            'subject' => $storedEmail->subject,
+                            'from' => $storedEmail->from_email,
+                            'text' => $storedEmail->text_body ?? '',
+                            'html' => $storedEmail->html_body ?? '',
+                            'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : null,
+                            'email_account_id' => $storedEmail->email_account_id,
+                            'processed_email_id' => $storedEmail->id,
+                        ];
+
+                        $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                        
+                        // Handle new format: ['data' => [...], 'method' => '...']
+                        $extractedInfo = null;
+                        $extractionMethod = null;
+                        if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                            $extractedInfo = $extractionResult['data'];
+                            $extractionMethod = $extractionResult['method'] ?? null;
+                        } else {
+                            $extractedInfo = $extractionResult; // Old format fallback
+                            $extractionMethod = 'unknown';
+                        }
+
+                        if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
+                            continue;
+                        }
+
+                        $emailDate = $storedEmail->email_date ? \Carbon\Carbon::parse($storedEmail->email_date) : null;
+                        $match = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
+
+                        // Log match attempt (same as PaymentController::checkMatch)
                         try {
-                            // Skip if already matched (from first pass)
-                            $processedEmail->refresh();
-                            if ($processedEmail->is_matched) {
-                                continue;
-                            }
-
-                            // Rebuild email data
-                            $emailData = [
-                                'subject' => $processedEmail->subject,
-                                'from' => $processedEmail->from_email,
-                                'text' => $processedEmail->text_body ?? '',
-                                'html' => $processedEmail->html_body ?? '',
-                                'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
-                                'email_account_id' => $processedEmail->email_account_id,
-                                'processed_email_id' => $processedEmail->id,
-                            ];
-
-                            // Try to match email to this specific payment
-                            // This will log attempts automatically
-                            $matchedPayment = $matchingService->matchEmail($emailData);
-
-                            if ($matchedPayment && $matchedPayment->id === $payment->id) {
-                                $results['matches_found']++;
-                                $results['matched_payments'][] = [
-                                    'transaction_id' => $payment->transaction_id,
-                                    'payment_id' => $payment->id,
-                                    'email_id' => $processedEmail->id,
-                                    'email_subject' => $processedEmail->subject,
-                                ];
-
-                                // Process the email payment (approve payment)
-                                \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
-
-                                Log::info('Global match: Payment matched to email', [
-                                    'transaction_id' => $payment->transaction_id,
-                                    'email_id' => $processedEmail->id,
-                                ]);
-
-                                // Break after first match (one email per payment)
-                                break;
-                            }
-                        } catch (\Exception $e) {
-                            $results['errors'][] = [
-                                'type' => 'payment_match',
+                            $matchLogger->logAttempt([
+                                'payment_id' => $payment->id,
+                                'processed_email_id' => $storedEmail->id,
                                 'transaction_id' => $payment->transaction_id,
-                                'email_id' => $processedEmail->id ?? 'unknown',
-                                'error' => $e->getMessage(),
-                            ];
-                            Log::error('Error matching payment to email in global match', [
-                                'transaction_id' => $payment->transaction_id,
-                                'email_id' => $processedEmail->id ?? 'unknown',
-                                'error' => $e->getMessage(),
+                                'match_result' => $match['matched'] ? \App\Models\MatchAttempt::RESULT_MATCHED : \App\Models\MatchAttempt::RESULT_UNMATCHED,
+                                'reason' => $match['reason'] ?? 'Unknown reason',
+                                'payment_amount' => $payment->amount,
+                                'payment_name' => $payment->payer_name,
+                                'payment_account_number' => $payment->account_number,
+                                'payment_created_at' => $payment->created_at,
+                                'extracted_amount' => $extractedInfo['amount'] ?? null,
+                                'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                                'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                                'email_subject' => $storedEmail->subject,
+                                'email_from' => $storedEmail->from_email,
+                                'email_date' => $emailDate,
+                                'amount_diff' => $match['amount_diff'] ?? null,
+                                'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                                'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                                'extraction_method' => $extractionMethod,
                             ]);
+                        } catch (\Exception $e) {
+                            Log::error('Failed to log match attempt in global match', [
+                                'error' => $e->getMessage(),
+                                'payment_id' => $payment->id,
+                                'email_id' => $storedEmail->id,
+                            ]);
+                        }
+
+                        if ($match['matched']) {
+                            $matchedEmail = $storedEmail;
+
+                            // Mark email as matched (same as PaymentController::checkMatch)
+                            $storedEmail->markAsMatched($payment);
+
+                            // Approve payment (same as PaymentController::checkMatch)
+                            $payment->approve([
+                                'subject' => $storedEmail->subject,
+                                'from' => $storedEmail->from_email,
+                                'text' => $storedEmail->text_body,
+                                'html' => $storedEmail->html_body,
+                                'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                                'sender_name' => $storedEmail->sender_name,
+                            ]);
+                            
+                            // Update payer_account_number if extracted (same as PaymentController::checkMatch)
+                            if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
+                                $payment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
+                            }
+
+                            // Update business balance (same as PaymentController::checkMatch)
+                            if ($payment->business_id) {
+                                $payment->business->increment('balance', $payment->amount);
+                            }
+
+                            // Dispatch event to send webhook (same as PaymentController::checkMatch)
+                            event(new \App\Events\PaymentApproved($payment));
+
+                            $results['matches_found']++;
+                            $results['matched_payments'][] = [
+                                'transaction_id' => $payment->transaction_id,
+                                'payment_id' => $payment->id,
+                                'email_id' => $storedEmail->id,
+                                'email_subject' => $storedEmail->subject,
+                            ];
+
+                            Log::info('Global match: Payment matched to email', [
+                                'transaction_id' => $payment->transaction_id,
+                                'email_id' => $storedEmail->id,
+                            ]);
+
+                            break; // One email per payment
                         }
                     }
                 } catch (\Exception $e) {

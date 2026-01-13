@@ -745,12 +745,51 @@ Route::get('/cron/global-match', function () {
                     ->orderBy('created_at', 'desc') // Check newest payments first
                     ->get();
                 
+                // Use same logic as PaymentController::checkMatch (which works!)
+                $matchLogger = new \App\Services\MatchAttemptLogger();
                 $matchedPayment = null;
+                
                 foreach ($potentialPayments as $potentialPayment) {
-                    // Use matchPayment() directly (same as admin checkMatch)
-                    $matchResult = $matchingService->matchPayment($potentialPayment, $extractedInfo, $emailDate);
+                    // Use matchPayment() directly (same as PaymentController::checkMatch)
+                    $match = $matchingService->matchPayment($potentialPayment, $extractedInfo, $emailDate);
+
+                    // Log match attempt (same as PaymentController::checkMatch)
+                    try {
+                        $extractionMethod = null;
+                        if (is_array($extractionResult) && isset($extractionResult['method'])) {
+                            $extractionMethod = $extractionResult['method'];
+                        }
+                        
+                        $matchLogger->logAttempt([
+                            'payment_id' => $potentialPayment->id,
+                            'processed_email_id' => $processedEmail->id,
+                            'transaction_id' => $potentialPayment->transaction_id,
+                            'match_result' => $match['matched'] ? \App\Models\MatchAttempt::RESULT_MATCHED : \App\Models\MatchAttempt::RESULT_UNMATCHED,
+                            'reason' => $match['reason'] ?? 'Unknown reason',
+                            'payment_amount' => $potentialPayment->amount,
+                            'payment_name' => $potentialPayment->payer_name,
+                            'payment_account_number' => $potentialPayment->account_number,
+                            'payment_created_at' => $potentialPayment->created_at,
+                            'extracted_amount' => $extractedInfo['amount'] ?? null,
+                            'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                            'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                            'email_subject' => $processedEmail->subject,
+                            'email_from' => $processedEmail->from_email,
+                            'email_date' => $emailDate,
+                            'amount_diff' => $match['amount_diff'] ?? null,
+                            'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                            'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                            'extraction_method' => $extractionMethod,
+                        ]);
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('Failed to log match attempt in global match cron', [
+                            'error' => $e->getMessage(),
+                            'payment_id' => $potentialPayment->id,
+                            'email_id' => $processedEmail->id,
+                        ]);
+                    }
                     
-                    if ($matchResult['matched']) {
+                    if ($match['matched']) {
                         $matchedPayment = $potentialPayment;
                         break;
                     }
@@ -765,8 +804,31 @@ Route::get('/cron/global-match', function () {
                         'payment_id' => $matchedPayment->id,
                     ];
 
-                    // Process the email payment (approve payment)
-                    \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
+                    // Mark email as matched (same as PaymentController::checkMatch)
+                    $processedEmail->markAsMatched($matchedPayment);
+
+                    // Approve payment (same as PaymentController::checkMatch)
+                    $matchedPayment->approve([
+                        'subject' => $processedEmail->subject,
+                        'from' => $processedEmail->from_email,
+                        'text' => $processedEmail->text_body,
+                        'html' => $processedEmail->html_body,
+                        'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                        'sender_name' => $processedEmail->sender_name,
+                    ]);
+                    
+                    // Update payer_account_number if extracted (same as PaymentController::checkMatch)
+                    if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
+                        $matchedPayment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
+                    }
+
+                    // Update business balance (same as PaymentController::checkMatch)
+                    if ($matchedPayment->business_id) {
+                        $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                    }
+
+                    // Dispatch event to send webhook (same as PaymentController::checkMatch)
+                    event(new \App\Events\PaymentApproved($matchedPayment));
                 }
             } catch (\Exception $e) {
                 $results['errors'][] = [
@@ -831,19 +893,28 @@ Route::get('/cron/global-match', function () {
                             'processed_email_id' => $processedEmail->id,
                         ];
 
-                        // Extract payment info from email
+                        // Extract payment info from email (same as PaymentController::checkMatch)
                         $extractionResult = $matchingService->extractPaymentInfo($emailData);
                         
-                        // Use stored values as fallback if extraction fails
-                        if (!$extractionResult || !isset($extractionResult['data'])) {
-                            // Fallback to stored values from database
+                        // Handle new format: ['data' => [...], 'method' => '...']
+                        $extractedInfo = null;
+                        $extractionMethod = null;
+                        if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                            $extractedInfo = $extractionResult['data'];
+                            $extractionMethod = $extractionResult['method'] ?? null;
+                        } else {
+                            $extractedInfo = $extractionResult; // Old format fallback
+                            $extractionMethod = 'unknown';
+                        }
+
+                        // Use stored values as fallback if extraction fails (same as PaymentController::checkMatch)
+                        if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
                             $extractedInfo = [
                                 'amount' => $processedEmail->amount,
                                 'sender_name' => $processedEmail->sender_name,
                                 'account_number' => $processedEmail->account_number,
                             ];
                         } else {
-                            $extractedInfo = $extractionResult['data'];
                             // Merge stored values if extraction didn't provide them
                             if (!isset($extractedInfo['amount']) && $processedEmail->amount) {
                                 $extractedInfo['amount'] = $processedEmail->amount;
@@ -851,24 +922,83 @@ Route::get('/cron/global-match', function () {
                             if (!isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
                                 $extractedInfo['sender_name'] = $processedEmail->sender_name;
                             }
+                            if (!isset($extractedInfo['account_number']) && $processedEmail->account_number) {
+                                $extractedInfo['account_number'] = $processedEmail->account_number;
+                            }
                         }
                         
-                        // Use matchPayment directly to check this specific payment
+                        // Use matchPayment() directly (same as PaymentController::checkMatch)
                         $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
-                        $matchResult = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
+                        $match = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
+                        
+                        // Log match attempt (same as PaymentController::checkMatch)
+                        try {
+                            $matchLogger = new \App\Services\MatchAttemptLogger();
+                            $matchLogger->logAttempt([
+                                'payment_id' => $payment->id,
+                                'processed_email_id' => $processedEmail->id,
+                                'transaction_id' => $payment->transaction_id,
+                                'match_result' => $match['matched'] ? \App\Models\MatchAttempt::RESULT_MATCHED : \App\Models\MatchAttempt::RESULT_UNMATCHED,
+                                'reason' => $match['reason'] ?? 'Unknown reason',
+                                'payment_amount' => $payment->amount,
+                                'payment_name' => $payment->payer_name,
+                                'payment_account_number' => $payment->account_number,
+                                'payment_created_at' => $payment->created_at,
+                                'extracted_amount' => $extractedInfo['amount'] ?? null,
+                                'extracted_name' => $extractedInfo['sender_name'] ?? null,
+                                'extracted_account_number' => $extractedInfo['account_number'] ?? null,
+                                'email_subject' => $processedEmail->subject,
+                                'email_from' => $processedEmail->from_email,
+                                'email_date' => $emailDate,
+                                'amount_diff' => $match['amount_diff'] ?? null,
+                                'name_similarity_percent' => $match['name_similarity_percent'] ?? null,
+                                'time_diff_minutes' => $match['time_diff_minutes'] ?? null,
+                                'extraction_method' => $extractionMethod,
+                            ]);
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error('Failed to log match attempt in global match cron', [
+                                'error' => $e->getMessage(),
+                                'payment_id' => $payment->id,
+                                'email_id' => $processedEmail->id,
+                            ]);
+                        }
 
-                        if ($matchResult['matched']) {
+                        if ($match['matched']) {
                             $results['matches_found']++;
                             $results['matched_payments'][] = [
                                 'transaction_id' => $payment->transaction_id,
                                 'payment_id' => $payment->id,
                                 'email_id' => $processedEmail->id,
                                 'email_subject' => $processedEmail->subject,
-                                'match_reason' => $matchResult['reason'] ?? 'Matched',
+                                'match_reason' => $match['reason'] ?? 'Matched',
                             ];
 
-                            // Process the email payment (approve payment)
-                            \App\Jobs\ProcessEmailPayment::dispatchSync($emailData);
+                            // Mark email as matched (same as PaymentController::checkMatch)
+                            $processedEmail->markAsMatched($payment);
+
+                            // Approve payment (same as PaymentController::checkMatch)
+                            $payment->approve([
+                                'subject' => $processedEmail->subject,
+                                'from' => $processedEmail->from_email,
+                                'text' => $processedEmail->text_body,
+                                'html' => $processedEmail->html_body,
+                                'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                                'sender_name' => $processedEmail->sender_name,
+                            ]);
+                            
+                            // Update payer_account_number if extracted (same as PaymentController::checkMatch)
+                            if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
+                                $payment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
+                            }
+
+                            // Update business balance (same as PaymentController::checkMatch)
+                            if ($payment->business_id) {
+                                $payment->business->increment('balance', $payment->amount);
+                            }
+
+                            // Dispatch event to send webhook (same as PaymentController::checkMatch)
+                            event(new \App\Events\PaymentApproved($payment));
+
                             break;
                         }
                     } catch (\Exception $e) {
