@@ -140,4 +140,86 @@ class DashboardController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Clear all sender names and re-extract them to test accuracy
+     */
+    public function testSenderExtraction(Request $request)
+    {
+        try {
+            $matchingService = new \App\Services\PaymentMatchingService();
+            
+            // Get initial stats
+            $totalEmails = ProcessedEmail::count();
+            $emailsWithSenderName = ProcessedEmail::whereNotNull('sender_name')->count();
+            
+            // Clear all sender names
+            $cleared = ProcessedEmail::query()->update(['sender_name' => null]);
+            
+            // Re-extract sender names
+            $emails = ProcessedEmail::all();
+            $successCount = 0;
+            $failedCount = 0;
+            $skippedCount = 0;
+            
+            foreach ($emails as $email) {
+                try {
+                    $extracted = $matchingService->extractMissingFromTextBody($email);
+                    if ($extracted && $email->refresh()->sender_name) {
+                        $successCount++;
+                    } else {
+                        $skippedCount++;
+                    }
+                } catch (\Exception $e) {
+                    $failedCount++;
+                    \Illuminate\Support\Facades\Log::error('Error extracting sender name', [
+                        'email_id' => $email->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+            
+            // Get final stats
+            $newCount = ProcessedEmail::whereNotNull('sender_name')->count();
+            $accuracy = $totalEmails > 0 ? round(($newCount / $totalEmails) * 100, 2) : 0;
+            
+            // Get sample extracted names
+            $samples = ProcessedEmail::whereNotNull('sender_name')
+                ->orderBy('id', 'desc')
+                ->limit(10)
+                ->get(['id', 'sender_name', 'subject']);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Sender name extraction test completed',
+                'results' => [
+                    'total_emails' => $totalEmails,
+                    'cleared' => $cleared,
+                    'successfully_extracted' => $successCount,
+                    'skipped' => $skippedCount,
+                    'failed' => $failedCount,
+                    'emails_with_sender_name_after' => $newCount,
+                    'accuracy_percent' => $accuracy,
+                    'before_extraction' => $emailsWithSenderName,
+                ],
+                'samples' => $samples->map(function ($email) {
+                    return [
+                        'id' => $email->id,
+                        'sender_name' => $email->sender_name,
+                        'subject' => substr($email->subject ?? 'N/A', 0, 60),
+                    ];
+                }),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error testing sender extraction', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

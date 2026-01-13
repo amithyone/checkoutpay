@@ -95,8 +95,20 @@ class TransactionCheckController extends Controller
                     }
                 }
                 
-                // If not matched, fetch new emails
+                // If not matched, trigger global match to check all emails and payments
                 if (!$matched) {
+                    try {
+                        // Trigger global match in background
+                        \Illuminate\Support\Facades\Http::timeout(1)->get(url('/cron/global-match'))->throw();
+                    } catch (\Exception $e) {
+                        // Silently fail - don't block the response
+                        Log::debug('Global match trigger failed (non-critical)', [
+                            'transaction_id' => $transactionId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                    
+                    // Also fetch new emails
                     Artisan::call('payment:monitor-emails');
                 }
                 

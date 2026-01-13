@@ -68,5 +68,13 @@ class PaymentRequest extends FormRequest
                 'payer_name' => trim($this->payer_name),
             ]);
         }
+        
+        // Normalize webhook URL to prevent double slashes
+        if ($this->has('webhook_url') && $this->webhook_url) {
+            $webhookUrl = preg_replace('#([^:])//+#', '$1/', $this->webhook_url); // Fix double slashes but preserve http:// or https://
+            $this->merge([
+                'webhook_url' => $webhookUrl,
+            ]);
+        }
     }
 }

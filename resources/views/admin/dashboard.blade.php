@@ -296,6 +296,26 @@
                 </p>
             </div>
 
+            <!-- Extract Missing Names -->
+            <div class="bg-white rounded-lg p-4 border border-orange-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-orange-700 bg-orange-100 px-2 py-1 rounded">EXTRACTION</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Extract Missing Names</span>
+                    </div>
+                    <button onclick="copyCronUrl('extract-names')" class="text-orange-600 hover:text-orange-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/extract-missing-names') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Extracts sender names from processed emails using AdvancedNameExtractor.</strong> Handles multiple formats, quoted-printable encoding, and spacing variations.
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Frequency:</strong> Every 5-10 minutes (can run less frequently than email reading)
+                </p>
+            </div>
+
             <!-- IMAP Email Fetching -->
             <div class="bg-white rounded-lg p-4 border border-blue-300">
                 <div class="flex items-center justify-between mb-2">
@@ -322,6 +342,7 @@
             </p>
             <ul class="text-xs text-yellow-700 space-y-1 list-disc list-inside">
                 <li><strong>Email Reading:</strong> Every 5-15 minutes (Direct Filesystem or IMAP)</li>
+                <li><strong>Extract Missing Names:</strong> Every 5-10 minutes (extracts sender names from emails)</li>
                 <li><strong>Global Matching:</strong> Every 10-30 minutes (matches unmatched items)</li>
             </ul>
             <p class="text-xs text-yellow-700 mt-2">
@@ -697,6 +718,8 @@ function copyCronUrl(type = 'direct') {
         url = '{{ url('/cron/monitor-emails') }}';
     } else if (type === 'global-match') {
         url = '{{ url('/cron/global-match') }}';
+    } else if (type === 'extract-names') {
+        url = '{{ url('/cron/extract-missing-names') }}';
     } else {
         url = '{{ url('/cron/read-emails-direct') }}';
     }

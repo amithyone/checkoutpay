@@ -99,12 +99,15 @@ class CheckoutController extends Controller
         }
 
         try {
+            // Normalize return_url to prevent double slashes
+            $returnUrl = preg_replace('#([^:])//+#', '$1/', $validated['return_url']);
+            
             // Create payment request
             $paymentData = [
                 'amount' => $validated['amount'],
                 'payer_name' => $validated['payer_name'],
                 'service' => $validated['service'] ?? null,
-                'webhook_url' => $validated['return_url'], // Use return_url as webhook_url for redirect-based flow
+                'webhook_url' => $returnUrl, // Use return_url as webhook_url for redirect-based flow
             ];
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);
@@ -185,6 +188,20 @@ class CheckoutController extends Controller
         $payment = Payment::with(['accountNumberDetails', 'business'])
             ->where('transaction_id', $transactionId)
             ->firstOrFail();
+
+        // If payment is pending, trigger global match in background to check for matching emails
+        if ($payment->status === Payment::STATUS_PENDING) {
+            try {
+                // Use dispatch to run in background (non-blocking)
+                \Illuminate\Support\Facades\Http::timeout(1)->get(url('/cron/global-match'))->throw();
+            } catch (\Exception $e) {
+                // Silently fail - don't block the response if global match fails
+                \Illuminate\Support\Facades\Log::debug('Global match trigger failed (non-critical)', [
+                    'transaction_id' => $transactionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         $shouldRedirect = false;
         $redirectUrl = null;

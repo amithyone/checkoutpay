@@ -61,6 +61,19 @@ class PaymentController extends Controller
                 'user_agent' => $request->userAgent(),
                 'payment_status' => $payment->status,
             ]);
+            
+            // Trigger global match in background to check for matching emails
+            // This ensures that when users check their transaction, we also check for matches
+            try {
+                // Use dispatch to run in background (non-blocking)
+                \Illuminate\Support\Facades\Http::timeout(1)->get(url('/cron/global-match'))->throw();
+            } catch (\Exception $e) {
+                // Silently fail - don't block the API response if global match fails
+                \Illuminate\Support\Facades\Log::debug('Global match trigger failed (non-critical)', [
+                    'transaction_id' => $transactionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([

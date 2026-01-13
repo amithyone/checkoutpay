@@ -298,7 +298,7 @@ class GmailApiService
      */
     protected function getRedirectUri(): string
     {
-        $baseUrl = config('app.url');
+        $baseUrl = rtrim(config('app.url'), '/');
         $emailAccountId = $this->emailAccount ? $this->emailAccount->id : 'default';
         return $baseUrl . '/admin/email-accounts/' . $emailAccountId . '/gmail/callback';
     }

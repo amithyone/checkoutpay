@@ -21,6 +21,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware('auth:admin')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('/extract-missing-names', [DashboardController::class, 'extractMissingNames'])->name('extract-missing-names');
+        Route::post('/test-sender-extraction', [DashboardController::class, 'testSenderExtraction'])->name('test-sender-extraction');
 
         // Processed Emails (Inbox)
         Route::get('processed-emails', [ProcessedEmailController::class, 'index'])->name('processed-emails.index');

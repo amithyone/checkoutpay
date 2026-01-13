@@ -32,6 +32,9 @@
         "allow-plugins": {
             "pestphp/pest": true,
             "php-http/discovery": true
+        },
+        "audit": {
+            "block-insecure": false
         }
     },
     "autoload": {
