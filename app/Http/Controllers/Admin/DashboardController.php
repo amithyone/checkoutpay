@@ -117,8 +117,9 @@ class DashboardController extends Controller
         try {
             $limit = (int) $request->input('limit', 50);
             
-            // Run the command
-            \Illuminate\Support\Facades\Artisan::call('payment:extract-missing-names', [
+            // TODO: Command 'payment:extract-missing-names' does not exist
+            // Using alternative: ReExtractFromTextBody command which extracts missing sender names
+            \Illuminate\Support\Facades\Artisan::call('payment:re-extract-text-body', [
                 '--limit' => $limit,
             ]);
             

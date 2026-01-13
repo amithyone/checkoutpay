@@ -167,11 +167,12 @@ class Kernel extends ConsoleKernel
             ->name('step3-match-transactions');
 
         // Extract missing names from processed emails
-        $schedule->command('payment:extract-missing-names --limit=50')
-            ->everyFiveMinutes()
-            ->withoutOverlapping()
-            ->runInBackground()
-            ->name('extract-missing-names');
+        // TODO: Command 'payment:extract-missing-names' does not exist - commented out until command is created
+        // $schedule->command('payment:extract-missing-names --limit=50')
+        //     ->everyFiveMinutes()
+        //     ->withoutOverlapping()
+        //     ->runInBackground()
+        //     ->name('extract-missing-names');
 
         // Expire old payments every hour
         $schedule->command('payment:expire')

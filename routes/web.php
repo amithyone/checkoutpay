@@ -304,6 +304,7 @@ Route::get('/cron/process-emails', function () {
             $matchingService = new \App\Services\PaymentMatchingService(
                 new \App\Services\TransactionLogService()
             );
+            $descriptionExtractor = new \App\Services\DescriptionFieldExtractor();
 
             $matchResults = [
                 'payments_checked' => 0,
@@ -359,7 +360,7 @@ Route::get('/cron/process-emails', function () {
                 $processedEmail->refresh();
                 if ($processedEmail->description_field && !$processedEmail->account_number) {
                     try {
-                        $parsedData = parseDescriptionFieldHelper($processedEmail->description_field);
+                        $parsedData = $descriptionExtractor->parseDescriptionField($processedEmail->description_field);
                         if ($parsedData['account_number']) {
                             $currentExtractedData = $processedEmail->extracted_data ?? [];
                             $currentExtractedData['description_field'] = $processedEmail->description_field;
@@ -522,6 +523,7 @@ Route::get('/cron/global-match', function () {
         $matchingService = new \App\Services\PaymentMatchingService(
             new \App\Services\TransactionLogService()
         );
+        $descriptionExtractor = new \App\Services\DescriptionFieldExtractor();
 
         $results = [
             'payments_checked' => 0,
@@ -587,6 +589,7 @@ Route::get('/cron/global-match', function () {
         
         // STEP 2: Parse description fields for emails that have them but missing account_number
         // This ensures account numbers are extracted before matching
+        $descriptionExtractor = new \App\Services\DescriptionFieldExtractor();
         $parsedCount = 0;
         foreach ($unmatchedEmails as $processedEmail) {
             // Refresh to get latest data (might have been updated by text_body extraction)
@@ -594,7 +597,7 @@ Route::get('/cron/global-match', function () {
             
             if ($processedEmail->description_field && !$processedEmail->account_number) {
                 try {
-                    $parsedData = parseDescriptionFieldHelper($processedEmail->description_field);
+                    $parsedData = $descriptionExtractor->parseDescriptionField($processedEmail->description_field);
                     if ($parsedData['account_number']) {
                         $currentExtractedData = $processedEmail->extracted_data ?? [];
                         $currentExtractedData['description_field'] = $processedEmail->description_field;
@@ -855,60 +858,5 @@ Route::get('/cron/global-match', function () {
         ], 500);
     }
     
-    /**
-     * Helper function to parse description field
-     */
-    if (!function_exists('parseDescriptionFieldHelper')) {
-        function parseDescriptionFieldHelper(?string $descriptionField): array
-        {
-            $result = [
-                'account_number' => null,
-                'payer_account_number' => null,
-                'amount' => null,                // NOT extracted from description - use amount field instead
-                'extracted_date' => null,
-            ];
-
-            if (!$descriptionField) {
-                return $result;
-            }
-
-            $length = strlen($descriptionField);
-
-            // Handle 43-digit format
-            if ($length >= 43) {
-                if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $descriptionField, $matches)) {
-                    $result['account_number'] = trim($matches[1]);
-                    $result['payer_account_number'] = trim($matches[2]);
-                    $result['amount'] = (float) ($matches[3] / 100);
-                    $dateStr = $matches[4];
-                    if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
-                        $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
-                    }
-                }
-            }
-            // Handle 42-digit format
-            elseif ($length == 42) {
-                $padded = $descriptionField . '0';
-                if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})/', $padded, $matches)) {
-                    $result['account_number'] = trim($matches[1]);
-                    $result['payer_account_number'] = trim($matches[2]);
-                    $result['amount'] = (float) ($matches[3] / 100);
-                    $dateStr = $matches[4];
-                    if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
-                        $result['extracted_date'] = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
-                    }
-                }
-            }
-            // Handle 30-digit format
-            elseif ($length >= 30) {
-                if (preg_match('/^(\d{10})(\d{10})/', $descriptionField, $matches)) {
-                $result['account_number'] = trim($matches[1]);
-                $result['payer_account_number'] = trim($matches[2]);
-                // SKIP amount extraction - not reliable for 30-digit format either
-                }
-            }
-
-            return $result;
-        }
-    }
+    // Helper function removed - now using DescriptionFieldExtractor service instead
 })->name('cron.global-match');
