@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
+use App\Services\DescriptionFieldExtractor;
 use App\Services\PaymentMatchingService;
 use App\Services\TransactionLogService;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class MatchController extends Controller
             $matchingService = new PaymentMatchingService(
                 new TransactionLogService()
             );
+            $descriptionExtractor = new DescriptionFieldExtractor();
 
             $results = [
                 'payments_checked' => 0,
@@ -92,7 +94,7 @@ class MatchController extends Controller
                 
                 if ($processedEmail->description_field && !$processedEmail->account_number) {
                     try {
-                        $parsedData = $this->parseDescriptionField($processedEmail->description_field);
+                        $parsedData = $descriptionExtractor->parseDescriptionField($processedEmail->description_field);
                         if ($parsedData['account_number']) {
                             $currentExtractedData = $processedEmail->extracted_data ?? [];
                             $currentExtractedData['description_field'] = $processedEmail->description_field;
