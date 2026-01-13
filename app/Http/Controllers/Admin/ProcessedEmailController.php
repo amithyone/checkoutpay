@@ -88,39 +88,42 @@ class ProcessedEmailController extends Controller
                 new \App\Services\TransactionLogService()
             );
             
-            $result = $matchingService->recheckStoredEmail($processedEmail);
+            // Build email data array for matchEmail
+            $emailData = [
+                'subject' => $processedEmail->subject,
+                'from' => $processedEmail->from_email,
+                'text' => $processedEmail->text_body ?? '',
+                'html' => $processedEmail->html_body ?? '',
+                'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                'email_account_id' => $processedEmail->email_account_id,
+                'processed_email_id' => $processedEmail->id,
+            ];
+            
+            // Try to match email against pending payments
+            $matchedPayment = $matchingService->matchEmail($emailData);
             
             // If a match is found, approve the payment
-            $matchedPayment = null;
-            if (isset($result['matches']) && is_array($result['matches'])) {
-                foreach ($result['matches'] as $match) {
-                    if (isset($match['matched']) && $match['matched'] && isset($match['payment']) && $match['payment']) {
-                        $matchedPayment = $match['payment'];
-                        
-                        // Mark email as matched
-                        $processedEmail->markAsMatched($matchedPayment);
-                        
-                        // Approve payment
-                        $matchedPayment->approve([
-                            'subject' => $processedEmail->subject,
-                            'from' => $processedEmail->from_email,
-                            'text' => $processedEmail->text_body,
-                            'html' => $processedEmail->html_body,
-                            'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
-                            'sender_name' => $processedEmail->sender_name, // Map sender_name to payer_name
-                        ]);
-                        
-                        // Update business balance
-                        if ($matchedPayment->business_id) {
-                            $matchedPayment->business->increment('balance', $matchedPayment->amount);
-                        }
-                        
-                        // Dispatch event to send webhook
-                        event(new \App\Events\PaymentApproved($matchedPayment));
-                        
-                        break;
-                    }
+            if ($matchedPayment) {
+                // Mark email as matched
+                $processedEmail->markAsMatched($matchedPayment);
+                
+                // Approve payment
+                $matchedPayment->approve([
+                    'subject' => $processedEmail->subject,
+                    'from' => $processedEmail->from_email,
+                    'text' => $processedEmail->text_body,
+                    'html' => $processedEmail->html_body,
+                    'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                    'sender_name' => $processedEmail->sender_name, // Map sender_name to payer_name
+                ]);
+                
+                // Update business balance
+                if ($matchedPayment->business_id) {
+                    $matchedPayment->business->increment('balance', $matchedPayment->amount);
                 }
+                
+                // Dispatch event to send webhook
+                event(new \App\Events\PaymentApproved($matchedPayment));
             }
             
             return response()->json([
@@ -131,11 +134,9 @@ class ProcessedEmailController extends Controller
                     'transaction_id' => $matchedPayment->transaction_id,
                     'amount' => $matchedPayment->amount,
                 ] : null,
-                'matches' => $result['matches'] ?? [],
-                'extracted_info' => $result['extracted_info'] ?? null,
                 'message' => $matchedPayment 
                     ? 'Payment matched and approved successfully!' 
-                    : 'No matching payment found. Check the matches below for details.',
+                    : 'No matching payment found.',
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Error in checkMatch', [
@@ -257,49 +258,52 @@ class ProcessedEmailController extends Controller
                 new \App\Services\TransactionLogService()
             );
             
-            $result = $matchingService->recheckStoredEmail($processedEmail);
+            // Build email data array for matchEmail
+            $emailData = [
+                'subject' => $processedEmail->subject,
+                'from' => $processedEmail->from_email,
+                'text' => $processedEmail->text_body ?? '',
+                'html' => $processedEmail->html_body ?? '',
+                'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                'email_account_id' => $processedEmail->email_account_id,
+                'processed_email_id' => $processedEmail->id,
+            ];
+            
+            // Try to match email against pending payments
+            $matchedPayment = $matchingService->matchEmail($emailData);
             
             // If a match is found, approve the payment
-            $matchedPayment = null;
-            if (isset($result['matches']) && is_array($result['matches'])) {
-                foreach ($result['matches'] as $match) {
-                    if (isset($match['matched']) && $match['matched'] && isset($match['payment']) && $match['payment']) {
-                        $matchedPayment = $match['payment'];
-                        
-                        // Mark email as matched
-                        $processedEmail->markAsMatched($matchedPayment);
-                        
-                        // Approve payment
-                        $matchedPayment->approve([
-                            'subject' => $processedEmail->subject,
-                            'from' => $processedEmail->from_email,
-                            'text' => $processedEmail->text_body,
-                            'html' => $processedEmail->html_body,
-                            'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
-                            'sender_name' => $processedEmail->sender_name, // Map sender_name to payer_name
-                        ]);
-                        
-                        // Update business balance
-                        if ($matchedPayment->business_id) {
-                            $matchedPayment->business->increment('balance', $matchedPayment->amount);
-                        }
-                        
-                        // Dispatch event to send webhook
-                        event(new \App\Events\PaymentApproved($matchedPayment));
-                        
-                        break;
-                    }
+            if ($matchedPayment) {
+                // Mark email as matched
+                $processedEmail->markAsMatched($matchedPayment);
+                
+                // Approve payment
+                $matchedPayment->approve([
+                    'subject' => $processedEmail->subject,
+                    'from' => $processedEmail->from_email,
+                    'text' => $processedEmail->text_body,
+                    'html' => $processedEmail->html_body,
+                    'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                    'sender_name' => $processedEmail->sender_name, // Map sender_name to payer_name
+                ]);
+                
+                // Update business balance
+                if ($matchedPayment->business_id) {
+                    $matchedPayment->business->increment('balance', $matchedPayment->amount);
                 }
+                
+                // Dispatch event to send webhook
+                event(new \App\Events\PaymentApproved($matchedPayment));
             }
 
-            // Get latest match reason if no match found
+            // Get latest match reason if no match found (from match attempts)
             $latestReason = null;
-            if (!$matchedPayment && isset($result['matches']) && is_array($result['matches'])) {
-                foreach ($result['matches'] as $match) {
-                    if (isset($match['reason'])) {
-                        $latestReason = $match['reason'];
-                        break;
-                    }
+            if (!$matchedPayment) {
+                $latestAttempt = \App\Models\MatchAttempt::where('processed_email_id', $processedEmail->id)
+                    ->latest()
+                    ->first();
+                if ($latestAttempt && $latestAttempt->reason) {
+                    $latestReason = $latestAttempt->reason;
                 }
             }
             
