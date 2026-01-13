@@ -527,6 +527,21 @@ class PaymentMatchingService
             // Pattern 5: "Description : CODE-TXN-CODE-CODE-NAME" format (handles quoted-printable)
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TXN-[\d\-]+-[A-Z]+=\s*[A-Z\-]*-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount)/i',
             
+            // Pattern 6: "Description : CODE-BBBB-KMB-NAME" format (handles quoted-printable)
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-BBBB-KMB-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*\.)/i',
+            
+            // Pattern 7: "Description : CODE-CODE-CODE-NAME" format (generic pattern)
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-[A-Z]+-[A-Z]+-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*\.)/i',
+            
+            // Pattern 8: "Description : CODE-NAME = PHONE-BANK" format (name before phone number)
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-([A-Z][A-Z\s\-,]{3,50}?)\s*=\s*[\d]+-[A-Z]+/i',
+            
+            // Pattern 9: "Description : CODE-NAME-BANK-NAME" format (extract first name before bank)
+            '/description[\s:]+(?:=\d+)?\s*[\d\-]+-([A-Z][A-Z\s\-,]{3,50}?)-(?:OPAY|GTBANK|ACCESS|ZENITH|UBA|FIRST\s+BANK|PALMPAY|KUD|BBBB|KMB)/i',
+            
+            // Pattern 10: "Remarks : NAME" (extract name from remarks field)
+            '/remark[s]?[\s:]+([A-Z][A-Z\s\-,]{3,50}?)(?:\s*\||\s*$|\s*Time)/i',
+            
             // Pattern 3: "FROM OPAY/ NAME" or "FROM BANK/ NAME"
             '/from\s+(?:[A-Z]+\/|OPAY\/|GTBANK\/|ACCESS\/|ZENITH\/|UBA\/|FIRST\s+BANK\/)\s*([A-Z][A-Z\s\-]{3,50}?)(?:\s*\/|\s*Support|\s*\||\s*$)/i',
             
