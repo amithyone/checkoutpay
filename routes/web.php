@@ -125,6 +125,7 @@ Route::get('/cron/monitor-emails', function () {
 
 // Direct Filesystem Email Reading Cron (RECOMMENDED for shared hosting)
 // FIXED: Use same logic as admin dashboard button - calls the same controller method
+// Reads from filesystem regardless of email account method setting
 Route::get('/cron/read-emails-direct', function () {
     try {
         $startTime = microtime(true);

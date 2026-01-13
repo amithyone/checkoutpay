@@ -57,6 +57,9 @@ class ReadEmailsDirect extends Command
         foreach ($emailAccounts as $emailAccount) {
             $this->info("Reading emails for: {$emailAccount->email}");
 
+            // REMOVED: No longer skip IMAP accounts - read from filesystem regardless of method setting
+            // The method field is just for reference, but we always read from filesystem for direct reading
+
             // Try to find mail directory
             $mailPaths = $this->findMailDirectory($emailAccount->email);
 
@@ -67,6 +70,7 @@ class ReadEmailsDirect extends Command
                 list($localPart, $domain) = explode('@', $emailAccount->email);
                 $this->info("  /home/{$username}/mail/{$domain}/{$localPart}/Maildir/");
                 $this->info("  /home/{$username}/mail/{$domain}/{$localPart}/");
+                $this->warn("   If emails are stored on IMAP server, use IMAP fetching instead");
                 continue;
             }
 
@@ -138,28 +142,48 @@ class ReadEmailsDirect extends Command
         list($localPart, $domain) = explode('@', $email);
         $username = $this->getUsername();
 
-        // Common cPanel mail paths (try multiple formats)
-        $commonPaths = [
-            // Standard cPanel Maildir format
-            "/home/{$username}/mail/{$domain}/{$localPart}/Maildir/cur/",
-            "/home/{$username}/mail/{$domain}/{$localPart}/Maildir/new/",
-            "/home/{$username}/mail/{$domain}/{$localPart}/Maildir/",
-            
-            // Alternative Maildir formats
-            "/home/{$username}/mail/{$domain}/{$localPart}/cur/",
-            "/home/{$username}/mail/{$domain}/{$localPart}/new/",
-            "/home/{$username}/mail/{$domain}/{$localPart}/",
-            
-            // cPanel sometimes uses domain-localpart format
-            "/home/{$username}/mail/{$domain}/{$localPart}-{$domain}/Maildir/cur/",
-            "/home/{$username}/mail/{$domain}/{$localPart}-{$domain}/Maildir/new/",
-            "/home/{$username}/mail/{$domain}/{$localPart}-{$domain}/Maildir/",
-            
-            // Root mail paths (mbox format)
-            "/var/spool/mail/{$localPart}",
-            "/var/mail/{$localPart}",
-            "/var/spool/mail/{$username}",
-        ];
+        // IMPROVED: Try multiple usernames (root, actual user, and common cPanel users)
+        $usernamesToTry = [$username];
+        
+        // Add common cPanel usernames if root doesn't work
+        if ($username === 'root') {
+            // Try to find actual cPanel username from home directories
+            $homeDirs = glob('/home/*', GLOB_ONLYDIR);
+            foreach ($homeDirs as $homeDir) {
+                $dirUser = basename($homeDir);
+                if ($dirUser !== 'root' && $dirUser !== 'noreply' && $dirUser !== 'support') {
+                    $usernamesToTry[] = $dirUser;
+                }
+            }
+        }
+
+        // Common cPanel mail paths (try multiple formats and usernames)
+        $commonPaths = [];
+        foreach ($usernamesToTry as $tryUsername) {
+            $commonPaths = array_merge($commonPaths, [
+                // Standard cPanel Maildir format
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}/Maildir/cur/",
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}/Maildir/new/",
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}/Maildir/",
+                
+                // Alternative Maildir formats
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}/cur/",
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}/new/",
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}/",
+                
+                // cPanel sometimes uses domain-localpart format
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}-{$domain}/Maildir/cur/",
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}-{$domain}/Maildir/new/",
+                "/home/{$tryUsername}/mail/{$domain}/{$localPart}-{$domain}/Maildir/",
+            ]);
+        }
+        
+        // Root mail paths (mbox format) - try with all usernames
+        foreach ($usernamesToTry as $tryUsername) {
+            $commonPaths[] = "/var/spool/mail/{$localPart}";
+            $commonPaths[] = "/var/mail/{$localPart}";
+            $commonPaths[] = "/var/spool/mail/{$tryUsername}";
+        }
 
         foreach ($commonPaths as $path) {
             if (is_dir($path) && is_readable($path)) {
@@ -176,40 +200,100 @@ class ReadEmailsDirect extends Command
         if (empty($paths)) {
             $this->warn("Standard paths not found. Attempting dynamic search...");
             
-            // Search in mail directory
-            $mailBase = "/home/{$username}/mail/";
-            if (is_dir($mailBase) && is_readable($mailBase)) {
-                $foundPaths = $this->searchForEmailDirectory($mailBase, $localPart, $domain);
-                $paths = array_merge($paths, $foundPaths);
+            // IMPROVED: Search in mail directories for ALL usernames we're trying
+            foreach ($usernamesToTry as $tryUsername) {
+                $mailBase = "/home/{$tryUsername}/mail/";
+                if (is_dir($mailBase) && is_readable($mailBase)) {
+                    $foundPaths = $this->searchForEmailDirectory($mailBase, $localPart, $domain);
+                    $paths = array_merge($paths, $foundPaths);
+                }
+            }
+            
+            // IMPROVED: Also try searching ALL /home/*/mail/ directories (broader search)
+            $homeDirs = glob('/home/*', GLOB_ONLYDIR);
+            foreach ($homeDirs as $homeDir) {
+                $mailBase = $homeDir . '/mail/';
+                if (is_dir($mailBase) && is_readable($mailBase)) {
+                    $foundPaths = $this->searchForEmailDirectory($mailBase, $localPart, $domain);
+                    $paths = array_merge($paths, $foundPaths);
+                }
+            }
+            
+            // IMPROVED: Also check if Maildir exists directly in /home/*/Maildir (some setups)
+            foreach ($homeDirs as $homeDir) {
+                $maildirPath = $homeDir . '/Maildir';
+                if (is_dir($maildirPath) && is_readable($maildirPath)) {
+                    $parentName = basename($homeDir);
+                    // If username matches localPart, use this Maildir
+                    if ($parentName === $localPart) {
+                        if (is_dir($maildirPath . '/cur')) {
+                            $paths[] = $maildirPath . '/cur';
+                        }
+                        if (is_dir($maildirPath . '/new')) {
+                            $paths[] = $maildirPath . '/new';
+                        }
+                    }
+                }
             }
         }
 
         // If still nothing, try checking if we need to look at domain differently
         if (empty($paths)) {
-            // Some hosts store mail differently - check parent mail directory structure
-            $mailParent = "/home/{$username}/mail/";
-            if (is_dir($mailParent) && is_readable($mailParent)) {
-                $this->info("Exploring mail directory structure...");
-                try {
-                    $domains = scandir($mailParent);
-                    foreach ($domains as $foundDomain) {
-                        if ($foundDomain === '.' || $foundDomain === '..') {
-                            continue;
-                        }
-                        $domainPath = $mailParent . $foundDomain;
-                        if (is_dir($domainPath)) {
-                            $this->info("  Found domain directory: {$foundDomain}");
-                            // Check if our email exists in any domain
-                            $emailPath = $domainPath . '/' . $localPart . '/Maildir/';
-                            if (is_dir($emailPath)) {
-                                $this->info("✅ Found email in domain {$foundDomain}: {$emailPath}");
-                                $paths[] = $emailPath . 'cur/';
-                                $paths[] = $emailPath . 'new/';
+            // IMPROVED: Check ALL user mail directories, not just the detected username
+            foreach ($usernamesToTry as $tryUsername) {
+                $mailParent = "/home/{$tryUsername}/mail/";
+                if (is_dir($mailParent) && is_readable($mailParent)) {
+                    $this->info("Exploring mail directory structure for user: {$tryUsername}...");
+                    try {
+                        $domains = scandir($mailParent);
+                        foreach ($domains as $foundDomain) {
+                            if ($foundDomain === '.' || $foundDomain === '..') {
+                                continue;
+                            }
+                            $domainPath = $mailParent . $foundDomain;
+                            if (is_dir($domainPath)) {
+                                $this->info("  Found domain directory: {$foundDomain}");
+                                // Check if our email exists in any domain
+                                $emailPath = $domainPath . '/' . $localPart . '/Maildir/';
+                                if (is_dir($emailPath)) {
+                                    $this->info("✅ Found email in domain {$foundDomain}: {$emailPath}");
+                                    $paths[] = $emailPath . 'cur/';
+                                    $paths[] = $emailPath . 'new/';
+                                }
                             }
                         }
+                    } catch (\Exception $e) {
+                        Log::debug('Error exploring mail directory', ['error' => $e->getMessage()]);
                     }
-                } catch (\Exception $e) {
-                    Log::debug('Error exploring mail directory', ['error' => $e->getMessage()]);
+                }
+            }
+            
+            // Also check ALL /home/*/mail/*/ directories (most comprehensive search)
+            $homeDirs = glob('/home/*', GLOB_ONLYDIR);
+            foreach ($homeDirs as $homeDir) {
+                $mailParent = $homeDir . '/mail/';
+                if (is_dir($mailParent) && is_readable($mailParent)) {
+                    try {
+                        $domains = scandir($mailParent);
+                        foreach ($domains as $foundDomain) {
+                            if ($foundDomain === '.' || $foundDomain === '..') {
+                                continue;
+                            }
+                            $domainPath = $mailParent . $foundDomain;
+                            if (is_dir($domainPath)) {
+                                // Check if our email exists in any domain
+                                $emailPath = $domainPath . '/' . $localPart . '/Maildir/';
+                                if (is_dir($emailPath)) {
+                                    $this->info("✅ Found email in {$homeDir}/mail/{$foundDomain}/{$localPart}/Maildir/");
+                                    $paths[] = $emailPath . 'cur/';
+                                    $paths[] = $emailPath . 'new/';
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // Skip directories we can't read
+                        continue;
+                    }
                 }
             }
         }
