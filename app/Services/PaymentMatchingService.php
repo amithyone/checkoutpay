@@ -328,7 +328,7 @@ class PaymentMatchingService
         if ($paymentNameNorm === $emailNameNorm) {
             return ['matched' => true, 'similarity' => 100];
         }
-        
+
         // CRITICAL: Check if expected name is contained in the other name
         // This handles cases like "john doe" vs "john doe from opay" or "john doe via gtbank"
         // Remove spaces for better matching

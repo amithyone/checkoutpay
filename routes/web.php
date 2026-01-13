@@ -124,27 +124,29 @@ Route::get('/cron/monitor-emails', function () {
 })->name('cron.monitor-emails');
 
 // Direct Filesystem Email Reading Cron (RECOMMENDED for shared hosting)
+// FIXED: Use same logic as admin dashboard button - calls the same controller method
 Route::get('/cron/read-emails-direct', function () {
     try {
         $startTime = microtime(true);
         
-        // STEP 1: Run direct filesystem email reading command (ONLY fetch emails, no matching)
-        \Illuminate\Support\Facades\Artisan::call('payment:read-emails-direct', [
-            '--all' => true,
-            '--no-match' => true, // Skip matching in this step
-        ]);
+        // Use the same controller method as the admin dashboard button
+        // This ensures emails are processed and matched exactly like the dashboard button
+        $controller = new \App\Http\Controllers\Admin\EmailMonitorController();
+        $request = new \Illuminate\Http\Request();
         
-        $output = \Illuminate\Support\Facades\Artisan::output();
+        $response = $controller->fetchEmailsDirect($request);
+        $responseData = json_decode($response->getContent(), true);
+        
         $executionTime = round(microtime(true) - $startTime, 2);
         
-        return response()->json([
-            'success' => true,
-            'message' => 'Direct filesystem email reading completed',
-            'method' => 'direct_filesystem',
-            'timestamp' => now()->toDateTimeString(),
-            'execution_time_seconds' => $executionTime,
-            'output' => $output,
-        ]);
+        // Add execution time to response
+        if ($responseData) {
+            $responseData['execution_time_seconds'] = $executionTime;
+            $responseData['method'] = 'direct_filesystem';
+            $responseData['timestamp'] = now()->toDateTimeString();
+        }
+        
+        return response()->json($responseData, $response->getStatusCode());
     } catch (\Exception $e) {
         \Illuminate\Support\Facades\Log::error('Cron job error (Direct Filesystem)', [
             'error' => $e->getMessage(),
