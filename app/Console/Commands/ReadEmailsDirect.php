@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\EmailAccount;
 use App\Models\ProcessedEmail;
+use App\Services\EmailExtractionService;
 use App\Services\PaymentMatchingService;
 use App\Jobs\ProcessEmailPayment;
 use Illuminate\Console\Command;
@@ -688,7 +689,7 @@ class ReadEmailsDirect extends Command
                     }
             
             // CRITICAL: Normalize text_body - ensure it's always stripped from HTML and never empty
-            $emailExtractor = new \App\Services\EmailExtractionService();
+            $emailExtractor = new EmailExtractionService();
             $normalizedTextBody = $emailExtractor->normalizeTextBody(
                 $parts['text_body'] ?? '',
                 $parts['html_body'] ?? ''

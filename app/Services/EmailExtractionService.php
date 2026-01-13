@@ -41,12 +41,23 @@ class EmailExtractionService
             }
         }
         
-        // PRIORITY: Extract sender name from description field FIRST (regardless of digit count)
-        // This is the PRIMARY source for sender name - must come from description field
-        // Format: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
-        // OR: "Description : 100004260111113119149684166825-TRANSFER FROM INNOCENT AMITHY SOLOMON"
-        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $text, $nameMatches)) {
-            $senderName = trim(strtolower($nameMatches[1]));
+        // PRIORITY: Extract sender name from description field FIRST (STRUCTURED approach like amount)
+        // This is the PRIMARY source - same logic as amount extraction for reliability
+        // Strategy: Extract description line, then parse name from it (like we parse amount from digits 11-16)
+        if (!$senderName && preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $text, $descLineMatches)) {
+            $descriptionLine = trim($descLineMatches[1]);
+            
+            // Use structured extraction from description line (like amount extraction)
+            // Pattern: digits FROM name (with optional dash, TO, or end)
+            if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = rtrim($potentialName, '- ');
+                $senderName = trim(strtolower($potentialName));
+            }
+            // Pattern: digits FROM name (end of line)
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+                $senderName = trim(strtolower($nameMatches[1]));
+            }
         }
         // Also try "TRANSFER FROM NAME" format in description
         if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z\s]+?)(?:-|$)/i', $text, $nameMatches)) {
@@ -305,12 +316,23 @@ class EmailExtractionService
         // Extract description field from plain text
         $descriptionField = $descExtractor->extractFromHtml($html);
         
-        // PRIORITY: Extract sender name from description field FIRST (regardless of digit count)
-        // This is the PRIMARY source for sender name - must come from description field
-        // Format: "Description : 900877121002100859959000020260111094651392 FROM SOLOMON"
-        // OR: "Description : 100004260111113119149684166825-TRANSFER FROM INNOCENT AMITHY SOLOMON"
-        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $plainText, $nameMatches)) {
-            $senderName = trim(strtolower($nameMatches[1]));
+        // PRIORITY: Extract sender name from description field FIRST (STRUCTURED approach like amount)
+        // This is the PRIMARY source - same logic as amount extraction for reliability
+        // Strategy: Extract description line, then parse name from it (like we parse amount from digits 11-16)
+        if (!$senderName && preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $plainText, $descLineMatches)) {
+            $descriptionLine = trim($descLineMatches[1]);
+            
+            // Use structured extraction from description line (like amount extraction)
+            // Pattern: digits FROM name (with optional dash, TO, or end)
+            if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = rtrim($potentialName, '- ');
+                $senderName = trim(strtolower($potentialName));
+            }
+            // Pattern: digits FROM name (end of line)
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+                $senderName = trim(strtolower($nameMatches[1]));
+            }
         }
         // Also try "TRANSFER FROM NAME" format in description
         if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z\s]+?)(?:-|$)/i', $plainText, $nameMatches)) {

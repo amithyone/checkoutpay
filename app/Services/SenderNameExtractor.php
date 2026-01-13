@@ -5,9 +5,9 @@ namespace App\Services;
 class SenderNameExtractor
 {
     /**
-     * Extract sender name from text using multiple patterns (IMPROVED VERSION)
-     * Priority order:
-     * 1. Description field with "FROM NAME" pattern (most reliable)
+     * Extract sender name from text using structured approach (like amount extraction)
+     * Priority order (same logic as amount extraction for reliability):
+     * 1. Description field line with "FROM NAME" pattern (MOST RELIABLE - structured position)
      * 2. "FROM NAME TO" pattern anywhere in text
      * 3. Description field with "CODE-NAME TRF FOR" pattern
      * 4. Remarks/Narration fields
@@ -19,17 +19,29 @@ class SenderNameExtractor
         $fullText = $this->normalizeText($subject . ' ' . $text);
         $senderName = null;
         
-        // PRIORITY 1: Description field with "FROM NAME" pattern (MOST RELIABLE)
-        // Format: "Description : 43digits FROM SOLOMON INNOCENT TO SQUA"
-        // Or: "Description : 43digits FROM SOLOMON INNOCENT -"
-        // Or: "Description : 43digits FROM SOLOMON INNOCENT"
-        // Pattern: description : numbers FROM name (with optional dash, TO, or end)
-        if (preg_match('/description[\s]*:[\s]*\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $text, $matches)) {
-            $potentialName = trim($matches[1]);
-            // Remove trailing dash if captured
-            $potentialName = rtrim($potentialName, '- ');
-            if ($this->isValidName($potentialName)) {
-                $senderName = strtolower($potentialName);
+        // PRIORITY 1: Extract from description field line (MOST RELIABLE - structured position like amount)
+        // Format: "Description : 43digits FROM FULL NAME -" or "Description : 43digits FROM FULL NAME TO"
+        // Strategy: Find the description line first, then extract name after "FROM" (like we extract amount from position 11-16)
+        $descriptionLine = null;
+        if (preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $text, $descLineMatches)) {
+            $descriptionLine = trim($descLineMatches[1]);
+            
+            // Extract name from this description line (structured approach)
+            // Pattern 1: digits FROM name (with optional dash, TO, or end)
+            if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Remove trailing dash if present
+                $potentialName = rtrim($potentialName, '- ');
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 2: digits FROM name (end of line)
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
             }
         }
         
@@ -99,24 +111,33 @@ class SenderNameExtractor
     }
     
     /**
-     * Extract sender name from HTML using multiple patterns (IMPROVED VERSION)
+     * Extract sender name from HTML using structured approach (like amount extraction)
      */
     public function extractFromHtml(string $html): ?string
     {
         $html = $this->normalizeText($html);
         $senderName = null;
         
-        // PRIORITY 1: HTML table - Description field with "FROM NAME TO"
-        // Format: <td>Description</td><td>:</td><td>43digits FROM SOLOMON TO SQUA</td>
-        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s]+TO/i', $html, $matches)) {
-            $potentialName = trim($matches[1]);
-            if ($this->isValidName($potentialName)) {
-                $senderName = strtolower($potentialName);
+        // PRIORITY 1: HTML table - Description field with "FROM NAME" (structured like amount extraction)
+        // Format: <td>Description</td><td>:</td><td>43digits FROM NAME TO</td>
+        // Strategy: Extract the description cell content, then parse it (like we do with amount)
+        if (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>([^<]+)<\/td>/i', $html, $cellMatches)) {
+            $descriptionCellContent = strip_tags($cellMatches[1]);
+            $descriptionCellContent = preg_replace('/\s+/', ' ', trim($descriptionCellContent));
+            
+            // Extract name from this structured cell (like amount extraction)
+            // Pattern: digits FROM name (with optional dash, TO, or end)
+            if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionCellContent, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = rtrim($potentialName, '- ');
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
             }
         }
         
-        // PRIORITY 2: HTML table - Description field with "FROM NAME" (no TO)
-        if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:\s+TO|[\s\-]|<\/td>|$)/i', $html, $matches)) {
+        // PRIORITY 2: HTML table - Description field with "FROM NAME TO"
+        if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>.*?FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s]+TO/i', $html, $matches)) {
             $potentialName = trim($matches[1]);
             if ($this->isValidName($potentialName)) {
                 $senderName = strtolower($potentialName);
@@ -182,6 +203,47 @@ class SenderNameExtractor
         }
         
         return $senderName;
+    }
+    
+    /**
+     * Extract name from description field line (structured approach like amount)
+     * This is the MOST RELIABLE method - extracts from the exact same source as amount
+     */
+    public function extractFromDescriptionField(string $descriptionLine): ?string
+    {
+        if (empty($descriptionLine)) {
+            return null;
+        }
+        
+        $descriptionLine = $this->normalizeText($descriptionLine);
+        
+        // Pattern 1: digits FROM name (with optional dash, TO, or end) - MOST COMMON
+        // Format: "43digits FROM SOLOMON INNOCENT -" or "43digits FROM SOLOMON INNOCENT TO"
+        if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            $potentialName = rtrim($potentialName, '- ');
+            if ($this->isValidName($potentialName)) {
+                return strtolower($potentialName);
+            }
+        }
+        
+        // Pattern 2: digits FROM name (end of line)
+        if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            if ($this->isValidName($potentialName)) {
+                return strtolower($potentialName);
+            }
+        }
+        
+        // Pattern 3: CODE-NAME TRF FOR format
+        if (preg_match('/[\d\-]+\s*-\s*([A-Z][A-Z\s]{2,}?)\s+(?:TRF|TRANSFER|FOR|TO)/i', $descriptionLine, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            if ($this->isValidName($potentialName)) {
+                return strtolower($potentialName);
+            }
+        }
+        
+        return null;
     }
     
     /**
