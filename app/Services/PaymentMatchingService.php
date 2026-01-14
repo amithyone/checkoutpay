@@ -402,6 +402,9 @@ class PaymentMatchingService
             
             $updated = false;
             
+            // Get current extracted_data or initialize empty array
+            $extractedData = $email->extracted_data ?? [];
+            
             // Extract description field if missing
             if (!$email->description_field) {
                 $descriptionField = $this->descriptionExtractor->extractFromHtml($htmlBody)
@@ -409,6 +412,12 @@ class PaymentMatchingService
                 
                 if ($descriptionField) {
                     $email->description_field = $descriptionField;
+                    // Update extracted_data
+                    $extractedData['description_field'] = $descriptionField;
+                    // Also update if nested in 'data' key
+                    if (isset($extractedData['data']) && is_array($extractedData['data'])) {
+                        $extractedData['data']['description_field'] = $descriptionField;
+                    }
                     $updated = true;
                 }
             }
@@ -418,11 +427,22 @@ class PaymentMatchingService
                 $senderName = $this->extractSenderNameFromText($textBody, $htmlBody);
                 if ($senderName) {
                     $email->sender_name = $senderName;
+                    // Update extracted_data
+                    $extractedData['sender_name'] = strtolower($senderName);
+                    // Also update if nested in 'data' key
+                    if (isset($extractedData['data']) && is_array($extractedData['data'])) {
+                        $extractedData['data']['sender_name'] = strtolower($senderName);
+                    }
+                    // Add extraction method info
+                    $extractedData['extraction_method'] = 'text_body_re_extraction';
+                    $extractedData['extraction_timestamp'] = now()->toDateTimeString();
                     $updated = true;
                 }
             }
             
             if ($updated) {
+                // Update extracted_data field
+                $email->extracted_data = $extractedData;
                 $email->save();
             }
             

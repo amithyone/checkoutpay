@@ -31,6 +31,12 @@
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <form method="GET" class="flex items-center space-x-4 flex-wrap">
+            <div class="flex-1 min-w-[200px]">
+                <input type="text" name="search" id="searchInput" value="{{ request('search') }}" 
+                    placeholder="Search by Transaction ID (TXN-...)..." 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                    autocomplete="off">
+            </div>
             <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All Status</option>
                 <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending (Not Expired)</option>

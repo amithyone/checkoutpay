@@ -78,6 +78,19 @@ class PaymentController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
 
+        // Search by transaction ID
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $transactionIdSearch = strtoupper($search);
+            // Remove TXN- prefix if present for search
+            $transactionIdClean = str_replace('TXN-', '', $transactionIdSearch);
+            
+            $query->where(function ($q) use ($transactionIdSearch, $transactionIdClean) {
+                $q->where('transaction_id', 'like', "%{$transactionIdSearch}%")
+                  ->orWhere('transaction_id', 'like', "%{$transactionIdClean}%");
+            });
+        }
+
         $payments = $query->paginate(20)->withQueryString();
 
         return view('admin.payments.index', compact('payments'));

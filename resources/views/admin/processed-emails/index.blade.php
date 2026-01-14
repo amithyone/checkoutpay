@@ -49,7 +49,7 @@
         <form method="GET" action="{{ route('admin.processed-emails.index') }}" id="searchForm" class="flex flex-wrap gap-4">
             <div class="flex-1 min-w-[200px]">
                 <input type="text" name="search" id="searchInput" value="{{ request('search') }}" 
-                    placeholder="Search by Subject, From, Amount, or Sender (type to filter)..." 
+                    placeholder="Search by Subject, From, Amount, Sender, or Transaction ID (TXN-...)..." 
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     autocomplete="off">
             </div>
@@ -103,7 +103,8 @@
                         data-sender-name="{{ strtolower($email->sender_name ?? '') }}"
                         data-amount="{{ $email->amount ?? '' }}"
                         data-status="{{ $email->is_matched ? 'matched' : 'unmatched' }}"
-                        data-email-account-id="{{ $email->email_account_id ?? '' }}">
+                        data-email-account-id="{{ $email->email_account_id ?? '' }}"
+                        data-transaction-id="{{ strtolower($email->matchedPayment ? $email->matchedPayment->transaction_id : '') }}">
                         <td class="px-6 py-4">
                             <div class="text-sm font-medium text-gray-900" title="{{ $email->subject ?? 'No Subject' }}">
                                 @php
@@ -242,11 +243,17 @@ function filterEmails() {
         let matchesSearch = true;
         if (searchTerm) {
             const numericSearch = searchTerm.replace(/[^0-9.]/g, '');
+            const transactionId = (row.dataset.transactionId || '').toLowerCase();
+            const searchTermUpper = searchTerm.toUpperCase();
+            const transactionIdClean = searchTermUpper.replace('TXN-', '');
+            
             matchesSearch = 
                 subject.includes(searchTerm) ||
                 fromEmail.includes(searchTerm) ||
                 fromName.includes(searchTerm) ||
                 senderName.includes(searchTerm) ||
+                transactionId.includes(searchTerm.toLowerCase()) ||
+                transactionId.includes(transactionIdClean.toLowerCase()) ||
                 (amount && numericSearch && amount.toString().includes(numericSearch));
         }
         

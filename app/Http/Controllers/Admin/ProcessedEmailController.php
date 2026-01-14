@@ -30,7 +30,7 @@ class ProcessedEmailController extends Controller
             $query->where('email_account_id', $request->email_account_id);
         }
 
-        // Search by Subject, From, Amount, and Sender
+        // Search by Subject, From, Amount, Sender, and Transaction ID
         if ($request->filled('search')) {
             $search = trim($request->search);
             $query->where(function ($q) use ($search) {
@@ -42,6 +42,15 @@ class ProcessedEmailController extends Controller
                     ->orWhere('from_name', 'like', "%{$search}%")
                     // Search in sender name
                     ->orWhere('sender_name', 'like', "%{$search}%");
+                
+                // Search by transaction ID (TXN- prefix or without)
+                $transactionIdSearch = strtoupper($search);
+                // Remove TXN- prefix if present for search
+                $transactionIdClean = str_replace('TXN-', '', $transactionIdSearch);
+                $q->orWhereHas('matchedPayment', function($paymentQuery) use ($transactionIdSearch, $transactionIdClean) {
+                    $paymentQuery->where('transaction_id', 'like', "%{$transactionIdSearch}%")
+                        ->orWhere('transaction_id', 'like', "%{$transactionIdClean}%");
+                });
                 
                 // If search looks like a number, also search in amount
                 $numericSearch = preg_replace('/[^0-9.]/', '', $search);
