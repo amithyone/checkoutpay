@@ -83,9 +83,16 @@ class PaymentMatchingService
             // PHP fallback: If Python extraction failed completely, try PHP extraction
             $textBody = $emailData['text'] ?? '';
             if (!empty($textBody)) {
+                // Decode quoted-printable encoding before passing to extractFromTextBody
+                $decodedTextBody = preg_replace('/=20/', ' ', $textBody);
+                $decodedTextBody = preg_replace('/=3D/', '=', $decodedTextBody);
+                $decodedTextBody = html_entity_decode($decodedTextBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $decodedTextBody = strip_tags($decodedTextBody);
+                $decodedTextBody = preg_replace('/\s+/', ' ', $decodedTextBody);
+                
                 $emailExtractor = new \App\Services\EmailExtractionService();
                 $phpResult = $emailExtractor->extractFromTextBody(
-                    $textBody,
+                    $decodedTextBody,
                     $emailData['subject'] ?? '',
                     $emailData['from'] ?? '',
                     $emailData['date'] ?? null
