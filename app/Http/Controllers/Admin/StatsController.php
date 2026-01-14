@@ -268,8 +268,8 @@ class StatsController extends Controller
     
     private function getTopBusinesses($since)
     {
-        return Payment::where('status', Payment::STATUS_APPROVED)
-            ->where('created_at', '>=', $since)
+        return Payment::where('payments.status', Payment::STATUS_APPROVED)
+            ->where('payments.created_at', '>=', $since)
             ->join('businesses', 'payments.business_id', '=', 'businesses.id')
             ->select('businesses.id', 'businesses.name', DB::raw('SUM(COALESCE(payments.received_amount, payments.amount)) as total_amount'), DB::raw('COUNT(*) as transaction_count'))
             ->groupBy('businesses.id', 'businesses.name')
