@@ -17,7 +17,7 @@ class ProcessedEmailController extends Controller
             ->latest();
 
         // Filter by status
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             if ($request->status === 'matched') {
                 $query->where('is_matched', true);
             } elseif ($request->status === 'unmatched') {
@@ -26,7 +26,7 @@ class ProcessedEmailController extends Controller
         }
 
         // Filter by email account
-        if ($request->has('email_account_id')) {
+        if ($request->filled('email_account_id')) {
             $query->where('email_account_id', $request->email_account_id);
         }
 

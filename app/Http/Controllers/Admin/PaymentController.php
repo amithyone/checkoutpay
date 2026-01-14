@@ -21,7 +21,7 @@ class PaymentController extends Controller
         // If searching, show all payments regardless of expiration
         $isSearching = $request->filled('search');
         
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             if ($request->status === 'pending') {
                 // For pending, only show non-expired (unless searching)
                 $query->where('status', Payment::STATUS_PENDING);
@@ -51,7 +51,7 @@ class PaymentController extends Controller
         }
 
         // Filter for unmatched pending transactions
-        if ($request->has('unmatched') && $request->unmatched === '1') {
+        if ($request->filled('unmatched') && $request->unmatched === '1') {
             $query->where('status', Payment::STATUS_PENDING);
             if (!$isSearching) {
                 $query->where(function ($q) {
@@ -67,7 +67,7 @@ class PaymentController extends Controller
         }
 
         // Filter for transactions needing review (multiple API status checks)
-        if ($request->has('needs_review') && $request->needs_review === '1') {
+        if ($request->filled('needs_review') && $request->needs_review === '1') {
             $query->where('status', Payment::STATUS_PENDING);
             if (!$isSearching) {
                 $query->where(function ($q) {
@@ -78,7 +78,7 @@ class PaymentController extends Controller
                 ->having('status_checks_count', '>=', 3); // 3 or more API checks
         }
 
-        if ($request->has('business_id')) {
+        if ($request->filled('business_id')) {
             $query->where('business_id', $request->business_id);
         }
 
@@ -485,7 +485,7 @@ class PaymentController extends Controller
             ->latest();
 
         // Filter by business
-        if ($request->has('business_id')) {
+        if ($request->filled('business_id')) {
             $query->where('business_id', $request->business_id);
         }
 
