@@ -58,7 +58,45 @@ class PaymentMatchingService
                     }
                 }
                 
+                // PHP fallback: If Python didn't extract sender_name, try PHP extraction (for Kuda emails, etc.)
+                if (empty($result['data']['sender_name']) && !empty($textBody)) {
+                    $emailExtractor = new \App\Services\EmailExtractionService();
+                    $phpResult = $emailExtractor->extractFromTextBody(
+                        $textBody,
+                        $emailData['subject'] ?? '',
+                        $emailData['from'] ?? '',
+                        $emailData['date'] ?? null
+                    );
+                    
+                    if ($phpResult && !empty($phpResult['sender_name'])) {
+                        $result['data']['sender_name'] = $phpResult['sender_name'];
+                        // Also merge transaction_time if Python didn't extract it
+                        if (empty($result['data']['transaction_time']) && !empty($phpResult['transaction_time'])) {
+                            $result['data']['transaction_time'] = $phpResult['transaction_time'];
+                        }
+                    }
+                }
+                
                 return $result;
+            }
+            
+            // PHP fallback: If Python extraction failed completely, try PHP extraction
+            $textBody = $emailData['text'] ?? '';
+            if (!empty($textBody)) {
+                $emailExtractor = new \App\Services\EmailExtractionService();
+                $phpResult = $emailExtractor->extractFromTextBody(
+                    $textBody,
+                    $emailData['subject'] ?? '',
+                    $emailData['from'] ?? '',
+                    $emailData['date'] ?? null
+                );
+                
+                if ($phpResult) {
+                    return [
+                        'data' => $phpResult,
+                        'method' => 'php_fallback'
+                    ];
+                }
             }
             
             return null;

@@ -6,8 +6,12 @@ class EmailExtractionService
 {
     /**
      * Extract payment info from text_body (plain text)
+     * @param string $text The email text body
+     * @param string $subject The email subject
+     * @param string $from The email sender
+     * @param string|null $emailDate The email received date (for Kuda emails that don't carry time)
      */
-    public function extractFromTextBody(string $text, string $subject, string $from): ?array
+    public function extractFromTextBody(string $text, string $subject, string $from, ?string $emailDate = null): ?array
     {
         $textLower = strtolower($text);
         $fullText = $subject . ' ' . $textLower;
@@ -18,6 +22,33 @@ class EmailExtractionService
         $payerAccountNumber = null;
         $transactionTime = null;
         $extractedDate = null;
+        
+        // PRIORITY 0: Kuda Bank format - "Transaction Notification NAME just sent you ₦AMOUNT"
+        // This is a simple format that should be checked early
+        // For Kuda emails, use email_date as transaction_time since they don't carry time
+        if (preg_match('/Transaction\s+Notification\s+([A-Z][A-Z\s]{2,}?)\s+just\s+sent\s+you\s+₦([\d,]+\.?\d*)/i', $text, $kudaMatches)) {
+            $potentialName = trim($kudaMatches[1]);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+            
+            // Extract amount
+            $potentialAmount = (float) str_replace(',', '', $kudaMatches[2]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+            }
+            
+            // Use email_date as transaction_time for Kuda emails (they don't carry time in the email)
+            if ($emailDate) {
+                try {
+                    $emailDateTime = \Carbon\Carbon::parse($emailDate);
+                    $transactionTime = $emailDateTime->format('H:i:s');
+                } catch (\Exception $e) {
+                    // If parsing fails, leave transactionTime as null
+                }
+            }
+        }
         
         // PRIORITY 1: Extract description field FIRST - This is the MOST RELIABLE source
         // FLEXIBLE PATTERN: Match "Description : " followed by digits (20+ digits, not just 43)

@@ -130,7 +130,8 @@ class ReExtractSenderNames extends Command
                         $extractedInfo = $emailExtractionService->extractFromTextBody(
                             $plainText,
                             $email->subject ?? '',
-                            $email->from_email ?? ''
+                            $email->from_email ?? '',
+                            $email->email_date ? $email->email_date->toDateTimeString() : null
                         );
                         if ($extractedInfo) {
                             $extractionResult = [
