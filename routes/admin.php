@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
+use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('/extract-missing-names', [DashboardController::class, 'extractMissingNames'])->name('extract-missing-names');
         Route::post('/test-sender-extraction', [DashboardController::class, 'testSenderExtraction'])->name('test-sender-extraction');
+        
+        // Statistics
+        Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 
         // Processed Emails (Inbox)
         Route::get('processed-emails', [ProcessedEmailController::class, 'index'])->name('processed-emails.index');

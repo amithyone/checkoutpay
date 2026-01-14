@@ -5,6 +5,94 @@
 
 @section('content')
 <div class="space-y-6">
+    <!-- Daily Stats Cards -->
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm border-2 border-blue-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-chart-line text-blue-600 mr-2"></i>
+            Today's Statistics
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- Daily Amount Received -->
+            <div class="bg-white rounded-lg shadow-sm p-4 border border-blue-100">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs text-gray-600">Amount Received Today</p>
+                    <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-money-bill-wave text-green-600 text-sm"></i>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">₦{{ number_format($stats['daily']['amount_received'], 2) }}</h3>
+                @if($stats['daily']['amount_change_percent'] != 0)
+                    <div class="mt-2 flex items-center text-xs">
+                        @if($stats['daily']['amount_change_percent'] > 0)
+                            <span class="text-green-600">
+                                <i class="fas fa-arrow-up mr-1"></i>
+                                {{ abs($stats['daily']['amount_change_percent']) }}% vs yesterday
+                            </span>
+                        @else
+                            <span class="text-red-600">
+                                <i class="fas fa-arrow-down mr-1"></i>
+                                {{ abs($stats['daily']['amount_change_percent']) }}% vs yesterday
+                            </span>
+                        @endif
+                    </div>
+                @endif
+            </div>
+
+            <!-- Daily Transactions -->
+            <div class="bg-white rounded-lg shadow-sm p-4 border border-blue-100">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs text-gray-600">Transactions Today</p>
+                    <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exchange-alt text-blue-600 text-sm"></i>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['daily']['transactions_count']) }}</h3>
+                <div class="mt-2 text-xs text-gray-500">
+                    {{ $stats['daily']['approved_count'] }} approved
+                </div>
+            </div>
+
+            <!-- Daily Approved -->
+            <div class="bg-white rounded-lg shadow-sm p-4 border border-green-100">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs text-gray-600">Approved Today</p>
+                    <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-check-circle text-green-600 text-sm"></i>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['daily']['approved_count']) }}</h3>
+                <div class="mt-2 text-xs text-gray-500">
+                    {{ $stats['daily']['transactions_count'] > 0 ? round(($stats['daily']['approved_count'] / $stats['daily']['transactions_count']) * 100, 1) : 0 }}% of total
+                </div>
+            </div>
+
+            <!-- Daily Pending -->
+            <div class="bg-white rounded-lg shadow-sm p-4 border border-yellow-100">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs text-gray-600">Pending Today</p>
+                    <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-clock text-yellow-600 text-sm"></i>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['daily']['pending_count']) }}</h3>
+                <div class="mt-2 text-xs text-gray-500">
+                    Awaiting approval
+                </div>
+            </div>
+
+            <!-- View Stats Link -->
+            <div class="bg-white rounded-lg shadow-sm p-4 border border-purple-100 flex items-center justify-center">
+                <a href="{{ route('admin.stats.index') }}" class="flex flex-col items-center text-center hover:opacity-80 transition-opacity">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
+                        <i class="fas fa-chart-bar text-purple-600 text-xl"></i>
+                    </div>
+                    <p class="text-sm font-semibold text-gray-900">View All Stats</p>
+                    <p class="text-xs text-gray-500 mt-1">Daily, Monthly, Yearly</p>
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <!-- Global Match Trigger Button -->

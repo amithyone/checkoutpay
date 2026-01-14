@@ -15,13 +15,46 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
+        // Daily statistics
+        $today = now()->startOfDay();
+        $yesterday = now()->subDay()->startOfDay();
+        
+        $dailyStats = [
+            'amount_received' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereDate('created_at', $today)
+                ->sum('received_amount') ?: Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereDate('created_at', $today)
+                ->sum('amount'),
+            'amount_received_yesterday' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereDate('created_at', $yesterday)
+                ->sum('received_amount') ?: Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereDate('created_at', $yesterday)
+                ->sum('amount'),
+            'transactions_count' => Payment::whereDate('created_at', $today)->count(),
+            'approved_count' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereDate('created_at', $today)
+                ->count(),
+            'pending_count' => Payment::where('status', Payment::STATUS_PENDING)
+                ->whereDate('created_at', $today)
+                ->count(),
+        ];
+        
+        // Calculate percentage change
+        $dailyStats['amount_change_percent'] = $dailyStats['amount_received_yesterday'] > 0
+            ? round((($dailyStats['amount_received'] - $dailyStats['amount_received_yesterday']) / $dailyStats['amount_received_yesterday']) * 100, 2)
+            : 0;
+        
         // Statistics
         $stats = [
+            'daily' => $dailyStats,
             'payments' => [
                 'total' => Payment::count(),
                 'pending' => Payment::where('status', Payment::STATUS_PENDING)->count(),
                 'approved' => Payment::where('status', Payment::STATUS_APPROVED)->count(),
                 'rejected' => Payment::where('status', Payment::STATUS_REJECTED)->count(),
+                'total_amount' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->sum('received_amount') ?: Payment::where('status', Payment::STATUS_APPROVED)
+                    ->sum('amount'),
             ],
             'businesses' => [
                 'total' => Business::count(),
