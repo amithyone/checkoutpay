@@ -148,13 +148,17 @@
         <!-- Amount Chart -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Amount Received</h3>
-            <canvas id="amountChart" height="300"></canvas>
+            <div class="relative" style="height: 400px; max-height: 400px; overflow: hidden;">
+                <canvas id="amountChart"></canvas>
+            </div>
         </div>
 
         <!-- Transaction Count Chart -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Transaction Count</h3>
-            <canvas id="countChart" height="300"></canvas>
+            <div class="relative" style="height: 400px; max-height: 400px; overflow: hidden;">
+                <canvas id="countChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -303,7 +307,8 @@ const countChart = new Chart(countCtx, {
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
+        aspectRatio: 1.5,
         plugins: {
             legend: {
                 display: true,
