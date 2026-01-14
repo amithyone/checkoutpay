@@ -18,51 +18,63 @@ class PaymentController extends Controller
             ->withCount(['matchAttempts', 'statusChecks'])
             ->latest();
 
+        // If searching, show all payments regardless of expiration
+        $isSearching = $request->filled('search');
+        
         if ($request->has('status')) {
             if ($request->status === 'pending') {
-                // For pending, only show non-expired
-                $query->where('status', Payment::STATUS_PENDING)
-                    ->where(function ($q) {
+                // For pending, only show non-expired (unless searching)
+                $query->where('status', Payment::STATUS_PENDING);
+                if (!$isSearching) {
+                    $query->where(function ($q) {
                         $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                     });
+                }
             } else {
                 $query->where('status', $request->status);
             }
         } else {
-            // Default: show all including expired
-            $query->where(function ($q) {
-                // Include all statuses, but for pending, exclude expired
-                $q->where('status', '!=', Payment::STATUS_PENDING)
-                    ->orWhere(function ($pendingQ) {
-                        $pendingQ->where('status', Payment::STATUS_PENDING)
-                            ->where(function ($expQ) {
-                                $expQ->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                            });
-                    });
-            });
+            // Default: show all including expired (unless searching, then show everything)
+            if (!$isSearching) {
+                $query->where(function ($q) {
+                    // Include all statuses, but for pending, exclude expired
+                    $q->where('status', '!=', Payment::STATUS_PENDING)
+                        ->orWhere(function ($pendingQ) {
+                            $pendingQ->where('status', Payment::STATUS_PENDING)
+                                ->where(function ($expQ) {
+                                    $expQ->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                                });
+                        });
+                });
+            }
+            // If searching, don't apply default expiration filter - show all
         }
 
         // Filter for unmatched pending transactions
         if ($request->has('unmatched') && $request->unmatched === '1') {
-            $query->where('status', Payment::STATUS_PENDING)
-                ->where(function ($q) {
+            $query->where('status', Payment::STATUS_PENDING);
+            if (!$isSearching) {
+                $query->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                })
-                ->whereNotExists(function ($subQuery) {
-                    $subQuery->select(DB::raw(1))
-                        ->from('processed_emails')
-                        ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
-                        ->where('processed_emails.is_matched', true);
                 });
+            }
+            $query->whereNotExists(function ($subQuery) {
+                $subQuery->select(DB::raw(1))
+                    ->from('processed_emails')
+                    ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                    ->where('processed_emails.is_matched', true);
+            });
         }
 
         // Filter for transactions needing review (multiple API status checks)
         if ($request->has('needs_review') && $request->needs_review === '1') {
-            $query->where('status', Payment::STATUS_PENDING)
-                ->where(function ($q) {
+            $query->where('status', Payment::STATUS_PENDING);
+            if (!$isSearching) {
+                $query->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                })
-                ->withCount('statusChecks')
+                });
+            }
+            $query->withCount('statusChecks')
                 ->having('status_checks_count', '>=', 3); // 3 or more API checks
         }
 
@@ -81,13 +93,17 @@ class PaymentController extends Controller
         // Search by transaction ID
         if ($request->filled('search')) {
             $search = trim($request->search);
-            $transactionIdSearch = strtoupper($search);
-            // Remove TXN- prefix if present for search
-            $transactionIdClean = str_replace('TXN-', '', $transactionIdSearch);
             
-            $query->where(function ($q) use ($transactionIdSearch, $transactionIdClean) {
-                $q->where('transaction_id', 'like', "%{$transactionIdSearch}%")
-                  ->orWhere('transaction_id', 'like', "%{$transactionIdClean}%");
+            // Remove TXN- prefix if present for flexible searching
+            $searchClean = str_ireplace('TXN-', '', $search);
+            
+            // Use case-insensitive search with LIKE
+            // MySQL LIKE is case-insensitive by default for most collations
+            $query->where(function ($q) use ($search, $searchClean) {
+                // Search with original term (handles both with and without TXN-)
+                $q->whereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($search) . '%'])
+                  ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($searchClean) . '%'])
+                  ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%txn-' . strtolower($searchClean) . '%']);
             });
         }
 

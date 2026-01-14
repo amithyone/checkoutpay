@@ -44,12 +44,16 @@ class ProcessedEmailController extends Controller
                     ->orWhere('sender_name', 'like', "%{$search}%");
                 
                 // Search by transaction ID (TXN- prefix or without)
-                $transactionIdSearch = strtoupper($search);
-                // Remove TXN- prefix if present for search
-                $transactionIdClean = str_replace('TXN-', '', $transactionIdSearch);
-                $q->orWhereHas('matchedPayment', function($paymentQuery) use ($transactionIdSearch, $transactionIdClean) {
-                    $paymentQuery->where('transaction_id', 'like', "%{$transactionIdSearch}%")
-                        ->orWhere('transaction_id', 'like', "%{$transactionIdClean}%");
+                // Remove TXN- prefix if present for flexible searching
+                $searchClean = str_ireplace('TXN-', '', $search);
+                
+                $q->orWhereHas('matchedPayment', function($paymentQuery) use ($search, $searchClean) {
+                    $paymentQuery->where(function($pq) use ($search, $searchClean) {
+                        // Use case-insensitive search with LOWER()
+                        $pq->whereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($search) . '%'])
+                          ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($searchClean) . '%'])
+                          ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%txn-' . strtolower($searchClean) . '%']);
+                    });
                 });
                 
                 // If search looks like a number, also search in amount
