@@ -76,6 +76,9 @@ class PaymentController extends Controller
             }
         }
 
+        // Refresh payment to get latest status before returning
+        $payment->refresh();
+
         return response()->json([
             'success' => true,
             'data' => new PaymentResource($payment),

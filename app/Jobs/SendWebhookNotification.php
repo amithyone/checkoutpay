@@ -45,11 +45,14 @@ class SendWebhookNotification implements ShouldQueue
             return;
         }
 
-        // Determine payload based on payment status - ALWAYS include transaction_id
+        // Refresh payment to ensure we have the latest status
+        $this->payment->refresh();
+        
+        // Determine payload based on payment status - ALWAYS include transaction_id and status
         if ($this->payment->status === 'approved') {
             $payload = [
                 'success' => true,
-                'status' => 'approved',
+                'status' => 'approved', // Current payment status
                 'transaction_id' => $this->payment->transaction_id, // Always included
                 'amount' => (float) $this->payment->amount,
                 'payer_name' => $this->payment->payer_name,
@@ -86,7 +89,7 @@ class SendWebhookNotification implements ShouldQueue
         } elseif ($this->payment->status === 'rejected') {
             $payload = [
                 'success' => false,
-                'status' => 'rejected',
+                'status' => 'rejected', // Current payment status
                 'transaction_id' => $this->payment->transaction_id, // Always included
                 'amount' => (float) $this->payment->amount,
                 'payer_name' => $this->payment->payer_name,
@@ -97,11 +100,23 @@ class SendWebhookNotification implements ShouldQueue
                 'reason' => $this->payment->email_data['rejection_reason'] ?? 'Payment verification failed',
                 'message' => 'Payment has been rejected',
             ];
+        } elseif ($this->payment->status === 'pending') {
+            // Handle pending status explicitly
+            $payload = [
+                'success' => false,
+                'status' => 'pending', // Current payment status
+                'transaction_id' => $this->payment->transaction_id, // Always included
+                'amount' => (float) $this->payment->amount,
+                'account_number' => $this->payment->account_number, // Recipient account number
+                'payer_account_number' => $this->payment->payer_account_number, // Sender account number
+                'expires_at' => $this->payment->expires_at?->toISOString(),
+                'message' => 'Payment is still pending verification',
+            ];
         } else {
             // Fallback for other statuses (expired, etc.)
             $payload = [
                 'success' => false,
-                'status' => $this->payment->status,
+                'status' => $this->payment->status, // Current payment status
                 'transaction_id' => $this->payment->transaction_id, // Always included
                 'amount' => (float) $this->payment->amount,
                 'account_number' => $this->payment->account_number, // Recipient account number

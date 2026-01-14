@@ -33,13 +33,18 @@ class TransactionCheckController extends Controller
                     ], 404);
                 }
                 
-                // If payment is already approved/rejected, return status
+                // Refresh payment to get latest status
+                $payment->refresh();
+                
+                // If payment is already approved/rejected, return current status
                 if ($payment->status !== Payment::STATUS_PENDING) {
                     return response()->json([
                         'success' => true,
                         'transaction_id' => $payment->transaction_id,
-                        'status' => $payment->status,
-                        'message' => 'Transaction already processed',
+                        'status' => $payment->status, // Current payment status
+                        'message' => $payment->status === Payment::STATUS_APPROVED 
+                            ? 'Payment has been verified and approved' 
+                            : 'Transaction already processed',
                     ]);
                 }
                 
@@ -114,15 +119,19 @@ class TransactionCheckController extends Controller
                     Artisan::call('payment:monitor-emails');
                 }
                 
-                // Refresh payment
+                // Refresh payment to get latest status
                 $payment->refresh();
                 
                 return response()->json([
                     'success' => true,
                     'transaction_id' => $payment->transaction_id,
-                    'status' => $payment->status,
+                    'status' => $payment->status, // Current payment status (pending, approved, or rejected)
                     'matched' => $matched,
-                    'message' => $matched ? 'Payment matched and approved' : 'No matching email found yet',
+                    'message' => $matched && $payment->status === Payment::STATUS_APPROVED
+                        ? 'Payment matched and approved' 
+                        : ($payment->status === Payment::STATUS_PENDING 
+                            ? 'No matching email found yet' 
+                            : 'Transaction status: ' . $payment->status),
                 ]);
             }
             
