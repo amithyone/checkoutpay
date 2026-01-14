@@ -82,12 +82,12 @@ class PaymentController extends Controller
             $query->where('business_id', $request->business_id);
         }
 
-        if ($request->has('from_date')) {
-            $query->whereDate('created_at', '>=', $request->from_date);
+        if ($request->filled('from_date')) {
+            $query->where('created_at', '>=', $request->from_date . ' 00:00:00');
         }
 
-        if ($request->has('to_date')) {
-            $query->whereDate('created_at', '<=', $request->to_date);
+        if ($request->filled('to_date')) {
+            $query->where('created_at', '<=', $request->to_date . ' 23:59:59');
         }
 
         // Search by transaction ID
@@ -490,12 +490,12 @@ class PaymentController extends Controller
         }
 
         // Filter by date range
-        if ($request->has('from_date')) {
-            $query->whereDate('created_at', '>=', $request->from_date);
+        if ($request->filled('from_date')) {
+            $query->where('created_at', '>=', $request->from_date . ' 00:00:00');
         }
 
-        if ($request->has('to_date')) {
-            $query->whereDate('created_at', '<=', $request->to_date);
+        if ($request->filled('to_date')) {
+            $query->where('created_at', '<=', $request->to_date . ' 23:59:59');
         }
 
         $payments = $query->paginate(20)->withQueryString();

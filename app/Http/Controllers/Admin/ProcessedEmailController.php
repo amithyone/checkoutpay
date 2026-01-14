@@ -33,37 +33,39 @@ class ProcessedEmailController extends Controller
         // Search by Subject, From, Amount, Sender, and Transaction ID
         if ($request->filled('search')) {
             $search = trim($request->search);
-            $query->where(function ($q) use ($search) {
-                // Search in subject
-                $q->where('subject', 'like', "%{$search}%")
-                    // Search in from email
-                    ->orWhere('from_email', 'like', "%{$search}%")
-                    // Search in from name
-                    ->orWhere('from_name', 'like', "%{$search}%")
-                    // Search in sender name
-                    ->orWhere('sender_name', 'like', "%{$search}%");
-                
-                // Search by transaction ID (TXN- prefix or without)
-                // Remove TXN- prefix if present for flexible searching
-                $searchClean = str_ireplace('TXN-', '', $search);
-                
-                $q->orWhereHas('matchedPayment', function($paymentQuery) use ($search, $searchClean) {
-                    $paymentQuery->where(function($pq) use ($search, $searchClean) {
-                        // Use case-insensitive search with LOWER()
-                        $pq->whereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($search) . '%'])
-                          ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($searchClean) . '%'])
-                          ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%txn-' . strtolower($searchClean) . '%']);
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    // Search in subject
+                    $q->where('subject', 'like', "%{$search}%")
+                        // Search in from email
+                        ->orWhere('from_email', 'like', "%{$search}%")
+                        // Search in from name
+                        ->orWhere('from_name', 'like', "%{$search}%")
+                        // Search in sender name
+                        ->orWhere('sender_name', 'like', "%{$search}%");
+                    
+                    // Search by transaction ID (TXN- prefix or without)
+                    // Remove TXN- prefix if present for flexible searching
+                    $searchClean = str_ireplace('TXN-', '', $search);
+                    
+                    $q->orWhereHas('matchedPayment', function($paymentQuery) use ($search, $searchClean) {
+                        $paymentQuery->where(function($pq) use ($search, $searchClean) {
+                            // Use case-insensitive search with LOWER()
+                            $pq->whereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($search) . '%'])
+                              ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($searchClean) . '%'])
+                              ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%txn-' . strtolower($searchClean) . '%']);
+                        });
                     });
+                    
+                    // If search looks like a number, also search in amount
+                    $numericSearch = preg_replace('/[^0-9.]/', '', $search);
+                    if (is_numeric($numericSearch) && $numericSearch > 0) {
+                        $amount = (float) $numericSearch;
+                        // Allow small tolerance for amount matching (handles formatting like 1000 vs 1000.00)
+                        $q->orWhereBetween('amount', [$amount - 0.01, $amount + 0.01]);
+                    }
                 });
-                
-                // If search looks like a number, also search in amount
-                $numericSearch = preg_replace('/[^0-9.]/', '', $search);
-                if (is_numeric($numericSearch) && $numericSearch > 0) {
-                    $amount = (float) $numericSearch;
-                    // Allow small tolerance for amount matching (handles formatting like 1000 vs 1000.00)
-                    $q->orWhereBetween('amount', [$amount - 0.01, $amount + 0.01]);
-                }
-            });
+            }
         }
 
         $emails = $query->paginate(20)->withQueryString();

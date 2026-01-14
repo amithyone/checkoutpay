@@ -218,6 +218,11 @@
 // Server-side search - form submits to search all records, not just current page
 document.addEventListener('DOMContentLoaded', function() {
     const searchForm = document.getElementById('searchForm');
+    if (!searchForm) {
+        console.error('Search form not found');
+        return;
+    }
+    
     const searchInput = document.getElementById('searchInput');
     const statusFilter = document.getElementById('statusFilter');
     const emailAccountFilter = document.getElementById('emailAccountFilter');
@@ -244,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
 });
 
 // Check match function
