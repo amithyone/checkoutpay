@@ -90,6 +90,10 @@ class StatsController extends Controller
                     ->where('created_at', '>=', $last30Days)
                     ->selectRaw('AVG(COALESCE(received_amount, amount)) as avg')
                     ->value('avg') ?: 0,
+                'average_transaction' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->where('created_at', '>=', $last30Days)
+                    ->selectRaw('AVG(COALESCE(received_amount, amount)) as avg')
+                    ->value('avg') ?: 0,
             ],
             'today' => [
                 'amount' => Payment::where('status', Payment::STATUS_APPROVED)
