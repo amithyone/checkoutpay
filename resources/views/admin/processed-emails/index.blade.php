@@ -73,9 +73,12 @@
                 </select>
             </div>
 
-            <button type="button" onclick="clearFilters()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
-                <i class="fas fa-times mr-2"></i> Clear
+            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark">
+                <i class="fas fa-search mr-2"></i> Search
             </button>
+            <a href="{{ route('admin.processed-emails.index') }}" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                <i class="fas fa-times mr-2"></i> Clear
+            </a>
         </form>
     </div>
 
@@ -205,144 +208,43 @@
         <!-- Pagination -->
         @if($emails->hasPages())
             <div class="px-6 py-4 border-t border-gray-200">
-                {{ $emails->appends(request()->query())->links() }}
+                {{ $emails->links() }}
             </div>
         @endif
     </div>
 </div>
 
 <script>
-let searchTimeout;
-
-function filterEmails() {
-    const searchInput = document.getElementById('searchInput');
-    const statusFilter = document.getElementById('statusFilter');
-    const emailAccountFilter = document.getElementById('emailAccountFilter');
-    const emailRows = document.querySelectorAll('.email-row');
-    
-    if (!searchInput || !emailRows.length) {
-        return;
-    }
-    
-    const searchTerm = (searchInput.value || '').toLowerCase().trim();
-    const statusValue = statusFilter ? statusFilter.value : '';
-    const emailAccountValue = emailAccountFilter ? emailAccountFilter.value : '';
-    
-    let visibleCount = 0;
-    
-    emailRows.forEach(row => {
-        const subject = (row.dataset.subject || '').toLowerCase();
-        const fromEmail = (row.dataset.fromEmail || '').toLowerCase();
-        const fromName = (row.dataset.fromName || '').toLowerCase();
-        const senderName = (row.dataset.senderName || '').toLowerCase();
-        const amount = row.dataset.amount || '';
-        const status = row.dataset.status || '';
-        const emailAccountId = row.dataset.emailAccountId || '';
-        
-        // Search filter
-        let matchesSearch = true;
-        if (searchTerm) {
-            const numericSearch = searchTerm.replace(/[^0-9.]/g, '');
-            const transactionId = (row.dataset.transactionId || '').toLowerCase();
-            const searchTermUpper = searchTerm.toUpperCase();
-            const transactionIdClean = searchTermUpper.replace('TXN-', '');
-            
-            matchesSearch = 
-                subject.includes(searchTerm) ||
-                fromEmail.includes(searchTerm) ||
-                fromName.includes(searchTerm) ||
-                senderName.includes(searchTerm) ||
-                transactionId.includes(searchTerm.toLowerCase()) ||
-                transactionId.includes(transactionIdClean.toLowerCase()) ||
-                (amount && numericSearch && amount.toString().includes(numericSearch));
-        }
-        
-        // Status filter
-        let matchesStatus = !statusValue || status === statusValue;
-        
-        // Email account filter
-        let matchesEmailAccount = !emailAccountValue || emailAccountId === emailAccountValue;
-        
-        // Show/hide row
-        if (matchesSearch && matchesStatus && matchesEmailAccount) {
-            row.style.display = '';
-            visibleCount++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-    
-    // Update empty state
-    const tbody = document.getElementById('emailsTableBody');
-    if (!tbody) return;
-    
-    let noResultsRow = tbody.querySelector('.no-results-row');
-    
-    if (visibleCount === 0 && emailRows.length > 0) {
-        // Show no results message
-        if (!noResultsRow) {
-            noResultsRow = document.createElement('tr');
-            noResultsRow.className = 'no-results-row';
-            noResultsRow.innerHTML = `
-                <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
-                    No emails found matching your search criteria.
-                    <button onclick="clearFilters()" class="text-primary hover:underline ml-2">Clear filters</button>
-                </td>
-            `;
-            tbody.appendChild(noResultsRow);
-        }
-        noResultsRow.style.display = '';
-    } else {
-        // Hide no results row if we have results
-        if (noResultsRow) {
-            noResultsRow.style.display = 'none';
-        }
-    }
-}
-
-// Real-time search as you type
+// Server-side search - form submits to search all records, not just current page
 document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.getElementById('searchForm');
     const searchInput = document.getElementById('searchInput');
     const statusFilter = document.getElementById('statusFilter');
     const emailAccountFilter = document.getElementById('emailAccountFilter');
     
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(filterEmails, 200); // Debounce 200ms
+    // Submit form to server when filters change (server-side search)
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            searchForm.submit();
         });
     }
     
-    if (statusFilter) {
-        statusFilter.addEventListener('change', filterEmails);
-    }
-    
     if (emailAccountFilter) {
-        emailAccountFilter.addEventListener('change', filterEmails);
+        emailAccountFilter.addEventListener('change', function() {
+            searchForm.submit();
+        });
     }
     
-    // Initial filter on page load (if there are query params)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('search') || urlParams.has('status') || urlParams.has('email_account_id')) {
-        filterEmails();
+    // Submit form on Enter key in search input
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchForm.submit();
+            }
+        });
     }
 });
-
-// Clear filters function
-function clearFilters() {
-    const searchInput = document.getElementById('searchInput');
-    const statusFilter = document.getElementById('statusFilter');
-    const emailAccountFilter = document.getElementById('emailAccountFilter');
-    
-    if (searchInput) searchInput.value = '';
-    if (statusFilter) statusFilter.value = '';
-    if (emailAccountFilter) emailAccountFilter.value = '';
-    
-    filterEmails();
-    
-    // Reload page to reset pagination
-    window.location.href = '{{ route("admin.processed-emails.index") }}';
-}
 
 // Check match function
 function checkMatch(emailId) {

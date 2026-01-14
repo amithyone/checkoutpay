@@ -62,7 +62,7 @@ class ProcessedEmailController extends Controller
             });
         }
 
-        $emails = $query->paginate(20);
+        $emails = $query->paginate(20)->withQueryString();
 
         // Statistics
         $stats = [

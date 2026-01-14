@@ -65,10 +65,53 @@
             </select>
             <input type="date" name="from_date" value="{{ request('from_date') }}" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
             <input type="date" name="to_date" value="{{ request('to_date') }}" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <button type="submit" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm">Filter</button>
-            <a href="{{ route('admin.payments.index') }}" class="text-gray-600 hover:text-gray-900 text-sm">Clear</a>
+            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark text-sm">
+                <i class="fas fa-search mr-2"></i> Search
+            </button>
+            <a href="{{ route('admin.payments.index') }}" class="text-gray-600 hover:text-gray-900 text-sm px-4 py-2">Clear</a>
         </form>
     </div>
+
+<script>
+// Server-side search - form submits to search all records, not just current page
+document.addEventListener('DOMContentLoaded', function() {
+    const searchForm = document.querySelector('form[method="GET"]');
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.querySelector('select[name="status"]');
+    const businessFilter = document.querySelector('select[name="business_id"]');
+    
+    // Submit form to server when filters change (server-side search)
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            searchForm.submit();
+        });
+    }
+    
+    if (businessFilter) {
+        businessFilter.addEventListener('change', function() {
+            searchForm.submit();
+        });
+    }
+    
+    // Submit form on Enter key in search input
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchForm.submit();
+            }
+        });
+    }
+    
+    // Submit form when checkboxes change
+    const checkboxes = document.querySelectorAll('input[type="checkbox"][name="unmatched"], input[type="checkbox"][name="needs_review"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            searchForm.submit();
+        });
+    });
+});
+</script>
 
     <!-- Table -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
