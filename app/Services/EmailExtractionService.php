@@ -47,21 +47,85 @@ class EmailExtractionService
         if (!$senderName && preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $text, $descLineMatches)) {
             $descriptionLine = trim($descLineMatches[1]);
             
-            // Use structured extraction from description line (like amount extraction)
-            // Pattern: digits FROM name (with optional dash, TO, or end)
-            if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1a: TRANSFER FROM: NAME (with colon) - e.g., "TRANSFER FROM: JOHN = AGBO"
+            if (preg_match('/TRANSFER\s+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:\s+TO|\s*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (convert "JOHN = AGBO" to "JOHN AGBO")
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1b: TRANSFER FROM NAME (without colon) - e.g., "TRANSFER FROM JIMMY = ALEX PAM-OPAY"
+            elseif (preg_match('/TRANSFER\s+FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:-OPAY|[\s\-]+OPAY|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1c: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
+            elseif (preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 $potentialName = rtrim($potentialName, '- ');
-                $senderName = trim(strtolower($potentialName));
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
             }
-            // Pattern: digits FROM name (end of line)
-            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)$/i', $descriptionLine, $nameMatches)) {
-                $senderName = trim(strtolower($nameMatches[1]));
+            // Pattern 1d: digits FROM = name (with equals sign) - e.g., "digits FROM = SOLOMON INNOCENT AMITHY"
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]*=[\s]*([A-Z][A-Z\s]{2,}?)(?:[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1e: digits FROM name (with optional dash, TO, or end) - original pattern
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1f: digits FROM: name (with colon) - e.g., "digits FROM: DESTINY = IWAJOMO"
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1g: digits FROM name (end of line)
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s=]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
             }
         }
-        // Also try "TRANSFER FROM NAME" format in description
-        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z\s]+?)(?:-|$)/i', $text, $nameMatches)) {
-            $senderName = trim(strtolower($nameMatches[1]));
+        // Pattern 2: Also try "TRANSFER FROM NAME" format in description (without description label)
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM[\s]*:?\s*([A-Z\s=]+?)(?:-|TO|\s*$)/i', $text, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
         }
         
         // Now parse the digits if we found them
@@ -129,7 +193,11 @@ class EmailExtractionService
                 $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
             }
             if (!$senderName) {
-                $senderName = trim(strtolower($matches[6]));
+                $potentialName = trim($matches[6]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $senderName = trim(strtolower($potentialName));
             }
         }
         // Pattern 3: Direct format without "Description :" prefix (fallback - very flexible)
@@ -245,9 +313,20 @@ class EmailExtractionService
         if (preg_match('/from\s+([A-Z][A-Z\s]+?)(?:\s+to|$)/i', $text, $matches)) {
             $senderName = trim(strtolower($matches[1]));
         }
-        // Pattern 1b: "TRANSFER FROM NAME" format in Description
-        elseif (preg_match('/description[\s]*:[\s]*.*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z][A-Z\s]+?)(?:-|$)/i', $text, $matches)) {
+        // Pattern 1b: "TRANSFER FROM NAME" format in Description (with or without colon)
+        if (!$senderName && preg_match('/description[\s]*:[\s]*.*?[\d\-]+\s*-\s*TRANSFER\s+FROM[\s]*:?\s*([A-Z][A-Z\s=]+?)(?:-OPAY|[\s\-]+OPAY|[\s]+TO|-|$)/i', $text, $matches)) {
             $potentialName = trim($matches[1]);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 1c: UNION TRANSFER = FROM NAME
+        elseif (!$senderName && preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            $potentialName = rtrim($potentialName, '- ');
             if (strlen($potentialName) >= 3) {
                 $senderName = trim(strtolower($potentialName));
             }
@@ -266,11 +345,38 @@ class EmailExtractionService
                 $senderName = trim(strtolower($potentialName));
             }
         }
-        // Pattern 3: Extract from Remarks field (just the name, no FROM)
-        elseif (preg_match('/(?:remark|remarks)[\s:]+([A-Z][A-Z\s]{2,}?)(?:\s|$)/i', $fullText, $matches)) {
+        // Pattern 3: Extract from Remarks field - UBA format (PRIORITY - check first)
+        // Format: "Remarks : 4-UBA-SOLO MON FEMI GARBA" - name is after "-UBA-"
+        if (!$senderName && preg_match('/(?:remark|remarks)[\s:]+[^\n\r]*?[\-]UBA[\-]([A-Z][A-Z\s]+?)(?:\s*$|\s+Time|\s+Transaction|\s+Amount|\s+Value)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 3a: Extract from Remarks field - handle dash-separated format
+        // Format: "Remarks : D-FAIRMONE Y-JOHN AGBO" or "Remarks : NAME"
+        elseif (!$senderName && preg_match('/(?:remark|remarks)[\s:]+[^\n\r]*?[\-]([A-Z][A-Z\s]{2,}?)(?:\s|$|Time|Transaction)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Remove common prefixes like "NT", "MR", "MRS", "MS", etc.
+            $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA|D-FAIRMONE\s+Y)\s*/i', '', $potentialName);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 3b: Remarks field without dash (original pattern)
+        elseif (!$senderName && preg_match('/(?:remark|remarks)[\s:]+([A-Z][A-Z\s]{2,}?)(?:\s|$)/i', $fullText, $matches)) {
             $potentialName = trim($matches[1]);
             // Remove common prefixes like "NT", "MR", "MRS", "MS", etc.
             $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA)\s+/i', '', $potentialName);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
             if (strlen($potentialName) >= 3) {
                 $senderName = trim(strtolower($potentialName));
             }
@@ -282,7 +388,10 @@ class EmailExtractionService
         
         // Clean up sender name
         if ($senderName) {
+            // Handle = characters in names (convert "JOHN = AGBO" to "JOHN AGBO")
+            $senderName = preg_replace('/\s*=\s*/', ' ', $senderName);
             $senderName = preg_replace('/\s+/', ' ', $senderName);
+            $senderName = trim($senderName);
             if (strlen($senderName) < 3) {
                 $senderName = null;
             }
@@ -322,21 +431,85 @@ class EmailExtractionService
         if (!$senderName && preg_match('/description[\s]*:[\s]*([^\n\r]+)/i', $plainText, $descLineMatches)) {
             $descriptionLine = trim($descLineMatches[1]);
             
-            // Use structured extraction from description line (like amount extraction)
-            // Pattern: digits FROM name (with optional dash, TO, or end)
-            if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1a: TRANSFER FROM: NAME (with colon) - e.g., "TRANSFER FROM: JOHN = AGBO"
+            if (preg_match('/TRANSFER\s+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:\s+TO|\s*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1b: TRANSFER FROM NAME (without colon, before OPAY) - e.g., "TRANSFER FROM JIMMY = ALEX PAM-OPAY"
+            elseif (preg_match('/TRANSFER\s+FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:-OPAY|[\s\-]+OPAY|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1c: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
+            elseif (preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 $potentialName = rtrim($potentialName, '- ');
-                $senderName = trim(strtolower($potentialName));
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
             }
-            // Pattern: digits FROM name (end of line)
-            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)$/i', $descriptionLine, $nameMatches)) {
-                $senderName = trim(strtolower($nameMatches[1]));
+            // Pattern 1d: digits FROM = name (with equals sign) - e.g., "digits FROM = SOLOMON INNOCENT AMITHY"
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]*=[\s]*([A-Z][A-Z\s]{2,}?)(?:[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1e: digits FROM name (with optional dash, TO, or end) - original pattern
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1f: digits FROM: name (with colon) - e.g., "digits FROM: DESTINY = IWAJOMO"
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1g: digits FROM name (end of line)
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s=]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
             }
         }
-        // Also try "TRANSFER FROM NAME" format in description
-        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM\s+([A-Z\s]+?)(?:-|$)/i', $plainText, $nameMatches)) {
-            $senderName = trim(strtolower($nameMatches[1]));
+        // Pattern 2: Also try "TRANSFER FROM NAME" format in description (without description label)
+        if (!$senderName && preg_match('/description[\s]*:[\s]*[^\n\r]*?[\d\-]+\s*-\s*TRANSFER\s+FROM[\s]*:?\s*([A-Z\s=]+?)(?:-OPAY|[\s\-]+OPAY|[\s]+TO|-|$)/i', $plainText, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
         }
         
         // Parse description field if found
@@ -379,7 +552,11 @@ class EmailExtractionService
                         $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
                     }
                     if (!$senderName) {
-                        $senderName = trim(strtolower($descMatches[6]));
+                        $potentialName = trim($descMatches[6]);
+                        // Handle = characters in names
+                        $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                        $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                        $senderName = trim(strtolower($potentialName));
                     }
                 }
             }
@@ -396,7 +573,11 @@ class EmailExtractionService
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
                 }
-                $senderName = trim(strtolower($matches[6]));
+                $potentialName = trim($matches[6]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $senderName = trim(strtolower($potentialName));
             }
             // Pattern 3: Description field with space between accounts
             elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $html, $matches)) {
@@ -411,7 +592,11 @@ class EmailExtractionService
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
                 }
-                $senderName = trim(strtolower($matches[6]));
+                $potentialName = trim($matches[6]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $senderName = trim(strtolower($potentialName));
             }
         }
         
@@ -454,6 +639,31 @@ class EmailExtractionService
         // Only use fallback patterns if we didn't get the name from description field
         if (!$senderName) {
             $senderName = $nameExtractor->extractFromHtml($html);
+        }
+        
+        // Additional pattern: Extract from Remarks field in HTML - UBA format (PRIORITY - check first)
+        // Format: "Remarks : 4-UBA-SOLO MON FEMI GARBA" - name is after "-UBA-"
+        if (!$senderName && preg_match('/(?:remark|remarks)[\s:]+[^\n\r<]*?[\-]UBA[\-]([A-Z][A-Z\s]+?)(?:\s*$|\s+Time|\s+Transaction|\s+Amount|\s+Value|<\/td>)/i', $plainText, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Additional pattern: Extract from Remarks field in HTML (if not found yet)
+        // Format: "Remarks : D-FAIRMONE Y-JOHN AGBO" or "Remarks : NAME"
+        elseif (!$senderName && preg_match('/(?:remark|remarks)[\s:]+[^\n\r<]*?[\-]([A-Z][A-Z\s]{2,}?)(?:\s|$|Time|Transaction|<\/td>)/i', $plainText, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Remove common prefixes and service names
+            $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA|D-FAIRMONE\s+Y)\s*/i', '', $potentialName);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
         }
         
         // Try extracting from email sender if no name found (but validate it's not an email)

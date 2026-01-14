@@ -27,18 +27,72 @@ class SenderNameExtractor
             $descriptionLine = trim($descLineMatches[1]);
             
             // Extract name from this description line (structured approach)
-            // Pattern 1: digits FROM name (with optional dash, TO, or end)
-            if (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1a: TRANSFER FROM: NAME (with colon) - e.g., "TRANSFER FROM: JOHN = AGBO"
+            if (preg_match('/TRANSFER\s+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:\s+TO|\s*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1b: TRANSFER FROM NAME (without colon, before OPAY) - e.g., "TRANSFER FROM JIMMY = ALEX PAM-OPAY"
+            elseif (preg_match('/TRANSFER\s+FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:-OPAY|[\s\-]+OPAY|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
+            elseif (preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = rtrim($potentialName, '- ');
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1d: digits FROM = name (with equals sign) - e.g., "digits FROM = SOLOMON INNOCENT AMITHY"
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]*=[\s]*([A-Z][A-Z\s]{2,}?)(?:[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1e: digits FROM name (with optional dash, TO, or end) - original pattern
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
                 // Remove trailing dash if present
                 $potentialName = rtrim($potentialName, '- ');
                 if ($this->isValidName($potentialName)) {
                     $senderName = strtolower($potentialName);
                 }
             }
-            // Pattern 2: digits FROM name (end of line)
-            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1f: digits FROM: name (with colon) - e.g., "digits FROM: DESTINY = IWAJOMO"
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1g: digits FROM name (end of line)
+            elseif (preg_match('/\d{20,}[\s]+FROM[\s]+([A-Z][A-Z\s=]{2,}?)$/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
                 if ($this->isValidName($potentialName)) {
                     $senderName = strtolower($potentialName);
                 }
@@ -71,12 +125,38 @@ class SenderNameExtractor
             }
         }
         
-        // PRIORITY 5: Extract from Remarks/Narration field
-        // Format: "Remarks : NAME" or "Narration : NAME"
-        if (!$senderName && preg_match('/(?:remark|remarks|narration|narrative)[\s]*:[\s]*([A-Z][A-Z\s]{2,}?)(?:\s|$|[\s\-])/i', $fullText, $matches)) {
+        // PRIORITY 5: Extract from Remarks/Narration field - UBA format (PRIORITY - check first)
+        // Format: "Remarks : 4-UBA-SOLO MON FEMI GARBA" - name is after "-UBA-"
+        if (!$senderName && preg_match('/(?:remark|remarks|narration|narrative)[\s]*:[\s]*[^\n\r]*?[\-]UBA[\-]([A-Z][A-Z\s]+?)(?:\s*$|\s+Time|\s+Transaction|\s+Amount|\s+Value)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // PRIORITY 5a: Extract from Remarks/Narration field - handle dash-separated format
+        // Format: "Remarks : D-FAIRMONE Y-JOHN AGBO" or "Remarks : NAME"
+        elseif (!$senderName && preg_match('/(?:remark|remarks|narration|narrative)[\s]*:[\s]*[^\n\r]*?[\-]([A-Z][A-Z\s]{2,}?)(?:\s|$|Time|Transaction)/i', $fullText, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Remove common prefixes and service names
+            $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA|MALLAM|MALAM|D-FAIRMONE\s+Y)\s*/i', '', $potentialName);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if ($this->isValidName($potentialName)) {
+                $senderName = strtolower($potentialName);
+            }
+        }
+        // Pattern 5b: Remarks field without dash (original pattern)
+        elseif (!$senderName && preg_match('/(?:remark|remarks|narration|narrative)[\s]*:[\s]*([A-Z][A-Z\s]{2,}?)(?:\s|$|[\s\-])/i', $fullText, $matches)) {
             $potentialName = trim($matches[1]);
             // Remove common prefixes
             $potentialName = preg_replace('/^(NT|MR|MRS|MS|DR|PROF|ENG|CHIEF|ALHAJI|ALHAJA|MALLAM|MALAM)\s+/i', '', $potentialName);
+            // Handle = characters in names
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
             if ($this->isValidName($potentialName)) {
                 $senderName = strtolower($potentialName);
             }
@@ -268,6 +348,9 @@ class SenderNameExtractor
      */
     protected function cleanName(string $name): string
     {
+        // Handle = characters in names (convert "JOHN = AGBO" to "JOHN AGBO")
+        $name = preg_replace('/\s*=\s*/', ' ', $name);
+        
         // Normalize whitespace
         $name = preg_replace('/\s+/', ' ', $name);
         $name = trim($name);
