@@ -69,7 +69,17 @@ class EmailExtractionService
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern 1c: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
+            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA"
+            elseif (preg_match('/[\-]KMB[\-]([A-Z][A-Z\s,]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Remove trailing period and clean up
+                $potentialName = rtrim($potentialName, '. ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1d: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
             elseif (preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 $potentialName = rtrim($potentialName, '- ');
@@ -453,7 +463,17 @@ class EmailExtractionService
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern 1c: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
+            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA"
+            elseif (preg_match('/[\-]KMB[\-]([A-Z][A-Z\s,]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Remove trailing period and clean up
+                $potentialName = rtrim($potentialName, '. ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+            // Pattern 1d: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
             elseif (preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 $potentialName = rtrim($potentialName, '- ');
@@ -461,7 +481,7 @@ class EmailExtractionService
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern 1d: digits FROM = name (with equals sign) - e.g., "digits FROM = SOLOMON INNOCENT AMITHY"
+            // Pattern 1e: digits FROM = name (with equals sign) - e.g., "digits FROM = SOLOMON INNOCENT AMITHY"
             elseif (preg_match('/\d{20,}[\s]+FROM[\s]*=[\s]*([A-Z][A-Z\s]{2,}?)(?:[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 $potentialName = preg_replace('/\s+/', ' ', $potentialName);
