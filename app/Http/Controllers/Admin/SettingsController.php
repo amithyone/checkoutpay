@@ -121,6 +121,7 @@ class SettingsController extends Controller
             'contact_address' => 'nullable|string|max:500',
             'logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
             'favicon' => 'nullable|image|mimes:png,ico|max:512',
+            'email_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
         ]);
 
         // Handle logo upload
@@ -135,6 +136,13 @@ class SettingsController extends Controller
             $favicon = $request->file('favicon');
             $faviconPath = $favicon->store('settings', 'public');
             Setting::set('site_favicon', $faviconPath, 'string', 'general', 'Site favicon');
+        }
+
+        // Handle email logo upload
+        if ($request->hasFile('email_logo')) {
+            $emailLogo = $request->file('email_logo');
+            $emailLogoPath = $emailLogo->store('settings', 'public');
+            Setting::set('email_logo', $emailLogoPath, 'string', 'general', 'Black logo for email templates');
         }
 
         // Update contact information

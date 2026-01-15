@@ -197,6 +197,32 @@
                 <p class="mt-2 text-xs text-gray-500">Recommended: PNG or ICO. Max size: 512KB</p>
             </div>
 
+            <!-- Email Logo Upload (Black Logo for Email Templates) -->
+            <div>
+                <label for="email_logo" class="block text-sm font-medium text-gray-700 mb-2">
+                    Email Logo (Black Logo)
+                    <span class="text-xs text-gray-500 font-normal">(Used in email templates)</span>
+                </label>
+                @php
+                    $emailLogo = \App\Models\Setting::get('email_logo');
+                    $emailLogoPath = $emailLogo ? storage_path('app/public/' . $emailLogo) : null;
+                @endphp
+                @if($emailLogo && $emailLogoPath && file_exists($emailLogoPath))
+                    <div class="mb-3">
+                        <img src="{{ asset('storage/' . $emailLogo) }}" alt="Current Email Logo" class="h-16 object-contain bg-gray-100 p-2 rounded" onerror="this.style.display='none';">
+                        <p class="text-xs text-gray-500 mt-1">Current email logo</p>
+                    </div>
+                @endif
+                <input 
+                    type="file" 
+                    id="email_logo" 
+                    name="email_logo" 
+                    accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">Recommended: PNG, JPG, or SVG. Max size: 2MB. This logo will be used in all email templates.</p>
+            </div>
+
             <!-- Contact Information -->
             <div class="border-t border-gray-200 pt-6">
                 <h4 class="text-md font-semibold text-gray-900 mb-4">Contact Information</h4>
