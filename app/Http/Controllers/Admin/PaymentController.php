@@ -551,8 +551,8 @@ class PaymentController extends Controller
         }
 
         try {
-            // Dispatch event to resend webhook
-            event(new \App\Events\PaymentApproved($payment));
+            // Dispatch job synchronously to execute immediately
+            \App\Jobs\SendWebhookNotification::dispatchSync($payment);
 
             // Log the resend action
             \Illuminate\Support\Facades\Log::info('Webhook resent by admin', [
@@ -564,12 +564,14 @@ class PaymentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Webhook notification has been queued for resending.',
+                'message' => 'Webhook notification has been sent successfully.',
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Error resending webhook', [
                 'payment_id' => $payment->id,
+                'transaction_id' => $payment->transaction_id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
