@@ -59,4 +59,31 @@ class EmailVerificationController extends Controller
 
         return back()->with('status', 'Verification link sent! Please check your email.');
     }
+
+    /**
+     * Resend verification email without authentication (for login page).
+     */
+    public function resendWithoutAuth(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'email' => 'required|email|exists:businesses,email',
+        ]);
+
+        $business = Business::where('email', $request->email)->first();
+
+        if (!$business) {
+            return back()->withErrors(['email' => 'Email address not found.']);
+        }
+
+        if ($business->hasVerifiedEmail()) {
+            return redirect()->route('business.login')
+                ->with('info', 'Your email is already verified. You can log in now.');
+        }
+
+        $business->sendEmailVerificationNotification();
+
+        return redirect()->route('business.login')
+            ->with('status', 'Verification link sent! Please check your email inbox.')
+            ->withInput(['email' => $request->email]);
+    }
 }

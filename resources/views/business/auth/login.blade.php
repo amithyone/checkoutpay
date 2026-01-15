@@ -47,6 +47,30 @@
                                 <li>{{ $error }}</li>
                             @endforeach
                         </ul>
+                        @if(session('unverified_email'))
+                            <div class="mt-3 pt-3 border-t border-red-200">
+                                <p class="text-sm mb-2">Didn't receive the verification email?</p>
+                                <form action="{{ route('business.verification.resend-without-auth') }}" method="POST" class="inline">
+                                    @csrf
+                                    <input type="hidden" name="email" value="{{ session('unverified_email') }}">
+                                    <button type="submit" class="text-sm text-primary hover:underline font-medium">
+                                        <i class="fas fa-paper-plane mr-1"></i> Resend verification email
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                @if(session('status'))
+                    <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+                        <p class="text-sm">{{ session('status') }}</p>
+                    </div>
+                @endif
+
+                @if(session('info'))
+                    <div class="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg">
+                        <p class="text-sm">{{ session('info') }}</p>
                     </div>
                 @endif
 

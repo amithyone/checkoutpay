@@ -34,7 +34,9 @@ class LoginController extends Controller
                 return redirect()->route('business.login')
                     ->withErrors([
                         'email' => 'Please verify your email address before logging in. Check your inbox for the verification link.',
-                    ])->onlyInput('email');
+                    ])
+                    ->with('unverified_email', $business->email)
+                    ->onlyInput('email');
             }
 
             $request->session()->regenerate();

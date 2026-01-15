@@ -31,6 +31,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     Route::get('/email/verify', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'notice'])->name('verification.notice');
     Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verify'])->name('verification.verify');
     Route::post('/email/verification-notification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resend'])->middleware('auth:business')->name('verification.send');
+    Route::post('/email/resend-verification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resendWithoutAuth'])->name('verification.resend-without-auth');
 
     // Protected business routes
     Route::middleware('auth:business')->group(function () {
