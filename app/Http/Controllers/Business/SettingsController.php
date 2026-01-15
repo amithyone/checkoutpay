@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SettingsController extends Controller
@@ -21,12 +22,65 @@ class SettingsController extends Controller
 
         $validated = $request->validate([
             'webhook_url' => 'nullable|url|max:500',
+            'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'notifications_email_enabled' => 'boolean',
+            'notifications_payment_enabled' => 'boolean',
+            'notifications_withdrawal_enabled' => 'boolean',
+            'notifications_website_enabled' => 'boolean',
+            'notifications_security_enabled' => 'boolean',
+            'timezone' => 'nullable|string|max:50',
+            'currency' => 'nullable|string|size:3',
+            'auto_withdraw_threshold' => 'nullable|numeric|min:0',
+            'two_factor_enabled' => 'boolean',
         ]);
+
+        // Handle profile picture upload
+        if ($request->hasFile('profile_picture')) {
+            // Delete old profile picture if exists
+            if ($business->profile_picture && Storage::disk('public')->exists($business->profile_picture)) {
+                Storage::disk('public')->delete($business->profile_picture);
+            }
+
+            // Store new profile picture
+            $path = $request->file('profile_picture')->store('businesses/profile-pictures', 'public');
+            $validated['profile_picture'] = $path;
+        } else {
+            // Remove profile_picture from validated if not uploaded
+            unset($validated['profile_picture']);
+        }
+
+        // Handle boolean fields that might not be sent
+        $booleanFields = [
+            'notifications_email_enabled',
+            'notifications_payment_enabled',
+            'notifications_withdrawal_enabled',
+            'notifications_website_enabled',
+            'notifications_security_enabled',
+            'two_factor_enabled',
+        ];
+
+        foreach ($booleanFields as $field) {
+            $validated[$field] = $request->has($field) ? (bool) $request->input($field) : false;
+        }
 
         $business->update($validated);
 
         return redirect()->route('business.settings.index')
             ->with('success', 'Settings updated successfully');
+    }
+
+    public function removeProfilePicture()
+    {
+        $business = Auth::guard('business')->user();
+
+        if ($business->profile_picture && Storage::disk('public')->exists($business->profile_picture)) {
+            Storage::disk('public')->delete($business->profile_picture);
+        }
+
+        $business->update(['profile_picture' => null]);
+
+        return redirect()->route('business.settings.index')
+            ->with('success', 'Profile picture removed successfully');
     }
 
     public function regenerateApiKey()

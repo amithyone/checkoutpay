@@ -29,6 +29,17 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'balance',
         'business_id',
         'email_verified_at',
+        'profile_picture',
+        'notifications_email_enabled',
+        'notifications_payment_enabled',
+        'notifications_withdrawal_enabled',
+        'notifications_website_enabled',
+        'notifications_security_enabled',
+        'timezone',
+        'currency',
+        'auto_withdraw_threshold',
+        'two_factor_enabled',
+        'two_factor_secret',
     ];
 
     protected $hidden = [
@@ -45,6 +56,13 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'notifications_email_enabled' => 'boolean',
+        'notifications_payment_enabled' => 'boolean',
+        'notifications_withdrawal_enabled' => 'boolean',
+        'notifications_website_enabled' => 'boolean',
+        'notifications_security_enabled' => 'boolean',
+        'two_factor_enabled' => 'boolean',
+        'auto_withdraw_threshold' => 'decimal:2',
     ];
 
     /**

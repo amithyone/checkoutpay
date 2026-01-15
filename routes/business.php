@@ -62,6 +62,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::post('/settings/regenerate-api-key', [SettingsController::class, 'regenerateApiKey'])->name('settings.regenerate-api-key');
+        Route::delete('/settings/profile-picture', [SettingsController::class, 'removeProfilePicture'])->name('settings.remove-profile-picture');
 
         // API Keys & Integration
         Route::get('/keys', [KeysController::class, 'index'])->name('keys.index');
