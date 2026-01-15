@@ -147,10 +147,11 @@
                 >
             </div>
 
-            <!-- Logo Upload -->
+            <!-- Site Logo Upload (Landing Pages) -->
             <div>
                 <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">
-                    Site Logo
+                    Landing Pages Logo
+                    <span class="text-xs text-gray-500 font-normal">(Home, Pricing pages)</span>
                 </label>
                 @php
                     $logo = \App\Models\Setting::get('site_logo');
@@ -161,7 +162,7 @@
                     <div class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <img src="{{ asset('storage/' . $logo) }}?v={{ time() }}" alt="Current Logo" class="h-16 object-contain max-w-full" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                         <p class="text-xs text-red-500 mt-1" style="display: none;">Failed to load logo image</p>
-                        <p class="text-xs text-gray-500 mt-1">Current logo</p>
+                        <p class="text-xs text-gray-500 mt-1">Current landing pages logo</p>
                     </div>
                 @elseif($logo)
                     <div class="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -172,6 +173,74 @@
                     type="file" 
                     id="logo" 
                     name="logo" 
+                    accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">Recommended: PNG, JPG, or SVG. Max size: 2MB</p>
+            </div>
+
+            <!-- Admin Logo Upload -->
+            <div>
+                <label for="admin_logo" class="block text-sm font-medium text-gray-700 mb-2">
+                    Admin Panel Logo
+                    <span class="text-xs text-gray-500 font-normal">(Admin dashboard sidebar)</span>
+                </label>
+                @php
+                    $adminLogo = \App\Models\Setting::get('admin_logo');
+                    $adminLogoPath = $adminLogo ? storage_path('app/public/' . $adminLogo) : null;
+                    $adminLogoExists = $adminLogo && $adminLogoPath && file_exists($adminLogoPath);
+                @endphp
+                @if($adminLogoExists)
+                    <div class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <img src="{{ asset('storage/' . $adminLogo) }}?v={{ time() }}" alt="Current Admin Logo" class="h-16 object-contain max-w-full" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <p class="text-xs text-red-500 mt-1" style="display: none;">Failed to load admin logo image</p>
+                        <p class="text-xs text-gray-500 mt-1">Current admin panel logo</p>
+                    </div>
+                @elseif($adminLogo)
+                    <div class="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p class="text-xs text-yellow-700">Admin logo file not found at: {{ $adminLogo }}</p>
+                    </div>
+                @else
+                    <p class="text-xs text-gray-500 mb-2">If not set, will use landing pages logo as fallback</p>
+                @endif
+                <input 
+                    type="file" 
+                    id="admin_logo" 
+                    name="admin_logo" 
+                    accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">Recommended: PNG, JPG, or SVG. Max size: 2MB</p>
+            </div>
+
+            <!-- Business Logo Upload -->
+            <div>
+                <label for="business_logo" class="block text-sm font-medium text-gray-700 mb-2">
+                    Business Dashboard Logo
+                    <span class="text-xs text-gray-500 font-normal">(Business dashboard sidebar)</span>
+                </label>
+                @php
+                    $businessLogo = \App\Models\Setting::get('business_logo');
+                    $businessLogoPath = $businessLogo ? storage_path('app/public/' . $businessLogo) : null;
+                    $businessLogoExists = $businessLogo && $businessLogoPath && file_exists($businessLogoPath);
+                @endphp
+                @if($businessLogoExists)
+                    <div class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <img src="{{ asset('storage/' . $businessLogo) }}?v={{ time() }}" alt="Current Business Logo" class="h-16 object-contain max-w-full" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <p class="text-xs text-red-500 mt-1" style="display: none;">Failed to load business logo image</p>
+                        <p class="text-xs text-gray-500 mt-1">Current business dashboard logo</p>
+                    </div>
+                @elseif($businessLogo)
+                    <div class="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p class="text-xs text-yellow-700">Business logo file not found at: {{ $businessLogo }}</p>
+                    </div>
+                @else
+                    <p class="text-xs text-gray-500 mb-2">If not set, will use landing pages logo as fallback</p>
+                @endif
+                <input 
+                    type="file" 
+                    id="business_logo" 
+                    name="business_logo" 
                     accept="image/png,image/jpeg,image/jpg,image/svg+xml"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >

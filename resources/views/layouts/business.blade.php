@@ -47,10 +47,23 @@
             <!-- Logo -->
             <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200">
                 @php
-                    $logo = \App\Models\Setting::get('site_logo');
-                    $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
+                    $businessLogo = \App\Models\Setting::get('business_logo');
+                    $businessLogoPath = $businessLogo ? storage_path('app/public/' . $businessLogo) : null;
+                    $businessLogoExists = $businessLogo && $businessLogoPath && file_exists($businessLogoPath);
+                    
+                    // Fallback to site logo if business logo not set
+                    if (!$businessLogoExists) {
+                        $logo = \App\Models\Setting::get('site_logo');
+                        $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
+                        $logoExists = $logo && $logoPath && file_exists($logoPath);
+                    } else {
+                        $logoExists = false;
+                    }
                 @endphp
-                @if($logo && $logoPath && file_exists($logoPath))
+                @if($businessLogoExists)
+                    <img src="{{ asset('storage/' . $businessLogo) }}" alt="Logo" class="h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <h1 class="text-xl font-bold text-primary" style="display: none;">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h1>
+                @elseif($logoExists)
                     <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                     <h1 class="text-xl font-bold text-primary" style="display: none;">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h1>
                 @else

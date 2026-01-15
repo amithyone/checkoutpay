@@ -120,15 +120,31 @@ class SettingsController extends Controller
             'contact_phone' => 'nullable|string|max:50',
             'contact_address' => 'nullable|string|max:500',
             'logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
+            'admin_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
+            'business_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
             'favicon' => 'nullable|image|mimes:png,ico|max:512',
             'email_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
         ]);
 
-        // Handle logo upload
+        // Handle site logo upload (for landing pages)
         if ($request->hasFile('logo')) {
             $logo = $request->file('logo');
             $logoPath = $logo->store('settings', 'public');
-            Setting::set('site_logo', $logoPath, 'string', 'general', 'Site logo');
+            Setting::set('site_logo', $logoPath, 'string', 'general', 'Site logo (for landing pages)');
+        }
+
+        // Handle admin logo upload
+        if ($request->hasFile('admin_logo')) {
+            $adminLogo = $request->file('admin_logo');
+            $adminLogoPath = $adminLogo->store('settings', 'public');
+            Setting::set('admin_logo', $adminLogoPath, 'string', 'general', 'Admin panel logo');
+        }
+
+        // Handle business logo upload
+        if ($request->hasFile('business_logo')) {
+            $businessLogo = $request->file('business_logo');
+            $businessLogoPath = $businessLogo->store('settings', 'public');
+            Setting::set('business_logo', $businessLogoPath, 'string', 'general', 'Business dashboard logo');
         }
 
         // Handle favicon upload
