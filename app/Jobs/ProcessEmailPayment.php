@@ -91,6 +91,9 @@ class ProcessEmailPayment implements ShouldQueue
                 // Update business balance if payment has a business
                 if ($payment->business_id) {
                     $payment->business->increment('balance', $payment->amount);
+                    
+                    // Send new deposit notification
+                    $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
                 }
 
                 // Dispatch event to send webhook

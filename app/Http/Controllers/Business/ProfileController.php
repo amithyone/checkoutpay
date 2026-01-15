@@ -52,6 +52,12 @@ class ProfileController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
+        // Send password change notification
+        $business->notify(new \App\Notifications\PasswordChangedNotification(
+            $request->ip(),
+            $request->userAgent()
+        ));
+
         return redirect()->route('business.profile.index')
             ->with('success', 'Password updated successfully');
     }

@@ -60,6 +60,9 @@ class WithdrawalController extends Controller
             'status' => 'pending',
         ]);
 
+        // Send notification to business
+        $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
+
         return redirect()->route('business.withdrawals.show', $withdrawal)
             ->with('success', 'Withdrawal request submitted successfully');
     }

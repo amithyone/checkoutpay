@@ -43,6 +43,9 @@ class WithdrawalController extends Controller
         // Log withdrawal request
         $this->logService->logWithdrawalRequest($withdrawal, $request);
 
+        // Send notification to business
+        $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
+
         return response()->json([
             'success' => true,
             'message' => 'Withdrawal request submitted successfully',

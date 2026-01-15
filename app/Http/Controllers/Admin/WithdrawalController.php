@@ -52,6 +52,9 @@ class WithdrawalController extends Controller
         $business = $withdrawal->business;
         $business->decrement('balance', $withdrawal->amount);
 
+        // Send notification to business
+        $business->notify(new \App\Notifications\WithdrawalApprovedNotification($withdrawal));
+
         return redirect()->route('admin.withdrawals.index')
             ->with('success', 'Withdrawal request approved');
     }

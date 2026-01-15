@@ -275,6 +275,9 @@ class MatchController extends Controller
                         // Update business balance (same as PaymentController::checkMatch)
                         if ($matchedPayment->business_id) {
                             $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                            
+                            // Send new deposit notification
+                            $matchedPayment->business->notify(new \App\Notifications\NewDepositNotification($matchedPayment));
                         }
 
                         // Dispatch event to send webhook (same as PaymentController::checkMatch)

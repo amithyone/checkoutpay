@@ -250,6 +250,9 @@ class ProcessedEmailController extends Controller
                         // Update business balance (same as PaymentController::checkMatch)
                         if ($payment->business_id) {
                             $payment->business->increment('balance', $payment->amount);
+                            
+                            // Send new deposit notification
+                            $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
                         }
 
                         // Dispatch event to send webhook (same as PaymentController::checkMatch)

@@ -25,11 +25,14 @@ class WebsitesController extends Controller
             'website_url' => 'required|url|max:500',
         ]);
 
-        BusinessWebsite::create([
+        $website = BusinessWebsite::create([
             'business_id' => $business->id,
             'website_url' => $validated['website_url'],
             'is_approved' => false, // Requires admin approval
         ]);
+
+        // Send notification to business
+        $business->notify(new \App\Notifications\WebsiteAddedNotification($website));
 
         return redirect()->route('business.websites.index')
             ->with('success', 'Website added successfully. It is pending admin approval.');

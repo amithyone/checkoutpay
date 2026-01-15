@@ -160,6 +160,9 @@ class BusinessController extends Controller
             'notes' => $request->notes,
         ]);
 
+        // Send notification to business
+        $business->notify(new \App\Notifications\WebsiteApprovedNotification($website));
+
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Website approved successfully.');
     }
@@ -192,12 +195,15 @@ class BusinessController extends Controller
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        BusinessWebsite::create([
+        $website = BusinessWebsite::create([
             'business_id' => $business->id,
             'website_url' => $validated['website_url'],
             'is_approved' => false,
             'notes' => $validated['notes'] ?? null,
         ]);
+
+        // Send notification to business
+        $business->notify(new \App\Notifications\WebsiteAddedNotification($website));
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Website added successfully. It requires approval.');
