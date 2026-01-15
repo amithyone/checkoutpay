@@ -24,8 +24,25 @@ class DashboardController extends Controller
             'balance' => $business->balance,
         ];
 
-        // Recent payments
+        // Get website statistics
+        $websiteStats = [];
+        foreach ($business->websites as $website) {
+            $websitePayments = $website->payments()->where('status', 'approved')->get();
+            $websiteStats[] = [
+                'website' => $website,
+                'total_revenue' => $websitePayments->sum('amount'),
+                'total_payments' => $websitePayments->count(),
+                'pending_payments' => $website->payments()->where('status', 'pending')->count(),
+            ];
+        }
+        // Sort by revenue descending
+        usort($websiteStats, function($a, $b) {
+            return $b['total_revenue'] <=> $a['total_revenue'];
+        });
+
+        // Recent payments with website
         $recentPayments = $business->payments()
+            ->with('website')
             ->latest()
             ->take(10)
             ->get();
@@ -36,6 +53,6 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        return view('business.dashboard', compact('stats', 'recentPayments', 'recentWithdrawals'));
+        return view('business.dashboard', compact('stats', 'websiteStats', 'recentPayments', 'recentWithdrawals'));
     }
 }

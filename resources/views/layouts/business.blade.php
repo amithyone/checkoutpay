@@ -75,6 +75,11 @@
                     <span>Business</span>
                 </a>
 
+                <a href="{{ route('business.websites.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.websites.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-globe w-5 mr-3"></i>
+                    <span>Websites</span>
+                </a>
+
                 <a href="{{ route('business.keys.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.keys.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-key w-5 mr-3"></i>
                     <span>API Keys</span>

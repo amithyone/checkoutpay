@@ -94,6 +94,55 @@
         </div>
     </div>
 
+    <!-- Website Revenue Breakdown -->
+    @if(count($websiteStats) > 0)
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div class="p-4 lg:p-6 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-base lg:text-lg font-semibold text-gray-900">
+                <i class="fas fa-globe mr-2 text-primary"></i> Website Revenue Breakdown
+            </h3>
+            <a href="{{ route('business.websites.index') }}" class="text-xs lg:text-sm text-primary hover:underline">Manage Websites</a>
+        </div>
+        <div class="p-4 lg:p-6">
+            <div class="space-y-4">
+                @foreach($websiteStats as $websiteStat)
+                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <a href="{{ $websiteStat['website']->website_url }}" target="_blank" class="text-primary hover:underline font-medium text-sm">
+                                    {{ parse_url($websiteStat['website']->website_url, PHP_URL_HOST) }}
+                                    <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                                </a>
+                                @if($websiteStat['website']->is_approved)
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                        <i class="fas fa-check-circle mr-1"></i> Approved
+                                    </span>
+                                @else
+                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                        <i class="fas fa-clock mr-1"></i> Pending
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-lg font-bold text-gray-900">₦{{ number_format($websiteStat['total_revenue'], 2) }}</p>
+                            <p class="text-xs text-gray-500">{{ $websiteStat['total_payments'] }} payments</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs text-gray-600">
+                        <span><strong>{{ $websiteStat['total_payments'] }}</strong> approved</span>
+                        @if($websiteStat['pending_payments'] > 0)
+                            <span class="text-yellow-600"><strong>{{ $websiteStat['pending_payments'] }}</strong> pending</span>
+                        @endif
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <!-- Recent Transactions -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -107,6 +156,7 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -119,6 +169,15 @@
                                 <a href="{{ route('business.transactions.show', $payment) }}" class="text-sm font-medium text-primary hover:underline">
                                     {{ Str::limit($payment->transaction_id, 20) }}
                                 </a>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600">
+                                @if($payment->website)
+                                    <span class="text-xs" title="{{ $payment->website->website_url }}">
+                                        {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400 text-xs">N/A</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900">₦{{ number_format($payment->amount, 2) }}</td>
                             <td class="px-6 py-4">
@@ -134,7 +193,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">No transactions found</td>
+                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No transactions found</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -147,7 +206,12 @@
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-gray-900 truncate">{{ Str::limit($payment->transaction_id, 25) }}</p>
-                            <p class="text-xs text-gray-500 mt-1">{{ $payment->created_at->format('M d, Y') }}</p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                @if($payment->website)
+                                    {{ parse_url($payment->website->website_url, PHP_URL_HOST) }} • 
+                                @endif
+                                {{ $payment->created_at->format('M d, Y') }}
+                            </p>
                         </div>
                         <div class="ml-4 text-right">
                             <p class="text-base font-semibold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
