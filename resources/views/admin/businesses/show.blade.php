@@ -142,6 +142,15 @@
                                         <strong>Note:</strong> {{ $website->notes }}
                                     </div>
                                 @endif
+                                @php
+                                    $websitePayments = $website->payments()->where('status', 'approved')->get();
+                                    $totalRevenue = $websitePayments->sum('amount');
+                                    $totalPayments = $websitePayments->count();
+                                @endphp
+                                <div class="mt-2 flex items-center gap-4 text-xs text-gray-600">
+                                    <span><strong>{{ $totalPayments }}</strong> payments</span>
+                                    <span><strong>₦{{ number_format($totalRevenue, 2) }}</strong> revenue</span>
+                                </div>
                             </div>
                             <div class="flex items-center space-x-2 ml-4">
                                 @if(!$website->is_approved)
@@ -348,18 +357,28 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
-                        @foreach($business->payments->take(10) as $payment)
+                        @foreach($business->payments()->with('website')->latest()->take(10)->get() as $payment)
                         <tr>
                             <td class="px-4 py-2 text-sm">
                                 <a href="{{ route('admin.payments.show', $payment) }}" class="text-primary hover:underline">
                                     {{ $payment->transaction_id }}
                                 </a>
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-600">
+                                @if($payment->website)
+                                    <span class="text-xs" title="{{ $payment->website->website_url }}">
+                                        {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400 text-xs">N/A</span>
+                                @endif
                             </td>
                             <td class="px-4 py-2 text-sm text-gray-900">₦{{ number_format($payment->amount, 2) }}</td>
                             <td class="px-4 py-2">

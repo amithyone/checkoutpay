@@ -65,6 +65,18 @@ class PaymentService
             $webhookUrl = preg_replace('#([^:])//+#', '$1/', $webhookUrl); // Fix double slashes but preserve http:// or https://
         }
 
+        // Identify website from webhook_url or return_url
+        $websiteId = null;
+        if ($business && ($webhookUrl || !empty($data['return_url']))) {
+            $urlToCheck = $webhookUrl ?? $data['return_url'];
+            $websiteId = $this->identifyWebsiteFromUrl($urlToCheck, $business);
+        }
+
+        // Allow explicit website_id override
+        if (!empty($data['business_website_id'])) {
+            $websiteId = $data['business_website_id'];
+        }
+
         $payment = Payment::create([
             'transaction_id' => $data['transaction_id'],
             'amount' => $data['amount'],
@@ -73,6 +85,7 @@ class PaymentService
             'webhook_url' => $webhookUrl,
             'account_number' => $accountNumber,
             'business_id' => $business?->id,
+            'business_website_id' => $websiteId,
             'status' => Payment::STATUS_PENDING,
             'expires_at' => $expiresAt,
         ]);
@@ -201,5 +214,36 @@ class PaymentService
                 'payment_id' => $payment->id,
             ]);
         }
+    }
+
+    /**
+     * Identify website from URL by matching against approved websites
+     */
+    protected function identifyWebsiteFromUrl(string $url, Business $business): ?int
+    {
+        $parsedUrl = parse_url($url);
+        $urlHost = $parsedUrl['host'] ?? null;
+        
+        if (!$urlHost) {
+            return null;
+        }
+
+        // Remove www. prefix for comparison
+        $urlHost = preg_replace('/^www\./', '', $urlHost);
+
+        // Check against all approved websites
+        $approvedWebsites = $business->approvedWebsites;
+        
+        foreach ($approvedWebsites as $website) {
+            $websiteHost = parse_url($website->website_url, PHP_URL_HOST);
+            if ($websiteHost) {
+                $websiteHost = preg_replace('/^www\./', '', $websiteHost);
+                if ($urlHost === $websiteHost) {
+                    return $website->id;
+                }
+            }
+        }
+
+        return null;
     }
 }

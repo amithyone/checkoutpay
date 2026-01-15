@@ -14,7 +14,7 @@ class PaymentController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Payment::with('business')
+        $query = Payment::with(['business', 'website'])
             ->withCount(['matchAttempts', 'statusChecks'])
             ->latest();
 

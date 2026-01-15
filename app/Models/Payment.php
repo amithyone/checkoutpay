@@ -24,6 +24,7 @@ class Payment extends Model
         'account_number',
         'payer_account_number',
         'business_id',
+        'business_website_id',
         'status',
         'email_data',
         'matched_at',
@@ -162,6 +163,14 @@ class Payment extends Model
     public function business()
     {
         return $this->belongsTo(Business::class);
+    }
+
+    /**
+     * Get the website that generated this payment
+     */
+    public function website()
+    {
+        return $this->belongsTo(BusinessWebsite::class, 'business_website_id');
     }
 
     /**

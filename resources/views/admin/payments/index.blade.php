@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Number</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payer Name</th>
@@ -135,6 +136,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $payment->transaction_id }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $payment->business->name ?? 'N/A' }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            @if($payment->website)
+                                <a href="{{ $payment->website->website_url }}" target="_blank" class="text-primary hover:underline" title="{{ $payment->website->website_url }}">
+                                    {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
+                                    <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                                </a>
+                            @else
+                                <span class="text-gray-400">N/A</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">₦{{ number_format($payment->amount, 2) }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $payment->account_number ?? 'N/A' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $payment->payer_name ?? 'N/A' }}</td>
@@ -209,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
+                        <td colspan="10" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
                     </tr>
                     @endforelse
                 </tbody>

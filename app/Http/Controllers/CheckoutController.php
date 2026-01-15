@@ -108,6 +108,7 @@ class CheckoutController extends Controller
                 'payer_name' => $validated['payer_name'],
                 'service' => $validated['service'] ?? null,
                 'webhook_url' => $returnUrl, // Use return_url as webhook_url for redirect-based flow
+                'return_url' => $returnUrl, // Also pass as return_url for website identification
             ];
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);

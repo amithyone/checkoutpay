@@ -58,4 +58,12 @@ class BusinessWebsite extends Model
     {
         return $query->where('is_approved', false);
     }
+
+    /**
+     * Get payments generated from this website
+     */
+    public function payments()
+    {
+        return $this->hasMany(Payment::class, 'business_website_id');
+    }
 }
