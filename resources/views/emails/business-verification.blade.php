@@ -20,18 +20,28 @@
             max-width: 600px;
             margin: 0 auto;
             background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .email-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3C50E0 0%, #2E40C7 100%);
             padding: 40px 30px;
             text-align: center;
-            border-radius: 8px 8px 0 0;
+        }
+        .email-header .logo-container {
+            margin-bottom: 15px;
+        }
+        .email-header .logo-container img {
+            max-height: 50px;
+            display: block;
+            margin: 0 auto;
         }
         .email-header h1 {
             color: #ffffff;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 700;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             letter-spacing: -0.5px;
         }
         .email-header .tagline {
@@ -55,8 +65,8 @@
             line-height: 1.7;
         }
         .verification-box {
-            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
-            border: 2px dashed #667eea;
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8edff 100%);
+            border: 2px solid #3C50E0;
             border-radius: 12px;
             padding: 30px;
             margin: 30px 0;
@@ -65,7 +75,7 @@
         .verification-box .icon {
             width: 64px;
             height: 64px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3C50E0 0%, #2E40C7 100%);
             border-radius: 50%;
             margin: 0 auto 20px;
             display: flex;
@@ -87,7 +97,7 @@
         }
         .verify-button {
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3C50E0 0%, #2E40C7 100%);
             color: #ffffff !important;
             text-decoration: none;
             padding: 16px 40px;
@@ -95,13 +105,13 @@
             font-weight: 600;
             font-size: 16px;
             text-align: center;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(60, 80, 224, 0.4);
             transition: all 0.3s ease;
             margin: 20px 0;
         }
         .verify-button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 6px 16px rgba(60, 80, 224, 0.5);
         }
         .security-note {
             background-color: #fff5f5;
@@ -166,7 +176,6 @@
             background-color: #1a202c;
             padding: 30px;
             text-align: center;
-            border-radius: 0 0 8px 8px;
         }
         .email-footer .footer-text {
             color: #a0aec0;
@@ -178,7 +187,7 @@
             margin-top: 20px;
         }
         .email-footer .footer-links a {
-            color: #667eea;
+            color: #3C50E0;
             text-decoration: none;
             margin: 0 10px;
             font-size: 12px;
@@ -199,7 +208,7 @@
                 padding: 30px 20px;
             }
             .email-header h1 {
-                font-size: 24px;
+                font-size: 20px;
             }
             .features-grid {
                 grid-template-columns: 1fr;
@@ -215,15 +224,20 @@
         <div class="email-container">
             <!-- Header -->
             <div class="email-header">
-                @php
-                    $emailLogo = \App\Models\Setting::get('email_logo');
-                    $emailLogoPath = $emailLogo ? storage_path('app/public/' . $emailLogo) : null;
-                @endphp
-                @if($emailLogo && $emailLogoPath && file_exists($emailLogoPath))
-                    <img src="{{ asset('storage/' . $emailLogo) }}" alt="{{ $appName }}" style="max-height: 50px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
-                @else
-                    <h1>{{ $appName }}</h1>
-                @endif
+                <div class="logo-container">
+                    @php
+                        $siteLogo = \App\Models\Setting::get('site_logo');
+                        $siteLogoPath = $siteLogo ? storage_path('app/public/' . $siteLogo) : null;
+                    @endphp
+                    @if($siteLogo && $siteLogoPath && file_exists($siteLogoPath))
+                        <img src="{{ asset('storage/' . $siteLogo) }}?v={{ time() }}" alt="{{ $appName }}" style="max-height: 50px; display: block; margin: 0 auto;">
+                    @else
+                        <div style="width: 50px; height: 50px; background: rgba(255, 255, 255, 0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                            <span style="color: #ffffff; font-size: 24px;">✓</span>
+                        </div>
+                    @endif
+                </div>
+                <h1>{{ $appName }}</h1>
                 <div class="tagline">Secure Payment Gateway</div>
             </div>
 
@@ -247,7 +261,7 @@
 
                 <div class="content-text" style="text-align: center; font-size: 13px; color: #718096;">
                     Or copy and paste this link into your browser:<br>
-                    <span style="word-break: break-all; color: #667eea;">{{ $verificationUrl }}</span>
+                    <span style="word-break: break-all; color: #3C50E0;">{{ $verificationUrl }}</span>
                 </div>
 
                 <!-- Security Note -->

@@ -19,9 +19,9 @@
             <div class="bg-gray-50 rounded-lg p-6 text-center">
                 <p class="text-sm text-gray-600 mb-4">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
                 <div class="inline-block bg-white p-4 rounded-lg border-2 border-gray-200">
-                    {!! QrCode::size(200)->generate($qrCodeUrl) !!}
+                    {!! QrCode::size(200)->margin(1)->generate($qrCodeUrl) !!}
                 </div>
-                <p class="text-xs text-gray-500 mt-4">Or enter this code manually: <code class="bg-gray-200 px-2 py-1 rounded font-mono">{{ $business->two_factor_secret }}</code></p>
+                <p class="text-xs text-gray-500 mt-4">Or enter this code manually: <code class="bg-gray-200 px-2 py-1 rounded font-mono break-all">{{ $business->two_factor_secret }}</code></p>
             </div>
 
             <!-- Verification Form -->
