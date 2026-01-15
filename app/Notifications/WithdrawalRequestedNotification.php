@@ -23,12 +23,14 @@ class WithdrawalRequestedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
         return (new MailMessage)
-            ->subject('Withdrawal Request Submitted - ' . config('app.name', 'CheckoutPay'))
+            ->subject('Withdrawal Request Submitted - ' . $appName)
             ->view('emails.withdrawal-requested', [
                 'business' => $notifiable,
                 'withdrawal' => $this->withdrawal,
-                'appName' => config('app.name', 'CheckoutPay'),
+                'appName' => $appName,
             ]);
     }
 }

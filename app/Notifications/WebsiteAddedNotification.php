@@ -23,12 +23,14 @@ class WebsiteAddedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
         return (new MailMessage)
-            ->subject('New Website Added - ' . config('app.name', 'CheckoutPay'))
+            ->subject('New Website Added - ' . $appName)
             ->view('emails.website-added', [
                 'business' => $notifiable,
                 'website' => $this->website,
-                'appName' => config('app.name', 'CheckoutPay'),
+                'appName' => $appName,
             ]);
     }
 }

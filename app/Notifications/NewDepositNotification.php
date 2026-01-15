@@ -23,12 +23,14 @@ class NewDepositNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
         return (new MailMessage)
-            ->subject('New Payment Received - ₦' . number_format($this->payment->amount, 2) . ' - ' . config('app.name', 'CheckoutPay'))
+            ->subject('New Payment Received - ₦' . number_format($this->payment->amount, 2) . ' - ' . $appName)
             ->view('emails.new-deposit', [
                 'business' => $notifiable,
                 'payment' => $this->payment,
-                'appName' => config('app.name', 'CheckoutPay'),
+                'appName' => $appName,
             ]);
     }
 }

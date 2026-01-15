@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use App\Models\WithdrawalRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,12 +24,14 @@ class WithdrawalApprovedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
         return (new MailMessage)
-            ->subject('Withdrawal Request Approved - ' . config('app.name', 'CheckoutPay'))
+            ->subject('Withdrawal Request Approved - ' . $appName)
             ->view('emails.withdrawal-approved', [
                 'business' => $notifiable,
                 'withdrawal' => $this->withdrawal,
-                'appName' => config('app.name', 'CheckoutPay'),
+                'appName' => $appName,
             ]);
     }
 }

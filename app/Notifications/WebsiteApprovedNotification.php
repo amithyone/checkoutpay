@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\BusinessWebsite;
+use App\Models\Setting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -23,12 +24,14 @@ class WebsiteApprovedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
         return (new MailMessage)
-            ->subject('Website Approved - ' . config('app.name', 'CheckoutPay'))
+            ->subject('Website Approved - ' . $appName)
             ->view('emails.website-approved', [
                 'business' => $notifiable,
                 'website' => $this->website,
-                'appName' => config('app.name', 'CheckoutPay'),
+                'appName' => $appName,
             ]);
     }
 }

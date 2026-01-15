@@ -23,13 +23,15 @@ class PasswordChangedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
         return (new MailMessage)
-            ->subject('Password Changed - ' . config('app.name', 'CheckoutPay'))
+            ->subject('Password Changed - ' . $appName)
             ->view('emails.password-changed', [
                 'business' => $notifiable,
                 'ipAddress' => $this->ipAddress,
                 'userAgent' => $this->userAgent,
-                'appName' => config('app.name', 'CheckoutPay'),
+                'appName' => $appName,
             ]);
     }
 }

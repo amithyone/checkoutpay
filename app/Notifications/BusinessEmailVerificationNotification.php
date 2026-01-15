@@ -42,12 +42,14 @@ class BusinessEmailVerificationNotification extends Notification
             ['id' => $notifiable->getKey(), 'hash' => sha1($notifiable->getEmailForVerification())]
         );
 
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
         return (new MailMessage)
-            ->subject('Verify Your Email Address - ' . config('app.name'))
+            ->subject('Verify Your Email Address - ' . $appName)
             ->view('emails.business-verification', [
                 'business' => $notifiable,
                 'verificationUrl' => $verificationUrl,
-                'appName' => config('app.name', 'CheckoutPay'),
+                'appName' => $appName,
             ]);
     }
 
