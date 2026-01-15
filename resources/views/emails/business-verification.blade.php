@@ -215,7 +215,15 @@
         <div class="email-container">
             <!-- Header -->
             <div class="email-header">
-                <h1>{{ $appName }}</h1>
+                @php
+                    $emailLogo = \App\Models\Setting::get('email_logo');
+                    $emailLogoPath = $emailLogo ? storage_path('app/public/' . $emailLogo) : null;
+                @endphp
+                @if($emailLogo && $emailLogoPath && file_exists($emailLogoPath))
+                    <img src="{{ asset('storage/' . $emailLogo) }}" alt="{{ $appName }}" style="max-height: 50px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
+                @else
+                    <h1>{{ $appName }}</h1>
+                @endif
                 <div class="tagline">Secure Payment Gateway</div>
             </div>
 

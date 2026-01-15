@@ -34,7 +34,15 @@
     <div style="padding: 20px;">
         <div class="email-container">
             <div class="email-header">
-                <h1>{{ $appName }}</h1>
+                @php
+                    $emailLogo = \App\Models\Setting::get('email_logo');
+                    $emailLogoPath = $emailLogo ? storage_path('app/public/' . $emailLogo) : null;
+                @endphp
+                @if($emailLogo && $emailLogoPath && file_exists($emailLogoPath))
+                    <img src="{{ asset('storage/' . $emailLogo) }}" alt="{{ $appName }}" style="max-height: 50px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
+                @else
+                    <h1>{{ $appName }}</h1>
+                @endif
                 <div style="color: rgba(255, 255, 255, 0.9); font-size: 14px;">Password Changed</div>
             </div>
             <div class="email-body">
