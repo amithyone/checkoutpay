@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Business\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Business;
+use App\Notifications\LoginNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -46,6 +47,12 @@ class TwoFactorController extends Controller
         // Log the business in
         Auth::guard('business')->login($business, $request->filled('remember'));
         $request->session()->regenerate();
+
+        // Send login notification after successful 2FA verification
+        $business->notify(new LoginNotification(
+            $request->ip(),
+            $request->userAgent() ?? 'Unknown'
+        ));
 
         return redirect()->intended(route('business.dashboard'))
             ->with('success', 'Login successful!');

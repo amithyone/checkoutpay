@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Business\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Notifications\LoginNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +49,12 @@ class LoginController extends Controller
                 return redirect()->route('business.2fa.verify')
                     ->with('message', 'Please enter your 2FA code to continue');
             }
+
+            // Send login notification (only if 2FA is not enabled, as 2FA login will send notification after verification)
+            $business->notify(new LoginNotification(
+                $request->ip(),
+                $request->userAgent() ?? 'Unknown'
+            ));
 
             $request->session()->regenerate();
 
