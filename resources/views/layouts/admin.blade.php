@@ -46,10 +46,15 @@
         <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 transform transition-transform duration-300 ease-in-out lg:transform-none sidebar-closed">
             <!-- Logo -->
             <div class="h-16 flex items-center justify-between px-6 border-b border-gray-200">
-                @if(\App\Models\Setting::get('site_logo'))
-                    <img src="{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}" alt="Logo" class="h-10 object-contain">
+                @php
+                    $logo = \App\Models\Setting::get('site_logo');
+                    $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
+                @endphp
+                @if($logo && $logoPath && file_exists($logoPath))
+                    <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <h1 class="text-xl font-bold text-primary" style="display: none;">{{ \App\Models\Setting::get('site_name', 'Payment Gateway') }}</h1>
                 @else
-                    <h1 class="text-xl font-bold text-primary">Payment Gateway</h1>
+                    <h1 class="text-xl font-bold text-primary">{{ \App\Models\Setting::get('site_name', 'Payment Gateway') }}</h1>
                 @endif
                 <button onclick="closeSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700">
                     <i class="fas fa-times text-xl"></i>

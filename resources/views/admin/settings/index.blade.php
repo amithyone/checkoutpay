@@ -152,9 +152,13 @@
                 <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">
                     Site Logo
                 </label>
-                @if(\App\Models\Setting::get('site_logo'))
+                @php
+                    $logo = \App\Models\Setting::get('site_logo');
+                    $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
+                @endphp
+                @if($logo && $logoPath && file_exists($logoPath))
                     <div class="mb-3">
-                        <img src="{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}" alt="Current Logo" class="h-16 object-contain">
+                        <img src="{{ asset('storage/' . $logo) }}" alt="Current Logo" class="h-16 object-contain" onerror="this.style.display='none';">
                         <p class="text-xs text-gray-500 mt-1">Current logo</p>
                     </div>
                 @endif
@@ -173,9 +177,13 @@
                 <label for="favicon" class="block text-sm font-medium text-gray-700 mb-2">
                     Favicon
                 </label>
-                @if(\App\Models\Setting::get('site_favicon'))
+                @php
+                    $favicon = \App\Models\Setting::get('site_favicon');
+                    $faviconPath = $favicon ? storage_path('app/public/' . $favicon) : null;
+                @endphp
+                @if($favicon && $faviconPath && file_exists($faviconPath))
                     <div class="mb-3">
-                        <img src="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}" alt="Current Favicon" class="h-8 w-8 object-contain">
+                        <img src="{{ asset('storage/' . $favicon) }}" alt="Current Favicon" class="h-8 w-8 object-contain" onerror="this.style.display='none';">
                         <p class="text-xs text-gray-500 mt-1">Current favicon</p>
                     </div>
                 @endif
