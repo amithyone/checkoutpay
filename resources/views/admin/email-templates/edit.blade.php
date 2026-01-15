@@ -90,7 +90,7 @@
                         placeholder="Enter your email template HTML/Blade code here..."
                     >{{ old('content', $customContent) }}</textarea>
                     <p class="text-xs text-gray-500 mt-1">
-                        Use Blade syntax (@{{ }}, @if, @forelse, etc.) and HTML/CSS for styling.
+                        Use Blade syntax (@{{ }}, @if, @foreach, etc.) and HTML/CSS for styling.
                         The template should include full HTML structure with &lt;!DOCTYPE html&gt;.
                     </p>
                 </div>
