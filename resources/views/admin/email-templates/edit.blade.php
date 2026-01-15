@@ -1,23 +1,34 @@
 @extends('layouts.admin')
 
 @section('title', 'Edit Email Template')
-@section('page-title', 'Edit Email Template: ' . $templateInfo['name'])
+@section('page-title', 'Edit Email Template')
 
 @section('content')
-<div class="max-w-6xl">
+<div class="max-w-6xl mx-auto">
+    @if(session('success'))
+        <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+            <i class="fas fa-check-circle mr-2"></i>{{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4">
+            <i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}
+        </div>
+    @endif
+
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-gray-900">{{ $templateInfo['name'] }}</h2>
+            <p class="text-sm text-gray-600 mt-1">{{ $templateInfo['description'] }}</p>
+        </div>
+
         <form action="{{ route('admin.email-templates.update', $template) }}" method="POST">
             @csrf
             @method('PUT')
             
             <div class="space-y-6">
-                <!-- Template Info -->
-                <div class="border-b border-gray-200 pb-4">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ $templateInfo['name'] }}</h3>
-                    <p class="text-sm text-gray-600">{{ $templateInfo['description'] }}</p>
-                </div>
-
-                <!-- Subject -->
+                <!-- Email Subject -->
                 <div>
                     <label for="subject" class="block text-sm font-medium text-gray-700 mb-2">
                         Email Subject <span class="text-red-500">*</span>
@@ -29,20 +40,19 @@
                         value="{{ old('subject', $customSubject) }}"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                         required
-                        placeholder="Email subject line"
                     >
-                    <p class="text-xs text-gray-500 mt-1">You can use variables like @{{ $appName }} in the subject</p>
+                    <p class="text-xs text-gray-500 mt-1">You can use variables like {{ '$appName' }} in the subject</p>
                 </div>
 
-                <!-- Use Custom Toggle -->
+                <!-- Use Custom Template Checkbox -->
                 <div class="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
                     <input 
                         type="checkbox" 
                         id="use_custom" 
                         name="use_custom" 
                         value="1"
-                        {{ old('use_custom', $isCustom) ? 'checked' : '' }}
-                        class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2"
+                        @if(old('use_custom', $isCustom)) checked @endif
+                        class="w-5 h-5 text-primary border-gray-300 rounded"
                     >
                     <label for="use_custom" class="text-sm font-medium text-gray-700 cursor-pointer">
                         Use Custom Template
@@ -52,49 +62,42 @@
                     </p>
                 </div>
 
-                <!-- Available Variables -->
+                <!-- Available Variables Info -->
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 class="text-sm font-semibold text-blue-900 mb-3">
-                        <i class="fas fa-code mr-1"></i> Available Variables
+                    <h4 class="text-sm font-semibold text-blue-900 mb-2">
+                        <i class="fas fa-info-circle mr-1"></i> Available Variables
                     </h4>
-                    <div class="text-xs text-blue-700 space-y-1" id="variables-display">
-                        <p><strong>Common variables:</strong> $appName, $business->name, $business->email</p>
-                        <p id="template-vars"></p>
+                    <div class="text-xs text-blue-800">
+                        <p class="mb-1"><strong>Common:</strong> {{ '$appName' }}, {{ '$business->name' }}, {{ '$business->email' }}</p>
+                        <p id="template-specific-vars" class="mb-0"></p>
                     </div>
                 </div>
 
-                <!-- Template Content Editor -->
+                <!-- Template Content -->
                 <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <label for="content" class="block text-sm font-medium text-gray-700">
-                            Email Template Content (Blade/HTML) <span class="text-red-500">*</span>
-                        </label>
-                        <div class="text-xs text-gray-500">
-                            <i class="fas fa-code mr-1"></i> Supports Blade syntax and HTML
-                        </div>
-                    </div>
+                    <label for="content" class="block text-sm font-medium text-gray-700 mb-2">
+                        Email Template Content (Blade/HTML) <span class="text-red-500">*</span>
+                    </label>
                     <textarea 
                         id="content" 
                         name="content" 
-                        rows="30"
+                        rows="25"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
                         required
-                        placeholder="Enter your email template HTML/Blade code here..."
                     >{{ old('content', $customContent) }}</textarea>
                     <p class="text-xs text-gray-500 mt-1">
-                        Use Blade syntax (@{{ }}, @if, @foreach, etc.) and HTML/CSS for styling.
-                        The template should include full HTML structure with &lt;!DOCTYPE html&gt;.
+                        Use Blade syntax and HTML. Include full HTML structure with DOCTYPE, html, head, and body tags.
                     </p>
                 </div>
 
-                <!-- Actions -->
+                <!-- Form Actions -->
                 <div class="flex items-center justify-end gap-4 pt-4 border-t border-gray-200">
                     <a href="{{ route('admin.email-templates.index') }}" 
                         class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                        <i class="fas fa-arrow-left mr-2"></i> Back to List
+                        Cancel
                     </a>
                     <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90">
-                        <i class="fas fa-save mr-2"></i> Save Template
+                        Save Template
                     </button>
                 </div>
             </div>
@@ -103,54 +106,36 @@
 
     <!-- Help Section -->
     <div class="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <h4 class="text-md font-semibold text-gray-900 mb-3">
-            <i class="fas fa-question-circle mr-2 text-primary"></i> Template Guidelines
-        </h4>
-        <ul class="space-y-2 text-sm text-gray-700">
-            <li class="flex items-start">
-                <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-                <span>Include full HTML structure: <code class="bg-gray-200 px-1 rounded">&lt;!DOCTYPE html&gt;</code>, <code class="bg-gray-200 px-1 rounded">&lt;html&gt;</code>, <code class="bg-gray-200 px-1 rounded">&lt;head&gt;</code>, <code class="bg-gray-200 px-1 rounded">&lt;body&gt;</code></span>
-            </li>
-            <li class="flex items-start">
-                <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-                <span>Use inline CSS for email compatibility (most email clients don't support external stylesheets)</span>
-            </li>
-            <li class="flex items-start">
-                <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-                <span>Access variables using Blade syntax: <code class="bg-gray-200 px-1 rounded">@{{ $variableName }}</code></span>
-            </li>
-            <li class="flex items-start">
-                <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-                <span>Use the logo from settings: <code class="bg-gray-200 px-1 rounded">@{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}</code></span>
-            </li>
-            <li class="flex items-start">
-                <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-                <span>Test your template before saving to ensure all variables are properly displayed</span>
-            </li>
-        </ul>
+        <h4 class="text-md font-semibold text-gray-900 mb-3">Template Guidelines</h4>
+        <div class="text-sm text-gray-700 space-y-2">
+            <p>• Include full HTML structure: DOCTYPE, html, head, and body tags</p>
+            <p>• Use inline CSS for email compatibility</p>
+            <p>• Access variables using Blade syntax: {{ '{{ $variableName }}' }}</p>
+            <p>• Use the logo from settings: {{ '{{ asset(\'storage/\' . \App\Models\Setting::get(\'site_logo\')) }}' }}</p>
+        </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const template = '{{ $template }}';
-    const templateVars = {
-        'business-verification': '<strong>Template-specific:</strong> $verificationUrl',
-        'login-notification': '<strong>Template-specific:</strong> $ipAddress, $userAgent',
-        'new-deposit': '<strong>Template-specific:</strong> $payment->amount, $payment->reference, $payment->created_at',
-        'website-approved': '<strong>Template-specific:</strong> $website->website_url',
-        'website-added': '<strong>Template-specific:</strong> $website->website_url',
-        'withdrawal-requested': '<strong>Template-specific:</strong> $withdrawal->amount, $withdrawal->bank_name, $withdrawal->account_name, $withdrawal->account_number, $withdrawal->created_at',
-        'withdrawal-approved': '<strong>Template-specific:</strong> $withdrawal->amount, $withdrawal->bank_name, $withdrawal->account_name, $withdrawal->account_number, $withdrawal->created_at',
-        'password-changed': '<strong>Template-specific:</strong> $ipAddress, $userAgent'
+(function() {
+    var template = '{{ $template }}';
+    var varsMap = {
+        'business-verification': '<strong>Template-specific:</strong> {{ '$verificationUrl' }}',
+        'login-notification': '<strong>Template-specific:</strong> {{ '$ipAddress' }}, {{ '$userAgent' }}',
+        'new-deposit': '<strong>Template-specific:</strong> {{ '$payment->amount' }}, {{ '$payment->reference' }}, {{ '$payment->created_at' }}',
+        'website-approved': '<strong>Template-specific:</strong> {{ '$website->website_url' }}',
+        'website-added': '<strong>Template-specific:</strong> {{ '$website->website_url' }}',
+        'withdrawal-requested': '<strong>Template-specific:</strong> {{ '$withdrawal->amount' }}, {{ '$withdrawal->bank_name' }}, {{ '$withdrawal->account_name' }}, {{ '$withdrawal->account_number' }}, {{ '$withdrawal->created_at' }}',
+        'withdrawal-approved': '<strong>Template-specific:</strong> {{ '$withdrawal->amount' }}, {{ '$withdrawal->bank_name' }}, {{ '$withdrawal->account_name' }}, {{ '$withdrawal->account_number' }}, {{ '$withdrawal->created_at' }}',
+        'password-changed': '<strong>Template-specific:</strong> {{ '$ipAddress' }}, {{ '$userAgent' }}'
     };
     
-    const varsElement = document.getElementById('template-vars');
-    if (templateVars[template]) {
-        varsElement.innerHTML = templateVars[template];
+    var varsElement = document.getElementById('template-specific-vars');
+    if (varsMap[template]) {
+        varsElement.innerHTML = varsMap[template];
     } else {
         varsElement.innerHTML = '<strong>Template-specific:</strong> None';
     }
-});
+})();
 </script>
 @endsection
