@@ -65,24 +65,39 @@ class PaymentService
             $webhookUrl = preg_replace('#([^:])//+#', '$1/', $webhookUrl); // Fix double slashes but preserve http:// or https://
         }
 
-        // Identify website from multiple sources
+        // Identify website from multiple sources (in priority order)
         $websiteId = null;
         
-        // 1. Allow explicit website_id override
+        // 1. Allow explicit website_id override (highest priority)
         if (!empty($data['business_website_id'])) {
-            $websiteId = $data['business_website_id'];
+            // Verify the website belongs to this business
+            $website = \App\Models\BusinessWebsite::where('id', $data['business_website_id'])
+                ->where('business_id', $business->id)
+                ->first();
+            if ($website) {
+                $websiteId = $website->id;
+            }
         }
-        // 2. Try to identify from webhook_url or return_url
+        // 2. Try to identify from explicit website_url parameter
+        elseif ($business && !empty($data['website_url'])) {
+            $websiteId = $this->identifyWebsiteFromUrl($data['website_url'], $business);
+        }
+        // 3. Try to identify from webhook_url or return_url
         elseif ($business && ($webhookUrl || !empty($data['return_url']))) {
             $urlToCheck = $webhookUrl ?? $data['return_url'];
             $websiteId = $this->identifyWebsiteFromUrl($urlToCheck, $business);
         }
-        // 3. Try to identify from HTTP referer header
+        // 4. Try to identify from HTTP referer header
         elseif ($business && $request && $request->header('referer')) {
             $referer = $request->header('referer');
             $websiteId = $this->identifyWebsiteFromUrl($referer, $business);
         }
-        // 4. If only one approved website exists, use that as default
+        // 5. Try to identify from Origin header
+        elseif ($business && $request && $request->header('origin')) {
+            $origin = $request->header('origin');
+            $websiteId = $this->identifyWebsiteFromUrl($origin, $business);
+        }
+        // 6. If only one approved website exists, use that as default
         elseif ($business) {
             $approvedWebsites = $business->approvedWebsites;
             if ($approvedWebsites->count() === 1) {
@@ -91,14 +106,24 @@ class PaymentService
         }
 
         // Log website identification for debugging
-        if ($business && !$websiteId) {
-            \Illuminate\Support\Facades\Log::debug('Website identification failed', [
-                'business_id' => $business->id,
-                'webhook_url' => $webhookUrl,
-                'return_url' => $data['return_url'] ?? null,
-                'referer' => $request?->header('referer'),
-                'approved_websites_count' => $business->approvedWebsites->count(),
-            ]);
+        if ($business) {
+            if (!$websiteId) {
+                \Illuminate\Support\Facades\Log::debug('Website identification failed', [
+                    'business_id' => $business->id,
+                    'webhook_url' => $webhookUrl,
+                    'return_url' => $data['return_url'] ?? null,
+                    'referer' => $request?->header('referer'),
+                    'approved_websites_count' => $business->approvedWebsites->count(),
+                ]);
+            } else {
+                \Illuminate\Support\Facades\Log::debug('Website identified successfully', [
+                    'business_id' => $business->id,
+                    'website_id' => $websiteId,
+                    'source' => !empty($data['business_website_id']) ? 'explicit' : 
+                               ($webhookUrl || !empty($data['return_url']) ? 'url' : 
+                               ($request?->header('referer') ? 'referer' : 'single_website_fallback')),
+                ]);
+            }
         }
 
         $payment = Payment::create([
