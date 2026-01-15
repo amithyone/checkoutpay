@@ -12,7 +12,7 @@ class TransactionController extends Controller
     {
         $business = Auth::guard('business')->user();
 
-        $query = $business->payments()->latest();
+        $query = $business->payments()->with('website')->latest();
 
         // Filter by status
         if ($request->filled('status')) {
@@ -40,7 +40,7 @@ class TransactionController extends Controller
     public function show($id)
     {
         $business = Auth::guard('business')->user();
-        $transaction = $business->payments()->findOrFail($id);
+        $transaction = $business->payments()->with('website')->findOrFail($id);
 
         return view('business.transactions.show', compact('transaction'));
     }

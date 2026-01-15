@@ -127,10 +127,25 @@
                         </div>
                         <div class="text-right">
                             <p class="text-lg font-bold text-gray-900">₦{{ number_format($websiteStat['total_revenue'], 2) }}</p>
-                            <p class="text-xs text-gray-500">{{ $websiteStat['total_payments'] }} payments</p>
+                            <p class="text-xs text-gray-500">Total: {{ $websiteStat['total_payments'] }} payments</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-4 text-xs text-gray-600">
+                    
+                    <!-- Daily and Monthly Revenue Breakdown -->
+                    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <p class="text-xs text-gray-600 mb-1">Today</p>
+                            <p class="text-base font-bold text-blue-900">₦{{ number_format($websiteStat['today_revenue'], 2) }}</p>
+                            <p class="text-xs text-gray-500 mt-1">{{ $websiteStat['today_payments'] }} payment{{ $websiteStat['today_payments'] != 1 ? 's' : '' }}</p>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-3">
+                            <p class="text-xs text-gray-600 mb-1">This Month</p>
+                            <p class="text-base font-bold text-purple-900">₦{{ number_format($websiteStat['monthly_revenue'], 2) }}</p>
+                            <p class="text-xs text-gray-500 mt-1">{{ $websiteStat['monthly_payments'] }} payment{{ $websiteStat['monthly_payments'] != 1 ? 's' : '' }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4 text-xs text-gray-600 mt-3">
                         <span><strong>{{ $websiteStat['total_payments'] }}</strong> approved</span>
                         @if($websiteStat['pending_payments'] > 0)
                             <span class="text-yellow-600"><strong>{{ $websiteStat['pending_payments'] }}</strong> pending</span>

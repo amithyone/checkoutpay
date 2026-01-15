@@ -41,6 +41,19 @@
                 <p class="text-sm text-gray-900">{{ $transaction->account_number ?? '-' }}</p>
             </div>
             <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                <p class="text-sm text-gray-900">
+                    @if($transaction->website)
+                        <a href="{{ $transaction->website->website_url }}" target="_blank" class="text-primary hover:underline">
+                            {{ $transaction->website->website_url }}
+                            <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                        </a>
+                    @else
+                        <span class="text-gray-400">Not specified</span>
+                    @endif
+                </p>
+            </div>
+            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Created At</label>
                 <p class="text-sm text-gray-900">{{ $transaction->created_at->format('M d, Y H:i:s') }}</p>
             </div>

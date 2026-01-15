@@ -48,6 +48,7 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payer</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -60,6 +61,16 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
                             <div class="text-sm font-medium text-gray-900">{{ $transaction->transaction_id }}</div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            @if($transaction->website)
+                                <a href="{{ $transaction->website->website_url }}" target="_blank" class="text-primary hover:underline" title="{{ $transaction->website->website_url }}">
+                                    {{ parse_url($transaction->website->website_url, PHP_URL_HOST) }}
+                                    <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                                </a>
+                            @else
+                                <span class="text-gray-400">N/A</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-900">₦{{ number_format($transaction->amount, 2) }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">
@@ -83,7 +94,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No transactions found</td>
+                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">No transactions found</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -97,7 +108,12 @@
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-gray-900 truncate mb-1">{{ Str::limit($transaction->transaction_id, 20) }}</p>
-                        <p class="text-xs text-gray-500">{{ $transaction->created_at->format('M d, Y H:i') }}</p>
+                        <p class="text-xs text-gray-500">
+                            @if($transaction->website)
+                                {{ parse_url($transaction->website->website_url, PHP_URL_HOST) }} • 
+                            @endif
+                            {{ $transaction->created_at->format('M d, Y H:i') }}
+                        </p>
                     </div>
                     <div class="ml-3 text-right">
                         @if($transaction->status === 'approved')

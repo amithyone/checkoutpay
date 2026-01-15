@@ -24,15 +24,46 @@ class DashboardController extends Controller
             'balance' => $business->balance,
         ];
 
-        // Get website statistics
+        // Get website statistics with daily and monthly breakdowns
         $websiteStats = [];
         foreach ($business->websites as $website) {
             $websitePayments = $website->payments()->where('status', 'approved')->get();
+            
+            // Calculate daily revenue (today)
+            $todayRevenue = $website->payments()
+                ->where('status', 'approved')
+                ->whereDate('created_at', today())
+                ->sum('amount');
+            
+            // Calculate monthly revenue (this month)
+            $monthlyRevenue = $website->payments()
+                ->where('status', 'approved')
+                ->whereYear('created_at', now()->year)
+                ->whereMonth('created_at', now()->month)
+                ->sum('amount');
+            
+            // Calculate daily payments count
+            $todayPayments = $website->payments()
+                ->where('status', 'approved')
+                ->whereDate('created_at', today())
+                ->count();
+            
+            // Calculate monthly payments count
+            $monthlyPayments = $website->payments()
+                ->where('status', 'approved')
+                ->whereYear('created_at', now()->year)
+                ->whereMonth('created_at', now()->month)
+                ->count();
+            
             $websiteStats[] = [
                 'website' => $website,
                 'total_revenue' => $websitePayments->sum('amount'),
                 'total_payments' => $websitePayments->count(),
                 'pending_payments' => $website->payments()->where('status', 'pending')->count(),
+                'today_revenue' => $todayRevenue,
+                'today_payments' => $todayPayments,
+                'monthly_revenue' => $monthlyRevenue,
+                'monthly_payments' => $monthlyPayments,
             ];
         }
         // Sort by revenue descending
