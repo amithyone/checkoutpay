@@ -30,6 +30,8 @@ class PaymentRequest extends FormRequest
             'webhook_url' => ['required', 'url', 'max:500'],
             'service' => ['nullable', 'string', 'max:255'], // Accept service field
             'transaction_id' => ['nullable', 'string', 'max:255', 'unique:payments,transaction_id'],
+            'business_website_id' => ['nullable', 'integer', 'exists:business_websites,id'], // Allow explicit website ID
+            'website_url' => ['nullable', 'url', 'max:500'], // Allow website URL for identification
         ];
     }
 
