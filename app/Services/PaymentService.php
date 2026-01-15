@@ -65,16 +65,40 @@ class PaymentService
             $webhookUrl = preg_replace('#([^:])//+#', '$1/', $webhookUrl); // Fix double slashes but preserve http:// or https://
         }
 
-        // Identify website from webhook_url or return_url
+        // Identify website from multiple sources
         $websiteId = null;
-        if ($business && ($webhookUrl || !empty($data['return_url']))) {
+        
+        // 1. Allow explicit website_id override
+        if (!empty($data['business_website_id'])) {
+            $websiteId = $data['business_website_id'];
+        }
+        // 2. Try to identify from webhook_url or return_url
+        elseif ($business && ($webhookUrl || !empty($data['return_url']))) {
             $urlToCheck = $webhookUrl ?? $data['return_url'];
             $websiteId = $this->identifyWebsiteFromUrl($urlToCheck, $business);
         }
+        // 3. Try to identify from HTTP referer header
+        elseif ($business && $request && $request->header('referer')) {
+            $referer = $request->header('referer');
+            $websiteId = $this->identifyWebsiteFromUrl($referer, $business);
+        }
+        // 4. If only one approved website exists, use that as default
+        elseif ($business) {
+            $approvedWebsites = $business->approvedWebsites;
+            if ($approvedWebsites->count() === 1) {
+                $websiteId = $approvedWebsites->first()->id;
+            }
+        }
 
-        // Allow explicit website_id override
-        if (!empty($data['business_website_id'])) {
-            $websiteId = $data['business_website_id'];
+        // Log website identification for debugging
+        if ($business && !$websiteId) {
+            \Illuminate\Support\Facades\Log::debug('Website identification failed', [
+                'business_id' => $business->id,
+                'webhook_url' => $webhookUrl,
+                'return_url' => $data['return_url'] ?? null,
+                'referer' => $request?->header('referer'),
+                'approved_websites_count' => $business->approvedWebsites->count(),
+            ]);
         }
 
         $payment = Payment::create([
@@ -221,25 +245,58 @@ class PaymentService
      */
     protected function identifyWebsiteFromUrl(string $url, Business $business): ?int
     {
+        if (empty($url)) {
+            return null;
+        }
+
         $parsedUrl = parse_url($url);
         $urlHost = $parsedUrl['host'] ?? null;
         
         if (!$urlHost) {
+            // If no host, try to extract from the URL itself
+            $urlHost = preg_replace('#^https?://#', '', $url);
+            $urlHost = preg_replace('#/.*$#', '', $urlHost);
+        }
+
+        if (!$urlHost) {
             return null;
         }
 
-        // Remove www. prefix for comparison
-        $urlHost = preg_replace('/^www\./', '', $urlHost);
+        // Normalize host: remove www. prefix and convert to lowercase
+        $urlHost = strtolower(preg_replace('/^www\./', '', $urlHost));
 
         // Check against all approved websites
         $approvedWebsites = $business->approvedWebsites;
         
         foreach ($approvedWebsites as $website) {
-            $websiteHost = parse_url($website->website_url, PHP_URL_HOST);
+            $websiteUrl = $website->website_url;
+            $websiteHost = parse_url($websiteUrl, PHP_URL_HOST);
+            
+            if (!$websiteHost) {
+                // If no host in website_url, try to extract it
+                $websiteHost = preg_replace('#^https?://#', '', $websiteUrl);
+                $websiteHost = preg_replace('#/.*$#', '', $websiteHost);
+            }
+            
             if ($websiteHost) {
-                $websiteHost = preg_replace('/^www\./', '', $websiteHost);
+                // Normalize website host
+                $websiteHost = strtolower(preg_replace('/^www\./', '', $websiteHost));
+                
+                // Exact match
                 if ($urlHost === $websiteHost) {
                     return $website->id;
+                }
+                
+                // Subdomain match (e.g., api.example.com matches example.com)
+                $urlParts = explode('.', $urlHost);
+                $websiteParts = explode('.', $websiteHost);
+                
+                // Check if URL host ends with website host (for subdomain matching)
+                if (count($urlParts) >= count($websiteParts)) {
+                    $urlSuffix = implode('.', array_slice($urlParts, -count($websiteParts)));
+                    if ($urlSuffix === $websiteHost) {
+                        return $website->id;
+                    }
                 }
             }
         }
