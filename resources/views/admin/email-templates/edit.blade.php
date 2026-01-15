@@ -110,8 +110,8 @@
         <div class="text-sm text-gray-700 space-y-2">
             <p>• Include full HTML structure: DOCTYPE, html, head, and body tags</p>
             <p>• Use inline CSS for email compatibility</p>
-            <p>• Access variables using Blade syntax: {{ '{{ $variableName }}' }}</p>
-            <p>• Use the logo from settings: {{ '{{ asset(\'storage/\' . \App\Models\Setting::get(\'site_logo\')) }}' }}</p>
+            <p>• Access variables using Blade syntax: @{{ $variableName }}</p>
+            <p>• Use the logo from settings: @{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}</p>
         </div>
     </div>
 </div>
