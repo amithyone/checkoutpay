@@ -19,6 +19,11 @@ class WebsiteApprovedNotification extends Notification
 
     public function via(object $notifiable): array
     {
+        // Check if email notifications and website notifications are enabled
+        if (!$notifiable->shouldReceiveEmailNotifications() || !$notifiable->shouldReceiveWebsiteNotifications()) {
+            return []; // Don't send notification
+        }
+        
         return ['mail'];
     }
 

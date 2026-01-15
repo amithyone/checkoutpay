@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,6 +19,11 @@ class PasswordChangedNotification extends Notification
 
     public function via(object $notifiable): array
     {
+        // Check if email notifications and security notifications are enabled
+        if (!$notifiable->shouldReceiveEmailNotifications() || !$notifiable->shouldReceiveSecurityNotifications()) {
+            return []; // Don't send notification
+        }
+        
         return ['mail'];
     }
 

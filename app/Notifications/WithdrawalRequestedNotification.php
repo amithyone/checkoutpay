@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use App\Models\WithdrawalRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,6 +19,11 @@ class WithdrawalRequestedNotification extends Notification
 
     public function via(object $notifiable): array
     {
+        // Check if email notifications and withdrawal notifications are enabled
+        if (!$notifiable->shouldReceiveEmailNotifications() || !$notifiable->shouldReceiveWithdrawalNotifications()) {
+            return []; // Don't send notification
+        }
+        
         return ['mail'];
     }
 

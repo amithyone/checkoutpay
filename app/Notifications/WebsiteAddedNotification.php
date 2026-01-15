@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\BusinessWebsite;
+use App\Models\Setting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,6 +19,11 @@ class WebsiteAddedNotification extends Notification
 
     public function via(object $notifiable): array
     {
+        // Check if email notifications and website notifications are enabled
+        if (!$notifiable->shouldReceiveEmailNotifications() || !$notifiable->shouldReceiveWebsiteNotifications()) {
+            return []; // Don't send notification
+        }
+        
         return ['mail'];
     }
 

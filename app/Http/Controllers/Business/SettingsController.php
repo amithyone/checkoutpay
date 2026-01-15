@@ -49,7 +49,8 @@ class SettingsController extends Controller
             unset($validated['profile_picture']);
         }
 
-        // Handle boolean fields that might not be sent
+        // Handle boolean fields that might not be sent (checkboxes)
+        // If checkbox is unchecked, it won't be in the request, so we default to false
         $booleanFields = [
             'notifications_email_enabled',
             'notifications_payment_enabled',
@@ -60,7 +61,12 @@ class SettingsController extends Controller
         ];
 
         foreach ($booleanFields as $field) {
-            $validated[$field] = $request->has($field) ? (bool) $request->input($field) : false;
+            // Check if the field exists in request and has a truthy value
+            if ($request->has($field) && $request->input($field)) {
+                $validated[$field] = true;
+            } else {
+                $validated[$field] = false;
+            }
         }
 
         $business->update($validated);

@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Payment;
+use App\Models\Setting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,6 +19,11 @@ class NewDepositNotification extends Notification
 
     public function via(object $notifiable): array
     {
+        // Check if email notifications and payment notifications are enabled
+        if (!$notifiable->shouldReceiveEmailNotifications() || !$notifiable->shouldReceivePaymentNotifications()) {
+            return []; // Don't send notification
+        }
+        
         return ['mail'];
     }
 

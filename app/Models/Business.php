@@ -285,4 +285,44 @@ class Business extends Authenticatable implements CanResetPasswordContract
     {
         $this->notify(new \App\Notifications\BusinessEmailVerificationNotification());
     }
+
+    /**
+     * Check if email notifications are enabled
+     */
+    public function shouldReceiveEmailNotifications(): bool
+    {
+        return $this->notifications_email_enabled ?? true;
+    }
+
+    /**
+     * Check if payment notifications are enabled
+     */
+    public function shouldReceivePaymentNotifications(): bool
+    {
+        return $this->notifications_payment_enabled ?? true;
+    }
+
+    /**
+     * Check if withdrawal notifications are enabled
+     */
+    public function shouldReceiveWithdrawalNotifications(): bool
+    {
+        return $this->notifications_withdrawal_enabled ?? true;
+    }
+
+    /**
+     * Check if website notifications are enabled
+     */
+    public function shouldReceiveWebsiteNotifications(): bool
+    {
+        return $this->notifications_website_enabled ?? true;
+    }
+
+    /**
+     * Check if security notifications are enabled
+     */
+    public function shouldReceiveSecurityNotifications(): bool
+    {
+        return $this->notifications_security_enabled ?? true;
+    }
 }
