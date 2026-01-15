@@ -242,10 +242,20 @@ class EmailTemplateController extends Controller
                 '$payment->reference' => 'Payment reference',
                 '$payment->created_at' => 'Payment date',
             ],
-            'website-approved', 'website-added' => [
+            'website-approved' => [
                 '$website->website_url' => 'Website URL',
             ],
-            'withdrawal-requested', 'withdrawal-approved' => [
+            'website-added' => [
+                '$website->website_url' => 'Website URL',
+            ],
+            'withdrawal-requested' => [
+                '$withdrawal->amount' => 'Withdrawal amount',
+                '$withdrawal->bank_name' => 'Bank name',
+                '$withdrawal->account_name' => 'Account name',
+                '$withdrawal->account_number' => 'Account number',
+                '$withdrawal->created_at' => 'Request date',
+            ],
+            'withdrawal-approved' => [
                 '$withdrawal->amount' => 'Withdrawal amount',
                 '$withdrawal->bank_name' => 'Bank name',
                 '$withdrawal->account_name' => 'Account name',
