@@ -21,19 +21,19 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-        <!-- Total Revenue -->
+        <!-- Amount Received Today -->
         <div class="bg-white rounded-xl shadow-sm p-5 lg:p-6 border border-gray-200 hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs lg:text-sm text-gray-600 mb-1">Total Revenue</p>
-                    <h3 class="text-xl lg:text-2xl font-bold text-gray-900 truncate">₦{{ number_format($stats['total_revenue'], 2) }}</h3>
+                    <p class="text-xs lg:text-sm text-gray-600 mb-1">Amount Received Today</p>
+                    <h3 class="text-xl lg:text-2xl font-bold text-gray-900 truncate">₦{{ number_format($stats['today_revenue'] ?? 0, 2) }}</h3>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-3">
                     <i class="fas fa-money-bill-wave text-green-600 text-lg lg:text-xl"></i>
                 </div>
             </div>
             <div class="pt-3 border-t border-gray-100">
-                <span class="text-xs text-gray-600">From {{ number_format($stats['approved_payments']) }} approved</span>
+                <span class="text-xs text-gray-600">Successful payments today</span>
             </div>
         </div>
 

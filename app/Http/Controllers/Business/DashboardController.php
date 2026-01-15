@@ -21,6 +21,17 @@ class DashboardController extends Controller
             'total_withdrawals' => $business->withdrawalRequests()->count(),
             'pending_withdrawals' => $business->withdrawalRequests()->where('status', 'pending')->count(),
             'total_revenue' => $business->payments()->where('status', 'approved')->sum('amount'),
+            'today_revenue' => $business->payments()
+                ->where('status', 'approved')
+                ->where(function($query) {
+                    $query->whereDate('matched_at', today())
+                          ->orWhere(function($q) {
+                              // Fallback to created_at if matched_at is null (for older payments)
+                              $q->whereNull('matched_at')
+                                ->whereDate('created_at', today());
+                          });
+                })
+                ->sum('amount'),
             'balance' => $business->balance,
         ];
 
