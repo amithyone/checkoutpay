@@ -56,7 +56,7 @@ class CheckoutController extends Controller
         }
 
         // Validate return URL is from approved website
-        if ($business->website && $business->website_approved && !$this->isUrlFromApprovedDomain($returnUrl, $business->website)) {
+        if (!$this->isUrlFromApprovedWebsites($returnUrl, $business)) {
             return view('checkout.error', [
                 'error' => 'Return URL must be from your approved website domain.',
             ]);
@@ -94,7 +94,7 @@ class CheckoutController extends Controller
             ->firstOrFail();
 
         // Validate return URL is from approved domain
-        if ($business->website && $business->website_approved && !$this->isUrlFromApprovedDomain($validated['return_url'], $business->website)) {
+        if (!$this->isUrlFromApprovedWebsites($validated['return_url'], $business)) {
             return back()->withErrors(['return_url' => 'Return URL must be from your approved website domain.'])->withInput();
         }
 
@@ -237,6 +237,33 @@ class CheckoutController extends Controller
                 'status' => $payment->status,
             ],
         ]);
+    }
+
+    /**
+     * Check if URL is from any approved website domain
+     */
+    protected function isUrlFromApprovedWebsites(string $url, Business $business): bool
+    {
+        // If business has no approved websites, allow the URL (backward compatibility)
+        $approvedWebsites = $business->approvedWebsites;
+        
+        if ($approvedWebsites->isEmpty()) {
+            // Backward compatibility: check old website field if no websites in new table
+            if ($business->website && $business->website_approved) {
+                return $this->isUrlFromApprovedDomain($url, $business->website);
+            }
+            // If no websites at all, allow (for backward compatibility)
+            return true;
+        }
+
+        // Check against all approved websites
+        foreach ($approvedWebsites as $website) {
+            if ($this->isUrlFromApprovedDomain($url, $website->website_url)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

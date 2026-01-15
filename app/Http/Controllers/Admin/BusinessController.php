@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessVerification;
+use App\Models\BusinessWebsite;
 use App\Models\EmailAccount;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
@@ -99,7 +100,8 @@ class BusinessController extends Controller
             'withdrawalRequests' => function($q) { $q->latest()->limit(10); },
             'accountNumbers',
             'verifications' => function($q) { $q->latest(); },
-            'activityLogs' => function($q) { $q->latest()->limit(10); }
+            'activityLogs' => function($q) { $q->latest()->limit(10); },
+            'websites'
         ]);
         
         return view('admin.businesses.show', compact('business'));
@@ -144,34 +146,73 @@ class BusinessController extends Controller
     public function approveWebsite(Request $request, Business $business): RedirectResponse
     {
         $request->validate([
+            'website_id' => 'required|exists:business_websites,id',
             'notes' => 'nullable|string|max:1000',
         ]);
 
-        $business->update([
-            'website_approved' => true,
+        $website = BusinessWebsite::where('business_id', $business->id)
+            ->findOrFail($request->website_id);
+
+        $website->update([
+            'is_approved' => true,
+            'approved_at' => now(),
+            'approved_by' => auth('admin')->id(),
+            'notes' => $request->notes,
         ]);
 
-        // Log activity if notes provided
-        if ($request->notes) {
-            // You can add activity logging here if needed
-        }
-
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', 'Website approved successfully. Business can now request account numbers.');
+            ->with('success', 'Website approved successfully.');
     }
 
     public function rejectWebsite(Request $request, Business $business): RedirectResponse
     {
         $request->validate([
+            'website_id' => 'required|exists:business_websites,id',
             'rejection_reason' => 'required|string|max:1000',
         ]);
 
-        $business->update([
-            'website_approved' => false,
+        $website = BusinessWebsite::where('business_id', $business->id)
+            ->findOrFail($request->website_id);
+
+        $website->update([
+            'is_approved' => false,
+            'notes' => $request->rejection_reason,
+            'approved_at' => null,
+            'approved_by' => null,
         ]);
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Website approval revoked. Reason: ' . $request->rejection_reason);
+    }
+
+    public function addWebsite(Request $request, Business $business): RedirectResponse
+    {
+        $validated = $request->validate([
+            'website_url' => 'required|url|max:500',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        BusinessWebsite::create([
+            'business_id' => $business->id,
+            'website_url' => $validated['website_url'],
+            'is_approved' => false,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Website added successfully. It requires approval.');
+    }
+
+    public function deleteWebsite(Request $request, Business $business, BusinessWebsite $website): RedirectResponse
+    {
+        if ($website->business_id !== $business->id) {
+            abort(403, 'Website does not belong to this business.');
+        }
+
+        $website->delete();
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Website deleted successfully.');
     }
 
     public function toggleStatus(Business $business): RedirectResponse

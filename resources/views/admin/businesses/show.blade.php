@@ -95,55 +95,90 @@
         </div>
     </div>
 
-    <!-- Website Approval Section -->
-    @if($business->website)
+    <!-- Websites Management Section -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-            <i class="fas fa-globe mr-2 text-primary"></i> Website Approval
-        </h3>
-        <div class="flex items-center justify-between">
-            <div class="flex-1">
-                <div class="mb-3">
-                    <p class="text-sm text-gray-600 mb-2">Website URL</p>
-                    <a href="{{ $business->website }}" target="_blank" class="text-sm text-primary hover:underline">
-                        {{ $business->website }} <i class="fas fa-external-link-alt text-xs"></i>
-                    </a>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-600 mb-2">Approval Status</p>
-                    @if($business->website_approved)
-                        <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
-                            <i class="fas fa-check-circle mr-2"></i> Approved
-                        </span>
-                        <p class="text-xs text-gray-500 mt-2">Business can request account numbers and use API</p>
-                    @else
-                        <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                            <i class="fas fa-clock mr-2"></i> Pending Approval
-                        </span>
-                        <p class="text-xs text-gray-500 mt-2">Business cannot request account numbers until approved</p>
-                    @endif
-                </div>
-            </div>
-            <div class="flex items-center space-x-3 ml-6">
-                @if(!$business->website_approved)
-                    <button onclick="showApproveWebsiteModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                        <i class="fas fa-check mr-2"></i> Approve Website
-                    </button>
-                @else
-                    <button onclick="showRejectWebsiteModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                        <i class="fas fa-times mr-2"></i> Revoke Approval
-                    </button>
-                @endif
-            </div>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-globe mr-2 text-primary"></i> Websites Portfolio
+            </h3>
+            <button onclick="showAddWebsiteModal()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                <i class="fas fa-plus mr-2"></i> Add Website
+            </button>
         </div>
+        
+        @if($business->websites->count() > 0)
+            <div class="space-y-3">
+                @foreach($business->websites as $website)
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <a href="{{ $website->website_url }}" target="_blank" 
+                                        class="text-primary hover:underline font-medium">
+                                        {{ $website->website_url }}
+                                        <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                                    </a>
+                                    @if($website->is_approved)
+                                        <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                            <i class="fas fa-check-circle mr-1"></i> Approved
+                                        </span>
+                                    @else
+                                        <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                            <i class="fas fa-clock mr-1"></i> Pending
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    Added {{ $website->created_at->format('M d, Y') }}
+                                    @if($website->approved_at)
+                                        • Approved {{ $website->approved_at->format('M d, Y') }}
+                                        @if($website->approver)
+                                            by {{ $website->approver->name }}
+                                        @endif
+                                    @endif
+                                </div>
+                                @if($website->notes)
+                                    <div class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                        <strong>Note:</strong> {{ $website->notes }}
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="flex items-center space-x-2 ml-4">
+                                @if(!$website->is_approved)
+                                    <button onclick="showApproveWebsiteModal({{ $website->id }})" 
+                                        class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                                        <i class="fas fa-check mr-1"></i> Approve
+                                    </button>
+                                @else
+                                    <button onclick="showRejectWebsiteModal({{ $website->id }})" 
+                                        class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
+                                        <i class="fas fa-times mr-1"></i> Revoke
+                                    </button>
+                                @endif
+                                <form method="POST" action="{{ route('admin.businesses.delete-website', [$business, $website]) }}" 
+                                    onsubmit="return confirm('Are you sure you want to delete this website?')" class="inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+            <div class="mt-4 text-xs text-gray-500">
+                <i class="fas fa-info-circle mr-1"></i>
+                Business needs at least one approved website to request account numbers.
+            </div>
+        @else
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-globe text-4xl mb-3 text-gray-300"></i>
+                <p>No websites added yet. Add a website using the button above.</p>
+            </div>
+        @endif
     </div>
-    @else
-    <div class="bg-gray-50 rounded-lg border border-gray-200 p-6">
-        <p class="text-sm text-gray-600">
-            <i class="fas fa-info-circle mr-2"></i> No website provided by this business.
-        </p>
-    </div>
-    @endif
 
     <!-- KYC Verification Section -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -398,12 +433,42 @@
     </div>
 </div>
 
+<!-- Add Website Modal -->
+<div id="addWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Add Website</h3>
+        <form action="{{ route('admin.businesses.add-website', $business) }}" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Website URL <span class="text-red-500">*</span></label>
+                <input type="url" name="website_url" required 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="https://example.com">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Add any notes..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeAddWebsiteModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    Add Website
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Approve Website Modal -->
 <div id="approveWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Approve Website</h3>
-        <form action="{{ route('admin.businesses.approve-website', $business) }}" method="POST">
+        <form id="approveWebsiteForm" method="POST">
             @csrf
+            <input type="hidden" name="website_id" id="approve_website_id">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Admin Notes (Optional)</label>
                 <textarea name="notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
@@ -425,8 +490,9 @@
 <div id="rejectWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Revoke Website Approval</h3>
-        <form action="{{ route('admin.businesses.reject-website', $business) }}" method="POST">
+        <form id="rejectWebsiteForm" method="POST">
             @csrf
+            <input type="hidden" name="website_id" id="reject_website_id">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Rejection Reason <span class="text-red-500">*</span></label>
                 <textarea name="rejection_reason" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
@@ -526,7 +592,17 @@
 
 @push('scripts')
 <script>
-function showApproveWebsiteModal() {
+function showAddWebsiteModal() {
+    document.getElementById('addWebsiteModal').classList.remove('hidden');
+}
+
+function closeAddWebsiteModal() {
+    document.getElementById('addWebsiteModal').classList.add('hidden');
+}
+
+function showApproveWebsiteModal(websiteId) {
+    document.getElementById('approve_website_id').value = websiteId;
+    document.getElementById('approveWebsiteForm').action = '{{ route("admin.businesses.approve-website", $business) }}';
     document.getElementById('approveWebsiteModal').classList.remove('hidden');
 }
 
@@ -534,7 +610,9 @@ function closeApproveWebsiteModal() {
     document.getElementById('approveWebsiteModal').classList.add('hidden');
 }
 
-function showRejectWebsiteModal() {
+function showRejectWebsiteModal(websiteId) {
+    document.getElementById('reject_website_id').value = websiteId;
+    document.getElementById('rejectWebsiteForm').action = '{{ route("admin.businesses.reject-website", $business) }}';
     document.getElementById('rejectWebsiteModal').classList.remove('hidden');
 }
 

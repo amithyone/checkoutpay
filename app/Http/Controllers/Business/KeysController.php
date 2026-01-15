@@ -19,10 +19,10 @@ class KeysController extends Controller
     {
         $business = Auth::guard('business')->user();
 
-        // Check if website is approved
-        if (!$business->website_approved) {
+        // Check if business has any approved website
+        if (!$business->hasApprovedWebsite()) {
             return redirect()->route('business.keys.index')
-                ->with('error', 'Your website must be approved before you can request an account number.');
+                ->with('error', 'At least one website must be approved before you can request an account number.');
         }
 
         // Check if business already has an account number

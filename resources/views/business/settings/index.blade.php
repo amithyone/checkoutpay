@@ -5,52 +5,86 @@
 
 @section('content')
 <div class="space-y-6">
-    <!-- Website Status -->
+    <!-- Websites Portfolio -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-6">Website Status</h3>
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-900">Websites Portfolio</h3>
+            <a href="{{ route('business.websites.index') }}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                <i class="fas fa-cog mr-2"></i> Manage Websites
+            </a>
+        </div>
         
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
-                <div class="flex items-center gap-2">
-                    <input type="text" value="{{ $business->website ?? 'Not provided' }}" readonly
-                        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                    @if($business->website)
-                        <a href="{{ $business->website }}" target="_blank" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
-                            <i class="fas fa-external-link-alt mr-2"></i> Visit
-                        </a>
-                    @endif
-                </div>
+        @php
+            $websites = $business->websites;
+            $approvedCount = $business->approvedWebsites->count();
+        @endphp
+        
+        @if($websites->count() > 0)
+            <div class="space-y-3 mb-4">
+                @foreach($websites->take(3) as $website)
+                    <div class="border border-gray-200 rounded-lg p-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <a href="{{ $website->website_url }}" target="_blank" 
+                                    class="text-primary hover:underline font-medium text-sm">
+                                    {{ $website->website_url }}
+                                    <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                                </a>
+                                <div class="mt-1">
+                                    @if($website->is_approved)
+                                        <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                            <i class="fas fa-check-circle mr-1"></i> Approved
+                                        </span>
+                                    @else
+                                        <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                            <i class="fas fa-clock mr-1"></i> Pending
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+                @if($websites->count() > 3)
+                    <p class="text-xs text-gray-500 text-center">
+                        + {{ $websites->count() - 3 }} more website(s). 
+                        <a href="{{ route('business.websites.index') }}" class="text-primary hover:underline">View all</a>
+                    </p>
+                @endif
             </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Approval Status</label>
-                @if($business->website_approved)
+            
+            <div class="border-t pt-4">
+                @if($approvedCount > 0)
                     <div class="flex items-center gap-2">
                         <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
-                            <i class="fas fa-check-circle mr-2"></i> Approved
+                            <i class="fas fa-check-circle mr-2"></i> {{ $approvedCount }} Approved Website(s)
                         </span>
-                        <p class="text-sm text-gray-600">Your website has been approved. You can request account numbers.</p>
+                        <p class="text-sm text-gray-600">You can request account numbers.</p>
                     </div>
                 @else
                     <div class="flex items-center gap-2">
                         <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
                             <i class="fas fa-clock mr-2"></i> Pending Approval
                         </span>
-                        <p class="text-sm text-gray-600">Your website is under review. You'll be notified once approved.</p>
+                        <p class="text-sm text-gray-600">Waiting for admin approval.</p>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-3">
+                        <p class="text-sm text-yellow-800">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Note:</strong> You need at least one approved website before you can request account numbers. Our team will review your websites and notify you once approved.
+                        </p>
                     </div>
                 @endif
             </div>
-
-            @if(!$business->website_approved)
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p class="text-sm text-yellow-800">
-                    <i class="fas fa-info-circle mr-2"></i>
-                    <strong>Note:</strong> You need website approval before you can request account numbers. Our team will review your website and notify you once approved.
-                </p>
+        @else
+            <div class="text-center py-6 text-gray-500">
+                <i class="fas fa-globe text-3xl mb-2 text-gray-300"></i>
+                <p class="text-sm mb-3">No websites added yet.</p>
+                <a href="{{ route('business.websites.index') }}" class="text-primary hover:underline text-sm">
+                    Add your first website →
+                </a>
             </div>
-            @endif
-        </div>
+        @endif
     </div>
 
     <!-- Webhook Settings -->

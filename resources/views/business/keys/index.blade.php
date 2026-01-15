@@ -115,7 +115,7 @@ X-API-Key: {{ $business->api_key }}</code></pre>
     </div>
 
     <!-- Account Number Request -->
-    @if($business->website_approved)
+    @if($business->hasApprovedWebsite())
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-6">Request Account Number</h3>
         

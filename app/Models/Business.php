@@ -197,4 +197,38 @@ class Business extends Authenticatable implements CanResetPasswordContract
     {
         return $this->hasMany(SupportTicket::class);
     }
+
+    /**
+     * Get websites for this business
+     */
+    public function websites()
+    {
+        return $this->hasMany(BusinessWebsite::class);
+    }
+
+    /**
+     * Get approved websites for this business
+     */
+    public function approvedWebsites()
+    {
+        return $this->hasMany(BusinessWebsite::class)->where('is_approved', true);
+    }
+
+    /**
+     * Check if business has any approved website
+     */
+    public function hasApprovedWebsite(): bool
+    {
+        return $this->approvedWebsites()->exists();
+    }
+
+    /**
+     * Get primary website (for backward compatibility)
+     * Returns the first approved website, or the first website if none approved
+     */
+    public function getPrimaryWebsiteAttribute()
+    {
+        return $this->approvedWebsites()->first() 
+            ?? $this->websites()->first();
+    }
 }

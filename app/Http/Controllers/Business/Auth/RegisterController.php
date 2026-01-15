@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Business\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Business;
+use App\Models\BusinessWebsite;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,9 +35,14 @@ class RegisterController extends Controller
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'] ?? null,
             'address' => $validated['address'] ?? null,
-            'website' => $validated['website'],
-            'website_approved' => false, // Requires admin approval
             'is_active' => true,
+        ]);
+
+        // Create website entry (requires admin approval)
+        BusinessWebsite::create([
+            'business_id' => $business->id,
+            'website_url' => $validated['website'],
+            'is_approved' => false,
         ]);
 
         Auth::guard('business')->login($business);

@@ -10,6 +10,7 @@ use App\Http\Controllers\Business\ProfileController;
 use App\Http\Controllers\Business\TeamController;
 use App\Http\Controllers\Business\SettingsController;
 use App\Http\Controllers\Business\KeysController;
+use App\Http\Controllers\Business\WebsitesController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('dashboard')->name('business.')->group(function () {
@@ -60,6 +61,11 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/keys', [KeysController::class, 'index'])->name('keys.index');
         Route::post('/keys/request-account-number', [KeysController::class, 'requestAccountNumber'])->name('keys.request-account-number');
         Route::get('/api-documentation', [\App\Http\Controllers\Business\ApiDocumentationController::class, 'index'])->name('api-documentation.index');
+
+        // Websites Management
+        Route::get('/websites', [WebsitesController::class, 'index'])->name('websites.index');
+        Route::post('/websites', [WebsitesController::class, 'store'])->name('websites.store');
+        Route::delete('/websites/{website}', [WebsitesController::class, 'destroy'])->name('websites.destroy');
 
         // Verification/KYC
         Route::get('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'index'])->name('verification.index');
