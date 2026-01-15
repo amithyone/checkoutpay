@@ -58,16 +58,14 @@
                         <i class="fas fa-code mr-1"></i> Available Variables
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        @if(isset($availableVariables) && is_array($availableVariables))
-                            @foreach($availableVariables as $var => $description)
-                            <div class="text-xs">
-                                <code class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">{{ $var }}</code>
-                                <span class="text-blue-700 ml-2">{{ $description }}</span>
-                            </div>
-                            @endforeach
-                        @else
-                            <div class="text-xs text-gray-500">No variables available for this template.</div>
-                        @endif
+                        @forelse($availableVariables ?? [] as $var => $description)
+                        <div class="text-xs">
+                            <code class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">{{ $var }}</code>
+                            <span class="text-blue-700 ml-2">{{ $description }}</span>
+                        </div>
+                        @empty
+                        <div class="text-xs text-gray-500">No variables available for this template.</div>
+                        @endforelse
                     </div>
                 </div>
 
@@ -90,7 +88,7 @@
                         placeholder="Enter your email template HTML/Blade code here..."
                     >{{ old('content', $customContent) }}</textarea>
                     <p class="text-xs text-gray-500 mt-1">
-                        Use Blade syntax (@{{ }}, @if, @foreach, etc.) and HTML/CSS for styling.
+                        Use Blade syntax (@{{ }}, @if, @forelse, etc.) and HTML/CSS for styling.
                         The template should include full HTML structure with &lt;!DOCTYPE html&gt;.
                     </p>
                 </div>

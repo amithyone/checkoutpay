@@ -143,6 +143,11 @@ class EmailTemplateController extends Controller
 
         // Available variables for each template
         $availableVariables = $this->getAvailableVariables($template);
+        
+        // Ensure it's always an array
+        if (!is_array($availableVariables)) {
+            $availableVariables = [];
+        }
 
         return view('admin.email-templates.edit', compact(
             'template',
