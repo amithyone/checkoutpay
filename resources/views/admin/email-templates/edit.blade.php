@@ -57,21 +57,9 @@
                     <h4 class="text-sm font-semibold text-blue-900 mb-3">
                         <i class="fas fa-code mr-1"></i> Available Variables
                     </h4>
-                    <div class="text-xs text-blue-700 space-y-1">
+                    <div class="text-xs text-blue-700 space-y-1" id="variables-display">
                         <p><strong>Common variables:</strong> $appName, $business->name, $business->email</p>
-                        @if($template === 'business-verification')
-                            <p><strong>Template-specific:</strong> $verificationUrl</p>
-                        @elseif($template === 'login-notification')
-                            <p><strong>Template-specific:</strong> $ipAddress, $userAgent</p>
-                        @elseif($template === 'new-deposit')
-                            <p><strong>Template-specific:</strong> $payment->amount, $payment->reference, $payment->created_at</p>
-                        @elseif($template === 'website-approved' || $template === 'website-added')
-                            <p><strong>Template-specific:</strong> $website->website_url</p>
-                        @elseif($template === 'withdrawal-requested' || $template === 'withdrawal-approved')
-                            <p><strong>Template-specific:</strong> $withdrawal->amount, $withdrawal->bank_name, $withdrawal->account_name, $withdrawal->account_number, $withdrawal->created_at</p>
-                        @elseif($template === 'password-changed')
-                            <p><strong>Template-specific:</strong> $ipAddress, $userAgent</p>
-                        @endif
+                        <p id="template-vars"></p>
                     </div>
                 </div>
 
@@ -142,4 +130,27 @@
         </ul>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const template = '{{ $template }}';
+    const templateVars = {
+        'business-verification': '<strong>Template-specific:</strong> $verificationUrl',
+        'login-notification': '<strong>Template-specific:</strong> $ipAddress, $userAgent',
+        'new-deposit': '<strong>Template-specific:</strong> $payment->amount, $payment->reference, $payment->created_at',
+        'website-approved': '<strong>Template-specific:</strong> $website->website_url',
+        'website-added': '<strong>Template-specific:</strong> $website->website_url',
+        'withdrawal-requested': '<strong>Template-specific:</strong> $withdrawal->amount, $withdrawal->bank_name, $withdrawal->account_name, $withdrawal->account_number, $withdrawal->created_at',
+        'withdrawal-approved': '<strong>Template-specific:</strong> $withdrawal->amount, $withdrawal->bank_name, $withdrawal->account_name, $withdrawal->account_number, $withdrawal->created_at',
+        'password-changed': '<strong>Template-specific:</strong> $ipAddress, $userAgent'
+    };
+    
+    const varsElement = document.getElementById('template-vars');
+    if (templateVars[template]) {
+        varsElement.innerHTML = templateVars[template];
+    } else {
+        varsElement.innerHTML = '<strong>Template-specific:</strong> None';
+    }
+});
+</script>
 @endsection
