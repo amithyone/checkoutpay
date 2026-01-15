@@ -75,19 +75,53 @@
 
                 <!-- Template Content -->
                 <div>
-                    <label for="content" class="block text-sm font-medium text-gray-700 mb-2">
-                        Email Template Content (Blade/HTML) <span class="text-red-500">*</span>
-                    </label>
-                    <textarea 
-                        id="content" 
-                        name="content" 
-                        rows="25"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
-                        required
-                    >{{ old('content', $customContent) }}</textarea>
-                    <p class="text-xs text-gray-500 mt-1">
-                        Use Blade syntax and HTML. Include full HTML structure with DOCTYPE, html, head, and body tags.
-                    </p>
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="content" class="block text-sm font-medium text-gray-700">
+                            Email Template Content (Blade/HTML) <span class="text-red-500">*</span>
+                        </label>
+                        <div class="flex items-center space-x-2">
+                            <button 
+                                type="button" 
+                                id="toggle-view-btn"
+                                class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                onclick="toggleView()"
+                            >
+                                <i class="fas fa-code mr-1" id="toggle-icon"></i>
+                                <span id="toggle-text">Preview</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- HTML Editor View -->
+                    <div id="html-editor-view">
+                        <textarea 
+                            id="content" 
+                            name="content" 
+                            rows="25"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
+                            required
+                            oninput="updatePreview()"
+                        >{{ old('content', $customContent) }}</textarea>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Use Blade syntax and HTML. Include full HTML structure with DOCTYPE, html, head, and body tags.
+                        </p>
+                    </div>
+                    
+                    <!-- Preview View -->
+                    <div id="preview-view" class="hidden border border-gray-300 rounded-lg bg-white">
+                        <div class="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+                            <span class="text-xs font-medium text-gray-700">Email Preview</span>
+                            <span class="text-xs text-gray-500">Note: Blade variables will show as placeholders</span>
+                        </div>
+                        <div class="p-4 overflow-auto" style="max-height: 600px;">
+                            <iframe 
+                                id="preview-frame" 
+                                class="w-full border-0"
+                                style="min-height: 500px;"
+                                sandbox="allow-same-origin"
+                            ></iframe>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Form Actions -->
@@ -136,6 +170,68 @@
     } else {
         varsElement.innerHTML = '<strong>Template-specific:</strong> None';
     }
+    
+    // Initialize preview
+    updatePreview();
 })();
+
+var isPreviewMode = false;
+
+function toggleView() {
+    var htmlView = document.getElementById('html-editor-view');
+    var previewView = document.getElementById('preview-view');
+    var toggleBtn = document.getElementById('toggle-view-btn');
+    var toggleIcon = document.getElementById('toggle-icon');
+    var toggleText = document.getElementById('toggle-text');
+    
+    isPreviewMode = !isPreviewMode;
+    
+    if (isPreviewMode) {
+        htmlView.classList.add('hidden');
+        previewView.classList.remove('hidden');
+        toggleIcon.className = 'fas fa-edit mr-1';
+        toggleText.textContent = 'Edit HTML';
+        updatePreview();
+    } else {
+        htmlView.classList.remove('hidden');
+        previewView.classList.add('hidden');
+        toggleIcon.className = 'fas fa-code mr-1';
+        toggleText.textContent = 'Preview';
+    }
+}
+
+function updatePreview() {
+    var content = document.getElementById('content').value;
+    var previewFrame = document.getElementById('preview-frame');
+    
+    if (!previewFrame) return;
+    
+    // Replace Blade syntax with sample data for preview
+    var previewContent = content
+        .replace(/\{\{\s*\$appName\s*\}\}/g, 'CheckoutPay')
+        .replace(/\{\{\s*\$business->name\s*\}\}/g, 'Sample Business Name')
+        .replace(/\{\{\s*\$business->email\s*\}\}/g, 'business@example.com')
+        .replace(/\{\{\s*\$verificationUrl\s*\}\}/g, '#')
+        .replace(/\{\{\s*\$ipAddress\s*\}\}/g, '192.168.1.1')
+        .replace(/\{\{\s*\$userAgent\s*\}\}/g, 'Mozilla/5.0 (Sample Browser)')
+        .replace(/\{\{\s*\$payment->amount\s*\}\}/g, '₦10,000.00')
+        .replace(/\{\{\s*\$payment->reference\s*\}\}/g, 'REF123456')
+        .replace(/\{\{\s*\$payment->created_at\s*\}\}/g, new Date().toLocaleString())
+        .replace(/\{\{\s*\$website->website_url\s*\}\}/g, 'https://example.com')
+        .replace(/\{\{\s*\$withdrawal->amount\s*\}\}/g, '₦5,000.00')
+        .replace(/\{\{\s*\$withdrawal->bank_name\s*\}\}/g, 'Sample Bank')
+        .replace(/\{\{\s*\$withdrawal->account_name\s*\}\}/g, 'John Doe')
+        .replace(/\{\{\s*\$withdrawal->account_number\s*\}\}/g, '1234567890')
+        .replace(/\{\{\s*\$withdrawal->created_at\s*\}\}/g, new Date().toLocaleString())
+        .replace(/\{\{\s*asset\([^)]+\)\s*\}\}/g, '/storage/logo.png')
+        .replace(/\{\{\s*date\('Y'\)\s*\}\}/g, new Date().getFullYear())
+        .replace(/\{\{\s*now\(\)->format\([^)]+\)\s*\}\}/g, new Date().toLocaleString());
+    
+    // Write to iframe
+    var iframeDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(previewContent);
+    iframeDoc.close();
+}
 </script>
 @endsection
