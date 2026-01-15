@@ -58,7 +58,10 @@
                         <i class="fas fa-code mr-1"></i> Available Variables
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        @forelse($availableVariables ?? [] as $var => $description)
+                        @php
+                            $vars = $availableVariables ?? [];
+                        @endphp
+                        @forelse($vars as $var => $description)
                         <div class="text-xs">
                             <code class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">{{ $var }}</code>
                             <span class="text-blue-700 ml-2">{{ $description }}</span>
