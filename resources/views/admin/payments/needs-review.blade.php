@@ -87,15 +87,23 @@
                        class="px-3 sm:px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs sm:text-sm text-center whitespace-nowrap">
                         <i class="fas fa-eye mr-2"></i> View Details
                     </a>
-                    <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
-                            class="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs sm:text-sm whitespace-nowrap">
-                        <i class="fas fa-check-circle mr-2"></i> Manual Approve
-                    </button>
-                    @if(!$payment->expires_at || $payment->expires_at->isFuture())
-                        <button onclick="markAsExpired({{ $payment->id }})" 
-                                class="px-3 sm:px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-xs sm:text-sm whitespace-nowrap">
-                            <i class="fas fa-clock mr-2"></i> Mark as Expired
+                    @if($payment->status === 'approved')
+                        <button onclick="resendWebhook({{ $payment->id }})" 
+                                id="resend-webhook-btn-{{ $payment->id }}"
+                                class="px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs sm:text-sm whitespace-nowrap">
+                            <i class="fas fa-paper-plane mr-2"></i> Resend Webhook
                         </button>
+                    @else
+                        <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
+                                class="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs sm:text-sm whitespace-nowrap">
+                            <i class="fas fa-check-circle mr-2"></i> Manual Approve
+                        </button>
+                        @if(!$payment->expires_at || $payment->expires_at->isFuture())
+                            <button onclick="markAsExpired({{ $payment->id }})" 
+                                    class="px-3 sm:px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-xs sm:text-sm whitespace-nowrap">
+                                <i class="fas fa-clock mr-2"></i> Mark as Expired
+                            </button>
+                        @endif
                     @endif
                     <button onclick="showDeleteModal({{ $payment->id }}, '{{ $payment->transaction_id }}')" 
                             class="px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs sm:text-sm whitespace-nowrap">
