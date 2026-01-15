@@ -57,16 +57,20 @@
                     <h4 class="text-sm font-semibold text-blue-900 mb-3">
                         <i class="fas fa-code mr-1"></i> Available Variables
                     </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        @if(isset($availableVariables) && count($availableVariables) > 0)
-                            @foreach($availableVariables as $var => $description)
-                            <div class="text-xs">
-                                <code class="bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">{{ $var }}</code>
-                                <span class="text-blue-700 ml-2">{{ $description }}</span>
-                            </div>
-                            @endforeach
-                        @else
-                            <div class="text-xs text-gray-500 col-span-2">No variables available for this template.</div>
+                    <div class="text-xs text-blue-700 space-y-1">
+                        <p><strong>Common variables:</strong> $appName, $business->name, $business->email</p>
+                        @if($template === 'business-verification')
+                            <p><strong>Template-specific:</strong> $verificationUrl</p>
+                        @elseif($template === 'login-notification')
+                            <p><strong>Template-specific:</strong> $ipAddress, $userAgent</p>
+                        @elseif($template === 'new-deposit')
+                            <p><strong>Template-specific:</strong> $payment->amount, $payment->reference, $payment->created_at</p>
+                        @elseif($template === 'website-approved' || $template === 'website-added')
+                            <p><strong>Template-specific:</strong> $website->website_url</p>
+                        @elseif($template === 'withdrawal-requested' || $template === 'withdrawal-approved')
+                            <p><strong>Template-specific:</strong> $withdrawal->amount, $withdrawal->bank_name, $withdrawal->account_name, $withdrawal->account_number, $withdrawal->created_at</p>
+                        @elseif($template === 'password-changed')
+                            <p><strong>Template-specific:</strong> $ipAddress, $userAgent</p>
                         @endif
                     </div>
                 </div>
