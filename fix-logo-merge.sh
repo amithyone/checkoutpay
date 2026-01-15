@@ -2,7 +2,8 @@
 # Script to fix logo file merge conflict on production server
 # Run this script on your production server before pulling
 
-cd /var/www/checkout || exit 1
+# Change to your actual project directory (adjust path as needed)
+cd public_html || cd /var/www/checkout || exit 1
 
 echo "Checking for untracked logo files..."
 

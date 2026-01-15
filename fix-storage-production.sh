@@ -2,7 +2,8 @@
 # Fix storage symlink and permissions on production server
 # Run this script on your production server
 
-cd /var/www/checkout || exit 1
+# Change to your actual project directory (adjust path as needed)
+cd public_html || cd /var/www/checkout || exit 1
 
 echo "=== Fixing Storage Symlink ==="
 

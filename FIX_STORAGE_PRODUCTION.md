@@ -14,7 +14,7 @@ The `public/storage` symlink is missing or broken on the production server. This
 ### Step 1: SSH into Production Server
 ```bash
 ssh your-server
-cd /var/www/checkout  # or your actual checkout path
+cd public_html  # Your production server directory
 ```
 
 ### Step 2: Remove Existing Symlink (if broken)
@@ -46,7 +46,7 @@ php artisan optimize:clear
 
 ## Complete Fix Script (Run on Production)
 ```bash
-cd /var/www/checkout && \
+cd public_html && \
 rm -f public/storage && \
 php artisan storage:link && \
 chmod -R 775 storage/app/public && \
@@ -69,5 +69,5 @@ ls -la storage/app/public/settings/
 # Check symlink target
 readlink -f public/storage
 
-# Should point to: /var/www/checkout/storage/app/public
+# Should point to: /home/username/public_html/storage/app/public (or your actual path)
 ```
