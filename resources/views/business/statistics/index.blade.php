@@ -113,123 +113,125 @@
         <div class="p-6">
             <div class="space-y-6">
                 @foreach($websiteStats as $ws)
-                <div class="border border-gray-200 rounded-lg p-6 hover:bg-gray-50">
+                <div class="border border-gray-200 rounded-lg p-4 sm:p-6 hover:bg-gray-50 overflow-hidden">
                     <!-- Website Header -->
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-3 mb-2">
-                                <a href="{{ $ws['website']->website_url }}" target="_blank" class="text-primary hover:underline font-semibold text-lg">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                                <a href="{{ $ws['website']->website_url }}" target="_blank" class="text-primary hover:underline font-semibold text-sm sm:text-base md:text-lg truncate">
                                     {{ parse_url($ws['website']->website_url, PHP_URL_HOST) }}
                                     <i class="fas fa-external-link-alt text-xs ml-1"></i>
                                 </a>
                                 @if($ws['website']->is_approved)
-                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full self-start">
                                         <i class="fas fa-check-circle mr-1"></i> Approved
                                     </span>
                                 @else
-                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full self-start">
                                         <i class="fas fa-clock mr-1"></i> Pending
                                     </span>
                                 @endif
                             </div>
                         </div>
-                        <div class="text-right">
-                            <p class="text-2xl font-bold text-gray-900">₦{{ number_format($ws['total_revenue'], 2) }}</p>
-                            <p class="text-sm text-gray-500">Total Revenue</p>
+                        <div class="text-left sm:text-right min-w-0">
+                            <p class="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 break-words">₦{{ number_format($ws['total_revenue'], 2) }}</p>
+                            <p class="text-xs sm:text-sm text-gray-500">Total Revenue</p>
                         </div>
                     </div>
 
                     <!-- Quick Stats Grid -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-blue-50 rounded-lg p-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                        <div class="bg-blue-50 rounded-lg p-3 sm:p-4 min-w-0 overflow-hidden">
                             <p class="text-xs text-gray-600 mb-1">Today</p>
-                            <p class="text-lg font-bold text-blue-900">₦{{ number_format($ws['today_revenue'], 2) }}</p>
+                            <p class="text-sm sm:text-base md:text-lg font-bold text-blue-900 break-words leading-tight">₦{{ number_format($ws['today_revenue'], 2) }}</p>
                             <p class="text-xs text-gray-500 mt-1">{{ $ws['today_payments'] }} payments</p>
                         </div>
-                        <div class="bg-purple-50 rounded-lg p-4">
+                        <div class="bg-purple-50 rounded-lg p-3 sm:p-4 min-w-0 overflow-hidden">
                             <p class="text-xs text-gray-600 mb-1">This Month</p>
-                            <p class="text-lg font-bold text-purple-900">₦{{ number_format($ws['monthly_revenue'], 2) }}</p>
+                            <p class="text-sm sm:text-base md:text-lg font-bold text-purple-900 break-words leading-tight">₦{{ number_format($ws['monthly_revenue'], 2) }}</p>
                             <p class="text-xs text-gray-500 mt-1">{{ $ws['monthly_payments'] }} payments</p>
                         </div>
-                        <div class="bg-green-50 rounded-lg p-4">
+                        <div class="bg-green-50 rounded-lg p-3 sm:p-4 min-w-0 overflow-hidden">
                             <p class="text-xs text-gray-600 mb-1">This Year</p>
-                            <p class="text-lg font-bold text-green-900">₦{{ number_format($ws['yearly_revenue'], 2) }}</p>
+                            <p class="text-sm sm:text-base md:text-lg font-bold text-green-900 break-words leading-tight">₦{{ number_format($ws['yearly_revenue'], 2) }}</p>
                             <p class="text-xs text-gray-500 mt-1">{{ $ws['yearly_payments'] }} payments</p>
                         </div>
-                        <div class="bg-orange-50 rounded-lg p-4">
+                        <div class="bg-orange-50 rounded-lg p-3 sm:p-4 min-w-0 overflow-hidden">
                             <p class="text-xs text-gray-600 mb-1">Approval Rate</p>
-                            <p class="text-lg font-bold text-orange-900">{{ number_format($ws['approval_rate'], 1) }}%</p>
-                            <p class="text-xs text-gray-500 mt-1">Avg: ₦{{ number_format($ws['average_transaction'], 2) }}</p>
+                            <p class="text-sm sm:text-base md:text-lg font-bold text-orange-900">{{ number_format($ws['approval_rate'], 1) }}%</p>
+                            <p class="text-xs text-gray-500 mt-1 break-words leading-tight">Avg: ₦{{ number_format($ws['average_transaction'], 2) }}</p>
                         </div>
                     </div>
 
                     <!-- Status Breakdown -->
-                    <div class="grid grid-cols-3 gap-4 mb-6">
-                        <div class="text-center">
-                            <p class="text-2xl font-bold text-green-600">{{ $ws['approved_payments'] }}</p>
+                    <div class="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+                        <div class="text-center min-w-0">
+                            <p class="text-lg sm:text-xl md:text-2xl font-bold text-green-600 break-words">{{ number_format($ws['approved_payments']) }}</p>
                             <p class="text-xs text-gray-600">Approved</p>
                         </div>
-                        <div class="text-center">
-                            <p class="text-2xl font-bold text-yellow-600">{{ $ws['pending_payments'] }}</p>
+                        <div class="text-center min-w-0">
+                            <p class="text-lg sm:text-xl md:text-2xl font-bold text-yellow-600 break-words">{{ number_format($ws['pending_payments']) }}</p>
                             <p class="text-xs text-gray-600">Pending</p>
                         </div>
-                        <div class="text-center">
-                            <p class="text-2xl font-bold text-red-600">{{ $ws['rejected_payments'] }}</p>
+                        <div class="text-center min-w-0">
+                            <p class="text-lg sm:text-xl md:text-2xl font-bold text-red-600 break-words">{{ number_format($ws['rejected_payments']) }}</p>
                             <p class="text-xs text-gray-600">Rejected</p>
                         </div>
                     </div>
 
                     <!-- Period-Specific Stats Table -->
                     <div class="border-t border-gray-200 pt-4">
-                        <h4 class="text-sm font-semibold text-gray-900 mb-3">
+                        <h4 class="text-xs sm:text-sm font-semibold text-gray-900 mb-3">
                             {{ ucfirst($period) }} Performance ({{ $dateFrom }} to {{ $dateTo }})
                         </h4>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        @if($period === 'daily')
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                        @elseif($period === 'monthly')
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
-                                        @else
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
-                                        @endif
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Approved</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pending</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rejected</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-200">
-                                    @php
-                                        $periodStats = $period === 'daily' ? $ws['daily_stats'] : ($period === 'monthly' ? $ws['monthly_stats'] : $ws['yearly_stats']);
-                                    @endphp
-                                    @forelse($periodStats as $stat)
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-4 py-3 text-gray-900">
+                        <div class="overflow-x-auto -mx-4 sm:mx-0">
+                            <div class="inline-block min-w-full align-middle">
+                                <table class="w-full text-xs sm:text-sm">
+                                    <thead class="bg-gray-50">
+                                        <tr>
                                             @if($period === 'daily')
-                                                {{ \Carbon\Carbon::parse($stat->date)->format('M d, Y') }}
+                                                <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                             @elseif($period === 'monthly')
-                                                {{ \Carbon\Carbon::create($stat->year, $stat->month, 1)->format('M Y') }}
+                                                <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
                                             @else
-                                                {{ $stat->year }}
+                                                <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
                                             @endif
-                                        </td>
-                                        <td class="px-4 py-3 text-gray-600">{{ $stat->count }}</td>
-                                        <td class="px-4 py-3 text-green-600 font-medium">{{ $stat->approved_count ?? 0 }}</td>
-                                        <td class="px-4 py-3 text-yellow-600 font-medium">{{ $stat->pending_count ?? 0 }}</td>
-                                        <td class="px-4 py-3 text-red-600 font-medium">{{ $stat->rejected_count ?? 0 }}</td>
-                                        <td class="px-4 py-3 font-semibold text-gray-900">₦{{ number_format($stat->revenue ?? 0, 2) }}</td>
-                                    </tr>
-                                    @empty
-                                    <tr>
-                                        <td colspan="6" class="px-4 py-4 text-center text-sm text-gray-500">No data available for this period</td>
-                                    </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                                            <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                            <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Approved</th>
+                                            <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pending</th>
+                                            <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rejected</th>
+                                            <th class="px-2 sm:px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase min-w-[100px]">Revenue</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        @php
+                                            $periodStats = $period === 'daily' ? $ws['daily_stats'] : ($period === 'monthly' ? $ws['monthly_stats'] : $ws['yearly_stats']);
+                                        @endphp
+                                        @forelse($periodStats as $stat)
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-2 sm:px-4 py-2 sm:py-3 text-gray-900 whitespace-nowrap">
+                                                @if($period === 'daily')
+                                                    {{ \Carbon\Carbon::parse($stat->date)->format('M d, Y') }}
+                                                @elseif($period === 'monthly')
+                                                    {{ \Carbon\Carbon::create($stat->year, $stat->month, 1)->format('M Y') }}
+                                                @else
+                                                    {{ $stat->year }}
+                                                @endif
+                                            </td>
+                                            <td class="px-2 sm:px-4 py-2 sm:py-3 text-gray-600">{{ $stat->count }}</td>
+                                            <td class="px-2 sm:px-4 py-2 sm:py-3 text-green-600 font-medium">{{ $stat->approved_count ?? 0 }}</td>
+                                            <td class="px-2 sm:px-4 py-2 sm:py-3 text-yellow-600 font-medium">{{ $stat->pending_count ?? 0 }}</td>
+                                            <td class="px-2 sm:px-4 py-2 sm:py-3 text-red-600 font-medium">{{ $stat->rejected_count ?? 0 }}</td>
+                                            <td class="px-2 sm:px-4 py-2 sm:py-3 font-semibold text-gray-900 break-words min-w-0">₦{{ number_format($stat->revenue ?? 0, 2) }}</td>
+                                        </tr>
+                                        @empty
+                                        <tr>
+                                            <td colspan="6" class="px-2 sm:px-4 py-4 text-center text-xs sm:text-sm text-gray-500">No data available for this period</td>
+                                        </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
