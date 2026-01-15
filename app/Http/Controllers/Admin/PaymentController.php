@@ -551,11 +551,16 @@ class PaymentController extends Controller
         }
 
         try {
-            // Dispatch job synchronously to execute immediately
-            \App\Jobs\SendWebhookNotification::dispatchSync($payment);
+            // Reload payment with relationships
+            $payment->load(['business', 'accountNumberDetails', 'website']);
+
+            // Create job instance and execute synchronously
+            $job = new \App\Jobs\SendWebhookNotification($payment);
+            $logService = app(\App\Services\TransactionLogService::class);
+            $job->handle($logService);
 
             // Log the resend action
-            \Illuminate\Support\Facades\Log::info('Webhook resent by admin', [
+            \Illuminate\Support\Facades\Log::info('Webhook resent by admin - executed successfully', [
                 'payment_id' => $payment->id,
                 'transaction_id' => $payment->transaction_id,
                 'admin_id' => auth('admin')->id(),
