@@ -155,11 +155,17 @@
                 @php
                     $logo = \App\Models\Setting::get('site_logo');
                     $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
+                    $logoExists = $logo && $logoPath && file_exists($logoPath);
                 @endphp
-                @if($logo && $logoPath && file_exists($logoPath))
-                    <div class="mb-3">
-                        <img src="{{ asset('storage/' . $logo) }}" alt="Current Logo" class="h-16 object-contain" onerror="this.style.display='none';">
+                @if($logoExists)
+                    <div class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <img src="{{ asset('storage/' . $logo) }}?v={{ time() }}" alt="Current Logo" class="h-16 object-contain max-w-full" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <p class="text-xs text-red-500 mt-1" style="display: none;">Failed to load logo image</p>
                         <p class="text-xs text-gray-500 mt-1">Current logo</p>
+                    </div>
+                @elseif($logo)
+                    <div class="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p class="text-xs text-yellow-700">Logo file not found at: {{ $logo }}</p>
                     </div>
                 @endif
                 <input 
@@ -180,11 +186,17 @@
                 @php
                     $favicon = \App\Models\Setting::get('site_favicon');
                     $faviconPath = $favicon ? storage_path('app/public/' . $favicon) : null;
+                    $faviconExists = $favicon && $faviconPath && file_exists($faviconPath);
                 @endphp
-                @if($favicon && $faviconPath && file_exists($faviconPath))
-                    <div class="mb-3">
-                        <img src="{{ asset('storage/' . $favicon) }}" alt="Current Favicon" class="h-8 w-8 object-contain" onerror="this.style.display='none';">
+                @if($faviconExists)
+                    <div class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <img src="{{ asset('storage/' . $favicon) }}?v={{ time() }}" alt="Current Favicon" class="h-8 w-8 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <p class="text-xs text-red-500 mt-1" style="display: none;">Failed to load favicon image</p>
                         <p class="text-xs text-gray-500 mt-1">Current favicon</p>
+                    </div>
+                @elseif($favicon)
+                    <div class="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p class="text-xs text-yellow-700">Favicon file not found at: {{ $favicon }}</p>
                     </div>
                 @endif
                 <input 
@@ -206,11 +218,17 @@
                 @php
                     $emailLogo = \App\Models\Setting::get('email_logo');
                     $emailLogoPath = $emailLogo ? storage_path('app/public/' . $emailLogo) : null;
+                    $emailLogoExists = $emailLogo && $emailLogoPath && file_exists($emailLogoPath);
                 @endphp
-                @if($emailLogo && $emailLogoPath && file_exists($emailLogoPath))
-                    <div class="mb-3">
-                        <img src="{{ asset('storage/' . $emailLogo) }}" alt="Current Email Logo" class="h-16 object-contain bg-gray-100 p-2 rounded" onerror="this.style.display='none';">
+                @if($emailLogoExists)
+                    <div class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <img src="{{ asset('storage/' . $emailLogo) }}?v={{ time() }}" alt="Current Email Logo" class="h-16 object-contain bg-gray-100 p-2 rounded max-w-full" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <p class="text-xs text-red-500 mt-1" style="display: none;">Failed to load email logo image</p>
                         <p class="text-xs text-gray-500 mt-1">Current email logo</p>
+                    </div>
+                @elseif($emailLogo)
+                    <div class="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p class="text-xs text-yellow-700">Email logo file not found at: {{ $emailLogo }}</p>
                     </div>
                 @endif
                 <input 
