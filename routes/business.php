@@ -33,6 +33,10 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     Route::post('/email/verification-notification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resend'])->middleware('auth:business')->name('verification.send');
     Route::post('/email/resend-verification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resendWithoutAuth'])->name('verification.resend-without-auth');
 
+    // Two-Factor Authentication routes
+    Route::get('/2fa/verify', [\App\Http\Controllers\Business\Auth\TwoFactorController::class, 'showVerifyForm'])->name('2fa.verify');
+    Route::post('/2fa/verify', [\App\Http\Controllers\Business\Auth\TwoFactorController::class, 'verify'])->name('2fa.verify.post');
+
     // Protected business routes
     Route::middleware('auth:business')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -63,6 +67,9 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::post('/settings/regenerate-api-key', [SettingsController::class, 'regenerateApiKey'])->name('settings.regenerate-api-key');
         Route::delete('/settings/profile-picture', [SettingsController::class, 'removeProfilePicture'])->name('settings.remove-profile-picture');
+        Route::get('/settings/2fa/setup', [SettingsController::class, 'setupTwoFactor'])->name('settings.2fa.setup');
+        Route::post('/settings/2fa/verify', [SettingsController::class, 'verifyTwoFactorSetup'])->name('settings.2fa.verify');
+        Route::post('/settings/2fa/disable', [SettingsController::class, 'disableTwoFactor'])->name('settings.2fa.disable');
 
         // API Keys & Integration
         Route::get('/keys', [KeysController::class, 'index'])->name('keys.index');

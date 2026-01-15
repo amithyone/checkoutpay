@@ -325,4 +325,131 @@ class Business extends Authenticatable implements CanResetPasswordContract
     {
         return $this->notifications_security_enabled ?? true;
     }
+
+    /**
+     * Generate 2FA secret
+     */
+    public function generateTwoFactorSecret(): string
+    {
+        $google2fa = app(\PragmaRX\Google2FA\Google2FA::class);
+        return $google2fa->generateSecretKey();
+    }
+
+    /**
+     * Get 2FA QR Code URL
+     */
+    public function getTwoFactorQrCodeUrl(): string
+    {
+        $google2fa = app(\PragmaRX\Google2FA\Google2FA::class);
+        $appName = \App\Models\Setting::get('site_name', 'CheckoutPay');
+        $qrCodeUrl = $google2fa->getQRCodeUrl(
+            $appName,
+            $this->email,
+            $this->two_factor_secret
+        );
+        return $qrCodeUrl;
+    }
+
+    /**
+     * Verify 2FA code
+     */
+    public function verifyTwoFactorCode(string $code): bool
+    {
+        if (!$this->two_factor_enabled || !$this->two_factor_secret) {
+            return false;
+        }
+
+        $google2fa = app(\PragmaRX\Google2FA\Google2FA::class);
+        return $google2fa->verifyKey($this->two_factor_secret, $code);
+    }
+
+    /**
+     * Check if auto-withdrawal should be triggered
+     */
+    public function shouldTriggerAutoWithdrawal(): bool
+    {
+        if (!$this->auto_withdraw_threshold || $this->auto_withdraw_threshold <= 0) {
+            return false;
+        }
+
+        return $this->balance >= $this->auto_withdraw_threshold;
+    }
+
+    /**
+     * Get default withdrawal details (from last withdrawal or profile)
+     */
+    public function getDefaultWithdrawalDetails(): ?array
+    {
+        $lastWithdrawal = $this->withdrawalRequests()
+            ->where('status', 'approved')
+            ->latest()
+            ->first();
+
+        if ($lastWithdrawal) {
+            return [
+                'bank_name' => $lastWithdrawal->bank_name,
+                'account_number' => $lastWithdrawal->account_number,
+                'account_name' => $lastWithdrawal->account_name,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Trigger auto-withdrawal if threshold is reached
+     */
+    public function triggerAutoWithdrawal(): ?\App\Models\WithdrawalRequest
+    {
+        if (!$this->shouldTriggerAutoWithdrawal()) {
+            return null;
+        }
+
+        // Check if there's already a pending withdrawal
+        $pendingWithdrawal = $this->withdrawalRequests()
+            ->where('status', 'pending')
+            ->first();
+
+        if ($pendingWithdrawal) {
+            return null; // Already has pending withdrawal
+        }
+
+        // Get default withdrawal details
+        $details = $this->getDefaultWithdrawalDetails();
+
+        if (!$details) {
+            // No withdrawal details available, cannot auto-withdraw
+            \Log::warning('Auto-withdrawal triggered but no withdrawal details found', [
+                'business_id' => $this->id,
+                'balance' => $this->balance,
+                'threshold' => $this->auto_withdraw_threshold,
+            ]);
+            return null;
+        }
+
+        // Create withdrawal request for full balance (or threshold amount)
+        $amount = min($this->balance, $this->auto_withdraw_threshold * 10); // Cap at 10x threshold to prevent issues
+
+        $withdrawal = $this->withdrawalRequests()->create([
+            'amount' => $amount,
+            'bank_name' => $details['bank_name'],
+            'account_number' => $details['account_number'],
+            'account_name' => $details['account_name'],
+            'notes' => 'Auto-withdrawal triggered - Balance reached threshold of ₦' . number_format($this->auto_withdraw_threshold, 2),
+            'status' => 'pending',
+        ]);
+
+        // Send notification
+        $this->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
+
+        \Log::info('Auto-withdrawal triggered', [
+            'business_id' => $this->id,
+            'withdrawal_id' => $withdrawal->id,
+            'amount' => $amount,
+            'balance' => $this->balance,
+            'threshold' => $this->auto_withdraw_threshold,
+        ]);
+
+        return $withdrawal;
+    }
 }

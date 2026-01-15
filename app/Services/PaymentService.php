@@ -244,9 +244,13 @@ class PaymentService
                     // Update business balance
                     if ($payment->business_id) {
                         $payment->business->increment('balance', $payment->amount);
+                        $payment->business->refresh(); // Refresh to get updated balance
                         
                         // Send new deposit notification
                         $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                        
+                        // Check for auto-withdrawal
+                        $payment->business->triggerAutoWithdrawal();
                     }
                     
                     // Dispatch event to send webhook

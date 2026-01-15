@@ -39,6 +39,16 @@ class LoginController extends Controller
                     ->onlyInput('email');
             }
 
+            // Check if 2FA is enabled
+            if ($business->two_factor_enabled && $business->two_factor_secret) {
+                // Store business ID in session for 2FA verification
+                $request->session()->put('business_2fa_id', $business->id);
+                Auth::guard('business')->logout();
+
+                return redirect()->route('business.2fa.verify')
+                    ->with('message', 'Please enter your 2FA code to continue');
+            }
+
             $request->session()->regenerate();
 
             return redirect()->intended(route('business.dashboard'));

@@ -100,4 +100,67 @@ class SettingsController extends Controller
         return redirect()->route('business.settings.index')
             ->with('success', 'API key regenerated successfully');
     }
+
+    public function setupTwoFactor()
+    {
+        $business = Auth::guard('business')->user();
+
+        // Generate secret if not exists
+        if (!$business->two_factor_secret) {
+            $business->update([
+                'two_factor_secret' => $business->generateTwoFactorSecret(),
+            ]);
+            $business->refresh();
+        }
+
+        $qrCodeUrl = $business->getTwoFactorQrCodeUrl();
+        $appName = \App\Models\Setting::get('site_name', 'CheckoutPay');
+
+        return view('business.settings.two-factor-setup', compact('business', 'qrCodeUrl', 'appName'));
+    }
+
+    public function verifyTwoFactorSetup(Request $request)
+    {
+        $business = Auth::guard('business')->user();
+
+        $validated = $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        if ($business->verifyTwoFactorCode($validated['code'])) {
+            $business->update([
+                'two_factor_enabled' => true,
+            ]);
+
+            return redirect()->route('business.settings.index')
+                ->with('success', 'Two-factor authentication enabled successfully');
+        }
+
+        return back()->withErrors([
+            'code' => 'Invalid verification code. Please try again.',
+        ]);
+    }
+
+    public function disableTwoFactor(Request $request)
+    {
+        $business = Auth::guard('business')->user();
+
+        $validated = $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        if (!$business->verifyTwoFactorCode($validated['code'])) {
+            return back()->withErrors([
+                'code' => 'Invalid verification code. Cannot disable 2FA.',
+            ]);
+        }
+
+        $business->update([
+            'two_factor_enabled' => false,
+            'two_factor_secret' => null,
+        ]);
+
+        return redirect()->route('business.settings.index')
+            ->with('success', 'Two-factor authentication disabled successfully');
+    }
 }

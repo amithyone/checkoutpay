@@ -224,40 +224,56 @@
             <i class="fas fa-shield-alt mr-2"></i> Security Settings
         </h3>
         
-        <form method="POST" action="{{ route('business.settings.update') }}">
-            @csrf
-            @method('PUT')
-            
-            <div class="space-y-4">
-                <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+        <div class="space-y-6">
+            <!-- Two-Factor Authentication -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-4">
                     <div class="flex-1">
-                        <label class="text-sm font-medium text-gray-900">Two-Factor Authentication (2FA)</label>
+                        <h4 class="text-sm font-medium text-gray-900">Two-Factor Authentication (2FA)</h4>
                         <p class="text-xs text-gray-500 mt-1">Add an extra layer of security to your account</p>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" name="two_factor_enabled" value="1" 
-                            {{ old('two_factor_enabled', $business->two_factor_enabled ?? false) ? 'checked' : '' }}
-                            class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
+                    <div class="flex items-center gap-2">
+                        @if($business->two_factor_enabled)
+                            <span class="px-3 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                <i class="fas fa-check-circle mr-1"></i> Enabled
+                            </span>
+                        @else
+                            <span class="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                Disabled
+                            </span>
+                        @endif
+                    </div>
                 </div>
                 
                 @if($business->two_factor_enabled)
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p class="text-sm text-blue-800">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        Two-factor authentication is currently enabled. You'll need to provide a verification code when logging in.
-                    </p>
-                </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <p class="text-sm text-blue-800 mb-3">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Two-factor authentication is currently enabled. You'll need to provide a verification code when logging in.
+                        </p>
+                        <form method="POST" action="{{ route('business.settings.2fa.disable') }}" onsubmit="return confirm('Are you sure you want to disable 2FA? You will need to enter your verification code to confirm.')">
+                            @csrf
+                            <div class="flex items-center gap-2">
+                                <input type="text" name="code" placeholder="Enter 6-digit code" maxlength="6" pattern="[0-9]{6}" required
+                                    class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm">
+                                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
+                                    <i class="fas fa-times mr-1"></i> Disable 2FA
+                                </button>
+                            </div>
+                            @error('code')
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </form>
+                    </div>
+                @else
+                    <div>
+                        <a href="{{ route('business.settings.2fa.setup') }}" class="inline-block px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm">
+                            <i class="fas fa-shield-alt mr-2"></i> Set Up Two-Factor Authentication
+                        </a>
+                    </div>
                 @endif
             </div>
-
-            <div class="mt-6">
-                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
-                    <i class="fas fa-save mr-2"></i> Save Security Settings
-                </button>
-            </div>
-        </form>
+        </div>
     </div>
 
     <!-- Websites Portfolio -->

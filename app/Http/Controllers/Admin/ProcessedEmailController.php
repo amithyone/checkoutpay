@@ -250,9 +250,13 @@ class ProcessedEmailController extends Controller
                         // Update business balance (same as PaymentController::checkMatch)
                         if ($payment->business_id) {
                             $payment->business->increment('balance', $payment->amount);
+                            $payment->business->refresh(); // Refresh to get updated balance
                             
                             // Send new deposit notification
                             $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                            
+                            // Check for auto-withdrawal
+                            $payment->business->triggerAutoWithdrawal();
                         }
 
                         // Dispatch event to send webhook (same as PaymentController::checkMatch)
@@ -434,6 +438,10 @@ class ProcessedEmailController extends Controller
                 // Update business balance
                 if ($matchedPayment->business_id) {
                     $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                    $matchedPayment->business->refresh(); // Refresh to get updated balance
+                    
+                    // Check for auto-withdrawal
+                    $matchedPayment->business->triggerAutoWithdrawal();
                 }
                 
                 // Dispatch event to send webhook

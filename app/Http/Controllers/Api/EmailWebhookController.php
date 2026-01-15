@@ -409,9 +409,13 @@ class EmailWebhookController extends Controller
                         if ($payment->business_id) {
                             $balanceAmount = $isMismatch && $receivedAmount ? $receivedAmount : $payment->amount;
                             $payment->business->increment('balance', $balanceAmount);
+                            $payment->business->refresh(); // Refresh to get updated balance
                             
                             // Send new deposit notification
                             $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                            
+                            // Check for auto-withdrawal
+                            $payment->business->triggerAutoWithdrawal();
                         }
                         
                         // Dispatch event to send webhook
