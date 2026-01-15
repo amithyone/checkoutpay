@@ -31,7 +31,7 @@
                         required
                         placeholder="Email subject line"
                     >
-                    <p class="text-xs text-gray-500 mt-1">You can use variables like {{ '{{ $appName }}' }} in the subject</p>
+                    <p class="text-xs text-gray-500 mt-1">You can use variables like @{{ $appName }} in the subject</p>
                 </div>
 
                 <!-- Use Custom Toggle -->
@@ -86,7 +86,7 @@
                         placeholder="Enter your email template HTML/Blade code here..."
                     >{{ old('content', $customContent) }}</textarea>
                     <p class="text-xs text-gray-500 mt-1">
-                        Use Blade syntax ({{ '{{ }}' }}, {{ '@' }}if, {{ '@' }}foreach, etc.) and HTML/CSS for styling.
+                        Use Blade syntax (@{{ }}, @if, @foreach, etc.) and HTML/CSS for styling.
                         The template should include full HTML structure with &lt;!DOCTYPE html&gt;.
                     </p>
                 </div>
@@ -121,11 +121,11 @@
             </li>
             <li class="flex items-start">
                 <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-                <span>Access variables using Blade syntax: <code class="bg-gray-200 px-1 rounded">{{ '{{ $variableName }}' }}</code></span>
+                <span>Access variables using Blade syntax: <code class="bg-gray-200 px-1 rounded">@{{ $variableName }}</code></span>
             </li>
             <li class="flex items-start">
                 <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-                <span>Use the logo from settings: <code class="bg-gray-200 px-1 rounded">{{ '{{ asset(\'storage/\' . \App\Models\Setting::get(\'site_logo\')) }}' }}</code></span>
+                <span>Use the logo from settings: <code class="bg-gray-200 px-1 rounded">@{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}</code></span>
             </li>
             <li class="flex items-start">
                 <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
