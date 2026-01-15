@@ -549,6 +549,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
@@ -570,10 +571,22 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">{{ $payment->created_at->format('M d, Y') }}</td>
+                            <td class="px-6 py-4">
+                                @if($payment->status === 'approved')
+                                    <button onclick="resendWebhook({{ $payment->id }})" 
+                                            id="resend-webhook-btn-{{ $payment->id }}"
+                                            class="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs flex items-center"
+                                            title="Resend webhook notification">
+                                        <i class="fas fa-paper-plane mr-1"></i> Resend Webhook
+                                    </button>
+                                @else
+                                    <span class="text-xs text-gray-400">-</span>
+                                @endif
+                            </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
+                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -996,6 +1009,58 @@ function getCsrfToken() {
     }
     console.error('CSRF token meta tag not found');
     return null;
+}
+
+function resendWebhook(paymentId) {
+    const btn = document.getElementById('resend-webhook-btn-' + paymentId);
+    if (!btn) return;
+    
+    if (!confirm('Are you sure you want to resend the webhook notification to the business?')) {
+        return;
+    }
+    
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Sending...';
+    
+    const csrfToken = getCsrfToken();
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        return;
+    }
+    
+    fetch(`/admin/payments/${paymentId}/resend-webhook`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => Promise.reject(data));
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('✅ Webhook notification has been queued for resending successfully!');
+        } else {
+            alert('❌ Error: ' + (data.message || 'Failed to resend webhook'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error: ' + (error.message || 'Failed to resend webhook. Please try again.'));
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
 }
 
 </script>
