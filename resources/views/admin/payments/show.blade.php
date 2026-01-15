@@ -46,6 +46,12 @@
                     </button>
                 </div>
                 @if($payment->status === 'approved')
+                    <button onclick="resendWebhook({{ $payment->id }})" 
+                        id="resend-webhook-btn"
+                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center"
+                        title="Resend webhook notification to business">
+                        <i class="fas fa-paper-plane mr-2"></i> Resend Webhook
+                    </button>
                     <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
                 @elseif($payment->status === 'pending')
                     <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
@@ -419,6 +425,50 @@ function showManualApproveModal(paymentId, transactionId, expectedAmount) {
 
 function closeManualApproveModal() {
     document.getElementById('manualApproveModal').classList.add('hidden');
+}
+
+function resendWebhook(paymentId) {
+    const btn = document.getElementById('resend-webhook-btn');
+    if (!btn) return;
+    
+    if (!confirm('Are you sure you want to resend the webhook notification to the business?')) {
+        return;
+    }
+    
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
+    
+    fetch(`/admin/payments/${paymentId}/resend-webhook`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => Promise.reject(data));
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('✅ Webhook notification has been queued for resending successfully!');
+        } else {
+            alert('❌ Error: ' + (data.message || 'Failed to resend webhook'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error: ' + (error.message || 'Failed to resend webhook. Please try again.'));
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
 }
 
 // Auto-check mismatch if amounts differ

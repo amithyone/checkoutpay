@@ -530,6 +530,56 @@ class PaymentController extends Controller
     }
 
     /**
+     * Resend webhook notification for an approved payment
+     */
+    public function resendWebhook(Payment $payment): \Illuminate\Http\JsonResponse
+    {
+        // Only allow resending for approved payments
+        if ($payment->status !== Payment::STATUS_APPROVED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Webhook can only be resent for approved payments.',
+            ], 400);
+        }
+
+        // Check if webhook URL exists
+        if (!$payment->webhook_url) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No webhook URL configured for this payment.',
+            ], 400);
+        }
+
+        try {
+            // Dispatch event to resend webhook
+            event(new \App\Events\PaymentApproved($payment));
+
+            // Log the resend action
+            \Illuminate\Support\Facades\Log::info('Webhook resent by admin', [
+                'payment_id' => $payment->id,
+                'transaction_id' => $payment->transaction_id,
+                'admin_id' => auth('admin')->id(),
+                'webhook_url' => $payment->webhook_url,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Webhook notification has been queued for resending.',
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error resending webhook', [
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to resend webhook: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Delete a payment
      */
     public function destroy(Payment $payment): RedirectResponse
