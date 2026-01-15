@@ -27,6 +27,11 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     Route::get('/password/reset/{token}', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'showResetForm'])->name('password.reset');
     Route::post('/password/reset', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'reset'])->name('password.update');
 
+    // Email verification routes
+    Route::get('/email/verify', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'notice'])->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verify'])->name('verification.verify');
+    Route::post('/email/verification-notification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resend'])->middleware('auth:business')->name('verification.send');
+
     // Protected business routes
     Route::middleware('auth:business')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

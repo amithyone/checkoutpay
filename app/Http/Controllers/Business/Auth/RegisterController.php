@@ -36,6 +36,7 @@ class RegisterController extends Controller
             'phone' => $validated['phone'] ?? null,
             'address' => $validated['address'] ?? null,
             'is_active' => true,
+            'email_verified_at' => null, // Email verification required
         ]);
 
         // Create website entry (requires admin approval)
@@ -45,9 +46,11 @@ class RegisterController extends Controller
             'is_approved' => false,
         ]);
 
-        Auth::guard('business')->login($business);
+        // Send email verification notification
+        $business->sendEmailVerificationNotification();
 
-        return redirect()->route('business.dashboard')
-            ->with('success', 'Registration successful! Your website is pending approval. You will be notified once approved.');
+        // Don't auto-login - require email verification first
+        return redirect()->route('business.login')
+            ->with('success', 'Registration successful! Please check your email to verify your account before logging in.');
     }
 }

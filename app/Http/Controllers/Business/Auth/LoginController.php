@@ -23,6 +23,20 @@ class LoginController extends Controller
         ]);
 
         if (Auth::guard('business')->attempt($credentials, $request->filled('remember'))) {
+            $business = Auth::guard('business')->user();
+
+            // Check if email is verified
+            if (!$business->hasVerifiedEmail()) {
+                Auth::guard('business')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->route('business.login')
+                    ->withErrors([
+                        'email' => 'Please verify your email address before logging in. Check your inbox for the verification link.',
+                    ])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
 
             return redirect()->intended(route('business.dashboard'));

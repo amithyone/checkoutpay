@@ -28,6 +28,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'is_active',
         'balance',
         'business_id',
+        'email_verified_at',
     ];
 
     protected $hidden = [
@@ -40,6 +41,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'website_approved' => 'boolean',
         'balance' => 'decimal:2',
         'password' => 'hashed',
+        'email_verified_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -230,5 +232,39 @@ class Business extends Authenticatable implements CanResetPasswordContract
     {
         return $this->approvedWebsites()->first() 
             ?? $this->websites()->first();
+    }
+
+    /**
+     * Get the email address that should be used for verification.
+     */
+    public function getEmailForVerification()
+    {
+        return $this->email;
+    }
+
+    /**
+     * Determine if the user has verified their email address.
+     */
+    public function hasVerifiedEmail(): bool
+    {
+        return !is_null($this->email_verified_at);
+    }
+
+    /**
+     * Mark the given user's email as verified.
+     */
+    public function markEmailAsVerified(): bool
+    {
+        return $this->forceFill([
+            'email_verified_at' => $this->freshTimestamp(),
+        ])->save();
+    }
+
+    /**
+     * Send the email verification notification.
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new \App\Notifications\BusinessEmailVerificationNotification());
     }
 }
