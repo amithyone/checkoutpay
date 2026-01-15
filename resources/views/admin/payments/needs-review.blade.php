@@ -316,6 +316,50 @@ function closeManualApproveModal() {
     document.getElementById('manualApproveModal').classList.add('hidden');
 }
 
+function resendWebhook(paymentId) {
+    const btn = document.getElementById('resend-webhook-btn-' + paymentId);
+    if (!btn) return;
+    
+    if (!confirm('Are you sure you want to resend the webhook notification to the business?')) {
+        return;
+    }
+    
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
+    
+    fetch(`/admin/payments/${paymentId}/resend-webhook`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => Promise.reject(data));
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert('✅ Webhook notification has been queued for resending successfully!');
+        } else {
+            alert('❌ Error: ' + (data.message || 'Failed to resend webhook'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error: ' + (error.message || 'Failed to resend webhook. Please try again.'));
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
 // Auto-check mismatch if amounts differ
 document.getElementById('modal-received-amount')?.addEventListener('input', function() {
     const expected = parseFloat(document.getElementById('modal-expected-amount').textContent.replace(/[₦,]/g, ''));
