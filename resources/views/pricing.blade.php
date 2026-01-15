@@ -30,8 +30,15 @@
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
                     <a href="{{ route('home') }}" class="flex items-center">
-                        @if(\App\Models\Setting::get('site_logo'))
-                            <img src="{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}" alt="Logo" class="h-10">
+                        @php
+                            $logo = \App\Models\Setting::get('site_logo');
+                            $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
+                        @endphp
+                        @if($logo && $logoPath && file_exists($logoPath))
+                            <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="h-10 w-10 bg-primary rounded-lg flex items-center justify-center" style="display: none;">
+                                <i class="fas fa-shield-alt text-white text-xl"></i>
+                            </div>
                         @else
                             <div class="h-10 w-10 bg-primary rounded-lg flex items-center justify-center">
                                 <i class="fas fa-shield-alt text-white text-xl"></i>
@@ -259,8 +266,15 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <div>
                     <div class="flex items-center mb-4">
-                        @if(\App\Models\Setting::get('site_logo'))
-                            <img src="{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}" alt="Logo" class="h-8 mr-2">
+                        @php
+                            $logo = \App\Models\Setting::get('site_logo');
+                            $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
+                        @endphp
+                        @if($logo && $logoPath && file_exists($logoPath))
+                            <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-8 mr-2 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="h-8 w-8 bg-primary rounded-lg flex items-center justify-center mr-2" style="display: none;">
+                                <i class="fas fa-shield-alt text-white"></i>
+                            </div>
                         @else
                             <div class="h-8 w-8 bg-primary rounded-lg flex items-center justify-center mr-2">
                                 <i class="fas fa-shield-alt text-white"></i>
