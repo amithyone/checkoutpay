@@ -35,30 +35,98 @@ class VerificationController extends Controller
                 BusinessVerification::TYPE_BANK_ACCOUNT,
                 BusinessVerification::TYPE_IDENTITY,
                 BusinessVerification::TYPE_ADDRESS,
+                BusinessVerification::TYPE_BVN,
+                BusinessVerification::TYPE_NIN,
+                BusinessVerification::TYPE_CAC_CERTIFICATE,
+                BusinessVerification::TYPE_CAC_APPLICATION,
+                BusinessVerification::TYPE_ACCOUNT_NUMBER,
+                BusinessVerification::TYPE_BANK_ADDRESS,
+                BusinessVerification::TYPE_UTILITY_BILL,
             ])],
-            'document_type' => 'required|string|max:255',
-            'document' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120', // 5MB max
+            'document_type' => 'nullable|string|max:255',
+            'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120', // 5MB max
+            'account_number' => 'nullable|string|max:255',
+            'bank_address' => 'nullable|string|max:1000',
+            'bvn' => 'nullable|string|max:11|min:11',
+            'nin' => 'nullable|string|max:11|min:11',
         ]);
 
-        // Check if verification already exists for this type
-        $existing = $business->verifications()
-            ->where('verification_type', $validated['verification_type'])
-            ->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW])
-            ->first();
+        // Handle text-based verifications (account_number, bank_address, BVN, NIN)
+        $textBasedTypes = [
+            BusinessVerification::TYPE_ACCOUNT_NUMBER,
+            BusinessVerification::TYPE_BANK_ADDRESS,
+            BusinessVerification::TYPE_BVN,
+            BusinessVerification::TYPE_NIN,
+        ];
 
-        if ($existing) {
-            return back()->withErrors(['document' => 'You already have a pending verification for this type.']);
+        if (in_array($validated['verification_type'], $textBasedTypes)) {
+            // Validate required fields for text-based types
+            if ($validated['verification_type'] === BusinessVerification::TYPE_ACCOUNT_NUMBER && empty($validated['account_number'])) {
+                return back()->withErrors(['account_number' => 'Account number is required.']);
+            }
+            if ($validated['verification_type'] === BusinessVerification::TYPE_BANK_ADDRESS && empty($validated['bank_address'])) {
+                return back()->withErrors(['bank_address' => 'Bank address is required.']);
+            }
+            if ($validated['verification_type'] === BusinessVerification::TYPE_BVN && empty($validated['bvn'])) {
+                return back()->withErrors(['bvn' => 'BVN is required.']);
+            }
+            if ($validated['verification_type'] === BusinessVerification::TYPE_NIN && empty($validated['nin'])) {
+                return back()->withErrors(['nin' => 'NIN is required.']);
+            }
+
+            // Check if verification already exists for this type
+            $existing = $business->verifications()
+                ->where('verification_type', $validated['verification_type'])
+                ->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW])
+                ->first();
+
+            if ($existing) {
+                return back()->withErrors(['verification_type' => 'You already have a pending verification for this type.']);
+            }
+
+            // For text-based verifications, store in business model
+            if ($validated['verification_type'] === BusinessVerification::TYPE_ACCOUNT_NUMBER && isset($validated['account_number'])) {
+                $business->update(['account_number' => $validated['account_number']]);
+            } elseif ($validated['verification_type'] === BusinessVerification::TYPE_BANK_ADDRESS && isset($validated['bank_address'])) {
+                $business->update(['bank_address' => $validated['bank_address']]);
+            }
+
+            // Create verification record with text data
+            $documentType = match($validated['verification_type']) {
+                BusinessVerification::TYPE_ACCOUNT_NUMBER => 'Account Number: ' . ($validated['account_number'] ?? ''),
+                BusinessVerification::TYPE_BANK_ADDRESS => 'Bank Address: ' . ($validated['bank_address'] ?? ''),
+                BusinessVerification::TYPE_BVN => 'BVN: ' . ($validated['bvn'] ?? ''),
+                BusinessVerification::TYPE_NIN => 'NIN: ' . ($validated['nin'] ?? ''),
+                default => $validated['document_type'] ?? '',
+            };
+            $path = null;
+        } else {
+            // For file-based verifications
+            if (!$request->hasFile('document')) {
+                return back()->withErrors(['document' => 'Document file is required for this verification type.']);
+            }
+
+            // Check if verification already exists for this type
+            $existing = $business->verifications()
+                ->where('verification_type', $validated['verification_type'])
+                ->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW])
+                ->first();
+
+            if ($existing) {
+                return back()->withErrors(['document' => 'You already have a pending verification for this type.']);
+            }
+
+            // Store document
+            $path = $request->file('document')->store('verifications/' . $business->id, 'public');
+            $documentType = $validated['document_type'] ?? BusinessVerification::getTypeLabel($validated['verification_type']);
         }
-
-        // Store document
-        $path = $request->file('document')->store('verifications/' . $business->id, 'public');
 
         // Create verification record
         $verification = BusinessVerification::create([
             'business_id' => $business->id,
             'verification_type' => $validated['verification_type'],
-            'document_type' => $validated['document_type'],
-            'document_path' => $path,
+            'document_type' => $documentType,
+            'document_path' => $path ?? null,
             'status' => BusinessVerification::STATUS_PENDING,
         ]);
 

@@ -44,6 +44,8 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_percentage',
         'charge_fixed',
         'charge_exempt',
+        'account_number',
+        'bank_address',
     ];
 
     protected $hidden = [
@@ -192,6 +194,50 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function verifications()
     {
         return $this->hasMany(BusinessVerification::class);
+    }
+
+    /**
+     * Check if all required KYC documents are submitted
+     */
+    public function hasAllRequiredKycDocuments(): bool
+    {
+        $requiredTypes = BusinessVerification::getRequiredTypes();
+        $submittedTypes = $this->verifications()
+            ->whereIn('verification_type', $requiredTypes)
+            ->pluck('verification_type')
+            ->unique()
+            ->toArray();
+
+        return count($submittedTypes) === count($requiredTypes);
+    }
+
+    /**
+     * Get missing required KYC documents
+     */
+    public function getMissingKycDocuments(): array
+    {
+        $requiredTypes = BusinessVerification::getRequiredTypes();
+        $submittedTypes = $this->verifications()
+            ->whereIn('verification_type', $requiredTypes)
+            ->pluck('verification_type')
+            ->unique()
+            ->toArray();
+
+        return array_diff($requiredTypes, $submittedTypes);
+    }
+
+    /**
+     * Check if all required KYC documents are approved
+     */
+    public function hasAllKycDocumentsApproved(): bool
+    {
+        $requiredTypes = BusinessVerification::getRequiredTypes();
+        $approvedCount = $this->verifications()
+            ->whereIn('verification_type', $requiredTypes)
+            ->where('status', BusinessVerification::STATUS_APPROVED)
+            ->count();
+
+        return $approvedCount === count($requiredTypes);
     }
 
     /**

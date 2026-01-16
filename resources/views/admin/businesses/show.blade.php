@@ -294,114 +294,128 @@
     </div>
 
     <!-- KYC Verification Section -->
+    @php
+        $requiredTypes = \App\Models\BusinessVerification::getRequiredTypes();
+        $missingDocs = $business->getMissingKycDocuments();
+        $allSubmitted = $business->hasAllRequiredKycDocuments();
+        $allApproved = $business->hasAllKycDocumentsApproved();
+        $kycVerifications = $business->verifications()->whereIn('verification_type', $requiredTypes)->get()->keyBy('verification_type');
+    @endphp
+
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-900">
                 <i class="fas fa-id-card mr-2 text-primary"></i> KYC Verification
             </h3>
             <div>
-                @if($business->verifications->count() > 0)
-                    @php
-                        $latestVerification = $business->verifications->first();
-                    @endphp
-                    @if($latestVerification->status === 'approved')
-                        <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
-                            <i class="fas fa-check-circle mr-1"></i> Verified
-                        </span>
-                    @elseif(in_array($latestVerification->status, ['pending', 'under_review']))
-                        <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                            <i class="fas fa-clock mr-1"></i> Under Review
-                        </span>
-                    @else
-                        <span class="px-3 py-1 text-sm font-medium bg-red-100 text-red-800 rounded-full">
-                            <i class="fas fa-times-circle mr-1"></i> Rejected
-                        </span>
-                    @endif
+                @if($allApproved)
+                    <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">
+                        <i class="fas fa-check-circle mr-1"></i> Complete
+                    </span>
+                @elseif($allSubmitted)
+                    <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                        <i class="fas fa-clock mr-1"></i> Under Review
+                    </span>
                 @else
-                    <span class="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">
-                        <i class="fas fa-exclamation-circle mr-1"></i> Not Submitted
+                    <span class="px-3 py-1 text-sm font-medium bg-red-100 text-red-800 rounded-full">
+                        <i class="fas fa-exclamation-circle mr-1"></i> Incomplete ({{ count($missingDocs) }} missing)
                     </span>
                 @endif
             </div>
         </div>
 
-        @if($business->verifications->count() > 0)
-            <div class="space-y-4">
-                @foreach($business->verifications as $verification)
-                <div class="border border-gray-200 rounded-lg p-4 {{ $verification->status === 'approved' ? 'bg-green-50' : ($verification->status === 'rejected' ? 'bg-red-50' : 'bg-yellow-50') }}">
-                    <div class="flex items-start justify-between mb-3">
+        @if(!$allSubmitted)
+        <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p class="text-sm text-yellow-800">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <strong>Warning:</strong> The following required documents are missing:
+            </p>
+            <ul class="list-disc list-inside mt-2 text-sm text-yellow-700">
+                @foreach($missingDocs as $type)
+                    <li>{{ \App\Models\BusinessVerification::getTypeLabel($type) }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
+
+        <div class="space-y-3">
+            @foreach($requiredTypes as $type)
+                @php
+                    $verification = $kycVerifications->get($type);
+                    $label = \App\Models\BusinessVerification::getTypeLabel($type);
+                    $status = $verification ? $verification->status : 'pending';
+                @endphp
+                <div class="border border-gray-200 rounded-lg p-4 {{ $status === 'approved' ? 'bg-green-50' : ($status === 'rejected' ? 'bg-red-50' : 'bg-gray-50') }}">
+                    <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center space-x-3 mb-2">
-                                <h4 class="text-sm font-semibold text-gray-900">
-                                    {{ ucfirst(str_replace('_', ' ', $verification->verification_type)) }} Verification
-                                </h4>
-                                @if($verification->status === 'approved')
+                                <h4 class="text-sm font-semibold text-gray-900">{{ $label }}</h4>
+                                @if($status === 'approved')
                                     <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
-                                @elseif($verification->status === 'rejected')
+                                @elseif($status === 'rejected')
                                     <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
-                                @elseif($verification->status === 'under_review')
+                                @elseif($status === 'under_review')
                                     <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Under Review</span>
                                 @else
-                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Pending</span>
+                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Not Submitted</span>
                                 @endif
                             </div>
-                            <div class="grid grid-cols-2 gap-4 text-xs text-gray-600">
-                                <div>
-                                    <span class="font-medium">Document Type:</span> {{ ucfirst(str_replace('_', ' ', $verification->document_type ?? 'N/A')) }}
+                            @if($verification)
+                                <div class="text-xs text-gray-600 space-y-1">
+                                    <div><span class="font-medium">Details:</span> {{ $verification->document_type }}</div>
+                                    <div><span class="font-medium">Submitted:</span> {{ $verification->created_at->format('M d, Y H:i') }}</div>
+                                    @if($verification->reviewed_at)
+                                        <div><span class="font-medium">Reviewed:</span> {{ $verification->reviewed_at->format('M d, Y H:i') }} 
+                                            @if($verification->reviewer)
+                                                by {{ $verification->reviewer->name }}
+                                            @endif
+                                        </div>
+                                    @endif
+                                    @if($verification->admin_notes)
+                                        <div class="mt-2 p-2 bg-white rounded border border-gray-200">
+                                            <p><strong>Admin Notes:</strong> {{ $verification->admin_notes }}</p>
+                                        </div>
+                                    @endif
+                                    @if($verification->rejection_reason)
+                                        <div class="mt-2 p-2 bg-red-100 rounded border border-red-200">
+                                            <p class="text-red-800"><strong>Rejection Reason:</strong> {{ $verification->rejection_reason }}</p>
+                                        </div>
+                                    @endif
                                 </div>
-                                <div>
-                                    <span class="font-medium">Submitted:</span> {{ $verification->created_at->format('M d, Y H:i') }}
-                                </div>
-                                @if($verification->reviewed_at)
-                                <div>
-                                    <span class="font-medium">Reviewed:</span> {{ $verification->reviewed_at->format('M d, Y H:i') }}
-                                </div>
-                                @if($verification->reviewer)
-                                <div>
-                                    <span class="font-medium">Reviewed By:</span> {{ $verification->reviewer->name }}
-                                </div>
-                                @endif
-                                @endif
-                            </div>
-                            @if($verification->admin_notes)
-                            <div class="mt-2 p-2 bg-white rounded border border-gray-200">
-                                <p class="text-xs text-gray-600"><strong>Admin Notes:</strong> {{ $verification->admin_notes }}</p>
-                            </div>
-                            @endif
-                            @if($verification->rejection_reason)
-                            <div class="mt-2 p-2 bg-red-100 rounded border border-red-200">
-                                <p class="text-xs text-red-800"><strong>Rejection Reason:</strong> {{ $verification->rejection_reason }}</p>
-                            </div>
                             @endif
                         </div>
                         <div class="ml-4 flex flex-col space-y-2">
-                            @if($verification->document_path)
-                                <a href="{{ route('admin.businesses.verification.download', [$business, $verification]) }}" 
-                                   class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs text-center">
-                                    <i class="fas fa-download mr-1"></i> Download
-                                </a>
-                            @endif
-                            @if(in_array($verification->status, ['pending', 'under_review']))
-                                <button onclick="showApproveKYCModal({{ $verification->id }})" 
-                                        class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs">
-                                    <i class="fas fa-check mr-1"></i> Approve
-                                </button>
-                                <button onclick="showRejectKYCModal({{ $verification->id }})" 
-                                        class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs">
-                                    <i class="fas fa-times mr-1"></i> Reject
-                                </button>
+                            @if($verification)
+                                @if($verification->document_path)
+                                    <a href="{{ route('admin.businesses.verification.download', [$business, $verification]) }}" 
+                                       class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs text-center">
+                                        <i class="fas fa-download mr-1"></i> View
+                                    </a>
+                                @else
+                                    <span class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs text-center">
+                                        Text Data
+                                    </span>
+                                @endif
+                                @if(in_array($status, ['pending', 'under_review']))
+                                    <button onclick="showApproveKYCModal({{ $verification->id }})" 
+                                            class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs">
+                                        <i class="fas fa-check mr-1"></i> Approve
+                                    </button>
+                                    <button onclick="showRejectKYCModal({{ $verification->id }})" 
+                                            class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs">
+                                        <i class="fas fa-times mr-1"></i> Reject
+                                    </button>
+                                @endif
+                            @else
+                                <span class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs text-center">
+                                    Not Submitted
+                                </span>
                             @endif
                         </div>
                     </div>
                 </div>
-                @endforeach
-            </div>
-        @else
-            <div class="text-center py-8">
-                <i class="fas fa-id-card text-gray-300 text-4xl mb-3"></i>
-                <p class="text-sm text-gray-500">No KYC verification documents submitted yet.</p>
-            </div>
-        @endif
+            @endforeach
+        </div>
     </div>
 
     <!-- Account Numbers -->
@@ -587,8 +601,35 @@
 
 <!-- Approve Website Modal -->
 <div id="approveWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Approve Website</h3>
+        
+        @php
+            $missingDocs = $business->getMissingKycDocuments();
+            $allApproved = $business->hasAllKycDocumentsApproved();
+        @endphp
+        
+        @if(!$business->hasAllRequiredKycDocuments() || !$allApproved)
+        <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div class="flex items-start">
+                <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5 mr-2"></i>
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-yellow-800 mb-1">KYC Verification Incomplete</p>
+                    @if(!$business->hasAllRequiredKycDocuments())
+                        <p class="text-xs text-yellow-700 mb-2">Missing documents: {{ count($missingDocs) }}</p>
+                        <ul class="list-disc list-inside text-xs text-yellow-700">
+                            @foreach($missingDocs as $type)
+                                <li>{{ \App\Models\BusinessVerification::getTypeLabel($type) }}</li>
+                            @endforeach
+                        </ul>
+                    @elseif(!$allApproved)
+                        <p class="text-xs text-yellow-700">Some documents are still under review or rejected.</p>
+                    @endif
+                </div>
+            </div>
+        </div>
+        @endif
+        
         <form id="approveWebsiteForm" method="POST">
             @csrf
             <input type="hidden" name="website_id" id="approve_website_id">
@@ -597,6 +638,17 @@
                 <textarea name="notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
                     placeholder="Add any notes about this approval..."></textarea>
             </div>
+            
+            @if(!$business->hasAllRequiredKycDocuments() || !$allApproved)
+            <div class="mb-4">
+                <label class="flex items-center">
+                    <input type="checkbox" name="bypass_kyc" value="1" class="rounded border-gray-300 text-primary focus:ring-primary">
+                    <span class="ml-2 text-sm text-gray-700">Bypass KYC verification requirement</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-1 ml-6">Check this to approve website even if KYC is incomplete</p>
+            </div>
+            @endif
+            
             <div class="flex justify-end space-x-3">
                 <button type="button" onclick="closeApproveWebsiteModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                     Cancel

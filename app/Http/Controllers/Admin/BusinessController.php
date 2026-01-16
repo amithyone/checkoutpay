@@ -148,10 +148,20 @@ class BusinessController extends Controller
         $request->validate([
             'website_id' => 'required|exists:business_websites,id',
             'notes' => 'nullable|string|max:1000',
+            'bypass_kyc' => 'nullable|boolean', // Allow bypassing KYC check
         ]);
 
         $website = BusinessWebsite::where('business_id', $business->id)
             ->findOrFail($request->website_id);
+
+        // Check KYC status (warning but allow bypass)
+        $missingDocs = $business->getMissingKycDocuments();
+        $allApproved = $business->hasAllKycDocumentsApproved();
+        
+        if (!$request->bypass_kyc && (!$business->hasAllRequiredKycDocuments() || !$allApproved)) {
+            return redirect()->route('admin.businesses.show', $business)
+                ->with('warning', 'KYC verification is incomplete. Please verify all required documents before approving website, or use bypass option.');
+        }
 
         $website->update([
             'is_approved' => true,
@@ -163,8 +173,13 @@ class BusinessController extends Controller
         // Send notification to business
         $business->notify(new \App\Notifications\WebsiteApprovedNotification($website));
 
+        $message = 'Website approved successfully.';
+        if ($request->bypass_kyc) {
+            $message .= ' (KYC bypassed)';
+        }
+
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', 'Website approved successfully.');
+            ->with('success', $message);
     }
 
     public function rejectWebsite(Request $request, Business $business): RedirectResponse
