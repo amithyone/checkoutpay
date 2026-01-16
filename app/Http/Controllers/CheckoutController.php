@@ -56,11 +56,17 @@ class CheckoutController extends Controller
             ]);
         }
 
-        // Validate return URL is from approved website
-        if (!$this->isUrlFromApprovedWebsites($returnUrl, $business)) {
-            return view('checkout.error', [
-                'error' => 'Return URL must be from your approved website domain.',
-            ]);
+        // Skip return URL validation for demo (business ID 1) or if return URL is from same site
+        $isDemo = $business->id == 1;
+        $isSameSite = $this->isUrlFromSameSite($returnUrl);
+        
+        if (!$isDemo && !$isSameSite) {
+            // Validate return URL is from approved website
+            if (!$this->isUrlFromApprovedWebsites($returnUrl, $business)) {
+                return view('checkout.error', [
+                    'error' => 'Return URL must be from your approved website domain.',
+                ]);
+            }
         }
 
         return view('checkout.show', [
@@ -95,9 +101,15 @@ class CheckoutController extends Controller
             ->with('approvedWebsites')
             ->firstOrFail();
 
-        // Validate return URL is from approved domain
-        if (!$this->isUrlFromApprovedWebsites($validated['return_url'], $business)) {
-            return back()->withErrors(['return_url' => 'Return URL must be from your approved website domain.'])->withInput();
+        // Skip return URL validation for demo (business ID 1) or if return URL is from same site
+        $isDemo = $business->id == 1;
+        $isSameSite = $this->isUrlFromSameSite($validated['return_url']);
+        
+        if (!$isDemo && !$isSameSite) {
+            // Validate return URL is from approved domain
+            if (!$this->isUrlFromApprovedWebsites($validated['return_url'], $business)) {
+                return back()->withErrors(['return_url' => 'Return URL must be from your approved website domain.'])->withInput();
+            }
         }
 
         try {
@@ -272,6 +284,28 @@ class CheckoutController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Check if URL is from the same site (current app domain)
+     */
+    protected function isUrlFromSameSite(string $url): bool
+    {
+        $parsedUrl = parse_url($url);
+        $appUrl = parse_url(config('app.url'));
+
+        $urlHost = $parsedUrl['host'] ?? null;
+        $appHost = $appUrl['host'] ?? null;
+
+        if (!$urlHost || !$appHost) {
+            return false;
+        }
+
+        // Remove www. prefix for comparison
+        $urlHost = preg_replace('/^www\./', '', $urlHost);
+        $appHost = preg_replace('/^www\./', '', $appHost);
+
+        return $urlHost === $appHost;
     }
 
     /**
