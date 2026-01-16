@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment - CheckoutPay</title>
+    <title>Payment - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
+    @if(\App\Models\Setting::get('site_favicon'))
+        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
+    @endif
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -24,9 +27,27 @@
     <div class="container mx-auto px-4 py-8 max-w-2xl">
         <!-- Header -->
         <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-lg mb-4">
-                <i class="fas fa-lock text-white text-2xl"></i>
-            </div>
+            @php
+                $logo = \App\Models\Setting::get('site_logo');
+                $siteName = \App\Models\Setting::get('site_name', 'CheckoutPay');
+            @endphp
+            @if($logo && file_exists(storage_path('app/public/' . $logo)))
+                <div class="flex justify-center mb-4">
+                    <img 
+                        src="{{ asset('storage/' . $logo) }}" 
+                        alt="{{ $siteName }}" 
+                        class="h-16 sm:h-20 object-contain max-w-full"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                    >
+                    <div class="hidden items-center justify-center w-16 h-16 bg-primary rounded-lg">
+                        <i class="fas fa-lock text-white text-2xl"></i>
+                    </div>
+                </div>
+            @else
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-lg mb-4">
+                    <i class="fas fa-lock text-white text-2xl"></i>
+                </div>
+            @endif
             <h1 class="text-3xl font-bold text-gray-900 mb-2">Secure Payment</h1>
             <p class="text-gray-600">Complete your payment using the details below</p>
         </div>
