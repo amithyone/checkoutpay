@@ -54,11 +54,33 @@
                 </div>
 
                 <div>
-                    <label for="bank_name" class="block text-sm font-medium text-gray-700 mb-1">Bank Name *</label>
-                    <input type="text" name="bank_name" id="bank_name" required
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
-                        value="{{ old('bank_name', $accountNumber->bank_name) }}">
+                    <label for="bank_code" class="block text-sm font-medium text-gray-700 mb-1">Bank *</label>
+                    <select name="bank_code" id="bank_code" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary">
+                        <option value="">Select Bank</option>
+                        @php
+                            $currentBankCode = old('bank_code');
+                            if (!$currentBankCode) {
+                                // Find bank code from bank name
+                                foreach(config('banks') as $bank) {
+                                    if ($bank['bank_name'] === $accountNumber->bank_name) {
+                                        $currentBankCode = $bank['code'];
+                                        break;
+                                    }
+                                }
+                            }
+                        @endphp
+                        @foreach(config('banks') as $bank)
+                            <option value="{{ $bank['code'] }}" data-bank-name="{{ $bank['bank_name'] }}" {{ $currentBankCode == $bank['code'] ? 'selected' : '' }}>
+                                {{ $bank['bank_name'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <input type="hidden" name="bank_name" id="bank_name" value="{{ old('bank_name', $accountNumber->bank_name) }}">
                     @error('bank_name')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                    @error('bank_code')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
@@ -89,10 +111,21 @@
     (function() {
         const accountNumberInput = document.getElementById('account_number');
         const accountNameInput = document.getElementById('account_name');
+        const bankCodeSelect = document.getElementById('bank_code');
         const bankNameInput = document.getElementById('bank_name');
         const validationDiv = document.getElementById('account_number_validation');
         const originalAccountNumber = '{{ $accountNumber->account_number }}';
         let validationTimeout = null;
+
+        // Update bank name when bank is selected
+        if (bankCodeSelect) {
+            bankCodeSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (selectedOption.value) {
+                    bankNameInput.value = selectedOption.getAttribute('data-bank-name');
+                }
+            });
+        }
 
         if (!accountNumberInput) return;
 
@@ -111,13 +144,21 @@
 
             // Only validate if account number changed and is exactly 10 digits
             if (accountNumber !== originalAccountNumber && accountNumber.length === 10) {
+                const bankCode = bankCodeSelect ? bankCodeSelect.value : '';
+                if (!bankCode) {
+                    validationDiv.classList.remove('hidden');
+                    validationDiv.textContent = 'Please select a bank first';
+                    validationDiv.className = 'mt-1 text-sm text-yellow-600';
+                    return;
+                }
+
                 validationDiv.classList.remove('hidden');
                 validationDiv.textContent = 'Validating account number...';
                 validationDiv.className = 'mt-1 text-sm text-blue-600';
 
                 // Debounce validation
                 validationTimeout = setTimeout(() => {
-                    validateAccountNumber(accountNumber);
+                    validateAccountNumber(accountNumber, bankCode);
                 }, 500);
             } else if (accountNumber !== originalAccountNumber && accountNumber.length > 0) {
                 validationDiv.classList.remove('hidden');
@@ -126,7 +167,7 @@
             }
         });
 
-        function validateAccountNumber(accountNumber) {
+        function validateAccountNumber(accountNumber, bankCode) {
             fetch('{{ route("admin.account-numbers.validate-account") }}', {
                 method: 'POST',
                 headers: {
@@ -134,7 +175,8 @@
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
                 body: JSON.stringify({
-                    account_number: accountNumber
+                    account_number: accountNumber,
+                    bank_code: bankCode || null
                 })
             })
             .then(response => response.json())

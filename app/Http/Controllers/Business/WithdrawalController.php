@@ -45,10 +45,11 @@ class WithdrawalController extends Controller
     {
         $request->validate([
             'account_number' => 'required|string|min:10|max:10',
+            'bank_code' => 'nullable|string',
         ]);
 
         $nubanService = app(NubanValidationService::class);
-        $validationResult = $nubanService->validate($request->account_number);
+        $validationResult = $nubanService->validate($request->account_number, $request->bank_code);
 
         if ($validationResult && $validationResult['valid']) {
             return response()->json([
@@ -88,6 +89,7 @@ class WithdrawalController extends Controller
 
         // Only require account fields if business doesn't have account number set
         if (!$hasAccountNumber) {
+            $rules['bank_code'] = 'required|string';
             $rules['bank_name'] = 'required|string|max:255';
             $rules['account_number'] = 'required|string|max:255';
             $rules['account_name'] = 'required|string|max:255';
@@ -103,7 +105,8 @@ class WithdrawalController extends Controller
         // Validate account number using NUBAN API if not using stored account
         if (!$hasAccountNumber) {
             $nubanService = app(NubanValidationService::class);
-            $validationResult = $nubanService->validate($accountNumber);
+            $bankCode = $validated['bank_code'] ?? null;
+            $validationResult = $nubanService->validate($accountNumber, $bankCode);
 
             if (!$validationResult || !$validationResult['valid']) {
                 return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();

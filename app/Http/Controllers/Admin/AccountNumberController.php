@@ -50,13 +50,14 @@ class AccountNumberController extends Controller
             'account_number' => 'required|string|unique:account_numbers,account_number',
             'account_name' => 'required|string|max:255',
             'bank_name' => 'required|string|max:255',
+            'bank_code' => 'required|string',
             'business_id' => 'nullable|exists:businesses,id',
             'is_pool' => 'boolean',
         ]);
 
         // Validate account number using NUBAN API
         $nubanService = app(NubanValidationService::class);
-        $validationResult = $nubanService->validate($validated['account_number']);
+        $validationResult = $nubanService->validate($validated['account_number'], $validated['bank_code']);
 
         if (!$validationResult || !$validationResult['valid']) {
             return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
@@ -93,14 +94,16 @@ class AccountNumberController extends Controller
             'account_number' => 'required|string|unique:account_numbers,account_number,' . $accountNumber->id,
             'account_name' => 'required|string|max:255',
             'bank_name' => 'required|string|max:255',
+            'bank_code' => 'required|string',
             'business_id' => 'nullable|exists:businesses,id',
             'is_active' => 'boolean',
         ]);
 
         // Validate account number using NUBAN API if account number changed
-        if ($validated['account_number'] !== $accountNumber->account_number) {
+        if ($validated['account_number'] !== $accountNumber->account_number || isset($validated['bank_code'])) {
             $nubanService = app(NubanValidationService::class);
-            $validationResult = $nubanService->validate($validated['account_number']);
+            $bankCode = $validated['bank_code'] ?? null;
+            $validationResult = $nubanService->validate($validated['account_number'], $bankCode);
 
             if (!$validationResult || !$validationResult['valid']) {
                 return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
@@ -133,10 +136,11 @@ class AccountNumberController extends Controller
     {
         $request->validate([
             'account_number' => 'required|string|min:10|max:10',
+            'bank_code' => 'nullable|string',
         ]);
 
         $nubanService = app(NubanValidationService::class);
-        $validationResult = $nubanService->validate($request->account_number);
+        $validationResult = $nubanService->validate($request->account_number, $request->bank_code);
 
         if ($validationResult && $validationResult['valid']) {
             return response()->json([
