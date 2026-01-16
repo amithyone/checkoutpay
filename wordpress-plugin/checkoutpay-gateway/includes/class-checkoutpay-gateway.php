@@ -73,8 +73,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             'api_url' => array(
                 'title' => __('API URL', 'checkoutpay-gateway'),
                 'type' => 'text',
-                'description' => __('Enter your CheckoutPay API URL (e.g., https://checkoutpay.com/api)', 'checkoutpay-gateway'),
-                'default' => '',
+                'description' => __('Enter your CheckoutPay API URL (e.g., https://check-outpay.com/api/v1)', 'checkoutpay-gateway'),
+                'default' => 'https://check-outpay.com/api/v1',
                 'desc_tip' => true,
             ),
             'api_key' => array(
@@ -120,22 +120,22 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         // Get original order amount
         $original_amount = $order->get_total();
 
+        // Get customer name
+        $customer_name = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
+        if (empty($customer_name)) {
+            $customer_name = $order->get_billing_email();
+        }
+
         // Create payment request (charges will be calculated on server side)
         $payment_data = array(
+            'name' => $customer_name,
             'amount' => $original_amount,
-            'currency' => $order->get_currency(),
-            'reference' => 'WC-' . $order_id . '-' . time(),
-            'customer_email' => $order->get_billing_email(),
-            'customer_name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-            'callback_url' => add_query_arg('wc-api', 'wc_checkoutpay_webhook', home_url('/')),
-            'metadata' => array(
-                'order_id' => $order_id,
-                'order_key' => $order->get_order_key(),
-            )
+            'service' => 'WC-' . $order_id,
+            'webhook_url' => add_query_arg('wc-api', 'wc_checkoutpay_webhook', home_url('/')),
         );
 
         // Make API request
-        $response = $this->make_api_request('payments', $payment_data);
+        $response = $this->make_api_request('payment-request', $payment_data);
 
         if (is_wp_error($response)) {
             wc_add_notice(__('Payment error: ', 'checkoutpay-gateway') . $response->get_error_message(), 'error');
@@ -147,18 +147,23 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
 
         $response_data = json_decode(wp_remote_retrieve_body($response), true);
 
-        if (isset($response_data['success']) && $response_data['success']) {
+        if (isset($response_data['success']) && $response_data['success'] && isset($response_data['data'])) {
+            $payment_data = $response_data['data'];
+            
             // Get charges from API response
-            $charges_data = isset($response_data['data']['charges']) 
-                ? $response_data['data']['charges'] 
+            $charges_data = isset($payment_data['charges']) 
+                ? $payment_data['charges'] 
                 : $this->calculateCharges($original_amount);
             
-            // Store payment reference in order meta
-            $order->update_meta_data('_checkoutpay_reference', $response_data['data']['reference']);
-            $order->update_meta_data('_checkoutpay_payment_id', $response_data['data']['id']);
+            // Store payment information in order meta
+            $order->update_meta_data('_checkoutpay_transaction_id', $payment_data['transaction_id']);
+            $order->update_meta_data('_checkoutpay_account_number', $payment_data['account_number']);
+            $order->update_meta_data('_checkoutpay_account_name', isset($payment_data['account_details']['account_name']) ? $payment_data['account_details']['account_name'] : '');
+            $order->update_meta_data('_checkoutpay_bank_name', isset($payment_data['account_details']['bank_name']) ? $payment_data['account_details']['bank_name'] : '');
             $order->update_meta_data('_checkoutpay_status', 'pending');
             $order->update_meta_data('_checkoutpay_charges', $charges_data);
             $order->update_meta_data('_checkoutpay_original_amount', $original_amount);
+            $order->update_meta_data('_checkoutpay_expires_at', isset($payment_data['expires_at']) ? $payment_data['expires_at'] : '');
             
             // Update order total if customer pays charges
             if (isset($charges_data['paid_by_customer']) && $charges_data['paid_by_customer'] && isset($charges_data['amount_to_pay'])) {
@@ -190,21 +195,24 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
      *
      * @param string $endpoint API endpoint
      * @param array $data Request data
+     * @param string $method HTTP method
      * @return array|WP_Error
      */
-    private function make_api_request($endpoint, $data = array()) {
+    private function make_api_request($endpoint, $data = array(), $method = 'POST') {
         $api_url = trailingslashit($this->api_url) . $endpoint;
         
         $args = array(
-            'method' => 'POST',
+            'method' => $method,
             'timeout' => 30,
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $this->api_key,
                 'X-API-Key' => $this->api_key,
             ),
-            'body' => json_encode($data),
         );
+
+        if ($method === 'POST' && !empty($data)) {
+            $args['body'] = json_encode($data);
+        }
 
         return wp_remote_request($api_url, $args);
     }
@@ -278,11 +286,17 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             exit;
         }
 
-        // Find order by reference
-        $reference = sanitize_text_field($data['reference']);
+        // Find order by transaction_id
+        $transaction_id = isset($data['transaction_id']) ? sanitize_text_field($data['transaction_id']) : '';
+        
+        if (empty($transaction_id)) {
+            status_header(400);
+            exit;
+        }
+
         $orders = wc_get_orders(array(
-            'meta_key' => '_checkoutpay_reference',
-            'meta_value' => $reference,
+            'meta_key' => '_checkoutpay_transaction_id',
+            'meta_value' => $transaction_id,
             'limit' => 1,
         ));
 
@@ -299,23 +313,36 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             // Add signature verification here if your API provides it
         }
 
-        // Update order status
-        if ($status === 'approved' || $status === 'completed') {
+        // Update order status based on webhook event
+        $event = isset($data['event']) ? sanitize_text_field($data['event']) : '';
+        
+        if ($status === 'approved' || $event === 'payment.approved') {
             $order->payment_complete();
             $order->add_order_note(__('Payment confirmed via CheckoutPay webhook', 'checkoutpay-gateway'));
-            $order->update_meta_data('_checkoutpay_status', 'completed');
+            $order->update_meta_data('_checkoutpay_status', 'approved');
+            
+            // Update charges if provided
+            if (isset($data['charges']) && is_array($data['charges'])) {
+                $order->update_meta_data('_checkoutpay_charges', $data['charges']);
+            }
+            
             $order->save();
             
             status_header(200);
             echo json_encode(array('success' => true));
-        } elseif ($status === 'failed' || $status === 'rejected') {
-            $order->update_status('failed', __('Payment failed via CheckoutPay', 'checkoutpay-gateway'));
-            $order->update_meta_data('_checkoutpay_status', 'failed');
+        } elseif ($status === 'rejected' || $status === 'failed' || $event === 'payment.rejected') {
+            $reason = isset($data['reason']) ? sanitize_text_field($data['reason']) : __('Payment rejected', 'checkoutpay-gateway');
+            $order->update_status('failed', __('Payment rejected via CheckoutPay: ', 'checkoutpay-gateway') . $reason);
+            $order->update_meta_data('_checkoutpay_status', 'rejected');
             $order->save();
             
             status_header(200);
             echo json_encode(array('success' => true));
         } else {
+            // Update status but don't change order status
+            $order->update_meta_data('_checkoutpay_status', $status);
+            $order->save();
+            
             status_header(200);
             echo json_encode(array('success' => true));
         }
@@ -324,30 +351,24 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
     }
 
     /**
-     * Calculate charges for an amount
+     * Calculate charges for an amount (fallback method)
      *
      * @param float $amount
      * @return array
      */
     private function calculateCharges($amount) {
-        // Get charges from API response or calculate locally
-        // For now, we'll get it from API response, but we can also calculate here
-        // Default charges: 1% + 100
+        // Default charges: 1% + 100 (fallback if API doesn't provide)
         $percentage = 1.0;
         $fixed = 100.0;
         $paid_by_customer = false; // Default: business pays
-        
-        // Try to get from API if available, otherwise use defaults
-        // This will be populated from API response
         
         $percentage_charge = ($amount * $percentage) / 100;
         $total_charges = $percentage_charge + $fixed;
         
         return array(
-            'original_amount' => $amount,
-            'charge_percentage' => round($percentage_charge, 2),
-            'charge_fixed' => $fixed,
-            'total_charges' => round($total_charges, 2),
+            'percentage' => round($percentage_charge, 2),
+            'fixed' => $fixed,
+            'total' => round($total_charges, 2),
             'amount_to_pay' => $paid_by_customer ? round($amount + $total_charges, 2) : $amount,
             'business_receives' => $paid_by_customer ? $amount : round($amount - $total_charges, 2),
             'paid_by_customer' => $paid_by_customer,
@@ -364,7 +385,10 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             return;
         }
 
-        $payment_id = $order->get_meta('_checkoutpay_payment_id');
+        $transaction_id = $order->get_meta('_checkoutpay_transaction_id');
+        $account_number = $order->get_meta('_checkoutpay_account_number');
+        $account_name = $order->get_meta('_checkoutpay_account_name');
+        $bank_name = $order->get_meta('_checkoutpay_bank_name');
         $status = $order->get_meta('_checkoutpay_status');
 
         if ($order->get_status() === 'processing' || $order->get_status() === 'completed') {
@@ -375,15 +399,31 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             
             echo '<div class="woocommerce-info">';
             echo '<p>' . esc_html($this->get_option('instructions')) . '</p>';
-            echo '<p><strong>' . __('Payment Reference:', 'checkoutpay-gateway') . '</strong> ' . esc_html($order->get_meta('_checkoutpay_reference')) . '</p>';
+            
+            if ($transaction_id) {
+                echo '<p><strong>' . __('Transaction ID:', 'checkoutpay-gateway') . '</strong> ' . esc_html($transaction_id) . '</p>';
+            }
+            
+            if ($account_number && $account_name && $bank_name) {
+                echo '<div class="checkoutpay-account-details" style="margin-top: 15px; padding: 15px; background: #e8f4f8; border-left: 4px solid #0073aa; border-radius: 5px;">';
+                echo '<p><strong>' . __('Payment Instructions:', 'checkoutpay-gateway') . '</strong></p>';
+                echo '<p><strong>' . __('Account Number:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_number) . '</p>';
+                echo '<p><strong>' . __('Account Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_name) . '</p>';
+                echo '<p><strong>' . __('Bank Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($bank_name) . '</p>';
+                echo '</div>';
+            }
             
             if ($charges && is_array($charges)) {
                 echo '<div class="checkoutpay-charges-info" style="margin-top: 15px; padding: 15px; background: #f0f0f0; border-radius: 5px;">';
                 echo '<p><strong>' . __('Payment Details:', 'checkoutpay-gateway') . '</strong></p>';
                 echo '<p>' . __('Order Amount:', 'checkoutpay-gateway') . ' ' . wc_price($original_amount ?: $order->get_total()) . '</p>';
-                if ($charges['total_charges'] > 0) {
-                    echo '<p>' . __('Charges:', 'checkoutpay-gateway') . ' ' . wc_price($charges['total_charges']) . '</p>';
-                    echo '<p><strong>' . __('Total to Pay:', 'checkoutpay-gateway') . ' ' . wc_price($charges['amount_to_pay']) . '</strong></p>';
+                if (isset($charges['total']) && $charges['total'] > 0) {
+                    echo '<p>' . __('Charges:', 'checkoutpay-gateway') . ' ' . wc_price($charges['total']) . '</p>';
+                    if (isset($charges['amount_to_pay'])) {
+                        echo '<p><strong>' . __('Total to Pay:', 'checkoutpay-gateway') . ' ' . wc_price($charges['amount_to_pay']) . '</strong></p>';
+                    } elseif (isset($charges['business_receives'])) {
+                        echo '<p><strong>' . __('You will receive:', 'checkoutpay-gateway') . ' ' . wc_price($charges['business_receives']) . '</strong></p>';
+                    }
                 }
                 echo '</div>';
             }
@@ -399,6 +439,7 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                     
                     $.ajax({
                         url: '<?php echo esc_url(add_query_arg('wc-api', 'wc_checkoutpay_gateway', home_url('/'))); ?>',
+                        type: 'GET',
                         data: {
                             order_id: <?php echo $order_id; ?>
                         },
