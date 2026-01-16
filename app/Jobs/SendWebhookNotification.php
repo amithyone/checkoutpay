@@ -127,6 +127,13 @@ class SendWebhookNotification implements ShouldQueue
                 'id' => $this->payment->website->id,
                 'url' => $this->payment->website->website_url,
             ] : null,
+            'charges' => [
+                'percentage' => (float) ($this->payment->charge_percentage ?? 0),
+                'fixed' => (float) ($this->payment->charge_fixed ?? 0),
+                'total' => (float) ($this->payment->total_charges ?? 0),
+                'paid_by_customer' => (bool) ($this->payment->charges_paid_by_customer ?? false),
+                'business_receives' => (float) ($this->payment->business_receives ?? $this->payment->amount),
+            ],
         ];
 
         // Include email data if available

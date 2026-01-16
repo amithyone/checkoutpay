@@ -126,7 +126,19 @@ X-API-Key: pk_your_api_key_here
     "matched_at": null,
     "expires_at": "2024-01-02T12:00:00.000000Z",
     "created_at": "2024-01-01T12:00:00.000000Z",
-    "updated_at": "2024-01-01T12:00:00.000000Z"
+    "updated_at": "2024-01-01T12:00:00.000000Z",
+    "charges": {
+      "percentage": 50.00,
+      "fixed": 100.00,
+      "total": 150.00,
+      "paid_by_customer": false,
+      "amount_to_pay": 5000.00,
+      "business_receives": 4850.00
+    },
+    "website": {
+      "id": 1,
+      "url": "https://yourwebsite.com"
+    }
   }
 }
 ```
@@ -173,6 +185,8 @@ X-API-Key: pk_your_api_key_here
 | `expires_at` | string | ISO 8601 timestamp when payment request expires |
 | `created_at` | string | ISO 8601 timestamp when request was created |
 | `updated_at` | string | ISO 8601 timestamp when payment was last updated |
+| `charges` | object | Charge breakdown (see Charges section below) |
+| `website` | object\|null | Website information (id and url) |
 
 ---
 
@@ -301,12 +315,80 @@ if (isset($_GET['status']) && $_GET['status'] === 'success') {
 
 ## Transaction Updates
 
-Check the current status of a payment transaction.
+Check the current status of a payment transaction or list all transactions.
 
-### Endpoint
+### Get Single Transaction
+
+**Endpoint:**
 
 ```
 GET /payment/{transaction_id}
+```
+
+**Alternative Endpoint:**
+
+```
+GET /payments/{transaction_id}
+```
+
+### List All Transactions
+
+**Endpoint:**
+
+```
+GET /payments
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `status` | string | No | Filter by status: `pending`, `approved`, `rejected` |
+| `from_date` | string | No | Filter from date (YYYY-MM-DD) |
+| `to_date` | string | No | Filter to date (YYYY-MM-DD) |
+| `website_id` | integer | No | Filter by website ID |
+| `per_page` | integer | No | Results per page (default: 15) |
+| `page` | integer | No | Page number |
+
+**List Response Example:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "transaction_id": "TXN-1234567890-abc123",
+      "amount": 5000.00,
+      "payer_name": "john doe",
+      "bank": "GTB",
+      "account_number": "1234567890",
+      "account_name": "Your Business Name",
+      "bank_name": "GTBank",
+      "status": "approved",
+      "expires_at": "2024-01-02T12:00:00.000000Z",
+      "matched_at": "2024-01-01T12:05:30.000000Z",
+      "approved_at": "2024-01-01T12:05:30.000000Z",
+      "created_at": "2024-01-01T12:00:00.000000Z",
+      "charges": {
+        "percentage": 50.00,
+        "fixed": 100.00,
+        "total": 150.00,
+        "paid_by_customer": false,
+        "business_receives": 4850.00
+      },
+      "website": {
+        "id": 1,
+        "url": "https://yourwebsite.com"
+      }
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "last_page": 5,
+    "per_page": 15,
+    "total": 75
+  }
+}
 ```
 
 ### Headers
@@ -335,10 +417,8 @@ X-API-Key: pk_your_api_key_here
     "bank": "GTB",
     "webhook_url": "https://yourwebsite.com/webhook/payment-status",
     "account_number": "1234567890",
-    "account_details": {
-      "account_name": "Your Business Name",
-      "bank_name": "GTBank"
-    },
+    "account_name": "Your Business Name",
+    "bank_name": "GTBank",
     "status": "approved",
     "email_data": {
       "amount": 5000.00,
@@ -347,14 +427,55 @@ X-API-Key: pk_your_api_key_here
       "transaction_date": "2024-01-01T12:05:00Z"
     },
     "matched_at": "2024-01-01T12:05:30.000000Z",
+    "approved_at": "2024-01-01T12:05:30.000000Z",
     "expires_at": "2024-01-02T12:00:00.000000Z",
     "created_at": "2024-01-01T12:00:00.000000Z",
-    "updated_at": "2024-01-01T12:05:30.000000Z"
+    "updated_at": "2024-01-01T12:05:30.000000Z",
+    "charges": {
+      "percentage": 50.00,
+      "fixed": 100.00,
+      "total": 150.00,
+      "paid_by_customer": false,
+      "business_receives": 4850.00
+    },
+    "website": {
+      "id": 1,
+      "url": "https://yourwebsite.com"
+    }
   }
 }
 ```
 
 **Note**: The `payer_name` field in the response is the normalized (lowercase) version of the `name` you sent in the request. This normalization helps with automatic payment matching.
+
+### Charges Information
+
+The `charges` object provides details about transaction fees:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `percentage` | number | Percentage charge amount (e.g., 1% of payment amount) |
+| `fixed` | number | Fixed charge amount (e.g., ₦100) |
+| `total` | number | Total charges (percentage + fixed) |
+| `paid_by_customer` | boolean | `true` if customer pays charges, `false` if business pays |
+| `amount_to_pay` | number | Total amount customer needs to pay (includes charges if `paid_by_customer` is true) |
+| `business_receives` | number | Amount business will receive after charges are deducted |
+
+**Charge Calculation Examples:**
+
+- **Business Pays Charges** (default):
+  - Payment: ₦10,000
+  - Charges: ₦150 (1% = ₦100 + ₦100 fixed)
+  - Customer pays: ₦10,000
+  - Business receives: ₦9,850
+
+- **Customer Pays Charges**:
+  - Payment: ₦10,000
+  - Charges: ₦150 (1% = ₦100 + ₦100 fixed)
+  - Customer pays: ₦10,150
+  - Business receives: ₦10,000
+
+**Default Charges:** 1% + ₦100 (configurable per business by admin)
 
 **Error (404 Not Found)**
 
@@ -402,18 +523,36 @@ Sent when a payment is verified and approved.
 
 ```json
 {
-  "success": true,
-  "status": "approved",
+  "event": "payment.approved",
   "transaction_id": "TXN-1234567890-abc123",
+  "status": "approved",
   "amount": 5000.00,
+  "received_amount": 5000.00,
   "payer_name": "john doe",
   "bank": "GTB",
   "account_number": "1234567890",
   "payer_account_number": "0987654321",
-  "approved_at": "2024-01-01T12:05:30.000000Z",
-  "message": "Payment has been verified and approved",
+  "account_details": {
+    "account_name": "Your Business Name",
+    "bank_name": "GTBank"
+  },
   "is_mismatch": false,
-  "name_mismatch": false
+  "name_mismatch": false,
+  "matched_at": "2024-01-01T12:05:30.000000Z",
+  "approved_at": "2024-01-01T12:05:30.000000Z",
+  "created_at": "2024-01-01T12:00:00.000000Z",
+  "timestamp": "2024-01-01T12:05:30.000000Z",
+  "charges": {
+    "percentage": 50.00,
+    "fixed": 100.00,
+    "total": 150.00,
+    "paid_by_customer": false,
+    "business_receives": 4850.00
+  },
+  "website": {
+    "id": 1,
+    "url": "https://yourwebsite.com"
+  }
 }
 ```
 
@@ -421,20 +560,37 @@ Sent when a payment is verified and approved.
 
 ```json
 {
-  "success": true,
-  "status": "approved",
+  "event": "payment.approved",
   "transaction_id": "TXN-1234567890-abc123",
+  "status": "approved",
   "amount": 5000.00,
   "received_amount": 4900.00,
   "payer_name": "john doe",
   "bank": "GTB",
   "account_number": "1234567890",
   "payer_account_number": "0987654321",
-  "approved_at": "2024-01-01T12:05:30.000000Z",
-  "message": "Payment has been verified and approved (amount mismatch detected)",
+  "account_details": {
+    "account_name": "Your Business Name",
+    "bank_name": "GTBank"
+  },
   "is_mismatch": true,
   "mismatch_reason": "Amount mismatch: expected 5000.00, received 4900.00",
-  "name_mismatch": false
+  "name_mismatch": false,
+  "matched_at": "2024-01-01T12:05:30.000000Z",
+  "approved_at": "2024-01-01T12:05:30.000000Z",
+  "created_at": "2024-01-01T12:00:00.000000Z",
+  "timestamp": "2024-01-01T12:05:30.000000Z",
+  "charges": {
+    "percentage": 49.00,
+    "fixed": 100.00,
+    "total": 149.00,
+    "paid_by_customer": false,
+    "business_receives": 4751.00
+  },
+  "website": {
+    "id": 1,
+    "url": "https://yourwebsite.com"
+  }
 }
 ```
 
@@ -442,19 +598,37 @@ Sent when a payment is verified and approved.
 
 ```json
 {
-  "success": true,
-  "status": "approved",
+  "event": "payment.approved",
   "transaction_id": "TXN-1234567890-abc123",
+  "status": "approved",
   "amount": 5000.00,
+  "received_amount": 5000.00,
   "payer_name": "john doe",
   "bank": "GTB",
   "account_number": "1234567890",
   "payer_account_number": "0987654321",
-  "approved_at": "2024-01-01T12:05:30.000000Z",
-  "message": "Payment has been verified and approved (name mismatch detected)",
+  "account_details": {
+    "account_name": "Your Business Name",
+    "bank_name": "GTBank"
+  },
   "is_mismatch": false,
   "name_mismatch": true,
-  "name_similarity_percent": 85
+  "name_similarity_percent": 85,
+  "matched_at": "2024-01-01T12:05:30.000000Z",
+  "approved_at": "2024-01-01T12:05:30.000000Z",
+  "created_at": "2024-01-01T12:00:00.000000Z",
+  "timestamp": "2024-01-01T12:05:30.000000Z",
+  "charges": {
+    "percentage": 50.00,
+    "fixed": 100.00,
+    "total": 150.00,
+    "paid_by_customer": false,
+    "business_receives": 4850.00
+  },
+  "website": {
+    "id": 1,
+    "url": "https://yourwebsite.com"
+  }
 }
 ```
 
@@ -466,17 +640,33 @@ Sent when a payment verification fails.
 
 ```json
 {
-  "success": false,
-  "status": "rejected",
+  "event": "payment.rejected",
   "transaction_id": "TXN-1234567890-abc123",
+  "status": "rejected",
   "amount": 5000.00,
   "payer_name": "john doe",
   "bank": "GTB",
   "account_number": "1234567890",
   "payer_account_number": null,
+  "account_details": {
+    "account_name": "Your Business Name",
+    "bank_name": "GTBank"
+  },
   "rejected_at": "2024-01-01T13:00:00.000000Z",
   "reason": "Payment expired - no payment received within time limit",
-  "message": "Payment has been rejected"
+  "created_at": "2024-01-01T12:00:00.000000Z",
+  "timestamp": "2024-01-01T13:00:00.000000Z",
+  "charges": {
+    "percentage": 0,
+    "fixed": 0,
+    "total": 0,
+    "paid_by_customer": false,
+    "business_receives": 0
+  },
+  "website": {
+    "id": 1,
+    "url": "https://yourwebsite.com"
+  }
 }
 ```
 
@@ -484,22 +674,42 @@ Sent when a payment verification fails.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `success` | boolean | `true` if approved, `false` if rejected |
+| `event` | string | Event type: `payment.approved` or `payment.rejected` |
 | `status` | string | Payment status: `approved` or `rejected` |
 | `transaction_id` | string | Unique transaction identifier |
 | `amount` | number | Original payment amount requested |
-| `received_amount` | number | Actual amount received (only if mismatch) |
+| `received_amount` | number | Actual amount received (may differ from amount if mismatch) |
 | `payer_name` | string | Payer's name from bank transaction |
 | `bank` | string | Bank name |
 | `account_number` | string | Account number where payment was sent TO |
 | `payer_account_number` | string | Account number where payment was sent FROM |
+| `account_details` | object | Account details (account_name, bank_name) |
 | `approved_at` / `rejected_at` | string | ISO 8601 timestamp |
-| `message` | string | Human-readable status message |
+| `matched_at` | string | ISO 8601 timestamp when payment was matched |
+| `created_at` | string | ISO 8601 timestamp when payment was created |
+| `timestamp` | string | ISO 8601 timestamp of webhook event |
 | `is_mismatch` | boolean | True if amount mismatch detected |
 | `mismatch_reason` | string | Reason for mismatch (if applicable) |
 | `name_mismatch` | boolean | True if name mismatch detected |
 | `name_similarity_percent` | number | Name similarity percentage (if name mismatch) |
 | `reason` | string | Rejection reason (if rejected) |
+| `charges` | object | Charge breakdown (see Charges section below) |
+| `website` | object\|null | Website information (id and url) |
+| `email` | object\|null | Email data (subject, from, date) if available |
+
+### Charges Information in Webhooks
+
+The `charges` object in webhook payloads provides details about transaction fees:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `percentage` | number | Percentage charge amount applied |
+| `fixed` | number | Fixed charge amount applied |
+| `total` | number | Total charges (percentage + fixed) |
+| `paid_by_customer` | boolean | `true` if customer pays charges, `false` if business pays |
+| `business_receives` | number | Amount business receives after charges |
+
+**Note:** Charges are calculated based on the business's charge settings. If the business is exempt from charges, all charge values will be 0.
 
 ---
 
