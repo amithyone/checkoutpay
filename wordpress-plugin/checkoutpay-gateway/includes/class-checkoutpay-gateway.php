@@ -117,16 +117,12 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             );
         }
 
-        // Calculate charges first
+        // Get original order amount
         $original_amount = $order->get_total();
-        $charges_data = $this->calculateCharges($original_amount);
-        
-        // Use amount_to_pay if customer pays charges, otherwise use original amount
-        $amount_to_request = $charges_data['paid_by_customer'] ? $charges_data['amount_to_pay'] : $original_amount;
 
-        // Create payment request
+        // Create payment request (charges will be calculated on server side)
         $payment_data = array(
-            'amount' => $amount_to_request,
+            'amount' => $original_amount,
             'currency' => $order->get_currency(),
             'reference' => 'WC-' . $order_id . '-' . time(),
             'customer_email' => $order->get_billing_email(),
