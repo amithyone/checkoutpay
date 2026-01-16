@@ -88,8 +88,29 @@ class CheckoutController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'payer_name' => 'required|string|max:255',
             'service' => 'nullable|string|max:255',
-            'return_url' => 'required|url',
-            'cancel_url' => 'nullable|url',
+            'return_url' => ['required', 'string', function ($attribute, $value, $fail) {
+                // Allow relative URLs and full URLs
+                if (!filter_var($value, FILTER_VALIDATE_URL) && !preg_match('/^\/[^\s]*$/', $value)) {
+                    // If it's not a full URL, try prepending the app URL
+                    $fullUrl = config('app.url') . '/' . ltrim($value, '/');
+                    if (!filter_var($fullUrl, FILTER_VALIDATE_URL)) {
+                        $fail('The return url field must be a valid URL.');
+                    }
+                }
+            }],
+            'cancel_url' => ['nullable', 'string', function ($attribute, $value, $fail) {
+                if (empty($value)) {
+                    return; // Allow null/empty
+                }
+                // Allow relative URLs and full URLs
+                if (!filter_var($value, FILTER_VALIDATE_URL) && !preg_match('/^\/[^\s]*$/', $value)) {
+                    // If it's not a full URL, try prepending the app URL
+                    $fullUrl = config('app.url') . '/' . ltrim($value, '/');
+                    if (!filter_var($fullUrl, FILTER_VALIDATE_URL)) {
+                        $fail('The cancel url field must be a valid URL.');
+                    }
+                }
+            }],
         ]);
 
         // Get business (try business_id first, fallback to id for backward compatibility)
@@ -139,8 +160,8 @@ class CheckoutController extends Controller
 
             // Store return_url in email_data for hosted checkout
             $emailData = $payment->email_data ?? [];
-            $emailData['return_url'] = $validated['return_url'];
-            $emailData['cancel_url'] = $validated['cancel_url'] ?? $validated['return_url'];
+            $emailData['return_url'] = $returnUrl;
+            $emailData['cancel_url'] = $cancelUrl ?? $returnUrl;
             $emailData['hosted_checkout'] = true;
             $payment->update(['email_data' => $emailData]);
 
@@ -150,7 +171,7 @@ class CheckoutController extends Controller
             // Redirect to payment details page
             return redirect()->route('checkout.payment', [
                 'transactionId' => $payment->transaction_id,
-                'return_url' => $validated['return_url'],
+                'return_url' => $returnUrl,
             ]);
         } catch (\Exception $e) {
             Log::error('Error creating payment in checkout', [
