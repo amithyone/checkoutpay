@@ -426,75 +426,7 @@
     </section>
     @endif
 
-    <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-300 py-8 sm:py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-                <div>
-                    <div class="flex items-center mb-3 sm:mb-4">
-                        @php
-                            $logo = \App\Models\Setting::get('site_logo');
-                            $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
-                        @endphp
-                        @if($logo && $logoPath && file_exists($logoPath))
-                            <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-7 sm:h-8 mr-2 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                            <div class="h-7 w-7 sm:h-8 sm:w-8 bg-primary rounded-lg flex items-center justify-center mr-2" style="display: none;">
-                                <i class="fas fa-shield-alt text-white text-sm"></i>
-                            </div>
-                        @else
-                            <div class="h-7 w-7 sm:h-8 sm:w-8 bg-primary rounded-lg flex items-center justify-center mr-2">
-                                <i class="fas fa-shield-alt text-white text-sm"></i>
-                            </div>
-                        @endif
-                        <div>
-                            <h3 class="text-white font-bold text-base sm:text-lg">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h3>
-                            <p class="text-xs text-gray-400">Intelligent Payment Gateway</p>
-                        </div>
-                    </div>
-                    @if(isset($footer['description']))
-                    <p class="text-xs sm:text-sm">{{ $footer['description'] }}</p>
-                    @endif
-                </div>
-
-                <div>
-                    <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Product</h4>
-                    <ul class="space-y-2 text-xs sm:text-sm">
-                        <li><a href="#features" class="hover:text-white">Features</a></li>
-                        <li><a href="{{ route('pricing') }}" class="hover:text-white">Pricing</a></li>
-                        <li><a href="#how-it-works" class="hover:text-white">How It Works</a></li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Developers</h4>
-                    <ul class="space-y-2 text-xs sm:text-sm">
-                        <li><a href="https://github.com/amithyone/checkoutpay/blob/main/docs/API_DOCUMENTATION.md" target="_blank" class="hover:text-white break-words">API Documentation</a></li>
-                        <li><a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="hover:text-white"><i class="fab fa-wordpress mr-1"></i> WordPress Plugin</a></li>
-                        <li><a href="/api/health" class="hover:text-white">API Status</a></li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Account</h4>
-                    <ul class="space-y-2 text-xs sm:text-sm">
-                        <li><a href="{{ route('business.login') }}" class="hover:text-white">Login</a></li>
-                        <li><a href="{{ route('business.register') }}" class="hover:text-white">Sign Up</a></li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="border-t border-gray-800 mt-6 sm:mt-8 pt-6 sm:pt-8">
-                <div class="flex flex-col md:flex-row justify-between items-center space-y-3 sm:space-y-4 md:space-y-0">
-                    <div class="flex flex-wrap justify-center md:justify-start gap-4 sm:gap-6 text-xs sm:text-sm">
-                        <a href="{{ route('privacy-policy') }}" class="text-gray-400 hover:text-white transition-colors">Privacy Policy</a>
-                        <a href="{{ route('terms') }}" class="text-gray-400 hover:text-white transition-colors">Terms & Conditions</a>
-                        <a href="{{ route('contact') }}" class="text-gray-400 hover:text-white transition-colors">Contact Us</a>
-                    </div>
-                    <p class="text-xs sm:text-sm text-gray-400">&copy; {{ date('Y') }} CheckoutPay. All rights reserved.</p>
-                </div>
-            </div>
-        </div>
-    </footer>
+    @include('partials.footer')
 
     <script>
         // Mobile menu toggle
