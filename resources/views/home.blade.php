@@ -114,6 +114,22 @@
                         {{ $hero['cta_secondary'] ?? 'View Pricing' }}
                     </a>
                 </div>
+                
+                <!-- WordPress Plugin Badge -->
+                <div class="mt-6 sm:mt-8 flex flex-col items-center">
+                    <div class="inline-flex items-center bg-white border border-purple-200 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 shadow-sm hover:shadow-md transition-shadow">
+                        <i class="fab fa-wordpress text-purple-600 text-lg sm:text-xl mr-2 sm:mr-3"></i>
+                        <span class="text-xs sm:text-sm text-gray-700 font-medium mr-2 sm:mr-3">WordPress Plugin Available</span>
+                        <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="text-purple-600 hover:text-purple-700 font-semibold text-xs sm:text-sm flex items-center">
+                            Download
+                            <i class="fas fa-arrow-right ml-1.5 text-xs"></i>
+                        </a>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500">
+                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                        Works with WooCommerce
+                    </p>
+                </div>
             </div>
         </div>
     </section>
