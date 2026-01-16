@@ -408,7 +408,7 @@ class EmailWebhookController extends Controller
                         // Update business balance - use received amount if mismatch, otherwise expected amount
                         if ($payment->business_id) {
                             $balanceAmount = $isMismatch && $receivedAmount ? $receivedAmount : $payment->amount;
-                            $payment->business->increment('balance', $balanceAmount);
+                            $payment->business->incrementBalanceWithCharges($payment->amount, $payment, $balanceAmount);
                             $payment->business->refresh(); // Refresh to get updated balance
                             
                             // Send new deposit notification

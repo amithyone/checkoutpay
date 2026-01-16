@@ -40,6 +40,10 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'auto_withdraw_threshold',
         'two_factor_enabled',
         'two_factor_secret',
+        'charges_paid_by_customer',
+        'charge_percentage',
+        'charge_fixed',
+        'charge_exempt',
     ];
 
     protected $hidden = [
@@ -63,6 +67,10 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'notifications_security_enabled' => 'boolean',
         'two_factor_enabled' => 'boolean',
         'auto_withdraw_threshold' => 'decimal:2',
+        'charges_paid_by_customer' => 'boolean',
+        'charge_percentage' => 'decimal:2',
+        'charge_fixed' => 'decimal:2',
+        'charge_exempt' => 'boolean',
     ];
 
     /**
@@ -451,5 +459,38 @@ class Business extends Authenticatable implements CanResetPasswordContract
         ]);
 
         return $withdrawal;
+    }
+
+    /**
+     * Increment balance with charges applied
+     *
+     * @param float $amount Original payment amount (or received amount for mismatches)
+     * @param Payment|null $payment Payment model (optional, for storing charge details)
+     * @param float|null $receivedAmount If provided, use this instead of amount for charge calculation
+     * @return float Amount actually added to balance
+     */
+    public function incrementBalanceWithCharges(float $amount, ?Payment $payment = null, ?float $receivedAmount = null): float
+    {
+        $chargeService = app(\App\Services\ChargeService::class);
+        
+        // Use received amount if provided (for mismatches), otherwise use original amount
+        $amountForCharges = $receivedAmount ?? $amount;
+        $charges = $chargeService->calculateCharges($amountForCharges, $this);
+
+        // Store charge details in payment if provided
+        if ($payment) {
+            $payment->update([
+                'charge_percentage' => $charges['charge_percentage'],
+                'charge_fixed' => $charges['charge_fixed'],
+                'total_charges' => $charges['total_charges'],
+                'business_receives' => $charges['business_receives'],
+                'charges_paid_by_customer' => $charges['paid_by_customer'],
+            ]);
+        }
+
+        // Increment balance with the amount business receives (after charges)
+        $this->increment('balance', $charges['business_receives']);
+
+        return $charges['business_receives'];
     }
 }

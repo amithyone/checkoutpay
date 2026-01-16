@@ -249,7 +249,7 @@ class ProcessedEmailController extends Controller
 
                         // Update business balance (same as PaymentController::checkMatch)
                         if ($payment->business_id) {
-                            $payment->business->increment('balance', $payment->amount);
+                            $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
                             $payment->business->refresh(); // Refresh to get updated balance
                             
                             // Send new deposit notification
@@ -437,7 +437,7 @@ class ProcessedEmailController extends Controller
                 
                 // Update business balance
                 if ($matchedPayment->business_id) {
-                    $matchedPayment->business->increment('balance', $matchedPayment->amount);
+                    $matchedPayment->business->incrementBalanceWithCharges($matchedPayment->amount, $matchedPayment);
                     $matchedPayment->business->refresh(); // Refresh to get updated balance
                     
                     // Check for auto-withdrawal

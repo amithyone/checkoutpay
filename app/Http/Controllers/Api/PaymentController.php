@@ -47,6 +47,10 @@ class PaymentController extends Controller
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);
 
+            // Calculate charges (for API response - actual charges applied when payment is approved)
+            $chargeService = app(\App\Services\ChargeService::class);
+            $charges = $chargeService->calculateCharges($payment->amount, $business);
+
             // Load account number details
             $payment->load('accountNumberDetails', 'website');
 
@@ -63,6 +67,14 @@ class PaymentController extends Controller
                     'status' => $payment->status,
                     'expires_at' => $payment->expires_at?->toISOString(),
                     'created_at' => $payment->created_at->toISOString(),
+                    'charges' => [
+                        'percentage' => $charges['charge_percentage'],
+                        'fixed' => $charges['charge_fixed'],
+                        'total' => $charges['total_charges'],
+                        'paid_by_customer' => $charges['paid_by_customer'],
+                        'amount_to_pay' => $charges['amount_to_pay'],
+                        'business_receives' => $charges['business_receives'],
+                    ],
                     'website' => $payment->website ? [
                         'id' => $payment->website->id,
                         'url' => $payment->website->website_url,
@@ -119,6 +131,13 @@ class PaymentController extends Controller
                 'approved_at' => $payment->approved_at?->toISOString(),
                 'created_at' => $payment->created_at->toISOString(),
                 'updated_at' => $payment->updated_at->toISOString(),
+                'charges' => [
+                    'percentage' => (float) ($payment->charge_percentage ?? 0),
+                    'fixed' => (float) ($payment->charge_fixed ?? 0),
+                    'total' => (float) ($payment->total_charges ?? 0),
+                    'paid_by_customer' => (bool) ($payment->charges_paid_by_customer ?? false),
+                    'business_receives' => (float) ($payment->business_receives ?? $payment->amount),
+                ],
                 'website' => $payment->website ? [
                     'id' => $payment->website->id,
                     'url' => $payment->website->website_url,

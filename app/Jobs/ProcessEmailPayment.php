@@ -90,7 +90,7 @@ class ProcessEmailPayment implements ShouldQueue
 
                 // Update business balance if payment has a business
                 if ($payment->business_id) {
-                    $payment->business->increment('balance', $payment->amount);
+                    $payment->business->incrementBalanceWithCharges($payment->amount, $payment, $receivedAmount);
                     $payment->business->refresh(); // Refresh to get updated balance
                     
                     // Send new deposit notification

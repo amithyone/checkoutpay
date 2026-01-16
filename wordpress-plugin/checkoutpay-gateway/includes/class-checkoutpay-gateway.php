@@ -117,9 +117,16 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             );
         }
 
+        // Calculate charges first
+        $original_amount = $order->get_total();
+        $charges_data = $this->calculateCharges($original_amount);
+        
+        // Use amount_to_pay if customer pays charges, otherwise use original amount
+        $amount_to_request = $charges_data['paid_by_customer'] ? $charges_data['amount_to_pay'] : $original_amount;
+
         // Create payment request
         $payment_data = array(
-            'amount' => $order->get_total(),
+            'amount' => $amount_to_request,
             'currency' => $order->get_currency(),
             'reference' => 'WC-' . $order_id . '-' . time(),
             'customer_email' => $order->get_billing_email(),
@@ -149,6 +156,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             $order->update_meta_data('_checkoutpay_reference', $response_data['data']['reference']);
             $order->update_meta_data('_checkoutpay_payment_id', $response_data['data']['id']);
             $order->update_meta_data('_checkoutpay_status', 'pending');
+            $order->update_meta_data('_checkoutpay_charges', $charges_data);
+            $order->update_meta_data('_checkoutpay_original_amount', $original_amount);
             $order->save();
 
             // Mark order as pending payment
@@ -308,6 +317,37 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
     }
 
     /**
+     * Calculate charges for an amount
+     *
+     * @param float $amount
+     * @return array
+     */
+    private function calculateCharges($amount) {
+        // Get charges from API response or calculate locally
+        // For now, we'll get it from API response, but we can also calculate here
+        // Default charges: 1% + 100
+        $percentage = 1.0;
+        $fixed = 100.0;
+        $paid_by_customer = false; // Default: business pays
+        
+        // Try to get from API if available, otherwise use defaults
+        // This will be populated from API response
+        
+        $percentage_charge = ($amount * $percentage) / 100;
+        $total_charges = $percentage_charge + $fixed;
+        
+        return array(
+            'original_amount' => $amount,
+            'charge_percentage' => round($percentage_charge, 2),
+            'charge_fixed' => $fixed,
+            'total_charges' => round($total_charges, 2),
+            'amount_to_pay' => $paid_by_customer ? round($amount + $total_charges, 2) : $amount,
+            'business_receives' => $paid_by_customer ? $amount : round($amount - $total_charges, 2),
+            'paid_by_customer' => $paid_by_customer,
+        );
+    }
+
+    /**
      * Output for the order received page
      */
     public function thankyou_page($order_id) {
@@ -323,9 +363,24 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         if ($order->get_status() === 'processing' || $order->get_status() === 'completed') {
             echo '<div class="woocommerce-message">' . __('Payment confirmed. Thank you for your order!', 'checkoutpay-gateway') . '</div>';
         } else {
+            $charges = $order->get_meta('_checkoutpay_charges');
+            $original_amount = $order->get_meta('_checkoutpay_original_amount');
+            
             echo '<div class="woocommerce-info">';
             echo '<p>' . esc_html($this->get_option('instructions')) . '</p>';
             echo '<p><strong>' . __('Payment Reference:', 'checkoutpay-gateway') . '</strong> ' . esc_html($order->get_meta('_checkoutpay_reference')) . '</p>';
+            
+            if ($charges && is_array($charges)) {
+                echo '<div class="checkoutpay-charges-info" style="margin-top: 15px; padding: 15px; background: #f0f0f0; border-radius: 5px;">';
+                echo '<p><strong>' . __('Payment Details:', 'checkoutpay-gateway') . '</strong></p>';
+                echo '<p>' . __('Order Amount:', 'checkoutpay-gateway') . ' ' . wc_price($original_amount ?: $order->get_total()) . '</p>';
+                if ($charges['total_charges'] > 0) {
+                    echo '<p>' . __('Charges:', 'checkoutpay-gateway') . ' ' . wc_price($charges['total_charges']) . '</p>';
+                    echo '<p><strong>' . __('Total to Pay:', 'checkoutpay-gateway') . ' ' . wc_price($charges['amount_to_pay']) . '</strong></p>';
+                }
+                echo '</div>';
+            }
+            
             echo '<p><button type="button" id="checkoutpay-check-status" class="button">' . __('Check Payment Status', 'checkoutpay-gateway') . '</button></p>';
             echo '</div>';
             ?>

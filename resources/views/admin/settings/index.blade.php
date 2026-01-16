@@ -362,5 +362,64 @@
             </div>
         </form>
     </div>
+
+    <!-- Charge Settings -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-percent mr-2 text-primary"></i>Default Charge Settings
+        </h3>
+
+        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="default_charge_percentage" class="block text-sm font-medium text-gray-700 mb-2">
+                        Default Charge Percentage (%)
+                    </label>
+                    <input 
+                        type="number" 
+                        id="default_charge_percentage" 
+                        name="default_charge_percentage" 
+                        value="{{ \App\Models\Setting::get('default_charge_percentage', 1) }}"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        required
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        Default percentage charge applied to all payments (e.g., 1 = 1%)
+                    </p>
+                </div>
+
+                <div>
+                    <label for="default_charge_fixed" class="block text-sm font-medium text-gray-700 mb-2">
+                        Default Fixed Charge (₦)
+                    </label>
+                    <input 
+                        type="number" 
+                        id="default_charge_fixed" 
+                        name="default_charge_fixed" 
+                        value="{{ \App\Models\Setting::get('default_charge_fixed', 100) }}"
+                        step="0.01"
+                        min="0"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        required
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        Default fixed charge amount added to all payments
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save Charge Settings
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

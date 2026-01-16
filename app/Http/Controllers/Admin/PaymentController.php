@@ -284,7 +284,7 @@ class PaymentController extends Controller
 
                     // Update business balance
                     if ($payment->business_id) {
-                        $payment->business->increment('balance', $payment->amount);
+                        $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
                         $payment->business->refresh(); // Refresh to get updated balance
                         
                         // Send new deposit notification
@@ -420,7 +420,7 @@ class PaymentController extends Controller
 
         // Update business balance
         if ($payment->business_id) {
-            $payment->business->increment('balance', $receivedAmount);
+            $payment->business->incrementBalanceWithCharges($payment->amount, $payment, $receivedAmount);
             $payment->business->refresh(); // Refresh to get updated balance
             
             // Check for auto-withdrawal

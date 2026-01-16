@@ -241,9 +241,9 @@ class PaymentService
                         'sender_name' => $storedEmail->sender_name, // Map sender_name to payer_name
                     ]);
                     
-                    // Update business balance
+                    // Update business balance with charges applied
                     if ($payment->business_id) {
-                        $payment->business->increment('balance', $payment->amount);
+                        $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
                         $payment->business->refresh(); // Refresh to get updated balance
                         
                         // Send new deposit notification

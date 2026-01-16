@@ -95,6 +95,110 @@
         </div>
     </div>
 
+    <!-- Charge Settings Section -->
+    @if(auth('admin')->user()->canUpdateBusinessBalance())
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-percent mr-2 text-primary"></i> Charge Settings
+            </h3>
+        </div>
+        
+        <form action="{{ route('admin.businesses.update-charges', $business) }}" method="POST">
+            @csrf
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Charge Percentage (%)
+                    </label>
+                    <input 
+                        type="number" 
+                        name="charge_percentage" 
+                        value="{{ $business->charge_percentage ?? '' }}"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="Leave empty to use default"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Default: {{ \App\Models\Setting::get('default_charge_percentage', 1) }}%</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Fixed Charge (₦)
+                    </label>
+                    <input 
+                        type="number" 
+                        name="charge_fixed" 
+                        value="{{ $business->charge_fixed ?? '' }}"
+                        step="0.01"
+                        min="0"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="Leave empty to use default"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Default: ₦{{ number_format(\App\Models\Setting::get('default_charge_fixed', 100), 2) }}</p>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <input 
+                        type="checkbox" 
+                        id="charge_exempt" 
+                        name="charge_exempt" 
+                        value="1"
+                        {{ $business->charge_exempt ? 'checked' : '' }}
+                        class="w-5 h-5 text-primary border-gray-300 rounded"
+                    >
+                    <label for="charge_exempt" class="text-sm font-medium text-gray-700 cursor-pointer">
+                        Exempt from charges
+                    </label>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <input 
+                        type="checkbox" 
+                        id="charges_paid_by_customer" 
+                        name="charges_paid_by_customer" 
+                        value="1"
+                        {{ $business->charges_paid_by_customer ? 'checked' : '' }}
+                        class="w-5 h-5 text-primary border-gray-300 rounded"
+                    >
+                    <label for="charges_paid_by_customer" class="text-sm font-medium text-gray-700 cursor-pointer">
+                        Customer pays charges (otherwise business pays)
+                    </label>
+                </div>
+            </div>
+            
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    <i class="fas fa-save mr-2"></i> Update Charge Settings
+                </button>
+            </div>
+        </form>
+        
+        @php
+            $chargeService = app(\App\Services\ChargeService::class);
+            $sampleCharges = $chargeService->calculateCharges(10000, $business);
+        @endphp
+        <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p class="text-xs font-semibold text-blue-900 mb-2">Sample Calculation (₦10,000 payment):</p>
+            <div class="text-xs text-blue-800 space-y-1">
+                <p>Original Amount: ₦{{ number_format($sampleCharges['original_amount'], 2) }}</p>
+                <p>Percentage Charge ({{ $sampleCharges['charge_percentage'] > 0 ? number_format($chargeService->getChargePercentage($business), 2) : '0' }}%): ₦{{ number_format($sampleCharges['charge_percentage'], 2) }}</p>
+                <p>Fixed Charge: ₦{{ number_format($sampleCharges['charge_fixed'], 2) }}</p>
+                <p>Total Charges: ₦{{ number_format($sampleCharges['total_charges'], 2) }}</p>
+                @if($sampleCharges['paid_by_customer'])
+                    <p><strong>Customer Pays: ₦{{ number_format($sampleCharges['amount_to_pay'], 2) }}</strong></p>
+                    <p>Business Receives: ₦{{ number_format($sampleCharges['business_receives'], 2) }}</p>
+                @else
+                    <p><strong>Customer Pays: ₦{{ number_format($sampleCharges['amount_to_pay'], 2) }}</strong></p>
+                    <p>Business Receives: ₦{{ number_format($sampleCharges['business_receives'], 2) }}</p>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Websites Management Section -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div class="flex items-center justify-between mb-4">

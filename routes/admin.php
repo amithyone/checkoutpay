@@ -67,6 +67,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
             ->middleware('super_admin')
             ->name('businesses.update-balance');
+        Route::post('businesses/{business}/update-charges', [BusinessController::class, 'updateCharges'])
+            ->middleware('super_admin')
+            ->name('businesses.update-charges');
         
         // Business KYC Management
         Route::post('businesses/{business}/verifications/{verification}/approve', [BusinessController::class, 'approveVerification'])

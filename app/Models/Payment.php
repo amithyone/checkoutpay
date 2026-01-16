@@ -32,6 +32,11 @@ class Payment extends Model
         'is_mismatch',
         'received_amount',
         'mismatch_reason',
+        'charge_percentage',
+        'charge_fixed',
+        'total_charges',
+        'business_receives',
+        'charges_paid_by_customer',
     ];
 
     /**
@@ -42,6 +47,11 @@ class Payment extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'received_amount' => 'decimal:2',
+        'charge_percentage' => 'decimal:2',
+        'charge_fixed' => 'decimal:2',
+        'total_charges' => 'decimal:2',
+        'business_receives' => 'decimal:2',
+        'charges_paid_by_customer' => 'boolean',
         'email_data' => 'array',
         'matched_at' => 'datetime',
         'expires_at' => 'datetime',

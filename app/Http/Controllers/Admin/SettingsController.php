@@ -19,6 +19,7 @@ class SettingsController extends Controller
             'email' => 'Email Settings',
             'general' => 'General Settings',
             'security' => 'Security Settings',
+            'charges' => 'Charge Settings',
         ];
 
         $settings = [];
@@ -73,6 +74,27 @@ class SettingsController extends Controller
             'email',
             'Disable IMAP email fetching. When enabled, only direct filesystem reading will be used. Recommended for shared hosting where direct filesystem access is more reliable.'
         );
+
+        // Update default charge settings
+        if ($request->has('default_charge_percentage')) {
+            Setting::set(
+                'default_charge_percentage',
+                $request->default_charge_percentage,
+                'float',
+                'charges',
+                'Default percentage charge applied to all payments'
+            );
+        }
+
+        if ($request->has('default_charge_fixed')) {
+            Setting::set(
+                'default_charge_fixed',
+                $request->default_charge_fixed,
+                'float',
+                'charges',
+                'Default fixed charge amount added to all payments'
+            );
+        }
 
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');
