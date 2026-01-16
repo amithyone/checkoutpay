@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\WithdrawalRequest;
+use App\Services\NubanValidationService;
 
 class WithdrawalController extends Controller
 {
@@ -38,6 +39,31 @@ class WithdrawalController extends Controller
     {
         $business = Auth::guard('business')->user();
         return view('business.withdrawals.create', compact('business'));
+    }
+
+    public function validateAccount(Request $request)
+    {
+        $request->validate([
+            'account_number' => 'required|string|min:10|max:10',
+        ]);
+
+        $nubanService = app(NubanValidationService::class);
+        $validationResult = $nubanService->validate($request->account_number);
+
+        if ($validationResult && $validationResult['valid']) {
+            return response()->json([
+                'success' => true,
+                'valid' => true,
+                'account_name' => $validationResult['account_name'],
+                'bank_name' => $validationResult['bank_name'],
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'valid' => false,
+            'message' => 'Invalid account number. Please verify and try again.',
+        ], 400);
     }
 
     public function store(Request $request)
@@ -73,6 +99,24 @@ class WithdrawalController extends Controller
         $bankName = $hasAccountNumber ? $accountDetails->bank_name : $validated['bank_name'];
         $accountNumber = $hasAccountNumber ? $accountDetails->account_number : $validated['account_number'];
         $accountName = $hasAccountNumber ? $accountDetails->account_name : $validated['account_name'];
+
+        // Validate account number using NUBAN API if not using stored account
+        if (!$hasAccountNumber) {
+            $nubanService = app(NubanValidationService::class);
+            $validationResult = $nubanService->validate($accountNumber);
+
+            if (!$validationResult || !$validationResult['valid']) {
+                return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
+            }
+
+            // Use validated account name and bank name from NUBAN API
+            if (!empty($validationResult['account_name'])) {
+                $accountName = $validationResult['account_name'];
+            }
+            if (!empty($validationResult['bank_name'])) {
+                $bankName = $validationResult['bank_name'];
+            }
+        }
 
         $withdrawal = $business->withdrawalRequests()->create([
             'amount' => $validated['amount'],

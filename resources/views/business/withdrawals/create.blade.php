@@ -51,9 +51,10 @@
 
                     <div>
                         <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
-                        <input type="text" name="account_number" id="account_number" required
+                        <input type="text" name="account_number" id="account_number" required maxlength="10"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                            placeholder="Enter account number">
+                            placeholder="Enter 10-digit account number">
+                        <div id="account_number_validation" class="mt-1 text-sm hidden"></div>
                         @error('account_number')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -61,9 +62,10 @@
 
                     <div>
                         <label for="account_name" class="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
-                        <input type="text" name="account_name" id="account_name" required
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                            placeholder="Enter account name">
+                        <input type="text" name="account_name" id="account_name" required readonly
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-gray-50"
+                            placeholder="Account name will be auto-filled after validation">
+                        <p id="account_name_hint" class="mt-1 text-sm text-gray-500">Enter and validate account number above to auto-fill account name</p>
                         @error('account_name')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -99,11 +101,187 @@
                 <a href="{{ route('business.withdrawals.index') }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                     Cancel
                 </a>
-                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                <button type="submit" id="submit_btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed">
                     Submit Request
                 </button>
             </div>
         </form>
     </div>
 </div>
+
+@if(!$hasAccountNumber)
+@push('scripts')
+<script>
+    (function() {
+        const accountNumberInput = document.getElementById('account_number');
+        const accountNameInput = document.getElementById('account_name');
+        const bankNameInput = document.getElementById('bank_name');
+        const validationDiv = document.getElementById('account_number_validation');
+        const accountNameHint = document.getElementById('account_name_hint');
+        const submitBtn = document.getElementById('submit_btn');
+        const form = document.querySelector('form');
+        let validationTimeout = null;
+        let isAccountValidated = false;
+
+        if (!accountNumberInput) return;
+
+        // Disable submit button initially
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+
+        accountNumberInput.addEventListener('input', function() {
+            const accountNumber = this.value.replace(/\D/g, ''); // Remove non-digits
+            this.value = accountNumber;
+
+            // Reset validation state
+            isAccountValidated = false;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+
+            // Clear previous timeout
+            if (validationTimeout) {
+                clearTimeout(validationTimeout);
+            }
+
+            // Hide validation message
+            validationDiv.classList.add('hidden');
+            validationDiv.textContent = '';
+
+            // Reset account name and bank name
+            if (accountNameInput) {
+                accountNameInput.value = '';
+                accountNameInput.classList.add('bg-gray-50');
+                accountNameInput.setAttribute('readonly', 'readonly');
+            }
+            if (accountNameHint) {
+                accountNameHint.textContent = 'Enter and validate account number above to auto-fill account name';
+                accountNameHint.className = 'mt-1 text-sm text-gray-500';
+            }
+            if (bankNameInput) {
+                bankNameInput.value = '';
+            }
+
+            // Only validate if account number is exactly 10 digits
+            if (accountNumber.length === 10) {
+                validationDiv.classList.remove('hidden');
+                validationDiv.textContent = 'Validating account number...';
+                validationDiv.className = 'mt-1 text-sm text-blue-600';
+
+                // Debounce validation
+                validationTimeout = setTimeout(() => {
+                    validateAccountNumber(accountNumber);
+                }, 500);
+            } else if (accountNumber.length > 0) {
+                validationDiv.classList.remove('hidden');
+                validationDiv.textContent = 'Account number must be 10 digits';
+                validationDiv.className = 'mt-1 text-sm text-yellow-600';
+            } else {
+                validationDiv.classList.remove('hidden');
+                validationDiv.textContent = 'Please enter account number to validate';
+                validationDiv.className = 'mt-1 text-sm text-gray-600';
+            }
+        });
+
+        function validateAccountNumber(accountNumber) {
+            fetch('{{ route("business.withdrawals.validate-account") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    account_number: accountNumber
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.valid) {
+                    isAccountValidated = true;
+                    validationDiv.textContent = '✓ Account number validated: ' + (data.account_name || 'Account verified');
+                    validationDiv.className = 'mt-1 text-sm text-green-600';
+                    
+                    // Auto-fill account name
+                    if (accountNameInput && data.account_name) {
+                        accountNameInput.value = data.account_name;
+                        accountNameInput.classList.remove('bg-gray-50');
+                        accountNameInput.removeAttribute('readonly');
+                    }
+                    if (accountNameHint && data.account_name) {
+                        accountNameHint.textContent = '✓ Account name verified: ' + data.account_name;
+                        accountNameHint.className = 'mt-1 text-sm text-green-600';
+                    }
+                    
+                    // Auto-fill bank name
+                    if (bankNameInput && data.bank_name) {
+                        bankNameInput.value = data.bank_name;
+                    }
+
+                    // Enable submit button
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                    }
+                } else {
+                    isAccountValidated = false;
+                    validationDiv.textContent = data.message || 'Invalid account number. Please verify and try again.';
+                    validationDiv.className = 'mt-1 text-sm text-red-600';
+                    
+                    // Clear account name and bank name
+                    if (accountNameInput) {
+                        accountNameInput.value = '';
+                        accountNameInput.classList.add('bg-gray-50');
+                        accountNameInput.setAttribute('readonly', 'readonly');
+                    }
+                    if (accountNameHint) {
+                        accountNameHint.textContent = 'Invalid account number. Please verify and try again.';
+                        accountNameHint.className = 'mt-1 text-sm text-red-600';
+                    }
+                    if (bankNameInput) {
+                        bankNameInput.value = '';
+                    }
+
+                    // Keep submit button disabled
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Validation error:', error);
+                isAccountValidated = false;
+                validationDiv.textContent = 'Error validating account number. Please try again.';
+                validationDiv.className = 'mt-1 text-sm text-red-600';
+                
+                // Keep submit button disabled
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                }
+            });
+        }
+
+        // Prevent form submission if account number is not validated
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (!isAccountValidated && accountNumberInput.value.length === 10) {
+                    e.preventDefault();
+                    validationDiv.classList.remove('hidden');
+                    validationDiv.textContent = 'Please wait for account number validation to complete';
+                    validationDiv.className = 'mt-1 text-sm text-red-600';
+                    return false;
+                }
+                
+                if (!isAccountValidated) {
+                    e.preventDefault();
+                    validationDiv.classList.remove('hidden');
+                    validationDiv.textContent = 'Please validate your account number before submitting';
+                    validationDiv.className = 'mt-1 text-sm text-red-600';
+                    return false;
+                }
+            });
+        }
+    })();
+</script>
+@endpush
+@endif
 @endsection

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountNumber;
 use App\Models\Business;
 use App\Services\AccountNumberService;
+use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -53,6 +54,22 @@ class AccountNumberController extends Controller
             'is_pool' => 'boolean',
         ]);
 
+        // Validate account number using NUBAN API
+        $nubanService = app(NubanValidationService::class);
+        $validationResult = $nubanService->validate($validated['account_number']);
+
+        if (!$validationResult || !$validationResult['valid']) {
+            return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
+        }
+
+        // Use validated account name and bank name from NUBAN API
+        if (!empty($validationResult['account_name'])) {
+            $validated['account_name'] = $validationResult['account_name'];
+        }
+        if (!empty($validationResult['bank_name'])) {
+            $validated['bank_name'] = $validationResult['bank_name'];
+        }
+
         if ($validated['is_pool'] ?? false) {
             $this->accountNumberService->createPoolAccount($validated);
         } else {
@@ -80,6 +97,24 @@ class AccountNumberController extends Controller
             'is_active' => 'boolean',
         ]);
 
+        // Validate account number using NUBAN API if account number changed
+        if ($validated['account_number'] !== $accountNumber->account_number) {
+            $nubanService = app(NubanValidationService::class);
+            $validationResult = $nubanService->validate($validated['account_number']);
+
+            if (!$validationResult || !$validationResult['valid']) {
+                return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
+            }
+
+            // Use validated account name and bank name from NUBAN API
+            if (!empty($validationResult['account_name'])) {
+                $validated['account_name'] = $validationResult['account_name'];
+            }
+            if (!empty($validationResult['bank_name'])) {
+                $validated['bank_name'] = $validationResult['bank_name'];
+            }
+        }
+
         $accountNumber->update($validated);
 
         return redirect()->route('admin.account-numbers.index')
@@ -92,5 +127,30 @@ class AccountNumberController extends Controller
 
         return redirect()->route('admin.account-numbers.index')
             ->with('success', 'Account number deleted successfully');
+    }
+
+    public function validateAccount(Request $request)
+    {
+        $request->validate([
+            'account_number' => 'required|string|min:10|max:10',
+        ]);
+
+        $nubanService = app(NubanValidationService::class);
+        $validationResult = $nubanService->validate($request->account_number);
+
+        if ($validationResult && $validationResult['valid']) {
+            return response()->json([
+                'success' => true,
+                'valid' => true,
+                'account_name' => $validationResult['account_name'],
+                'bank_name' => $validationResult['bank_name'],
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'valid' => false,
+            'message' => 'Invalid account number. Please verify and try again.',
+        ], 400);
     }
 }

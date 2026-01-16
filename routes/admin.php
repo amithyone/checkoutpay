@@ -48,6 +48,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Account Numbers
             Route::resource('account-numbers', AccountNumberController::class);
+            Route::post('account-numbers/validate-account', [AccountNumberController::class, 'validateAccount'])
+                ->name('account-numbers.validate-account');
         });
 
         // Businesses

@@ -50,6 +50,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');
         Route::post('/withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
         Route::get('/withdrawals/{withdrawal}', [WithdrawalController::class, 'show'])->name('withdrawals.show');
+        Route::post('/withdrawals/validate-account', [WithdrawalController::class, 'validateAccount'])->name('withdrawals.validate-account');
 
         // Statistics
         Route::get('/statistics', [StatisticsController::class, 'index'])->name('statistics.index');
