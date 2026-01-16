@@ -22,64 +22,7 @@
     </script>
 </head>
 <body class="bg-white">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center flex-1">
-                    <div class="flex-shrink-0">
-                        @php
-                            $logo = \App\Models\Setting::get('site_logo');
-                            $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
-                        @endphp
-                        @if($logo && $logoPath && file_exists($logoPath))
-                            <a href="{{ route('home') }}">
-                                <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-8 sm:h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                <div class="h-8 w-8 sm:h-10 sm:w-10 bg-primary rounded-lg flex items-center justify-center" style="display: none;">
-                                    <i class="fas fa-shield-alt text-white text-lg sm:text-xl"></i>
-                                </div>
-                            </a>
-                        @else
-                            <a href="{{ route('home') }}">
-                                <div class="h-8 w-8 sm:h-10 sm:w-10 bg-primary rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-shield-alt text-white text-lg sm:text-xl"></i>
-                                </div>
-                            </a>
-                        @endif
-                    </div>
-                    <div class="ml-2 sm:ml-3">
-                        <a href="{{ route('home') }}">
-                            <h1 class="text-base sm:text-xl font-bold text-gray-900">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h1>
-                            <p class="text-xs text-gray-500 hidden sm:block">Intelligent Payment Gateway</p>
-                        </a>
-                    </div>
-                </div>
-                <div class="hidden md:flex items-center space-x-4">
-                    <a href="{{ route('products.index') }}" class="text-primary px-3 py-2 rounded-md text-sm font-medium border-b-2 border-primary">Products</a>
-                    <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Resources</a>
-                    <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Pricing</a>
-                    <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Developers</a>
-                    <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Support</a>
-                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
-                    <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors">Get Started</a>
-                </div>
-                <button id="mobile-menu-btn" class="md:hidden p-2 rounded-md text-gray-700 hover:text-primary focus:outline-none">
-                    <i class="fas fa-bars text-xl"></i>
-                </button>
-            </div>
-            <div id="mobile-menu" class="hidden md:hidden pb-4 border-t border-gray-200 mt-2">
-                <div class="flex flex-col space-y-2 pt-4">
-                    <a href="{{ route('products.index') }}" class="text-primary px-3 py-2 rounded-md text-sm font-medium">Products</a>
-                    <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Resources</a>
-                    <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Pricing</a>
-                    <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Developers</a>
-                    <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Support</a>
-                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
-                    <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors text-center">Get Started</a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    @include('partials.nav')
 
     <!-- Hero Section -->
     <section class="bg-gradient-to-br from-primary/10 via-white to-primary/5 py-12 sm:py-16 md:py-20">
@@ -202,38 +145,6 @@
                     </div>
                 </div>
 
-                <!-- Email-Based Payment Verification -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-envelope text-primary text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Email-Based Payment Verification</h3>
-                    <p class="text-gray-600 mb-4">
-                        Our unique email-based payment verification system automatically matches bank transfer notifications with payment requests, ensuring accurate and timely payment processing.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Automatic payment matching from email notifications</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Real-time payment verification</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Smart name and amount matching</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Instant webhook notifications</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('home') }}#how-it-works" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Learn How It Works
-                        <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
             </div>
         </div>
     </section>
@@ -308,66 +219,6 @@
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="bg-gray-900 text-gray-300 py-8 sm:py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-                <div>
-                    <div class="flex items-center mb-3 sm:mb-4">
-                        @if($logo && $logoPath && file_exists($logoPath))
-                            <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-7 sm:h-8 mr-2 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                            <div class="h-7 w-7 sm:h-8 sm:w-8 bg-primary rounded-lg flex items-center justify-center mr-2" style="display: none;">
-                                <i class="fas fa-shield-alt text-white text-sm"></i>
-                            </div>
-                        @else
-                            <div class="h-7 w-7 sm:h-8 sm:w-8 bg-primary rounded-lg flex items-center justify-center mr-2">
-                                <i class="fas fa-shield-alt text-white text-sm"></i>
-                            </div>
-                        @endif
-                        <h3 class="text-white font-bold text-base sm:text-lg">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h3>
-                    </div>
-                    <p class="text-xs sm:text-sm text-gray-400">Intelligent Payment Gateway</p>
-                </div>
-                <div>
-                    <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Product</h4>
-                    <ul class="space-y-2 text-xs sm:text-sm">
-                        <li><a href="{{ route('products.index') }}" class="hover:text-white">Products</a></li>
-                        <li><a href="{{ route('pricing') }}" class="hover:text-white">Pricing</a></li>
-                        <li><a href="{{ route('home') }}#features" class="hover:text-white">Features</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Developers</h4>
-                    <ul class="space-y-2 text-xs sm:text-sm">
-                        <li><a href="{{ route('developers.index') }}" class="hover:text-white">API Reference</a></li>
-                        <li><a href="{{ route('resources.index') }}" class="hover:text-white">Documentation</a></li>
-                        <li><a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="hover:text-white"><i class="fab fa-wordpress mr-1"></i> WordPress Plugin</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Support</h4>
-                    <ul class="space-y-2 text-xs sm:text-sm">
-                        <li><a href="{{ route('support.index') }}" class="hover:text-white">Help Center</a></li>
-                        <li><a href="{{ route('contact') }}" class="hover:text-white">Contact Us</a></li>
-                        <li><a href="{{ route('business.login') }}" class="hover:text-white">Login</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="border-t border-gray-800 mt-6 sm:mt-8 pt-6 sm:pt-8">
-                <div class="flex flex-col md:flex-row justify-between items-center">
-                    <p class="text-xs sm:text-sm text-gray-400">&copy; {{ date('Y') }} {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}. All rights reserved.</p>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <script>
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        const mobileMenu = document.getElementById('mobile-menu');
-        
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
-    </script>
+    @include('partials.footer')
 </body>
 </html>
