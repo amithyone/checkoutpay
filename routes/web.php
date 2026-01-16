@@ -7,6 +7,34 @@ use App\Http\Controllers\TestEmailController;
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
+Route::get('/payout', [\App\Http\Controllers\PayoutController::class, 'index'])->name('payout.index');
+Route::get('/collections', [\App\Http\Controllers\CollectionsController::class, 'index'])->name('collections.index');
+Route::get('/checkout-demo', [\App\Http\Controllers\CheckoutDemoController::class, 'index'])->name('checkout-demo.index');
+Route::get('/about-us', [\App\Http\Controllers\AboutController::class, 'index'])->name('about.index');
+Route::get('/blog', [\App\Http\Controllers\BlogController::class, 'index'])->name('blog.index');
+Route::get('/faqs', [\App\Http\Controllers\FaqsController::class, 'index'])->name('faqs.index');
+Route::get('/status', [\App\Http\Controllers\StatusController::class, 'index'])->name('status.index');
+Route::get('/security', function () {
+    $page = \App\Models\Page::getBySlug('security');
+    if (!$page) {
+        abort(404);
+    }
+    return view('page', compact('page'));
+})->name('security');
+Route::get('/esg-policy', function () {
+    $page = \App\Models\Page::getBySlug('esg-policy');
+    if (!$page) {
+        abort(404);
+    }
+    return view('page', compact('page'));
+})->name('esg-policy');
+Route::get('/fraud-awareness', function () {
+    $page = \App\Models\Page::getBySlug('fraud-awareness');
+    if (!$page) {
+        abort(404);
+    }
+    return view('page', compact('page'));
+})->name('fraud-awareness');
 Route::get('/resources', [\App\Http\Controllers\ResourcesController::class, 'index'])->name('resources.index');
 Route::get('/developers', [\App\Http\Controllers\DevelopersController::class, 'index'])->name('developers.index');
 Route::get('/support', [\App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
