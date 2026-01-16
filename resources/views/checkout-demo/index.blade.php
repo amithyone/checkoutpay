@@ -174,9 +174,9 @@
             // Get demo business ID - we'll use the first active business or create a demo
             const returnUrl = window.location.origin + '{{ route("checkout-demo.index") }}?demo=success';
             
-            // Build checkout URL
+            // Build checkout URL - Use business ID 1 (HGEOV)
             const checkoutUrl = new URL('{{ route("checkout.show") }}', window.location.origin);
-            checkoutUrl.searchParams.set('business_id', '{{ $demoBusinessId ?? 1 }}');
+            checkoutUrl.searchParams.set('business_id', '1');
             checkoutUrl.searchParams.set('amount', amount);
             if (service) {
                 checkoutUrl.searchParams.set('service', service);

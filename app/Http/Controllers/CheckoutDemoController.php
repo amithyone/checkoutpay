@@ -9,8 +9,13 @@ class CheckoutDemoController extends Controller
 {
     public function index(): View
     {
-        // Get first active business for demo
-        $demoBusiness = Business::where('is_active', true)->first();
+        // Use business ID 1 (HGEOV) for demo
+        $demoBusiness = Business::find(1);
+        
+        if (!$demoBusiness) {
+            // Fallback to first active business if ID 1 doesn't exist
+            $demoBusiness = Business::where('is_active', true)->first();
+        }
         
         // Ensure business has approved website for demo return URL
         if ($demoBusiness) {
@@ -31,7 +36,7 @@ class CheckoutDemoController extends Controller
         }
         
         return view('checkout-demo.index', [
-            'demoBusinessId' => $demoBusiness ? $demoBusiness->id : null,
+            'demoBusinessId' => $demoBusiness ? $demoBusiness->id : 1,
             'demoBusinessName' => $demoBusiness ? $demoBusiness->name : 'Demo Business',
         ]);
     }
