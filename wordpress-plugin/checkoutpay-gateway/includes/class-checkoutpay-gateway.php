@@ -148,12 +148,23 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         $response_data = json_decode(wp_remote_retrieve_body($response), true);
 
         if (isset($response_data['success']) && $response_data['success']) {
+            // Get charges from API response
+            $charges_data = isset($response_data['data']['charges']) 
+                ? $response_data['data']['charges'] 
+                : $this->calculateCharges($original_amount);
+            
             // Store payment reference in order meta
             $order->update_meta_data('_checkoutpay_reference', $response_data['data']['reference']);
             $order->update_meta_data('_checkoutpay_payment_id', $response_data['data']['id']);
             $order->update_meta_data('_checkoutpay_status', 'pending');
             $order->update_meta_data('_checkoutpay_charges', $charges_data);
             $order->update_meta_data('_checkoutpay_original_amount', $original_amount);
+            
+            // Update order total if customer pays charges
+            if (isset($charges_data['paid_by_customer']) && $charges_data['paid_by_customer'] && isset($charges_data['amount_to_pay'])) {
+                $order->set_total($charges_data['amount_to_pay']);
+            }
+            
             $order->save();
 
             // Mark order as pending payment
