@@ -45,6 +45,11 @@ class NubanValidationService
                     return null;
                 }
 
+                // Handle array response (API sometimes returns array with single object)
+                if (is_array($data) && isset($data[0])) {
+                    $data = $data[0];
+                }
+
                 // Handle different response structures
                 $accountName = $data['account_name'] ?? $data['name'] ?? $data['accountName'] ?? null;
                 $bankName = $data['bank_name'] ?? $data['bankName'] ?? $data['bank'] ?? null;
@@ -115,6 +120,11 @@ class NubanValidationService
                         'message' => $data['message'] ?? 'Unknown error',
                     ]);
                     return null;
+                }
+
+                // Handle array response (API sometimes returns array with single object)
+                if (is_array($data) && isset($data[0])) {
+                    $data = $data[0];
                 }
 
                 // Handle different response structures
