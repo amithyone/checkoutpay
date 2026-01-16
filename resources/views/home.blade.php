@@ -227,6 +227,93 @@
     </section>
     @endif
 
+    <!-- WordPress Plugin Section -->
+    <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-br from-purple-50 via-white to-purple-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="bg-white rounded-2xl shadow-xl border border-purple-100 overflow-hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-0">
+                    <!-- Left Side - Content -->
+                    <div class="p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col justify-center">
+                        <div class="inline-flex items-center bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6 w-fit">
+                            <i class="fab fa-wordpress mr-2"></i> WooCommerce Integration
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4 sm:mb-6">
+                            WordPress Plugin Available
+                        </h2>
+                        <p class="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8">
+                            Quick integration for WooCommerce stores. Install our plugin and start accepting payments in minutes. No coding required!
+                        </p>
+                        <div class="space-y-4 mb-6 sm:mb-8">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 mb-1">Easy Installation</h3>
+                                    <p class="text-sm text-gray-600">Upload and activate in seconds. Works with WordPress 5.0+ and WooCommerce 5.0+</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 mb-1">Automatic Configuration</h3>
+                                    <p class="text-sm text-gray-600">Enter your API key and you're ready to accept payments. No complex setup needed.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 mb-1">Charge Management</h3>
+                                    <p class="text-sm text-gray-600">Choose whether you or your customers pay transaction fees. Fully customizable.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                            <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-base sm:text-lg transition-colors shadow-lg">
+                                <i class="fas fa-download mr-2"></i> Download Plugin
+                            </a>
+                            <a href="{{ route('business.register') }}" class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 border-2 border-purple-300 rounded-lg hover:bg-purple-50 font-medium text-base sm:text-lg transition-colors">
+                                <i class="fas fa-key mr-2"></i> Get API Key
+                            </a>
+                        </div>
+                        <div class="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                            <p class="text-xs sm:text-sm text-gray-600">
+                                <i class="fas fa-info-circle mr-2 text-purple-600"></i>
+                                <strong>Version 1.0.0</strong> | Requires WordPress 5.0+ and WooCommerce 5.0+ | Free to use
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Right Side - Visual -->
+                    <div class="bg-gradient-to-br from-purple-100 to-purple-200 p-6 sm:p-8 md:p-10 lg:p-12 flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="inline-flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-2xl shadow-lg mb-6">
+                                <i class="fab fa-wordpress text-purple-600 text-4xl sm:text-5xl"></i>
+                            </div>
+                            <div class="space-y-3 sm:space-y-4">
+                                <div class="flex items-center justify-center space-x-2 text-gray-700">
+                                    <i class="fab fa-wordpress text-xl sm:text-2xl"></i>
+                                    <span class="text-sm sm:text-base font-medium">WordPress</span>
+                                </div>
+                                <div class="text-purple-600">
+                                    <i class="fas fa-plus text-lg sm:text-xl"></i>
+                                </div>
+                                <div class="flex items-center justify-center space-x-2 text-gray-700">
+                                    <i class="fas fa-shopping-cart text-xl sm:text-2xl"></i>
+                                    <span class="text-sm sm:text-base font-medium">WooCommerce</span>
+                                </div>
+                                <div class="text-purple-600">
+                                    <i class="fas fa-equals text-lg sm:text-xl"></i>
+                                </div>
+                                <div class="flex items-center justify-center space-x-2 text-purple-600">
+                                    <i class="fas fa-check-circle text-xl sm:text-2xl"></i>
+                                    <span class="text-sm sm:text-base font-semibold">CheckoutPay</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- How It Works -->
     @if(isset($howItWorks['title']))
     <section class="py-12 sm:py-16 md:py-20 bg-white">
@@ -318,6 +405,7 @@
                     <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Developers</h4>
                     <ul class="space-y-2 text-xs sm:text-sm">
                         <li><a href="https://github.com/amithyone/checkoutpay/blob/main/docs/API_DOCUMENTATION.md" target="_blank" class="hover:text-white break-words">API Documentation</a></li>
+                        <li><a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="hover:text-white"><i class="fab fa-wordpress mr-1"></i> WordPress Plugin</a></li>
                         <li><a href="/api/health" class="hover:text-white">API Status</a></li>
                     </ul>
                 </div>

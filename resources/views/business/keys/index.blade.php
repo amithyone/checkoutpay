@@ -40,6 +40,33 @@
         </div>
     </div>
 
+    <!-- WordPress Plugin -->
+    <div class="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4 lg:p-6">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <i class="fab fa-wordpress text-purple-600 text-2xl"></i>
+            </div>
+            <div class="ml-3 flex-1">
+                <h3 class="text-base font-semibold text-purple-900 mb-1">WordPress / WooCommerce Plugin</h3>
+                <p class="text-sm text-purple-700 mb-3">Quick integration for WooCommerce stores. Install our plugin and start accepting payments in minutes.</p>
+                <div class="flex flex-wrap gap-2">
+                    <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">
+                        <i class="fas fa-download mr-2"></i> Download Plugin
+                    </a>
+                    <a href="{{ route('business.api-documentation.index') }}" class="inline-flex items-center px-4 py-2 bg-white text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 text-sm font-medium">
+                        <i class="fas fa-book mr-2"></i> Installation Guide
+                    </a>
+                </div>
+                <div class="mt-3 p-2 bg-white/50 rounded-lg">
+                    <p class="text-xs text-purple-800">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <strong>Version:</strong> 1.0.0 | <strong>Requires:</strong> WordPress 5.0+, WooCommerce 5.0+
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Documentation Link -->
     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 lg:p-6">
         <div class="flex items-start">
