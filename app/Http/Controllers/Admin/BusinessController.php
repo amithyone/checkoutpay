@@ -304,11 +304,34 @@ class BusinessController extends Controller
 
     public function downloadVerificationDocument(Business $business, BusinessVerification $verification)
     {
-        if (!$verification->document_path || !file_exists(storage_path('app/' . $verification->document_path))) {
+        // Check if verification belongs to this business
+        if ($verification->business_id !== $business->id) {
+            abort(403, 'Verification does not belong to this business.');
+        }
+
+        // For text-based verifications, return business data
+        $textBasedTypes = [
+            BusinessVerification::TYPE_ACCOUNT_NUMBER,
+            BusinessVerification::TYPE_BANK_ADDRESS,
+            BusinessVerification::TYPE_BVN,
+            BusinessVerification::TYPE_NIN,
+        ];
+
+        if (in_array($verification->verification_type, $textBasedTypes)) {
+            $data = match($verification->verification_type) {
+                BusinessVerification::TYPE_ACCOUNT_NUMBER => ['Account Number' => $business->account_number],
+                BusinessVerification::TYPE_BANK_ADDRESS => ['Bank Address' => $business->bank_address],
+                default => ['Details' => $verification->document_type],
+            };
+            return response()->json($data);
+        }
+
+        // For file-based verifications
+        if (!$verification->document_path || !Storage::disk('public')->exists($verification->document_path)) {
             abort(404, 'Document not found');
         }
 
-        return response()->download(storage_path('app/' . $verification->document_path));
+        return Storage::disk('public')->download($verification->document_path);
     }
 
     public function updateCharges(Request $request, Business $business): RedirectResponse

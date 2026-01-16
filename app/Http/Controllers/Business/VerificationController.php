@@ -126,7 +126,7 @@ class VerificationController extends Controller
             'business_id' => $business->id,
             'verification_type' => $validated['verification_type'],
             'document_type' => $documentType,
-            'document_path' => $path ?? null,
+            'document_path' => $path,
             'status' => BusinessVerification::STATUS_PENDING,
         ]);
 
