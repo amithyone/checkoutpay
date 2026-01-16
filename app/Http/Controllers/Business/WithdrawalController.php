@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use App\Models\WithdrawalRequest;
 
 class WithdrawalController extends Controller
@@ -43,19 +44,41 @@ class WithdrawalController extends Controller
     {
         $business = Auth::guard('business')->user();
 
-        $validated = $request->validate([
+        // Check if business has account number set
+        $hasAccountNumber = $business->hasAccountNumber();
+        $accountDetails = $hasAccountNumber ? $business->primaryAccountNumber() : null;
+
+        // Validate password
+        if (!Hash::check($request->password, $business->password)) {
+            return back()->withErrors(['password' => 'Invalid password.'])->withInput();
+        }
+
+        // Build validation rules
+        $rules = [
             'amount' => 'required|numeric|min:1|max:' . $business->balance,
-            'bank_name' => 'required|string|max:255',
-            'account_number' => 'required|string|max:255',
-            'account_name' => 'required|string|max:255',
+            'password' => 'required',
             'notes' => 'nullable|string|max:1000',
-        ]);
+        ];
+
+        // Only require account fields if business doesn't have account number set
+        if (!$hasAccountNumber) {
+            $rules['bank_name'] = 'required|string|max:255';
+            $rules['account_number'] = 'required|string|max:255';
+            $rules['account_name'] = 'required|string|max:255';
+        }
+
+        $validated = $request->validate($rules);
+
+        // Use stored account details if available, otherwise use form input
+        $bankName = $hasAccountNumber ? $accountDetails->bank_name : $validated['bank_name'];
+        $accountNumber = $hasAccountNumber ? $accountDetails->account_number : $validated['account_number'];
+        $accountName = $hasAccountNumber ? $accountDetails->account_name : $validated['account_name'];
 
         $withdrawal = $business->withdrawalRequests()->create([
             'amount' => $validated['amount'],
-            'bank_name' => $validated['bank_name'],
-            'account_number' => $validated['account_number'],
-            'account_name' => $validated['account_name'],
+            'bank_name' => $bankName,
+            'account_number' => $accountNumber,
+            'account_name' => $accountName,
             'notes' => $validated['notes'] ?? null,
             'status' => 'pending',
         ]);
