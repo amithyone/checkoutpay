@@ -208,7 +208,11 @@
                     <div class="ml-3 flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-900 truncate">{{ auth('admin')->user()->name }}</p>
                         <p class="text-xs text-gray-500 truncate">{{ auth('admin')->user()->email }}</p>
+                        @if(auth('admin')->user()->isSuperAdmin())
+                        <a href="{{ route('admin.profile.index') }}" class="text-xs text-primary font-medium capitalize hover:underline">{{ str_replace('_', ' ', auth('admin')->user()->role) }}</a>
+                        @else
                         <p class="text-xs text-primary font-medium capitalize">{{ str_replace('_', ' ', auth('admin')->user()->role) }}</p>
+                        @endif
                     </div>
                 </div>
                 <form action="{{ route('admin.logout') }}" method="POST">
@@ -235,6 +239,11 @@
                         <i class="far fa-clock mr-2"></i>
                         <span id="current-time"></span>
                     </div>
+                    @if(auth('admin')->user()->isSuperAdmin())
+                    <a href="{{ route('admin.profile.index') }}" class="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-primary hover:bg-gray-50 rounded-lg transition-colors" title="Profile Settings">
+                        <i class="fas fa-user-circle text-xl"></i>
+                    </a>
+                    @endif
                 </div>
             </header>
 

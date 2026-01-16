@@ -160,5 +160,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('staff/{staff}/toggle-status', [\App\Http\Controllers\Admin\StaffController::class, 'toggleStatus'])
                 ->name('staff.toggle-status');
         });
+
+        // Profile Management (Super Admin only)
+        Route::middleware('super_admin')->group(function () {
+            Route::get('profile', [\App\Http\Controllers\Admin\ProfileController::class, 'index'])->name('profile.index');
+            Route::put('profile', [\App\Http\Controllers\Admin\ProfileController::class, 'update'])->name('profile.update');
+            Route::put('profile/password', [\App\Http\Controllers\Admin\ProfileController::class, 'updatePassword'])->name('profile.update-password');
+        });
     });
 });
