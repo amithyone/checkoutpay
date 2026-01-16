@@ -39,6 +39,7 @@ class CheckoutController extends Controller
                       ->orWhere('id', $businessId);
             })
             ->where('is_active', true)
+            ->with('approvedWebsites')
             ->first();
 
         if (!$business) {
@@ -91,6 +92,7 @@ class CheckoutController extends Controller
                       ->orWhere('id', $validated['business_id']);
             })
             ->where('is_active', true)
+            ->with('approvedWebsites')
             ->firstOrFail();
 
         // Validate return URL is from approved domain
@@ -245,6 +247,11 @@ class CheckoutController extends Controller
      */
     protected function isUrlFromApprovedWebsites(string $url, Business $business): bool
     {
+        // Load approved websites if not already loaded
+        if (!$business->relationLoaded('approvedWebsites')) {
+            $business->load('approvedWebsites');
+        }
+        
         // If business has no approved websites, allow the URL (backward compatibility)
         $approvedWebsites = $business->approvedWebsites;
         
