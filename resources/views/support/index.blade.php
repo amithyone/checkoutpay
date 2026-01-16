@@ -40,7 +40,7 @@
     <!-- Help Sections -->
     <section class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-8">
                 <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8">
                     <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-book text-primary text-2xl"></i>
@@ -60,6 +60,23 @@
                     <a href="{{ route('contact') }}" class="text-primary hover:text-primary/80 font-medium">
                         Contact Us <i class="fas fa-arrow-right ml-1"></i>
                     </a>
+                </div>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-6 sm:p-8">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">Common Questions</h3>
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">How do I get started?</h4>
+                        <p class="text-sm text-gray-600">Sign up for an account, verify your business, and get your API keys from the dashboard.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">What payment methods are supported?</h4>
+                        <p class="text-sm text-gray-600">We support bank transfers with automatic email-based verification.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">How are charges calculated?</h4>
+                        <p class="text-sm text-gray-600">Default charges are 1% + ₦100 per transaction. You can choose if you or your customer pays.</p>
+                    </div>
                 </div>
             </div>
         </div>

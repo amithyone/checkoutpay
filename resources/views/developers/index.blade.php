@@ -79,6 +79,36 @@
         </div>
     </section>
 
+    <!-- API Integration -->
+    <section id="api-integration" class="py-12 sm:py-16 md:py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-8 text-center">Quick Integration Guide</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <span class="text-primary font-bold text-xl">1</span>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Get API Keys</h3>
+                    <p class="text-sm text-gray-600">Sign up and get your API keys from the dashboard</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <span class="text-primary font-bold text-xl">2</span>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Make API Call</h3>
+                    <p class="text-sm text-gray-600">Create payment request using our REST API</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <span class="text-primary font-bold text-xl">3</span>
+                    </div>
+                    <h3 class="font-bold text-gray-900 mb-2">Receive Webhook</h3>
+                    <p class="text-sm text-gray-600">Get notified when payment is verified</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Testing -->
     <section id="testing" class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -89,6 +119,10 @@
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                     <p class="text-sm text-yellow-800"><strong>Note:</strong> Test mode uses the same API endpoints but with test credentials. No real payments will be processed.</p>
                 </div>
+                <a href="{{ route('business.register') }}" class="inline-flex items-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">
+                    Get Started with Test Keys
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
         </div>
     </section>
