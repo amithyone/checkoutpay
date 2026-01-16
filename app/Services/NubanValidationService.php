@@ -25,26 +25,56 @@ class NubanValidationService
                 'acc_no' => $accountNumber,
             ]);
 
+            $statusCode = $response->status();
+            $responseBody = $response->body();
+            $data = $response->json();
+
+            Log::info('NUBAN API Response (account only)', [
+                'account_number' => $accountNumber,
+                'status_code' => $statusCode,
+                'response' => $data,
+            ]);
+
             if ($response->successful()) {
-                $data = $response->json();
+                // Check if API returned an error
+                if (isset($data['error']) && $data['error'] === true) {
+                    Log::warning('NUBAN API returned error', [
+                        'account_number' => $accountNumber,
+                        'message' => $data['message'] ?? 'Unknown error',
+                    ]);
+                    return null;
+                }
+
+                // Handle different response structures
+                $accountName = $data['account_name'] ?? $data['name'] ?? $data['accountName'] ?? null;
+                $bankName = $data['bank_name'] ?? $data['bankName'] ?? $data['bank'] ?? null;
+                $bankCode = $data['bank_code'] ?? $data['bankCode'] ?? $data['code'] ?? null;
                 
-                // Check if account is valid
-                if (isset($data['account_name']) && !empty($data['account_name'])) {
+                // Check if account is valid (account name exists and is not empty)
+                if (!empty($accountName)) {
                     return [
                         'account_number' => $accountNumber,
-                        'account_name' => $data['account_name'] ?? null,
-                        'bank_name' => $data['bank_name'] ?? null,
-                        'bank_code' => $data['bank_code'] ?? null,
+                        'account_name' => $accountName,
+                        'bank_name' => $bankName,
+                        'bank_code' => $bankCode,
                         'valid' => true,
                     ];
                 }
             }
+
+            // Log failed response for debugging
+            Log::warning('NUBAN validation failed', [
+                'account_number' => $accountNumber,
+                'status_code' => $statusCode,
+                'response' => $responseBody,
+            ]);
 
             return null;
         } catch (\Exception $e) {
             Log::error('NUBAN validation error', [
                 'account_number' => $accountNumber,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return null;
         }
@@ -65,19 +95,52 @@ class NubanValidationService
                 'acc_no' => $accountNumber,
             ]);
 
+            $statusCode = $response->status();
+            $responseBody = $response->body();
+            $data = $response->json();
+
+            Log::info('NUBAN API Response (with bank code)', [
+                'account_number' => $accountNumber,
+                'bank_code' => $bankCode,
+                'status_code' => $statusCode,
+                'response' => $data,
+            ]);
+
             if ($response->successful()) {
-                $data = $response->json();
+                // Check if API returned an error
+                if (isset($data['error']) && $data['error'] === true) {
+                    Log::warning('NUBAN API returned error (with bank code)', [
+                        'account_number' => $accountNumber,
+                        'bank_code' => $bankCode,
+                        'message' => $data['message'] ?? 'Unknown error',
+                    ]);
+                    return null;
+                }
+
+                // Handle different response structures
+                $accountName = $data['account_name'] ?? $data['name'] ?? $data['accountName'] ?? null;
+                $bankName = $data['bank_name'] ?? $data['bankName'] ?? $data['bank'] ?? null;
+                $returnedBankCode = $data['bank_code'] ?? $data['bankCode'] ?? $data['code'] ?? $bankCode;
                 
-                if (isset($data['account_name']) && !empty($data['account_name'])) {
+                // Check if account is valid (account name exists and is not empty)
+                if (!empty($accountName)) {
                     return [
                         'account_number' => $accountNumber,
-                        'account_name' => $data['account_name'] ?? null,
-                        'bank_name' => $data['bank_name'] ?? null,
-                        'bank_code' => $data['bank_code'] ?? $bankCode,
+                        'account_name' => $accountName,
+                        'bank_name' => $bankName,
+                        'bank_code' => $returnedBankCode,
                         'valid' => true,
                     ];
                 }
             }
+
+            // Log failed response for debugging
+            Log::warning('NUBAN validation failed (with bank code)', [
+                'account_number' => $accountNumber,
+                'bank_code' => $bankCode,
+                'status_code' => $statusCode,
+                'response' => $responseBody,
+            ]);
 
             return null;
         } catch (\Exception $e) {
@@ -85,6 +148,7 @@ class NubanValidationService
                 'account_number' => $accountNumber,
                 'bank_code' => $bankCode,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return null;
         }
@@ -136,10 +200,46 @@ class NubanValidationService
             return null;
         }
 
+        // If bank code is provided, try with that bank first
         if ($bankCode) {
-            return $this->validateAccountNumberWithBankCode($accountNumber, $bankCode);
+            $result = $this->validateAccountNumberWithBankCode($accountNumber, $bankCode);
+            if ($result && $result['valid']) {
+                return $result;
+            }
+
+            // If validation failed with provided bank code, try possible banks
+            Log::info('Validation failed with provided bank code, trying possible banks', [
+                'account_number' => $accountNumber,
+                'bank_code' => $bankCode,
+            ]);
         }
 
-        return $this->validateAccountNumber($accountNumber);
+        // Try without bank code first
+        $result = $this->validateAccountNumber($accountNumber);
+        if ($result && $result['valid']) {
+            return $result;
+        }
+
+        // If that fails, try possible banks endpoint
+        $possibleBanks = $this->getPossibleBanks($accountNumber);
+        if (!empty($possibleBanks)) {
+            // Try validating with each possible bank
+            foreach ($possibleBanks as $bank) {
+                $bankCodeToTry = $bank['bank_code'] ?? $bank['destbankcode'] ?? null;
+                if ($bankCodeToTry) {
+                    $result = $this->validateAccountNumberWithBankCode($accountNumber, $bankCodeToTry);
+                    if ($result && $result['valid']) {
+                        Log::info('Validation succeeded with possible bank', [
+                            'account_number' => $accountNumber,
+                            'bank_code' => $bankCodeToTry,
+                            'bank_name' => $bank['name'] ?? null,
+                        ]);
+                        return $result;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }
