@@ -127,6 +127,16 @@ class CheckoutController extends Controller
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);
 
+            // Ensure payment has an account number
+            if (!$payment->account_number) {
+                Log::error('Payment created without account number', [
+                    'payment_id' => $payment->id,
+                    'transaction_id' => $payment->transaction_id,
+                    'business_id' => $business->id,
+                ]);
+                return back()->withErrors(['error' => 'Unable to assign account number. Please contact support.'])->withInput();
+            }
+
             // Store return_url in email_data for hosted checkout
             $emailData = $payment->email_data ?? [];
             $emailData['return_url'] = $validated['return_url'];
@@ -145,10 +155,11 @@ class CheckoutController extends Controller
         } catch (\Exception $e) {
             Log::error('Error creating payment in checkout', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'business_id' => $validated['business_id'],
             ]);
 
-            return back()->withErrors(['error' => 'Failed to create payment. Please try again.'])->withInput();
+            return back()->withErrors(['error' => 'Failed to create payment: ' . $e->getMessage()])->withInput();
         }
     }
 
@@ -157,9 +168,18 @@ class CheckoutController extends Controller
      */
     public function payment(Request $request, string $transactionId)
     {
-        $payment = Payment::with(['accountNumberDetails', 'business'])
-            ->where('transaction_id', $transactionId)
-            ->firstOrFail();
+        try {
+            $payment = Payment::with(['accountNumberDetails', 'business'])
+                ->where('transaction_id', $transactionId)
+                ->firstOrFail();
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Payment not found for checkout', [
+                'transaction_id' => $transactionId,
+            ]);
+            return view('checkout.error', [
+                'error' => 'Payment not found. Please check your transaction ID.',
+            ]);
+        }
 
         $returnUrl = $request->query('return_url');
 
