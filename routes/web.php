@@ -6,6 +6,10 @@ use App\Http\Controllers\TestEmailController;
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
+Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
+Route::get('/resources', [\App\Http\Controllers\ResourcesController::class, 'index'])->name('resources.index');
+Route::get('/developers', [\App\Http\Controllers\DevelopersController::class, 'index'])->name('developers.index');
+Route::get('/support', [\App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
 Route::get('/pricing', [\App\Http\Controllers\PricingController::class, 'index'])->name('pricing');
 
 // Dynamic pages (Privacy Policy, Terms, etc.)
