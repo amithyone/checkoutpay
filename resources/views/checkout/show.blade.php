@@ -82,13 +82,31 @@
                     @enderror
                 </div>
 
+                <!-- Error Messages -->
+                @if($errors->any())
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-exclamation-circle text-red-600 mt-0.5 mr-3"></i>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-red-900 mb-1">Error</p>
+                                <ul class="text-sm text-red-700 list-disc list-inside">
+                                    @foreach($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <!-- Submit Button -->
                 <button 
                     type="submit" 
-                    class="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors flex items-center justify-center"
+                    id="submitBtn"
+                    class="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <span>Continue to Payment</span>
-                    <i class="fas fa-arrow-right ml-2"></i>
+                    <span id="submitText">Continue to Payment</span>
+                    <i class="fas fa-arrow-right ml-2" id="submitIcon"></i>
                 </button>
 
                 <!-- Cancel Link -->
@@ -98,5 +116,18 @@
             </form>
         </div>
     </div>
+
+    <script>
+        // Prevent double submission
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const submitBtn = document.getElementById('submitBtn');
+            const submitText = document.getElementById('submitText');
+            const submitIcon = document.getElementById('submitIcon');
+            
+            submitBtn.disabled = true;
+            submitText.textContent = 'Processing...';
+            submitIcon.className = 'fas fa-spinner fa-spin ml-2';
+        });
+    </script>
 </body>
 </html>
