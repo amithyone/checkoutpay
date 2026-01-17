@@ -69,10 +69,14 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $account->usage_count }}</td>
                         <td class="px-6 py-4 text-sm text-gray-900">
-                            <div class="flex flex-col">
-                                <span class="font-medium text-gray-900">{{ number_format($account->payments_received_count ?? 0) }} payments</span>
-                                <span class="text-xs text-gray-600">₦{{ number_format($account->payments_received_amount ?? 0, 2) }}</span>
-                            </div>
+                            @if(($account->payments_received_count ?? 0) > 0)
+                                <div class="flex flex-col">
+                                    <span class="font-medium text-gray-900">{{ number_format($account->payments_received_count) }} payments</span>
+                                    <span class="text-xs text-gray-600">₦{{ number_format($account->payments_received_amount ?? 0, 2) }}</span>
+                                </div>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4">
                             @if($account->is_active)

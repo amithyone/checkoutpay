@@ -134,6 +134,7 @@ class StatsController extends Controller
                 'counts' => $dailyCounts,
             ],
             'top_businesses' => $this->getTopBusinesses($last30Days),
+            'top_account_numbers' => $this->getTopAccountNumbers($last30Days),
             'recent_payments' => Payment::with('business')
                 ->where('created_at', '>=', $last30Days)
                 ->latest()
@@ -210,6 +211,7 @@ class StatsController extends Controller
                 'counts' => $monthlyCounts,
             ],
             'top_businesses' => $this->getTopBusinesses($last12Months),
+            'top_account_numbers' => $this->getTopAccountNumbers($last12Months),
             'recent_payments' => Payment::with('business')
                 ->where('created_at', '>=', $last12Months)
                 ->latest()
@@ -284,12 +286,24 @@ class StatsController extends Controller
                 'counts' => $yearlyCounts,
             ],
             'top_businesses' => $this->getTopBusinesses($last5Years),
+            'top_account_numbers' => $this->getTopAccountNumbers($last5Years),
             'recent_payments' => Payment::with('business')
                 ->where('created_at', '>=', $last5Years)
                 ->latest()
                 ->limit(10)
                 ->get(),
         ];
+    }
+    
+    private function getTopAccountNumbers($since)
+    {
+        return AccountNumber::select('account_numbers.*')
+            ->selectRaw('(SELECT COUNT(*) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ? AND payments.created_at >= ?) as payments_count', [Payment::STATUS_APPROVED, $since])
+            ->selectRaw('(SELECT SUM(COALESCE(payments.received_amount, payments.amount)) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ? AND payments.created_at >= ?) as payments_amount', [Payment::STATUS_APPROVED, $since])
+            ->havingRaw('payments_count > 0')
+            ->orderByDesc('payments_amount')
+            ->limit(10)
+            ->get();
     }
     
     private function getTopBusinesses($since)

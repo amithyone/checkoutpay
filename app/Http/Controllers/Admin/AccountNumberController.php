@@ -22,18 +22,9 @@ class AccountNumberController extends Controller
     public function index(Request $request): View
     {
         $query = AccountNumber::with('business')
-            ->withCount([
-                'payments as payments_received_count' => function ($q) {
-                    $q->where('status', Payment::STATUS_APPROVED);
-                }
-            ])
             ->select('account_numbers.*')
-            ->selectSub(function ($query) {
-                $query->from('payments')
-                    ->whereColumn('payments.account_number', 'account_numbers.account_number')
-                    ->where('payments.status', Payment::STATUS_APPROVED)
-                    ->selectRaw('SUM(COALESCE(payments.received_amount, payments.amount))');
-            }, 'payments_received_amount')
+            ->selectRaw('(SELECT COUNT(*) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ?) as payments_received_count', [Payment::STATUS_APPROVED])
+            ->selectRaw('(SELECT SUM(COALESCE(payments.received_amount, payments.amount)) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ?) as payments_received_amount', [Payment::STATUS_APPROVED])
             ->latest();
 
         if ($request->has('type')) {
