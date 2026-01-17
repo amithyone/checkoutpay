@@ -226,6 +226,65 @@ class SenderNameExtractor
             }
         }
         
+        // PRIORITY 1.6: Extract from Remarks field when description has TXN pattern but no name found
+        // Some banks put sender name in Remarks when description only has transaction codes
+        // Format: "Remarks : NAME" or "Remarks : D-NAME" or "Remarks : /NONE/...-FBN-NAME"
+        if (!$senderName && preg_match('/TXN[\-]?[\d]+[\-]?[A-Z0-9]+/i', $text)) {
+            // Check if remarks contains a name (not just transaction codes)
+            if (preg_match('/remark[s]*[\s]*:[\s]*([^\n\r]+)/i', $text, $remarksMatches)) {
+                $remarksLine = trim($remarksMatches[1]);
+                // Skip if remarks only contains transaction codes (no actual name pattern)
+                if (!preg_match('/^[\dA-Z\-\s]{10,}$/i', $remarksLine) || preg_match('/[A-Z]{2,}\s+[A-Z]/i', $remarksLine)) {
+                    // Pattern 1: Direct name at start: "D-HENRY CH IBUZOR CHIKWENDU" or "NAME"
+                    if (preg_match('/^(?:D[\-])?([A-Z][A-Z\s]{2,}?)(?:\s+Time|\s+Transaction|\s+Document)/i', $remarksLine, $nameMatches)) {
+                        $potentialName = trim($nameMatches[1]);
+                        $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                        if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                            $senderName = strtolower($potentialName);
+                        }
+                    }
+                    // Pattern 2: Name after codes or prefixes: "/NONE/...-FBN-NAME"
+                    elseif (preg_match('/[\-]FBN[\-]([A-Z][A-Z\s]{2,}?)(?:\s+Time|\s+Transaction|\s+Document)/i', $remarksLine, $nameMatches)) {
+                        $potentialName = trim($nameMatches[1]);
+                        $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                        if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                            $senderName = strtolower($potentialName);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // PRIORITY 1.7: Extract from Remarks field for other cases where name might be in remarks
+        // Check remarks for names that look like actual person names (not transaction codes)
+        if (!$senderName && preg_match('/remark[s]*[\s]*:[\s]*([^\n\r]+)/i', $text, $remarksMatches)) {
+            $remarksLine = trim($remarksMatches[1]);
+            // Skip if it looks like transaction codes (all caps, no spaces, or mostly numbers)
+            if (!preg_match('/^[\dA-Z\-]{10,}$/i', $remarksLine)) {
+                // Pattern 1: Name with D- prefix: "D-HENRY CH IBUZOR CHIKWENDU"
+                if (preg_match('/^(?:D[\-])?([A-Z][A-Z\s]{2,}?)(?:\s+Time|\s+Transaction|\s+Document)/i', $remarksLine, $nameMatches)) {
+                    $potentialName = trim($nameMatches[1]);
+                    // Must have at least 2 words with capital letters
+                    if (preg_match('/[A-Z]{2,}\s+[A-Z]/i', $potentialName)) {
+                        $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                        if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                            $senderName = strtolower($potentialName);
+                        }
+                    }
+                }
+                // Pattern 2: Name after FBN: "/NONE/...-FBN-NAME"
+                elseif (preg_match('/[\-]FBN[\-]([A-Z][A-Z\s]{2,}?)(?:\s+Time|\s+Transaction|\s+Document)/i', $remarksLine, $nameMatches)) {
+                    $potentialName = trim($nameMatches[1]);
+                    if (preg_match('/[A-Z]{2,}\s+[A-Z]/i', $potentialName)) {
+                        $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                        if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                            $senderName = strtolower($potentialName);
+                        }
+                    }
+                }
+            }
+        }
+        
         // PRIORITY 2: "FROM NAME TO" pattern anywhere in text (flexible spacing)
         // Format: "FROM SOLOMON INNOCENT AMITHY TO SQUA" or "FROM NAME TO"
         if (!$senderName && preg_match('/FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s]+TO[\s]+[A-Z]/i', $text, $matches)) {
