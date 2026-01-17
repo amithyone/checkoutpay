@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccountNumber;
 use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\Business;
@@ -44,6 +45,16 @@ class StatsController extends Controller
             'total_score' => MatchAttempt::whereNotNull('name_similarity_percent')->sum('name_similarity_percent'),
             'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
             'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
+        ];
+        
+        // Add account numbers payment stats (applies to all periods)
+        $stats['account_numbers'] = [
+            'total' => AccountNumber::count(),
+            'pool' => AccountNumber::pool()->active()->count(),
+            'business_specific' => AccountNumber::businessSpecific()->active()->count(),
+            'total_payments_received' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereNotNull('account_number')
+                ->count(),
         ];
         
         return $stats;

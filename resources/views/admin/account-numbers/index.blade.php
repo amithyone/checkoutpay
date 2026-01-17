@@ -46,6 +46,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usage</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payments Received</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
@@ -67,6 +68,11 @@
                             {{ $account->business ? $account->business->name : '-' }}
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $account->usage_count }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 font-medium">
+                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                {{ number_format($account->payments_received_count ?? 0) }}
+                            </span>
+                        </td>
                         <td class="px-6 py-4">
                             @if($account->is_active)
                                 <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>
@@ -85,7 +91,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">No account numbers found</td>
+                        <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">No account numbers found</td>
                     </tr>
                     @endforelse
                 </tbody>

@@ -70,6 +70,9 @@ class DashboardController extends Controller
                 'total' => AccountNumber::count(),
                 'pool' => AccountNumber::pool()->active()->count(),
                 'business_specific' => AccountNumber::businessSpecific()->active()->count(),
+                'total_payments_received' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->whereNotNull('account_number')
+                    ->count(),
             ],
             'stored_emails' => [
                 'total' => ProcessedEmail::count(),

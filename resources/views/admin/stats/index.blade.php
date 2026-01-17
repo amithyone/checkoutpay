@@ -27,7 +27,7 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
         <!-- Total Amount -->
         <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-6 border-2 border-green-200">
             <div class="flex items-center justify-between mb-4">
@@ -125,6 +125,24 @@
                 {{ number_format($stats['match_similarity']['total_attempts']) }} attempts
                 <br>
                 Avg: {{ number_format($stats['match_similarity']['average_score'], 2) }}%
+            </div>
+        </div>
+
+        <!-- Account Numbers Payments Received -->
+        <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg shadow-sm p-6 border-2 border-indigo-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Account Numbers</p>
+                    <h3 class="text-3xl font-bold text-gray-900">{{ number_format($stats['account_numbers']['total']) }}</h3>
+                </div>
+                <div class="w-16 h-16 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-credit-card text-indigo-600 text-2xl"></i>
+                </div>
+            </div>
+            <div class="text-xs text-gray-500">
+                Payments Received: <span class="font-semibold text-gray-900">{{ number_format($stats['account_numbers']['total_payments_received']) }}</span>
+                <br>
+                Pool: {{ $stats['account_numbers']['pool'] }} • Business: {{ $stats['account_numbers']['business_specific'] }}
             </div>
         </div>
     </div>

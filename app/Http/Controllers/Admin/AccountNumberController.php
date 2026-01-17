@@ -19,7 +19,13 @@ class AccountNumberController extends Controller
 
     public function index(Request $request): View
     {
-        $query = AccountNumber::with('business')->latest();
+        $query = AccountNumber::with('business')
+            ->withCount([
+                'payments as payments_received_count' => function ($q) {
+                    $q->where('status', \App\Models\Payment::STATUS_APPROVED);
+                }
+            ])
+            ->latest();
 
         if ($request->has('type')) {
             if ($request->type === 'pool') {

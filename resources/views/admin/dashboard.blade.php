@@ -203,6 +203,12 @@
                 <span class="mx-2">•</span>
                 <span class="text-gray-600">Business: {{ $stats['account_numbers']['business_specific'] }}</span>
             </div>
+            <div class="mt-3 pt-3 border-t border-gray-200">
+                <span class="text-xs text-gray-500">
+                    <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                    Payments Received: <span class="font-semibold text-gray-900">{{ number_format($stats['account_numbers']['total_payments_received']) }}</span>
+                </span>
+            </div>
         </div>
 
         <!-- Stored Emails -->
