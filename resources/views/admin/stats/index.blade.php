@@ -26,8 +26,8 @@
         </div>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+    <!-- Summary Cards - Row 1 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <!-- Total Amount -->
         <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-6 border-2 border-green-200">
             <div class="flex items-center justify-between mb-4">
@@ -109,7 +109,10 @@
                 Per transaction
             </div>
         </div>
+    </div>
 
+    <!-- Summary Cards - Row 2 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <!-- Total Match Similarity Score -->
         <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg shadow-sm p-6 border-2 border-purple-200">
             <div class="flex items-center justify-between mb-4">

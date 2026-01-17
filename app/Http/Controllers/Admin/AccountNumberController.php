@@ -32,7 +32,7 @@ class AccountNumberController extends Controller
                 $query->from('payments')
                     ->whereColumn('payments.account_number', 'account_numbers.account_number')
                     ->where('payments.status', Payment::STATUS_APPROVED)
-                    ->selectRaw('COALESCE(SUM(payments.received_amount), SUM(payments.amount))');
+                    ->selectRaw('SUM(COALESCE(payments.received_amount, payments.amount))');
             }, 'payments_received_amount')
             ->latest();
 
