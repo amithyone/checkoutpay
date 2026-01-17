@@ -157,7 +157,20 @@ class SenderNameExtractor
                 }
             }
             // Pattern 1d: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C" or "MOBILE/UNION TRANSFER = FROM NAME"
-            elseif (preg_match('/(?:MOBILE\/)?UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:[\s\-]+|[\s]+TO|[\s]+NA|\s*$)/i', $descriptionLine, $nameMatches)) {
+            // Also handle "TRANSFER = FROM NAME" pattern
+            // Capture name until dash with NA, TO, or end of line
+            elseif (preg_match('/(?:MOBILE\/)?UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s]*\-[\s]*NA|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1d1: TRANSFER = FROM NAME (without UNION) - e.g., "TRANSFER = FROM UTEBOR PAUL C"
+            elseif (preg_match('/TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s]*\-[\s]*NA|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 // Handle = characters in names
                 $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
@@ -448,6 +461,19 @@ class SenderNameExtractor
             $senderName = $this->cleanName($senderName);
             if (!$this->isValidName($senderName)) {
                 $senderName = null;
+            }
+        }
+        
+        // PRIORITY FINAL: Fallback - Extract LEMONADE from description/remarks if all else fails
+        // LEMONADE TECHNOLOGY LIMITED is a company name, use "lemonade" as fallback
+        if (!$senderName && (stripos($text, 'LEMONADE') !== false || stripos($text, 'LEMFI') !== false)) {
+            // Check if LEMONADE TECHNOLOGY LIMITED appears
+            if (preg_match('/[\-]LEMONADE[\s]+TECHNOLOGY[\s]+LIMITED/i', $text)) {
+                $senderName = 'lemonade';
+            }
+            // Or if LEMFI TRANSFER appears
+            elseif (preg_match('/[\-]LEMFI[\s]+TRANSFER/i', $text)) {
+                $senderName = 'lemonade';
             }
         }
         
