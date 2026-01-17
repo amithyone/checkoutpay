@@ -209,6 +209,23 @@ class SenderNameExtractor
             }
         }
         
+        // PRIORITY 1.5: Check Remarks field for Access Bank transactions
+        // When Access Bank is detected in description, sender name is usually in Remarks
+        if (!$senderName && preg_match('/[\-]ACCESS[\-]/i', $text)) {
+            // Extract from Remarks field
+            if (preg_match('/remark[s]*[\s]*:[\s]*([^\n\r]+)/i', $text, $remarksMatches)) {
+                $remarksLine = trim($remarksMatches[1]);
+                // Extract name from remarks (usually just the name before "Time" or other fields)
+                if (preg_match('/^([A-Z][A-Z\s]{2,}?)(?:\s+Time|\s+Transaction|\s+Document|\s*$)/i', $remarksLine, $nameMatches)) {
+                    $potentialName = trim($nameMatches[1]);
+                    $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                    if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                        $senderName = strtolower($potentialName);
+                    }
+                }
+            }
+        }
+        
         // PRIORITY 2: "FROM NAME TO" pattern anywhere in text (flexible spacing)
         // Format: "FROM SOLOMON INNOCENT AMITHY TO SQUA" or "FROM NAME TO"
         if (!$senderName && preg_match('/FROM[\s]+([A-Z][A-Z\s]{2,}?)[\s]+TO[\s]+[A-Z]/i', $text, $matches)) {
