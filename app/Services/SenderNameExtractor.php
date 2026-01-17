@@ -226,7 +226,35 @@ class SenderNameExtractor
             }
         }
         
-        // PRIORITY 1.6: Extract from Remarks field when description has TXN pattern but no name found
+        // PRIORITY 1.6: Extract TXN ID from description and match with pending payments
+        // When description has TXN pattern, look up the transaction_id in pending payments
+        if (!$senderName && preg_match('/TXN[\-]?[\d]+[\-]?[A-Z0-9]+/i', $text, $txnMatches)) {
+            // Extract TXN ID (convert to uppercase for matching)
+            $txnIdFromDesc = strtoupper(trim($txnMatches[0]));
+            $txnIdFromDescNoDash = str_replace('-', '', $txnIdFromDesc);
+            
+            // Try to find matching pending payment by transaction_id
+            // Match by comparing uppercase versions with dashes removed
+            $payment = \App\Models\Payment::where('status', 'pending')
+                ->where('transaction_id', 'LIKE', 'TXN%')
+                ->get()
+                ->first(function ($payment) use ($txnIdFromDesc, $txnIdFromDescNoDash) {
+                    $paymentTxnUpper = strtoupper($payment->transaction_id);
+                    $paymentTxnNoDash = str_replace('-', '', $paymentTxnUpper);
+                    
+                    // Match if uppercase versions match (with or without dashes)
+                    return $txnIdFromDesc === $paymentTxnUpper 
+                        || $txnIdFromDescNoDash === $paymentTxnNoDash
+                        || $txnIdFromDesc === $paymentTxnNoDash
+                        || $txnIdFromDescNoDash === $paymentTxnUpper;
+                });
+            
+            if ($payment && !empty($payment->payer_name)) {
+                $senderName = strtolower(trim($payment->payer_name));
+            }
+        }
+        
+        // PRIORITY 1.6a: Extract from Remarks field when description has TXN pattern but no payment match found
         // Some banks put sender name in Remarks when description only has transaction codes
         // Format: "Remarks : NAME" or "Remarks : D-NAME" or "Remarks : /NONE/...-FBN-NAME"
         if (!$senderName && preg_match('/TXN[\-]?[\d]+[\-]?[A-Z0-9]+/i', $text)) {
