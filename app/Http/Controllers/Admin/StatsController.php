@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\Business;
 use App\Models\ProcessedEmail;
@@ -37,6 +38,13 @@ class StatsController extends Controller
                 $stats = $this->getYearlyStats();
                 break;
         }
+        
+        // Add match similarity score (applies to all periods)
+        $stats['match_similarity'] = [
+            'total_score' => MatchAttempt::whereNotNull('name_similarity_percent')->sum('name_similarity_percent'),
+            'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
+            'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
+        ];
         
         return $stats;
     }

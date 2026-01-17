@@ -229,6 +229,24 @@
                 <span><i class="fas fa-file-alt text-gray-500 mr-1"></i> Direct: {{ $stats['stored_emails']['direct_filesystem'] }}</span>
             </div>
         </div>
+
+        <!-- Total Match Similarity Score -->
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Total Match Similarity Score</p>
+                    <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['match_similarity']['total_score']) }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-percentage text-purple-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <span class="text-gray-600">Total Attempts: {{ number_format($stats['match_similarity']['total_attempts']) }}</span>
+                <span class="mx-2">•</span>
+                <span class="text-purple-600">Average: {{ number_format($stats['match_similarity']['average_score'], 2) }}%</span>
+            </div>
+        </div>
     </div>
 
     <!-- Unmatched Pending Transactions Widget -->

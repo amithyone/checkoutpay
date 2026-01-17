@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AccountNumber;
 use App\Models\Business;
+use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
 use App\Models\WithdrawalRequest;
@@ -77,6 +78,11 @@ class DashboardController extends Controller
                 'imap' => ProcessedEmail::where('source', 'imap')->count(),
                 'gmail_api' => ProcessedEmail::where('source', 'gmail_api')->count(),
                 'direct_filesystem' => ProcessedEmail::where('source', 'direct_filesystem')->count(),
+            ],
+            'match_similarity' => [
+                'total_score' => MatchAttempt::whereNotNull('name_similarity_percent')->sum('name_similarity_percent'),
+                'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
+                'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
             ],
             'unmatched_pending' => [
                 // Get pending payments that haven't been matched and are not expired

@@ -27,7 +27,7 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <!-- Total Amount -->
         <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-6 border-2 border-green-200">
             <div class="flex items-center justify-between mb-4">
@@ -107,6 +107,24 @@
             </div>
             <div class="text-xs text-gray-500">
                 Per transaction
+            </div>
+        </div>
+
+        <!-- Total Match Similarity Score -->
+        <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg shadow-sm p-6 border-2 border-purple-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Total Match Similarity Score</p>
+                    <h3 class="text-3xl font-bold text-gray-900">{{ number_format($stats['match_similarity']['total_score']) }}</h3>
+                </div>
+                <div class="w-16 h-16 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-percentage text-purple-600 text-2xl"></i>
+                </div>
+            </div>
+            <div class="text-xs text-gray-500">
+                {{ number_format($stats['match_similarity']['total_attempts']) }} attempts
+                <br>
+                Avg: {{ number_format($stats['match_similarity']['average_score'], 2) }}%
             </div>
         </div>
     </div>
