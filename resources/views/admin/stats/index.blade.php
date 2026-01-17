@@ -140,9 +140,15 @@
                 </div>
             </div>
             <div class="text-xs text-gray-500">
-                Payments Received: <span class="font-semibold text-gray-900">{{ number_format($stats['account_numbers']['total_payments_received']) }}</span>
-                <br>
-                Pool: {{ $stats['account_numbers']['pool'] }} • Business: {{ $stats['account_numbers']['business_specific'] }}
+                <div class="mb-1">
+                    Payments: <span class="font-semibold text-gray-900">{{ number_format($stats['account_numbers']['total_payments_received_count']) }}</span>
+                </div>
+                <div class="mb-1">
+                    Amount: <span class="font-semibold text-gray-900">₦{{ number_format($stats['account_numbers']['total_payments_received_amount'], 2) }}</span>
+                </div>
+                <div>
+                    Pool: {{ $stats['account_numbers']['pool'] }} • Business: {{ $stats['account_numbers']['business_specific'] }}
+                </div>
             </div>
         </div>
     </div>

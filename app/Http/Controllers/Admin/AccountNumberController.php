@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AccountNumber;
 use App\Models\Business;
+use App\Models\Payment;
 use App\Services\AccountNumberService;
 use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class AccountNumberController extends Controller
 {
@@ -22,9 +24,16 @@ class AccountNumberController extends Controller
         $query = AccountNumber::with('business')
             ->withCount([
                 'payments as payments_received_count' => function ($q) {
-                    $q->where('status', \App\Models\Payment::STATUS_APPROVED);
+                    $q->where('status', Payment::STATUS_APPROVED);
                 }
             ])
+            ->select('account_numbers.*')
+            ->selectSub(function ($query) {
+                $query->from('payments')
+                    ->whereColumn('payments.account_number', 'account_numbers.account_number')
+                    ->where('payments.status', Payment::STATUS_APPROVED)
+                    ->selectRaw('COALESCE(SUM(payments.received_amount), SUM(payments.amount))');
+            }, 'payments_received_amount')
             ->latest();
 
         if ($request->has('type')) {

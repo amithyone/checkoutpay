@@ -68,10 +68,11 @@
                             {{ $account->business ? $account->business->name : '-' }}
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $account->usage_count }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-900 font-medium">
-                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                                {{ number_format($account->payments_received_count ?? 0) }}
-                            </span>
+                        <td class="px-6 py-4 text-sm text-gray-900">
+                            <div class="flex flex-col">
+                                <span class="font-medium text-gray-900">{{ number_format($account->payments_received_count ?? 0) }} payments</span>
+                                <span class="text-xs text-gray-600">₦{{ number_format($account->payments_received_amount ?? 0, 2) }}</span>
+                            </div>
                         </td>
                         <td class="px-6 py-4">
                             @if($account->is_active)

@@ -52,9 +52,12 @@ class StatsController extends Controller
             'total' => AccountNumber::count(),
             'pool' => AccountNumber::pool()->active()->count(),
             'business_specific' => AccountNumber::businessSpecific()->active()->count(),
-            'total_payments_received' => Payment::where('status', Payment::STATUS_APPROVED)
+            'total_payments_received_count' => Payment::where('status', Payment::STATUS_APPROVED)
                 ->whereNotNull('account_number')
                 ->count(),
+            'total_payments_received_amount' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereNotNull('account_number')
+                ->sum(DB::raw('COALESCE(received_amount, amount)')),
         ];
         
         return $stats;

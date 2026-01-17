@@ -204,10 +204,16 @@
                 <span class="text-gray-600">Business: {{ $stats['account_numbers']['business_specific'] }}</span>
             </div>
             <div class="mt-3 pt-3 border-t border-gray-200">
-                <span class="text-xs text-gray-500">
-                    <i class="fas fa-check-circle text-green-500 mr-1"></i>
-                    Payments Received: <span class="font-semibold text-gray-900">{{ number_format($stats['account_numbers']['total_payments_received']) }}</span>
-                </span>
+                <div class="text-xs text-gray-500">
+                    <div class="mb-1">
+                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                        Payments: <span class="font-semibold text-gray-900">{{ number_format($stats['account_numbers']['total_payments_received_count']) }}</span>
+                    </div>
+                    <div>
+                        <i class="fas fa-money-bill-wave text-green-500 mr-1"></i>
+                        Amount: <span class="font-semibold text-gray-900">₦{{ number_format($stats['account_numbers']['total_payments_received_amount'], 2) }}</span>
+                    </div>
+                </div>
             </div>
         </div>
 
