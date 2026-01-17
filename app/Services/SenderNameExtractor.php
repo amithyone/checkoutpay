@@ -228,26 +228,76 @@ class SenderNameExtractor
         
         // PRIORITY 1.6: Extract TXN ID from description and match with pending payments
         // When description has TXN pattern, look up the transaction_id in pending payments
+        // Format: Email has "TXN17685930623YUR0JMAKA", Payment has "TXN-1768593062-3yUR0JMAk"
+        // Match by comparing uppercase versions with dashes removed (fuzzy match for 1 char difference)
         if (!$senderName && preg_match('/TXN[\-]?[\d]+[\-]?[A-Z0-9]+/i', $text, $txnMatches)) {
             // Extract TXN ID (convert to uppercase for matching)
             $txnIdFromDesc = strtoupper(trim($txnMatches[0]));
             $txnIdFromDescNoDash = str_replace('-', '', $txnIdFromDesc);
             
-            // Try to find matching pending payment by transaction_id
-            // Match by comparing uppercase versions with dashes removed
-            $payment = \App\Models\Payment::where('status', 'pending')
-                ->where('transaction_id', 'LIKE', 'TXN%')
+            // Try to find matching payment by transaction_id (check pending first, then all)
+            // Get all payments with TXN prefix and match in memory (more flexible)
+            $payment = \App\Models\Payment::where('transaction_id', 'LIKE', 'TXN%')
+                ->where('status', 'pending') // Prioritize pending payments
                 ->get()
-                ->first(function ($payment) use ($txnIdFromDesc, $txnIdFromDescNoDash) {
+                ->first(function ($payment) use ($txnIdFromDescNoDash) {
                     $paymentTxnUpper = strtoupper($payment->transaction_id);
                     $paymentTxnNoDash = str_replace('-', '', $paymentTxnUpper);
                     
-                    // Match if uppercase versions match (with or without dashes)
-                    return $txnIdFromDesc === $paymentTxnUpper 
-                        || $txnIdFromDescNoDash === $paymentTxnNoDash
-                        || $txnIdFromDesc === $paymentTxnNoDash
-                        || $txnIdFromDescNoDash === $paymentTxnUpper;
+                    // Exact match
+                    if ($txnIdFromDescNoDash === $paymentTxnNoDash) {
+                        return true;
+                    }
+                    
+                    // Fuzzy match: if one is prefix of the other (min 15 chars) or differs by 1 char
+                    $minLen = min(strlen($txnIdFromDescNoDash), strlen($paymentTxnNoDash));
+                    if ($minLen >= 15) {
+                        // Check if one is a prefix of the other (bank might add/remove trailing chars)
+                        if (strpos($txnIdFromDescNoDash, $paymentTxnNoDash) === 0 || 
+                            strpos($paymentTxnNoDash, $txnIdFromDescNoDash) === 0) {
+                            return true;
+                        }
+                        // Check if they differ by only 1 character (similarity >= 95%)
+                        $diff = abs(strlen($txnIdFromDescNoDash) - strlen($paymentTxnNoDash));
+                        if ($diff <= 1 && substr($txnIdFromDescNoDash, 0, $minLen - 1) === substr($paymentTxnNoDash, 0, $minLen - 1)) {
+                            return true;
+                        }
+                    }
+                    
+                    return false;
                 });
+            
+            // If no pending payment found, check all payments (approved/rejected might have payer_name)
+            if (!$payment) {
+                $payment = \App\Models\Payment::where('transaction_id', 'LIKE', 'TXN%')
+                    ->get()
+                    ->first(function ($payment) use ($txnIdFromDescNoDash) {
+                        $paymentTxnUpper = strtoupper($payment->transaction_id);
+                        $paymentTxnNoDash = str_replace('-', '', $paymentTxnUpper);
+                        
+                        // Exact match
+                        if ($txnIdFromDescNoDash === $paymentTxnNoDash) {
+                            return true;
+                        }
+                        
+                        // Fuzzy match: if one is prefix of the other (min 15 chars) or differs by 1 char
+                        $minLen = min(strlen($txnIdFromDescNoDash), strlen($paymentTxnNoDash));
+                        if ($minLen >= 15) {
+                            // Check if one is a prefix of the other
+                            if (strpos($txnIdFromDescNoDash, $paymentTxnNoDash) === 0 || 
+                                strpos($paymentTxnNoDash, $txnIdFromDescNoDash) === 0) {
+                                return true;
+                            }
+                            // Check if they differ by only 1 character
+                            $diff = abs(strlen($txnIdFromDescNoDash) - strlen($paymentTxnNoDash));
+                            if ($diff <= 1 && substr($txnIdFromDescNoDash, 0, $minLen - 1) === substr($paymentTxnNoDash, 0, $minLen - 1)) {
+                                return true;
+                            }
+                        }
+                        
+                        return false;
+                    });
+            }
             
             if ($payment && !empty($payment->payer_name)) {
                 $senderName = strtolower(trim($payment->payer_name));
