@@ -27,14 +27,24 @@ class SenderNameExtractor
             $descriptionLine = trim($descLineMatches[1]);
             
             // Extract name from this description line (structured approach)
+            // Pattern 1a1: TRANSFER FROM: NAME = NAME TO SQUAD - e.g., "TRANSFER FROM: JOHN = AGBO TO SQUAD" (MORE SPECIFIC - check first)
+            if (preg_match('/TRANSFER\s+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)[\s]+TO/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
             // Pattern 1a: TRANSFER FROM: NAME (with colon) - e.g., "TRANSFER FROM: JOHN = AGBO"
-            if (preg_match('/TRANSFER\s+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:\s+TO|\s*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+            elseif (preg_match('/TRANSFER\s+FROM[\s]*:[\s]*([A-Z][A-Z\s=]{2,}?)(?:\s+TO|\s*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 // Handle = characters in names
                 $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
                 $potentialName = preg_replace('/\s+/', ' ', $potentialName);
                 $potentialName = rtrim($potentialName, '- ');
-                if ($this->isValidName($potentialName)) {
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
                     $senderName = strtolower($potentialName);
                 }
             }
@@ -45,25 +55,115 @@ class SenderNameExtractor
                 $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
                 $potentialName = preg_replace('/\s+/', ' ', $potentialName);
                 $potentialName = rtrim($potentialName, '- ');
-                if ($this->isValidName($potentialName)) {
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
                     $senderName = strtolower($potentialName);
                 }
             }
-            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA"
-            elseif (preg_match('/[\-]KMB[\-]([A-Z][A-Z\s,]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|$)/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA" or "PAYMENT -KMB-OGWU, OGELUE DIVINE"
+            // Handle both "V-KMB-NAME" and " -KMB-NAME" patterns
+            // Allow equals signs in name (quoted-printable encoding)
+            elseif (preg_match('/[\s\-]KMB[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (quoted-printable)
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
                 // Remove trailing period and clean up
                 $potentialName = rtrim($potentialName, '. ');
                 $potentialName = preg_replace('/\s+/', ' ', $potentialName);
-                if ($this->isValidName($potentialName)) {
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
                     $senderName = strtolower($potentialName);
                 }
             }
-            // Pattern 1d: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C"
-            elseif (preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1c1a: OPAY pattern - "TRANSFER FROM NAME-OPAY-" (extract name before OPAY)
+            elseif (preg_match('/TRANSFER\s+FROM\s+([A-Z][A-Z\s,=\-]{2,}?)[\s\-]+OPAY/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (quoted-printable)
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
                 $potentialName = rtrim($potentialName, '- ');
-                if ($this->isValidName($potentialName)) {
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c1b: OPAY pattern - e.g., "PURCHASE-OPAY-NAME", "GIFT-OPAY-NAME", "MISCELLANEOUS-OPAY-NAME", "PAY-OPAY-NAME", "LOAN-REPAYMENT-OPAY-NAME", "TELEGRAM-OPAY-NAME", "NUMBERS-OPAY-NAME"
+            elseif (preg_match('/[\-](?:PURCHASE|GIFT|MISCELLANEOUS|TRANSFER|PAY|LOAN[\s]*=[\s]*REPAYMENT|TELEGRAM|NUMBERS|BABA)[\-]OPAY[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (quoted-printable)
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                // Remove trailing period and clean up
+                $potentialName = rtrim($potentialName, '. ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c1c: OPAY pattern - "TRANSFER FROM NAME-OPAY-" (extract name before OPAY, handle truncation)
+            elseif (preg_match('/TRANSFER\s+FROM\s+([A-Z][A-Z\s,=\-]{2,}?)[\s\-]+OPA/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (quoted-printable)
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c1d: OPAY pattern - "NAME-OPAY-NAME" format (extract name after OPAY)
+            elseif (preg_match('/[\-]OPAY[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (quoted-printable)
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '. ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c2a: PALMPAY pattern - extract name BEFORE PALMPAY (full name)
+            // Format: "NAME = NAMEphone-PALMPAY-TRUNCATED" or "NAME:phone-PALMPAY-TRUNCATED"
+            // Extract the full name before PALMPAY (may include equals sign)
+            // Pattern: capture name parts before phone number (10+ digits) followed by -PALMPAY
+            elseif (preg_match('/([A-Z][A-Z\s=]{2,}?)[\s]*[=:][\s]*([A-Z][A-Z\s]*?)[\d]{10,}[\-]PALMPAY/i', $descriptionLine, $nameMatches)) {
+                // Combine both name parts
+                $potentialName = trim($nameMatches[1]) . ' ' . trim($nameMatches[2]);
+                // Handle = characters in names (quoted-printable)
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c2a1: PALMPAY pattern - simpler format "NAMEphone-PALMPAY"
+            elseif (preg_match('/([A-Z][A-Z\s=]{2,}?)[\d]{10,}[\-]PALMPAY/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (quoted-printable)
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c2b: PALMPAY pattern - extract name AFTER PALMPAY (fallback if no name before)
+            // Format: "NAME:phone-PALMPAY-NAME" (extract name after PALMPAY)
+            elseif (preg_match('/[\-]PALMPAY[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names (quoted-printable) - remove =20, =0D, etc.
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/=\d+/', '', $potentialName); // Remove =20, =0D, etc.
+                // Remove trailing period and clean up
+                $potentialName = rtrim($potentialName, '. ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1d: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C" or "MOBILE/UNION TRANSFER = FROM NAME"
+            elseif (preg_match('/(?:MOBILE\/)?UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s=]{2,}?)(?:[\s\-]+|[\s]+TO|[\s]+NA|\s*$)/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = rtrim($potentialName, '- ');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
                     $senderName = strtolower($potentialName);
                 }
             }
@@ -287,7 +387,7 @@ class SenderNameExtractor
         // Clean up and validate
         if ($senderName) {
             $senderName = $this->cleanName($senderName);
-            if (!$this->isValidName($senderName)) {
+            if (!$this->isValidName($senderName) || $this->isGenericTransactionName($senderName)) {
                 $senderName = null;
             }
         }
@@ -344,6 +444,16 @@ class SenderNameExtractor
         // Decode HTML entities
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
+        // Handle quoted-printable encoding (=20 for space, =0D=0A for newline, etc.)
+        // Replace =XX with actual character (hex decode)
+        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function($matches) {
+            return chr(hexdec($matches[1]));
+        }, $text);
+        
+        // Handle soft line breaks (= at end of line)
+        $text = preg_replace('/=\r?\n/', '', $text);
+        $text = preg_replace('/=\s*$/', '', $text);
+        
         // Normalize whitespace (but preserve structure)
         $text = preg_replace('/\s+/', ' ', $text);
         
@@ -372,6 +482,50 @@ class SenderNameExtractor
     }
     
     /**
+     * Check if name is a generic transaction name (not a real person name)
+     */
+    protected function isGenericTransactionName(string $name): bool
+    {
+        $name = strtolower(trim($name));
+        
+        // List of generic transaction names to filter out
+        $genericNames = [
+            'payment',
+            'vam transfer transaction',
+            'transfer transaction',
+            'transaction',
+            'credit',
+            'debit',
+            'deposit',
+            'withdrawal',
+            'transfer',
+            'remittance',
+            'payment received',
+            'payment sent',
+            'bank transfer',
+            'online transfer',
+            'mobile transfer',
+            'atm transaction',
+            'pos transaction',
+            'card transaction',
+        ];
+        
+        // Check exact matches
+        if (in_array($name, $genericNames)) {
+            return true;
+        }
+        
+        // Check if name contains generic transaction words
+        foreach ($genericNames as $generic) {
+            if (stripos($name, $generic) !== false && strlen($name) < 30) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
      * Validate if extracted text looks like a real name
      */
     protected function isValidName(?string $name): bool
@@ -384,6 +538,11 @@ class SenderNameExtractor
         
         // Must be at least 3 characters
         if (strlen($name) < 3) {
+            return false;
+        }
+        
+        // Filter out generic transaction names
+        if ($this->isGenericTransactionName($name)) {
             return false;
         }
         

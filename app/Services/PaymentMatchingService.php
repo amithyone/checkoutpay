@@ -511,19 +511,21 @@ class PaymentMatchingService
         $textBody = $this->decodeQuotedPrintable($textBody);
         $htmlBody = $this->decodeQuotedPrintable($htmlBody);
         
-        // Try HTML first (more structured)
-        if (!empty($htmlBody)) {
-            $htmlName = $this->extractFromHtml($htmlBody);
-            if ($htmlName) {
-                return $htmlName;
+        // PRIORITY: Try text body first (cleaner, no HTML tags)
+        if (!empty($textBody)) {
+            $nameExtractor = new \App\Services\SenderNameExtractor();
+            $textName = $nameExtractor->extractFromText($textBody);
+            if ($textName) {
+                return $textName;
             }
         }
         
-        // Then try text body
-        if (!empty($textBody)) {
-            $textName = $this->extractFromText($textBody);
-            if ($textName) {
-                return $textName;
+        // Then try HTML (more structured but may have HTML tags)
+        if (!empty($htmlBody)) {
+            $nameExtractor = new \App\Services\SenderNameExtractor();
+            $htmlName = $nameExtractor->extractFromHtml($htmlBody);
+            if ($htmlName) {
+                return $htmlName;
             }
         }
         
@@ -534,7 +536,8 @@ class PaymentMatchingService
         // Normalize whitespace
         $combined = preg_replace('/\s+/', ' ', $combined);
         
-        return $this->extractFromText($combined);
+        $nameExtractor = new \App\Services\SenderNameExtractor();
+        return $nameExtractor->extractFromText($combined);
     }
     
     /**

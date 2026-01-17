@@ -119,9 +119,9 @@ class CheckoutController extends Controller
                       ->orWhere('id', $validated['business_id']);
             })
             ->where('is_active', true)
-            ->with('approvedWebsites')
             ->firstOrFail();
 
+        // Validate return URL is from approved domain
         // Skip return URL validation for demo (business ID 1) or if return URL is from same site
         $isDemo = $business->id == 1;
         $isSameSite = $this->isUrlFromSameSite($validated['return_url']);
@@ -131,9 +131,9 @@ class CheckoutController extends Controller
             if (!$this->isUrlFromApprovedWebsites($validated['return_url'], $business)) {
                 return back()->withErrors(['return_url' => 'Return URL must be from your approved website domain.'])->withInput();
             }
-        }
 
         try {
+            // Normalize return_url to prevent double slashes
             // Normalize return_url to prevent double slashes
             $returnUrl = preg_replace('#([^:])//+#', '$1/', $validated['return_url']);
             
@@ -181,7 +181,6 @@ class CheckoutController extends Controller
             ]);
 
             return back()->withErrors(['error' => 'Failed to create payment: ' . $e->getMessage()])->withInput();
-        }
     }
 
     /**
@@ -189,6 +188,7 @@ class CheckoutController extends Controller
      */
     public function payment(Request $request, string $transactionId)
     {
+        $payment = Payment::with(['accountNumberDetails', 'business'])
         try {
             $payment = Payment::with(['accountNumberDetails', 'business'])
                 ->where('transaction_id', $transactionId)
@@ -201,7 +201,6 @@ class CheckoutController extends Controller
                 'error' => 'Payment not found. Please check your transaction ID.',
             ]);
         }
-
         $returnUrl = $request->query('return_url');
 
         // Get return_url from email_data
@@ -300,12 +299,12 @@ class CheckoutController extends Controller
      */
     protected function isUrlFromApprovedWebsites(string $url, Business $business): bool
     {
+        // If business has no approved websites, allow the URL (backward compatibility)
         // Load approved websites if not already loaded
         if (!$business->relationLoaded('approvedWebsites')) {
             $business->load('approvedWebsites');
         }
         
-        // If business has no approved websites, allow the URL (backward compatibility)
         $approvedWebsites = $business->approvedWebsites;
         
         if ($approvedWebsites->isEmpty()) {
@@ -328,6 +327,7 @@ class CheckoutController extends Controller
     }
 
     /**
+     * Check if URL is from approved domain
      * Check if URL is from the same site (current app domain)
      */
     protected function isUrlFromSameSite(string $url): bool
@@ -350,7 +350,6 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Check if URL is from approved domain
      */
     protected function isUrlFromApprovedDomain(string $url, string $approvedDomain): bool
     {
