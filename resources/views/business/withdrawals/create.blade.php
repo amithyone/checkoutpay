@@ -39,7 +39,7 @@
                 </div>
 
                 @if(!$hasAccountNumber)
-                    <div>
+                <div>
                         <label for="bank_code" class="block text-sm font-medium text-gray-700 mb-1">Bank</label>
                         <select name="bank_code" id="bank_code" required
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
@@ -51,27 +51,27 @@
                             @endforeach
                         </select>
                         <input type="hidden" name="bank_name" id="bank_name">
-                        @error('bank_name')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
+                    @error('bank_name')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                         @error('bank_code')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
-                    </div>
+                </div>
 
-                    <div>
-                        <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                <div>
+                    <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
                         <input type="text" name="account_number" id="account_number" required maxlength="10"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                             placeholder="Enter 10-digit account number">
                         <div id="account_number_validation" class="mt-1 text-sm hidden"></div>
-                        @error('account_number')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
+                    @error('account_number')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
 
-                    <div>
-                        <label for="account_name" class="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
+                <div>
+                    <label for="account_name" class="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
                         <input type="text" name="account_name" id="account_name" required readonly
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-gray-50"
                             placeholder="Account name will be auto-filled after validation">

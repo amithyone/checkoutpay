@@ -511,32 +511,49 @@ class PaymentMatchingService
         $textBody = $this->decodeQuotedPrintable($textBody);
         $htmlBody = $this->decodeQuotedPrintable($htmlBody);
         
-        // PRIORITY: Try text body first (cleaner, no HTML tags)
-        if (!empty($textBody)) {
-            $nameExtractor = new \App\Services\SenderNameExtractor();
-            $textName = $nameExtractor->extractFromText($textBody);
+        $nameExtractor = new \App\Services\SenderNameExtractor();
+        
+        // Check if text_body contains HTML tags (old system saved HTML in text_body)
+        $textBodyHasHtml = !empty($textBody) && preg_match('/<[^>]+>/', $textBody);
+        
+        // PRIORITY: If text_body contains HTML, treat it as HTML
+        if ($textBodyHasHtml) {
+            $htmlName = $nameExtractor->extractFromHtml($textBody);
+            if ($htmlName) {
+                return $htmlName;
+            }
+            // Also try extracting from text (strip tags first)
+            $textOnly = strip_tags($textBody);
+            $textName = $nameExtractor->extractFromText($textOnly);
             if ($textName) {
                 return $textName;
             }
+        } else {
+            // PRIORITY: Try text body first (cleaner, no HTML tags)
+            if (!empty($textBody)) {
+                $textName = $nameExtractor->extractFromText($textBody);
+                if ($textName) {
+                    return $textName;
+                }
+            }
         }
         
-        // Then try HTML (more structured but may have HTML tags)
+        // Then try HTML body (more structured but may have HTML tags)
         if (!empty($htmlBody)) {
-            $nameExtractor = new \App\Services\SenderNameExtractor();
             $htmlName = $nameExtractor->extractFromHtml($htmlBody);
             if ($htmlName) {
                 return $htmlName;
             }
         }
         
-        // Fallback: combine both
+        // Fallback: combine both (strip HTML tags from text_body if it has HTML)
+        $textForCombined = $textBodyHasHtml ? strip_tags($textBody) : $textBody;
         $htmlText = strip_tags($htmlBody);
-        $combined = $htmlText . ' ' . $textBody;
+        $combined = $htmlText . ' ' . $textForCombined;
         
         // Normalize whitespace
         $combined = preg_replace('/\s+/', ' ', $combined);
         
-        $nameExtractor = new \App\Services\SenderNameExtractor();
         return $nameExtractor->extractFromText($combined);
     }
     
