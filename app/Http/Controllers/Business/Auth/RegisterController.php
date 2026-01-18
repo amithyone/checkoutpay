@@ -49,8 +49,9 @@ class RegisterController extends Controller
         // Send email verification notification
         $business->sendEmailVerificationNotification();
 
-        // Don't auto-login - require email verification first
-        return redirect()->route('business.login')
-            ->with('success', 'Registration successful! Please check your email to verify your account before logging in.');
+        // Redirect to verify email page with email in session
+        return redirect()->route('business.verification.notice')
+            ->with('registered_email', $business->email)
+            ->with('success', 'Registration successful! Please check your email to verify your account.');
     }
 }

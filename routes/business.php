@@ -30,7 +30,8 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     // Email verification routes
     Route::get('/email/verify', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'notice'])->name('verification.notice');
     Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verify'])->name('verification.verify');
-    Route::post('/email/verification-notification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resend'])->middleware('auth:business')->name('verification.send');
+    Route::post('/email/verify-pin', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verifyPin'])->name('verification.verify-pin');
+    Route::post('/email/verification-notification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resend'])->name('verification.send');
     Route::post('/email/resend-verification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resendWithoutAuth'])->name('verification.resend-without-auth');
 
     // Two-Factor Authentication routes

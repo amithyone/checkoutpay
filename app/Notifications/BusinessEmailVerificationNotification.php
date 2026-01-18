@@ -43,6 +43,16 @@ class BusinessEmailVerificationNotification extends Notification
             ['id' => $notifiable->getKey(), 'hash' => sha1($notifiable->getEmailForVerification())]
         );
 
+        // Generate 6-digit verification PIN
+        $verificationPin = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        
+        // Store PIN in cache for 60 minutes (keyed by business ID)
+        \Illuminate\Support\Facades\Cache::put(
+            'email_verification_pin_' . $notifiable->getKey(),
+            $verificationPin,
+            now()->addMinutes(60)
+        );
+
         $appName = Setting::get('site_name', 'CheckoutPay');
         
         return (new MailMessage)
@@ -50,6 +60,7 @@ class BusinessEmailVerificationNotification extends Notification
             ->view('emails.business-verification', [
                 'business' => $notifiable,
                 'verificationUrl' => $verificationUrl,
+                'verificationPin' => $verificationPin,
                 'appName' => $appName,
             ]);
     }

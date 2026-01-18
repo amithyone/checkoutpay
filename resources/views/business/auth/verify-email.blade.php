@@ -47,22 +47,72 @@
                 </div>
             @endif
 
+            @if (session('success'))
+                <div class="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if ($errors->any())
+                <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+                    <ul class="list-disc list-inside text-sm">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="text-center">
                 <div class="mb-6">
                     <div class="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-blue-100 mb-4">
                         <i class="fas fa-envelope-open text-blue-600 text-3xl"></i>
                     </div>
                     <p class="text-gray-700 mb-4">
-                        Before proceeding, please check your email for a verification link.
+                        Before proceeding, please check your email for a verification link or PIN.
                     </p>
                     <p class="text-sm text-gray-600 mb-6">
-                        If you didn't receive the email, we can send you another one.
+                        @if(session('registered_email'))
+                            Verification email sent to: <strong>{{ session('registered_email') }}</strong>
+                        @else
+                            If you didn't receive the email, we can send you another one.
+                        @endif
                     </p>
                 </div>
 
+                <!-- PIN Verification Form -->
+                <div class="mb-6 pb-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Verify with PIN</h3>
+                    <form method="POST" action="{{ route('business.verification.verify-pin') }}">
+                        @csrf
+                        <div class="mb-4">
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-2 text-left">Email Address</label>
+                            <input type="email" name="email" id="email" required 
+                                value="{{ session('registered_email') ?? old('email') }}"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                placeholder="Enter your email">
+                        </div>
+                        <div class="mb-4">
+                            <label for="pin" class="block text-sm font-medium text-gray-700 mb-2 text-left">Verification PIN</label>
+                            <input type="text" name="pin" id="pin" required maxlength="6" pattern="[0-9]{6}"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-center text-2xl font-mono tracking-widest"
+                                placeholder="000000">
+                            <p class="text-xs text-gray-500 mt-1 text-left">Enter the 6-digit PIN from your email</p>
+                        </div>
+                        <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            Verify Email with PIN
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Resend Email Form -->
                 <form method="POST" action="{{ route('business.verification.send') }}">
                     @csrf
-                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors">
+                    @if(session('registered_email'))
+                        <input type="hidden" name="email" value="{{ session('registered_email') }}">
+                    @endif
+                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
                         <i class="fas fa-paper-plane mr-2"></i>
                         Resend Verification Email
                     </button>

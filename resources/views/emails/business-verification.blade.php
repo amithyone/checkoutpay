@@ -259,6 +259,21 @@
                     </a>
                 </div>
 
+                <!-- Verification PIN -->
+                @if(isset($verificationPin))
+                <div class="verification-box" style="background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%); border-color: #fc8181;">
+                    <div style="font-size: 14px; color: #742a2a; margin-bottom: 15px; font-weight: 600;">
+                        Or use this verification PIN:
+                    </div>
+                    <div style="font-size: 32px; font-weight: 700; color: #c53030; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+                        {{ $verificationPin }}
+                    </div>
+                    <div style="font-size: 12px; color: #742a2a; margin-top: 15px;">
+                        Enter this PIN on the verification page to verify your email
+                    </div>
+                </div>
+                @endif
+
                 <div class="content-text" style="text-align: center; font-size: 13px; color: #718096;">
                     Or copy and paste this link into your browser:<br>
                     <span style="word-break: break-all; color: #3C50E0;">{{ $verificationUrl }}</span>
