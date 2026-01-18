@@ -68,10 +68,6 @@
                         <div class="value">{{ $ipAddress }}</div>
                     </div>
                     <div class="info-item">
-                        <div class="label">Device/Browser</div>
-                        <div class="value">{{ $userAgent }}</div>
-                    </div>
-                    <div class="info-item">
                         <div class="label">Time</div>
                         <div class="value">{{ now()->format('F d, Y \a\t g:i A') }}</div>
                     </div>
