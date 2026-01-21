@@ -28,6 +28,10 @@
                         data-payment-id="{{ $payment->id }}">
                         <i class="fas fa-search mr-2"></i> Check Match
                     </button>
+                    <button onclick="showManualVerifyModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
+                        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center">
+                        <i class="fas fa-check-double mr-2"></i> Manual Verify
+                    </button>
                     <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
                         class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center">
                         <i class="fas fa-check-circle mr-2"></i> Manual Approve
@@ -103,6 +107,25 @@
             <div>
                 <label class="text-sm text-gray-600">Matched At</label>
                 <p class="text-sm font-medium text-gray-900">{{ $payment->matched_at->format('M d, Y H:i:s') }}</p>
+            </div>
+            @endif
+            @if($payment->email_data && isset($payment->email_data['manual_verification']))
+            <div>
+                <label class="text-sm text-gray-600">Manual Verification</label>
+                <div class="mt-1">
+                    <span class="px-2 py-1 text-xs font-medium bg-indigo-100 text-indigo-800 rounded-full">
+                        <i class="fas fa-check-double mr-1"></i> Verified
+                    </span>
+                    <p class="text-xs text-gray-500 mt-1">
+                        By: {{ $payment->email_data['manual_verification']['verified_by_name'] ?? 'Admin' }}
+                        @if(isset($payment->email_data['manual_verification']['verified_at']))
+                            - {{ \Carbon\Carbon::parse($payment->email_data['manual_verification']['verified_at'])->format('M d, Y H:i') }}
+                        @endif
+                    </p>
+                    @if(isset($payment->email_data['manual_verification']['verification_notes']) && !empty($payment->email_data['manual_verification']['verification_notes']))
+                        <p class="text-xs text-gray-600 mt-1 italic">{{ $payment->email_data['manual_verification']['verification_notes'] }}</p>
+                    @endif
+                </div>
             </div>
             @endif
             @if($payment->expires_at)
@@ -236,6 +259,54 @@
                 <button type="submit" 
                     class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
                     <i class="fas fa-trash mr-2"></i> Delete Transaction
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Manual Verify Modal -->
+<div id="manualVerifyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-check-double text-indigo-600 mr-2"></i>Manually Verify Transaction
+        </h3>
+        <form id="manualVerifyForm" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Transaction ID</label>
+                <p class="text-sm font-mono text-gray-900 bg-gray-50 p-2 rounded" id="verify-modal-transaction-id"></p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Expected Amount</label>
+                <p class="text-lg font-bold text-gray-900" id="verify-modal-expected-amount"></p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Verified Amount <span class="text-red-500">*</span></label>
+                <input type="number" name="verified_amount" step="0.01" min="0" required id="verify-modal-verified-amount"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                <p class="text-xs text-gray-500 mt-1">Enter the amount you verified (defaults to expected amount)</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Verification Notes</label>
+                <textarea name="verification_notes" rows="3" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Add notes about the verification (e.g., checked bank statement, confirmed receipt, etc.)..."></textarea>
+            </div>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p class="text-xs text-blue-800">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    <strong>Note:</strong> This will mark the transaction as manually verified. You can approve it later using the "Manual Approve" button.
+                </p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeManualVerifyModal()" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" 
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                    <i class="fas fa-check-double mr-2"></i> Verify Transaction
                 </button>
             </div>
         </form>
@@ -412,6 +483,21 @@ function closeDeleteModal() {
     document.getElementById('deleteModal').classList.add('hidden');
 }
 
+function showManualVerifyModal(paymentId, transactionId, expectedAmount) {
+    const form = document.getElementById('manualVerifyForm');
+    form.action = `/admin/payments/${paymentId}/manual-verify`;
+    
+    document.getElementById('verify-modal-transaction-id').textContent = transactionId;
+    document.getElementById('verify-modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
+    document.getElementById('verify-modal-verified-amount').value = expectedAmount;
+    
+    document.getElementById('manualVerifyModal').classList.remove('hidden');
+}
+
+function closeManualVerifyModal() {
+    document.getElementById('manualVerifyModal').classList.add('hidden');
+}
+
 function showManualApproveModal(paymentId, transactionId, expectedAmount) {
     const form = document.getElementById('manualApproveForm');
     form.action = `/admin/payments/${paymentId}/manual-approve`;
@@ -505,6 +591,16 @@ document.addEventListener('DOMContentLoaded', function() {
         deleteModal.addEventListener('click', function(e) {
             if (e.target === this) {
                 closeDeleteModal();
+            }
+        });
+    }
+
+    // Close verify modal when clicking outside
+    const verifyModal = document.getElementById('manualVerifyModal');
+    if (verifyModal) {
+        verifyModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeManualVerifyModal();
             }
         });
     }

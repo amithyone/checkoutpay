@@ -86,6 +86,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('payments/needs-review', [PaymentController::class, 'needsReview'])->name('payments.needs-review');
         Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
         Route::post('payments/{payment}/check-match', [PaymentController::class, 'checkMatch'])->name('payments.check-match');
+        Route::post('payments/{payment}/manual-verify', [PaymentController::class, 'manualVerify'])->name('payments.manual-verify');
         Route::post('payments/{payment}/manual-approve', [PaymentController::class, 'manualApprove'])->name('payments.manual-approve');
         Route::get('payments/{payment}/unmatched-emails', [PaymentController::class, 'getUnmatchedEmails'])->name('payments.unmatched-emails');
         Route::post('payments/{payment}/mark-expired', [PaymentController::class, 'markAsExpired'])->name('payments.mark-expired');

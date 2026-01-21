@@ -336,6 +336,51 @@ class PaymentController extends Controller
     }
 
     /**
+     * Manually verify a payment (mark as verified by admin)
+     */
+    public function manualVerify(Request $request, Payment $payment): RedirectResponse
+    {
+        $request->validate([
+            'verification_notes' => 'nullable|string|max:1000',
+            'verified_amount' => 'nullable|numeric|min:0',
+        ]);
+
+        // Only allow verification for pending payments
+        if ($payment->status !== Payment::STATUS_PENDING) {
+            return redirect()->route('admin.payments.show', $payment)
+                ->with('error', 'Only pending payments can be manually verified.');
+        }
+
+        $verifiedAmount = $request->verified_amount ?? $payment->amount;
+
+        // Store verification data in email_data
+        $emailData = $payment->email_data ?? [];
+        $emailData['manual_verification'] = [
+            'verified' => true,
+            'verified_by' => auth('admin')->user()->id,
+            'verified_by_name' => auth('admin')->user()->name,
+            'verified_at' => now()->toDateTimeString(),
+            'verification_notes' => $request->verification_notes,
+            'verified_amount' => $verifiedAmount,
+        ];
+
+        $payment->update([
+            'email_data' => $emailData,
+        ]);
+
+        // Log the verification
+        \Illuminate\Support\Facades\Log::info('Payment manually verified by admin', [
+            'payment_id' => $payment->id,
+            'transaction_id' => $payment->transaction_id,
+            'admin_id' => auth('admin')->id(),
+            'verified_amount' => $verifiedAmount,
+        ]);
+
+        return redirect()->route('admin.payments.show', $payment)
+            ->with('success', 'Payment has been manually verified. You can now approve it if needed.');
+    }
+
+    /**
      * Manually approve a payment (even if it doesn't match)
      */
     public function manualApprove(Request $request, Payment $payment): RedirectResponse
