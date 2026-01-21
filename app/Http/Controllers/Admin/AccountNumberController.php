@@ -55,11 +55,27 @@ class AccountNumberController extends Controller
         $validated = $request->validate([
             'account_number' => 'required|string|unique:account_numbers,account_number',
             'account_name' => 'required|string|max:255',
-            'bank_name' => 'required|string|max:255',
+            'bank_name' => 'nullable|string|max:255',
             'bank_code' => 'required|string',
             'business_id' => 'nullable|exists:businesses,id',
             'is_pool' => 'boolean',
         ]);
+        
+        // Auto-populate bank_name from bank_code if not provided
+        if (empty($validated['bank_name']) && !empty($validated['bank_code'])) {
+            $banks = config('banks', []);
+            foreach ($banks as $bank) {
+                if ($bank['code'] === $validated['bank_code']) {
+                    $validated['bank_name'] = $bank['bank_name'];
+                    break;
+                }
+            }
+        }
+        
+        // Ensure bank_name is set
+        if (empty($validated['bank_name'])) {
+            return back()->withErrors(['bank_code' => 'Please select a valid bank.'])->withInput();
+        }
 
         // Validate account number using NUBAN API
         $nubanService = app(NubanValidationService::class);
@@ -99,11 +115,27 @@ class AccountNumberController extends Controller
         $validated = $request->validate([
             'account_number' => 'required|string|unique:account_numbers,account_number,' . $accountNumber->id,
             'account_name' => 'required|string|max:255',
-            'bank_name' => 'required|string|max:255',
+            'bank_name' => 'nullable|string|max:255',
             'bank_code' => 'required|string',
             'business_id' => 'nullable|exists:businesses,id',
             'is_active' => 'boolean',
         ]);
+        
+        // Auto-populate bank_name from bank_code if not provided
+        if (empty($validated['bank_name']) && !empty($validated['bank_code'])) {
+            $banks = config('banks', []);
+            foreach ($banks as $bank) {
+                if ($bank['code'] === $validated['bank_code']) {
+                    $validated['bank_name'] = $bank['bank_name'];
+                    break;
+                }
+            }
+        }
+        
+        // Ensure bank_name is set
+        if (empty($validated['bank_name'])) {
+            return back()->withErrors(['bank_code' => 'Please select a valid bank.'])->withInput();
+        }
 
         // Validate account number using NUBAN API if account number changed
         if ($validated['account_number'] !== $accountNumber->account_number || isset($validated['bank_code'])) {

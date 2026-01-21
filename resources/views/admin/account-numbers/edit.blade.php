@@ -55,11 +55,10 @@
 
                 <div>
                     <label for="bank_code" class="block text-sm font-medium text-gray-700 mb-1">Bank *</label>
-                    <select name="bank_code" id="bank_code" required
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary">
-                        <option value="">Select Bank</option>
+                    <div class="relative">
                         @php
                             $currentBankCode = old('bank_code');
+                            $currentBankName = old('bank_name', $accountNumber->bank_name);
                             if (!$currentBankCode) {
                                 // Find bank code from bank name
                                 foreach(config('banks') as $bank) {
@@ -70,13 +69,36 @@
                                 }
                             }
                         @endphp
-                        @foreach(config('banks') as $bank)
-                            <option value="{{ $bank['code'] }}" data-bank-name="{{ $bank['bank_name'] }}" {{ $currentBankCode == $bank['code'] ? 'selected' : '' }}>
-                                {{ $bank['bank_name'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <input type="hidden" name="bank_name" id="bank_name" value="{{ old('bank_name', $accountNumber->bank_name) }}">
+                        <input type="text" 
+                               id="bank_search" 
+                               autocomplete="off"
+                               placeholder="Search for a bank..."
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
+                               value="{{ $currentBankName }}"
+                               onkeyup="filterBanks(this.value)"
+                               onclick="toggleBankDropdown()">
+                        <select name="bank_code" id="bank_code" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary hidden"
+                            onchange="updateBankName()">
+                            <option value="">Select Bank</option>
+                            @foreach(config('banks') as $bank)
+                                <option value="{{ $bank['code'] }}" data-bank-name="{{ $bank['bank_name'] }}" {{ $currentBankCode == $bank['code'] ? 'selected' : '' }}>
+                                    {{ $bank['bank_name'] }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div id="bank_dropdown" class="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto hidden">
+                            @foreach(config('banks') as $bank)
+                                <div class="bank-option px-3 py-2 hover:bg-gray-100 cursor-pointer" 
+                                     data-code="{{ $bank['code'] }}" 
+                                     data-name="{{ $bank['bank_name'] }}"
+                                     onclick="selectBank('{{ $bank['code'] }}', '{{ $bank['bank_name'] }}')">
+                                    {{ $bank['bank_name'] }}
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    <input type="hidden" name="bank_name" id="bank_name" value="{{ $currentBankName }}">
                     @error('bank_name')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -107,6 +129,79 @@
 
 @push('scripts')
 <script>
+    // Bank search functionality (same as create page)
+    function filterBanks(searchTerm) {
+        const dropdown = document.getElementById('bank_dropdown');
+        const options = dropdown.querySelectorAll('.bank-option');
+        const searchLower = searchTerm.toLowerCase();
+        
+        dropdown.classList.remove('hidden');
+        
+        options.forEach(option => {
+            const bankName = option.textContent.toLowerCase();
+            if (bankName.includes(searchLower)) {
+                option.style.display = 'block';
+            } else {
+                option.style.display = 'none';
+            }
+        });
+    }
+
+    function toggleBankDropdown() {
+        const dropdown = document.getElementById('bank_dropdown');
+        const searchInput = document.getElementById('bank_search');
+        
+        if (dropdown.classList.contains('hidden')) {
+            dropdown.classList.remove('hidden');
+            filterBanks(searchInput.value);
+        }
+    }
+
+    function selectBank(code, name) {
+        const bankCodeSelect = document.getElementById('bank_code');
+        const bankNameInput = document.getElementById('bank_name');
+        const bankSearchInput = document.getElementById('bank_search');
+        const dropdown = document.getElementById('bank_dropdown');
+        
+        // Set the select value
+        bankCodeSelect.value = code;
+        bankNameInput.value = name;
+        bankSearchInput.value = name;
+        
+        // Hide dropdown
+        dropdown.classList.add('hidden');
+        
+        // Trigger change event
+        bankCodeSelect.dispatchEvent(new Event('change'));
+    }
+
+    function updateBankName() {
+        const bankCodeSelect = document.getElementById('bank_code');
+        const bankNameInput = document.getElementById('bank_name');
+        const bankSearchInput = document.getElementById('bank_search');
+        const selectedOption = bankCodeSelect.options[bankCodeSelect.selectedIndex];
+        
+        if (selectedOption.value) {
+            const bankName = selectedOption.getAttribute('data-bank-name') || selectedOption.textContent;
+            bankNameInput.value = bankName;
+            bankSearchInput.value = bankName;
+        } else {
+            bankNameInput.value = '';
+            bankSearchInput.value = '';
+        }
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const bankSearchInput = document.getElementById('bank_search');
+        const bankDropdown = document.getElementById('bank_dropdown');
+        const bankContainer = bankSearchInput ? bankSearchInput.closest('.relative') : null;
+        
+        if (bankContainer && !bankContainer.contains(event.target)) {
+            bankDropdown.classList.add('hidden');
+        }
+    });
+
     // Account number validation (only if account number changes)
     (function() {
         const accountNumberInput = document.getElementById('account_number');
@@ -120,10 +215,7 @@
         // Update bank name when bank is selected
         if (bankCodeSelect) {
             bankCodeSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                if (selectedOption.value) {
-                    bankNameInput.value = selectedOption.getAttribute('data-bank-name');
-                }
+                updateBankName();
             });
         }
 
