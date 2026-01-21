@@ -186,7 +186,40 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
         $controller = new \App\Http\Controllers\Admin\EmailMonitorController();
         
         $response = $controller->fetchEmailsDirect($request);
-        $responseData = json_decode($response->getContent(), true);
+        $responseContent = $response->getContent();
+        
+        // Safely decode JSON, handle large responses
+        $responseData = json_decode($responseContent, true);
+        
+        // If JSON decode failed or response is too large, create a minimal response
+        if (json_last_error() !== JSON_ERROR_NONE || strlen($responseContent) > 100000) {
+            \Illuminate\Support\Facades\Log::warning('Large response detected in cron endpoint', [
+                'content_length' => strlen($responseContent),
+                'json_error' => json_last_error_msg(),
+            ]);
+            
+            // Extract just the essential info from the response
+            $responseData = [
+                'success' => true,
+                'message' => 'Email fetching completed (output truncated due to size)',
+                'stats' => [
+                    'processed' => 0,
+                    'skipped' => 0,
+                    'failed' => 0,
+                ],
+            ];
+            
+            // Try to extract stats from the response content if possible
+            if (preg_match('/Total processed:\s*(\d+)/i', $responseContent, $matches)) {
+                $responseData['stats']['processed'] = (int)$matches[1];
+            }
+            if (preg_match('/Total skipped:\s*(\d+)/i', $responseContent, $matches)) {
+                $responseData['stats']['skipped'] = (int)$matches[1];
+            }
+            if (preg_match('/Total failed:\s*(\d+)/i', $responseContent, $matches)) {
+                $responseData['stats']['failed'] = (int)$matches[1];
+            }
+        }
         
         $executionTime = round(microtime(true) - $startTime, 2);
         
@@ -195,6 +228,14 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
             $responseData['execution_time_seconds'] = $executionTime;
             $responseData['method'] = 'direct_filesystem';
             $responseData['timestamp'] = now()->toDateTimeString();
+            
+            // Remove or truncate large output fields for cron responses
+            if (isset($responseData['output']) && strlen($responseData['output']) > 2000) {
+                $responseData['output'] = substr($responseData['output'], 0, 2000) . "\n\n... (truncated) ...";
+            }
+            if (isset($responseData['summary']) && strlen($responseData['summary']) > 2000) {
+                $responseData['summary'] = substr($responseData['summary'], 0, 2000) . "\n\n... (truncated) ...";
+            }
         }
         
         return response()->json($responseData, $response->getStatusCode());

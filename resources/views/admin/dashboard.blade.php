@@ -701,7 +701,27 @@ function fetchEmails() {
     .then(data => {
         if (data.success) {
             resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
-            resultDiv.innerHTML = '<strong>Success!</strong> ' + data.message + '<pre class="mt-2 text-xs overflow-auto max-h-40">' + (data.output || '') + '</pre>';
+            
+            let content = '<strong>Success!</strong> ' + data.message;
+            
+            // Display stats if available
+            if (data.stats) {
+                content += '<div class="mt-3 grid grid-cols-3 gap-4 text-sm">';
+                content += '<div><strong>Processed:</strong> ' + (data.stats.processed || 0) + '</div>';
+                content += '<div><strong>Skipped:</strong> ' + (data.stats.skipped || 0) + '</div>';
+                content += '<div><strong>Failed:</strong> ' + (data.stats.failed || 0) + '</div>';
+                content += '</div>';
+            }
+            
+            // Display summary if available (preferred over full output)
+            if (data.summary) {
+                content += '<pre class="mt-2 text-xs overflow-auto max-h-40 bg-white p-2 rounded border">' + (data.summary || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+            } else if (data.output) {
+                // Fallback to truncated output if summary not available
+                content += '<pre class="mt-2 text-xs overflow-auto max-h-40 bg-white p-2 rounded border">' + (data.output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+            }
+            
+            resultDiv.innerHTML = content;
         } else {
             resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
             resultDiv.innerHTML = '<strong>Error!</strong> ' + (data.message || 'Unknown error');
@@ -758,7 +778,27 @@ function fetchEmailsDirect() {
     .then(data => {
         if (data.success) {
             resultDiv.className = 'mt-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg';
-            resultDiv.innerHTML = '<strong>Success!</strong> ' + data.message + '<pre class="mt-2 text-xs overflow-auto max-h-40">' + (data.output || '') + '</pre>';
+            
+            let content = '<strong>Success!</strong> ' + data.message;
+            
+            // Display stats if available
+            if (data.stats) {
+                content += '<div class="mt-3 grid grid-cols-3 gap-4 text-sm">';
+                content += '<div><strong>Processed:</strong> ' + (data.stats.processed || 0) + '</div>';
+                content += '<div><strong>Skipped:</strong> ' + (data.stats.skipped || 0) + '</div>';
+                content += '<div><strong>Failed:</strong> ' + (data.stats.failed || 0) + '</div>';
+                content += '</div>';
+            }
+            
+            // Display summary if available (preferred over full output)
+            if (data.summary) {
+                content += '<pre class="mt-2 text-xs overflow-auto max-h-40 bg-white p-2 rounded border">' + (data.summary || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+            } else if (data.output) {
+                // Fallback to truncated output if summary not available
+                content += '<pre class="mt-2 text-xs overflow-auto max-h-40 bg-white p-2 rounded border">' + (data.output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+            }
+            
+            resultDiv.innerHTML = content;
         } else {
             resultDiv.className = 'mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg';
             resultDiv.innerHTML = '<strong>Error!</strong> ' + (data.message || 'Unknown error');

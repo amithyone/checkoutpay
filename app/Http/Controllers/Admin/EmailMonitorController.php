@@ -29,10 +29,49 @@ class EmailMonitorController extends Controller
             Artisan::call('payment:monitor-emails', ['--all' => true]);
             $output = Artisan::output();
             
+            // Extract summary from output (last few lines with totals)
+            $outputLines = explode("\n", trim($output));
+            $summaryLines = [];
+            $totalProcessed = 0;
+            $totalSkipped = 0;
+            $totalFailed = 0;
+            
+            // Look for summary lines (contain totals)
+            foreach ($outputLines as $line) {
+                if (preg_match('/Total processed:\s*(\d+)/i', $line, $matches)) {
+                    $totalProcessed = (int)$matches[1];
+                    $summaryLines[] = $line;
+                } elseif (preg_match('/Total skipped:\s*(\d+)/i', $line, $matches)) {
+                    $totalSkipped = (int)$matches[1];
+                    $summaryLines[] = $line;
+                } elseif (preg_match('/Total failed:\s*(\d+)/i', $line, $matches)) {
+                    $totalFailed = (int)$matches[1];
+                    $summaryLines[] = $line;
+                } elseif (preg_match('/✅|⏭️|❌|📧|ℹ️/', $line)) {
+                    // Include lines with emoji indicators (summary lines)
+                    $summaryLines[] = $line;
+                }
+            }
+            
+            // Get last 20 lines as summary (usually contains the totals)
+            $lastLines = array_slice($outputLines, -20);
+            $summary = implode("\n", array_unique(array_merge($summaryLines, $lastLines)));
+            
+            // Truncate full output to prevent "output too large" error (max 5000 chars)
+            $truncatedOutput = strlen($output) > 5000 
+                ? substr($output, 0, 5000) . "\n\n... (output truncated, showing summary only) ..."
+                : $output;
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Email fetching (IMAP) completed successfully',
-                'output' => $output,
+                'summary' => $summary ?: 'No summary available',
+                'stats' => [
+                    'processed' => $totalProcessed,
+                    'skipped' => $totalSkipped,
+                    'failed' => $totalFailed,
+                ],
+                'output' => $truncatedOutput, // Truncated output for debugging
             ]);
         } catch (\Exception $e) {
             Log::error('Error fetching emails manually (IMAP)', [
@@ -57,10 +96,49 @@ class EmailMonitorController extends Controller
             Artisan::call('payment:read-emails-direct', ['--all' => true]);
             $output = Artisan::output();
             
+            // Extract summary from output (last few lines with totals)
+            $outputLines = explode("\n", trim($output));
+            $summaryLines = [];
+            $totalProcessed = 0;
+            $totalSkipped = 0;
+            $totalFailed = 0;
+            
+            // Look for summary lines (contain totals)
+            foreach ($outputLines as $line) {
+                if (preg_match('/Total processed:\s*(\d+)/i', $line, $matches)) {
+                    $totalProcessed = (int)$matches[1];
+                    $summaryLines[] = $line;
+                } elseif (preg_match('/Total skipped:\s*(\d+)/i', $line, $matches)) {
+                    $totalSkipped = (int)$matches[1];
+                    $summaryLines[] = $line;
+                } elseif (preg_match('/Total failed:\s*(\d+)/i', $line, $matches)) {
+                    $totalFailed = (int)$matches[1];
+                    $summaryLines[] = $line;
+                } elseif (preg_match('/✅|⏭️|❌|📧|ℹ️/', $line)) {
+                    // Include lines with emoji indicators (summary lines)
+                    $summaryLines[] = $line;
+                }
+            }
+            
+            // Get last 20 lines as summary (usually contains the totals)
+            $lastLines = array_slice($outputLines, -20);
+            $summary = implode("\n", array_unique(array_merge($summaryLines, $lastLines)));
+            
+            // Truncate full output to prevent "output too large" error (max 5000 chars)
+            $truncatedOutput = strlen($output) > 5000 
+                ? substr($output, 0, 5000) . "\n\n... (output truncated, showing summary only) ..."
+                : $output;
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Direct filesystem email reading completed successfully',
-                'output' => $output,
+                'summary' => $summary ?: 'No summary available',
+                'stats' => [
+                    'processed' => $totalProcessed,
+                    'skipped' => $totalSkipped,
+                    'failed' => $totalFailed,
+                ],
+                'output' => $truncatedOutput, // Truncated output for debugging
             ]);
         } catch (\Exception $e) {
             Log::error('Error reading emails directly from filesystem', [
