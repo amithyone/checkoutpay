@@ -45,7 +45,21 @@ class WebsitesController extends Controller
         $business = Auth::guard('business')->user();
 
         // Ensure the website belongs to the authenticated business
-        if (!$website || $website->business_id !== $business->id) {
+        // Use strict comparison and check both website and business exist
+        if (!$website) {
+            abort(404, 'Website not found.');
+        }
+
+        // Compare business_id (from business_websites table) with business id (from businesses table)
+        // Use == instead of === to handle potential type differences
+        if ((int)$website->business_id !== (int)$business->id) {
+            \Log::error('Website ownership mismatch', [
+                'website_id' => $website->id,
+                'website_business_id' => $website->business_id,
+                'website_business_id_type' => gettype($website->business_id),
+                'authenticated_business_id' => $business->id,
+                'authenticated_business_id_type' => gettype($business->id),
+            ]);
             abort(403, 'Website does not belong to this business.');
         }
 

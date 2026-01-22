@@ -76,12 +76,20 @@ class BusinessWebsite extends Model
     {
         // If we're in a business context (business guard is authenticated), scope to that business
         if (auth('business')->check()) {
-            $website = $this->where('id', $value)
-                ->where('business_id', auth('business')->id())
+            $businessId = auth('business')->id();
+            
+            // Query the database directly using static to ensure proper scoping
+            $website = static::where('id', $value)
+                ->where('business_id', $businessId)
                 ->first();
             
             // If not found, return null to trigger 404
             if (!$website) {
+                \Log::warning('Website route binding failed - website not found for business', [
+                    'website_id' => $value,
+                    'business_id' => $businessId,
+                    'auth_business_id' => auth('business')->id(),
+                ]);
                 return null;
             }
             
