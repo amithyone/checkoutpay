@@ -44,21 +44,41 @@ class WebsitesController extends Controller
     {
         $business = Auth::guard('business')->user();
 
+        // Log the incoming request for debugging
+        \Log::info('Website update request', [
+            'website_id' => $website->id ?? 'null',
+            'website_business_id' => $website->business_id ?? 'null',
+            'authenticated_business_id' => $business->id ?? 'null',
+            'request_route_param' => $request->route('website')?->id ?? 'null',
+        ]);
+
         // Ensure the website belongs to the authenticated business
         // Use strict comparison and check both website and business exist
         if (!$website) {
+            \Log::warning('Website not found in update method');
             abort(404, 'Website not found.');
         }
 
         // Compare business_id (from business_websites table) with business id (from businesses table)
         // Use == instead of === to handle potential type differences
-        if ((int)$website->business_id !== (int)$business->id) {
+        $websiteBusinessId = (int)$website->business_id;
+        $authenticatedBusinessId = (int)$business->id;
+        
+        \Log::info('Comparing business IDs', [
+            'website_business_id' => $websiteBusinessId,
+            'authenticated_business_id' => $authenticatedBusinessId,
+            'match' => $websiteBusinessId === $authenticatedBusinessId,
+        ]);
+
+        if ($websiteBusinessId !== $authenticatedBusinessId) {
             \Log::error('Website ownership mismatch', [
                 'website_id' => $website->id,
                 'website_business_id' => $website->business_id,
                 'website_business_id_type' => gettype($website->business_id),
+                'website_business_id_int' => $websiteBusinessId,
                 'authenticated_business_id' => $business->id,
                 'authenticated_business_id_type' => gettype($business->id),
+                'authenticated_business_id_int' => $authenticatedBusinessId,
             ]);
             abort(403, 'Website does not belong to this business.');
         }

@@ -74,6 +74,13 @@ class BusinessWebsite extends Model
      */
     public function resolveRouteBinding($value, $field = null)
     {
+        \Log::info('BusinessWebsite resolveRouteBinding called', [
+            'value' => $value,
+            'field' => $field,
+            'business_guard_check' => auth('business')->check(),
+            'business_id' => auth('business')->check() ? auth('business')->id() : null,
+        ]);
+
         // If we're in a business context (business guard is authenticated), scope to that business
         if (auth('business')->check()) {
             $businessId = auth('business')->id();
@@ -82,6 +89,13 @@ class BusinessWebsite extends Model
             $website = static::where('id', $value)
                 ->where('business_id', $businessId)
                 ->first();
+            
+            \Log::info('Route binding query result', [
+                'website_id' => $value,
+                'business_id' => $businessId,
+                'found' => $website ? true : false,
+                'website_business_id' => $website?->business_id,
+            ]);
             
             // If not found, return null to trigger 404
             if (!$website) {
@@ -97,6 +111,7 @@ class BusinessWebsite extends Model
         }
 
         // For admin routes, allow any website
+        \Log::info('Using parent resolveRouteBinding (admin route)');
         return parent::resolveRouteBinding($value, $field);
     }
 }
