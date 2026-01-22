@@ -229,7 +229,33 @@ class BusinessController extends Controller
 
     public function updateWebsite(Request $request, Business $business, BusinessWebsite $website): RedirectResponse
     {
-        if ($website->business_id !== $business->id) {
+        // Log for debugging
+        \Log::info('Admin updateWebsite called', [
+            'website_id' => $website->id,
+            'website_business_id' => $website->business_id,
+            'website_business_id_type' => gettype($website->business_id),
+            'business_id' => $business->id,
+            'business_id_type' => gettype($business->id),
+        ]);
+
+        // Use explicit type casting for comparison
+        $websiteBusinessId = (int)$website->business_id;
+        $businessId = (int)$business->id;
+
+        \Log::info('Admin comparing business IDs', [
+            'website_business_id' => $websiteBusinessId,
+            'business_id' => $businessId,
+            'match' => $websiteBusinessId === $businessId,
+        ]);
+
+        if ($websiteBusinessId !== $businessId) {
+            \Log::error('Admin: Website ownership mismatch', [
+                'website_id' => $website->id,
+                'website_business_id' => $website->business_id,
+                'website_business_id_int' => $websiteBusinessId,
+                'business_id' => $business->id,
+                'business_id_int' => $businessId,
+            ]);
             abort(403, 'Website does not belong to this business.');
         }
 
