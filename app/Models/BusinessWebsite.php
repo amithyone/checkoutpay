@@ -70,48 +70,25 @@ class BusinessWebsite extends Model
 
     /**
      * Retrieve the model for route model binding.
-     * For business routes, scope to authenticated business's websites.
+     * For business routes, we allow any website to be resolved - the controller will check ownership.
+     * Route model binding happens before authentication middleware, so we can't scope here.
      */
     public function resolveRouteBinding($value, $field = null)
     {
+        // Route model binding happens BEFORE authentication middleware runs
+        // So we can't check auth('business')->check() here
+        // Instead, we'll let the controller handle the authorization check
+        // This ensures the website can be resolved, and then the controller verifies ownership
+        
         \Log::info('BusinessWebsite resolveRouteBinding called', [
             'value' => $value,
             'field' => $field,
-            'business_guard_check' => auth('business')->check(),
-            'business_id' => auth('business')->check() ? auth('business')->id() : null,
+            'request_path' => request()->path(),
+            'route_name' => request()->route()?->getName(),
         ]);
 
-        // If we're in a business context (business guard is authenticated), scope to that business
-        if (auth('business')->check()) {
-            $businessId = auth('business')->id();
-            
-            // Query the database directly using static to ensure proper scoping
-            $website = static::where('id', $value)
-                ->where('business_id', $businessId)
-                ->first();
-            
-            \Log::info('Route binding query result', [
-                'website_id' => $value,
-                'business_id' => $businessId,
-                'found' => $website ? true : false,
-                'website_business_id' => $website?->business_id,
-            ]);
-            
-            // If not found, return null to trigger 404
-            if (!$website) {
-                \Log::warning('Website route binding failed - website not found for business', [
-                    'website_id' => $value,
-                    'business_id' => $businessId,
-                    'auth_business_id' => auth('business')->id(),
-                ]);
-                return null;
-            }
-            
-            return $website;
-        }
-
-        // For admin routes, allow any website
-        \Log::info('Using parent resolveRouteBinding (admin route)');
+        // Use parent method to resolve the website normally
+        // The controller will verify ownership after authentication middleware runs
         return parent::resolveRouteBinding($value, $field);
     }
 }
