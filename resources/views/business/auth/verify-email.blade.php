@@ -75,7 +75,7 @@
                         @if(session('registered_email'))
                             Verification email sent to: <strong>{{ session('registered_email') }}</strong>
                         @else
-                            If you didn't receive the email, we can send you another one.
+                        If you didn't receive the email, we can send you another one.
                         @endif
                     </p>
                 </div>

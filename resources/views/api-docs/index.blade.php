@@ -465,6 +465,59 @@ X-API-Key: pk_your_api_key_here</code></pre>
                             </div>
 
                             <div>
+                                <h3 class="text-xl font-semibold text-gray-900 mb-3">Charges Mismatch Handling</h3>
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <p class="text-sm text-blue-800 mb-3">
+                                        <i class="fas fa-info-circle mr-2"></i>
+                                        <strong>Automatic Charges Mismatch Detection:</strong> Our system automatically detects when a customer pays the base amount without including charges.
+                                    </p>
+                                    <p class="text-sm text-blue-800 mb-3">
+                                        If the following conditions are met, the payment will be automatically approved with a mismatch flag:
+                                    </p>
+                                    <ul class="list-disc list-inside text-sm text-blue-800 space-y-1 ml-4 mb-3">
+                                        <li>The payer name matches the expected name</li>
+                                        <li>The received amount is less than the requested amount</li>
+                                        <li>The difference equals the calculated charges (within ₦1 tolerance)</li>
+                                    </ul>
+                                    <p class="text-sm text-blue-800">
+                                        In this case, the webhook will include:
+                                    </p>
+                                    <ul class="list-disc list-inside text-sm text-blue-800 space-y-1 ml-4">
+                                        <li><code>is_mismatch: true</code></li>
+                                        <li><code>received_amount</code> - The actual amount received (base amount without charges)</li>
+                                        <li><code>mismatch_reason</code> - Explanation of the mismatch</li>
+                                        <li><code>amount</code> - The originally requested amount (includes charges)</li>
+                                    </ul>
+                                </div>
+                                <div class="code-block mb-4">
+                                    <pre><code>{
+  "event": "payment.approved",
+  "transaction_id": "TXN-1234567890",
+  "status": "approved",
+  "amount": 2070.00,  // Requested amount (includes charges)
+  "received_amount": 2000.00,  // Actual amount received (base amount)
+  "is_mismatch": true,
+  "mismatch_reason": "Customer paid base amount without charges. Expected: ₦2,070.00, Received: ₦2,000.00 (charges: ₦70.00)",
+  "name_mismatch": false,
+  "charges": {
+    "percentage": 20.00,
+    "fixed": 50.00,
+    "total": 70.00,
+    "paid_by_customer": false,
+    "business_receives": 1930.00  // received_amount - charges
+  },
+  ...
+}</code></pre>
+                                </div>
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                    <p class="text-sm text-yellow-800">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        <strong>Important:</strong> When handling charges mismatch, your business balance will be credited with the <code>business_receives</code> amount (received_amount minus charges), not the full requested amount. Always check <code>is_mismatch</code> and <code>received_amount</code> fields in your webhook handler to process payments correctly.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div>
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3">Webhook Security</h3>
                                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                                     <p class="text-sm text-yellow-800 mb-2">

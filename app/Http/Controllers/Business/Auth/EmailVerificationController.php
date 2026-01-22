@@ -122,14 +122,14 @@ class EmailVerificationController extends Controller
 
         // With auth (from dashboard)
         if ($request->user('business')) {
-            if ($request->user('business')->hasVerifiedEmail()) {
-                return redirect()->route('business.dashboard')
-                    ->with('info', 'Your email is already verified.');
-            }
+        if ($request->user('business')->hasVerifiedEmail()) {
+            return redirect()->route('business.dashboard')
+                ->with('info', 'Your email is already verified.');
+        }
 
-            $request->user('business')->sendEmailVerificationNotification();
+        $request->user('business')->sendEmailVerificationNotification();
 
-            return back()->with('status', 'Verification link sent! Please check your email.');
+        return back()->with('status', 'Verification link sent! Please check your email.');
         }
 
         return redirect()->route('business.verification.notice')

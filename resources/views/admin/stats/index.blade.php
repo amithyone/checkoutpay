@@ -246,40 +246,40 @@
         </div>
         @endif
 
-        <!-- Top Businesses -->
-        @if(isset($stats['top_businesses']) && $stats['top_businesses']->count() > 0)
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div class="p-6 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Top Businesses</h3>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        @foreach($stats['top_businesses'] as $index => $business)
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4">
-                                <span class="text-sm font-medium text-gray-900">#{{ $index + 1 }}</span>
-                            </td>
-                            <td class="px-6 py-4">
-                                <span class="text-sm font-medium text-gray-900">{{ $business->name }}</span>
-                            </td>
-                            <td class="px-6 py-4 text-sm text-gray-900">₦{{ number_format($business->total_amount, 2) }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ number_format($business->transaction_count) }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+    <!-- Top Businesses -->
+    @if(isset($stats['top_businesses']) && $stats['top_businesses']->count() > 0)
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Top Businesses</h3>
         </div>
-        @endif
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @foreach($stats['top_businesses'] as $index => $business)
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <span class="text-sm font-medium text-gray-900">#{{ $index + 1 }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="text-sm font-medium text-gray-900">{{ $business->name }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900">₦{{ number_format($business->total_amount, 2) }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">{{ number_format($business->transaction_count) }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
     </div>
 
     <!-- Recent Payments -->

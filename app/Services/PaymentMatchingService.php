@@ -226,19 +226,55 @@ class PaymentMatchingService
             'mismatch_reason' => null,
         ];
         
-        // STEP 1: Amount matching (REQUIRED - must match)
-        $amountDiff = abs($payment->amount - ($extractedInfo['amount'] ?? 0));
-        if ($amountDiff > 1) { // Allow 1 naira tolerance
-            $result['reason'] = "Amount mismatch: payment={$payment->amount}, email=" . ($extractedInfo['amount'] ?? 0);
-            return $result;
-        }
-        $result['amount_match'] = true;
+        // STEP 1: Amount matching and charges mismatch detection
+        $receivedAmount = $extractedInfo['amount'] ?? 0;
+        $requestedAmount = $payment->amount;
+        $amountDiff = abs($requestedAmount - $receivedAmount);
         
         // STEP 2: Name matching (check if names match or are similar)
         $nameMatch = $this->matchNames($payment->payer_name, $extractedInfo['sender_name'] ?? null);
         $result['name_match'] = $nameMatch['matched'];
         $result['name_similarity_percent'] = $nameMatch['similarity'] ?? null;
         $result['name_mismatch'] = !$nameMatch['matched'];
+        
+        // Check for charges mismatch scenario: name matches but amount differs by charges amount
+        $chargesMismatchDetected = false;
+        if ($result['name_match'] && $amountDiff > 1 && $payment->business_id) {
+            $business = $payment->business;
+            $chargeService = app(\App\Services\ChargeService::class);
+            
+            // Calculate what charges would be for the received amount
+            $chargesForReceived = $chargeService->calculateCharges($receivedAmount, $business);
+            $expectedCharges = $chargesForReceived['total_charges'];
+            
+            // Check if the difference equals the charges (within 1 naira tolerance)
+            if (abs($amountDiff - $expectedCharges) <= 1) {
+                // This is a charges mismatch - customer paid base amount without charges
+                $chargesMismatchDetected = true;
+                $result['matched'] = true;
+                $result['amount_match'] = false; // Amount doesn't match exactly
+                $result['is_mismatch'] = true;
+                $result['received_amount'] = $receivedAmount;
+                $result['mismatch_reason'] = 'Customer paid base amount without charges. Expected: ₦' . number_format($requestedAmount, 2) . ', Received: ₦' . number_format($receivedAmount, 2) . ' (charges: ₦' . number_format($expectedCharges, 2) . ')';
+                $result['reason'] = 'Matched: Name matches, amount mismatch equals charges (charges not included)';
+                
+                // Store charges info for later use
+                $result['_charges_info'] = [
+                    'expected_charges' => $expectedCharges,
+                    'charges_percentage' => $chargesForReceived['charge_percentage'],
+                    'charges_fixed' => $chargesForReceived['charge_fixed'],
+                ];
+            }
+        }
+        
+        // STEP 1 (continued): Strict amount matching (if not charges mismatch)
+        if (!$chargesMismatchDetected) {
+            if ($amountDiff > 1) { // Allow 1 naira tolerance
+                $result['reason'] = "Amount mismatch: payment={$requestedAmount}, email={$receivedAmount}";
+                return $result;
+            }
+            $result['amount_match'] = true;
+        }
         
         // STEP 3: Time matching (CRITICAL: Email must be received AFTER transaction creation)
         if ($emailDate) {
@@ -278,6 +314,25 @@ class PaymentMatchingService
         
         // Final decision: Match if amount matches AND (name matches OR account matches OR time is reasonable)
         // Priority: Amount (required) > Name > Time
+        // Note: Charges mismatch case is already handled above and marked as matched
+        if ($result['matched'] && $chargesMismatchDetected) {
+            // Charges mismatch already detected - ensure time match passes
+            if (!$result['time_match'] && $emailDate) {
+                // If time doesn't match, still allow if within reasonable window (charges mismatch is acceptable)
+                $timeDiffMinutes = $payment->created_at->diffInMinutes($emailDate);
+                if ($timeDiffMinutes <= 120) { // 2 hours window for charges mismatch
+                    $result['time_match'] = true;
+                } else {
+                    // Time window exceeded - reject the match
+                    $result['matched'] = false;
+                    $result['reason'] = "Charges mismatch detected but time window exceeded: {$timeDiffMinutes} minutes (max: 120)";
+                    return $result;
+                }
+            }
+            // Charges mismatch is already matched and time validated, return
+            return $result;
+        }
+        
         if ($result['amount_match']) {
             if ($result['name_match']) {
                 // Amount + Name match = STRONG MATCH
