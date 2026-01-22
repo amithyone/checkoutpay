@@ -205,8 +205,14 @@
                                                 <tr>
                                                     <td class="px-4 py-3 font-mono text-gray-900">payer_name</td>
                                                     <td class="px-4 py-3 text-gray-700">string</td>
-                                                    <td class="px-4 py-3 text-gray-700">No</td>
-                                                    <td class="px-4 py-3 text-gray-700">Customer's name</td>
+                                                    <td class="px-4 py-3 text-gray-700"><span class="text-red-600 font-semibold">Yes</span></td>
+                                                    <td class="px-4 py-3 text-gray-700">Customer's name (required to get account number)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">name</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700"><span class="text-red-600 font-semibold">Yes*</span></td>
+                                                    <td class="px-4 py-3 text-gray-700">Alternative to payer_name (either 'name' or 'payer_name' is required)</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="px-4 py-3 font-mono text-gray-900">bank</td>
@@ -603,7 +609,7 @@ $apiUrl = '{{ url('/api/v1') }}';
 
 $data = [
     'amount' => 5000.00,
-    'payer_name' => 'John Doe',
+    'payer_name' => 'John Doe', // Required
     'bank' => 'GTBank',
     'webhook_url' => 'https://yourwebsite.com/webhook/payment-status',
     'service' => 'Product Purchase'
@@ -682,7 +688,7 @@ api_url = '{{ url('/api/v1') }}'
 
 data = {
     'amount': 5000.00,
-    'payer_name': 'John Doe',
+    'payer_name': 'John Doe',  # Required
     'bank': 'GTBank',
     'webhook_url': 'https://yourwebsite.com/webhook/payment-status',
     'service': 'Product Purchase'
@@ -807,6 +813,16 @@ if ($payload['event'] === 'payment.approved') {
                                             <pre><code>{
   "success": false,
   "message": "Invalid API key"
+}</code></pre>
+                                        </div>
+                                    </div>
+                                    <div class="border-l-4 border-red-500 pl-4">
+                                        <h4 class="font-semibold text-gray-900">Missing Payer Name</h4>
+                                        <p class="text-gray-700 text-sm">Status: 400</p>
+                                        <div class="code-block mt-2">
+                                            <pre><code>{
+  "success": false,
+  "message": "The payer name field is required. Please provide either \"name\" or \"payer_name\"."
 }</code></pre>
                                         </div>
                                     </div>
