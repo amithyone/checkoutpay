@@ -76,4 +76,40 @@ class AccountNumber extends Model
     {
         $this->increment('usage_count');
     }
+
+    /**
+     * Boot the model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // When business_id becomes null, automatically move account number to pool
+        static::updating(function ($accountNumber) {
+            // If business_id is being set to null and it's currently a business-specific account
+            if (is_null($accountNumber->business_id) && !$accountNumber->is_pool && $accountNumber->isDirty('business_id')) {
+                $accountNumber->is_pool = true;
+            }
+        });
+
+        // Also handle when business is deleted (via foreign key cascade sets business_id to null)
+        // Use updating event to catch when business_id changes to null from database trigger
+        static::saving(function ($accountNumber) {
+            // If business_id is null but is_pool is false, move to pool
+            // This handles cases where business_id was set to null by foreign key cascade
+            if (is_null($accountNumber->business_id) && !$accountNumber->is_pool) {
+                $accountNumber->is_pool = true;
+            }
+        });
+    }
+
+    /**
+     * Scope for account numbers that should be in pool (business_id is null but is_pool is false)
+     */
+    public function scopeShouldBeInPool($query)
+    {
+        return $query->whereNull('business_id')
+            ->where('is_pool', false)
+            ->where('is_active', true);
+    }
 }

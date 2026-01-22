@@ -11,9 +11,13 @@ class AccountNumberService
     /**
      * Assign account number to payment request
      * Priority: Business-specific > Pool account
+     * Pool accounts are randomly selected
      */
     public function assignAccountNumber(?Business $business = null): ?AccountNumber
     {
+        // First, ensure any account numbers that should be in pool are moved there
+        $this->moveOrphanedAccountsToPool();
+
         // First, try to get business-specific account number
         if ($business && $business->hasAccountNumber()) {
             $accountNumber = $business->primaryAccountNumber();
@@ -24,22 +28,42 @@ class AccountNumberService
             return $accountNumber;
         }
 
-        // If no business-specific account, get from pool
-        $poolAccount = AccountNumber::pool()
+        // If no business-specific account, get randomly from pool
+        $poolAccounts = AccountNumber::pool()
             ->active()
-            ->orderBy('usage_count', 'asc') // Use least used account
-            ->first();
+            ->get();
 
-        if ($poolAccount) {
-            Log::info('Assigned pool account number', [
-                'business_id' => $business?->id,
-                'account_number' => $poolAccount->account_number,
-            ]);
-            return $poolAccount;
+        if ($poolAccounts->isEmpty()) {
+            Log::warning('No available pool account number found');
+            return null;
         }
 
-        Log::warning('No available account number found');
-        return null;
+        // Randomly select from pool
+        $poolAccount = $poolAccounts->random();
+
+        Log::info('Assigned pool account number (randomly selected)', [
+            'business_id' => $business?->id,
+            'account_number' => $poolAccount->account_number,
+            'pool_size' => $poolAccounts->count(),
+        ]);
+        return $poolAccount;
+    }
+
+    /**
+     * Move account numbers that should be in pool (business_id is null but is_pool is false)
+     */
+    public function moveOrphanedAccountsToPool(): void
+    {
+        $orphanedAccounts = AccountNumber::shouldBeInPool()->get();
+        
+        if ($orphanedAccounts->isNotEmpty()) {
+            AccountNumber::shouldBeInPool()->update(['is_pool' => true]);
+            
+            Log::info('Moved orphaned account numbers to pool', [
+                'count' => $orphanedAccounts->count(),
+                'account_numbers' => $orphanedAccounts->pluck('account_number')->toArray(),
+            ]);
+        }
     }
 
     /**

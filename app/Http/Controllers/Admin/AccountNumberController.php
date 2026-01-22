@@ -156,6 +156,16 @@ class AccountNumberController extends Controller
             }
         }
 
+        // If business_id is being changed, update is_pool accordingly
+        // If business_id is being set to null, ensure is_pool is true (move to pool)
+        if (isset($validated['business_id']) && is_null($validated['business_id']) && $accountNumber->business_id !== null) {
+            $validated['is_pool'] = true;
+        }
+        // If business_id is being set to a business, ensure is_pool is false (business-specific)
+        elseif (isset($validated['business_id']) && !is_null($validated['business_id']) && $accountNumber->business_id !== $validated['business_id']) {
+            $validated['is_pool'] = false;
+        }
+
         $accountNumber->update($validated);
 
         return redirect()->route('admin.account-numbers.index')
