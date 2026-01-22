@@ -29,6 +29,7 @@
             <div>
                 <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Learn & Resources</h4>
                 <ul class="space-y-2 text-xs sm:text-sm">
+                    <li><a href="{{ route('api-docs') }}" class="hover:text-white transition-colors font-semibold">API Documentation</a></li>
                     <li><a href="{{ route('support.index') }}" class="hover:text-white transition-colors">Support</a></li>
                     <li><a href="{{ route('blog.index') }}" class="hover:text-white transition-colors">Blog</a></li>
                     <li><a href="{{ route('developers.index') }}" class="hover:text-white transition-colors">Developers</a></li>

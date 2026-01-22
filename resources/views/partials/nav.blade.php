@@ -55,14 +55,19 @@
                 </div>
                 <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('support.*') ? 'text-primary border-b-2 border-primary' : '' }}">Support</a>
                 <div class="relative group">
-                    <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('resources.*') || request()->routeIs('blog.*') || request()->routeIs('status.*') || request()->routeIs('faqs.*') ? 'text-primary border-b-2 border-primary' : '' }}">
+                    <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('resources.*') || request()->routeIs('blog.*') || request()->routeIs('status.*') || request()->routeIs('faqs.*') || request()->routeIs('api-docs') ? 'text-primary border-b-2 border-primary' : '' }}">
                         Resources <i class="fas fa-chevron-down ml-1 text-xs"></i>
                     </a>
                     <div class="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <a href="{{ route('api-docs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary font-semibold">
+                            <i class="fas fa-code mr-2 text-primary"></i>API Documentation
+                        </a>
+                        <div class="border-t border-gray-200 my-1"></div>
                         <a href="{{ route('resources.index') }}#documentation" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Documentation</a>
                         <a href="{{ route('resources.index') }}#guides" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Integration Guides</a>
                         <a href="{{ route('resources.index') }}#sdk" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">SDKs & Libraries</a>
                         <a href="{{ route('resources.index') }}#examples" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Code Examples</a>
+                        <div class="border-t border-gray-200 my-1"></div>
                         <a href="{{ route('blog.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Blog</a>
                         <a href="{{ route('status.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Status</a>
                         <a href="{{ route('faqs.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">FAQs</a>
@@ -85,6 +90,9 @@
                 <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Developers</a>
                 <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Support</a>
                 <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Resources</a>
+                <a href="{{ route('api-docs') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4 font-semibold">
+                    <i class="fas fa-code mr-2 text-primary"></i>API Documentation
+                </a>
                 <a href="{{ route('blog.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Blog</a>
                 <a href="{{ route('status.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Status</a>
                 <a href="{{ route('faqs.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">FAQs</a>

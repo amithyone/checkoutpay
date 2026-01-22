@@ -39,6 +39,7 @@ Route::get('/resources', [\App\Http\Controllers\ResourcesController::class, 'ind
 Route::get('/developers', [\App\Http\Controllers\DevelopersController::class, 'index'])->name('developers.index');
 Route::get('/support', [\App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
 Route::get('/pricing', [\App\Http\Controllers\PricingController::class, 'index'])->name('pricing');
+Route::get('/api-docs', [\App\Http\Controllers\ApiDocsController::class, 'index'])->name('api-docs');
 
 // Dynamic pages (Privacy Policy, Terms, etc.)
 Route::get('/page/{slug}', [\App\Http\Controllers\PageController::class, 'show'])->name('page.show');
