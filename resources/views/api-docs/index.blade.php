@@ -83,7 +83,6 @@
                             <a href="#authentication" class="block text-sm text-gray-700 hover:text-primary py-2">Authentication</a>
                             <a href="#endpoints" class="block text-sm text-gray-700 hover:text-primary py-2">API Endpoints</a>
                             <a href="#payments" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Payments</a>
-                            <a href="#withdrawals" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Withdrawals</a>
                             <a href="#webhooks" class="block text-sm text-gray-700 hover:text-primary py-2">Webhooks</a>
                             <a href="#code-examples" class="block text-sm text-gray-700 hover:text-primary py-2">Code Examples</a>
                             <a href="#error-handling" class="block text-sm text-gray-700 hover:text-primary py-2">Error Handling</a>
@@ -389,105 +388,6 @@
                                     <div class="code-block">
                                         <pre><code>GET {{ url('/api/v1/payments?status=approved&from_date=2024-01-01&per_page=20') }}
 X-API-Key: pk_your_api_key_here</code></pre>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Withdrawals Section -->
-                        <div id="withdrawals" class="mb-8">
-                            <h3 class="text-2xl font-semibold text-gray-900 mb-4 mt-8">Withdrawals</h3>
-
-                            <!-- Create Withdrawal -->
-                            <div class="mb-6 border-l-4 border-blue-500 pl-4">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <span class="endpoint-badge badge-post">POST</span>
-                                    <code class="text-lg font-mono text-gray-900">/withdrawal</code>
-                                </div>
-                                <p class="text-gray-700 mb-4">Request a withdrawal from your account balance.</p>
-
-                                <div class="mb-4">
-                                    <h4 class="font-semibold text-gray-900 mb-2">Request Body</h4>
-                                    <div class="code-block">
-                                        <pre><code>{
-  "amount": 10000.00,
-  "account_number": "0123456789",
-  "account_name": "Your Name",
-  "bank_name": "GTBank"
-}</code></pre>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <h4 class="font-semibold text-gray-900 mb-2">Request Parameters</h4>
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                            <thead class="bg-gray-50">
-                                                <tr>
-                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Parameter</th>
-                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Type</th>
-                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Required</th>
-                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Description</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-gray-200">
-                                                <tr>
-                                                    <td class="px-4 py-3 font-mono text-gray-900">amount</td>
-                                                    <td class="px-4 py-3 text-gray-700">decimal</td>
-                                                    <td class="px-4 py-3 text-gray-700">Yes</td>
-                                                    <td class="px-4 py-3 text-gray-700">Withdrawal amount (must not exceed balance)</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="px-4 py-3 font-mono text-gray-900">account_number</td>
-                                                    <td class="px-4 py-3 text-gray-700">string</td>
-                                                    <td class="px-4 py-3 text-gray-700">Yes</td>
-                                                    <td class="px-4 py-3 text-gray-700">Bank account number (10 digits)</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="px-4 py-3 font-mono text-gray-900">account_name</td>
-                                                    <td class="px-4 py-3 text-gray-700">string</td>
-                                                    <td class="px-4 py-3 text-gray-700">Yes</td>
-                                                    <td class="px-4 py-3 text-gray-700">Account holder name</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="px-4 py-3 font-mono text-gray-900">bank_name</td>
-                                                    <td class="px-4 py-3 text-gray-700">string</td>
-                                                    <td class="px-4 py-3 text-gray-700">Yes</td>
-                                                    <td class="px-4 py-3 text-gray-700">Bank name</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- List Withdrawals -->
-                            <div class="mb-6 border-l-4 border-green-500 pl-4">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <span class="endpoint-badge badge-get">GET</span>
-                                    <code class="text-lg font-mono text-gray-900">/withdrawals</code>
-                                </div>
-                                <p class="text-gray-700 mb-4">List all withdrawal requests with optional status filter.</p>
-                            </div>
-
-                            <!-- Get Balance -->
-                            <div class="mb-6 border-l-4 border-green-500 pl-4">
-                                <div class="flex items-center gap-3 mb-2">
-                                    <span class="endpoint-badge badge-get">GET</span>
-                                    <code class="text-lg font-mono text-gray-900">/balance</code>
-                                </div>
-                                <p class="text-gray-700 mb-4">Get your current account balance.</p>
-
-                                <div class="mb-4">
-                                    <h4 class="font-semibold text-gray-900 mb-2">Response (200 OK)</h4>
-                                    <div class="code-block">
-                                        <pre><code>{
-  "success": true,
-  "data": {
-    "balance": 50000.00,
-    "currency": "NGN"
-  }
-}</code></pre>
                                     </div>
                                 </div>
                             </div>
