@@ -62,6 +62,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('businesses.reject-website');
         Route::post('businesses/{business}/add-website', [BusinessController::class, 'addWebsite'])
             ->name('businesses.add-website');
+        Route::put('businesses/{business}/websites/{website}', [BusinessController::class, 'updateWebsite'])
+            ->name('businesses.update-website');
         Route::delete('businesses/{business}/websites/{website}', [BusinessController::class, 'deleteWebsite'])
             ->name('businesses.delete-website');
         Route::post('businesses/{business}/toggle-status', [BusinessController::class, 'toggleStatus'])

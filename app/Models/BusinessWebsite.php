@@ -13,6 +13,7 @@ class BusinessWebsite extends Model
     protected $fillable = [
         'business_id',
         'website_url',
+        'webhook_url',
         'is_approved',
         'notes',
         'approved_at',

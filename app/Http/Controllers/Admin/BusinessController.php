@@ -208,12 +208,14 @@ class BusinessController extends Controller
     {
         $validated = $request->validate([
             'website_url' => 'required|url|max:500',
+            'webhook_url' => 'nullable|url|max:500',
             'notes' => 'nullable|string|max:1000',
         ]);
 
         $website = BusinessWebsite::create([
             'business_id' => $business->id,
             'website_url' => $validated['website_url'],
+            'webhook_url' => $validated['webhook_url'] ?? null,
             'is_approved' => false,
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -223,6 +225,28 @@ class BusinessController extends Controller
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Website added successfully. It requires approval.');
+    }
+
+    public function updateWebsite(Request $request, Business $business, BusinessWebsite $website): RedirectResponse
+    {
+        if ($website->business_id !== $business->id) {
+            abort(403, 'Website does not belong to this business.');
+        }
+
+        $validated = $request->validate([
+            'website_url' => 'required|url|max:500',
+            'webhook_url' => 'nullable|url|max:500',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $website->update([
+            'website_url' => $validated['website_url'],
+            'webhook_url' => $validated['webhook_url'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Website updated successfully.');
     }
 
     public function deleteWebsite(Request $request, Business $business, BusinessWebsite $website): RedirectResponse

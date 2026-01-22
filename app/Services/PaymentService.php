@@ -67,6 +67,7 @@ class PaymentService
 
         // Identify website from multiple sources (in priority order)
         $websiteId = null;
+        $website = null;
         
         // 1. Allow explicit website_id override (highest priority)
         if (!empty($data['business_website_id'])) {
@@ -76,16 +77,39 @@ class PaymentService
                 ->first();
             if ($website) {
                 $websiteId = $website->id;
+                // Use website-specific webhook URL if available, otherwise use provided webhook_url
+                if ($website->webhook_url) {
+                    $webhookUrl = $website->webhook_url;
+                }
             }
         }
         // 2. Try to identify from explicit website_url parameter
         elseif ($business && !empty($data['website_url'])) {
-            $websiteId = $this->identifyWebsiteFromUrl($data['website_url'], $business);
+            $website = \App\Models\BusinessWebsite::where('business_id', $business->id)
+                ->where('is_approved', true)
+                ->where('website_url', $data['website_url'])
+                ->first();
+            if ($website) {
+                $websiteId = $website->id;
+                // Use website-specific webhook URL if available
+                if ($website->webhook_url) {
+                    $webhookUrl = $website->webhook_url;
+                }
+            } else {
+                $websiteId = $this->identifyWebsiteFromUrl($data['website_url'], $business);
+            }
         }
         // 3. Try to identify from webhook_url or return_url
         elseif ($business && ($webhookUrl || !empty($data['return_url']))) {
             $urlToCheck = $webhookUrl ?? $data['return_url'];
             $websiteId = $this->identifyWebsiteFromUrl($urlToCheck, $business);
+            // If website found, use its webhook URL
+            if ($websiteId) {
+                $website = \App\Models\BusinessWebsite::find($websiteId);
+                if ($website && $website->webhook_url) {
+                    $webhookUrl = $website->webhook_url;
+                }
+            }
         }
         // 4. Try to identify from HTTP referer header
         elseif ($business && $request && $request->header('referer')) {
@@ -101,7 +125,12 @@ class PaymentService
         elseif ($business) {
             $approvedWebsites = $business->approvedWebsites;
             if ($approvedWebsites->count() === 1) {
-                $websiteId = $approvedWebsites->first()->id;
+                $website = $approvedWebsites->first();
+                $websiteId = $website->id;
+                // Use website-specific webhook URL if available
+                if ($website->webhook_url) {
+                    $webhookUrl = $website->webhook_url;
+                }
             }
         }
 

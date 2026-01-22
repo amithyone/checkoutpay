@@ -23,11 +23,13 @@ class WebsitesController extends Controller
 
         $validated = $request->validate([
             'website_url' => 'required|url|max:500',
+            'webhook_url' => 'nullable|url|max:500',
         ]);
 
         $website = BusinessWebsite::create([
             'business_id' => $business->id,
             'website_url' => $validated['website_url'],
+            'webhook_url' => $validated['webhook_url'] ?? null,
             'is_approved' => false, // Requires admin approval
         ]);
 
@@ -36,6 +38,27 @@ class WebsitesController extends Controller
 
         return redirect()->route('business.websites.index')
             ->with('success', 'Website added successfully. It is pending admin approval.');
+    }
+
+    public function update(Request $request, BusinessWebsite $website)
+    {
+        $business = Auth::guard('business')->user();
+
+        // Ensure the website belongs to the authenticated business
+        if ($website->business_id !== $business->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $validated = $request->validate([
+            'webhook_url' => 'nullable|url|max:500',
+        ]);
+
+        $website->update([
+            'webhook_url' => $validated['webhook_url'],
+        ]);
+
+        return redirect()->route('business.websites.index')
+            ->with('success', 'Webhook URL updated successfully.');
     }
 
     public function destroy(BusinessWebsite $website)

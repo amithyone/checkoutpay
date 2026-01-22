@@ -34,12 +34,26 @@ class SendWebhookNotification implements ShouldQueue
         // Reload payment with relationships
         $this->payment->load(['business', 'accountNumberDetails', 'website']);
 
-        $webhookUrl = $this->payment->webhook_url;
+        // Priority: Website-specific webhook URL > Payment webhook URL > Business webhook URL
+        $webhookUrl = null;
+        
+        if ($this->payment->website && $this->payment->website->webhook_url) {
+            // Use website-specific webhook URL if available
+            $webhookUrl = $this->payment->website->webhook_url;
+        } elseif ($this->payment->webhook_url) {
+            // Fall back to payment webhook URL
+            $webhookUrl = $this->payment->webhook_url;
+        } elseif ($this->payment->business && $this->payment->business->webhook_url) {
+            // Fall back to business webhook URL
+            $webhookUrl = $this->payment->business->webhook_url;
+        }
 
         if (!$webhookUrl) {
             Log::warning('Payment webhook skipped - no webhook URL', [
                 'payment_id' => $this->payment->id,
                 'transaction_id' => $this->payment->transaction_id,
+                'has_website' => $this->payment->website ? true : false,
+                'website_webhook' => $this->payment->website?->webhook_url ?? null,
             ]);
             return;
         }

@@ -131,6 +131,7 @@ class CheckoutController extends Controller
             if (!$this->isUrlFromApprovedWebsites($validated['return_url'], $business)) {
                 return back()->withErrors(['return_url' => 'Return URL must be from your approved website domain.'])->withInput();
             }
+        }
 
         try {
             // Normalize return_url to prevent double slashes
@@ -181,6 +182,7 @@ class CheckoutController extends Controller
             ]);
 
             return back()->withErrors(['error' => 'Failed to create payment: ' . $e->getMessage()])->withInput();
+        }
     }
 
     /**
@@ -188,7 +190,6 @@ class CheckoutController extends Controller
      */
     public function payment(Request $request, string $transactionId)
     {
-        $payment = Payment::with(['accountNumberDetails', 'business'])
         try {
             $payment = Payment::with(['accountNumberDetails', 'business'])
                 ->where('transaction_id', $transactionId)

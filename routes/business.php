@@ -81,6 +81,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         // Websites Management
         Route::get('/websites', [WebsitesController::class, 'index'])->name('websites.index');
         Route::post('/websites', [WebsitesController::class, 'store'])->name('websites.store');
+        Route::put('/websites/{website}', [WebsitesController::class, 'update'])->name('websites.update');
         Route::delete('/websites/{website}', [WebsitesController::class, 'destroy'])->name('websites.destroy');
 
         // Verification/KYC

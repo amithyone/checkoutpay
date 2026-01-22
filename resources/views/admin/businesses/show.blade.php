@@ -246,6 +246,15 @@
                                         <strong>Note:</strong> {{ $website->notes }}
                                     </div>
                                 @endif
+                                @if($website->is_approved && $website->webhook_url)
+                                    <div class="mt-2 text-xs text-gray-600">
+                                        <strong>Webhook URL:</strong> <span class="font-mono text-gray-800">{{ $website->webhook_url }}</span>
+                                    </div>
+                                @elseif($website->is_approved)
+                                    <div class="mt-2 text-xs text-yellow-600">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i> No webhook URL configured
+                                    </div>
+                                @endif
                                 @php
                                     $websitePayments = $website->payments()->where('status', 'approved')->get();
                                     $totalRevenue = $websitePayments->sum('amount');
@@ -257,6 +266,10 @@
                                 </div>
                             </div>
                             <div class="flex items-center space-x-2 ml-4">
+                                <button onclick="showEditWebsiteModal({{ $website->id }}, '{{ addslashes($website->website_url) }}', '{{ addslashes($website->webhook_url ?? '') }}', '{{ addslashes($website->notes ?? '') }}')" 
+                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                                    <i class="fas fa-edit mr-1"></i> Edit
+                                </button>
                                 @if(!$website->is_approved)
                                     <button onclick="showApproveWebsiteModal({{ $website->id }})" 
                                         class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
@@ -583,6 +596,13 @@
                     placeholder="https://example.com">
             </div>
             <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Webhook URL (Optional)</label>
+                <input type="url" name="webhook_url" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="https://example.com/webhook">
+                <p class="text-xs text-gray-500 mt-1">Payment notifications will be sent to this URL for this website.</p>
+            </div>
+            <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
                 <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
                     placeholder="Add any notes..."></textarea>
@@ -685,6 +705,44 @@
     </div>
 </div>
 
+<!-- Edit Website Modal -->
+<div id="editWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Edit Website</h3>
+        <form id="editWebsiteForm" method="POST">
+            @csrf
+            @method('PUT')
+            <input type="hidden" name="website_id" id="edit_website_id">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Website URL <span class="text-red-500">*</span></label>
+                <input type="url" name="website_url" id="edit_website_url" required 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="https://example.com">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Webhook URL (Optional)</label>
+                <input type="url" name="webhook_url" id="edit_webhook_url" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="https://example.com/webhook">
+                <p class="text-xs text-gray-500 mt-1">Payment notifications will be sent to this URL for this website.</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                <textarea name="notes" id="edit_notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Add any notes..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeEditWebsiteModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    Update Website
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Approve KYC Modal -->
 <div id="approveKYCModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -773,6 +831,19 @@ function showAddWebsiteModal() {
 
 function closeAddWebsiteModal() {
     document.getElementById('addWebsiteModal').classList.add('hidden');
+}
+
+function showEditWebsiteModal(websiteId, websiteUrl, webhookUrl, notes) {
+    document.getElementById('edit_website_id').value = websiteId;
+    document.getElementById('edit_website_url').value = websiteUrl;
+    document.getElementById('edit_webhook_url').value = webhookUrl || '';
+    document.getElementById('edit_notes').value = notes || '';
+    document.getElementById('editWebsiteForm').action = '{{ route("admin.businesses.update-website", [$business, ":website"]) }}'.replace(':website', websiteId);
+    document.getElementById('editWebsiteModal').classList.remove('hidden');
+}
+
+function closeEditWebsiteModal() {
+    document.getElementById('editWebsiteModal').classList.add('hidden');
 }
 
 function showApproveWebsiteModal(websiteId) {
