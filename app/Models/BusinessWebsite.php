@@ -67,4 +67,28 @@ class BusinessWebsite extends Model
     {
         return $this->hasMany(Payment::class, 'business_website_id');
     }
+
+    /**
+     * Retrieve the model for route model binding.
+     * For business routes, scope to authenticated business's websites.
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        // If we're in a business context (business guard is authenticated), scope to that business
+        if (auth('business')->check()) {
+            $website = $this->where('id', $value)
+                ->where('business_id', auth('business')->id())
+                ->first();
+            
+            // If not found, return null to trigger 404
+            if (!$website) {
+                return null;
+            }
+            
+            return $website;
+        }
+
+        // For admin routes, allow any website
+        return parent::resolveRouteBinding($value, $field);
+    }
 }

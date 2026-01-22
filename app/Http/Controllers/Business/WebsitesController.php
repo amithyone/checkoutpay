@@ -45,8 +45,8 @@ class WebsitesController extends Controller
         $business = Auth::guard('business')->user();
 
         // Ensure the website belongs to the authenticated business
-        if ($website->business_id !== $business->id) {
-            abort(403, 'Unauthorized action.');
+        if (!$website || $website->business_id !== $business->id) {
+            abort(403, 'Website does not belong to this business.');
         }
 
         $validated = $request->validate([
