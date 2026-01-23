@@ -59,6 +59,16 @@ class AccountNumber extends Model
     }
 
     /**
+     * Scope to get account numbers that should be in pool
+     * (business_id is null but is_pool is false - orphaned accounts)
+     */
+    public function scopeShouldBeInPool($query)
+    {
+        return $query->whereNull('business_id')
+            ->where('is_pool', false);
+    }
+
+    /**
      * Get the business that owns this account number
      */
     public function business()
