@@ -6,7 +6,7 @@
 @section('content')
 <div class="max-w-2xl">
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <form action="{{ route('admin.account-numbers.store') }}" method="POST">
+        <form action="{{ route('admin.account-numbers.store') }}" method="POST" id="account-number-form" onsubmit="return validateForm()">
             @csrf
             <div class="space-y-6">
                 <div>
@@ -66,7 +66,7 @@
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
                                onkeyup="filterBanks(this.value)"
                                onclick="toggleBankDropdown()">
-                        <select name="bank_code" id="bank_code" required
+                        <select name="bank_code" id="bank_code"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary hidden"
                             onchange="updateBankName()">
                             <option value="">Select Bank</option>
@@ -208,6 +208,38 @@
             bankNameInput.value = '';
             bankSearchInput.value = '';
         }
+    }
+
+    // Form validation before submission
+    function validateForm() {
+        const bankNameInput = document.getElementById('bank_name');
+        const bankCodeSelect = document.getElementById('bank_code');
+        
+        // Ensure bank_name is set
+        if (!bankNameInput.value || bankNameInput.value.trim() === '') {
+            alert('Please select a bank.');
+            const bankSearchInput = document.getElementById('bank_search');
+            if (bankSearchInput) {
+                bankSearchInput.focus();
+                toggleBankDropdown();
+            }
+            return false;
+        }
+        
+        // Ensure bank_code is set if bank_name is set
+        if (!bankCodeSelect.value && bankNameInput.value) {
+            // Try to find matching bank code
+            const bankName = bankNameInput.value.trim();
+            const options = bankCodeSelect.options;
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].getAttribute('data-bank-name') === bankName || options[i].textContent.trim() === bankName) {
+                    bankCodeSelect.value = options[i].value;
+                    break;
+                }
+            }
+        }
+        
+        return true;
     }
 
     // Close dropdown when clicking outside
