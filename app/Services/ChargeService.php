@@ -80,10 +80,10 @@ class ChargeService
     }
 
     /**
-     * Get charge percentage - website-based, fallback to business, then default
+     * Get charge percentage - website-based (default: 1%), no fallback to business
      *
      * @param BusinessWebsite|null $website
-     * @param Business|null $business
+     * @param Business|null $business (kept for backward compatibility, not used)
      * @return float
      */
     public function getChargePercentage(?BusinessWebsite $website = null, ?Business $business = null): float
@@ -93,20 +93,15 @@ class ChargeService
             return (float) $website->charge_percentage;
         }
 
-        // Fallback to business if website not provided
-        if ($business && $business->charge_percentage !== null) {
-            return (float) $business->charge_percentage;
-        }
-
-        // Get default from settings (default: 1%)
+        // Default: 1% (website-based charges, no fallback to business)
         return (float) Setting::get('default_charge_percentage', self::DEFAULT_PERCENTAGE);
     }
 
     /**
-     * Get fixed charge - website-based, fallback to business, then default
+     * Get fixed charge - website-based (default: 100), no fallback to business
      *
      * @param BusinessWebsite|null $website
-     * @param Business|null $business
+     * @param Business|null $business (kept for backward compatibility, not used)
      * @return float
      */
     public function getChargeFixed(?BusinessWebsite $website = null, ?Business $business = null): float
@@ -116,12 +111,7 @@ class ChargeService
             return (float) $website->charge_fixed;
         }
 
-        // Fallback to business if website not provided
-        if ($business && $business->charge_fixed !== null) {
-            return (float) $business->charge_fixed;
-        }
-
-        // Get default from settings (default: 100)
+        // Default: 100 (website-based charges, no fallback to business)
         return (float) Setting::get('default_charge_fixed', self::DEFAULT_FIXED);
     }
 
@@ -144,10 +134,10 @@ class ChargeService
     }
 
     /**
-     * Check if charges are paid by customer - website-based, fallback to business
+     * Check if charges are paid by customer - website-based (default: false)
      *
      * @param BusinessWebsite|null $website
-     * @param Business|null $business
+     * @param Business|null $business (kept for backward compatibility, not used)
      * @return bool
      */
     public function isPaidByCustomer(?BusinessWebsite $website = null, ?Business $business = null): bool
@@ -157,12 +147,7 @@ class ChargeService
             return (bool) $website->charges_paid_by_customer;
         }
 
-        // Fallback to business if website not provided
-        if ($business && $business->charges_paid_by_customer !== null) {
-            return (bool) $business->charges_paid_by_customer;
-        }
-
-        // Default: business pays charges
+        // Default: business pays charges (false)
         return false;
     }
 }
