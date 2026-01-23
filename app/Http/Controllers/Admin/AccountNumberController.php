@@ -137,7 +137,9 @@ class AccountNumberController extends Controller
         unset($validated['bank_code']);
 
         // Handle is_active checkbox - checkboxes only send value when checked
-        $validated['is_active'] = $request->has('is_active') && $request->input('is_active') == '1';
+        // If checkbox is checked, it sends 'is_active' = '1' (string)
+        // If checkbox is unchecked, it doesn't send anything, so we default to false
+        $validated['is_active'] = $request->has('is_active') && ($request->input('is_active') == '1' || $request->input('is_active') === true || $request->input('is_active') === 'true');
 
         try {
             $accountNumber->update($validated);
@@ -148,6 +150,7 @@ class AccountNumberController extends Controller
                 'error' => $e->getMessage(),
                 'account_number_id' => $accountNumber->id,
                 'request_data' => $request->all(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return back()->withInput()->with('error', 'Failed to update account number: ' . $e->getMessage());
         }
