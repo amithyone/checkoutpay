@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
+use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\MatchAttemptController;
@@ -66,4 +67,7 @@ Route::middleware(['web', 'auth:admin'])->prefix('admin')->name('admin.')->group
     // Match Attempts
     Route::get('match-attempts', [MatchAttemptController::class, 'index'])->name('match-attempts.index');
     Route::get('match-attempts/{matchAttempt}', [MatchAttemptController::class, 'show'])->name('match-attempts.show');
+
+    // Businesses
+    Route::resource('businesses', BusinessController::class);
 });
