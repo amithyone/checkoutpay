@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\MatchAttemptController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
+use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\TestTransactionController;
 use App\Http\Controllers\Admin\TransactionLogController;
 use App\Http\Controllers\Admin\WithdrawalController;
@@ -70,4 +71,7 @@ Route::middleware(['web', 'auth:admin'])->prefix('admin')->name('admin.')->group
 
     // Businesses
     Route::resource('businesses', BusinessController::class);
+
+    // Statistics
+    Route::get('stats', [StatsController::class, 'index'])->name('stats.index');
 });
