@@ -44,9 +44,6 @@ class Kernel extends ConsoleKernel
             ->throttle(4); // Max 4 runs per minute
         
         // STEP 3: Match transactions (global match)
-        // TODO: PaymentMatchingService was deleted - need to recreate or refactor
-        // Temporarily disabled to fix autoloader issue
-        /*
         $schedule->call(function () {
             try {
                 $matchingService = new \App\Services\PaymentMatchingService(
@@ -173,7 +170,6 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->runInBackground()
             ->name('step3-match-transactions');
-        */
 
         // Extract missing names from processed emails
         // TODO: Command 'payment:extract-missing-names' does not exist - commented out until command is created
