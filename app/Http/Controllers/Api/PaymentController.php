@@ -48,8 +48,10 @@ class PaymentController extends Controller
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);
 
             // Calculate charges (for API response - actual charges applied when payment is approved)
+            // Use website-based charges, fallback to business
             $chargeService = app(\App\Services\ChargeService::class);
-            $charges = $chargeService->calculateCharges($payment->amount, $business);
+            $website = $payment->website;
+            $charges = $chargeService->calculateCharges($payment->amount, $website, $business);
 
             // Load account number details
             $payment->load('accountNumberDetails', 'website');

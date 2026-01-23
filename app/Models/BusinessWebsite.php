@@ -18,10 +18,16 @@ class BusinessWebsite extends Model
         'notes',
         'approved_at',
         'approved_by',
+        'charge_percentage',
+        'charge_fixed',
+        'charges_paid_by_customer',
     ];
 
     protected $casts = [
         'is_approved' => 'boolean',
+        'charge_percentage' => 'decimal:2',
+        'charge_fixed' => 'decimal:2',
+        'charges_paid_by_customer' => 'boolean',
         'approved_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',

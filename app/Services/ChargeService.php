@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Business;
+use App\Models\BusinessWebsite;
 use App\Models\Setting;
 
 class ChargeService
@@ -21,16 +22,17 @@ class ChargeService
      * Calculate charges for a payment amount
      *
      * @param float $amount Original payment amount
-     * @param Business|null $business Business model (optional, for custom charges)
+     * @param BusinessWebsite|null $website Website model (optional, for custom charges)
+     * @param Business|null $business Business model (fallback if website not provided)
      * @return array
      */
-    public function calculateCharges(float $amount, ?Business $business = null): array
+    public function calculateCharges(float $amount, ?BusinessWebsite $website = null, ?Business $business = null): array
     {
-        // Get charge settings
-        $percentage = $this->getChargePercentage($business);
-        $fixed = $this->getChargeFixed($business);
-        $isExempt = $this->isChargeExempt($business);
-        $paidByCustomer = $this->isPaidByCustomer($business);
+        // Get charge settings - prioritize website over business
+        $percentage = $this->getChargePercentage($website, $business);
+        $fixed = $this->getChargeFixed($website, $business);
+        $isExempt = $this->isChargeExempt($website, $business);
+        $paidByCustomer = $this->isPaidByCustomer($website, $business);
 
         // If business is exempt, no charges
         if ($isExempt) {
@@ -78,66 +80,89 @@ class ChargeService
     }
 
     /**
-     * Get charge percentage for business
+     * Get charge percentage - website-based, fallback to business, then default
      *
+     * @param BusinessWebsite|null $website
      * @param Business|null $business
      * @return float
      */
-    public function getChargePercentage(?Business $business = null): float
+    public function getChargePercentage(?BusinessWebsite $website = null, ?Business $business = null): float
     {
-        // Check if business has custom percentage
+        // Check if website has custom percentage
+        if ($website && $website->charge_percentage !== null) {
+            return (float) $website->charge_percentage;
+        }
+
+        // Fallback to business if website not provided
         if ($business && $business->charge_percentage !== null) {
             return (float) $business->charge_percentage;
         }
 
-        // Get default from settings
+        // Get default from settings (default: 1%)
         return (float) Setting::get('default_charge_percentage', self::DEFAULT_PERCENTAGE);
     }
 
     /**
-     * Get fixed charge for business
+     * Get fixed charge - website-based, fallback to business, then default
      *
+     * @param BusinessWebsite|null $website
      * @param Business|null $business
      * @return float
      */
-    public function getChargeFixed(?Business $business = null): float
+    public function getChargeFixed(?BusinessWebsite $website = null, ?Business $business = null): float
     {
-        // Check if business has custom fixed charge
+        // Check if website has custom fixed charge
+        if ($website && $website->charge_fixed !== null) {
+            return (float) $website->charge_fixed;
+        }
+
+        // Fallback to business if website not provided
         if ($business && $business->charge_fixed !== null) {
             return (float) $business->charge_fixed;
         }
 
-        // Get default from settings
+        // Get default from settings (default: 100)
         return (float) Setting::get('default_charge_fixed', self::DEFAULT_FIXED);
     }
 
     /**
-     * Check if business is exempt from charges
+     * Check if website/business is exempt from charges
      *
+     * @param BusinessWebsite|null $website
      * @param Business|null $business
      * @return bool
      */
-    public function isChargeExempt(?Business $business = null): bool
+    public function isChargeExempt(?BusinessWebsite $website = null, ?Business $business = null): bool
     {
-        if (!$business) {
-            return false;
+        // Website-level exemption (if implemented in future)
+        // For now, check business-level exemption
+        if ($business && $business->charge_exempt) {
+            return true;
         }
 
-        return (bool) $business->charge_exempt;
+        return false;
     }
 
     /**
-     * Check if charges are paid by customer
+     * Check if charges are paid by customer - website-based, fallback to business
      *
+     * @param BusinessWebsite|null $website
      * @param Business|null $business
      * @return bool
      */
-    public function isPaidByCustomer(?Business $business = null): bool
+    public function isPaidByCustomer(?BusinessWebsite $website = null, ?Business $business = null): bool
     {
-        if (!$business) {
-            return false;
+        // Check if website has custom setting
+        if ($website && $website->charges_paid_by_customer !== null) {
+            return (bool) $website->charges_paid_by_customer;
         }
 
-        return (bool) $business->charges_paid_by_customer;
+        // Fallback to business if website not provided
+        if ($business && $business->charges_paid_by_customer !== null) {
+            return (bool) $business->charges_paid_by_customer;
+        }
+
+        // Default: business pays charges
+        return false;
     }
 }

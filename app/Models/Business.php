@@ -521,7 +521,10 @@ class Business extends Authenticatable implements CanResetPasswordContract
         
         // Use received amount if provided (for mismatches), otherwise use original amount
         $amountForCharges = $receivedAmount ?? $amount;
-        $charges = $chargeService->calculateCharges($amountForCharges, $this);
+        
+        // Use website-based charges if payment has website, fallback to business
+        $website = $payment && $payment->relationLoaded('website') ? $payment->website : ($payment ? $payment->website()->first() : null);
+        $charges = $chargeService->calculateCharges($amountForCharges, $website, $this);
 
         // Store charge details in payment if provided
         if ($payment) {
