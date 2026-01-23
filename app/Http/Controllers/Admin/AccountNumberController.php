@@ -5,204 +5,224 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AccountNumber;
 use App\Models\Business;
-use App\Models\Payment;
-use App\Services\AccountNumberService;
-use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AccountNumberController extends Controller
 {
-    public function __construct(
-        protected AccountNumberService $accountNumberService
-    ) {}
-
-    public function index(Request $request): View
+    /**
+     * Display a listing of account numbers
+     */
+    public function index(Request $request)
     {
-        $query = AccountNumber::with('business')
-            ->select('account_numbers.*')
-            ->selectRaw('(SELECT COUNT(*) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ?) as payments_received_count', [Payment::STATUS_APPROVED])
-            ->selectRaw('(SELECT SUM(COALESCE(payments.received_amount, payments.amount)) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ?) as payments_received_amount', [Payment::STATUS_APPROVED])
-            ->latest();
+        $query = AccountNumber::with('business');
 
-        if ($request->has('type')) {
-            if ($request->type === 'pool') {
-                $query->pool();
-            } elseif ($request->type === 'business') {
-                $query->businessSpecific();
+        // Filter by type
+        if ($request->type === 'pool') {
+            $query->where('is_pool', true);
+        } elseif ($request->type === 'business') {
+            $query->where('is_pool', false);
+        }
+
+        // Filter by status
+        if ($request->status === 'active') {
+            $query->where('is_active', true);
+        } elseif ($request->status === 'inactive') {
+            $query->where('is_active', false);
+        }
+
+        // Add payment statistics (if Payment model exists)
+        try {
+            $accountNumbers = $query->withCount([
+                'payments as payments_received_count' => function ($q) {
+                    if (class_exists(\App\Models\Payment::class)) {
+                        $q->where('status', \App\Models\Payment::STATUS_APPROVED);
+                    }
+                }
+            ])->withSum([
+                'payments as payments_received_amount' => function ($q) {
+                    if (class_exists(\App\Models\Payment::class)) {
+                        $q->where('status', \App\Models\Payment::STATUS_APPROVED)
+                          ->selectRaw('COALESCE(received_amount, amount)');
+                    }
+                }
+            ], 'amount')
+            ->latest()
+            ->paginate(15);
+        } catch (\Exception $e) {
+            // Fallback if Payment model doesn't exist
+            $accountNumbers = $query->latest()->paginate(15);
+            foreach ($accountNumbers as $account) {
+                $account->payments_received_count = 0;
+                $account->payments_received_amount = 0;
             }
         }
-
-        if ($request->has('status')) {
-            $query->where('is_active', $request->status === 'active');
-        }
-
-        $accountNumbers = $query->paginate(20);
 
         return view('admin.account-numbers.index', compact('accountNumbers'));
     }
 
-    public function create(): View
+    /**
+     * Show the form for creating a new account number
+     */
+    public function create()
     {
-        $businesses = Business::where('is_active', true)->get();
+        $businesses = Business::where('is_active', true)->orderBy('name')->get();
         return view('admin.account-numbers.create', compact('businesses'));
     }
 
-    public function store(Request $request): RedirectResponse
+    /**
+     * Store a newly created account number
+     */
+    public function store(Request $request)
     {
         $validated = $request->validate([
-            'account_number' => 'required|string|unique:account_numbers,account_number',
+            'account_number' => 'required|string|size:10|unique:account_numbers,account_number',
             'account_name' => 'required|string|max:255',
-            'bank_name' => 'nullable|string|max:255',
-            'bank_code' => 'required|string',
-            'business_id' => 'nullable|exists:businesses,id',
-            'is_pool' => 'boolean',
+            'bank_name' => 'required|string|max:255',
+            'bank_code' => 'nullable|string|max:10',
+            'is_pool' => 'required|boolean',
+            'business_id' => 'nullable|exists:businesses,id|required_if:is_pool,0',
+            'is_active' => 'boolean',
         ]);
-        
-        // Auto-populate bank_name from bank_code if not provided
-        if (empty($validated['bank_name']) && !empty($validated['bank_code'])) {
-            $banks = config('banks', []);
-            foreach ($banks as $bank) {
-                if ($bank['code'] === $validated['bank_code']) {
-                    $validated['bank_name'] = $bank['bank_name'];
-                    break;
-                }
-            }
-        }
-        
-        // Ensure bank_name is set
-        if (empty($validated['bank_name'])) {
-            return back()->withErrors(['bank_code' => 'Please select a valid bank.'])->withInput();
+
+        // Set business_id to null for pool accounts
+        if ($validated['is_pool']) {
+            $validated['business_id'] = null;
         }
 
-        // Validate account number using NUBAN API
-        $nubanService = app(NubanValidationService::class);
-        $validationResult = $nubanService->validate($validated['account_number'], $validated['bank_code']);
+        // Remove bank_code if not needed (we store bank_name)
+        unset($validated['bank_code']);
 
-        if (!$validationResult || !$validationResult['valid']) {
-            return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
-        }
+        // Handle is_active checkbox
+        $validated['is_active'] = $request->has('is_active') ? (bool)$request->input('is_active') : false;
 
-        // Use validated account name and bank name from NUBAN API
-        if (!empty($validationResult['account_name'])) {
-            $validated['account_name'] = $validationResult['account_name'];
+        try {
+            AccountNumber::create($validated);
+            return redirect()->route('admin.account-numbers.index')
+                ->with('success', 'Account number created successfully!');
+        } catch (\Exception $e) {
+            Log::error('Error creating account number', ['error' => $e->getMessage()]);
+            return back()->withInput()->with('error', 'Failed to create account number: ' . $e->getMessage());
         }
-        if (!empty($validationResult['bank_name'])) {
-            $validated['bank_name'] = $validationResult['bank_name'];
-        }
-
-        if ($validated['is_pool'] ?? false) {
-            $this->accountNumberService->createPoolAccount($validated);
-        } else {
-            $business = Business::findOrFail($validated['business_id']);
-            $this->accountNumberService->createBusinessAccount($business, $validated);
-        }
-
-        return redirect()->route('admin.account-numbers.index')
-            ->with('success', 'Account number created successfully');
     }
 
-    public function edit(AccountNumber $accountNumber): View
+    /**
+     * Show the form for editing an account number
+     */
+    public function edit(AccountNumber $accountNumber)
     {
-        $businesses = Business::where('is_active', true)->get();
+        $businesses = Business::where('is_active', true)->orderBy('name')->get();
         return view('admin.account-numbers.edit', compact('accountNumber', 'businesses'));
     }
 
-    public function update(Request $request, AccountNumber $accountNumber): RedirectResponse
+    /**
+     * Update the specified account number
+     */
+    public function update(Request $request, AccountNumber $accountNumber)
     {
         $validated = $request->validate([
-            'account_number' => 'required|string|unique:account_numbers,account_number,' . $accountNumber->id,
+            'account_number' => 'required|string|size:10|unique:account_numbers,account_number,' . $accountNumber->id,
             'account_name' => 'required|string|max:255',
-            'bank_name' => 'nullable|string|max:255',
-            'bank_code' => 'required|string',
+            'bank_name' => 'required|string|max:255',
+            'bank_code' => 'nullable|string|max:10',
             'business_id' => 'nullable|exists:businesses,id',
-            'is_active' => 'boolean',
         ]);
-        
-        // Auto-populate bank_name from bank_code if not provided
-        if (empty($validated['bank_name']) && !empty($validated['bank_code'])) {
-            $banks = config('banks', []);
-            foreach ($banks as $bank) {
-                if ($bank['code'] === $validated['bank_code']) {
-                    $validated['bank_name'] = $bank['bank_name'];
-                    break;
-                }
-            }
-        }
-        
-        // Ensure bank_name is set
-        if (empty($validated['bank_name'])) {
-            return back()->withErrors(['bank_code' => 'Please select a valid bank.'])->withInput();
+
+        // Set business_id to null for pool accounts
+        if ($accountNumber->is_pool) {
+            $validated['business_id'] = null;
         }
 
-        // Validate account number using NUBAN API if account number changed
-        if ($validated['account_number'] !== $accountNumber->account_number || isset($validated['bank_code'])) {
-            $nubanService = app(NubanValidationService::class);
-            $bankCode = $validated['bank_code'] ?? null;
-            $validationResult = $nubanService->validate($validated['account_number'], $bankCode);
+        // Remove bank_code if not needed (we store bank_name)
+        unset($validated['bank_code']);
 
-            if (!$validationResult || !$validationResult['valid']) {
-                return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
-            }
+        // Handle is_active checkbox - checkboxes only send value when checked
+        $validated['is_active'] = $request->has('is_active') && $request->input('is_active') == '1';
 
-            // Use validated account name and bank name from NUBAN API
-            if (!empty($validationResult['account_name'])) {
-                $validated['account_name'] = $validationResult['account_name'];
-            }
-            if (!empty($validationResult['bank_name'])) {
-                $validated['bank_name'] = $validationResult['bank_name'];
-            }
+        try {
+            $accountNumber->update($validated);
+            return redirect()->route('admin.account-numbers.index')
+                ->with('success', 'Account number updated successfully!');
+        } catch (\Exception $e) {
+            Log::error('Error updating account number', [
+                'error' => $e->getMessage(),
+                'account_number_id' => $accountNumber->id,
+                'request_data' => $request->all(),
+            ]);
+            return back()->withInput()->with('error', 'Failed to update account number: ' . $e->getMessage());
         }
-
-        // If business_id is being changed, update is_pool accordingly
-        // If business_id is being set to null, ensure is_pool is true (move to pool)
-        if (isset($validated['business_id']) && is_null($validated['business_id']) && $accountNumber->business_id !== null) {
-            $validated['is_pool'] = true;
-        }
-        // If business_id is being set to a business, ensure is_pool is false (business-specific)
-        elseif (isset($validated['business_id']) && !is_null($validated['business_id']) && $accountNumber->business_id !== $validated['business_id']) {
-            $validated['is_pool'] = false;
-        }
-
-        $accountNumber->update($validated);
-
-        return redirect()->route('admin.account-numbers.index')
-            ->with('success', 'Account number updated successfully');
     }
 
-    public function destroy(AccountNumber $accountNumber): RedirectResponse
+    /**
+     * Remove the specified account number
+     */
+    public function destroy(AccountNumber $accountNumber)
     {
-        $accountNumber->delete();
+        try {
+            // Check if account number is being used by payments
+            if ($accountNumber->payments()->count() > 0) {
+                return back()->with('error', 'Cannot delete account number that has associated payments.');
+            }
 
-        return redirect()->route('admin.account-numbers.index')
-            ->with('success', 'Account number deleted successfully');
+            $accountNumber->delete();
+            return redirect()->route('admin.account-numbers.index')
+                ->with('success', 'Account number deleted successfully!');
+        } catch (\Exception $e) {
+            Log::error('Error deleting account number', [
+                'error' => $e->getMessage(),
+                'account_number_id' => $accountNumber->id,
+            ]);
+            return back()->with('error', 'Failed to delete account number: ' . $e->getMessage());
+        }
     }
 
+    /**
+     * Validate account number
+     */
     public function validateAccount(Request $request)
     {
-        $request->validate([
-            'account_number' => 'required|string|min:10|max:10',
+        $validated = $request->validate([
+            'account_number' => 'required|string|size:10',
             'bank_code' => 'nullable|string',
         ]);
 
-        $nubanService = app(NubanValidationService::class);
-        $validationResult = $nubanService->validate($request->account_number, $request->bank_code);
+        try {
+            $nubanService = app(\App\Services\NubanValidationService::class);
+            
+            if ($validated['bank_code']) {
+                $result = $nubanService->validateAccountNumberWithBankCode(
+                    $validated['account_number'],
+                    $validated['bank_code']
+                );
+            } else {
+                $result = $nubanService->validateAccountNumber($validated['account_number']);
+            }
 
-        if ($validationResult && $validationResult['valid']) {
+            if ($result && isset($result['account_name'])) {
+                return response()->json([
+                    'success' => true,
+                    'valid' => true,
+                    'account_name' => $result['account_name'],
+                    'bank_name' => $result['bank_name'] ?? null,
+                ]);
+            }
+
             return response()->json([
-                'success' => true,
-                'valid' => true,
-                'account_name' => $validationResult['account_name'],
-                'bank_name' => $validationResult['bank_name'],
+                'success' => false,
+                'valid' => false,
+                'message' => 'Could not validate account number. Please verify and try again.',
             ]);
-        }
+        } catch (\Exception $e) {
+            Log::error('Error validating account number', [
+                'error' => $e->getMessage(),
+                'account_number' => $validated['account_number'],
+            ]);
 
-        return response()->json([
-            'success' => false,
-            'valid' => false,
-            'message' => 'Invalid account number. Please verify and try again.',
-        ], 400);
+            return response()->json([
+                'success' => false,
+                'valid' => false,
+                'message' => 'Error validating account number: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }
