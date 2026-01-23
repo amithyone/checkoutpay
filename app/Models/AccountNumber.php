@@ -77,6 +77,14 @@ class AccountNumber extends Model
     }
 
     /**
+     * Increment usage count
+     */
+    public function incrementUsage(): void
+    {
+        $this->increment('usage_count');
+    }
+
+    /**
      * Get payments using this account number
      */
     public function payments()
