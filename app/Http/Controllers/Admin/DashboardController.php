@@ -67,7 +67,7 @@ class DashboardController extends Controller
                 'approved' => WithdrawalRequest::where('status', WithdrawalRequest::STATUS_APPROVED)->count(),
             ],
             'account_numbers' => [
-                'total' => AccountNumber::count(),
+                'total' => AccountNumber::active()->count(), // Only count active account numbers
                 'pool' => AccountNumber::pool()->active()->count(),
                 'business_specific' => AccountNumber::businessSpecific()->active()->count(),
                 'total_payments_received_count' => Payment::where('status', Payment::STATUS_APPROVED)

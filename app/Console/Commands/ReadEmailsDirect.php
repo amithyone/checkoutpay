@@ -489,6 +489,12 @@ class ReadEmailsDirect extends Command
                 }
 
                 $this->info("  📧 Found " . count($emailFiles) . " email file(s)");
+                
+                // LIMIT: Only process 10 emails at a time for faster processing
+                $emailFiles = array_slice($emailFiles, 0, 10);
+                if (count($emailFiles) === 10) {
+                    $this->info("  ⚡ Processing first 10 emails (limit applied for performance)");
+                }
 
                 foreach ($emailFiles as $file) {
                     $filePath = $dirPath . '/' . $file;
@@ -725,12 +731,52 @@ class ReadEmailsDirect extends Command
 
             $fromEmail = $parts['from_email'] ?? '';
             $fromName = $parts['from_name'] ?? '';
+            $textBody = $parts['text_body'] ?? '';
+            $htmlBody = $parts['html_body'] ?? '';
+            $subject = $parts['subject'] ?? '';
+
+            // IMPROVED: Extract sender name from email body if not already in headers
+            // This ensures we capture the name even if it's not in the From header
+            if (empty($fromName) && (!empty($textBody) || !empty($htmlBody))) {
+                try {
+                    $nameExtractor = new \App\Services\SenderNameExtractor();
+                    $emailExtractor = new \App\Services\EmailExtractionService();
+                    
+                    // Try extracting from text body first
+                    $senderNameFromBody = null;
+                    if (!empty($textBody)) {
+                        $senderNameFromBody = $nameExtractor->extractFromText($textBody, $subject);
+                    }
+                    
+                    // If not found in text, try HTML body
+                    if (!$senderNameFromBody && !empty($htmlBody)) {
+                        $senderNameFromBody = $nameExtractor->extractFromHtml($htmlBody);
+                    }
+                    
+                    if ($senderNameFromBody) {
+                        // Use name from body if found and validate it
+                        $validatedName = $emailExtractor->validateSenderName($senderNameFromBody);
+                        if ($validatedName) {
+                            $fromName = $validatedName;
+                            Log::debug('Extracted sender name from email body (ReadEmailsDirect)', [
+                                'sender_name' => $fromName,
+                                'subject' => $subject,
+                            ]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::debug('Failed to extract sender name from body (ReadEmailsDirect)', [
+                        'error' => $e->getMessage(),
+                        'subject' => $subject,
+                    ]);
+                }
+            }
 
             // Filter by allowed senders
             if (!$emailAccount->isSenderAllowed($fromEmail)) {
                 Log::info('Email skipped: sender not allowed', [
                     'from' => $fromEmail,
-                    'subject' => $parts['subject'] ?? '',
+                    'subject' => $subject,
                     'email_account' => $emailAccount->email,
                 ]);
                 return null;
@@ -742,10 +788,10 @@ class ReadEmailsDirect extends Command
             );
 
             $emailData = [
-                'subject' => $parts['subject'] ?? '',
+                'subject' => $subject,
                 'from' => $fromEmail,
-                'text' => $parts['text_body'] ?? '',
-                'html' => $parts['html_body'] ?? '',
+                'text' => $textBody,
+                'html' => $htmlBody,
                 'date' => $parts['date'] ?? now()->toDateTimeString(),
                 'email_account_id' => $emailAccount->id,
             ];

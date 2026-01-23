@@ -232,7 +232,8 @@ class MonitorEmails extends Command
             
             // Get ALL emails without keyword filtering
             // This ensures we don't miss any emails that might contain payment info
-            $messages = $query->get();
+            // LIMIT: Only fetch 10 emails at a time for faster processing
+            $messages = $query->limit(10)->get();
 
             $accountEmail = $emailAccount ? $emailAccount->email : 'default account';
             $totalEmailsFound = $messages->count();
@@ -916,12 +917,9 @@ class MonitorEmails extends Command
             
             // Store email even if extraction failed or returned null
             try {
-                $textBody = $message->getTextBody() ?? '';
-                $htmlBody = $message->getHTMLBody() ?? '';
-                
                 // CRITICAL: Normalize text_body - ensure it's always stripped from HTML and never empty
                 $emailExtractor = new \App\Services\EmailExtractionService();
-                $normalizedTextBody = $emailExtractor->normalizeTextBody($textBody, $htmlBody);
+                $normalizedTextBody = $emailExtractor->normalizeTextBody($textBody ?? '', $htmlBody ?? '');
                 
                 if (empty(trim($textBody)) && !empty(trim($htmlBody))) {
                     Log::debug('Extracted text_body from html_body in MonitorEmails', [

@@ -49,7 +49,7 @@ class StatsController extends Controller
         
         // Add account numbers payment stats (applies to all periods)
         $stats['account_numbers'] = [
-            'total' => AccountNumber::count(),
+            'total' => AccountNumber::active()->count(), // Only count active account numbers
             'pool' => AccountNumber::pool()->active()->count(),
             'business_specific' => AccountNumber::businessSpecific()->active()->count(),
             'total_payments_received_count' => Payment::where('status', Payment::STATUS_APPROVED)
@@ -297,7 +297,8 @@ class StatsController extends Controller
     
     private function getTopAccountNumbers($since)
     {
-        return AccountNumber::select('account_numbers.*')
+        return AccountNumber::active() // Only get active account numbers
+            ->select('account_numbers.*')
             ->selectRaw('(SELECT COUNT(*) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ? AND payments.created_at >= ?) as payments_count', [Payment::STATUS_APPROVED, $since])
             ->selectRaw('(SELECT SUM(COALESCE(payments.received_amount, payments.amount)) FROM payments WHERE payments.account_number = account_numbers.account_number AND payments.status = ? AND payments.created_at >= ?) as payments_amount', [Payment::STATUS_APPROVED, $since])
             ->havingRaw('payments_count > 0')
