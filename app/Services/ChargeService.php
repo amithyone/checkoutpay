@@ -60,19 +60,25 @@ class ChargeService
                 'charge_fixed' => $fixed,
                 'total_charges' => round($totalCharges, 2),
                 'amount_to_pay' => round($amount + $totalCharges, 2),
-                'business_receives' => $amount,
+                'business_receives' => $this->roundBusinessReceives($amount),
                 'paid_by_customer' => true,
                 'exempt' => false,
             ];
         } else {
-            // Business pays charges - deduct from amount
+            // Business pays charges - deduct from amount and round business receives
+            $businessReceives = $amount - $totalCharges;
+            $roundedBusinessReceives = $this->roundBusinessReceives($businessReceives);
+            
+            // Adjust total charges to match rounded business receives
+            $adjustedTotalCharges = $amount - $roundedBusinessReceives;
+            
             return [
                 'original_amount' => $amount,
                 'charge_percentage' => round($percentageCharge, 2),
                 'charge_fixed' => $fixed,
-                'total_charges' => round($totalCharges, 2),
+                'total_charges' => round($adjustedTotalCharges, 2),
                 'amount_to_pay' => $amount,
-                'business_receives' => round($amount - $totalCharges, 2),
+                'business_receives' => $roundedBusinessReceives,
                 'paid_by_customer' => false,
                 'exempt' => false,
             ];
@@ -149,5 +155,23 @@ class ChargeService
 
         // Default: business pays charges (false)
         return false;
+    }
+
+    /**
+     * Round business receives to nearest nice round number
+     * Rounds to nearest 500 for amounts >= 1000, nearest 100 for amounts < 1000
+     *
+     * @param float $amount
+     * @return float
+     */
+    protected function roundBusinessReceives(float $amount): float
+    {
+        if ($amount >= 1000) {
+            // Round to nearest 500 for amounts >= 1000
+            return round($amount / 500) * 500;
+        } else {
+            // Round to nearest 100 for amounts < 1000
+            return round($amount / 100) * 100;
+        }
     }
 }
