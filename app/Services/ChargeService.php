@@ -14,9 +14,9 @@ class ChargeService
     const DEFAULT_PERCENTAGE = 1.0;
 
     /**
-     * Default fixed charge (100)
+     * Default fixed charge (50)
      */
-    const DEFAULT_FIXED = 100.0;
+    const DEFAULT_FIXED = 50.0;
 
     /**
      * Calculate charges for a payment amount
