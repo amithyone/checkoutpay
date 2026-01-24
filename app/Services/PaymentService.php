@@ -228,6 +228,7 @@ class PaymentService
     protected function checkStoredEmailsForMatch(Payment $payment): void
     {
         try {
+            // STEP 1: First try normal matching (extract from email, match by amount + name)
             // Get unmatched stored emails with matching amount
             // CRITICAL: Only check emails received AFTER transaction creation
             $storedEmails = ProcessedEmail::unmatched()
@@ -268,6 +269,37 @@ class PaymentService
                         'html' => $storedEmail->html_body,
                         'date' => $storedEmail->email_date->toDateTimeString(),
                         'sender_name' => $storedEmail->sender_name, // Map sender_name to payer_name
+                    ]);
+                    
+                    // Update business balance with charges applied
+                    if ($payment->business_id) {
+                        $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
+                        $payment->business->refresh(); // Refresh to get updated balance
+                        
+                        // Send new deposit notification
+                        $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                    }
+                    
+                    return; // Match found in STEP 1, exit early
+                }
+            }
+            
+            // STEP 2: If normal matching returned null, try reverse search (search for payer_name in unmatched emails)
+            if (!empty($payment->payer_name)) {
+                $matchedEmail = $this->paymentMatchingService->reverseSearchPaymentInEmails($payment);
+                
+                if ($matchedEmail) {
+                    // Mark stored email as matched
+                    $matchedEmail->markAsMatched($payment);
+                    
+                    // Approve payment
+                    $payment->approve([
+                        'subject' => $matchedEmail->subject,
+                        'from' => $matchedEmail->from_email,
+                        'text' => $matchedEmail->text_body,
+                        'html' => $matchedEmail->html_body,
+                        'date' => $matchedEmail->email_date ? $matchedEmail->email_date->toDateTimeString() : null,
+                        'sender_name' => $matchedEmail->sender_name, // Map sender_name to payer_name
                     ]);
                     
                     // Update business balance with charges applied

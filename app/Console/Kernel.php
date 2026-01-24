@@ -152,7 +152,37 @@ class Kernel extends ConsoleKernel
                             continue;
                         }
 
-                        $matchingService->matchPaymentToStoredEmail($payment);
+                        // STEP 1: Try normal matching first (extract from email, match by amount + name)
+                        $matchedEmail = $matchingService->matchPaymentToStoredEmail($payment);
+                        
+                        // STEP 2: If normal matching returns null, try reverse search (search for payer_name in unmatched emails)
+                        if (!$matchedEmail && !empty($payment->payer_name)) {
+                            $matchedEmail = $matchingService->reverseSearchPaymentInEmails($payment);
+                        }
+                        
+                        // STEP 3: Continue with other processes if match found
+                        
+                        // If match found, approve payment
+                        if ($matchedEmail) {
+                            $matchedEmail->markAsMatched($payment);
+                            $payment->approve([
+                                'subject' => $matchedEmail->subject,
+                                'from' => $matchedEmail->from_email,
+                                'text' => $matchedEmail->text_body,
+                                'html' => $matchedEmail->html_body,
+                                'date' => $matchedEmail->email_date ? $matchedEmail->email_date->toDateTimeString() : null,
+                                'sender_name' => $matchedEmail->sender_name,
+                            ]);
+                            
+                            if ($payment->business_id) {
+                                $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
+                                $payment->business->refresh();
+                                $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                                $payment->business->triggerAutoWithdrawal();
+                            }
+                            
+                            event(new \App\Events\PaymentApproved($payment));
+                        }
                     } catch (\Exception $e) {
                         \Illuminate\Support\Facades\Log::error('Error matching payment in scheduler', [
                             'transaction_id' => $payment->transaction_id,

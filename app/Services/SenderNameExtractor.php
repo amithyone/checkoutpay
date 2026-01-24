@@ -156,6 +156,30 @@ class SenderNameExtractor
                     $senderName = strtolower($potentialName);
                 }
             }
+            // Pattern 1c2c: PALMPAY/OPAY pattern - "palmpay-NAME" or "opay-NAME" (name follows after hyphen)
+            elseif (preg_match('/(?:palmpay|opay)[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/=\d+/', '', $potentialName);
+                $potentialName = rtrim($potentialName, '. -');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 1c2d: Kuda bank patterns - "-KMB-NAME", "-OPAY-NAME", "-PALMPAY-NAME" (name follows after these phrases)
+            elseif (preg_match('/[\-](?:KMB|OPAY|PALMPAY)[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                // Handle = characters in names
+                $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+                $potentialName = preg_replace('/=\d+/', '', $potentialName);
+                $potentialName = rtrim($potentialName, '. -');
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
             // Pattern 1d: UNION TRANSFER = FROM NAME - e.g., "UNION TRANSFER = FROM UTEBOR PAUL C" or "MOBILE/UNION TRANSFER = FROM NAME"
             // Also handle "TRANSFER = FROM NAME" pattern
             // Capture name until dash with NA, TO, or end of line
@@ -613,6 +637,30 @@ class SenderNameExtractor
             }
         }
         
+        // Pattern 4: PALMPAY/OPAY pattern - "palmpay-NAME" or "opay-NAME" (name follows after hyphen)
+        if (preg_match('/(?:palmpay|opay)[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/=\d+/', '', $potentialName);
+            $potentialName = rtrim($potentialName, '. -');
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                return strtolower($potentialName);
+            }
+        }
+        
+        // Pattern 5: Kuda bank patterns - "-KMB-NAME", "-OPAY-NAME", "-PALMPAY-NAME" (name follows after these phrases)
+        if (preg_match('/[\-](?:KMB|OPAY|PALMPAY)[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+            $potentialName = trim($nameMatches[1]);
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/=\d+/', '', $potentialName);
+            $potentialName = rtrim($potentialName, '. -');
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                return strtolower($potentialName);
+            }
+        }
+        
         return null;
     }
     
@@ -715,6 +763,12 @@ class SenderNameExtractor
         }
         
         $name = trim($name);
+        
+        // Reject specific invalid names
+        $invalidNames = ['-', 'mobile', 'vam transfer transaction', 'vam'];
+        if (in_array(strtolower($name), $invalidNames)) {
+            return false;
+        }
         
         // Must be at least 3 characters
         if (strlen($name) < 3) {

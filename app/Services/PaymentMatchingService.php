@@ -33,55 +33,11 @@ class PaymentMatchingService
     public function extractPaymentInfo(array $emailData): ?array
     {
         try {
-            // Try Python extraction first
-            $result = $this->extractionService->extractPaymentInfo($emailData);
-            
-            if ($result && isset($result['data'])) {
-                // Also extract description field from text/html
-                $textBody = $emailData['text'] ?? '';
-                $htmlBody = $emailData['html'] ?? '';
-                
-                // Extract description field
-                $descriptionField = $this->descriptionExtractor->extractFromHtml($htmlBody)
-                    ?? $this->descriptionExtractor->extractFromText($textBody);
-                
-                if ($descriptionField) {
-                    $parsed = $this->descriptionExtractor->parseDescriptionField($descriptionField);
-                    
-                    // Merge description field data into result
-                    $result['data']['description_field'] = $descriptionField;
-                    if ($parsed['account_number'] && !$result['data']['account_number']) {
-                        $result['data']['account_number'] = $parsed['account_number'];
-                    }
-                    if ($parsed['payer_account_number'] && !isset($result['data']['payer_account_number'])) {
-                        $result['data']['payer_account_number'] = $parsed['payer_account_number'];
-                    }
-                }
-                
-                // PHP fallback: If Python didn't extract sender_name, try PHP extraction (for Kuda emails, etc.)
-                if (empty($result['data']['sender_name']) && !empty($textBody)) {
-                    $emailExtractor = new \App\Services\EmailExtractionService();
-                    $phpResult = $emailExtractor->extractFromTextBody(
-                        $textBody,
-                        $emailData['subject'] ?? '',
-                        $emailData['from'] ?? '',
-                        $emailData['date'] ?? null
-                    );
-                    
-                    if ($phpResult && !empty($phpResult['sender_name'])) {
-                        $result['data']['sender_name'] = $phpResult['sender_name'];
-                        // Also merge transaction_time if Python didn't extract it
-                        if (empty($result['data']['transaction_time']) && !empty($phpResult['transaction_time'])) {
-                            $result['data']['transaction_time'] = $phpResult['transaction_time'];
-                        }
-                    }
-                }
-                
-                return $result;
-            }
-            
-            // PHP fallback: If Python extraction failed completely, try PHP extraction
             $textBody = $emailData['text'] ?? '';
+            $htmlBody = $emailData['html'] ?? '';
+            $result = null;
+            
+            // PRIORITY 1: Try PHP extraction first
             if (!empty($textBody)) {
                 // Decode quoted-printable encoding before passing to extractFromTextBody
                 $decodedTextBody = preg_replace('/=20/', ' ', $textBody);
@@ -99,14 +55,104 @@ class PaymentMatchingService
                 );
                 
                 if ($phpResult) {
-                    return [
+                    $result = [
                         'data' => $phpResult,
-                        'method' => 'php_fallback'
+                        'method' => 'php'
                     ];
                 }
             }
             
-            return null;
+            // PRIORITY 2: If PHP didn't extract name or name is invalid, try direct extraction
+            $extractedSenderName = $result['data']['sender_name'] ?? null;
+            $needsDirectExtraction = !$result || empty($extractedSenderName) || !$this->isValidExtractedName($extractedSenderName);
+            
+            if ($needsDirectExtraction) {
+                $nameExtractor = new \App\Services\SenderNameExtractor();
+                $directName = null;
+                
+                // Try HTML first
+                if (!empty($htmlBody)) {
+                    $directName = $nameExtractor->extractFromHtml($htmlBody);
+                }
+                
+                // If still invalid or empty, try text
+                if ((!$directName || !$this->isValidExtractedName($directName)) && !empty($textBody)) {
+                    $directName = $nameExtractor->extractFromText($textBody, $emailData['subject'] ?? '');
+                }
+                
+                // Use direct extraction if valid
+                if ($directName && $this->isValidExtractedName($directName)) {
+                    if (!$result) {
+                        $result = ['data' => [], 'method' => 'direct'];
+                    }
+                    $result['data']['sender_name'] = $directName;
+                } elseif ($result && $extractedSenderName && !$this->isValidExtractedName($extractedSenderName)) {
+                    // Clear invalid name
+                    $result['data']['sender_name'] = null;
+                }
+            }
+            
+            // PRIORITY 3: Extract description field from text/html
+            $descriptionField = $this->descriptionExtractor->extractFromHtml($htmlBody)
+                ?? $this->descriptionExtractor->extractFromText($textBody);
+            
+            if ($descriptionField) {
+                if (!$result) {
+                    $result = ['data' => [], 'method' => 'direct'];
+                }
+                $parsed = $this->descriptionExtractor->parseDescriptionField($descriptionField);
+                
+                // Merge description field data into result
+                $result['data']['description_field'] = $descriptionField;
+                if ($parsed['account_number'] && empty($result['data']['account_number'])) {
+                    $result['data']['account_number'] = $parsed['account_number'];
+                }
+                if ($parsed['payer_account_number'] && !isset($result['data']['payer_account_number'])) {
+                    $result['data']['payer_account_number'] = $parsed['payer_account_number'];
+                }
+            }
+            
+            // PRIORITY 3.5: Extract transaction ID from email text/html
+            $transactionId = null;
+            $combinedText = ($textBody ?? '') . ' ' . ($htmlBody ?? '');
+            if (preg_match('/TXN[\-]?[\d]+[\-]?[A-Z0-9]+/i', $combinedText, $txnMatches)) {
+                $transactionId = trim($txnMatches[0]);
+            }
+            
+            if ($transactionId) {
+                if (!$result) {
+                    $result = ['data' => [], 'method' => 'direct'];
+                }
+                $result['data']['transaction_id'] = $transactionId;
+            }
+            
+            // PRIORITY 4: Try Python extraction LAST (only if we don't have amount or need to fill missing data)
+            if (!$result || empty($result['data']['amount']) || $result['data']['amount'] <= 0) {
+                $pythonResult = $this->extractionService->extractPaymentInfo($emailData);
+                
+                if ($pythonResult && isset($pythonResult['data'])) {
+                    if (!$result) {
+                        $result = $pythonResult;
+                        $result['method'] = 'python';
+                    } else {
+                        // Merge Python results into existing result (Python fills gaps)
+                        foreach ($pythonResult['data'] as $key => $value) {
+                            if (empty($result['data'][$key]) && !empty($value)) {
+                                $result['data'][$key] = $value;
+                            }
+                        }
+                        // Only use Python's sender_name if we don't have a valid one
+                        if (empty($result['data']['sender_name']) || !$this->isValidExtractedName($result['data']['sender_name'])) {
+                            $pythonName = $pythonResult['data']['sender_name'] ?? null;
+                            if ($pythonName && $this->isValidExtractedName($pythonName)) {
+                                $result['data']['sender_name'] = $pythonName;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return $result;
         } catch (\Exception $e) {
             Log::error('Error extracting payment info', [
                 'error' => $e->getMessage(),
@@ -226,13 +272,74 @@ class PaymentMatchingService
             'mismatch_reason' => null,
         ];
         
+        // STEP 0: Transaction ID matching (HIGHEST PRIORITY - if transaction ID matches exactly, match even without name)
+        $extractedTransactionId = $extractedInfo['transaction_id'] ?? null;
+        if ($extractedTransactionId && !empty($payment->transaction_id)) {
+            // Normalize transaction IDs (uppercase, remove dashes for comparison)
+            $extractedTxnUpper = strtoupper(trim($extractedTransactionId));
+            $paymentTxnUpper = strtoupper(trim($payment->transaction_id));
+            $extractedTxnNoDash = str_replace('-', '', $extractedTxnUpper);
+            $paymentTxnNoDash = str_replace('-', '', $paymentTxnUpper);
+            
+            // Exact match (with or without dashes)
+            if ($extractedTxnNoDash === $paymentTxnNoDash || $extractedTxnUpper === $paymentTxnUpper) {
+                // Transaction ID matches exactly - this is a STRONG MATCH even without name
+                $receivedAmount = $extractedInfo['amount'] ?? 0;
+                $requestedAmount = $payment->amount;
+                $amountDiff = abs($requestedAmount - $receivedAmount);
+                
+                // Still check amount (should match)
+                if ($amountDiff <= 1) {
+                    $result['matched'] = true;
+                    $result['amount_match'] = true;
+                    $result['name_match'] = false; // Name not required for transaction ID match
+                    $result['reason'] = 'Matched: Exact transaction ID match (name not required)';
+                    
+                    // Still try to match name if available
+                    $extractedSenderName = $extractedInfo['sender_name'] ?? null;
+                    if ($extractedSenderName && $this->isValidExtractedName($extractedSenderName)) {
+                        $nameMatch = $this->matchNames($payment->payer_name, $extractedSenderName);
+                        $result['name_match'] = $nameMatch['matched'];
+                        $result['name_similarity_percent'] = $nameMatch['similarity'] ?? null;
+                        if ($nameMatch['matched']) {
+                            $result['reason'] = 'Matched: Exact transaction ID and name match';
+                        }
+                    }
+                    
+                    // Time matching (less strict for transaction ID match)
+                    if ($emailDate) {
+                        if ($emailDate->lt($payment->created_at)) {
+                            $result['reason'] = "Transaction ID matches but email received before transaction creation";
+                            return $result;
+                        }
+                        $timeDiffMinutes = $payment->created_at->diffInMinutes($emailDate);
+                        $result['time_match'] = ($timeDiffMinutes <= 120); // 2 hours window for transaction ID match
+                    } else {
+                        $result['time_match'] = true;
+                    }
+                    
+                    return $result;
+                } else {
+                    $result['reason'] = "Transaction ID matches but amount mismatch: payment={$requestedAmount}, email={$receivedAmount}";
+                    return $result;
+                }
+            }
+        }
+        
         // STEP 1: Amount matching and charges mismatch detection
         $receivedAmount = $extractedInfo['amount'] ?? 0;
         $requestedAmount = $payment->amount;
         $amountDiff = abs($requestedAmount - $receivedAmount);
         
+        // CRITICAL: Validate extracted sender name before matching
+        $extractedSenderName = $extractedInfo['sender_name'] ?? null;
+        if ($extractedSenderName && !$this->isValidExtractedName($extractedSenderName)) {
+            $result['reason'] = "Invalid extracted sender name: '{$extractedSenderName}'";
+            return $result;
+        }
+        
         // STEP 2: Name matching (check if names match or are similar)
-        $nameMatch = $this->matchNames($payment->payer_name, $extractedInfo['sender_name'] ?? null);
+        $nameMatch = $this->matchNames($payment->payer_name, $extractedSenderName);
         $result['name_match'] = $nameMatch['matched'];
         $result['name_similarity_percent'] = $nameMatch['similarity'] ?? null;
         $result['name_mismatch'] = !$nameMatch['matched'];
@@ -799,6 +906,14 @@ class PaymentMatchingService
             return false;
         }
         
+        $name = trim($name);
+        
+        // Reject specific invalid names
+        $invalidNames = ['-', 'mobile', 'vam transfer transaction', 'vam'];
+        if (in_array(strtolower($name), $invalidNames)) {
+            return false;
+        }
+        
         // Must not be an email address
         if (preg_match('/@/', $name)) {
             return false;
@@ -886,6 +1001,121 @@ class PaymentMatchingService
             return null;
         } catch (\Exception $e) {
             Log::error('Error matching payment to stored email', [
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Reverse search: Check if payer_name from pending payment appears in unmatched emails
+     * This helps catch cases where emails came in but weren't matched initially
+     * 
+     * @param Payment $payment The pending payment to search for
+     * @return ProcessedEmail|null The matched email if found
+     */
+    public function reverseSearchPaymentInEmails(Payment $payment): ?ProcessedEmail
+    {
+        try {
+            // Skip if payment doesn't have a valid payer_name
+            if (empty($payment->payer_name) || !$this->isValidExtractedName($payment->payer_name)) {
+                return null;
+            }
+
+            // Get unmatched emails with matching amount
+            // CRITICAL: Only check emails received AFTER transaction creation
+            $query = ProcessedEmail::where('is_matched', false)
+                ->whereBetween('amount', [
+                    $payment->amount - 1,
+                    $payment->amount + 1
+                ])
+                ->where('email_date', '>=', $payment->created_at); // Email must be AFTER transaction
+            
+            // Filter by email account if business has one
+            if ($payment->business_id && $payment->business->email_account_id) {
+                $query->where('email_account_id', $payment->business->email_account_id);
+            }
+            
+            $potentialEmails = $query->orderBy('email_date', 'asc')->get();
+            
+            // Normalize payer name for searching (uppercase, remove extra spaces)
+            $payerNameNormalized = strtoupper(trim($payment->payer_name));
+            $payerNameNormalized = preg_replace('/\s+/', ' ', $payerNameNormalized);
+            $payerNameWords = explode(' ', $payerNameNormalized);
+            
+            // Need at least 2 words to search (to avoid false matches)
+            if (count($payerNameWords) < 2) {
+                return null;
+            }
+            
+            foreach ($potentialEmails as $email) {
+                // Combine text and HTML for searching
+                $emailContent = ($email->text_body ?? '') . ' ' . ($email->html_body ?? '');
+                $emailContent = strip_tags($emailContent); // Remove HTML tags
+                $emailContent = $this->decodeQuotedPrintable($emailContent);
+                $emailContentUpper = strtoupper($emailContent);
+                
+                // Check if payer name appears in email content
+                // Strategy: Check if all significant words from payer_name appear in email
+                $significantWords = array_filter($payerNameWords, function($word) {
+                    return strlen($word) >= 3; // Only words with 3+ characters
+                });
+                
+                if (empty($significantWords)) {
+                    continue;
+                }
+                
+                // Check if all significant words appear in email (in any order)
+                $allWordsFound = true;
+                foreach ($significantWords as $word) {
+                    // Use word boundary to avoid partial matches
+                    if (!preg_match('/\b' . preg_quote($word, '/') . '\b/i', $emailContentUpper)) {
+                        $allWordsFound = false;
+                        break;
+                    }
+                }
+                
+                if (!$allWordsFound) {
+                    continue;
+                }
+                
+                // Name found in email! Now verify amount matches and extract info for proper matching
+                $emailData = [
+                    'subject' => $email->subject,
+                    'from' => $email->from_email,
+                    'text' => $email->text_body ?? '',
+                    'html' => $email->html_body ?? '',
+                    'date' => $email->email_date ? $email->email_date->toDateTimeString() : null,
+                    'email_account_id' => $email->email_account_id,
+                    'processed_email_id' => $email->id,
+                ];
+                
+                $extractionResult = $this->extractPaymentInfo($emailData);
+                if (!$extractionResult || !isset($extractionResult['data'])) {
+                    continue;
+                }
+                
+                $extractedInfo = $extractionResult['data'];
+                $emailDate = $email->email_date ? Carbon::parse($email->email_date) : null;
+                
+                // Use matchPayment to verify the match (checks amount, time, etc.)
+                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate);
+                
+                if ($matchResult['matched']) {
+                    Log::info('Reverse search found match', [
+                        'payment_id' => $payment->id,
+                        'email_id' => $email->id,
+                        'payer_name' => $payment->payer_name,
+                        'amount' => $payment->amount,
+                    ]);
+                    return $email;
+                }
+            }
+            
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Error in reverse search for payment', [
                 'payment_id' => $payment->id,
                 'error' => $e->getMessage(),
             ]);
