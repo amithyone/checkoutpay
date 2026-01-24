@@ -97,6 +97,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Withdrawals
         Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
+        Route::get('withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');
+        Route::post('withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
         Route::get('withdrawals/{withdrawal}', [WithdrawalController::class, 'show'])->name('withdrawals.show');
         Route::post('withdrawals/{withdrawal}/approve', [WithdrawalController::class, 'approve'])->name('withdrawals.approve');
         Route::post('withdrawals/{withdrawal}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject');

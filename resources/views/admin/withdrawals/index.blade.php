@@ -5,6 +5,17 @@
 
 @section('content')
 <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900">Withdrawals</h2>
+            <p class="text-sm text-gray-600 mt-1">Manage withdrawal requests</p>
+        </div>
+        <a href="{{ route('admin.withdrawals.create') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium">
+            <i class="fas fa-plus mr-2"></i> Create Withdrawal
+        </a>
+    </div>
+
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <form method="GET" class="flex items-center space-x-4 flex-wrap">
