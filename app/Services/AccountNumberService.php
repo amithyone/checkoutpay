@@ -11,7 +11,7 @@ class AccountNumberService
     /**
      * Assign account number to payment request
      * Priority: Business-specific > Pool account
-     * Pool accounts are randomly selected
+     * Pool accounts are assigned sequentially by ID, excluding last used and accounts with pending payments
      */
     public function assignAccountNumber(?Business $business = null): ?AccountNumber
     {
@@ -28,9 +28,10 @@ class AccountNumberService
             return $accountNumber;
         }
 
-        // If no business-specific account, get randomly from pool
+        // Get all pool accounts ordered by ID (sequential)
         $poolAccounts = AccountNumber::pool()
             ->active()
+            ->orderBy('id')
             ->get();
 
         if ($poolAccounts->isEmpty()) {
@@ -38,15 +39,111 @@ class AccountNumberService
             return null;
         }
 
-        // Randomly select from pool
-        $poolAccount = $poolAccounts->random();
+        // Get account numbers that have pending payments (exclude these)
+        $pendingAccountNumbers = [];
+        if (class_exists(\App\Models\Payment::class)) {
+            $pendingAccountNumbers = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+                ->whereNotNull('account_number')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', now());
+                })
+                ->pluck('account_number')
+                ->unique()
+                ->toArray();
+        }
 
-        Log::info('Assigned pool account number (randomly selected)', [
+        // Get the last used account number (from most recent pending payment)
+        $lastUsedAccountNumber = null;
+        $lastUsedAccountId = null;
+        if (class_exists(\App\Models\Payment::class)) {
+            $lastPayment = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+                ->whereNotNull('account_number')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', now());
+                })
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            if ($lastPayment) {
+                $lastUsedAccountNumber = $lastPayment->account_number;
+                // Find the account ID for the last used account
+                $lastUsedAccount = $poolAccounts->firstWhere('account_number', $lastUsedAccountNumber);
+                if ($lastUsedAccount) {
+                    $lastUsedAccountId = $lastUsedAccount->id;
+                }
+            }
+        }
+
+        // Find starting point: next account after last used (by ID)
+        $startIndex = 0;
+        if ($lastUsedAccountId) {
+            // Find the index of the last used account in the ordered pool
+            $lastUsedIndex = $poolAccounts->search(function ($account) use ($lastUsedAccountId) {
+                return $account->id === $lastUsedAccountId;
+            });
+            
+            if ($lastUsedIndex !== false) {
+                // Start from the next account after the last used one
+                $startIndex = $lastUsedIndex + 1;
+            }
+        }
+
+        // Try to find the next available account starting from startIndex
+        $selectedAccount = null;
+        $poolAccountsArray = $poolAccounts->values()->all();
+        $poolCount = count($poolAccountsArray);
+        
+        // Try accounts starting from startIndex, wrapping around if needed
+        for ($i = 0; $i < $poolCount; $i++) {
+            $index = ($startIndex + $i) % $poolCount;
+            $account = $poolAccountsArray[$index];
+            
+            // Skip if this is the last used account
+            if ($lastUsedAccountNumber && $account->account_number === $lastUsedAccountNumber) {
+                continue;
+            }
+            
+            // Skip if this account has pending payments
+            if (in_array($account->account_number, $pendingAccountNumbers)) {
+                continue;
+            }
+            
+            // Found an available account
+            $selectedAccount = $account;
+            break;
+        }
+
+        // If still no account found (all have pending payments), use the next one after last used (even if it has pending)
+        if (!$selectedAccount && $lastUsedAccountId) {
+            $lastUsedIndex = $poolAccounts->search(function ($account) use ($lastUsedAccountId) {
+                return $account->id === $lastUsedAccountId;
+            });
+            
+            if ($lastUsedIndex !== false) {
+                $nextIndex = ($lastUsedIndex + 1) % $poolCount;
+                $selectedAccount = $poolAccountsArray[$nextIndex];
+            }
+        }
+
+        // Final fallback: use first account
+        if (!$selectedAccount) {
+            $selectedAccount = $poolAccounts->first();
+        }
+
+        Log::info('Assigned pool account number (sequentially)', [
             'business_id' => $business?->id,
-            'account_number' => $poolAccount->account_number,
+            'account_number' => $selectedAccount->account_number,
+            'account_id' => $selectedAccount->id,
             'pool_size' => $poolAccounts->count(),
+            'pending_accounts_count' => count($pendingAccountNumbers),
+            'last_used_account' => $lastUsedAccountNumber,
+            'last_used_account_id' => $lastUsedAccountId,
+            'start_index' => $startIndex,
         ]);
-        return $poolAccount;
+
+        return $selectedAccount;
     }
 
     /**
