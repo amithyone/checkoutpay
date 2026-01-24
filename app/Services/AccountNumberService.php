@@ -91,11 +91,12 @@ class AccountNumberService
         }
 
         // Try to find the next available account starting from startIndex
+        // We will always assign an account - wrap around and reuse accounts with pending payments if needed
         $selectedAccount = null;
         $poolAccountsArray = $poolAccounts->values()->all();
         $poolCount = count($poolAccountsArray);
         
-        // Try accounts starting from startIndex, wrapping around if needed
+        // First pass: Try to find account without pending payments (excluding last used)
         for ($i = 0; $i < $poolCount; $i++) {
             $index = ($startIndex + $i) % $poolCount;
             $account = $poolAccountsArray[$index];
@@ -105,32 +106,42 @@ class AccountNumberService
                 continue;
             }
             
-            // Skip if this account has pending payments
+            // Skip if this account has pending payments (prefer accounts without pending)
             if (in_array($account->account_number, $pendingAccountNumbers)) {
                 continue;
             }
             
-            // Found an available account
+            // Found an available account without pending payments
             $selectedAccount = $account;
             break;
         }
 
-        // If still no account found (all have pending payments), use the next one after last used (even if it has pending)
-        if (!$selectedAccount && $lastUsedAccountId) {
-            $lastUsedIndex = $poolAccounts->search(function ($account) use ($lastUsedAccountId) {
-                return $account->id === $lastUsedAccountId;
-            });
-            
-            if ($lastUsedIndex !== false) {
-                $nextIndex = ($lastUsedIndex + 1) % $poolCount;
-                $selectedAccount = $poolAccountsArray[$nextIndex];
+        // Second pass: If no account found without pending, wrap around and use next one after last used
+        // This ensures we ALWAYS assign an account number when requested, even if all have pending payments
+        // When we reach the end of the pool, we start again from the beginning (wraps around)
+        if (!$selectedAccount) {
+            if ($lastUsedAccountId) {
+                $lastUsedIndex = $poolAccounts->search(function ($account) use ($lastUsedAccountId) {
+                    return $account->id === $lastUsedAccountId;
+                });
+                
+                if ($lastUsedIndex !== false) {
+                    // Get next account after last used, wrapping around to beginning if at end
+                    // This ensures we always have an account to assign, even if it has pending payments
+                    $nextIndex = ($lastUsedIndex + 1) % $poolCount;
+                    $selectedAccount = $poolAccountsArray[$nextIndex];
+                } else {
+                    // Last used account not found in pool, start from beginning
+                    $selectedAccount = $poolAccountsArray[0];
+                }
+            } else {
+                // No last used account, start from beginning
+                $selectedAccount = $poolAccountsArray[0];
             }
         }
-
-        // Final fallback: use first account
-        if (!$selectedAccount) {
-            $selectedAccount = $poolAccounts->first();
-        }
+        
+        // At this point, $selectedAccount is guaranteed to be set
+        // We always assign an account number, wrapping around if needed
 
         Log::info('Assigned pool account number (sequentially)', [
             'business_id' => $business?->id,
