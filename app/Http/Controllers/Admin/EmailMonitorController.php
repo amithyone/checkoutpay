@@ -92,9 +92,31 @@ class EmailMonitorController extends Controller
     public function fetchEmailsDirect(Request $request)
     {
         try {
+            // Increase memory and time limits for email processing
+            ini_set('memory_limit', '512M');
+            set_time_limit(300); // 5 minutes
+            
             // Run the direct filesystem email reading command
-            Artisan::call('payment:read-emails-direct', ['--all' => true]);
-            $output = Artisan::output();
+            try {
+                Artisan::call('payment:read-emails-direct', ['--all' => true]);
+                $output = Artisan::output();
+            } catch (\Throwable $e) {
+                Log::error('Error running read-emails-direct command', [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error running email command: ' . $e->getMessage(),
+                    'stats' => [
+                        'processed' => 0,
+                        'skipped' => 0,
+                        'failed' => 0,
+                    ],
+                ], 200); // Return 200 to prevent cron failures
+            }
             
             // Extract summary from output (last few lines with totals)
             $outputLines = explode("\n", trim($output));
@@ -140,9 +162,11 @@ class EmailMonitorController extends Controller
                 ],
                 'output' => $truncatedOutput, // Truncated output for debugging
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Error reading emails directly from filesystem', [
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ]);
             

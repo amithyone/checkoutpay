@@ -719,10 +719,8 @@ class ReadEmailsDirect extends Command
             
             // Fast O(1) duplicate check
             if (isset($cachedExistingIds[$messageId])) {
-                Log::debug('Email skipped: already stored', [
-                    'message_id' => $messageId,
-                    'subject' => $parts['subject'] ?? '',
-                ]);
+                // Don't log skipped emails - they're expected and fill up logs
+                // Only log summary at end of processing
                 return null; // Already stored
             }
             
@@ -758,17 +756,12 @@ class ReadEmailsDirect extends Command
                         $validatedName = $emailExtractor->validateSenderName($senderNameFromBody);
                         if ($validatedName) {
                             $fromName = $validatedName;
-                            Log::debug('Extracted sender name from email body (ReadEmailsDirect)', [
-                                'sender_name' => $fromName,
-                                'subject' => $subject,
-                            ]);
+                            // Don't log successful name extraction - too verbose for production
                         }
                     }
                 } catch (\Exception $e) {
-                    Log::debug('Failed to extract sender name from body (ReadEmailsDirect)', [
-                        'error' => $e->getMessage(),
-                        'subject' => $subject,
-                    ]);
+                    // Only log actual errors, not expected failures
+                    // Don't log failed name extraction - it's expected for many emails
                 }
             }
 
@@ -1126,13 +1119,7 @@ class ReadEmailsDirect extends Command
                         // Also decode HTML entities
                         $htmlBody = html_entity_decode($htmlBody, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                         
-                        // Log HTML body length for debugging
-                        if (strlen($htmlBody) > 0) {
-                            \Illuminate\Support\Facades\Log::debug('Extracted HTML body from multipart', [
-                                'html_length' => strlen($htmlBody),
-                                'html_preview' => substr($htmlBody, 0, 200),
-                            ]);
-                        }
+                        // Don't log HTML extraction - too verbose for production
                     }
                 }
             }
@@ -1159,10 +1146,7 @@ class ReadEmailsDirect extends Command
         // This ensures we always have text_body for extraction (handles multipart HTML-only emails)
         if (empty(trim($textBody)) && !empty(trim($htmlBody))) {
             $textBody = $this->htmlToText($htmlBody);
-            \Illuminate\Support\Facades\Log::debug('Extracted text_body from html_body', [
-                'text_length' => strlen($textBody),
-                'html_length' => strlen($htmlBody),
-            ]);
+            // Don't log text extraction - too verbose for production
         }
 
         // Parse date

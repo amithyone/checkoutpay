@@ -161,6 +161,10 @@ Route::get('/cron/monitor-emails', function () {
 // Reads from filesystem regardless of email account method setting
 // Optional security: Add ?token=YOUR_SECRET_TOKEN to protect the endpoint
 Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $request) {
+    // Increase memory limit and execution time for cron jobs
+    ini_set('memory_limit', '512M');
+    set_time_limit(300); // 5 minutes max
+    
     try {
         // Optional security: Check for secret token if configured
         $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
@@ -186,8 +190,23 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
         // This ensures emails are processed and matched exactly like the dashboard button
         $controller = new \App\Http\Controllers\Admin\EmailMonitorController();
         
-        $response = $controller->fetchEmailsDirect($request);
-        $responseContent = $response->getContent();
+        try {
+            $response = $controller->fetchEmailsDirect($request);
+            $responseContent = $response->getContent();
+        } catch (\Throwable $e) {
+            // Catch any errors from controller
+            \Illuminate\Support\Facades\Log::error('Error in fetchEmailsDirect controller', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error processing emails: ' . $e->getMessage(),
+                'timestamp' => now()->toDateTimeString(),
+            ], 500);
+        }
         
         // Safely decode JSON, handle large responses
         $responseData = json_decode($responseContent, true);
@@ -239,10 +258,18 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
             }
         }
         
-        return response()->json($responseData, $response->getStatusCode());
-    } catch (\Exception $e) {
+        // Ensure we return a valid status code
+        $statusCode = $response->getStatusCode();
+        if ($statusCode >= 500) {
+            $statusCode = 200; // Don't return 500 to cron, return 200 with success=false
+        }
+        
+        return response()->json($responseData, $statusCode);
+    } catch (\Throwable $e) {
         \Illuminate\Support\Facades\Log::error('Cron job error (Direct Filesystem)', [
             'error' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
             'trace' => $e->getTraceAsString(),
         ]);
         
@@ -250,7 +277,7 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
             'success' => false,
             'message' => 'Error: ' . $e->getMessage(),
             'timestamp' => now()->toDateTimeString(),
-        ], 500);
+        ], 200); // Return 200 instead of 500 to prevent cron failures
     }
 })->name('cron.read-emails-direct');
 
