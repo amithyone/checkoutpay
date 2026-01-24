@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             GtbankTemplateSeeder::class,
             EmailTemplateSeeder::class,
+            SuperAdminBusinessSeeder::class,
         ]);
     }
 }
