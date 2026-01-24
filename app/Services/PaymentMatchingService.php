@@ -241,10 +241,11 @@ class PaymentMatchingService
         $chargesMismatchDetected = false;
         if ($result['name_match'] && $amountDiff > 1 && $payment->business_id) {
             $business = $payment->business;
+            $website = $payment->website; // Get website from payment if available
             $chargeService = app(\App\Services\ChargeService::class);
             
             // Calculate what charges would be for the received amount
-            $chargesForReceived = $chargeService->calculateCharges($receivedAmount, $business);
+            $chargesForReceived = $chargeService->calculateCharges($receivedAmount, $website, $business);
             $expectedCharges = $chargesForReceived['total_charges'];
             
             // Check if the difference equals the charges (within 1 naira tolerance)

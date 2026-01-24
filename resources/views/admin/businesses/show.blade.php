@@ -178,13 +178,13 @@
         
         @php
             $chargeService = app(\App\Services\ChargeService::class);
-            $sampleCharges = $chargeService->calculateCharges(10000, $business);
+            $sampleCharges = $chargeService->calculateCharges(10000, null, $business);
         @endphp
         <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p class="text-xs font-semibold text-blue-900 mb-2">Sample Calculation (₦10,000 payment):</p>
             <div class="text-xs text-blue-800 space-y-1">
                 <p>Original Amount: ₦{{ number_format($sampleCharges['original_amount'], 2) }}</p>
-                <p>Percentage Charge ({{ $sampleCharges['charge_percentage'] > 0 ? number_format($chargeService->getChargePercentage($business), 2) : '0' }}%): ₦{{ number_format($sampleCharges['charge_percentage'], 2) }}</p>
+                <p>Percentage Charge ({{ $sampleCharges['charge_percentage'] > 0 ? number_format($chargeService->getChargePercentage(null, $business), 2) : '0' }}%): ₦{{ number_format($sampleCharges['charge_percentage'], 2) }}</p>
                 <p>Fixed Charge: ₦{{ number_format($sampleCharges['charge_fixed'], 2) }}</p>
                 <p>Total Charges: ₦{{ number_format($sampleCharges['total_charges'], 2) }}</p>
                 @if($sampleCharges['paid_by_customer'])
