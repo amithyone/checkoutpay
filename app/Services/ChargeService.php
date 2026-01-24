@@ -28,14 +28,17 @@ class ChargeService
      */
     public function calculateCharges(float $amount, ?BusinessWebsite $website = null, ?Business $business = null): array
     {
+        // Check if charges are enabled for website
+        $chargesEnabled = $this->areChargesEnabled($website, $business);
+        
         // Get charge settings - prioritize website over business
         $percentage = $this->getChargePercentage($website, $business);
         $fixed = $this->getChargeFixed($website, $business);
         $isExempt = $this->isChargeExempt($website, $business);
         $paidByCustomer = $this->isPaidByCustomer($website, $business);
 
-        // If business is exempt, no charges
-        if ($isExempt) {
+        // If charges are disabled or business is exempt, no charges
+        if (!$chargesEnabled || $isExempt) {
             return [
                 'original_amount' => $amount,
                 'charge_percentage' => 0,
@@ -119,6 +122,29 @@ class ChargeService
 
         // Default: 100 (website-based charges, no fallback to business)
         return (float) Setting::get('default_charge_fixed', self::DEFAULT_FIXED);
+    }
+
+    /**
+     * Check if charges are enabled for website
+     *
+     * @param BusinessWebsite|null $website
+     * @param Business|null $business
+     * @return bool
+     */
+    public function areChargesEnabled(?BusinessWebsite $website = null, ?Business $business = null): bool
+    {
+        // Website-level charges enabled (default: true)
+        if ($website) {
+            return $website->charges_enabled ?? true;
+        }
+
+        // If no website, check business-level exemption
+        if ($business && $business->charge_exempt) {
+            return false;
+        }
+
+        // Default: charges enabled
+        return true;
     }
 
     /**

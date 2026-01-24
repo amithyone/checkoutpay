@@ -46,6 +46,19 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_exempt',
         'account_number',
         'bank_address',
+        'telegram_bot_token',
+        'telegram_chat_id',
+        'telegram_withdrawal_enabled',
+        'telegram_security_enabled',
+        'telegram_payment_enabled',
+        'telegram_login_enabled',
+        'telegram_admin_login_enabled',
+        'daily_revenue',
+        'monthly_revenue',
+        'yearly_revenue',
+        'last_daily_revenue_update',
+        'last_monthly_revenue_update',
+        'last_yearly_revenue_update',
     ];
 
     protected $hidden = [
@@ -67,6 +80,17 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'notifications_withdrawal_enabled' => 'boolean',
         'notifications_website_enabled' => 'boolean',
         'notifications_security_enabled' => 'boolean',
+        'telegram_withdrawal_enabled' => 'boolean',
+        'telegram_security_enabled' => 'boolean',
+        'telegram_payment_enabled' => 'boolean',
+        'telegram_login_enabled' => 'boolean',
+        'telegram_admin_login_enabled' => 'boolean',
+        'daily_revenue' => 'decimal:2',
+        'monthly_revenue' => 'decimal:2',
+        'yearly_revenue' => 'decimal:2',
+        'last_daily_revenue_update' => 'datetime',
+        'last_monthly_revenue_update' => 'datetime',
+        'last_yearly_revenue_update' => 'datetime',
         'two_factor_enabled' => 'boolean',
         'auto_withdraw_threshold' => 'decimal:2',
         'charges_paid_by_customer' => 'boolean',
@@ -381,6 +405,22 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
+     * Check if Telegram is configured
+     */
+    public function isTelegramConfigured(): bool
+    {
+        return !empty($this->telegram_bot_token) && !empty($this->telegram_chat_id);
+    }
+
+    /**
+     * Get notification channels for the business
+     */
+    public function routeNotificationForTelegram(): ?string
+    {
+        return $this->isTelegramConfigured() ? 'telegram' : null;
+    }
+
+    /**
      * Generate 2FA secret
      */
     public function generateTwoFactorSecret(): string
@@ -535,11 +575,33 @@ class Business extends Authenticatable implements CanResetPasswordContract
                 'business_receives' => $charges['business_receives'],
                 'charges_paid_by_customer' => $charges['paid_by_customer'],
             ]);
+
+            // Track charges collected for website if payment has a website
+            if ($payment->business_website_id && $charges['total_charges'] > 0) {
+                $paymentWebsite = $payment->website()->first();
+                if ($paymentWebsite) {
+                    $paymentWebsite->increment('total_charges_collected', $charges['total_charges']);
+                }
+            }
         }
 
         // Increment balance with the amount business receives (after charges)
         $this->increment('balance', $charges['business_receives']);
 
+        // Record transaction and update revenue
+        if ($payment) {
+            $revenueService = app(\App\Services\RevenueService::class);
+            $revenueService->recordTransaction($payment, $charges['business_receives']);
+        }
+
         return $charges['business_receives'];
+    }
+
+    /**
+     * Get all payments (transactions) for this business
+     */
+    public function transactions()
+    {
+        return $this->payments();
     }
 }

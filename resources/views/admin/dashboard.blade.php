@@ -94,7 +94,7 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
         <!-- Global Match Trigger Button -->
         <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-6 border-2 border-green-200 hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
@@ -259,6 +259,36 @@
                 <span class="text-purple-600">Average: {{ number_format($stats['match_similarity']['average_score'], 2) }}%</span>
             </div>
         </div>
+
+        <!-- Total Charges Collected -->
+        @if(auth('admin')->user()->isSuperAdmin() || auth('admin')->user()->role === 'admin')
+        <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg shadow-sm p-6 border-2 border-orange-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Total Charges Collected</p>
+                    <h3 class="text-2xl font-bold text-gray-900">₦{{ number_format($stats['charges']['total_collected'] ?? 0, 2) }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-percent text-orange-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <span class="text-gray-600">Today: ₦{{ number_format($stats['charges']['today_collected'] ?? 0, 2) }}</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-orange-200">
+                <div class="text-xs text-gray-500">
+                    <div class="mb-1">
+                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                        Enabled: <span class="font-semibold text-gray-900">{{ number_format($stats['charges']['websites_with_charges_enabled'] ?? 0) }}</span>
+                    </div>
+                    <div>
+                        <i class="fas fa-times-circle text-red-500 mr-1"></i>
+                        Disabled: <span class="font-semibold text-gray-900">{{ number_format($stats['charges']['websites_with_charges_disabled'] ?? 0) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
     </div>
 
     <!-- Unmatched Pending Transactions Widget -->

@@ -36,14 +36,39 @@ class StatisticsController extends Controller
             }
         }
 
+        // Calculate business revenue from actual transactions (not edited values)
+        $todayDate = today()->toDateString();
+        
+        // Today's revenue: sum of all approved payments for today
+        $todayRevenue = $business->payments()
+            ->where('status', 'approved')
+            ->whereDate('created_at', $todayDate)
+            ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
+        
+        // Monthly revenue: sum of all approved payments for current month
+        $monthlyRevenue = $business->payments()
+            ->where('status', 'approved')
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
+        
+        // Yearly revenue: sum of all approved payments for current year
+        $yearlyRevenue = $business->payments()
+            ->where('status', 'approved')
+            ->whereYear('created_at', now()->year)
+            ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
+
         // Overall statistics
         $stats = [
             'total_transactions' => $business->payments()->count(),
             'total_approved' => $business->payments()->where('status', 'approved')->count(),
             'total_pending' => $business->payments()->where('status', 'pending')->count(),
             'total_rejected' => $business->payments()->where('status', 'rejected')->count(),
-            'total_revenue' => $business->payments()->where('status', 'approved')->sum('amount'),
-            'average_transaction' => $business->payments()->where('status', 'approved')->avg('amount'),
+            'total_revenue' => $business->payments()->where('status', 'approved')->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0,
+            'today_revenue' => $todayRevenue, // Calculated from actual transactions
+            'monthly_revenue' => $monthlyRevenue, // Calculated from actual transactions
+            'yearly_revenue' => $yearlyRevenue, // Calculated from actual transactions
+            'average_transaction' => $business->payments()->where('status', 'approved')->avg(DB::raw('COALESCE(business_receives, amount)')),
         ];
 
         // Website-specific statistics
@@ -104,31 +129,31 @@ class StatisticsController extends Controller
             $averageTransaction = $approvedPayments > 0 ? $totalRevenue / $approvedPayments : 0;
             $approvalRate = $totalPayments > 0 ? ($approvedPayments / $totalPayments) * 100 : 0;
 
-            // Today's stats
+            // Today's stats - calculate from actual transactions
             $todayRevenue = $website->payments()
                 ->where('status', 'approved')
                 ->whereDate('created_at', today())
-                ->sum('amount');
+                ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             $todayPayments = $website->payments()
                 ->whereDate('created_at', today())
                 ->count();
 
-            // This month's stats
+            // This month's stats - calculate from actual transactions
             $monthlyRevenue = $website->payments()
                 ->where('status', 'approved')
                 ->whereYear('created_at', now()->year)
                 ->whereMonth('created_at', now()->month)
-                ->sum('amount');
+                ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             $monthlyPayments = $website->payments()
                 ->whereYear('created_at', now()->year)
                 ->whereMonth('created_at', now()->month)
                 ->count();
 
-            // This year's stats
+            // This year's stats - calculate from actual transactions
             $yearlyRevenue = $website->payments()
                 ->where('status', 'approved')
                 ->whereYear('created_at', now()->year)
-                ->sum('amount');
+                ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             $yearlyPayments = $website->payments()
                 ->whereYear('created_at', now()->year)
                 ->count();

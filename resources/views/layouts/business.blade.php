@@ -38,6 +38,20 @@
     </style>
 </head>
 <body class="bg-gray-50">
+    @if(session()->has('admin_impersonating_business_id') && auth('business')->check())
+        <div class="bg-yellow-500 text-white px-4 py-3 flex items-center justify-between z-50 relative">
+            <div class="flex items-center">
+                <i class="fas fa-user-secret mr-2"></i>
+                <span class="font-medium">You are viewing as <strong>{{ auth('business')->user()->name }}</strong> (Admin Impersonation Mode)</span>
+            </div>
+            <form action="{{ route('admin.businesses.exit-impersonation') }}" method="POST" class="inline">
+                @csrf
+                <button type="submit" class="bg-white text-yellow-600 px-4 py-1 rounded hover:bg-gray-100 font-medium">
+                    <i class="fas fa-sign-out-alt mr-1"></i> Exit View
+                </button>
+            </form>
+        </div>
+    @endif
     <div class="flex h-screen overflow-hidden">
         <!-- Mobile Sidebar Overlay -->
         <div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden hidden" onclick="closeSidebar()"></div>

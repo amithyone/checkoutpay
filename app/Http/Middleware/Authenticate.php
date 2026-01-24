@@ -5,9 +5,52 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Auth\Middleware\Authenticate as Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class Authenticate extends Middleware
 {
+    /**
+     * Handle an incoming request.
+     * 
+     * Override to allow admin impersonation for business routes.
+     */
+    public function handle($request, Closure $next, ...$guards)
+    {
+        // If this is a business route and admin is impersonating, allow access
+        // Check if it's a dashboard route (with or without trailing path) and if business guard is required
+        if (($request->is('dashboard') || $request->is('dashboard/*')) && (empty($guards) || in_array('business', $guards))) {
+            if ($request->session()->has('admin_impersonating_business_id')) {
+                $businessId = $request->session()->get('admin_impersonating_business_id');
+                $adminId = $request->session()->get('admin_impersonating_admin_id');
+                
+                // Verify admin is still authenticated and is super admin
+                $admin = Auth::guard('admin')->user();
+                if ($admin && $admin->id == $adminId && $admin->isSuperAdmin()) {
+                    $business = \App\Models\Business::find($businessId);
+                    if ($business) {
+                        // Login as business if not already logged in as this business
+                        if (!Auth::guard('business')->check() || Auth::guard('business')->id() != $businessId) {
+                            Auth::guard('business')->login($business);
+                        }
+                        // Allow the request to proceed without further auth checks
+                        return $next($request);
+                    } else {
+                        // Business not found, clear impersonation
+                        $request->session()->forget(['admin_impersonating_business_id', 'admin_impersonating_admin_id']);
+                    }
+                } else {
+                    // Admin session expired, clear impersonation
+                    $request->session()->forget(['admin_impersonating_business_id', 'admin_impersonating_admin_id']);
+                    if (Auth::guard('business')->check()) {
+                        Auth::guard('business')->logout();
+                    }
+                }
+            }
+        }
+
+        return parent::handle($request, $next, ...$guards);
+    }
+
     /**
      * Get the path the user should be redirected to when they are not authenticated.
      */
@@ -23,7 +66,7 @@ class Authenticate extends Middleware
         }
 
         // Check if business route
-        if ($request->is('dashboard/*')) {
+        if ($request->is('dashboard') || $request->is('dashboard/*')) {
             return route('business.login');
         }
 

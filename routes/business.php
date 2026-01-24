@@ -39,7 +39,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     Route::post('/2fa/verify', [\App\Http\Controllers\Business\Auth\TwoFactorController::class, 'verify'])->name('2fa.verify.post');
 
     // Protected business routes
-    Route::middleware('auth:business')->group(function () {
+    Route::middleware([\App\Http\Middleware\AllowAdminImpersonation::class, 'auth:business'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         // Transactions

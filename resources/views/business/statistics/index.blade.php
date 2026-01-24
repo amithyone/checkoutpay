@@ -102,6 +102,48 @@
         </div>
     </div>
 
+    <!-- Revenue Summary (Today/Monthly/Yearly) -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg shadow-sm p-4 sm:p-6 border-2 border-green-200 min-w-0 overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm text-gray-600 mb-1">Today's Revenue</p>
+                    <h3 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words leading-tight">₦{{ number_format($stats['today_revenue'] ?? 0, 2) }}</h3>
+                    <p class="text-xs text-gray-500 mt-1">From actual transactions</p>
+                </div>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-2 sm:ml-3">
+                    <i class="fas fa-calendar-day text-green-600 text-base sm:text-lg md:text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm p-4 sm:p-6 border-2 border-blue-200 min-w-0 overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm text-gray-600 mb-1">Monthly Revenue</p>
+                    <h3 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words leading-tight">₦{{ number_format($stats['monthly_revenue'] ?? 0, 2) }}</h3>
+                    <p class="text-xs text-gray-500 mt-1">From actual transactions</p>
+                </div>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-2 sm:ml-3">
+                    <i class="fas fa-calendar-alt text-blue-600 text-base sm:text-lg md:text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg shadow-sm p-4 sm:p-6 border-2 border-purple-200 min-w-0 overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs sm:text-sm text-gray-600 mb-1">Yearly Revenue</p>
+                    <h3 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 break-words leading-tight">₦{{ number_format($stats['yearly_revenue'] ?? 0, 2) }}</h3>
+                    <p class="text-xs text-gray-500 mt-1">From actual transactions</p>
+                </div>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-2 sm:ml-3">
+                    <i class="fas fa-calendar text-purple-600 text-base sm:text-lg md:text-xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Website Performance Breakdown -->
     @if(count($websiteStats) > 0)
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">

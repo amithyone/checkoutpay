@@ -158,6 +158,113 @@
         </form>
     </div>
 
+    <!-- Telegram Notifications -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-6">
+            <i class="fab fa-telegram mr-2"></i> Telegram Notifications
+        </h3>
+        
+        <form method="POST" action="{{ route('business.settings.update') }}">
+            @csrf
+            @method('PUT')
+            
+            <div class="space-y-6">
+                <!-- Telegram Configuration -->
+                <div class="border border-gray-200 rounded-lg p-4 space-y-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Telegram Configuration</h4>
+                    
+                    <div>
+                        <label for="telegram_bot_token" class="block text-sm font-medium text-gray-700 mb-1">Bot Token</label>
+                        <input type="text" name="telegram_bot_token" id="telegram_bot_token" 
+                            value="{{ old('telegram_bot_token', $business->telegram_bot_token) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary font-mono text-sm"
+                            placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
+                        <p class="mt-1 text-xs text-gray-500">Get your bot token from <a href="https://t.me/BotFather" target="_blank" class="text-primary hover:underline">@BotFather</a></p>
+                        @error('telegram_bot_token')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="telegram_chat_id" class="block text-sm font-medium text-gray-700 mb-1">Chat ID</label>
+                        <input type="text" name="telegram_chat_id" id="telegram_chat_id" 
+                            value="{{ old('telegram_chat_id', $business->telegram_chat_id) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary font-mono text-sm"
+                            placeholder="123456789">
+                        <p class="mt-1 text-xs text-gray-500">Get your chat ID by messaging <a href="https://t.me/userinfobot" target="_blank" class="text-primary hover:underline">@userinfobot</a></p>
+                        @error('telegram_chat_id')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                <!-- Telegram Notification Types -->
+                <div class="space-y-4">
+                    <h4 class="text-sm font-medium text-gray-900">Notification Types</h4>
+                    
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div class="flex-1">
+                            <label class="text-sm font-medium text-gray-900">Payment Notifications</label>
+                            <p class="text-xs text-gray-500 mt-1">Get notified via Telegram when payments are received</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="telegram_payment_enabled" value="1" 
+                                {{ old('telegram_payment_enabled', $business->telegram_payment_enabled ?? false) ? 'checked' : '' }}
+                                class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div class="flex-1">
+                            <label class="text-sm font-medium text-gray-900">Withdrawal Notifications</label>
+                            <p class="text-xs text-gray-500 mt-1">Get notified via Telegram about withdrawal requests and approvals</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="telegram_withdrawal_enabled" value="1" 
+                                {{ old('telegram_withdrawal_enabled', $business->telegram_withdrawal_enabled ?? false) ? 'checked' : '' }}
+                                class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div class="flex-1">
+                            <label class="text-sm font-medium text-gray-900">Security Notifications</label>
+                            <p class="text-xs text-gray-500 mt-1">Get notified via Telegram about security events (password changes, etc.)</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="telegram_security_enabled" value="1" 
+                                {{ old('telegram_security_enabled', $business->telegram_security_enabled ?? false) ? 'checked' : '' }}
+                                class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div class="flex-1">
+                            <label class="text-sm font-medium text-gray-900">Login Notifications</label>
+                            <p class="text-xs text-gray-500 mt-1">Get notified via Telegram when you log in</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="telegram_login_enabled" value="1" 
+                                {{ old('telegram_login_enabled', $business->telegram_login_enabled ?? false) ? 'checked' : '' }}
+                                class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    <i class="fas fa-save mr-2"></i> Save Telegram Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- General Settings -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-6">

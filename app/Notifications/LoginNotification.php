@@ -20,12 +20,32 @@ class LoginNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        // Check if email notifications and security notifications are enabled
-        if (!$notifiable->shouldReceiveEmailNotifications() || !$notifiable->shouldReceiveSecurityNotifications()) {
-            return []; // Don't send notification
+        $channels = [];
+        
+        // Email notifications
+        if ($notifiable->shouldReceiveEmailNotifications() && $notifiable->shouldReceiveSecurityNotifications()) {
+            $channels[] = 'mail';
         }
         
-        return ['mail'];
+        // Telegram notifications
+        if ($notifiable->isTelegramConfigured() && $notifiable->telegram_login_enabled) {
+            $channels[] = 'telegram';
+        }
+        
+        return $channels;
+    }
+
+    public function toTelegram(object $notifiable): ?string
+    {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
+        return "🔐 <b>New Login Detected</b>\n\n" .
+               "Account: {$notifiable->name}\n" .
+               "IP Address: {$this->ipAddress}\n" .
+               "Device: {$this->userAgent}\n" .
+               "Time: " . now()->format('M d, Y H:i') . "\n\n" .
+               "If this wasn't you, please secure your account immediately.\n\n" .
+               "{$appName}";
     }
 
     public function toMail(object $notifiable): MailMessage

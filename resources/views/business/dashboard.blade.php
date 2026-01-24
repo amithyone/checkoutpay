@@ -21,11 +21,11 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-        <!-- Amount Received Today -->
+        <!-- Daily Revenue -->
         <div class="bg-white rounded-xl shadow-sm p-5 lg:p-6 border border-gray-200 hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs lg:text-sm text-gray-600 mb-1">Amount Received Today</p>
+                    <p class="text-xs lg:text-sm text-gray-600 mb-1">Daily Revenue</p>
                     <h3 class="text-xl lg:text-2xl font-bold text-gray-900 truncate">₦{{ number_format($stats['today_revenue'] ?? 0, 2) }}</h3>
                 </div>
                 <div class="w-10 h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-3">
@@ -33,7 +33,10 @@
                 </div>
             </div>
             <div class="pt-3 border-t border-gray-100">
-                <span class="text-xs text-gray-600">Successful payments today</span>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-gray-600">Monthly: ₦{{ number_format($stats['monthly_revenue'] ?? 0, 2) }}</span>
+                    <span class="text-gray-600">Yearly: ₦{{ number_format($stats['yearly_revenue'] ?? 0, 2) }}</span>
+                </div>
             </div>
         </div>
 
@@ -136,6 +139,7 @@
                         <div class="bg-blue-50 rounded-lg p-3 min-w-0 overflow-hidden">
                             <p class="text-xs text-gray-600 mb-1">Today</p>
                             <p class="text-sm sm:text-base font-bold text-blue-900 break-words leading-tight">₦{{ number_format($websiteStat['today_revenue'], 2) }}</p>
+                            <p class="text-xs text-gray-500 mt-1">Monthly: ₦{{ number_format($websiteStat['monthly_revenue'] ?? 0, 2) }} • Yearly: ₦{{ number_format($websiteStat['yearly_revenue'] ?? 0, 2) }}</p>
                             <p class="text-xs text-gray-500 mt-1">{{ $websiteStat['today_payments'] }} payment{{ $websiteStat['today_payments'] != 1 ? 's' : '' }}</p>
                         </div>
                         <div class="bg-purple-50 rounded-lg p-3 min-w-0 overflow-hidden">
@@ -143,6 +147,15 @@
                             <p class="text-sm sm:text-base font-bold text-purple-900 break-words leading-tight">₦{{ number_format($websiteStat['monthly_revenue'], 2) }}</p>
                             <p class="text-xs text-gray-500 mt-1">{{ $websiteStat['monthly_payments'] }} payment{{ $websiteStat['monthly_payments'] != 1 ? 's' : '' }}</p>
                         </div>
+                    </div>
+                    @if(isset($websiteStat['yearly_revenue']))
+                    <div class="mt-3 pt-3 border-t border-gray-100">
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <p class="text-xs text-gray-600 mb-1">This Year</p>
+                            <p class="text-sm sm:text-base font-bold text-green-900">₦{{ number_format($websiteStat['yearly_revenue'], 2) }}</p>
+                        </div>
+                    </div>
+                    @endif
                     </div>
                     
                     <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-gray-600 mt-3">

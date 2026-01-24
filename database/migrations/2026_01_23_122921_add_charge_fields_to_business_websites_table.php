@@ -12,7 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('business_websites', function (Blueprint $table) {
-            $table->decimal('charge_percentage', 5, 2)->nullable()->after('webhook_url')->comment('Charge percentage (default: 1%)');
+            // Check if webhook_url exists, if so add after it, otherwise add at end
+            if (Schema::hasColumn('business_websites', 'webhook_url')) {
+                $table->decimal('charge_percentage', 5, 2)->nullable()->after('webhook_url')->comment('Charge percentage (default: 1%)');
+            } else {
+                $table->decimal('charge_percentage', 5, 2)->nullable()->comment('Charge percentage (default: 1%)');
+            }
             $table->decimal('charge_fixed', 10, 2)->nullable()->after('charge_percentage')->comment('Fixed charge amount (default: 100)');
             $table->boolean('charges_paid_by_customer')->default(false)->after('charge_fixed')->comment('Whether customer pays charges (default: false, business pays)');
         });

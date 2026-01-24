@@ -5,12 +5,33 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index()
     {
         $business = Auth::guard('business')->user();
+
+        // Calculate business revenue from actual transactions (not edited values)
+        // Today's revenue: sum of all approved payments for today
+        $todayRevenue = $business->payments()
+            ->where('status', 'approved')
+            ->whereDate('created_at', today())
+            ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
+        
+        // Monthly revenue: sum of all approved payments for current month
+        $monthlyRevenue = $business->payments()
+            ->where('status', 'approved')
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
+        
+        // Yearly revenue: sum of all approved payments for current year
+        $yearlyRevenue = $business->payments()
+            ->where('status', 'approved')
+            ->whereYear('created_at', now()->year)
+            ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
 
         // Get statistics
         $stats = [
@@ -20,18 +41,10 @@ class DashboardController extends Controller
             'rejected_payments' => $business->payments()->where('status', 'rejected')->count(),
             'total_withdrawals' => $business->withdrawalRequests()->count(),
             'pending_withdrawals' => $business->withdrawalRequests()->where('status', 'pending')->count(),
-            'total_revenue' => $business->payments()->where('status', 'approved')->sum('amount'),
-            'today_revenue' => $business->payments()
-                ->where('status', 'approved')
-                ->where(function($query) {
-                    $query->whereDate('matched_at', today())
-                          ->orWhere(function($q) {
-                              // Fallback to created_at if matched_at is null (for older payments)
-                              $q->whereNull('matched_at')
-                                ->whereDate('created_at', today());
-                          });
-                })
-                ->sum('amount'),
+            'total_revenue' => $business->payments()->where('status', 'approved')->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0,
+            'today_revenue' => $todayRevenue, // Calculated from actual transactions
+            'monthly_revenue' => $monthlyRevenue, // Calculated from actual transactions
+            'yearly_revenue' => $yearlyRevenue, // Calculated from actual transactions
             'balance' => $business->balance,
         ];
 
@@ -40,18 +53,22 @@ class DashboardController extends Controller
         foreach ($business->websites as $website) {
             $websitePayments = $website->payments()->where('status', 'approved')->get();
             
-            // Calculate daily revenue (today)
+            // Calculate revenue from actual transactions
             $todayRevenue = $website->payments()
                 ->where('status', 'approved')
                 ->whereDate('created_at', today())
-                ->sum('amount');
+                ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             
-            // Calculate monthly revenue (this month)
+            // Calculate monthly/yearly revenue from actual transactions
             $monthlyRevenue = $website->payments()
                 ->where('status', 'approved')
                 ->whereYear('created_at', now()->year)
                 ->whereMonth('created_at', now()->month)
-                ->sum('amount');
+                ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
+            $yearlyRevenue = $website->payments()
+                ->where('status', 'approved')
+                ->whereYear('created_at', now()->year)
+                ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             
             // Calculate daily payments count
             $todayPayments = $website->payments()
@@ -68,12 +85,13 @@ class DashboardController extends Controller
             
             $websiteStats[] = [
                 'website' => $website,
-                'total_revenue' => $websitePayments->sum('amount'),
+                'total_revenue' => $websitePayments->sum('amount'), // Real transaction data for reference
                 'total_payments' => $websitePayments->count(),
                 'pending_payments' => $website->payments()->where('status', 'pending')->count(),
-                'today_revenue' => $todayRevenue,
+                'today_revenue' => $todayRevenue, // Calculated from actual transactions
                 'today_payments' => $todayPayments,
-                'monthly_revenue' => $monthlyRevenue,
+                'monthly_revenue' => $monthlyRevenue, // Calculated from actual transactions
+                'yearly_revenue' => $yearlyRevenue, // Calculated from actual transactions
                 'monthly_payments' => $monthlyPayments,
             ];
         }

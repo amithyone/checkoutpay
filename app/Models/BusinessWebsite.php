@@ -21,6 +21,12 @@ class BusinessWebsite extends Model
         'charge_percentage',
         'charge_fixed',
         'charges_paid_by_customer',
+        'charges_enabled',
+        'total_charges_collected',
+        'monthly_revenue',
+        'yearly_revenue',
+        'last_monthly_revenue_update',
+        'last_yearly_revenue_update',
     ];
 
     protected $casts = [
@@ -28,7 +34,13 @@ class BusinessWebsite extends Model
         'charge_percentage' => 'decimal:2',
         'charge_fixed' => 'decimal:2',
         'charges_paid_by_customer' => 'boolean',
+        'charges_enabled' => 'boolean',
+        'total_charges_collected' => 'decimal:2',
+        'monthly_revenue' => 'decimal:2',
+        'yearly_revenue' => 'decimal:2',
         'approved_at' => 'datetime',
+        'last_monthly_revenue_update' => 'datetime',
+        'last_yearly_revenue_update' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -72,6 +84,24 @@ class BusinessWebsite extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class, 'business_website_id');
+    }
+
+    /**
+     * Get daily revenue records for this website
+     */
+    public function dailyRevenues()
+    {
+        return $this->hasMany(WebsiteRevenueDaily::class, 'business_website_id');
+    }
+
+    /**
+     * Get daily revenue for a specific date
+     */
+    public function getDailyRevenueForDate($date)
+    {
+        return $this->dailyRevenues()
+            ->whereDate('revenue_date', $date)
+            ->first();
     }
 
     /**

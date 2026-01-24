@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class BusinessController extends Controller
 {
@@ -318,6 +319,300 @@ class BusinessController extends Controller
             ->with('success', "Balance updated from ₦" . number_format($oldBalance, 2) . " to ₦" . number_format($request->balance, 2));
     }
 
+    /**
+     * Preview transactions for transfer (Super Admin only)
+     */
+    public function previewTransactions(Request $request, Business $business, BusinessWebsite $website = null): \Illuminate\Http\JsonResponse
+    {
+        $admin = auth('admin')->user();
+        
+        if (!$admin->isSuperAdmin()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Check if transfer feature is enabled
+        $enabled = \App\Models\Setting::get('transaction_transfer_enabled', config('transaction_transfer.enabled', true));
+        if (!$enabled) {
+            return response()->json(['error' => 'Transaction transfer feature is disabled'], 403);
+        }
+
+        $query = \App\Models\Payment::where('business_id', $business->id);
+        
+        if ($website) {
+            $query->where('business_website_id', $website->id);
+        }
+
+        if ($request->filled('max_amount')) {
+            $query->where('amount', '<=', $request->max_amount);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $transactions = $query->orderBy('created_at', 'desc')->get(['id', 'transaction_id', 'amount', 'business_receives', 'status', 'created_at']);
+
+        // If target_amount is specified, find transactions that sum to that amount
+        if ($request->filled('target_amount')) {
+            $targetAmount = (float)$request->target_amount;
+            $selectedTransactions = $this->findTransactionsForAmount($transactions, $targetAmount);
+            $transactions = $selectedTransactions;
+        } else {
+            // Apply limit if specified
+            $limit = $request->filled('limit') ? (int)$request->limit : 100;
+            $transactions = $transactions->take($limit);
+        }
+
+        // Calculate total amount
+        $totalAmount = $transactions->sum(function($payment) {
+            return $payment->business_receives ?? $payment->amount;
+        });
+
+        return response()->json([
+            'transactions' => $transactions,
+            'count' => $transactions->count(),
+            'total_amount' => $totalAmount,
+        ]);
+    }
+
+    /**
+     * Find transactions that sum to target amount (or close to it)
+     * Uses an optimized greedy algorithm with multiple passes
+     */
+    private function findTransactionsForAmount($transactions, float $targetAmount): \Illuminate\Support\Collection
+    {
+        if ($transactions->isEmpty()) {
+            return collect();
+        }
+
+        // Convert to array with amounts
+        $items = $transactions->map(function($payment) {
+            return [
+                'payment' => $payment,
+                'amount' => (float)($payment->business_receives ?? $payment->amount),
+            ];
+        })->values()->all();
+
+        // Sort by amount descending
+        usort($items, function($a, $b) {
+            return $b['amount'] <=> $a['amount'];
+        });
+
+        $bestSelection = [];
+        $bestSum = 0;
+        $bestDiff = PHP_FLOAT_MAX;
+
+        // Try multiple strategies
+        // Strategy 1: Greedy from largest
+        $this->tryGreedyStrategy($items, $targetAmount, $bestSelection, $bestSum, $bestDiff);
+        
+        // Strategy 2: Greedy from smallest (for cases with many small transactions)
+        $itemsReversed = array_reverse($items);
+        $this->tryGreedyStrategy($itemsReversed, $targetAmount, $bestSelection, $bestSum, $bestDiff);
+
+        // Strategy 3: Try to get as close as possible without exceeding
+        $this->tryClosestUnderStrategy($items, $targetAmount, $bestSelection, $bestSum, $bestDiff);
+
+        return collect($bestSelection);
+    }
+
+    /**
+     * Greedy strategy: add transactions until close to target
+     */
+    private function tryGreedyStrategy($items, $targetAmount, &$bestSelection, &$bestSum, &$bestDiff): void
+    {
+        $selection = [];
+        $sum = 0;
+
+        foreach ($items as $item) {
+            $newSum = $sum + $item['amount'];
+            $newDiff = abs($targetAmount - $newSum);
+
+            // If adding gets us closer or we're still under target
+            if ($newDiff < abs($targetAmount - $sum) || $newSum <= $targetAmount * 1.15) {
+                $selection[] = $item['payment'];
+                $sum = $newSum;
+
+                if ($newDiff < $bestDiff) {
+                    $bestDiff = $newDiff;
+                    $bestSum = $sum;
+                    $bestSelection = $selection;
+                }
+
+                // Stop if we're very close
+                if ($newDiff < 0.01) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Strategy: Get as close as possible without exceeding target by much
+     */
+    private function tryClosestUnderStrategy($items, $targetAmount, &$bestSelection, &$bestSum, &$bestDiff): void
+    {
+        $selection = [];
+        $sum = 0;
+        $maxOver = $targetAmount * 0.1; // Allow 10% over
+
+        foreach ($items as $item) {
+            $newSum = $sum + $item['amount'];
+            
+            // Only add if we don't exceed too much
+            if ($newSum <= $targetAmount + $maxOver) {
+                $selection[] = $item['payment'];
+                $sum = $newSum;
+                $diff = abs($targetAmount - $sum);
+
+                if ($diff < $bestDiff) {
+                    $bestDiff = $diff;
+                    $bestSum = $sum;
+                    $bestSelection = $selection;
+                }
+
+                // Perfect match
+                if ($diff < 0.01) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Transfer transactions from business/website to super admin business (Super Admin only)
+     */
+    public function transferTransactions(Request $request, Business $business, BusinessWebsite $website = null): \Illuminate\Http\JsonResponse|RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        
+        if (!$admin->isSuperAdmin()) {
+            abort(403, 'Only super admins can transfer transactions.');
+        }
+
+        // Check if transfer feature is enabled
+        $enabled = \App\Models\Setting::get('transaction_transfer_enabled', config('transaction_transfer.enabled', true));
+        if (!$enabled) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Transaction transfer feature is disabled'], 403);
+            }
+            abort(403, 'Transaction transfer feature is disabled');
+        }
+
+        // Handle JSON payment_ids from AJAX
+        $paymentIds = $request->payment_ids;
+        if (is_string($paymentIds)) {
+            $paymentIds = json_decode($paymentIds, true);
+        }
+
+        if (empty($paymentIds) || !is_array($paymentIds)) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'No transactions selected'], 400);
+            }
+            return redirect()->route('admin.businesses.show', $business)
+                ->with('error', 'No transactions selected');
+        }
+
+        $superAdminBusiness = \App\Services\SuperAdminBusinessService::getOrCreateSuperAdminBusiness();
+        $superAdminWebsite = \App\Services\SuperAdminBusinessService::getSuperAdminWebsite();
+
+        $transferred = 0;
+        $totalAmount = 0;
+
+        foreach ($paymentIds as $paymentId) {
+            $payment = \App\Models\Payment::find($paymentId);
+            
+            // Verify payment belongs to this business/website
+            if ($payment && $payment->business_id == $business->id) {
+                if ($website && $payment->business_website_id != $website->id) {
+                    continue; // Skip if website filter is set and doesn't match
+                }
+
+                $originalBusinessId = $payment->business_id;
+                $originalWebsiteId = $payment->business_website_id;
+                $amount = $payment->business_receives ?? $payment->amount;
+
+                // Transfer to super admin business
+                $payment->business_id = $superAdminBusiness->id;
+                $payment->business_website_id = $superAdminWebsite ? $superAdminWebsite->id : null;
+                $payment->save();
+
+                // Update balances
+                if ($payment->status === \App\Models\Payment::STATUS_APPROVED) {
+                    // Remove from original business balance
+                    $originalBusiness = \App\Models\Business::find($originalBusinessId);
+                    if ($originalBusiness) {
+                        $originalBusiness->decrement('balance', $amount);
+                    }
+
+                    // Add to super admin business balance
+                    $superAdminBusiness->increment('balance', $amount);
+                }
+
+                $transferred++;
+                $totalAmount += $amount;
+
+                \Illuminate\Support\Facades\Log::info('Transaction transferred to super admin', [
+                    'payment_id' => $payment->id,
+                    'original_business_id' => $originalBusinessId,
+                    'original_website_id' => $originalWebsiteId,
+                    'super_admin_business_id' => $superAdminBusiness->id,
+                    'amount' => $amount,
+                    'admin_id' => $admin->id,
+                ]);
+            }
+        }
+
+        // Recalculate revenue for both businesses
+        $revenueService = app(\App\Services\RevenueService::class);
+        $revenueService->recalculateBusinessRevenueFromWebsites($business);
+        $revenueService->recalculateBusinessRevenueFromWebsites($superAdminBusiness);
+
+        $message = "{$transferred} transaction(s) transferred to super admin business. Total amount: ₦" . number_format($totalAmount, 2);
+        
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => $message]);
+        }
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', $message);
+    }
+
+    /**
+     * Toggle charges enabled/disabled for website (Super Admin only)
+     */
+    public function toggleWebsiteCharges(Business $business, BusinessWebsite $website): RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        
+        if (!$admin->isSuperAdmin()) {
+            abort(403, 'Only super admins can toggle website charges.');
+        }
+
+        $website->update([
+            'charges_enabled' => !($website->charges_enabled ?? true),
+        ]);
+
+        $status = $website->charges_enabled ? 'enabled' : 'disabled';
+        
+        \Illuminate\Support\Facades\Log::info('Website charges toggled by admin', [
+            'website_id' => $website->id,
+            'charges_enabled' => $website->charges_enabled,
+            'admin_id' => $admin->id,
+        ]);
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', "Charges {$status} for website successfully");
+    }
+
     // KYC Management Methods
     public function approveVerification(Request $request, Business $business, BusinessVerification $verification): RedirectResponse
     {
@@ -409,5 +704,71 @@ class BusinessController extends Controller
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', "Charge settings updated successfully");
+    }
+
+    /**
+     * Login as business (impersonation) - Super Admin only
+     */
+    public function loginAsBusiness(Request $request, Business $business): RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        
+        if (!$admin || !$admin->isSuperAdmin()) {
+            abort(403, 'Only super admins can impersonate businesses.');
+        }
+
+        // Store impersonation data in session
+        $request->session()->put('admin_impersonating_business_id', $business->id);
+        $request->session()->put('admin_impersonating_admin_id', $admin->id);
+        
+        // Actually log in as the business
+        Auth::guard('business')->login($business);
+        
+        // Save session immediately to ensure it's persisted
+        $request->session()->save();
+
+        // Send admin login notification to business
+        $business->notify(new \App\Notifications\AdminLoginNotification(
+            $admin->name,
+            $admin->email,
+            $request->ip(),
+            $request->userAgent() ?? 'Unknown'
+        ));
+
+        // Log the impersonation
+        \Illuminate\Support\Facades\Log::info('Admin impersonating business', [
+            'admin_id' => $admin->id,
+            'admin_email' => $admin->email,
+            'business_id' => $business->id,
+            'business_email' => $business->email,
+        ]);
+
+        return redirect()->route('business.dashboard')
+            ->with('success', "You are now viewing as {$business->name}");
+    }
+
+    /**
+     * Exit business impersonation
+     */
+    public function exitImpersonation(Request $request): RedirectResponse
+    {
+        $businessId = $request->session()->get('admin_impersonating_business_id');
+        
+        // Clear impersonation session
+        $request->session()->forget(['admin_impersonating_business_id', 'admin_impersonating_admin_id']);
+        
+        // Logout from business guard
+        Auth::guard('business')->logout();
+        
+        // Log the exit
+        if ($businessId) {
+            \Illuminate\Support\Facades\Log::info('Admin exited business impersonation', [
+                'admin_id' => auth('admin')->id(),
+                'business_id' => $businessId,
+            ]);
+        }
+
+        return redirect()->route('admin.businesses.index')
+            ->with('success', 'Exited business view successfully');
     }
 }

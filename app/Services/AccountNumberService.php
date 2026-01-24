@@ -18,7 +18,7 @@ class AccountNumberService
         // First, ensure any account numbers that should be in pool are moved there
         $this->moveOrphanedAccountsToPool();
 
-        // First, try to get business-specific account number
+        // Try to get business-specific account number
         if ($business && $business->hasAccountNumber()) {
             $accountNumber = $business->primaryAccountNumber();
             Log::info('Assigned business-specific account number', [

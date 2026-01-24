@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AccountNumber;
 use App\Models\Business;
+use App\Models\BusinessWebsite;
 use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
@@ -89,6 +90,15 @@ class DashboardController extends Controller
                 'total_score' => MatchAttempt::whereNotNull('name_similarity_percent')->sum('name_similarity_percent'),
                 'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
                 'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
+            ],
+            'charges' => [
+                'total_collected' => BusinessWebsite::sum('total_charges_collected'),
+                'today_collected' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->whereDate('created_at', $today)
+                    ->whereNotNull('total_charges')
+                    ->sum('total_charges'),
+                'websites_with_charges_enabled' => BusinessWebsite::where('charges_enabled', true)->count(),
+                'websites_with_charges_disabled' => BusinessWebsite::where('charges_enabled', false)->count(),
             ],
             'unmatched_pending' => [
                 // Get pending payments that haven't been matched and are not expired

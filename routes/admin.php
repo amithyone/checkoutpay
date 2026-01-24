@@ -66,6 +66,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('businesses.update-website');
         Route::delete('businesses/{business}/websites/{website}', [BusinessController::class, 'deleteWebsite'])
             ->name('businesses.delete-website');
+        Route::get('businesses/{business}/websites/{website}/transactions/preview', [BusinessController::class, 'previewTransactions'])
+            ->middleware('super_admin')
+            ->name('businesses.websites.preview-transactions');
+        Route::post('businesses/{business}/websites/{website}/transfer-transactions', [BusinessController::class, 'transferTransactions'])
+            ->middleware('super_admin')
+            ->name('businesses.websites.transfer-transactions');
+        Route::post('businesses/{business}/transfer-transactions', [BusinessController::class, 'transferTransactions'])
+            ->middleware('super_admin')
+            ->name('businesses.transfer-transactions');
+        Route::post('businesses/{business}/websites/{website}/toggle-charges', [BusinessController::class, 'toggleWebsiteCharges'])
+            ->middleware('super_admin')
+            ->name('businesses.websites.toggle-charges');
         Route::post('businesses/{business}/toggle-status', [BusinessController::class, 'toggleStatus'])
             ->name('businesses.toggle-status');
         Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
@@ -74,6 +86,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('businesses/{business}/update-charges', [BusinessController::class, 'updateCharges'])
             ->middleware('super_admin')
             ->name('businesses.update-charges');
+        Route::post('businesses/{business}/login-as', [BusinessController::class, 'loginAsBusiness'])
+            ->middleware('super_admin')
+            ->name('businesses.login-as');
+        Route::post('businesses/exit-impersonation', [BusinessController::class, 'exitImpersonation'])
+            ->name('businesses.exit-impersonation');
         
         // Business KYC Management
         Route::post('businesses/{business}/verifications/{verification}/approve', [BusinessController::class, 'approveVerification'])

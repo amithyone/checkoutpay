@@ -8,11 +8,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PasswordChangedNotification extends Notification
+class AdminLoginNotification extends Notification
 {
     use Queueable;
 
     public function __construct(
+        public string $adminName,
+        public string $adminEmail,
         public string $ipAddress,
         public string $userAgent
     ) {}
@@ -27,24 +29,11 @@ class PasswordChangedNotification extends Notification
         }
         
         // Telegram notifications
-        if ($notifiable->isTelegramConfigured() && $notifiable->telegram_security_enabled) {
+        if ($notifiable->isTelegramConfigured() && $notifiable->telegram_admin_login_enabled) {
             $channels[] = 'telegram';
         }
         
         return $channels;
-    }
-
-    public function toTelegram(object $notifiable): ?string
-    {
-        $appName = Setting::get('site_name', 'CheckoutPay');
-        
-        return "🔒 <b>Password Changed</b>\n\n" .
-               "Your account password has been changed.\n\n" .
-               "IP Address: {$this->ipAddress}\n" .
-               "Device: {$this->userAgent}\n" .
-               "Time: " . now()->format('M d, Y H:i') . "\n\n" .
-               "If this wasn't you, please secure your account immediately.\n\n" .
-               "{$appName}";
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -52,12 +41,28 @@ class PasswordChangedNotification extends Notification
         $appName = Setting::get('site_name', 'CheckoutPay');
         
         return (new MailMessage)
-            ->subject('Password Changed - ' . $appName)
-            ->view('emails.password-changed', [
+            ->subject('Admin Login Detected - ' . $appName)
+            ->view('emails.admin-login', [
                 'business' => $notifiable,
+                'adminName' => $this->adminName,
+                'adminEmail' => $this->adminEmail,
                 'ipAddress' => $this->ipAddress,
                 'userAgent' => $this->userAgent,
                 'appName' => $appName,
             ]);
+    }
+
+    public function toTelegram(object $notifiable): ?string
+    {
+        $appName = Setting::get('site_name', 'CheckoutPay');
+        
+        return "⚠️ <b>Admin Login Detected</b>\n\n" .
+               "An administrator has logged in as your business account.\n\n" .
+               "Admin: {$this->adminName} ({$this->adminEmail})\n" .
+               "IP Address: {$this->ipAddress}\n" .
+               "Device: {$this->userAgent}\n" .
+               "Time: " . now()->format('M d, Y H:i') . "\n\n" .
+               "If you didn't authorize this, please contact support immediately.\n\n" .
+               "{$appName}";
     }
 }
