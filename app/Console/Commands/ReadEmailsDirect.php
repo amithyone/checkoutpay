@@ -838,11 +838,13 @@ class ReadEmailsDirect extends Command
             // This ensures names are extracted right when emails are fetched
             if (!$validatedSenderName && !empty($normalizedTextBody)) {
                 try {
-                    $matchingServiceForExtraction = new PaymentMatchingService(
-                        new \App\Services\TransactionLogService()
-                    );
+                    $nameExtractor = new \App\Services\SenderNameExtractor();
                     // Extract sender name from text_body immediately
-                    $extractedSenderName = $matchingServiceForExtraction->extractSenderNameFromText($normalizedTextBody, $parts['html_body'] ?? '');
+                    $extractedSenderName = $nameExtractor->extractFromText($normalizedTextBody, $parts['subject'] ?? '');
+                    if (!$extractedSenderName && !empty($parts['html_body'])) {
+                        // Try HTML if text extraction didn't work
+                        $extractedSenderName = $nameExtractor->extractFromHtml($parts['html_body']);
+                    }
                     if ($extractedSenderName) {
                         $validatedSenderName = $emailExtractor->validateSenderName($extractedSenderName);
                     }

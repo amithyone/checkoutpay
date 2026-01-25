@@ -1063,11 +1063,13 @@ class MonitorEmails extends Command
                 // This ensures names are extracted right when emails are fetched
                 if (!$validatedSenderName && !empty($normalizedTextBody)) {
                     try {
-                        $matchingServiceForExtraction = new PaymentMatchingService(
-                            new \App\Services\TransactionLogService()
-                        );
+                        $nameExtractor = new \App\Services\SenderNameExtractor();
                         // Extract sender name from text_body immediately
-                        $extractedSenderName = $matchingServiceForExtraction->extractSenderNameFromText($normalizedTextBody, $htmlBody ?? '');
+                        $extractedSenderName = $nameExtractor->extractFromText($normalizedTextBody, $emailData['subject'] ?? '');
+                        if (!$extractedSenderName && !empty($htmlBody)) {
+                            // Try HTML if text extraction didn't work
+                            $extractedSenderName = $nameExtractor->extractFromHtml($htmlBody);
+                        }
                         if ($extractedSenderName) {
                             $validatedSenderName = $emailExtractor->validateSenderName($extractedSenderName);
                         }
