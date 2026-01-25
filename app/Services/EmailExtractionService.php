@@ -786,16 +786,24 @@ class EmailExtractionService
             return '';
         }
         
-        // Decode quoted-printable format: =XX where XX is hex
-        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function ($matches) {
-            return chr(hexdec($matches[1]));
-        }, $text);
+        // Use PHP's built-in function first (handles UTF-8 properly)
+        $decoded = quoted_printable_decode($text);
+        
+        // Also handle any remaining =XX patterns manually (for edge cases)
+        $decoded = preg_replace_callback('/=([0-9A-F]{2})/i', function ($matches) {
+            $char = chr(hexdec($matches[1]));
+            // Only return if it's a valid single-byte character or part of valid UTF-8 sequence
+            return $char;
+        }, $decoded);
         
         // Handle soft line breaks
-        $text = preg_replace('/=\r?\n/', '', $text);
-        $text = preg_replace('/=\s*\n/', "\n", $text);
+        $decoded = preg_replace('/=\r?\n/', '', $decoded);
+        $decoded = preg_replace('/=\s*\n/', "\n", $decoded);
         
-        return $text;
+        // Sanitize UTF-8 after decoding
+        $decoded = $this->sanitizeUtf8($decoded);
+        
+        return $decoded;
     }
     
     /**
@@ -829,7 +837,55 @@ class EmailExtractionService
         $textBody = preg_replace('/\s+/', ' ', $textBody);
         $textBody = trim($textBody);
         
+        // Sanitize UTF-8 to prevent malformed characters
+        $textBody = $this->sanitizeUtf8($textBody);
+        
         return $textBody;
+    }
+    
+    /**
+     * Sanitize UTF-8 string to remove malformed characters
+     * 
+     * @param string $string
+     * @return string
+     */
+    protected function sanitizeUtf8(string $string): string
+    {
+        if (empty($string)) {
+            return $string;
+        }
+        
+        // First, try to fix encoding using mb_convert_encoding
+        if (!mb_check_encoding($string, 'UTF-8')) {
+            // Try to convert from various encodings
+            $encodings = ['ISO-8859-1', 'Windows-1252', 'UTF-8'];
+            foreach ($encodings as $encoding) {
+                $converted = @mb_convert_encoding($string, 'UTF-8', $encoding);
+                if (mb_check_encoding($converted, 'UTF-8')) {
+                    $string = $converted;
+                    break;
+                }
+            }
+        }
+        
+        // Use iconv to remove invalid UTF-8 sequences
+        $sanitized = @iconv('UTF-8', 'UTF-8//IGNORE', $string);
+        
+        // If iconv failed, use mb_convert_encoding with IGNORE flag
+        if ($sanitized === false || !mb_check_encoding($sanitized, 'UTF-8')) {
+            $sanitized = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+        }
+        
+        // Remove control characters except newlines, carriage returns, and tabs
+        $sanitized = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
+        
+        // Final check: ensure valid UTF-8
+        if (!mb_check_encoding($sanitized, 'UTF-8')) {
+            // Last resort: remove any remaining invalid bytes
+            $sanitized = mb_convert_encoding($sanitized, 'UTF-8', 'UTF-8');
+        }
+        
+        return $sanitized ?: '';
     }
     
     /**
