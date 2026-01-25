@@ -100,8 +100,9 @@ class EmailExtractionService
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA"
-            elseif (preg_match('/[\-]KMB[\-]([A-Z][A-Z\s,]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|$)/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA" or "-BIG-KMB-OSULA, GODSTIME"
+            // Also handles "-BIG-KMB-NAME" format
+            elseif (preg_match('/[\-](?:BIG[\-])?KMB[\-]([A-Z][A-Z\s,]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 // Remove trailing period and clean up
                 $potentialName = rtrim($potentialName, '. ');
@@ -494,8 +495,9 @@ class EmailExtractionService
                     $senderName = trim(strtolower($potentialName));
                 }
             }
-            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA"
-            elseif (preg_match('/[\-]KMB[\-]([A-Z][A-Z\s,]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|$)/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA" or "-BIG-KMB-OSULA, GODSTIME"
+            // Also handles "-BIG-KMB-NAME" format
+            elseif (preg_match('/[\-](?:BIG[\-])?KMB[\-]([A-Z][A-Z\s,]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 // Remove trailing period and clean up
                 $potentialName = rtrim($potentialName, '. ');

@@ -780,9 +780,9 @@ class PaymentMatchingService
             // Handles: ...-PALMPAY-OKWUDIRI RICHARD Amount
             '/description[\s:]+.*?-(?:PALMPAY|OPAY|KUD|KUDABANK)-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value)/i',
             
-            // Pattern 5c: "Description : ...-INTERNET-KMB-NAME" or "...-KMB-NAME" format (KMB specific)
-            // Handles: ...-INTERNET-KMB-AKINDEINDE, OLAYINKA H Amount
-            '/description[\s:]+.*?-(?:INTERNET-)?KMB-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value|\s*H\s*=)/i',
+            // Pattern 5c: "Description : ...-INTERNET-KMB-NAME" or "...-KMB-NAME" or "...-BIG-KMB-NAME" format (KMB specific)
+            // Handles: ...-INTERNET-KMB-AKINDEINDE, OLAYINKA H Amount or ...-BIG-KMB-OSULA, GODSTIME
+            '/description[\s:]+.*?-(?:INTERNET-|BIG-)?KMB-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount|\s*Value|\s*H\s*=)/i',
             
             // Pattern 6: "Description : CODE-TXN-CODE-CODE-NAME" format (handles quoted-printable)
             '/description[\s:]+(?:=\d+)?\s*[\d\-]+-TXN-[\d\-]+-[A-Z]+=\s*[A-Z\-]*-([A-Z][A-Z\s\-,]{3,50}?)(?:\s*=|\s*Amount)/i',

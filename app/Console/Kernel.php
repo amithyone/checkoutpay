@@ -152,12 +152,16 @@ class Kernel extends ConsoleKernel
                             continue;
                         }
 
-                        // STEP 1: Try normal matching first (extract from email, match by amount + name)
-                        $matchedEmail = $matchingService->matchPaymentToStoredEmail($payment);
-                        
-                        // STEP 2: If normal matching returns null, try reverse search (search for payer_name in unmatched emails)
-                        if (!$matchedEmail && !empty($payment->payer_name)) {
+                        // OPTIMIZED: Try reverse search FIRST if payer_name exists (faster - searches by known name)
+                        // Reverse search is faster because it searches for a specific payer_name in unmatched emails
+                        $matchedEmail = null;
+                        if (!empty($payment->payer_name)) {
                             $matchedEmail = $matchingService->reverseSearchPaymentInEmails($payment);
+                        }
+                        
+                        // STEP 2: If reverse search didn't find a match, try normal matching (extract from email, match by amount + name)
+                        if (!$matchedEmail) {
+                            $matchedEmail = $matchingService->matchPaymentToStoredEmail($payment);
                         }
                         
                         // STEP 3: Continue with other processes if match found

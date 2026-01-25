@@ -60,9 +60,11 @@ class SenderNameExtractor
                 }
             }
             // Pattern 1c: KMB pattern - e.g., "digits-TXN-digits-GANYJIBM= Q-KMB-OGUNTUASE, SHOLA" or "PAYMENT -KMB-OGWU, OGELUE DIVINE"
-            // Handle both "V-KMB-NAME" and " -KMB-NAME" patterns
+            // Also handles "-BIG-KMB-OSULA, GODSTIME" format
+            // Handle both "V-KMB-NAME" and " -KMB-NAME" and "-BIG-KMB-NAME" patterns
             // Allow equals signs in name (quoted-printable encoding)
-            elseif (preg_match('/[\s\-]KMB[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|$)/i', $descriptionLine, $nameMatches)) {
+            // Use greedy match to capture full name including comma-separated names
+            elseif (preg_match('/[\s\-](?:BIG[\-])?KMB[\-]([A-Z][A-Z\s,=]{2,})(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|$)/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 // Handle = characters in names (quoted-printable)
                 $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
@@ -168,8 +170,8 @@ class SenderNameExtractor
                     $senderName = strtolower($potentialName);
                 }
             }
-            // Pattern 1c2d: Kuda bank patterns - "-KMB-NAME", "-OPAY-NAME", "-PALMPAY-NAME" (name follows after these phrases)
-            elseif (preg_match('/[\-](?:KMB|OPAY|PALMPAY)[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+            // Pattern 1c2d: Kuda bank patterns - "-KMB-NAME", "-OPAY-NAME", "-PALMPAY-NAME", "-BIG-KMB-NAME" (name follows after these phrases)
+            elseif (preg_match('/[\-](?:BIG[\-])?(?:KMB|OPAY|PALMPAY)[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
                 $potentialName = trim($nameMatches[1]);
                 // Handle = characters in names
                 $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
@@ -649,8 +651,9 @@ class SenderNameExtractor
             }
         }
         
-        // Pattern 5: Kuda bank patterns - "-KMB-NAME", "-OPAY-NAME", "-PALMPAY-NAME" (name follows after these phrases)
-        if (preg_match('/[\-](?:KMB|OPAY|PALMPAY)[\-]([A-Z][A-Z\s,=]{2,}?)(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
+        // Pattern 5: Kuda bank patterns - "-KMB-NAME", "-OPAY-NAME", "-PALMPAY-NAME", "-BIG-KMB-NAME" (name follows after these phrases)
+        // Use greedy match to capture full name including comma-separated names
+        if (preg_match('/[\-](?:BIG[\-])?(?:KMB|OPAY|PALMPAY)[\-]([A-Z][A-Z\s,=]{2,})(?:[\s]*\.|[\s]+Amount|[\s]+Value|[\s]+Time|[\s]*=|[\s]*$|[\s\-])/i', $descriptionLine, $nameMatches)) {
             $potentialName = trim($nameMatches[1]);
             $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
             $potentialName = preg_replace('/=\d+/', '', $potentialName);
