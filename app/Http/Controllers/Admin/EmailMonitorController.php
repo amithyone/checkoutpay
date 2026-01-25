@@ -10,6 +10,50 @@ use Illuminate\Support\Facades\Log;
 class EmailMonitorController extends Controller
 {
     /**
+     * Sanitize UTF-8 string to remove malformed characters
+     * 
+     * @param string $string
+     * @return string
+     */
+    protected function sanitizeUtf8(string $string): string
+    {
+        if (empty($string)) {
+            return $string;
+        }
+        
+        // First, try to fix encoding using mb_convert_encoding
+        if (!mb_check_encoding($string, 'UTF-8')) {
+            // Try to convert from various encodings
+            $encodings = ['ISO-8859-1', 'Windows-1252', 'UTF-8'];
+            foreach ($encodings as $encoding) {
+                $converted = @mb_convert_encoding($string, 'UTF-8', $encoding);
+                if (mb_check_encoding($converted, 'UTF-8')) {
+                    $string = $converted;
+                    break;
+                }
+            }
+        }
+        
+        // Use iconv to remove invalid UTF-8 sequences
+        $sanitized = @iconv('UTF-8', 'UTF-8//IGNORE', $string);
+        
+        // If iconv failed, use mb_convert_encoding with IGNORE flag
+        if ($sanitized === false || !mb_check_encoding($sanitized, 'UTF-8')) {
+            $sanitized = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+        }
+        
+        // Remove control characters except newlines, carriage returns, and tabs
+        $sanitized = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
+        
+        // Final check: ensure valid UTF-8
+        if (!mb_check_encoding($sanitized, 'UTF-8')) {
+            // Last resort: remove any remaining invalid bytes
+            $sanitized = mb_convert_encoding($sanitized, 'UTF-8', 'UTF-8');
+        }
+        
+        return $sanitized ?: '';
+    }
+    /**
      * Manually trigger email monitoring (IMAP)
      */
     public function fetchEmails(Request $request)
@@ -62,10 +106,14 @@ class EmailMonitorController extends Controller
                 ? substr($output, 0, 5000) . "\n\n... (output truncated, showing summary only) ..."
                 : $output;
             
+            // Sanitize UTF-8 before JSON encoding
+            $summary = $this->sanitizeUtf8($summary ?: 'No summary available');
+            $truncatedOutput = $this->sanitizeUtf8($truncatedOutput);
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Email fetching (IMAP) completed successfully',
-                'summary' => $summary ?: 'No summary available',
+                'summary' => $summary,
                 'stats' => [
                     'processed' => $totalProcessed,
                     'skipped' => $totalSkipped,
@@ -151,10 +199,14 @@ class EmailMonitorController extends Controller
                 ? substr($output, 0, 5000) . "\n\n... (output truncated, showing summary only) ..."
                 : $output;
             
+            // Sanitize UTF-8 before JSON encoding
+            $summary = $this->sanitizeUtf8($summary ?: 'No summary available');
+            $truncatedOutput = $this->sanitizeUtf8($truncatedOutput);
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Direct filesystem email reading completed successfully',
-                'summary' => $summary ?: 'No summary available',
+                'summary' => $summary,
                 'stats' => [
                     'processed' => $totalProcessed,
                     'skipped' => $totalSkipped,
