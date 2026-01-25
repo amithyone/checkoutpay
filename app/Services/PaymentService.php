@@ -317,12 +317,12 @@ class PaymentService
                     // Dispatch event to send webhook
                     event(new \App\Events\PaymentApproved($payment));
                     
-                    \Illuminate\Support\Facades\Log::info('Payment matched from stored email on creation', [
+                    \Illuminate\Support\Facades\Log::info('Payment matched via reverse search from stored email on creation', [
                         'transaction_id' => $payment->transaction_id,
-                        'stored_email_id' => $storedEmail->id,
+                        'matched_email_id' => $matchedEmail->id,
                     ]);
                     
-                    break; // Only match one email per payment
+                    return; // Match found in STEP 2, exit early
                 }
             }
         } catch (\Exception $e) {
