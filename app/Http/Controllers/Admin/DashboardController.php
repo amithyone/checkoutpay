@@ -93,6 +93,7 @@ class DashboardController extends Controller
             ],
             'matching_time' => [
                 'average_minutes' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
                     ->whereNotNull('matched_at')
                     ->get()
                     ->map(function ($payment) {
@@ -100,6 +101,7 @@ class DashboardController extends Controller
                     })
                     ->avg() ?: 0,
                 'average_minutes_today' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
                     ->whereNotNull('matched_at')
                     ->whereDate('created_at', $today)
                     ->get()
@@ -108,9 +110,11 @@ class DashboardController extends Controller
                     })
                     ->avg() ?: 0,
                 'total_matched' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
                     ->whereNotNull('matched_at')
                     ->count(),
                 'total_matched_today' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
                     ->whereNotNull('matched_at')
                     ->whereDate('created_at', $today)
                     ->count(),

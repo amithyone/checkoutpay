@@ -48,8 +48,10 @@ class StatsController extends Controller
         ];
         
         // Add average matching time (applies to all periods)
+        // Only include approved payments with matched_at - explicitly exclude pending transactions
         $stats['matching_time'] = [
             'average_minutes' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
                 ->whereNotNull('matched_at')
                 ->get()
                 ->map(function ($payment) {
@@ -57,6 +59,7 @@ class StatsController extends Controller
                 })
                 ->avg() ?: 0,
             'total_matched' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
                 ->whereNotNull('matched_at')
                 ->count(),
         ];
