@@ -47,6 +47,20 @@ class StatsController extends Controller
             'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
         ];
         
+        // Add average matching time (applies to all periods)
+        $stats['matching_time'] = [
+            'average_minutes' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereNotNull('matched_at')
+                ->get()
+                ->map(function ($payment) {
+                    return $payment->created_at->diffInMinutes($payment->matched_at);
+                })
+                ->avg() ?: 0,
+            'total_matched' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->whereNotNull('matched_at')
+                ->count(),
+        ];
+        
         // Add account numbers payment stats (applies to all periods)
         $stats['account_numbers'] = [
             'total' => AccountNumber::active()->count(), // Only count active account numbers

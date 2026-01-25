@@ -131,6 +131,22 @@
             </div>
         </div>
 
+        <!-- Average Matching Time -->
+        <div class="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-sm p-6 border-2 border-teal-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Average Matching Time</p>
+                    <h3 class="text-3xl font-bold text-gray-900">{{ number_format($stats['matching_time']['average_minutes'], 1) }} min</h3>
+                </div>
+                <div class="w-16 h-16 bg-teal-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-stopwatch text-teal-600 text-2xl"></i>
+                </div>
+            </div>
+            <div class="text-xs text-gray-500">
+                {{ number_format($stats['matching_time']['total_matched']) }} matched payments
+            </div>
+        </div>
+
         <!-- Account Numbers Payments Received -->
         <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg shadow-sm p-6 border-2 border-indigo-200">
             <div class="flex items-center justify-between mb-4">

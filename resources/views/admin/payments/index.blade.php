@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payer Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matching Time</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                     </tr>
@@ -168,6 +169,25 @@ document.addEventListener('DOMContentLoaded', function() {
                             @endif
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $payment->created_at->format('M d, Y H:i') }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            @if($payment->matched_at && $payment->status === 'approved')
+                                @php
+                                    $matchingTimeMinutes = $payment->created_at->diffInMinutes($payment->matched_at);
+                                @endphp
+                                <div class="text-gray-900 font-medium">{{ $matchingTimeMinutes }} min</div>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    Matched {{ $payment->matched_at->format('M d, Y H:i') }}
+                                </div>
+                            @elseif($payment->status === 'pending')
+                                @php
+                                    $pendingMinutes = $payment->created_at->diffInMinutes(now());
+                                @endphp
+                                <div class="text-yellow-600 font-medium">{{ $pendingMinutes }} min</div>
+                                <div class="text-xs text-gray-400 mt-1">Still pending</div>
+                            @else
+                                <span class="text-gray-400">N/A</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-500">
                             @if($payment->expires_at)
                                 <div class="{{ $payment->expires_at->isPast() ? 'text-red-600' : ($payment->expires_at->diffInHours(now()) < 2 ? 'text-orange-600' : 'text-gray-600') }}">
@@ -220,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
+                        <td colspan="11" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
                     </tr>
                     @endforelse
                 </tbody>

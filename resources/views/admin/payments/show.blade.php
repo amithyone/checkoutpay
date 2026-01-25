@@ -107,6 +107,25 @@
             <div>
                 <label class="text-sm text-gray-600">Matched At</label>
                 <p class="text-sm font-medium text-gray-900">{{ $payment->matched_at->format('M d, Y H:i:s') }}</p>
+                @php
+                    $matchingTimeMinutes = $payment->created_at->diffInMinutes($payment->matched_at);
+                @endphp
+                <p class="text-xs text-gray-500 mt-1">
+                    <i class="fas fa-stopwatch mr-1"></i>
+                    Matching Time: <span class="font-semibold text-teal-600">{{ $matchingTimeMinutes }} minutes</span>
+                    ({{ $payment->created_at->diffForHumans($payment->matched_at, true) }})
+                </p>
+            </div>
+            @elseif($payment->status === 'pending')
+            <div>
+                <label class="text-sm text-gray-600">Pending Time</label>
+                @php
+                    $pendingMinutes = $payment->created_at->diffInMinutes(now());
+                @endphp
+                <p class="text-sm font-medium text-yellow-600">{{ $pendingMinutes }} minutes</p>
+                <p class="text-xs text-gray-500 mt-1">
+                    Created {{ $payment->created_at->diffForHumans() }}
+                </p>
             </div>
             @endif
             @if($payment->email_data && isset($payment->email_data['manual_verification']))

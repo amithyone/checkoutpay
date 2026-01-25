@@ -91,6 +91,30 @@ class DashboardController extends Controller
                 'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
                 'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
             ],
+            'matching_time' => [
+                'average_minutes' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->whereNotNull('matched_at')
+                    ->get()
+                    ->map(function ($payment) {
+                        return $payment->created_at->diffInMinutes($payment->matched_at);
+                    })
+                    ->avg() ?: 0,
+                'average_minutes_today' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->whereNotNull('matched_at')
+                    ->whereDate('created_at', $today)
+                    ->get()
+                    ->map(function ($payment) {
+                        return $payment->created_at->diffInMinutes($payment->matched_at);
+                    })
+                    ->avg() ?: 0,
+                'total_matched' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->whereNotNull('matched_at')
+                    ->count(),
+                'total_matched_today' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->whereNotNull('matched_at')
+                    ->whereDate('created_at', $today)
+                    ->count(),
+            ],
             'charges' => [
                 'total_collected' => BusinessWebsite::sum('total_charges_collected'),
                 'today_collected' => Payment::where('status', Payment::STATUS_APPROVED)

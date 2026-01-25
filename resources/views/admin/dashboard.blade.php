@@ -260,6 +260,34 @@
             </div>
         </div>
 
+        <!-- Average Matching Time -->
+        <div class="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-sm p-6 border-2 border-teal-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Average Matching Time</p>
+                    <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['matching_time']['average_minutes'], 1) }} min</h3>
+                </div>
+                <div class="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-stopwatch text-teal-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <span class="text-gray-600">Today: {{ number_format($stats['matching_time']['average_minutes_today'], 1) }} min</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-teal-200">
+                <div class="text-xs text-gray-500">
+                    <div class="mb-1">
+                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                        Total Matched: <span class="font-semibold text-gray-900">{{ number_format($stats['matching_time']['total_matched']) }}</span>
+                    </div>
+                    <div>
+                        <i class="fas fa-calendar-day text-blue-500 mr-1"></i>
+                        Matched Today: <span class="font-semibold text-gray-900">{{ number_format($stats['matching_time']['total_matched_today']) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Total Charges Collected -->
         @if(auth('admin')->user()->isSuperAdmin() || auth('admin')->user()->role === 'admin')
         <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg shadow-sm p-6 border-2 border-orange-200">
