@@ -17,7 +17,7 @@ class EmailExtractionService
         // =20 is space, =3D is equals sign, etc.
         $text = preg_replace('/=20/', ' ', $text);
         $text = preg_replace('/=3D/', '=', $text);
-        $text = preg_replace('/=([0-9A-F]{2})/i', function($matches) {
+        $text = preg_replace_callback('/=([0-9A-F]{2})/i', function($matches) {
             return chr(hexdec($matches[1]));
         }, $text);
         
