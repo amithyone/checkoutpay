@@ -28,11 +28,35 @@ class Page extends Model
 
     /**
      * Get page by slug
+     * OPTIMIZED: Uses caching to avoid database queries
      */
     public static function getBySlug(string $slug): ?self
     {
-        return self::where('slug', $slug)
-            ->where('is_published', true)
-            ->first();
+        return \Illuminate\Support\Facades\Cache::remember(
+            "page_{$slug}",
+            3600, // Cache for 1 hour
+            function () use ($slug) {
+                return self::where('slug', $slug)
+                    ->where('is_published', true)
+                    ->first();
+            }
+        );
+    }
+
+    /**
+     * Boot the model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Invalidate cache when page is updated
+        static::saved(function ($page) {
+            \Illuminate\Support\Facades\Cache::forget("page_{$page->slug}");
+        });
+
+        static::deleted(function ($page) {
+            \Illuminate\Support\Facades\Cache::forget("page_{$page->slug}");
+        });
     }
 }

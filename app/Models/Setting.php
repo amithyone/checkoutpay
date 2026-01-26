@@ -19,20 +19,29 @@ class Setting extends Model
 
     /**
      * Get a setting value by key
+     * OPTIMIZED: Uses caching to avoid database queries on every call
      */
     public static function get(string $key, $default = null)
     {
-        $setting = self::where('key', $key)->first();
-        
-        if (!$setting) {
-            return $default;
-        }
+        // Cache settings for 1 hour to avoid database queries on every page load
+        return \Illuminate\Support\Facades\Cache::remember(
+            "setting_{$key}",
+            3600, // 1 hour cache
+            function () use ($key, $default) {
+                $setting = self::where('key', $key)->first();
+                
+                if (!$setting) {
+                    return $default;
+                }
 
-        return self::castValue($setting->value, $setting->type);
+                return self::castValue($setting->value, $setting->type);
+            }
+        );
     }
 
     /**
      * Set a setting value by key
+     * OPTIMIZED: Invalidates cache when setting is updated
      */
     public static function set(string $key, $value, string $type = 'string', string $group = 'general', ?string $description = null): void
     {
@@ -45,6 +54,9 @@ class Setting extends Model
                 'description' => $description,
             ]
         );
+        
+        // Invalidate cache when setting is updated
+        \Illuminate\Support\Facades\Cache::forget("setting_{$key}");
     }
 
     /**

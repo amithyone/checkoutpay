@@ -4,13 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $page->meta_title ?? 'CheckoutPay - Intelligent Payment Gateway' }}</title>
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-        <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
+    @if(!empty($settings['site_favicon']))
+        <link rel="icon" type="image/png" href="{{ asset('storage/' . $settings['site_favicon']) }}">
+        <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . $settings['site_favicon']) }}">
     @endif
     <meta name="description" content="{{ $page->meta_description ?? 'Intelligent payment gateway for businesses. Accept payments with the cheapest rates in the market - just 1% + ₦50 per transaction.' }}">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- OPTIMIZED: Preconnect to CDN domains for faster loading -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <!-- OPTIMIZED: Load CSS before JS to prevent render blocking -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+    <script src="https://cdn.tailwindcss.com" defer></script>
     <script>
         tailwind.config = {
             theme: {
@@ -25,17 +32,19 @@
 </head>
 <body class="bg-white">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <!-- OPTIMIZED: Header is LCP element - ensure it renders quickly -->
+    <header id="home" class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <nav class="bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center flex-1">
                     <div class="flex-shrink-0">
                         @php
-                            $logo = \App\Models\Setting::get('site_logo');
+                            $logo = $settings['site_logo'] ?? null;
                             $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
                         @endphp
                         @if($logo && $logoPath && file_exists($logoPath))
-                            <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-8 sm:h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-8 sm:h-10 object-contain" loading="eager" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                             <div class="h-8 w-8 sm:h-10 sm:w-10 bg-primary rounded-lg flex items-center justify-center" style="display: none;">
                                 <i class="fas fa-shield-alt text-white text-lg sm:text-xl"></i>
                             </div>
@@ -46,7 +55,7 @@
                         @endif
                     </div>
                     <div class="ml-2 sm:ml-3">
-                        <h1 class="text-base sm:text-xl font-bold text-gray-900">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h1>
+                        <h1 class="text-base sm:text-xl font-bold text-gray-900">{{ $settings['site_name'] ?? 'CheckoutPay' }}</h1>
                         <p class="text-xs text-gray-500 hidden sm:block">Intelligent Payment Gateway</p>
                     </div>
                 </div>
@@ -119,6 +128,7 @@
             </div>
         </div>
     </nav>
+    </header>
 
     @php
         $hero = $content['hero'] ?? [];
