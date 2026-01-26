@@ -14,8 +14,9 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-    <!-- Load CSS normally (async loading was breaking styles) -->
+    <!-- Load CSS normally (must load synchronously for proper rendering) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS must load before page renders (no defer) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
