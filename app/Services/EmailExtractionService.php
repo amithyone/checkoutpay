@@ -13,6 +13,17 @@ class EmailExtractionService
      */
     public function extractFromTextBody(string $text, string $subject, string $from, ?string $emailDate = null): ?array
     {
+        // Decode quoted-printable encoding (common in email text_body)
+        // =20 is space, =3D is equals sign, etc.
+        $text = preg_replace('/=20/', ' ', $text);
+        $text = preg_replace('/=3D/', '=', $text);
+        $text = preg_replace('/=([0-9A-F]{2})/i', function($matches) {
+            return chr(hexdec($matches[1]));
+        }, $text);
+        
+        // Decode HTML entities
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
         $textLower = strtolower($text);
         $fullText = $subject . ' ' . $textLower;
         
@@ -292,15 +303,17 @@ class EmailExtractionService
         // Extract amount from text (case insensitive, flexible patterns) - ONLY from "Amount" line
         // Priority: Amount after NGN on the "Amount" line (GTBank format: "Amount : NGN 1000")
         // Amount should ONLY come from text_body, NOT from description field
+        // Handle HTML entities like =20 (space in quoted-printable encoding)
         $amountPatterns = [
             // Pattern 1: "Amount : NGN 1000" - GTBank format with space after colon and NGN
-            '/amount[\s]*:[\s]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            // Also handles HTML entities: "Amount : NGN=201000" (=20 is space)
+            '/amount[\s]*:[\s=]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i',
             // Pattern 2: "Amount: NGN 1,000.00" - standard format
-            '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i',
             // Pattern 3: Tab separated "Amount\t:\tNGN 1000"
-            '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t]+([\d,]+\.?\d*)/i',
+            '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t=]+([\d,]+\.?\d*)/i',
             // Pattern 4: Other amount labels with NGN
-            '/(?:sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            '/(?:sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i',
         ];
         
         foreach ($amountPatterns as $pattern) {
