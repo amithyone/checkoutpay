@@ -265,14 +265,18 @@ class EmailExtractionService
         }
         
         // Extract amount from text (case insensitive, flexible patterns) - only if not already extracted
+        // Priority: Amount after NGN (GTBank format)
         $amountPatterns = [
-            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)/i',
-            '/(?:ngn|naira|₦|NGN)[\s]*([\d,]+\.?\d*)/i',
-            '/([\d,]+\.?\d*)[\s]*(?:naira|ngn|usd|dollar|NGN)/i',
-            // Pattern for format: "Amount\t:\tNGN 1000" (tab separated)
-            '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t]*([\d,]+\.?\d*)/i',
-            // Pattern for format: "Amount: NGN  1000" (multiple spaces)
+            // Pattern 1: "Amount: NGN 1,000.00" - amount after NGN (GTBank format)
+            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            // Pattern 2: "NGN 1,000.00" - standalone NGN followed by amount
+            '/(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            // Pattern 3: Tab separated "Amount\t:\tNGN 1000"
+            '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t]+([\d,]+\.?\d*)/i',
+            // Pattern 4: Multiple spaces "Amount: NGN  1000"
             '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            // Pattern 5: Fallback - amount before currency (less common)
+            '/([\d,]+\.?\d*)[\s]+(?:naira|ngn|usd|dollar|NGN)/i',
         ];
         
         foreach ($amountPatterns as $pattern) {
