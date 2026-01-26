@@ -409,6 +409,18 @@ class EmailExtractionService
                 $senderName = trim(strtolower($potentialName));
             }
         }
+        // Pattern 1b1: PALMPAY pattern - "DIGITS-NAME:PHONE-PALMPAY-..." format in Description
+        // Example: "Description : 100033260126211505020007915346-OLUWATOBI IFEDAYO = ALADE:7038292657-PALMPAY-OLUWAT"
+        // Extract name between first dash after digits and colon before phone number
+        if (!$senderName && preg_match('/description[\s]*:[\s]*.*?\d+\-([A-Z][A-Z\s=]{2,}?):\d+\-PALMPAY/i', $text, $matches)) {
+            $potentialName = trim($matches[1]);
+            // Handle = characters in names (quoted-printable encoding)
+            $potentialName = preg_replace('/\s*=\s*/', ' ', $potentialName);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
         // Pattern 1c: UNION TRANSFER = FROM NAME
         elseif (!$senderName && preg_match('/UNION\s+TRANSFER\s*=\s*FROM[\s]+([A-Z][A-Z\s]{2,}?)(?:[\s\-]+|[\s]+TO|\s*$)/i', $text, $matches)) {
             $potentialName = trim($matches[1]);
