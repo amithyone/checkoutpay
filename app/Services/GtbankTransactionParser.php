@@ -128,22 +128,36 @@ class GtbankTransactionParser
 
     /**
      * Extract amount from HTML table
+     * Amount is after "NGN" in GTBank emails
      */
     protected function extractAmount(string $html, string $text): ?float
     {
-        // Pattern 1: HTML table with "Amount" label
-        if (preg_match('/<td[^>]*>[\s]*amount[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦)?\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // Pattern 1: HTML table with "Amount" label, amount after NGN
+        // Format: <td>Amount:</td><td>NGN 1,000.00</td>
+        if (preg_match('/<td[^>]*>[\s]*amount[\s:]*<\/td>\s*<td[^>]*>[\s]*(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             return (float) str_replace(',', '', $matches[1]);
         }
         
-        // Pattern 2: Same cell format
-        if (preg_match('/<td[^>]*>[\s]*amount[\s:]+(?:ngn|naira|₦)?\s*([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
+        // Pattern 2: Same cell format, amount after NGN
+        // Format: <td>Amount: NGN 1,000.00</td>
+        if (preg_match('/<td[^>]*>[\s]*amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)[\s]*<\/td>/i', $html, $matches)) {
             return (float) str_replace(',', '', $matches[1]);
         }
         
-        // Pattern 3: Text format
-        if (preg_match('/amount[\s:]+(?:ngn|naira|₦)?\s*([\d,]+\.?\d*)/i', $text, $matches)) {
+        // Pattern 3: Text format, amount after NGN
+        // Format: Amount: NGN 1,000.00
+        if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
             return (float) str_replace(',', '', $matches[1]);
+        }
+        
+        // Pattern 4: Fallback - any NGN followed by amount (for edge cases)
+        // Format: NGN 1,000.00
+        if (preg_match('/(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $html . ' ' . $text, $matches)) {
+            $amount = (float) str_replace(',', '', $matches[1]);
+            // Only return if amount is reasonable (>= 10)
+            if ($amount >= 10) {
+                return $amount;
+            }
         }
 
         return null;
