@@ -778,6 +778,10 @@ Route::get('/cron/global-match', function () {
             'unmatched_emails_count' => $unmatchedEmails->count(),
         ]);
 
+        // OPTIMIZED: Batch load all data upfront to avoid N+1 queries
+        // Reload emails after extraction to get updated data (single query)
+        $emailIds = $unmatchedEmails->pluck('id')->toArray();
+        
         // STEP 1: Extract missing sender_name and description_field from text_body
         // This runs ONLY before global match to fill in missing data
         $textBodyExtractedCount = 0;
@@ -788,8 +792,6 @@ Route::get('/cron/global-match', function () {
                     $extracted = $matchingService->extractMissingFromTextBody($processedEmail);
                     if ($extracted) {
                         $textBodyExtractedCount++;
-                        // Refresh the model to get updated data
-                        $processedEmail->refresh();
                     }
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\Log::error('Failed to extract from text_body in global match cron', [
@@ -802,6 +804,10 @@ Route::get('/cron/global-match', function () {
         
         if ($textBodyExtractedCount > 0) {
             \Illuminate\Support\Facades\Log::info("Extracted {$textBodyExtractedCount} missing fields from text_body before matching");
+            // Reload emails once after all extractions (single query instead of N queries)
+            $unmatchedEmails = \App\Models\ProcessedEmail::whereIn('id', $emailIds)
+                ->where('is_matched', false)
+                ->get();
         }
         
         // STEP 2: Parse description fields for emails that have them but missing account_number
@@ -809,9 +815,7 @@ Route::get('/cron/global-match', function () {
         $descriptionExtractor = new \App\Services\DescriptionFieldExtractor();
         $parsedCount = 0;
         foreach ($unmatchedEmails as $processedEmail) {
-            // Refresh to get latest data (might have been updated by text_body extraction)
-            $processedEmail->refresh();
-            
+            // OPTIMIZED: No refresh needed - data is already fresh from reload above
             if ($processedEmail->description_field && !$processedEmail->account_number) {
                 try {
                     $parsedData = $descriptionExtractor->parseDescriptionField($processedEmail->description_field);
@@ -842,11 +846,26 @@ Route::get('/cron/global-match', function () {
             \Illuminate\Support\Facades\Log::info("Parsed {$parsedCount} description fields before matching");
         }
 
+        // OPTIMIZED: Pre-load all payments once (single query) instead of querying per email
+        $allPendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->whereNotExists(function ($query) {
+                $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                    ->from('processed_emails')
+                    ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                    ->where('processed_emails.is_matched', true);
+            })
+            ->with('business')
+            ->get()
+            ->keyBy('id'); // Key by ID for O(1) lookup
+        
         // Strategy: For each unmatched email, try to match against all pending payments
         // FIXED: Use same approach as admin checkMatch - use matchPayment() directly instead of matchEmail()
         foreach ($unmatchedEmails as $processedEmail) {
             try {
-                $processedEmail->refresh();
+                // OPTIMIZED: No refresh needed - check is_matched from database query
                 if ($processedEmail->is_matched) {
                     continue;
                 }
@@ -899,21 +918,23 @@ Route::get('/cron/global-match', function () {
                     }
                 }
 
-                // Find payments with matching amount and time constraints (same as admin checkMatch)
+                // OPTIMIZED: Filter pre-loaded payments instead of querying database
                 $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
                 
                 // CRITICAL: Only check payments created BEFORE email was received
-                $potentialPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                    })
-                    ->whereBetween('amount', [
-                        $extractedInfo['amount'] - 1,
-                        $extractedInfo['amount'] + 1
-                    ])
-                    ->where('created_at', '<=', $emailDate ?? now()) // Payment must be created BEFORE email
-                    ->orderBy('created_at', 'desc') // Check newest payments first
-                    ->get();
+                // Filter from pre-loaded collection instead of querying
+                $potentialPayments = $allPendingPayments->filter(function ($payment) use ($extractedInfo, $emailDate) {
+                    // Amount match (within 1 naira tolerance)
+                    $amountMatch = abs($payment->amount - $extractedInfo['amount']) <= 1;
+                    
+                    // Time constraint: Payment must be created BEFORE email
+                    $timeMatch = !$emailDate || $payment->created_at <= $emailDate;
+                    
+                    // Not expired
+                    $notExpired = !$payment->expires_at || $payment->expires_at > now();
+                    
+                    return $amountMatch && $timeMatch && $notExpired;
+                })->sortByDesc('created_at')->values(); // Sort by newest first
                 
                 // Use same logic as PaymentController::checkMatch (which works!)
                 $matchLogger = new \App\Services\MatchAttemptLogger();
@@ -1014,11 +1035,15 @@ Route::get('/cron/global-match', function () {
             }
         }
 
+        // OPTIMIZED: Pre-load all unmatched emails once (already loaded above, but filter unmatched)
+        $unmatchedEmailsByAmount = $unmatchedEmails->groupBy(function ($email) {
+            return round($email->amount);
+        });
+        
         // Also check pending payments that weren't matched in the first pass
         foreach ($pendingPayments as $payment) {
             try {
-                $payment->refresh();
-                
+                // OPTIMIZED: No refresh needed - check status from loaded data
                 if ($payment->status !== \App\Models\Payment::STATUS_PENDING || $payment->isExpired()) {
                     continue;
                 }
@@ -1033,21 +1058,27 @@ Route::get('/cron/global-match', function () {
                 $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
                 $checkUntil = $payment->created_at->copy()->addMinutes($timeWindowMinutes);
                 
-                // Filter emails by amount (within 1 naira tolerance) and time window
-                $potentialEmails = \App\Models\ProcessedEmail::where('is_matched', false)
-                    ->whereNotNull('amount')
-                    ->where('amount', '>', 0)
-                    ->whereBetween('amount', [
-                        $payment->amount - 1,
-                        $payment->amount + 1
-                    ])
-                    ->where('email_date', '>=', $payment->created_at) // Email must be AFTER transaction creation
-                    ->where('email_date', '<=', $checkUntil)
-                    ->get();
+                // OPTIMIZED: Filter from pre-loaded emails instead of querying database
+                $amountKey = round($payment->amount);
+                $potentialEmails = ($unmatchedEmailsByAmount[$amountKey] ?? collect())
+                    ->filter(function ($email) use ($payment, $checkUntil) {
+                        // Amount match (already filtered by groupBy)
+                        $amountMatch = abs($email->amount - $payment->amount) <= 1;
+                        
+                        // Time constraints
+                        $timeMatch = $email->email_date 
+                            && $email->email_date >= $payment->created_at 
+                            && $email->email_date <= $checkUntil;
+                        
+                        // Not matched
+                        $notMatched = !$email->is_matched;
+                        
+                        return $amountMatch && $timeMatch && $notMatched;
+                    });
 
                 foreach ($potentialEmails as $processedEmail) {
                     try {
-                        $processedEmail->refresh();
+                        // OPTIMIZED: No refresh needed - already filtered unmatched emails
                         if ($processedEmail->is_matched) {
                             continue;
                         }
