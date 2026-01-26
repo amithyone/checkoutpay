@@ -21,6 +21,11 @@ class AccountNumberService
     const CACHE_KEY_LAST_USED_ACCOUNT = 'account_number_service:last_used_account';
     
     /**
+     * Cache key for pool accounts list
+     */
+    const CACHE_KEY_POOL_ACCOUNTS = 'account_number_service:pool_accounts';
+    
+    /**
      * Cache TTL in seconds (60 seconds = 1 minute)
      */
     const CACHE_TTL = 60;
@@ -34,25 +39,30 @@ class AccountNumberService
      */
     public function assignAccountNumber(?Business $business = null): ?AccountNumber
     {
+        $startTime = microtime(true);
+        
         // NOTE: moveOrphanedAccountsToPool() moved to cron job to avoid running on every request
         // This improves performance significantly
 
         // Try to get business-specific account number
         if ($business && $business->hasAccountNumber()) {
             $accountNumber = $business->primaryAccountNumber();
+            $duration = (microtime(true) - $startTime) * 1000;
             Log::info('Assigned business-specific account number', [
                 'business_id' => $business->id,
                 'account_number' => $accountNumber->account_number,
+                'duration_ms' => round($duration, 2),
             ]);
             return $accountNumber;
         }
 
-        // Get all pool accounts ordered by ID (sequential)
-        // OPTIMIZED: Cache this if pool is very large (future optimization)
-        $poolAccounts = AccountNumber::pool()
-            ->active()
-            ->orderBy('id')
-            ->get();
+        // OPTIMIZED: Get pool accounts from cache to avoid loading all accounts every time
+        $poolAccounts = Cache::remember(self::CACHE_KEY_POOL_ACCOUNTS, self::CACHE_TTL, function () {
+            return AccountNumber::pool()
+                ->active()
+                ->orderBy('id')
+                ->get();
+        });
 
         if ($poolAccounts->isEmpty()) {
             Log::warning('No available pool account number found');
@@ -150,6 +160,7 @@ class AccountNumberService
         // At this point, $selectedAccount is guaranteed to be set
         // We always assign an account number, wrapping around if needed
 
+        $duration = (microtime(true) - $startTime) * 1000;
         Log::info('Assigned pool account number (sequentially)', [
             'business_id' => $business?->id,
             'account_number' => $selectedAccount->account_number,
@@ -159,6 +170,7 @@ class AccountNumberService
             'last_used_account' => $lastUsedAccountNumber,
             'last_used_account_id' => $lastUsedAccountId,
             'start_index' => $startIndex,
+            'duration_ms' => round($duration, 2),
         ]);
 
         return $selectedAccount;
@@ -219,6 +231,7 @@ class AccountNumberService
     {
         Cache::forget(self::CACHE_KEY_PENDING_ACCOUNTS);
         Cache::forget(self::CACHE_KEY_LAST_USED_ACCOUNT);
+        Cache::forget(self::CACHE_KEY_POOL_ACCOUNTS);
     }
 
     /**

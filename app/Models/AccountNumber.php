@@ -101,6 +101,18 @@ class AccountNumber extends Model
                 $accountNumber->is_pool = true;
             }
         });
+
+        // Invalidate cache when account numbers are created or updated
+        static::created(function () {
+            app(\App\Services\AccountNumberService::class)->invalidatePendingAccountsCache();
+        });
+
+        static::updated(function ($accountNumber) {
+            // Invalidate cache if pool status or active status changed
+            if ($accountNumber->isDirty(['is_pool', 'is_active', 'business_id'])) {
+                app(\App\Services\AccountNumberService::class)->invalidatePendingAccountsCache();
+            }
+        });
     }
 
     /**
