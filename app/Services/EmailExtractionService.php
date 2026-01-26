@@ -304,16 +304,18 @@ class EmailExtractionService
         // Priority: Amount after NGN on the "Amount" line (GTBank format: "Amount : NGN 1000")
         // Amount should ONLY come from text_body, NOT from description field
         // Handle HTML entities like =20 (space in quoted-printable encoding)
+        // Handle Unicode spaces (non-breaking space, etc.)
         $amountPatterns = [
             // Pattern 1: "Amount : NGN 1000" - GTBank format with space after colon and NGN
             // Also handles HTML entities: "Amount : NGN=201000" (=20 is space)
-            '/amount[\s]*:[\s=]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i',
+            // \s matches all whitespace including non-breaking spaces
+            '/amount[\s]*:[\s=]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/iu',
             // Pattern 2: "Amount: NGN 1,000.00" - standard format
-            '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i',
+            '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/iu',
             // Pattern 3: Tab separated "Amount\t:\tNGN 1000"
-            '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t=]+([\d,]+\.?\d*)/i',
+            '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t=]+([\d,]+\.?\d*)/iu',
             // Pattern 4: Other amount labels with NGN
-            '/(?:sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i',
+            '/(?:sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/iu',
         ];
         
         foreach ($amountPatterns as $pattern) {

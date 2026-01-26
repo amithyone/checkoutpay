@@ -155,14 +155,15 @@ class GtbankTransactionParser
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         // Pattern 3: Text format - "Amount : NGN 1000" (with space after colon)
-        // Format: Amount : NGN 1,000.00 (also handles =20 for space)
-        if (preg_match('/amount[\s]*:[\s=]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i', $text, $matches)) {
+        // Format: Amount : NGN 1,000.00 (also handles =20 for space and Unicode spaces)
+        // Use 'u' flag for Unicode support (handles non-breaking spaces)
+        if (preg_match('/amount[\s]*:[\s=]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/iu', $text, $matches)) {
             return (float) str_replace(',', '', $matches[1]);
         }
         
         // Pattern 4: Text format - "Amount: NGN 1000" (without space after colon)
         // Format: Amount: NGN 1,000.00
-        if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/i', $text, $matches)) {
+        if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s=]+([\d,]+\.?\d*)/iu', $text, $matches)) {
             return (float) str_replace(',', '', $matches[1]);
         }
 
