@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
-use App\Services\PythonExtractionService;
 use App\Services\DescriptionFieldExtractor;
 use App\Services\MatchAttemptLogger;
 use App\Services\TransactionLogService;
@@ -13,14 +12,12 @@ use Carbon\Carbon;
 
 class PaymentMatchingService
 {
-    protected PythonExtractionService $extractionService;
     protected DescriptionFieldExtractor $descriptionExtractor;
     protected MatchAttemptLogger $matchLogger;
     protected TransactionLogService $logService;
 
     public function __construct(?TransactionLogService $logService = null)
     {
-        $this->extractionService = new PythonExtractionService();
         $this->descriptionExtractor = new DescriptionFieldExtractor();
         $this->matchLogger = new MatchAttemptLogger();
         $this->logService = $logService ?? new TransactionLogService();
@@ -126,31 +123,8 @@ class PaymentMatchingService
                 $result['data']['transaction_id'] = $transactionId;
             }
             
-            // PRIORITY 4: Try Python extraction LAST (only if we don't have amount or need to fill missing data)
-            if (!$result || empty($result['data']['amount']) || $result['data']['amount'] <= 0) {
-                $pythonResult = $this->extractionService->extractPaymentInfo($emailData);
-                
-                if ($pythonResult && isset($pythonResult['data'])) {
-                    if (!$result) {
-                        $result = $pythonResult;
-                        $result['method'] = 'python';
-                    } else {
-                        // Merge Python results into existing result (Python fills gaps)
-                        foreach ($pythonResult['data'] as $key => $value) {
-                            if (empty($result['data'][$key]) && !empty($value)) {
-                                $result['data'][$key] = $value;
-                            }
-                        }
-                        // Only use Python's sender_name if we don't have a valid one
-                        if (empty($result['data']['sender_name']) || !$this->isValidExtractedName($result['data']['sender_name'])) {
-                            $pythonName = $pythonResult['data']['sender_name'] ?? null;
-                            if ($pythonName && $this->isValidExtractedName($pythonName)) {
-                                $result['data']['sender_name'] = $pythonName;
-                            }
-                        }
-                    }
-                }
-            }
+            // Python extraction removed - using PHP extraction only for better performance
+            // PHP extraction is more reliable and faster than Python service
             
             return $result;
         } catch (\Exception $e) {
