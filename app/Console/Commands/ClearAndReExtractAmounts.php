@@ -6,7 +6,6 @@ use App\Models\ProcessedEmail;
 use App\Services\PaymentMatchingService;
 use App\Services\TransactionLogService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class ClearAndReExtractAmounts extends Command
 {
