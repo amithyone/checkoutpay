@@ -206,4 +206,26 @@ class Payment extends Model
     {
         return $this->hasMany(PaymentStatusCheck::class);
     }
+
+    /**
+     * Boot the model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Invalidate account number cache when payment is created or status changes
+        static::created(function ($payment) {
+            if ($payment->account_number) {
+                app(\App\Services\AccountNumberService::class)->invalidatePendingAccountsCache();
+            }
+        });
+
+        static::updated(function ($payment) {
+            // Invalidate cache if status or account_number changed
+            if ($payment->isDirty(['status', 'account_number', 'expires_at'])) {
+                app(\App\Services\AccountNumberService::class)->invalidatePendingAccountsCache();
+            }
+        });
+    }
 }

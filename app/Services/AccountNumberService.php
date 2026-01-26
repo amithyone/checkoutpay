@@ -4,19 +4,38 @@ namespace App\Services;
 
 use App\Models\AccountNumber;
 use App\Models\Business;
+use App\Models\Payment;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class AccountNumberService
 {
     /**
+     * Cache key for pending account numbers
+     */
+    const CACHE_KEY_PENDING_ACCOUNTS = 'account_number_service:pending_accounts';
+    
+    /**
+     * Cache key for last used account
+     */
+    const CACHE_KEY_LAST_USED_ACCOUNT = 'account_number_service:last_used_account';
+    
+    /**
+     * Cache TTL in seconds (60 seconds = 1 minute)
+     */
+    const CACHE_TTL = 60;
+
+    /**
      * Assign account number to payment request
      * Priority: Business-specific > Pool account
      * Pool accounts are assigned sequentially by ID, excluding last used and accounts with pending payments
+     * 
+     * OPTIMIZED: Uses caching to avoid querying all pending payments on every request
      */
     public function assignAccountNumber(?Business $business = null): ?AccountNumber
     {
-        // First, ensure any account numbers that should be in pool are moved there
-        $this->moveOrphanedAccountsToPool();
+        // NOTE: moveOrphanedAccountsToPool() moved to cron job to avoid running on every request
+        // This improves performance significantly
 
         // Try to get business-specific account number
         if ($business && $business->hasAccountNumber()) {
@@ -29,6 +48,7 @@ class AccountNumberService
         }
 
         // Get all pool accounts ordered by ID (sequential)
+        // OPTIMIZED: Cache this if pool is very large (future optimization)
         $poolAccounts = AccountNumber::pool()
             ->active()
             ->orderBy('id')
@@ -39,50 +59,38 @@ class AccountNumberService
             return null;
         }
 
-        // Get account numbers that have pending payments (exclude these)
-        $pendingAccountNumbers = [];
-        if (class_exists(\App\Models\Payment::class)) {
-            $pendingAccountNumbers = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
-                ->whereNotNull('account_number')
-                ->where(function ($query) {
-                    $query->whereNull('expires_at')
-                        ->orWhere('expires_at', '>', now());
-                })
-                ->pluck('account_number')
-                ->unique()
-                ->toArray();
-        }
-
-        // Get the last used account number (from most recent pending payment)
-        $lastUsedAccountNumber = null;
+        // OPTIMIZED: Use cached pending account numbers instead of querying every time
+        $pendingAccountNumbers = $this->getPendingAccountNumbers();
+        
+        // OPTIMIZED: Use cached last used account instead of querying every time
+        $lastUsedAccountNumber = $this->getLastUsedAccountNumber();
         $lastUsedAccountId = null;
-        if (class_exists(\App\Models\Payment::class)) {
-            $lastPayment = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
-                ->whereNotNull('account_number')
-                ->where(function ($query) {
-                    $query->whereNull('expires_at')
-                        ->orWhere('expires_at', '>', now());
-                })
-                ->orderBy('created_at', 'desc')
-                ->first();
-            
-            if ($lastPayment) {
-                $lastUsedAccountNumber = $lastPayment->account_number;
-                // Find the account ID for the last used account
-                $lastUsedAccount = $poolAccounts->firstWhere('account_number', $lastUsedAccountNumber);
-                if ($lastUsedAccount) {
-                    $lastUsedAccountId = $lastUsedAccount->id;
-                }
+        
+        // OPTIMIZED: Use array key mapping for O(1) lookups instead of O(n) firstWhere()
+        $poolAccountsById = [];
+        $poolAccountsByNumber = [];
+        foreach ($poolAccounts as $account) {
+            $poolAccountsById[$account->id] = $account;
+            $poolAccountsByNumber[$account->account_number] = $account;
+        }
+        
+        if ($lastUsedAccountNumber) {
+            // O(1) lookup instead of O(n) firstWhere()
+            $lastUsedAccount = $poolAccountsByNumber[$lastUsedAccountNumber] ?? null;
+            if ($lastUsedAccount) {
+                $lastUsedAccountId = $lastUsedAccount->id;
             }
         }
 
+        // OPTIMIZED: Use array key mapping for O(1) index lookup instead of O(n) search()
+        $poolAccountsArray = $poolAccounts->values()->all();
+        $poolCount = count($poolAccountsArray);
+        
         // Find starting point: next account after last used (by ID)
         $startIndex = 0;
-        if ($lastUsedAccountId) {
-            // Find the index of the last used account in the ordered pool
-            $lastUsedIndex = $poolAccounts->search(function ($account) use ($lastUsedAccountId) {
-                return $account->id === $lastUsedAccountId;
-            });
+        if ($lastUsedAccountId && isset($poolAccountsById[$lastUsedAccountId])) {
+            // Find index using array_search for O(n) but only once, then use array keys
+            $lastUsedIndex = array_search($lastUsedAccountId, array_column($poolAccountsArray, 'id'));
             
             if ($lastUsedIndex !== false) {
                 // Start from the next account after the last used one
@@ -90,11 +98,12 @@ class AccountNumberService
             }
         }
 
+        // OPTIMIZED: Use array key lookup for pending check (O(1) instead of in_array O(n))
+        $pendingAccountNumbersSet = array_flip($pendingAccountNumbers);
+        
         // Try to find the next available account starting from startIndex
         // We will always assign an account - wrap around and reuse accounts with pending payments if needed
         $selectedAccount = null;
-        $poolAccountsArray = $poolAccounts->values()->all();
-        $poolCount = count($poolAccountsArray);
         
         // First pass: Try to find account without pending payments (excluding last used)
         for ($i = 0; $i < $poolCount; $i++) {
@@ -106,8 +115,8 @@ class AccountNumberService
                 continue;
             }
             
-            // Skip if this account has pending payments (prefer accounts without pending)
-            if (in_array($account->account_number, $pendingAccountNumbers)) {
+            // OPTIMIZED: O(1) lookup instead of O(n) in_array
+            if (isset($pendingAccountNumbersSet[$account->account_number])) {
                 continue;
             }
             
@@ -121,9 +130,7 @@ class AccountNumberService
         // When we reach the end of the pool, we start again from the beginning (wraps around)
         if (!$selectedAccount) {
             if ($lastUsedAccountId) {
-                $lastUsedIndex = $poolAccounts->search(function ($account) use ($lastUsedAccountId) {
-                    return $account->id === $lastUsedAccountId;
-                });
+                $lastUsedIndex = array_search($lastUsedAccountId, array_column($poolAccountsArray, 'id'));
                 
                 if ($lastUsedIndex !== false) {
                     // Get next account after last used, wrapping around to beginning if at end
@@ -155,6 +162,63 @@ class AccountNumberService
         ]);
 
         return $selectedAccount;
+    }
+    
+    /**
+     * Get pending account numbers (cached)
+     * OPTIMIZED: Uses cache to avoid querying all pending payments on every request
+     */
+    protected function getPendingAccountNumbers(): array
+    {
+        return Cache::remember(self::CACHE_KEY_PENDING_ACCOUNTS, self::CACHE_TTL, function () {
+            if (!class_exists(Payment::class)) {
+                return [];
+            }
+            
+            return Payment::where('status', Payment::STATUS_PENDING)
+                ->whereNotNull('account_number')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', now());
+                })
+                ->pluck('account_number')
+                ->unique()
+                ->toArray();
+        });
+    }
+    
+    /**
+     * Get last used account number (cached)
+     * OPTIMIZED: Uses cache to avoid querying on every request
+     */
+    protected function getLastUsedAccountNumber(): ?string
+    {
+        return Cache::remember(self::CACHE_KEY_LAST_USED_ACCOUNT, self::CACHE_TTL, function () {
+            if (!class_exists(Payment::class)) {
+                return null;
+            }
+            
+            $lastPayment = Payment::where('status', Payment::STATUS_PENDING)
+                ->whereNotNull('account_number')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', now());
+                })
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            return $lastPayment ? $lastPayment->account_number : null;
+        });
+    }
+    
+    /**
+     * Invalidate cache for pending account numbers
+     * Call this when payments are created or approved
+     */
+    public function invalidatePendingAccountsCache(): void
+    {
+        Cache::forget(self::CACHE_KEY_PENDING_ACCOUNTS);
+        Cache::forget(self::CACHE_KEY_LAST_USED_ACCOUNT);
     }
 
     /**

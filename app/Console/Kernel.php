@@ -217,6 +217,14 @@ class Kernel extends ConsoleKernel
         $schedule->command('payment:expire')
             ->hourly()
             ->withoutOverlapping();
+        
+        // Move orphaned account numbers to pool (moved from AccountNumberService to avoid running on every request)
+        $schedule->call(function () {
+            app(\App\Services\AccountNumberService::class)->moveOrphanedAccountsToPool();
+        })
+            ->hourly()
+            ->withoutOverlapping()
+            ->name('move-orphaned-accounts-to-pool');
     }
 
     /**
