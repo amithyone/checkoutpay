@@ -228,6 +228,12 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
     ini_set('memory_limit', '512M');
     set_time_limit(300); // 5 minutes max
     
+    // Detect if this is a cron request (minimal response needed)
+    $isCronRequest = $request->hasHeader('User-Agent') && 
+                     (stripos($request->header('User-Agent'), 'curl') !== false || 
+                      stripos($request->header('User-Agent'), 'cron') !== false ||
+                      $request->query('minimal') === 'true');
+    
     try {
         // Optional security: Check for secret token if configured
         $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
@@ -274,6 +280,54 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
         // Safely decode JSON, handle large responses
         $responseData = json_decode($responseContent, true);
         
+        // For cron requests, return minimal response (stats only, no verbose output)
+        if ($isCronRequest) {
+            $executionTime = round(microtime(true) - $startTime, 2);
+            
+            // Extract stats from response content
+            $stats = [
+                'processed' => 0,
+                'skipped' => 0,
+                'failed' => 0,
+            ];
+            
+            // Try to extract stats from the response content
+            if (preg_match('/Total processed:\s*(\d+)/i', $responseContent, $matches)) {
+                $stats['processed'] = (int)$matches[1];
+            }
+            if (preg_match('/Total skipped:\s*(\d+)/i', $responseContent, $matches)) {
+                $stats['skipped'] = (int)$matches[1];
+            }
+            if (preg_match('/Total failed:\s*(\d+)/i', $responseContent, $matches)) {
+                $stats['failed'] = (int)$matches[1];
+            }
+            
+            // If responseData has stats, use those instead
+            if (isset($responseData['stats']) && is_array($responseData['stats'])) {
+                $stats = array_merge($stats, $responseData['stats']);
+            }
+            
+            // Log full output for debugging (but don't return it)
+            if (strlen($responseContent) > 10000) {
+                \Illuminate\Support\Facades\Log::info('Cron email fetch completed (large output logged)', [
+                    'stats' => $stats,
+                    'execution_time' => $executionTime,
+                    'output_length' => strlen($responseContent),
+                ]);
+            }
+            
+            // Return minimal response for cron
+            return response()->json([
+                'success' => true,
+                'message' => 'Email fetching completed',
+                'stats' => $stats,
+                'execution_time_seconds' => $executionTime,
+                'method' => 'direct_filesystem',
+                'timestamp' => now()->toDateTimeString(),
+            ], 200);
+        }
+        
+        // For non-cron requests (admin dashboard), return full response
         // If JSON decode failed or response is too large, create a minimal response
         if (json_last_error() !== JSON_ERROR_NONE || strlen($responseContent) > 100000) {
             \Illuminate\Support\Facades\Log::warning('Large response detected in cron endpoint', [
@@ -312,7 +366,7 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
             $responseData['method'] = 'direct_filesystem';
             $responseData['timestamp'] = now()->toDateTimeString();
             
-            // Remove or truncate large output fields for cron responses
+            // Remove or truncate large output fields for non-cron responses
             if (isset($responseData['output']) && strlen($responseData['output']) > 2000) {
                 $responseData['output'] = substr($responseData['output'], 0, 2000) . "\n\n... (truncated) ...";
             }
