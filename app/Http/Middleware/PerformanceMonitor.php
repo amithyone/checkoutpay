@@ -27,9 +27,16 @@ class PerformanceMonitor
         $startMemory = memory_get_usage(true);
         $queryCount = 0;
         $slowQueries = [];
+        $totalQueryTime = 0;
 
-        // Enable query logging
-        DB::enableQueryLog();
+        // OPTIMIZED: Only enable query logging for potentially slow endpoints or if already enabled
+        // This reduces overhead for fast requests
+        $shouldLogQueries = $this->isAccountAssignmentEndpoint($request) || 
+                           $this->isPotentiallySlowEndpoint($request);
+        
+        if ($shouldLogQueries) {
+            DB::enableQueryLog();
+        }
 
         try {
             $response = $next($request);
@@ -39,27 +46,33 @@ class PerformanceMonitor
             $duration = ($endTime - $startTime) * 1000; // Convert to milliseconds
             $memoryUsed = ($endMemory - $startMemory) / 1024 / 1024; // Convert to MB
 
-            // Get query log
-            $queries = DB::getQueryLog();
-            $queryCount = count($queries);
-            $totalQueryTime = 0;
+            // Only get query log if we enabled it
+            if ($shouldLogQueries) {
+                $queries = DB::getQueryLog();
+                $queryCount = count($queries);
 
-            // Find slow queries (> 100ms)
-            foreach ($queries as $query) {
-                $queryTime = $query['time'] ?? 0;
-                $totalQueryTime += $queryTime;
-                
-                if ($queryTime > 100) {
-                    $slowQueries[] = [
-                        'sql' => $query['query'],
-                        'bindings' => $query['bindings'],
-                        'time' => $queryTime . 'ms',
-                    ];
+                // Find slow queries (> 100ms)
+                foreach ($queries as $query) {
+                    $queryTime = $query['time'] ?? 0;
+                    $totalQueryTime += $queryTime;
+                    
+                    if ($queryTime > 100) {
+                        $slowQueries[] = [
+                            'sql' => $query['query'],
+                            'bindings' => $query['bindings'],
+                            'time' => $queryTime . 'ms',
+                        ];
+                    }
                 }
+            } else {
+                // For fast endpoints, estimate query count from duration (rough estimate)
+                // This avoids the overhead of query logging
+                $queryCount = $duration > 200 ? 'unknown (query logging disabled)' : 'low';
             }
 
             // Log slow requests (> 500ms) or requests with slow queries
-            $isSlow = $duration > 500 || !empty($slowQueries) || $queryCount > 50;
+            // OPTIMIZED: Only check query count if we logged queries
+            $isSlow = $duration > 500 || !empty($slowQueries) || ($shouldLogQueries && $queryCount > 50);
 
             if ($isSlow) {
                 $logData = [
@@ -143,5 +156,30 @@ class PerformanceMonitor
         return str_contains($path, 'payment-request') 
             || str_contains($path, 'checkout')
             || str_contains($path, 'api/v1/payment');
+    }
+
+    /**
+     * Check if this is a potentially slow endpoint that should be monitored
+     */
+    protected function isPotentiallySlowEndpoint(Request $request): bool
+    {
+        $path = $request->path();
+        
+        // Monitor admin dashboard, reports, etc.
+        $slowPaths = [
+            'admin/dashboard',
+            'admin/stats',
+            'admin/payments',
+            'business/dashboard',
+            'business/statistics',
+        ];
+        
+        foreach ($slowPaths as $slowPath) {
+            if (str_contains($path, $slowPath)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 }

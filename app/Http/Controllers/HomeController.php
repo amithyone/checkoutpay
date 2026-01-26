@@ -26,6 +26,7 @@ class HomeController extends Controller
         $content = is_array($page->content) ? $page->content : (json_decode($page->content, true) ?? []);
         
         // OPTIMIZED: Pre-load all settings used in the view to avoid N+1 queries
+        // Settings are already cached in the model, but loading them here ensures single cache lookup
         $settings = [
             'site_favicon' => \App\Models\Setting::get('site_favicon'),
             'site_logo' => \App\Models\Setting::get('site_logo'),
