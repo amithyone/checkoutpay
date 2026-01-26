@@ -20,7 +20,7 @@ class ReadEmailsDirect extends Command
 
     public function handle(): void
     {
-        $this->info('Reading emails directly from server filesystem...');
+        // Keep initial message simple
 
         // Get email accounts to process
         if ($this->option('all')) {
@@ -32,7 +32,7 @@ class ReadEmailsDirect extends Command
                 return;
             }
 
-            $this->info("Processing {$emailAccounts->count()} active email account(s)...");
+            // Don't log account count - keep it simple
         } else {
             // Process specific email account
             $emailAddress = $this->option('email') ?? 'notify@check-outpay.com';
@@ -55,7 +55,7 @@ class ReadEmailsDirect extends Command
         $totalFailed = 0;
 
         foreach ($emailAccounts as $emailAccount) {
-            $this->info("Reading emails for: {$emailAccount->email}");
+            // Don't log account name - keep it simple
 
             // REMOVED: No longer skip IMAP accounts - read from filesystem regardless of method setting
             // The method field is just for reference, but we always read from filesystem for direct reading
@@ -74,10 +74,7 @@ class ReadEmailsDirect extends Command
                 continue;
             }
 
-            $this->info('Found mail directory(s):');
-            foreach ($mailPaths as $path) {
-                $this->info("  - {$path}");
-            }
+            // Don't log mail directories - keep it simple
 
             // Read emails from each path
             $accountReadCount = 0;
@@ -99,35 +96,22 @@ class ReadEmailsDirect extends Command
             $totalSkipped += $accountSkippedCount;
             $totalFailed += $accountFailedCount;
             
-            $this->info("   ✅ Processed: {$accountReadCount} email(s)");
-            if ($accountSkippedCount > 0) {
-                $this->warn("   ⏭️  Skipped: {$accountSkippedCount} email(s) (duplicates or sender not allowed)");
-            }
-            if ($accountFailedCount > 0) {
-                $this->error("   ❌ Failed: {$accountFailedCount} email(s) (parsing errors)");
-            }
-            $this->newLine();
+            // Don't log per-account stats - only show totals
         }
 
-        $this->info("═══════════════════════════════════════════");
-        $this->info("✅ Total processed: {$totalRead} email(s)");
+        // Simple summary output
+        if ($totalRead > 0) {
+            $this->info("✅ Fetched: {$totalRead} email(s)");
+        }
         if ($totalSkipped > 0) {
-            $this->warn("⏭️  Total skipped: {$totalSkipped} email(s)");
+            $this->info("⏭️  Skipped: {$totalSkipped} email(s)");
         }
         if ($totalFailed > 0) {
-            $this->error("❌ Total failed: {$totalFailed} email(s)");
+            $this->warn("❌ Failed: {$totalFailed} email(s)");
         }
-        $this->info("═══════════════════════════════════════════");
         
-        if ($totalRead > 0) {
-            $this->info("📧 Emails have been processed and matching jobs dispatched!");
-            $this->info("   Processing jobs will automatically match payments if found.");
-        } else {
-            if ($totalSkipped > 0 || $totalFailed > 0) {
-                $this->warn("ℹ️  No new emails processed. Check skipped/failed counts above.");
-            } else {
-                $this->info("ℹ️  No new emails found (or all emails already processed).");
-            }
+        if ($totalRead === 0 && $totalSkipped === 0 && $totalFailed === 0) {
+            $this->info("ℹ️  No emails found");
         }
     }
 
@@ -187,11 +171,11 @@ class ReadEmailsDirect extends Command
 
         foreach ($commonPaths as $path) {
             if (is_dir($path) && is_readable($path)) {
-                $this->info("✅ Found mail directory: {$path}");
+                // Don't log each directory - keep it simple
                 $paths[] = $path;
             } elseif (is_file($path) && is_readable($path)) {
                 // mbox format
-                $this->info("✅ Found mail file: {$path}");
+                // Don't log each file - keep it simple
                 $paths[] = $path;
             }
         }
@@ -252,11 +236,11 @@ class ReadEmailsDirect extends Command
                             }
                             $domainPath = $mailParent . $foundDomain;
                             if (is_dir($domainPath)) {
-                                $this->info("  Found domain directory: {$foundDomain}");
+                                // Don't log domain directories - keep it simple
                                 // Check if our email exists in any domain
                                 $emailPath = $domainPath . '/' . $localPart . '/Maildir/';
                                 if (is_dir($emailPath)) {
-                                    $this->info("✅ Found email in domain {$foundDomain}: {$emailPath}");
+                                    // Don't log each found directory - keep it simple
                                     $paths[] = $emailPath . 'cur/';
                                     $paths[] = $emailPath . 'new/';
                                 }
@@ -284,7 +268,7 @@ class ReadEmailsDirect extends Command
                                 // Check if our email exists in any domain
                                 $emailPath = $domainPath . '/' . $localPart . '/Maildir/';
                                 if (is_dir($emailPath)) {
-                                    $this->info("✅ Found email in {$homeDir}/mail/{$foundDomain}/{$localPart}/Maildir/");
+                                    // Don't log each found directory - keep it simple
                                     $paths[] = $emailPath . 'cur/';
                                     $paths[] = $emailPath . 'new/';
                                 }
@@ -484,17 +468,13 @@ class ReadEmailsDirect extends Command
                 });
 
                 if (empty($emailFiles)) {
-                    $this->info("  ℹ️  No email files found in: {$dirPath}");
+                    // Don't log empty directories - keep it simple
                     continue;
                 }
 
-                $this->info("  📧 Found " . count($emailFiles) . " email file(s)");
-                
                 // LIMIT: Only process 10 emails at a time for faster processing
                 $emailFiles = array_slice($emailFiles, 0, 10);
-                if (count($emailFiles) === 10) {
-                    $this->info("  ⚡ Processing first 10 emails (limit applied for performance)");
-                }
+                // Don't log individual file counts - only show summary at end
 
                 foreach ($emailFiles as $file) {
                     $filePath = $dirPath . '/' . $file;
@@ -511,19 +491,14 @@ class ReadEmailsDirect extends Command
                         
                         if ($result['status'] === 'processed') {
                             $processed++;
-                            $subject = $result['email']->subject ?? 'No Subject';
-                            $this->info("  ✅ Processed: {$subject}");
+                            // Don't log each processed email - only show summary at end
                         } elseif ($result['status'] === 'skipped') {
                             $skipped++;
-                            $reason = $result['reason'] ?? 'unknown';
-                            $this->line("  ⏭️  Skipped: {$file} ({$reason})");
+                            // Don't log each skipped email - only show summary at end
                         } else {
                             $failed++;
                             $hasHeaders = preg_match('/^(From|Subject|Date|To|Message-ID|Content-Type):/mi', $emailContent);
-                            $this->warn("  ⚠️  Could not parse email from: {$file}");
-                            if (!$hasHeaders) {
-                                $this->line("     (No recognizable email headers found)");
-                            }
+                            // Only log failed emails if there are any (for debugging)
                             Log::debug('Email parsing failed', [
                                 'file' => $file,
                                 'content_length' => strlen($emailContent),
