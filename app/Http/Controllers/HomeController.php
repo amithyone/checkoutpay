@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Page;
-use Illuminate\View\View;
+use Illuminate\Http\Response;
 
 class HomeController extends Controller
 {
-    public function index(): View
+    public function index(): Response
     {
         // OPTIMIZED: Cache page data to avoid database query on every request
         $page = \Illuminate\Support\Facades\Cache::remember(
