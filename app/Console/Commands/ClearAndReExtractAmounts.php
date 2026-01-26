@@ -32,11 +32,31 @@ class ClearAndReExtractAmounts extends Command
         $this->info('🔄 Clearing all amounts and sender names...');
         
         // Clear all amounts and sender names
-        $cleared = ProcessedEmail::query()->update([
-            'amount' => null,
-            'sender_name' => null,
-            'extracted_data' => DB::raw("JSON_SET(COALESCE(extracted_data, '{}'), '$.amount', NULL, '$.sender_name', NULL)")
-        ]);
+        $cleared = 0;
+        ProcessedEmail::chunk(100, function ($emails) use (&$cleared) {
+            foreach ($emails as $email) {
+                $extractedData = $email->extracted_data ?? [];
+                if (isset($extractedData['amount'])) {
+                    unset($extractedData['amount']);
+                }
+                if (isset($extractedData['sender_name'])) {
+                    unset($extractedData['sender_name']);
+                }
+                if (isset($extractedData['data']['amount'])) {
+                    unset($extractedData['data']['amount']);
+                }
+                if (isset($extractedData['data']['sender_name'])) {
+                    unset($extractedData['data']['sender_name']);
+                }
+                
+                $email->update([
+                    'amount' => null,
+                    'sender_name' => null,
+                    'extracted_data' => $extractedData,
+                ]);
+                $cleared++;
+            }
+        });
         
         $this->info("✅ Cleared {$cleared} emails");
         $this->newLine();
