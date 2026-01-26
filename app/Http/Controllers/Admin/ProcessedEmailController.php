@@ -489,76 +489,76 @@ class ProcessedEmailController extends Controller
     }
 
     /**
-     * Update account number for a processed email
+     * Update amount for a processed email
      */
-    public function updateAccount(Request $request, ProcessedEmail $processedEmail)
+    public function updateAmount(Request $request, ProcessedEmail $processedEmail)
     {
         $request->validate([
-            'account_number' => 'required|string|max:255',
+            'amount' => 'required|numeric|min:0.01',
         ]);
 
         try {
-            $accountNumber = trim($request->account_number);
+            $amount = (float) $request->amount;
             
             // Get current extracted_data or initialize empty array
             $extractedData = $processedEmail->extracted_data ?? [];
             
-            // Update account_number in extracted_data
-            $extractedData['account_number'] = $accountNumber;
+            // Update amount in extracted_data
+            $extractedData['amount'] = $amount;
             
             // Also update if it's nested in a 'data' key (some extraction methods use this structure)
             if (isset($extractedData['data']) && is_array($extractedData['data'])) {
-                $extractedData['data']['account_number'] = $accountNumber;
+                $extractedData['data']['amount'] = $amount;
             }
             
             $processedEmail->update([
-                'account_number' => $accountNumber,
+                'amount' => $amount,
                 'extracted_data' => $extractedData,
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Account number and extracted data updated successfully',
+                'message' => 'Amount and extracted data updated successfully',
             ]);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error updating account number', [
+            \Illuminate\Support\Facades\Log::error('Error updating amount', [
                 'email_id' => $processedEmail->id,
                 'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating account number: ' . $e->getMessage(),
+                'message' => 'Error updating amount: ' . $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Update account number and rematch the email
+     * Update amount and rematch the email
      */
-    public function updateAccountAndRematch(Request $request, ProcessedEmail $processedEmail)
+    public function updateAmountAndRematch(Request $request, ProcessedEmail $processedEmail)
     {
         $request->validate([
-            'account_number' => 'required|string|max:255',
+            'amount' => 'required|numeric|min:0.01',
         ]);
 
         try {
-            $accountNumber = trim($request->account_number);
+            $amount = (float) $request->amount;
             
             // Get current extracted_data or initialize empty array
             $extractedData = $processedEmail->extracted_data ?? [];
             
-            // Update account_number in extracted_data
-            $extractedData['account_number'] = $accountNumber;
+            // Update amount in extracted_data
+            $extractedData['amount'] = $amount;
             
             // Also update if it's nested in a 'data' key (some extraction methods use this structure)
             if (isset($extractedData['data']) && is_array($extractedData['data'])) {
-                $extractedData['data']['account_number'] = $accountNumber;
+                $extractedData['data']['amount'] = $amount;
             }
             
-            // Update the account number and extracted_data
+            // Update the amount and extracted_data
             $processedEmail->update([
-                'account_number' => $accountNumber,
+                'amount' => $amount,
                 'extracted_data' => $extractedData,
             ]);
 
@@ -633,13 +633,13 @@ class ProcessedEmailController extends Controller
                     'status' => $matchedPayment->status, // Include status so frontend can refresh
                 ] : null,
                 'message' => $matchedPayment 
-                    ? 'Account number updated and payment matched successfully!' 
-                    : 'Account number updated. No matching payment found.',
+                    ? 'Amount updated and payment matched successfully!' 
+                    : 'Amount updated. No matching payment found.',
                 'latest_reason' => $latestReason,
                 'redirect_url' => $matchedPayment ? route('admin.payments.show', $matchedPayment) : null,
             ]);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error updating account and rematching', [
+            \Illuminate\Support\Facades\Log::error('Error updating amount and rematching', [
                 'email_id' => $processedEmail->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -647,7 +647,7 @@ class ProcessedEmailController extends Controller
             
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating account and rematching: ' . $e->getMessage(),
+                'message' => 'Error updating amount and rematching: ' . $e->getMessage(),
             ], 500);
         }
     }

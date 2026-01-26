@@ -90,19 +90,31 @@
             <div class="border-t border-gray-200 pt-6">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Extracted Payment Information</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    @if($processedEmail->amount)
-                        <div>
-                            <label class="text-sm font-medium text-gray-500">Amount</label>
-                            <p class="mt-1 text-lg font-bold text-gray-900">
-                                ₦{{ number_format($processedEmail->amount, 2) }}
-                            </p>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Amount</label>
+                        <div class="mt-1 flex items-center gap-2">
+                            <div class="flex-1 relative">
+                                <span class="absolute left-3 top-2 text-gray-500">₦</span>
+                                <input type="number" 
+                                       id="amount-input" 
+                                       step="0.01"
+                                       min="0"
+                                       value="{{ $processedEmail->amount ?? '' }}" 
+                                       class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
+                                       placeholder="0.00">
+                            </div>
+                            <button onclick="updateAmount({{ $processedEmail->id }})" 
+                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-save mr-1"></i> Update
+                            </button>
                         </div>
-                    @else
-                        <div>
-                            <label class="text-sm font-medium text-gray-500">Amount</label>
-                            <p class="mt-1 text-sm text-gray-400">Not extracted</p>
-                        </div>
-                    @endif
+                        @if(!$processedEmail->is_matched)
+                            <button onclick="updateAmountAndRematch({{ $processedEmail->id }})" 
+                                    class="mt-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center justify-center">
+                                <i class="fas fa-redo mr-2"></i> Update Amount & Rematch
+                            </button>
+                        @endif
+                    </div>
 
                     <div>
                         <label class="text-sm font-medium text-gray-500">Sender Name</label>
@@ -125,26 +137,17 @@
                         @endif
                     </div>
 
-                    <div>
-                        <label class="text-sm font-medium text-gray-500">Account Number</label>
-                        <div class="mt-1 flex items-center gap-2">
-                            <input type="text" 
-                                   id="account-number-input" 
-                                   value="{{ $processedEmail->account_number ?? '' }}" 
-                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm font-mono"
-                                   placeholder="Enter account number">
-                            <button onclick="updateAccountNumber({{ $processedEmail->id }})" 
-                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                                <i class="fas fa-save mr-1"></i> Update
-                            </button>
+                    @if($processedEmail->account_number)
+                        <div>
+                            <label class="text-sm font-medium text-gray-500">Account Number</label>
+                            <p class="mt-1 text-sm text-gray-900 font-mono">{{ $processedEmail->account_number }}</p>
                         </div>
-                        @if(!$processedEmail->is_matched)
-                            <button onclick="updateAccountAndRematch({{ $processedEmail->id }})" 
-                                    class="mt-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center justify-center">
-                                <i class="fas fa-redo mr-2"></i> Update Account & Rematch
-                            </button>
-                        @endif
-                    </div>
+                    @else
+                        <div>
+                            <label class="text-sm font-medium text-gray-500">Account Number</label>
+                            <p class="mt-1 text-sm text-gray-400">Not extracted</p>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -317,30 +320,23 @@ function updateAndRematch(emailId) {
     });
 }
 
-function updateAccountNumber(emailId) {
-    const input = document.getElementById('account-number-input');
-    const accountNumber = input.value.trim();
+function updateAmount(emailId) {
+    const input = document.getElementById('amount-input');
+    const amount = parseFloat(input.value);
     
-    if (!accountNumber) {
-        alert('Please enter an account number');
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid amount greater than 0');
         return;
     }
 
-    // Validate account number format (should be numeric, 10 digits)
-    if (!/^\d{10}$/.test(accountNumber)) {
-        if (!confirm('Account number should be 10 digits. Do you want to continue anyway?')) {
-            return;
-        }
-    }
-
-    fetch(`/admin/processed-emails/${emailId}/update-account`, {
+    fetch(`/admin/processed-emails/${emailId}/update-amount`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
         body: JSON.stringify({
-            account_number: accountNumber
+            amount: amount
         })
     })
     .then(response => response.json())
@@ -354,31 +350,31 @@ function updateAccountNumber(emailId) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('❌ Error updating account number: ' + error.message);
+        alert('❌ Error updating amount: ' + error.message);
     });
 }
 
-function updateAccountAndRematch(emailId) {
-    const input = document.getElementById('account-number-input');
-    const accountNumber = input.value.trim();
+function updateAmountAndRematch(emailId) {
+    const input = document.getElementById('amount-input');
+    const amount = parseFloat(input.value);
     
-    if (!accountNumber) {
-        alert('Please enter an account number before rematching');
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid amount greater than 0 before rematching');
         return;
     }
 
-    if (!confirm('Update the account number and retry matching this email against all pending payments?')) {
+    if (!confirm('Update the amount and retry matching this email against all pending payments?')) {
         return;
     }
 
-    fetch(`/admin/processed-emails/${emailId}/update-account-and-rematch`, {
+    fetch(`/admin/processed-emails/${emailId}/update-amount-and-rematch`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
         body: JSON.stringify({
-            account_number: accountNumber
+            amount: amount
         })
     })
     .then(response => response.json())
@@ -400,7 +396,7 @@ function updateAccountAndRematch(emailId) {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('❌ Error updating account and rematching: ' + error.message);
+        alert('❌ Error updating amount and rematching: ' + error.message);
     });
 }
 
