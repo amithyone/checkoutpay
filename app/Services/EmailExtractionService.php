@@ -23,9 +23,13 @@ class EmailExtractionService
         $transactionTime = null;
         $extractedDate = null;
         
-        // PRIORITY 0: Kuda Bank format - "Transaction Notification NAME just sent you ₦AMOUNT"
-        // This is a simple format that should be checked early
+        // PRIORITY 0: Kuda Bank format - multiple variations
+        // Pattern 1: "Transaction Notification NAME just sent you ₦AMOUNT"
+        // Pattern 2: "You just sent ₦AMOUNT to NAME" (outgoing payment)
+        // Pattern 3: "NAME just sent you ₦AMOUNT" (incoming payment)
         // For Kuda emails, use email_date as transaction_time since they don't carry time
+        
+        // Pattern 1: "Transaction Notification NAME just sent you ₦AMOUNT"
         if (preg_match('/Transaction\s+Notification\s+([A-Z][A-Z\s]{2,}?)\s+just\s+sent\s+you\s+₦([\d,]+\.?\d*)/i', $text, $kudaMatches)) {
             $potentialName = trim($kudaMatches[1]);
             $potentialName = preg_replace('/\s+/', ' ', $potentialName);
@@ -38,15 +42,45 @@ class EmailExtractionService
             if ($potentialAmount >= 10) {
                 $amount = $potentialAmount;
             }
+        }
+        // Pattern 2: "You just sent ₦AMOUNT to NAME" (outgoing payment - sender is the account owner)
+        elseif (preg_match('/You\s+just\s+sent\s+₦([\d,]+\.?\d*)\s+to\s+([A-Z][A-Z\s\-]{2,}?)/i', $text, $kudaMatches)) {
+            // Extract amount
+            $potentialAmount = (float) str_replace(',', '', $kudaMatches[1]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+            }
             
-            // Use email_date as transaction_time for Kuda emails (they don't carry time in the email)
-            if ($emailDate) {
-                try {
-                    $emailDateTime = \Carbon\Carbon::parse($emailDate);
-                    $transactionTime = $emailDateTime->format('H:i:s');
-                } catch (\Exception $e) {
-                    // If parsing fails, leave transactionTime as null
-                }
+            // Extract recipient name (not sender, but store it anyway)
+            $potentialName = trim($kudaMatches[2]);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            $potentialName = rtrim($potentialName, '- .');
+            if (strlen($potentialName) >= 3 && !$senderName) {
+                $senderName = trim(strtolower($potentialName));
+            }
+        }
+        // Pattern 3: "NAME just sent you ₦AMOUNT" (incoming payment)
+        elseif (preg_match('/([A-Z][A-Z\s]{2,}?)\s+just\s+sent\s+you\s+₦([\d,]+\.?\d*)/i', $text, $kudaMatches)) {
+            $potentialName = trim($kudaMatches[1]);
+            $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+            if (strlen($potentialName) >= 3) {
+                $senderName = trim(strtolower($potentialName));
+            }
+            
+            // Extract amount
+            $potentialAmount = (float) str_replace(',', '', $kudaMatches[2]);
+            if ($potentialAmount >= 10) {
+                $amount = $potentialAmount;
+            }
+        }
+        
+        // Use email_date as transaction_time for Kuda emails (they don't carry time in the email)
+        if ($amount && $emailDate) {
+            try {
+                $emailDateTime = \Carbon\Carbon::parse($emailDate);
+                $transactionTime = $emailDateTime->format('H:i:s');
+            } catch (\Exception $e) {
+                // If parsing fails, leave transactionTime as null
             }
         }
         
