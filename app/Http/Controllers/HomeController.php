@@ -12,7 +12,7 @@ class HomeController extends Controller
         // OPTIMIZED: Cache page data to avoid database query on every request
         $page = \Illuminate\Support\Facades\Cache::remember(
             'page_home',
-            3600, // Cache for 1 hour
+            86400, // Cache for 24 hours (homepage rarely changes)
             function () {
                 return Page::getBySlug('home');
             }

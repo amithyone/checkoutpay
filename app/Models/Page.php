@@ -34,7 +34,7 @@ class Page extends Model
     {
         return \Illuminate\Support\Facades\Cache::remember(
             "page_{$slug}",
-            3600, // Cache for 1 hour
+            86400, // Cache for 24 hours (pages rarely change)
             function () use ($slug) {
                 return self::where('slug', $slug)
                     ->where('is_published', true)

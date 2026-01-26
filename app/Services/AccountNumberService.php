@@ -26,9 +26,10 @@ class AccountNumberService
     const CACHE_KEY_POOL_ACCOUNTS = 'account_number_service:pool_accounts';
     
     /**
-     * Cache TTL in seconds (60 seconds = 1 minute)
+     * Cache TTL in seconds (300 seconds = 5 minutes)
+     * Increased from 60s to 300s to prevent frequent cache expiration
      */
-    const CACHE_TTL = 60;
+    const CACHE_TTL = 300;
 
     /**
      * Assign account number to payment request

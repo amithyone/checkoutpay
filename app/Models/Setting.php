@@ -23,10 +23,11 @@ class Setting extends Model
      */
     public static function get(string $key, $default = null)
     {
-        // Cache settings for 1 hour to avoid database queries on every page load
+        // Cache settings for 24 hours to avoid database queries on every page load
+        // Settings rarely change, so longer cache is safe and improves performance
         return \Illuminate\Support\Facades\Cache::remember(
             "setting_{$key}",
-            3600, // 1 hour cache
+            86400, // 24 hours cache (settings rarely change)
             function () use ($key, $default) {
                 $setting = self::where('key', $key)->first();
                 
