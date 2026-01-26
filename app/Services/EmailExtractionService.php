@@ -623,11 +623,7 @@ class EmailExtractionService
                 if (preg_match('/(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $descriptionField, $descMatches)) {
                     $accountNumber = trim($descMatches[1]);
                     $payerAccountNumber = trim($descMatches[2]);
-                    $amountFromDesc = (float) ($descMatches[3] / 100);
-                    if (!$amount && $amountFromDesc >= 10) {
-                        $amount = $amountFromDesc;
-                        $method = 'html_table_description';
-                    }
+                    // SKIP amount extraction from description field - amount should come from "Amount" line only
                     $dateStr = $descMatches[4];
                     if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                         $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
@@ -645,11 +641,7 @@ class EmailExtractionService
             elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>.*?<td[^>]*>.*?(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s*TO|$)/i', $html, $matches)) {
                 $accountNumber = trim($matches[1]);
                 $payerAccountNumber = trim($matches[2]);
-                $amountFromDesc = (float) ($matches[3] / 100);
-                if (!$amount && $amountFromDesc >= 10) {
-                    $amount = $amountFromDesc;
-                    $method = 'html_table_description';
-                }
+                // SKIP amount extraction from description field - amount should come from "Amount" line only
                 $dateStr = $matches[4];
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
@@ -664,11 +656,7 @@ class EmailExtractionService
             elseif (preg_match('/(?s)<td[^>]*>[\s]*(?:description|remarks|details|narration)[\s:]*<\/td>\s*<td[^>]*>[\s:]*<\/td>\s*<td[^>]*>[\s]*(\d{10})[\s]+(\d{10})(\d{6})(\d{8})(\d{9})\s+FROM\s+([A-Z\s]+?)(?:\s+TO|$)/i', $html, $matches)) {
                 $accountNumber = trim($matches[1]);
                 $payerAccountNumber = trim($matches[2]);
-                $amountFromDesc = (float) ($matches[3] / 100);
-                if (!$amount && $amountFromDesc >= 10) {
-                    $amount = $amountFromDesc;
-                    $method = 'html_table_description';
-                }
+                // SKIP amount extraction from description field - amount should come from "Amount" line only
                 $dateStr = $matches[4];
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
