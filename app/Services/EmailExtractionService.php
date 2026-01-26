@@ -321,7 +321,8 @@ class EmailExtractionService
         foreach ($amountPatterns as $pattern) {
             if (preg_match($pattern, $fullText, $matches)) {
                 $potentialAmount = (float) str_replace(',', '', $matches[1]);
-                if ($potentialAmount >= 10) {
+                // Accept any positive amount (removed >= 10 check - bank charges can be small)
+                if ($potentialAmount > 0) {
                     $amount = $potentialAmount;
                     break;
                 }
