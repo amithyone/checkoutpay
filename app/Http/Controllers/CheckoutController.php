@@ -134,6 +134,9 @@ class CheckoutController extends Controller
         }
 
         try {
+            // Increase execution time for account assignment
+            set_time_limit(60); // 60 seconds should be enough with optimizations
+            
             // Normalize return_url to prevent double slashes
             // Normalize return_url to prevent double slashes
             $returnUrl = preg_replace('#([^:])//+#', '$1/', $validated['return_url']);

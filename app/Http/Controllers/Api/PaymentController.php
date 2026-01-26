@@ -21,6 +21,9 @@ class PaymentController extends Controller
      */
     public function store(PaymentRequest $request): JsonResponse
     {
+        // Increase execution time for account assignment (Cloudflare timeout is 100s, PHP default might be 30s)
+        set_time_limit(60); // 60 seconds should be enough with optimizations
+        
         try {
             $business = $request->user();
 
@@ -83,16 +86,38 @@ class PaymentController extends Controller
                     ] : null,
                 ],
             ], 201);
-        } catch (\Exception $e) {
-            Log::error('Error creating payment via API', [
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error creating payment via API', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'business_id' => $request->user()->id,
+                'sql' => $e->getSql(),
+                'bindings' => $e->getBindings(),
+                'business_id' => $request->user()->id ?? null,
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create payment request. Please try again.',
+                'message' => 'Database error. Please try again later.',
+            ], 500);
+        } catch (\Exception $e) {
+            // Check if it's a timeout error
+            $isTimeout = strpos($e->getMessage(), 'timeout') !== false 
+                      || strpos($e->getMessage(), 'timed out') !== false
+                      || strpos($e->getMessage(), 'Maximum execution time') !== false;
+            
+            Log::error('Error creating payment via API', [
+                'error' => $e->getMessage(),
+                'is_timeout' => $isTimeout,
+                'trace' => $e->getTraceAsString(),
+                'business_id' => $request->user()->id ?? null,
+            ]);
+
+            $message = $isTimeout 
+                ? 'Payment service temporarily unavailable. Please try again later.'
+                : 'Failed to create payment request. Please try again.';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
             ], 500);
         }
     }

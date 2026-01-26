@@ -26,6 +26,8 @@ class PaymentService
      */
     public function createPayment(array $data, ?Business $business = null, ?Request $request = null): Payment
     {
+        $startTime = microtime(true);
+        
         // Generate transaction ID if not provided
         if (empty($data['transaction_id'])) {
             $data['transaction_id'] = $this->generateTransactionId();
@@ -176,10 +178,12 @@ class PaymentService
             $this->transactionLogService->logAccountAssignment($payment, $assignedAccount);
         }
 
+        $duration = (microtime(true) - $startTime) * 1000;
         \Illuminate\Support\Facades\Log::info('Payment request created', [
             'transaction_id' => $payment->transaction_id,
             'amount' => $payment->amount,
             'payer_name' => $payment->payer_name,
+            'duration_ms' => round($duration, 2),
         ]);
 
         // Check stored emails for immediate match
