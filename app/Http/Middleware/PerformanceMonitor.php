@@ -72,9 +72,15 @@ class PerformanceMonitor
 
             // Log slow requests (> 500ms) or requests with slow queries
             // OPTIMIZED: Only check query count if we logged queries
-            $isSlow = $duration > 500 || !empty($slowQueries) || ($shouldLogQueries && $queryCount > 50);
+            $isSlow = $duration > 500 || !empty($slowQueries) || ($shouldLogQueries && is_numeric($queryCount) && $queryCount > 50);
 
             if ($isSlow) {
+                // Calculate average query time only if queryCount is numeric
+                $avgQueryTime = 0;
+                if (is_numeric($queryCount) && $queryCount > 0) {
+                    $avgQueryTime = round($totalQueryTime / $queryCount, 2);
+                }
+                
                 $logData = [
                     'type' => 'slow_request',
                     'method' => $request->method(),
@@ -84,7 +90,7 @@ class PerformanceMonitor
                     'memory_mb' => round($memoryUsed, 2),
                     'query_count' => $queryCount,
                     'total_query_time_ms' => round($totalQueryTime, 2),
-                    'avg_query_time_ms' => $queryCount > 0 ? round($totalQueryTime / $queryCount, 2) : 0,
+                    'avg_query_time_ms' => $avgQueryTime,
                     'slow_queries' => $slowQueries,
                     'ip' => $request->ip(),
                     'user_agent' => $request->userAgent(),
