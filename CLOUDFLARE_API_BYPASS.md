@@ -21,7 +21,7 @@
 
 **URL Pattern:**
 ```
-*check-outpay.com/api/*
+*check-outnow.com/api/*
 ```
 
 **Settings (Add Multiple):**
@@ -90,7 +90,7 @@ After configuring bypass:
 
 ```bash
 # Test API endpoint
-curl -X POST https://check-outpay.com/api/v1/payment-request \
+curl -X POST https://check-outnow.com/api/v1/payment-request \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_API_KEY" \
   -d '{"name":"Test","amount":1000,"webhook_url":"https://example.com"}' \

@@ -311,7 +311,7 @@ class EmailWebhookController extends Controller
                 'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                 'html_body' => $html,
                 'email_date' => $timeSent,
-                'amount' => $extractedInfo['amount'],
+                'amount' => $extractedInfo['amount'] ?? null,
                 'sender_name' => $validatedSenderName, // Validated (no email addresses)
                 'account_number' => $extractedInfo['account_number'],
                 'extracted_data' => $extractedInfo,

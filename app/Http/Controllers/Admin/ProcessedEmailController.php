@@ -487,4 +487,168 @@ class ProcessedEmailController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Update account number for a processed email
+     */
+    public function updateAccount(Request $request, ProcessedEmail $processedEmail)
+    {
+        $request->validate([
+            'account_number' => 'required|string|max:255',
+        ]);
+
+        try {
+            $accountNumber = trim($request->account_number);
+            
+            // Get current extracted_data or initialize empty array
+            $extractedData = $processedEmail->extracted_data ?? [];
+            
+            // Update account_number in extracted_data
+            $extractedData['account_number'] = $accountNumber;
+            
+            // Also update if it's nested in a 'data' key (some extraction methods use this structure)
+            if (isset($extractedData['data']) && is_array($extractedData['data'])) {
+                $extractedData['data']['account_number'] = $accountNumber;
+            }
+            
+            $processedEmail->update([
+                'account_number' => $accountNumber,
+                'extracted_data' => $extractedData,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Account number and extracted data updated successfully',
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error updating account number', [
+                'email_id' => $processedEmail->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating account number: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update account number and rematch the email
+     */
+    public function updateAccountAndRematch(Request $request, ProcessedEmail $processedEmail)
+    {
+        $request->validate([
+            'account_number' => 'required|string|max:255',
+        ]);
+
+        try {
+            $accountNumber = trim($request->account_number);
+            
+            // Get current extracted_data or initialize empty array
+            $extractedData = $processedEmail->extracted_data ?? [];
+            
+            // Update account_number in extracted_data
+            $extractedData['account_number'] = $accountNumber;
+            
+            // Also update if it's nested in a 'data' key (some extraction methods use this structure)
+            if (isset($extractedData['data']) && is_array($extractedData['data'])) {
+                $extractedData['data']['account_number'] = $accountNumber;
+            }
+            
+            // Update the account number and extracted_data
+            $processedEmail->update([
+                'account_number' => $accountNumber,
+                'extracted_data' => $extractedData,
+            ]);
+
+            // Refresh to get updated data
+            $processedEmail->refresh();
+
+            // Now rematch using the matching service
+            $matchingService = new \App\Services\PaymentMatchingService(
+                new \App\Services\TransactionLogService()
+            );
+            
+            // Build email data array for matchEmail
+            $emailData = [
+                'subject' => $processedEmail->subject,
+                'from' => $processedEmail->from_email,
+                'text' => $processedEmail->text_body ?? '',
+                'html' => $processedEmail->html_body ?? '',
+                'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                'email_account_id' => $processedEmail->email_account_id,
+                'processed_email_id' => $processedEmail->id,
+            ];
+            
+            // Try to match email against pending payments
+            $matchedPayment = $matchingService->matchEmail($emailData);
+            
+            // If a match is found, approve the payment
+            if ($matchedPayment) {
+                // Mark email as matched
+                $processedEmail->markAsMatched($matchedPayment);
+                
+                // Approve payment
+                $matchedPayment->approve([
+                    'subject' => $processedEmail->subject,
+                    'from' => $processedEmail->from_email,
+                    'text' => $processedEmail->text_body,
+                    'html' => $processedEmail->html_body,
+                    'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                    'sender_name' => $processedEmail->sender_name, // Map sender_name to payer_name
+                ]);
+                
+                // Update business balance
+                if ($matchedPayment->business_id) {
+                    $matchedPayment->business->incrementBalanceWithCharges($matchedPayment->amount, $matchedPayment);
+                    $matchedPayment->business->refresh(); // Refresh to get updated balance
+                    
+                    // Check for auto-withdrawal
+                    $matchedPayment->business->triggerAutoWithdrawal();
+                }
+                
+                // Dispatch event to send webhook
+                event(new \App\Events\PaymentApproved($matchedPayment));
+            }
+
+            // Get latest match reason if no match found (from match attempts)
+            $latestReason = null;
+            if (!$matchedPayment) {
+                $latestAttempt = \App\Models\MatchAttempt::where('processed_email_id', $processedEmail->id)
+                    ->latest()
+                    ->first();
+                if ($latestAttempt && $latestAttempt->reason) {
+                    $latestReason = $latestAttempt->reason;
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'matched' => $matchedPayment !== null,
+                'payment' => $matchedPayment ? [
+                    'id' => $matchedPayment->id,
+                    'transaction_id' => $matchedPayment->transaction_id,
+                    'amount' => $matchedPayment->amount,
+                    'status' => $matchedPayment->status, // Include status so frontend can refresh
+                ] : null,
+                'message' => $matchedPayment 
+                    ? 'Account number updated and payment matched successfully!' 
+                    : 'Account number updated. No matching payment found.',
+                'latest_reason' => $latestReason,
+                'redirect_url' => $matchedPayment ? route('admin.payments.show', $matchedPayment) : null,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error updating account and rematching', [
+                'email_id' => $processedEmail->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating account and rematching: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

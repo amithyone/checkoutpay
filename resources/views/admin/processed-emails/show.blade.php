@@ -125,17 +125,26 @@
                         @endif
                     </div>
 
-                    @if($processedEmail->account_number)
-                        <div>
-                            <label class="text-sm font-medium text-gray-500">Account Number</label>
-                            <p class="mt-1 text-sm text-gray-900 font-mono">{{ $processedEmail->account_number }}</p>
+                    <div>
+                        <label class="text-sm font-medium text-gray-500">Account Number</label>
+                        <div class="mt-1 flex items-center gap-2">
+                            <input type="text" 
+                                   id="account-number-input" 
+                                   value="{{ $processedEmail->account_number ?? '' }}" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm font-mono"
+                                   placeholder="Enter account number">
+                            <button onclick="updateAccountNumber({{ $processedEmail->id }})" 
+                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                                <i class="fas fa-save mr-1"></i> Update
+                            </button>
                         </div>
-                    @else
-                        <div>
-                            <label class="text-sm font-medium text-gray-500">Account Number</label>
-                            <p class="mt-1 text-sm text-gray-400">Not extracted</p>
-                        </div>
-                    @endif
+                        @if(!$processedEmail->is_matched)
+                            <button onclick="updateAccountAndRematch({{ $processedEmail->id }})" 
+                                    class="mt-2 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center justify-center">
+                                <i class="fas fa-redo mr-2"></i> Update Account & Rematch
+                            </button>
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -305,6 +314,93 @@ function updateAndRematch(emailId) {
     .catch(error => {
         console.error('Error:', error);
         alert('❌ Error updating and rematching: ' + error.message);
+    });
+}
+
+function updateAccountNumber(emailId) {
+    const input = document.getElementById('account-number-input');
+    const accountNumber = input.value.trim();
+    
+    if (!accountNumber) {
+        alert('Please enter an account number');
+        return;
+    }
+
+    // Validate account number format (should be numeric, 10 digits)
+    if (!/^\d{10}$/.test(accountNumber)) {
+        if (!confirm('Account number should be 10 digits. Do you want to continue anyway?')) {
+            return;
+        }
+    }
+
+    fetch(`/admin/processed-emails/${emailId}/update-account`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            account_number: accountNumber
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            window.location.reload();
+        } else {
+            alert('❌ ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error updating account number: ' + error.message);
+    });
+}
+
+function updateAccountAndRematch(emailId) {
+    const input = document.getElementById('account-number-input');
+    const accountNumber = input.value.trim();
+    
+    if (!accountNumber) {
+        alert('Please enter an account number before rematching');
+        return;
+    }
+
+    if (!confirm('Update the account number and retry matching this email against all pending payments?')) {
+        return;
+    }
+
+    fetch(`/admin/processed-emails/${emailId}/update-account-and-rematch`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            account_number: accountNumber
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            if (data.payment && data.redirect_url) {
+                window.location.href = data.redirect_url;
+            } else {
+                window.location.reload();
+            }
+        } else {
+            alert('❌ ' + data.message);
+            if (data.latest_reason) {
+                console.log('Latest reason:', data.latest_reason);
+                alert('Latest reason: ' + data.latest_reason);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error updating account and rematching: ' + error.message);
     });
 }
 

@@ -33,10 +33,18 @@ class HomeController extends Controller
             'site_name' => \App\Models\Setting::get('site_name', 'CheckoutPay'),
         ];
         
-        return view('home', [
+        $response = response()->view('home', [
             'page' => $page,
             'content' => $content,
             'settings' => $settings, // Pass settings to view
         ]);
+
+        // Add HTTP cache headers for fast server performance
+        // Browser/CDN will cache this page for 1 hour
+        $response->headers->set('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+        $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 3600) . ' GMT');
+        $response->headers->set('Vary', 'Accept-Encoding');
+
+        return $response;
     }
 }

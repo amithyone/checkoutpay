@@ -20,6 +20,7 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         \App\Http\Middleware\PerformanceMonitor::class, // Monitor slow requests
+        \App\Http\Middleware\CacheResponse::class, // Add HTTP cache headers for static pages
     ];
 
     /**

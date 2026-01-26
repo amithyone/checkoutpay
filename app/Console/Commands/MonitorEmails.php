@@ -903,6 +903,11 @@ class MonitorEmails extends Command
             $descriptionField = $extractedInfo['description_field'] ?? null;
             $parsedFromDescription = $this->parseDescriptionField($descriptionField);
             
+            // Ensure $extractedInfo is an array (even if extraction failed)
+            if (!is_array($extractedInfo)) {
+                $extractedInfo = [];
+            }
+            
             // Use account_number from description field if not already set (description field is PRIMARY source)
             $accountNumber = $extractedInfo['account_number'] ?? $parsedFromDescription['account_number'] ?? null;
             
@@ -911,7 +916,10 @@ class MonitorEmails extends Command
                 $extractedInfo['description_field'] = $descriptionField;
                 $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
                 $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
-                // SKIP amount_from_description - not reliable, use amount field instead
+                // Use amount from description field if amount wasn't extracted from text
+                if (empty($extractedInfo['amount']) && !empty($parsedFromDescription['amount'])) {
+                    $extractedInfo['amount'] = $parsedFromDescription['amount'];
+                }
                 $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
             }
             
@@ -956,7 +964,7 @@ class MonitorEmails extends Command
                     'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                     'html_body' => $htmlBody,
                     'email_date' => $emailDate,
-                    'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction, not from description field
+                    'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction or description field
                     'sender_name' => $validatedSenderName, // Validated (no email addresses) - extracted immediately
                     'account_number' => $accountNumber, // Use from description field if available (PRIMARY source)
                     'description_field' => $descriptionField, // Store the 43-digit description field
@@ -1015,16 +1023,50 @@ class MonitorEmails extends Command
             
             // Try to extract payment info, but store email even if extraction fails
             $extractedInfo = null;
+            $extractionMethod = null;
             try {
                 $matchingService = new PaymentMatchingService(
                     new \App\Services\TransactionLogService()
                 );
-                $extractedInfo = $matchingService->extractPaymentInfo($emailData);
+                $extractionResult = $matchingService->extractPaymentInfo($emailData);
+                // Handle new format: ['data' => [...], 'method' => '...']
+                if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                    $extractedInfo = $extractionResult['data'];
+                    $extractionMethod = $extractionResult['method'] ?? null;
+                } else {
+                    // Old format fallback
+                    $extractedInfo = $extractionResult;
+                    $extractionMethod = 'unknown';
+                }
             } catch (\Exception $e) {
                 Log::debug('Payment info extraction failed, storing email anyway', [
                     'error' => $e->getMessage(),
                     'subject' => $emailData['subject'] ?? '',
                 ]);
+            }
+            
+            // Ensure $extractedInfo is an array (even if extraction failed)
+            if (!is_array($extractedInfo)) {
+                $extractedInfo = [];
+            }
+            
+            // Parse description field to extract account numbers and amount if available
+            $descriptionField = $extractedInfo['description_field'] ?? null;
+            $parsedFromDescription = $this->parseDescriptionField($descriptionField);
+            
+            // Use account_number from description field if not already set
+            $accountNumber = $extractedInfo['account_number'] ?? $parsedFromDescription['account_number'] ?? null;
+            
+            // Update extracted_data to include parsed description field data
+            if ($descriptionField) {
+                $extractedInfo['description_field'] = $descriptionField;
+                $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
+                $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
+                // Use amount from description field if amount wasn't extracted from text
+                if (empty($extractedInfo['amount']) && !empty($parsedFromDescription['amount'])) {
+                    $extractedInfo['amount'] = $parsedFromDescription['amount'];
+                }
+                $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
             }
             
             // Check if email already exists
@@ -1088,10 +1130,12 @@ class MonitorEmails extends Command
                     'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                     'html_body' => $htmlBody,
                     'email_date' => $emailData['date'] ?? now(),
-                    'amount' => $extractedInfo['amount'] ?? null,
+                    'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction or description field
                     'sender_name' => $validatedSenderName, // Validated (no email addresses) - extracted immediately
-                    'account_number' => $extractedInfo['account_number'] ?? null,
+                    'account_number' => $accountNumber, // Use from description field if available
+                    'description_field' => $descriptionField, // Store the description field
                     'extracted_data' => $extractedInfo,
+                    'extraction_method' => $extractionMethod,
                 ]);
             } catch (\Exception $e) {
                 Log::error('Failed to store Gmail API email in database', [

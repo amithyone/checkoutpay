@@ -808,6 +808,11 @@ class ReadEmailsDirect extends Command
                 ]);
             }
 
+            // Ensure $extractedInfo is an array (even if extraction failed)
+            if (!is_array($extractedInfo)) {
+                $extractedInfo = [];
+            }
+            
             // Parse description field to extract account numbers if available
             $descriptionField = $extractedInfo['description_field'] ?? null;
             $parsedFromDescription = $this->parseDescriptionField($descriptionField);
@@ -815,14 +820,17 @@ class ReadEmailsDirect extends Command
             // Use account_number from description field if not already set (description field is PRIMARY source)
             $accountNumber = $extractedInfo['account_number'] ?? $parsedFromDescription['account_number'] ?? null;
             
-                    // Update extracted_data to include parsed description field data
-                    if ($descriptionField) {
-                        $extractedInfo['description_field'] = $descriptionField;
-                        $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
-                        $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
-                        // SKIP amount_from_description - not reliable, use amount field instead
-                        $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
-                    }
+            // Update extracted_data to include parsed description field data
+            if ($descriptionField) {
+                $extractedInfo['description_field'] = $descriptionField;
+                $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
+                $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
+                // Use amount from description field if amount wasn't extracted from text
+                if (empty($extractedInfo['amount']) && !empty($parsedFromDescription['amount'])) {
+                    $extractedInfo['amount'] = $parsedFromDescription['amount'];
+                }
+                $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
+            }
             
             // CRITICAL: Normalize text_body - ensure it's always stripped from HTML and never empty
             $emailExtractor = new EmailExtractionService();
@@ -864,7 +872,7 @@ class ReadEmailsDirect extends Command
                 'text_body' => $normalizedTextBody, // Always normalized (stripped from HTML)
                 'html_body' => $parts['html_body'] ?? '',
                 'email_date' => $parts['date'] ?? now(),
-                'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction, not from description field
+                'amount' => $extractedInfo['amount'] ?? null, // Use amount from extraction or description field
                 'sender_name' => $validatedSenderName, // Validated (no email addresses) - extracted immediately
                 'account_number' => $accountNumber, // Use from description field if available (PRIMARY source)
                 'description_field' => $descriptionField, // Store the 43-digit description field

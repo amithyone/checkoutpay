@@ -33,6 +33,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('processed-emails/{processedEmail}/check-match', [ProcessedEmailController::class, 'checkMatch'])->name('processed-emails.check-match');
         Route::post('processed-emails/{processedEmail}/update-name', [ProcessedEmailController::class, 'updateName'])->name('processed-emails.update-name');
         Route::post('processed-emails/{processedEmail}/update-and-rematch', [ProcessedEmailController::class, 'updateAndRematch'])->name('processed-emails.update-and-rematch');
+        Route::post('processed-emails/{processedEmail}/update-account', [ProcessedEmailController::class, 'updateAccount'])->name('processed-emails.update-account');
+        Route::post('processed-emails/{processedEmail}/update-account-and-rematch', [ProcessedEmailController::class, 'updateAccountAndRematch'])->name('processed-emails.update-account-and-rematch');
 
         // Email Accounts (Admin/Super Admin only)
         Route::middleware('admin_or_super')->group(function () {
