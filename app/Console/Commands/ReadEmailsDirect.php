@@ -825,10 +825,7 @@ class ReadEmailsDirect extends Command
                 $extractedInfo['description_field'] = $descriptionField;
                 $extractedInfo['account_number'] = $parsedFromDescription['account_number'] ?? $extractedInfo['account_number'] ?? null;
                 $extractedInfo['payer_account_number'] = $parsedFromDescription['payer_account_number'] ?? $extractedInfo['payer_account_number'] ?? null;
-                // Use amount from description field if amount wasn't extracted from text
-                if (empty($extractedInfo['amount']) && !empty($parsedFromDescription['amount'])) {
-                    $extractedInfo['amount'] = $parsedFromDescription['amount'];
-                }
+                // SKIP amount from description field - amount should ONLY come from "Amount" line in text_body
                 $extractedInfo['date_from_description'] = $parsedFromDescription['extracted_date'] ?? null;
             }
             

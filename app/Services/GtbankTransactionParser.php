@@ -129,6 +129,7 @@ class GtbankTransactionParser
     /**
      * Extract amount from HTML table
      * Amount is after "NGN" in GTBank emails
+     * Format: "Amount : NGN 1000" (with space after colon and NGN)
      */
     protected function extractAmount(string $html, string $text): ?float
     {
@@ -144,20 +145,16 @@ class GtbankTransactionParser
             return (float) str_replace(',', '', $matches[1]);
         }
         
-        // Pattern 3: Text format, amount after NGN
-        // Format: Amount: NGN 1,000.00
-        if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
+        // Pattern 3: Text format - "Amount : NGN 1000" (with space after colon)
+        // Format: Amount : NGN 1,000.00
+        if (preg_match('/amount[\s]*:[\s]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
             return (float) str_replace(',', '', $matches[1]);
         }
         
-        // Pattern 4: Fallback - any NGN followed by amount (for edge cases)
-        // Format: NGN 1,000.00
-        if (preg_match('/(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $html . ' ' . $text, $matches)) {
-            $amount = (float) str_replace(',', '', $matches[1]);
-            // Only return if amount is reasonable (>= 10)
-            if ($amount >= 10) {
-                return $amount;
-            }
+        // Pattern 4: Text format - "Amount: NGN 1000" (without space after colon)
+        // Format: Amount: NGN 1,000.00
+        if (preg_match('/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i', $text, $matches)) {
+            return (float) str_replace(',', '', $matches[1]);
         }
 
         return null;

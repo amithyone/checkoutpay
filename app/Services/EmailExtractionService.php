@@ -204,18 +204,16 @@ class EmailExtractionService
             }
         }
         
-        // Now parse the digits if we found them
+        // Now parse the digits if we found them (ONLY for account numbers and date, NOT amount)
+        // Amount should ONLY come from the "Amount" line in text_body, not from description field
         // Try 43-digit format first (most common)
         if ($descriptionField && strlen($descriptionField) === 43) {
             // Parse the 43 digits: recipient(10) + payer(10) + amount(6) + date(8) + unknown(9)
+            // SKIP amount extraction - amount should come from "Amount" line only
             if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $descriptionField, $digitMatches)) {
                 $accountNumber = trim($digitMatches[1]); // PRIMARY: recipient account (first 10 digits)
                 $payerAccountNumber = trim($digitMatches[2]); // Sender account (next 10 digits)
-                $amountFromDesc = (float) ($digitMatches[3] / 100); // Amount (6 digits, divide by 100)
-                
-                if ($amountFromDesc >= 10) {
-                    $amount = $amountFromDesc;
-                }
+                // SKIP amount extraction from description field - amount should come from "Amount" line
                 
                 $dateStr = $digitMatches[4]; // Date YYYYMMDD (8 digits)
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
@@ -229,10 +227,7 @@ class EmailExtractionService
             if (preg_match('/^(\d{10})(\d{10})(\d{6})(\d{8})(\d{9})$/', $padded, $digitMatches)) {
                 $accountNumber = trim($digitMatches[1]);
                 $payerAccountNumber = trim($digitMatches[2]);
-                $amountFromDesc = (float) ($digitMatches[3] / 100);
-                if ($amountFromDesc >= 10) {
-                    $amount = $amountFromDesc;
-                }
+                // SKIP amount extraction from description field - amount should come from "Amount" line
                 $dateStr = $digitMatches[4];
                 if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                     $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
@@ -257,13 +252,11 @@ class EmailExtractionService
         // Format: "Description : 900877121002100859959000020260111094651392 FROM..."
         // CRITICAL: Make TO optional - text might be truncated or not have TO
         // Use 'if' instead of 'elseif' so it runs even if description field extraction didn't find a match
+        // SKIP amount extraction - amount should ONLY come from "Amount" line in text_body
         if (!$accountNumber && preg_match('/description[\s]*:[\s]*(\d{10})(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
-            $amountFromDesc = (float) ($matches[3] / 100);
-            if ($amountFromDesc >= 10) {
-                $amount = $amountFromDesc;
-            }
+            // SKIP amount extraction from description field - amount should come from "Amount" line only
             $dateStr = $matches[4];
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                 $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
@@ -282,13 +275,11 @@ class EmailExtractionService
         // CRITICAL: This pattern allows ANY characters (including spaces, dashes, etc.) between digits and FROM
         // CRITICAL: Make TO optional - text might be truncated or not have TO
         // Use 'if' instead of 'elseif' so it runs even if previous patterns didn't find a match
+        // SKIP amount extraction - amount should ONLY come from "Amount" line in text_body
         if (!$accountNumber && preg_match('/(\d{10})[\s]*(\d{10})(\d{6})(\d{8})(\d{9}).*?FROM.*?([A-Z\s]+?)(?:\s+TO|$)/i', $text, $matches)) {
             $accountNumber = trim($matches[1]); // PRIMARY source: recipient account
             $payerAccountNumber = trim($matches[2]);
-            $amountFromDesc = (float) ($matches[3] / 100);
-            if ($amountFromDesc >= 10) {
-                $amount = $amountFromDesc;
-            }
+            // SKIP amount extraction from description field - amount should come from "Amount" line only
             $dateStr = $matches[4];
             if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $dateStr, $dateMatches)) {
                 $extractedDate = $dateMatches[1] . '-' . $dateMatches[2] . '-' . $dateMatches[3];
@@ -298,19 +289,18 @@ class EmailExtractionService
             }
         }
         
-        // Extract amount from text (case insensitive, flexible patterns) - only if not already extracted
-        // Priority: Amount after NGN (GTBank format)
+        // Extract amount from text (case insensitive, flexible patterns) - ONLY from "Amount" line
+        // Priority: Amount after NGN on the "Amount" line (GTBank format: "Amount : NGN 1000")
+        // Amount should ONLY come from text_body, NOT from description field
         $amountPatterns = [
-            // Pattern 1: "Amount: NGN 1,000.00" - amount after NGN (GTBank format)
-            '/(?:amount|sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
-            // Pattern 2: "NGN 1,000.00" - standalone NGN followed by amount
-            '/(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            // Pattern 1: "Amount : NGN 1000" - GTBank format with space after colon and NGN
+            '/amount[\s]*:[\s]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
+            // Pattern 2: "Amount: NGN 1,000.00" - standard format
+            '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
             // Pattern 3: Tab separated "Amount\t:\tNGN 1000"
             '/amount[\s\t:]+(?:ngn|naira|₦|NGN)[\s\t]+([\d,]+\.?\d*)/i',
-            // Pattern 4: Multiple spaces "Amount: NGN  1000"
-            '/amount[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
-            // Pattern 5: Fallback - amount before currency (less common)
-            '/([\d,]+\.?\d*)[\s]+(?:naira|ngn|usd|dollar|NGN)/i',
+            // Pattern 4: Other amount labels with NGN
+            '/(?:sum|value|total|paid|payment|deposit|transfer|credit)[\s:]+(?:ngn|naira|₦|NGN)[\s]+([\d,]+\.?\d*)/i',
         ];
         
         foreach ($amountPatterns as $pattern) {
