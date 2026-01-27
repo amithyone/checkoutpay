@@ -16,6 +16,7 @@ class EventServiceProvider extends ServiceProvider
     protected $listen = [
         PaymentApproved::class => [
             SendPaymentWebhook::class,
+            \App\Listeners\ProcessTicketOrderOnPayment::class,
         ],
         \App\Events\PaymentExpired::class => [
             \App\Listeners\SendExpiredPaymentWebhook::class,

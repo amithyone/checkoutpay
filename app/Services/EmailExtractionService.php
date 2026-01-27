@@ -300,6 +300,68 @@ class EmailExtractionService
             }
         }
         
+        // PRIORITY: Moniepoint Bank format (no-reply@moniepoint.com)
+        // Format: "Credit Amount 5,000.00" or "Credit Amount: 5,000.00"
+        // Also extract account number: "Account Number: 5212816532"
+        // Date format: "Date & Time: 27 Jan, 2026 | 07:59:45 PM"
+        // Sender's Name: "Sender's Name: from CHECKOUT NOW LTD"
+        // Note: Ignore Account Balance, use Credit Amount only
+        $isMoniepointEmail = stripos($from, 'moniepoint.com') !== false;
+        
+        if ($isMoniepointEmail) {
+            // Extract Credit Amount (ignore Account Balance)
+            if (preg_match('/credit\s+amount[\s:]+([\d,]+\.?\d*)/i', $text, $moniepointAmountMatches)) {
+                $potentialAmount = (float) str_replace(',', '', $moniepointAmountMatches[1]);
+                if ($potentialAmount > 0) {
+                    $amount = $potentialAmount;
+                }
+            }
+            
+            // Extract account number from Moniepoint format: "Account Number: 5212816532"
+            if (!$accountNumber && preg_match('/account\s+number[\s:]+(\d{10,})/i', $text, $moniepointAccountMatches)) {
+                $accountNumber = trim($moniepointAccountMatches[1]);
+            }
+            
+            // Extract date & time from Moniepoint format: "Date & Time: 27 Jan, 2026 | 07:59:45 PM"
+            if (preg_match('/date\s*[&]?\s*time[\s:]+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*,\s*(\d{4})\s*[|]\s*(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i', $text, $moniepointDateMatches)) {
+                $day = (int) $moniepointDateMatches[1];
+                $month = $moniepointDateMatches[2];
+                $year = (int) $moniepointDateMatches[3];
+                $hour = (int) $moniepointDateMatches[4];
+                $minute = (int) $moniepointDateMatches[5];
+                $second = (int) $moniepointDateMatches[6];
+                $ampm = strtoupper($moniepointDateMatches[7]);
+                
+                // Convert month name to number
+                $monthNames = ['jan' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4, 'may' => 5, 'jun' => 6,
+                              'jul' => 7, 'aug' => 8, 'sep' => 9, 'oct' => 10, 'nov' => 11, 'dec' => 12];
+                $monthNum = $monthNames[strtolower(substr($month, 0, 3))] ?? 1;
+                
+                // Convert 12-hour to 24-hour format
+                if ($ampm === 'PM' && $hour < 12) {
+                    $hour += 12;
+                } elseif ($ampm === 'AM' && $hour === 12) {
+                    $hour = 0;
+                }
+                
+                $transactionTime = sprintf('%02d:%02d:%02d', $hour, $minute, $second);
+                $extractedDate = sprintf('%04d-%02d-%02d', $year, $monthNum, $day);
+            }
+            
+            // Extract sender name from Moniepoint format: "Sender's Name: from CHECKOUT NOW LTD"
+            // Extract even if already found (user wants to test re-extraction)
+            if (preg_match("/sender['\s]*s?\s*name[\s:]+(?:from\s+)?([A-Z][A-Z\s&.,]+?)(?:\s*$|\s+Date|\s+Narration|\s+Account)/i", $text, $moniepointNameMatches)) {
+                $potentialName = trim($moniepointNameMatches[1]);
+                // Remove "from" prefix if present
+                $potentialName = preg_replace('/^from\s+/i', '', $potentialName);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                $potentialName = trim($potentialName);
+                if (strlen($potentialName) >= 3) {
+                    $senderName = trim(strtolower($potentialName));
+                }
+            }
+        }
+        
         // Extract amount from text (case insensitive, flexible patterns) - ONLY from "Amount" line
         // Priority: Amount after NGN on the "Amount" line (GTBank format: "Amount : NGN 1000")
         // Amount should ONLY come from text_body, NOT from description field
@@ -335,8 +397,8 @@ class EmailExtractionService
             $senderName = $this->extractSenderNameFromText($text, $fullText);
         }
         
-        // Extract transaction time from text
-        if (preg_match('/(?:time|transaction\s*time)[\s]*:[\s]*(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i', $text, $timeMatches)) {
+        // Extract transaction time from text (only if not already extracted from Moniepoint format)
+        if (!$transactionTime && preg_match('/(?:time|transaction\s*time)[\s]*:[\s]*(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i', $text, $timeMatches)) {
             $hour = (int) $timeMatches[1];
             $minute = (int) $timeMatches[2];
             $second = (int) $timeMatches[3];

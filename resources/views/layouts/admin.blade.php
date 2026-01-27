@@ -137,6 +137,15 @@
                     <span>Transaction Logs</span>
                 </a>
 
+                <a href="{{ route('admin.tickets.events.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.tickets.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-ticket-alt w-5 mr-3"></i>
+                    <span>Tickets</span>
+                </a>
+                <a href="{{ route('admin.tickets.scanner') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.tickets.scanner*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-qrcode w-5 mr-3"></i>
+                    <span>QR Scanner</span>
+                </a>
+
                 <a href="{{ route('admin.test-transaction.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.test-transaction.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-flask w-5 mr-3"></i>
                     <span>Test Transaction</span>

@@ -81,6 +81,14 @@ Route::post('/pay', [\App\Http\Controllers\CheckoutController::class, 'store'])-
 Route::get('/pay/{transactionId}', [\App\Http\Controllers\CheckoutController::class, 'payment'])->name('checkout.payment');
 Route::get('/pay/{transactionId}/status', [\App\Http\Controllers\CheckoutController::class, 'checkStatus'])->name('checkout.status');
 
+// Public ticket routes
+Route::prefix('tickets')->name('tickets.')->group(function () {
+    Route::get('{event}', [\App\Http\Controllers\Public\TicketController::class, 'show'])->name('show');
+    Route::post('{event}/purchase', [\App\Http\Controllers\Public\TicketController::class, 'purchase'])->name('purchase');
+    Route::get('order/{orderNumber}', [\App\Http\Controllers\Public\TicketController::class, 'order'])->name('order');
+    Route::get('order/{orderNumber}/download', [\App\Http\Controllers\Public\TicketController::class, 'download'])->name('download');
+});
+
 // Cron job endpoints (for external cron services)
 
 // IMAP Email Fetching Cron (requires IMAP to be enabled)

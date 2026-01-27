@@ -104,5 +104,23 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::post('/support', [\App\Http\Controllers\Business\SupportController::class, 'store'])->name('support.store');
         Route::get('/support/{ticket}', [\App\Http\Controllers\Business\SupportController::class, 'show'])->name('support.show');
         Route::post('/support/{ticket}/reply', [\App\Http\Controllers\Business\SupportController::class, 'reply'])->name('support.reply');
+
+        // Tickets
+        Route::prefix('tickets')->name('tickets.')->group(function () {
+            // Events
+            Route::resource('events', \App\Http\Controllers\Business\EventController::class);
+            Route::post('events/{event}/publish', [\App\Http\Controllers\Business\EventController::class, 'publish'])->name('events.publish');
+            Route::post('events/{event}/cancel', [\App\Http\Controllers\Business\EventController::class, 'cancel'])->name('events.cancel');
+            
+            // Orders
+            Route::get('orders', [\App\Http\Controllers\Business\TicketOrderController::class, 'index'])->name('orders.index');
+            Route::get('orders/{order}', [\App\Http\Controllers\Business\TicketOrderController::class, 'show'])->name('orders.show');
+            
+            // QR Scanner
+            Route::get('scanner', [\App\Http\Controllers\Business\TicketScannerController::class, 'index'])->name('scanner');
+            Route::post('scanner/verify', [\App\Http\Controllers\Business\TicketScannerController::class, 'verify'])->name('scanner.verify');
+            Route::post('scanner/check-in', [\App\Http\Controllers\Business\TicketScannerController::class, 'checkIn'])->name('scanner.check-in');
+            Route::post('scanner/manual-check-in', [\App\Http\Controllers\Business\TicketScannerController::class, 'manualCheckIn'])->name('scanner.manual-check-in');
+        });
     });
 });

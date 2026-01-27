@@ -1,0 +1,113 @@
+@extends('layouts.business')
+
+@section('title', 'Edit Event')
+@section('page-title', 'Edit Event')
+
+@section('content')
+<div class="space-y-4 lg:space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-gray-900">Edit Event</h1>
+        <a href="{{ route('business.tickets.events.show', $event) }}" class="text-primary hover:text-primary/80">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Event
+        </a>
+    </div>
+
+    <form action="{{ route('business.tickets.events.update', $event) }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+        @csrf
+        @method('PUT')
+
+        <!-- Basic Information -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-xl font-bold mb-4">Basic Information</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Event Title *</label>
+                    <input type="text" name="title" required value="{{ old('title', $event->title) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    @error('title')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Venue *</label>
+                    <input type="text" name="venue" required value="{{ old('venue', $event->venue) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    @error('venue')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea name="description" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg">{{ old('description', $event->description) }}</textarea>
+                @error('description')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input type="text" name="address" value="{{ old('address', $event->address) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Date & Time *</label>
+                    <input type="datetime-local" name="start_date" required value="{{ old('start_date', $event->start_date->format('Y-m-d\TH:i')) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    @error('start_date')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Date & Time *</label>
+                    <input type="datetime-local" name="end_date" required value="{{ old('end_date', $event->end_date->format('Y-m-d\TH:i')) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    @error('end_date')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
+                    @if($event->cover_image)
+                        <div class="mb-2">
+                            <img src="{{ asset('storage/' . $event->cover_image) }}" alt="Current cover" class="h-32 object-cover rounded-lg">
+                        </div>
+                    @endif
+                    <input type="file" name="cover_image" accept="image/*" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    @error('cover_image')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Max Attendees</label>
+                    <input type="number" name="max_attendees" min="1" value="{{ old('max_attendees', $event->max_attendees) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Max Tickets Per Customer</label>
+                <input type="number" name="max_tickets_per_customer" min="1" value="{{ old('max_tickets_per_customer', $event->max_tickets_per_customer) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-xl font-bold mb-4">Settings</h2>
+            <div class="space-y-4">
+                <div class="flex items-center">
+                    <input type="checkbox" name="allow_refunds" value="1" {{ old('allow_refunds', $event->allow_refunds) ? 'checked' : '' }} id="allow_refunds" class="mr-2">
+                    <label for="allow_refunds" class="text-sm text-gray-700">Allow refunds for this event</label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Refund Policy</label>
+                    <textarea name="refund_policy" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Enter refund policy...">{{ old('refund_policy', $event->refund_policy) }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="draft" {{ old('status', $event->status) === 'draft' ? 'selected' : '' }}>Draft</option>
+                        <option value="published" {{ old('status', $event->status) === 'published' ? 'selected' : '' }}>Published</option>
+                        <option value="cancelled" {{ old('status', $event->status) === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex justify-end gap-4">
+            <a href="{{ route('business.tickets.events.show', $event) }}" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</a>
+            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">Update Event</button>
+        </div>
+    </form>
+</div>
+@endsection

@@ -193,5 +193,20 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::put('profile', [\App\Http\Controllers\Admin\ProfileController::class, 'update'])->name('profile.update');
             Route::put('profile/password', [\App\Http\Controllers\Admin\ProfileController::class, 'updatePassword'])->name('profile.update-password');
         });
+
+        // Tickets Management
+        Route::prefix('tickets')->name('tickets.')->group(function () {
+            Route::get('events', [\App\Http\Controllers\Admin\TicketController::class, 'events'])->name('events.index');
+            Route::get('orders', [\App\Http\Controllers\Admin\TicketController::class, 'orders'])->name('orders.index');
+            Route::get('orders/{order}', [\App\Http\Controllers\Admin\TicketController::class, 'showOrder'])->name('orders.show');
+            Route::post('orders/{order}/refund', [\App\Http\Controllers\Admin\TicketController::class, 'refund'])->name('orders.refund');
+            Route::put('events/{event}/max-tickets', [\App\Http\Controllers\Admin\TicketController::class, 'updateMaxTickets'])->name('events.update-max-tickets');
+            
+            // QR Scanner
+            Route::get('scanner', [\App\Http\Controllers\Admin\TicketScannerController::class, 'index'])->name('scanner');
+            Route::post('scanner/verify', [\App\Http\Controllers\Admin\TicketScannerController::class, 'verify'])->name('scanner.verify');
+            Route::post('scanner/check-in', [\App\Http\Controllers\Admin\TicketScannerController::class, 'checkIn'])->name('scanner.check-in');
+            Route::post('scanner/manual-check-in', [\App\Http\Controllers\Admin\TicketScannerController::class, 'manualCheckIn'])->name('scanner.manual-check-in');
+        });
     });
 });
