@@ -604,4 +604,20 @@ class Business extends Authenticatable implements CanResetPasswordContract
     {
         return $this->payments();
     }
+
+    /**
+     * Get events for this business
+     */
+    public function events()
+    {
+        return $this->hasMany(Event::class);
+    }
+
+    /**
+     * Get ticket orders for this business
+     */
+    public function ticketOrders()
+    {
+        return $this->hasMany(TicketOrder::class);
+    }
 }
