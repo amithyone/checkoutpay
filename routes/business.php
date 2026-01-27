@@ -104,5 +104,30 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::post('/support', [\App\Http\Controllers\Business\SupportController::class, 'store'])->name('support.store');
         Route::get('/support/{ticket}', [\App\Http\Controllers\Business\SupportController::class, 'show'])->name('support.show');
         Route::post('/support/{ticket}/reply', [\App\Http\Controllers\Business\SupportController::class, 'reply'])->name('support.reply');
+
+        // Events Management
+        Route::get('/events', [\App\Http\Controllers\Business\EventController::class, 'index'])->name('events.index');
+        Route::get('/events/create', [\App\Http\Controllers\Business\EventController::class, 'create'])->name('events.create');
+        Route::post('/events', [\App\Http\Controllers\Business\EventController::class, 'store'])->name('events.store');
+        Route::get('/events/{event}', [\App\Http\Controllers\Business\EventController::class, 'show'])->name('events.show');
+        Route::get('/events/{event}/edit', [\App\Http\Controllers\Business\EventController::class, 'edit'])->name('events.edit');
+        Route::put('/events/{event}', [\App\Http\Controllers\Business\EventController::class, 'update'])->name('events.update');
+        Route::delete('/events/{event}', [\App\Http\Controllers\Business\EventController::class, 'destroy'])->name('events.destroy');
+        Route::post('/events/{event}/publish', [\App\Http\Controllers\Business\EventController::class, 'publish'])->name('events.publish');
+        Route::post('/events/{event}/cancel', [\App\Http\Controllers\Business\EventController::class, 'cancel'])->name('events.cancel');
+
+        // Ticket Types
+        Route::post('/events/{event}/ticket-types', [\App\Http\Controllers\Business\TicketTypeController::class, 'store'])->name('ticket-types.store');
+        Route::put('/ticket-types/{ticketType}', [\App\Http\Controllers\Business\TicketTypeController::class, 'update'])->name('ticket-types.update');
+        Route::delete('/ticket-types/{ticketType}', [\App\Http\Controllers\Business\TicketTypeController::class, 'destroy'])->name('ticket-types.destroy');
+
+        // Ticket Orders
+        Route::get('/events/{event}/orders', [\App\Http\Controllers\Business\TicketOrderController::class, 'index'])->name('events.orders');
+        Route::get('/orders/{order}', [\App\Http\Controllers\Business\TicketOrderController::class, 'show'])->name('orders.show');
+
+        // Check-in
+        Route::get('/events/{event}/check-in', [\App\Http\Controllers\Business\CheckInController::class, 'index'])->name('events.check-in');
+        Route::post('/events/{event}/check-in', [\App\Http\Controllers\Business\CheckInController::class, 'checkIn'])->name('events.check-in.post');
+        Route::get('/events/{event}/check-in/statistics', [\App\Http\Controllers\Business\CheckInController::class, 'statistics'])->name('events.check-in.statistics');
     });
 });

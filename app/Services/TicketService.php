@@ -7,7 +7,6 @@ use App\Models\Ticket;
 use App\Models\TicketType;
 use App\Models\Event;
 use App\Models\Business;
-use App\Services\PaymentService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -16,9 +15,8 @@ class TicketService
     protected $paymentService;
     protected $qrCodeService;
 
-    public function __construct(PaymentService $paymentService, QRCodeService $qrCodeService)
+    public function __construct(QRCodeService $qrCodeService)
     {
-        $this->paymentService = $paymentService;
         $this->qrCodeService = $qrCodeService;
     }
 
@@ -47,9 +45,12 @@ class TicketService
                 'total_amount' => $totalAmount,
                 'status' => 'pending',
                 'payment_status' => 'pending',
+                'metadata' => [
+                    'attendees' => collect($items)->pluck('attendees')->flatten(1)->toArray(),
+                ],
             ]);
 
-            // Create order items
+            // Create order items with metadata
             foreach ($items as $item) {
                 $ticketType = TicketType::findOrFail($item['ticket_type_id']);
                 
@@ -59,6 +60,9 @@ class TicketService
                     'quantity' => $item['quantity'],
                     'unit_price' => $ticketType->price,
                     'total_price' => $ticketType->price * $item['quantity'],
+                    'metadata' => [
+                        'attendees' => $item['attendees'] ?? [],
+                    ],
                 ]);
             }
 
@@ -148,7 +152,10 @@ class TicketService
         $sequence = 1;
         
         foreach ($order->items as $item) {
-            $attendees = $item->metadata['attendees'] ?? [];
+            // Get attendees from order metadata or item metadata
+            $orderMetadata = $order->metadata ?? [];
+            $itemMetadata = $item->metadata ?? [];
+            $attendees = $itemMetadata['attendees'] ?? $orderMetadata['attendees'] ?? [];
             
             for ($i = 0; $i < $item->quantity; $i++) {
                 $attendee = $attendees[$i] ?? [
@@ -156,10 +163,14 @@ class TicketService
                     'email' => $order->customer_email,
                 ];
 
+                // Generate ticket number
+                $ticketNumber = Ticket::generateTicketNumber($order->order_number, $sequence);
+
                 // Generate QR code
-                $qrCode = $this->qrCodeService->generate($order->order_number . '-' . str_pad($sequence, 3, '0', STR_PAD_LEFT));
+                $qrCode = $this->qrCodeService->generate($ticketNumber);
 
                 Ticket::create([
+                    'ticket_number' => $ticketNumber,
                     'order_id' => $order->id,
                     'ticket_type_id' => $item->ticket_type_id,
                     'event_id' => $order->event_id,

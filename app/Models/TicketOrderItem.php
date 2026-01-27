@@ -15,12 +15,14 @@ class TicketOrderItem extends Model
         'quantity',
         'unit_price',
         'total_price',
+        'metadata',
     ];
 
     protected $casts = [
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
+        'metadata' => 'array',
     ];
 
     /**
