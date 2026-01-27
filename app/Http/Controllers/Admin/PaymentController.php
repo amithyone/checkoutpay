@@ -634,10 +634,16 @@ class PaymentController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-
+            
+            // Truncate error message for user display (prevent long SQL errors)
+            $errorMessage = $e->getMessage();
+            if (mb_strlen($errorMessage) > 200) {
+                $errorMessage = mb_substr($errorMessage, 0, 197) . '...';
+            }
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to resend webhook: ' . $e->getMessage(),
+                'message' => 'Failed to resend webhook: ' . $errorMessage,
             ], 500);
         }
     }

@@ -20,12 +20,26 @@ class TransactionLogService
         ?int $businessId = null,
         ?Request $request = null
     ): TransactionLog {
+        // Truncate description to prevent "Data too long" errors
+        // MySQL TEXT can hold 65,535 bytes, but we'll limit to 500 chars for safety
+        // Store full description in metadata if truncated
+        $truncatedDescription = $description;
+        $originalDescription = $description;
+        if ($description && mb_strlen($description) > 500) {
+            $truncatedDescription = mb_substr($description, 0, 497) . '...';
+            // Store full description in metadata if not already present
+            if (!isset($metadata['full_description'])) {
+                $metadata = $metadata ?? [];
+                $metadata['full_description'] = $originalDescription;
+            }
+        }
+        
         $log = TransactionLog::create([
             'transaction_id' => $transactionId,
             'payment_id' => $paymentId,
             'business_id' => $businessId,
             'event_type' => $eventType,
-            'description' => $description,
+            'description' => $truncatedDescription,
             'metadata' => $metadata,
             'ip_address' => $request?->ip(),
             'user_agent' => $request?->userAgent(),
@@ -189,13 +203,23 @@ class TransactionLogService
      */
     public function logWebhookFailed($payment, string $error): TransactionLog
     {
+        // Truncate error message for description, store full error in metadata
+        $errorPrefix = "Webhook failed: ";
+        $maxDescriptionLength = 500;
+        $maxErrorLength = $maxDescriptionLength - mb_strlen($errorPrefix) - 3; // -3 for "..."
+        
+        $truncatedError = $error;
+        if (mb_strlen($error) > $maxErrorLength) {
+            $truncatedError = mb_substr($error, 0, $maxErrorLength) . '...';
+        }
+        
         return $this->log(
             transactionId: $payment->transaction_id,
             eventType: TransactionLog::EVENT_WEBHOOK_FAILED,
-            description: "Webhook failed: {$error}",
+            description: $errorPrefix . $truncatedError,
             metadata: [
                 'webhook_url' => $payment->webhook_url,
-                'error' => $error,
+                'error' => $error, // Full error stored in metadata
             ],
             paymentId: $payment->id,
             businessId: $payment->business_id
