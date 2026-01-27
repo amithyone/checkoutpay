@@ -159,31 +159,6 @@ class SendWebhookNotification implements ShouldQueue
             ];
         }
 
-        // Include ticket order data if payment is for tickets
-        if (($emailData['order_type'] ?? null) === 'ticket') {
-            $ticketOrderId = $emailData['ticket_order_id'] ?? null;
-            if ($ticketOrderId) {
-                $ticketOrder = \App\Models\TicketOrder::with(['event', 'tickets.ticketType'])->find($ticketOrderId);
-                if ($ticketOrder) {
-                    $payload['order_type'] = 'ticket';
-                    $payload['ticket_order'] = [
-                        'order_number' => $ticketOrder->order_number,
-                        'event_id' => $ticketOrder->event_id,
-                        'event_title' => $ticketOrder->event->title,
-                        'tickets' => $ticketOrder->tickets->map(function ($ticket) {
-                            return [
-                                'ticket_number' => $ticket->ticket_number,
-                                'ticket_type' => $ticket->ticketType->name,
-                                'attendee_name' => $ticket->attendee_name,
-                                'attendee_email' => $ticket->attendee_email,
-                                'qr_code' => $ticket->qr_code,
-                            ];
-                        })->toArray(),
-                    ];
-                }
-            }
-        }
-
         return $payload;
     }
 

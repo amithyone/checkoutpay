@@ -1,0 +1,39 @@
+[07-Jan-2026 10:17:21 UTC] PHP Warning:  require(/home/checzspw/public_html/vendor/autoload.php): Failed to open stream: No such file or directory in /home/checzspw/public_html/artisan on line 7
+[07-Jan-2026 10:17:21 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/checzspw/public_html/vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/checzspw/public_html/artisan:7
+Stack trace:
+#0 {main}
+  thrown in /home/checzspw/public_html/artisan on line 7
+[07-Jan-2026 10:17:22 UTC] PHP Warning:  require(/home/checzspw/public_html/vendor/autoload.php): Failed to open stream: No such file or directory in /home/checzspw/public_html/artisan on line 7
+[07-Jan-2026 10:17:22 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/checzspw/public_html/vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/checzspw/public_html/artisan:7
+Stack trace:
+#0 {main}
+  thrown in /home/checzspw/public_html/artisan on line 7
+[07-Jan-2026 10:17:22 UTC] PHP Warning:  require(/home/checzspw/public_html/vendor/autoload.php): Failed to open stream: No such file or directory in /home/checzspw/public_html/artisan on line 7
+[07-Jan-2026 10:17:22 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/checzspw/public_html/vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/checzspw/public_html/artisan:7
+Stack trace:
+#0 {main}
+  thrown in /home/checzspw/public_html/artisan on line 7
+[07-Jan-2026 15:02:40 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Connection refused (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:02:40 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Connection refused (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:02:40 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Network is unreachable (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:02:40 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Network is unreachable (errflg=2) in Unknown on line 0
+[07-Jan-2026 15:03:21 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Connection refused (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:03:21 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Connection refused (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:03:21 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Network is unreachable (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:03:21 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,993: Network is unreachable (errflg=2) in Unknown on line 0
+[07-Jan-2026 15:06:29 UTC] PHP Notice:  PHP Request Shutdown: Connection failed to imap.gmail.com,143: Connection timed out (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:06:29 UTC] PHP Notice:  PHP Request Shutdown: Connection failed to imap.gmail.com,143: Connection timed out (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:06:29 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,143: Network is unreachable (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:06:29 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,143: Network is unreachable (errflg=2) in Unknown on line 0
+[07-Jan-2026 15:15:48 UTC] PHP Notice:  PHP Request Shutdown: Connection failed to imap.gmail.com,143: Connection timed out (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:15:48 UTC] PHP Notice:  PHP Request Shutdown: Connection failed to imap.gmail.com,143: Connection timed out (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:15:48 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,143: Network is unreachable (errflg=1) in Unknown on line 0
+[07-Jan-2026 15:15:48 UTC] PHP Notice:  PHP Request Shutdown: Can't connect to imap.gmail.com,143: Network is unreachable (errflg=2) in Unknown on line 0
+[09-Jan-2026 22:45:12 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
+[09-Jan-2026 22:45:26 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
+[09-Jan-2026 22:45:26 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
+[09-Jan-2026 22:45:26 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
+[09-Jan-2026 22:45:26 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
+[09-Jan-2026 22:45:40 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
+[09-Jan-2026 22:45:40 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
+[09-Jan-2026 22:45:46 UTC] PHP Warning:  Array to string conversion in /home/checzspw/public_html/test_imap_connection.php on line 50
