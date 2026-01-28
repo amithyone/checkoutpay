@@ -34,26 +34,84 @@ class SendWebhookNotification implements ShouldQueue
         // Reload payment with relationships
         $this->payment->load(['business', 'accountNumberDetails', 'website']);
 
-        // Priority: Website-specific webhook URL > Payment webhook URL > Business webhook URL
-        $webhookUrl = null;
-        
+        // Collect all webhook URLs to send to
+        $webhookUrls = [];
+
+        // 1. Add website-specific webhook URL (if payment has a website)
         if ($this->payment->website && $this->payment->website->webhook_url) {
-            // Use website-specific webhook URL if available
-            $webhookUrl = $this->payment->website->webhook_url;
-        } elseif ($this->payment->webhook_url) {
-            // Fall back to payment webhook URL
-            $webhookUrl = $this->payment->webhook_url;
-        } elseif ($this->payment->business && $this->payment->business->webhook_url) {
-            // Fall back to business webhook URL
-            $webhookUrl = $this->payment->business->webhook_url;
+            $webhookUrls[] = [
+                'url' => $this->payment->website->webhook_url,
+                'type' => 'website',
+                'website_id' => $this->payment->website->id,
+            ];
         }
 
-        if (!$webhookUrl) {
+        // 2. Add payment-specific webhook URL
+        if ($this->payment->webhook_url) {
+            $webhookUrls[] = [
+                'url' => $this->payment->webhook_url,
+                'type' => 'payment',
+            ];
+        }
+
+        // 3. Add business webhook URL
+        if ($this->payment->business && $this->payment->business->webhook_url) {
+            $webhookUrls[] = [
+                'url' => $this->payment->business->webhook_url,
+                'type' => 'business',
+            ];
+        }
+
+        // 4. Add webhooks from ALL websites under the business (if payment has a business)
+        if ($this->payment->business) {
+            $businessWebsites = $this->payment->business->websites()
+                ->where('is_approved', true)
+                ->whereNotNull('webhook_url')
+                ->get();
+
+            foreach ($businessWebsites as $website) {
+                // Skip if already added (the payment's specific website)
+                $alreadyAdded = false;
+                foreach ($webhookUrls as $existing) {
+                    if (isset($existing['website_id']) && $existing['website_id'] === $website->id) {
+                        $alreadyAdded = true;
+                        break;
+                    }
+                    if ($existing['url'] === $website->webhook_url) {
+                        $alreadyAdded = true;
+                        break;
+                    }
+                }
+
+                if (!$alreadyAdded) {
+                    $webhookUrls[] = [
+                        'url' => $website->webhook_url,
+                        'type' => 'business_website',
+                        'website_id' => $website->id,
+                    ];
+                }
+            }
+        }
+
+        // Remove duplicates (same URL)
+        $uniqueUrls = [];
+        $seenUrls = [];
+        foreach ($webhookUrls as $webhook) {
+            if (!in_array($webhook['url'], $seenUrls)) {
+                $uniqueUrls[] = $webhook;
+                $seenUrls[] = $webhook['url'];
+            }
+        }
+        $webhookUrls = $uniqueUrls;
+
+        if (empty($webhookUrls)) {
             Log::warning('Payment webhook skipped - no webhook URL', [
                 'payment_id' => $this->payment->id,
                 'transaction_id' => $this->payment->transaction_id,
                 'has_website' => $this->payment->website ? true : false,
+                'has_business' => $this->payment->business ? true : false,
                 'website_webhook' => $this->payment->website?->webhook_url ?? null,
+                'business_webhook' => $this->payment->business?->webhook_url ?? null,
             ]);
             return;
         }
@@ -61,51 +119,83 @@ class SendWebhookNotification implements ShouldQueue
         // Build webhook payload
         $payload = $this->buildWebhookPayload();
 
-        try {
-            $response = Http::timeout(30)
-                ->post($webhookUrl, $payload);
+        // Send webhook to all URLs
+        $successCount = 0;
+        $failureCount = 0;
+        $errors = [];
 
-            if ($response->successful()) {
-                // Log successful webhook
-                $logService->logWebhookSent($this->payment, [
-                    'status_code' => $response->status(),
-                    'response' => $response->body(),
-                ]);
+        foreach ($webhookUrls as $webhookInfo) {
+            $webhookUrl = $webhookInfo['url'];
+            $webhookType = $webhookInfo['type'];
 
-                Log::info('Payment webhook sent successfully', [
+            try {
+                $response = Http::timeout(30)
+                    ->post($webhookUrl, $payload);
+
+                if ($response->successful()) {
+                    // Log successful webhook
+                    $logService->logWebhookSent($this->payment, [
+                        'status_code' => $response->status(),
+                        'response' => $response->body(),
+                        'webhook_type' => $webhookType,
+                        'webhook_url' => $webhookUrl,
+                    ]);
+
+                    Log::info('Payment webhook sent successfully', [
+                        'payment_id' => $this->payment->id,
+                        'transaction_id' => $this->payment->transaction_id,
+                        'webhook_url' => $webhookUrl,
+                        'webhook_type' => $webhookType,
+                        'status_code' => $response->status(),
+                    ]);
+
+                    $successCount++;
+                } else {
+                    // Log failed webhook
+                    $errorMsg = "HTTP {$response->status()}: {$response->body()}";
+                    $logService->logWebhookFailed($this->payment, $errorMsg);
+
+                    Log::warning('Payment webhook failed', [
+                        'payment_id' => $this->payment->id,
+                        'transaction_id' => $this->payment->transaction_id,
+                        'webhook_url' => $webhookUrl,
+                        'webhook_type' => $webhookType,
+                        'status_code' => $response->status(),
+                        'response' => $response->body(),
+                    ]);
+
+                    $failureCount++;
+                    $errors[] = "{$webhookUrl}: {$errorMsg}";
+                }
+            } catch (\Exception $e) {
+                $logService->logWebhookFailed($this->payment, $e->getMessage());
+
+                Log::error('Payment webhook error', [
                     'payment_id' => $this->payment->id,
                     'transaction_id' => $this->payment->transaction_id,
                     'webhook_url' => $webhookUrl,
-                    'status_code' => $response->status(),
-                ]);
-            } else {
-                // Log failed webhook
-                $logService->logWebhookFailed($this->payment, "HTTP {$response->status()}: {$response->body()}");
-
-                Log::warning('Payment webhook failed', [
-                    'payment_id' => $this->payment->id,
-                    'transaction_id' => $this->payment->transaction_id,
-                    'webhook_url' => $webhookUrl,
-                    'status_code' => $response->status(),
-                    'response' => $response->body(),
+                    'webhook_type' => $webhookType,
+                    'error' => $e->getMessage(),
                 ]);
 
-                // Retry if not successful
-                throw new \Exception("Webhook returned status {$response->status()}");
+                $failureCount++;
+                $errors[] = "{$webhookUrl}: {$e->getMessage()}";
             }
-        } catch (\Exception $e) {
-            $logService->logWebhookFailed($this->payment, $e->getMessage());
-
-            Log::error('Payment webhook error', [
-                'payment_id' => $this->payment->id,
-                'transaction_id' => $this->payment->transaction_id,
-                'webhook_url' => $webhookUrl,
-                'error' => $e->getMessage(),
-            ]);
-
-            // Re-throw to trigger retry
-            throw $e;
         }
+
+        // If all webhooks failed, throw exception to trigger retry
+        if ($failureCount > 0 && $successCount === 0) {
+            throw new \Exception("All webhooks failed: " . implode('; ', $errors));
+        }
+
+        // Log summary
+        Log::info('Payment webhook summary', [
+            'payment_id' => $this->payment->id,
+            'transaction_id' => $this->payment->transaction_id,
+            'total_webhooks' => count($webhookUrls),
+            'successful' => $successCount,
+            'failed' => $failureCount,
+        ]);
     }
 
     /**
