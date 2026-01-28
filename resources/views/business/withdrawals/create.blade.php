@@ -5,10 +5,10 @@
 
 @section('content')
 <div class="max-w-2xl mx-auto">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div class="mb-6">
-            <h3 class="text-lg font-semibold text-gray-900">Request Withdrawal</h3>
-            <p class="text-sm text-gray-600 mt-1">Available Balance: <span class="font-semibold text-primary">₦{{ number_format($business->balance, 2) }}</span></p>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div class="mb-4 sm:mb-6">
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900">Request Withdrawal</h3>
+            <p class="text-xs sm:text-sm text-gray-600 mt-1">Available Balance: <span class="font-semibold text-primary">₦{{ number_format($business->balance, 2) }}</span></p>
         </div>
 
         @php
@@ -17,8 +17,8 @@
         @endphp
 
         @if($hasAccountNumber && $accountDetails)
-            <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p class="text-sm text-blue-800">
+            <div class="mb-4 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-xs sm:text-sm text-blue-800 break-words">
                     <strong>Account Details:</strong> {{ $accountDetails->bank_name }} - {{ $accountDetails->account_name }} ({{ $accountDetails->account_number }})
                 </p>
             </div>
@@ -107,11 +107,11 @@
                 </div>
             </div>
 
-            <div class="mt-6 flex items-center justify-end gap-4">
-                <a href="{{ route('business.withdrawals.index') }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+            <div class="mt-4 sm:mt-6 flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-end gap-3">
+                <a href="{{ route('business.withdrawals.index') }}" class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-center text-sm">
                     Cancel
                 </a>
-                <button type="submit" id="submit_btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="submit" id="submit_btn" class="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
                     Submit Request
                 </button>
             </div>
