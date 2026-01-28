@@ -408,11 +408,10 @@ class SendWebhookNotification implements ShouldQueue
 
     /**
      * Build webhook payload
+     * Optimized to include only essential transaction approval details
      */
     protected function buildWebhookPayload(): array
     {
-        $emailData = $this->payment->email_data ?? [];
-        
         $payload = [
             'event' => 'payment.approved',
             'transaction_id' => $this->payment->transaction_id,
@@ -421,7 +420,6 @@ class SendWebhookNotification implements ShouldQueue
             'received_amount' => (float) ($this->payment->received_amount ?? $this->payment->amount),
             'payer_name' => $this->payment->payer_name,
             'bank' => $this->payment->bank,
-            'payer_account_number' => $this->payment->payer_account_number,
             'account_number' => $this->payment->account_number,
             'account_details' => $this->payment->accountNumberDetails ? [
                 'account_name' => $this->payment->accountNumberDetails->account_name,
@@ -429,8 +427,6 @@ class SendWebhookNotification implements ShouldQueue
             ] : null,
             'is_mismatch' => $this->payment->is_mismatch ?? false,
             'mismatch_reason' => $this->payment->mismatch_reason,
-            'name_mismatch' => $emailData['name_mismatch'] ?? false,
-            'name_similarity_percent' => $emailData['name_similarity_percent'] ?? null,
             'matched_at' => $this->payment->matched_at?->toISOString(),
             'approved_at' => $this->payment->approved_at?->toISOString(),
             'created_at' => $this->payment->created_at->toISOString(),
@@ -448,16 +444,11 @@ class SendWebhookNotification implements ShouldQueue
             ],
         ];
 
-        // Include email metadata if available (exclude large text/html bodies)
-        if (!empty($emailData)) {
-            $payload['email'] = [
-                'subject' => $emailData['subject'] ?? null,
-                'from' => $emailData['from'] ?? $emailData['from_email'] ?? null,
-                'date' => $emailData['date'] ?? $emailData['transaction_date'] ?? null,
-                // Only include previews, not full bodies
-                'text_preview' => $emailData['text_preview'] ?? null,
-            ];
-        }
+        // Removed unnecessary fields:
+        // - payer_account_number (not needed for webhook)
+        // - email object (subject, from, date - not needed for transaction approval)
+        // - name_mismatch (redundant with is_mismatch)
+        // - name_similarity_percent (not needed for webhook)
 
         return $payload;
     }
