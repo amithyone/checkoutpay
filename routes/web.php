@@ -1254,12 +1254,25 @@ Route::get('/cron/global-match', function () {
                                 $payment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
                             }
 
-                            // Update business balance (same as PaymentController::checkMatch)
+                            // Update business balance with charges (same as PaymentController::checkMatch)
                             if ($payment->business_id) {
-                                $payment->business->increment('balance', $payment->amount);
+                                $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
+                                $payment->business->refresh();
+                                
+                                // Send new deposit notification
+                                $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                                
+                                // Check for auto-withdrawal
+                                $payment->business->triggerAutoWithdrawal();
                             }
 
+                            // CRITICAL: Reload payment with business websites relationship before dispatching webhook
+                            // This ensures webhooks are sent to ALL websites under the business (e.g., fadded.net)
+                            $payment->refresh();
+                            $payment->load(['business.websites', 'website']);
+
                             // Dispatch event to send webhook (same as PaymentController::checkMatch)
+                            // This will send webhooks to ALL websites under the business
                             event(new \App\Events\PaymentApproved($payment));
 
                             break;

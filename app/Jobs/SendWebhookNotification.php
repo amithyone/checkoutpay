@@ -31,8 +31,8 @@ class SendWebhookNotification implements ShouldQueue
      */
     public function handle(TransactionLogService $logService): void
     {
-        // Reload payment with relationships
-        $this->payment->load(['business', 'accountNumberDetails', 'website']);
+        // Reload payment with relationships - CRITICAL: Load business websites relationship
+        $this->payment->load(['business.websites', 'accountNumberDetails', 'website']);
 
         // Collect all webhook URLs to send to
         $webhookUrls = [];

@@ -185,6 +185,13 @@ class Kernel extends ConsoleKernel
                                 $payment->business->triggerAutoWithdrawal();
                             }
                             
+                            // CRITICAL: Reload payment with business websites relationship before dispatching webhook
+                            // This ensures webhooks are sent to ALL websites under the business (e.g., fadded.net)
+                            $payment->refresh();
+                            $payment->load(['business.websites', 'website']);
+                            
+                            // Dispatch event to send webhook to ALL websites under the business
+                            // This ensures fadded.net and all other websites receive webhooks
                             event(new \App\Events\PaymentApproved($payment));
                         }
                     } catch (\Exception $e) {

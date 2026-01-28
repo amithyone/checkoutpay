@@ -318,7 +318,12 @@ class PaymentService
                         $payment->business->triggerAutoWithdrawal();
                     }
                     
-                    // Dispatch event to send webhook
+                    // CRITICAL: Reload payment with business websites relationship before dispatching webhook
+                    // This ensures webhooks are sent to ALL websites under the business (e.g., fadded.net)
+                    $payment->refresh();
+                    $payment->load(['business.websites', 'website']);
+                    
+                    // Dispatch event to send webhook to ALL websites under the business
                     event(new \App\Events\PaymentApproved($payment));
                     
                     \Illuminate\Support\Facades\Log::info('Payment matched via reverse search from stored email on creation', [

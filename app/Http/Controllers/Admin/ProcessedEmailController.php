@@ -259,7 +259,11 @@ class ProcessedEmailController extends Controller
                             $payment->business->triggerAutoWithdrawal();
                         }
 
-                        // Dispatch event to send webhook (same as PaymentController::checkMatch)
+                        // CRITICAL: Reload payment with business websites relationship before dispatching webhook
+                        $payment->refresh();
+                        $payment->load(['business.websites', 'website']);
+
+                        // Dispatch event to send webhook to ALL websites under the business
                         event(new \App\Events\PaymentApproved($payment));
 
                         break;
@@ -444,7 +448,11 @@ class ProcessedEmailController extends Controller
                     $matchedPayment->business->triggerAutoWithdrawal();
                 }
                 
-                // Dispatch event to send webhook
+                // CRITICAL: Reload payment with business websites relationship before dispatching webhook
+                $matchedPayment->refresh();
+                $matchedPayment->load(['business.websites', 'website']);
+                
+                // Dispatch event to send webhook to ALL websites under the business
                 event(new \App\Events\PaymentApproved($matchedPayment));
             }
 
@@ -608,7 +616,11 @@ class ProcessedEmailController extends Controller
                     $matchedPayment->business->triggerAutoWithdrawal();
                 }
                 
-                // Dispatch event to send webhook
+                // CRITICAL: Reload payment with business websites relationship before dispatching webhook
+                $matchedPayment->refresh();
+                $matchedPayment->load(['business.websites', 'website']);
+                
+                // Dispatch event to send webhook to ALL websites under the business
                 event(new \App\Events\PaymentApproved($matchedPayment));
             }
 

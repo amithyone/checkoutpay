@@ -100,7 +100,12 @@ class ProcessEmailPayment implements ShouldQueue
                     $payment->business->triggerAutoWithdrawal();
                 }
 
-                // Dispatch event to send webhook
+                // CRITICAL: Reload payment with business websites relationship before dispatching webhook
+                // This ensures webhooks are sent to ALL websites under the business (e.g., fadded.net)
+                $payment->refresh();
+                $payment->load(['business.websites', 'website']);
+
+                // Dispatch event to send webhook to ALL websites under the business
                 event(new PaymentApproved($payment));
                 
                 $processingTime = round((microtime(true) - $startTime) * 1000, 2);
