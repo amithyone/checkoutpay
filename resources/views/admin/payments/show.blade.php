@@ -72,41 +72,41 @@
 
         <div class="grid grid-cols-2 gap-6">
             <div>
-                <label class="text-sm text-gray-600">Amount</label>
-                <p class="text-lg font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Amount</label>
+                <p class="text-base sm:text-lg font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
             </div>
             <div>
-                <label class="text-sm text-gray-600">Business</label>
-                <p class="text-sm font-medium text-gray-900">{{ $payment->business->name ?? 'N/A' }}</p>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Business</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">{{ $payment->business->name ?? 'N/A' }}</p>
             </div>
             <div>
-                <label class="text-sm text-gray-600">Payer Name</label>
-                <p class="text-sm font-medium text-gray-900">{{ $payment->payer_name ?? 'N/A' }}</p>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Payer Name</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">{{ $payment->payer_name ?? 'N/A' }}</p>
             </div>
             <div>
-                <label class="text-sm text-gray-600">Bank</label>
-                <p class="text-sm font-medium text-gray-900">{{ $payment->bank ?? 'N/A' }}</p>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Bank</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900">{{ $payment->bank ?? 'N/A' }}</p>
             </div>
             <div>
-                <label class="text-sm text-gray-600">Account Number</label>
-                <p class="text-sm font-medium text-gray-900">{{ $payment->account_number ?? 'N/A' }}</p>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Account Number</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900 font-mono break-all">{{ $payment->account_number ?? 'N/A' }}</p>
             </div>
             @if($payment->accountNumberDetails)
             <div>
-                <label class="text-sm text-gray-600">Account Details</label>
-                <p class="text-sm font-medium text-gray-900">
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Account Details</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">
                     {{ $payment->accountNumberDetails->account_name }} - {{ $payment->accountNumberDetails->bank_name }}
                 </p>
             </div>
             @endif
             <div>
-                <label class="text-sm text-gray-600">Created At</label>
-                <p class="text-sm font-medium text-gray-900">{{ $payment->created_at->format('M d, Y H:i:s') }}</p>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Created At</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900">{{ $payment->created_at->format('M d, Y H:i:s') }}</p>
             </div>
             @if($payment->matched_at)
             <div>
-                <label class="text-sm text-gray-600">Matched At</label>
-                <p class="text-sm font-medium text-gray-900">{{ $payment->matched_at->format('M d, Y H:i:s') }}</p>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Matched At</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900">{{ $payment->matched_at->format('M d, Y H:i:s') }}</p>
                 @php
                     $matchingTimeMinutes = $payment->created_at->diffInMinutes($payment->matched_at);
                 @endphp
@@ -118,11 +118,11 @@
             </div>
             @elseif($payment->status === 'pending')
             <div>
-                <label class="text-sm text-gray-600">Pending Time</label>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Pending Time</label>
                 @php
                     $pendingMinutes = $payment->created_at->diffInMinutes(now());
                 @endphp
-                <p class="text-sm font-medium text-yellow-600">{{ $pendingMinutes }} minutes</p>
+                <p class="text-xs sm:text-sm font-medium text-yellow-600">{{ $pendingMinutes }} minutes</p>
                 <p class="text-xs text-gray-500 mt-1">
                     Created {{ $payment->created_at->diffForHumans() }}
                 </p>
@@ -130,27 +130,27 @@
             @endif
             @if($payment->email_data && isset($payment->email_data['manual_verification']))
             <div>
-                <label class="text-sm text-gray-600">Manual Verification</label>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Manual Verification</label>
                 <div class="mt-1">
                     <span class="px-2 py-1 text-xs font-medium bg-indigo-100 text-indigo-800 rounded-full">
                         <i class="fas fa-check-double mr-1"></i> Verified
                     </span>
-                    <p class="text-xs text-gray-500 mt-1">
+                    <p class="text-xs text-gray-500 mt-1 break-words">
                         By: {{ $payment->email_data['manual_verification']['verified_by_name'] ?? 'Admin' }}
                         @if(isset($payment->email_data['manual_verification']['verified_at']))
                             - {{ \Carbon\Carbon::parse($payment->email_data['manual_verification']['verified_at'])->format('M d, Y H:i') }}
                         @endif
                     </p>
                     @if(isset($payment->email_data['manual_verification']['verification_notes']) && !empty($payment->email_data['manual_verification']['verification_notes']))
-                        <p class="text-xs text-gray-600 mt-1 italic">{{ $payment->email_data['manual_verification']['verification_notes'] }}</p>
+                        <p class="text-xs text-gray-600 mt-1 italic break-words">{{ $payment->email_data['manual_verification']['verification_notes'] }}</p>
                     @endif
                 </div>
             </div>
             @endif
             @if($payment->expires_at)
             <div>
-                <label class="text-sm text-gray-600">Expires At</label>
-                <p class="text-sm font-medium {{ $payment->expires_at->isPast() ? 'text-red-600' : ($payment->expires_at->diffInHours(now()) < 2 ? 'text-orange-600' : 'text-gray-900') }}">
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Expires At</label>
+                <p class="text-xs sm:text-sm font-medium {{ $payment->expires_at->isPast() ? 'text-red-600' : ($payment->expires_at->diffInHours(now()) < 2 ? 'text-orange-600' : 'text-gray-900') }}">
                     {{ $payment->expires_at->format('M d, Y H:i:s') }}
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
@@ -252,8 +252,74 @@
 
         @if($payment->email_data)
         <div class="mt-6 pt-6 border-t border-gray-200">
-            <label class="text-sm text-gray-600 mb-2 block">Email Data</label>
-            <pre class="bg-gray-50 p-3 sm:p-4 rounded-lg text-xs overflow-x-auto">{{ json_encode($payment->email_data, JSON_PRETTY_PRINT) }}</pre>
+            <label class="text-xs sm:text-sm text-gray-600 mb-2 block">Email Data</label>
+            <pre class="bg-gray-50 p-3 sm:p-4 rounded-lg text-xs overflow-x-auto break-words whitespace-pre-wrap">{{ json_encode($payment->email_data, JSON_PRETTY_PRINT) }}</pre>
+        </div>
+        @endif
+        
+        <!-- Webhook Status Section (if approved) -->
+        @if($payment->status === 'approved' && $payment->webhook_status)
+        <div class="mt-6 pt-6 border-t border-gray-200">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                <h4 class="text-sm sm:text-md font-semibold text-gray-900">
+                    <i class="fas fa-paper-plane text-primary mr-2"></i>Webhook Status
+                </h4>
+                @if($payment->webhook_status === 'sent')
+                    <span class="px-3 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                        <i class="fas fa-check-circle mr-1"></i> All Sent
+                    </span>
+                @elseif($payment->webhook_status === 'partial')
+                    <span class="px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Partially Sent
+                    </span>
+                @elseif($payment->webhook_status === 'failed')
+                    <span class="px-3 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                        <i class="fas fa-times-circle mr-1"></i> Failed
+                    </span>
+                @else
+                    <span class="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                        <i class="fas fa-clock mr-1"></i> Pending
+                    </span>
+                @endif
+            </div>
+            @if($payment->webhook_sent_at)
+                <p class="text-xs text-gray-600 mb-2">
+                    Last sent: {{ $payment->webhook_sent_at->format('M d, Y H:i:s') }}
+                    ({{ $payment->webhook_attempts }} attempt(s))
+                </p>
+            @endif
+            @if($payment->webhook_urls_sent)
+                <div class="space-y-2">
+                    <p class="text-xs font-medium text-gray-700">Webhook URLs:</p>
+                    @foreach($payment->webhook_urls_sent as $webhook)
+                        <div class="bg-gray-50 rounded p-2 text-xs">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-mono text-gray-700 break-all">{{ Str::limit($webhook['url'], 60) }}</span>
+                                @if($webhook['status'] === 'success')
+                                    <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs ml-2">
+                                        <i class="fas fa-check"></i> Sent
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs ml-2">
+                                        <i class="fas fa-times"></i> Failed
+                                    </span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-gray-500">
+                                Type: {{ ucfirst(str_replace('_', ' ', $webhook['type'])) }}
+                                @if(isset($webhook['error']))
+                                    • Error: {{ Str::limit($webhook['error'], 50) }}
+                                @endif
+                            </p>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+            @if($payment->webhook_last_error)
+                <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+                    <strong>Last Error:</strong> {{ Str::limit($payment->webhook_last_error, 200) }}
+                </div>
+            @endif
         </div>
         @endif
     </div>
