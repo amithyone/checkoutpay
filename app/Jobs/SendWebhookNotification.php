@@ -16,8 +16,9 @@ class SendWebhookNotification implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public $tries = 5; // Increased tries for rate limiting
     public $timeout = 30;
+    public $backoff = [60, 300, 900, 1800, 3600]; // Exponential backoff: 1min, 5min, 15min, 30min, 1hr
 
     /**
      * Create a new job instance.
@@ -258,9 +259,32 @@ class SendWebhookNotification implements ShouldQueue
                         'status_code' => $response->status(),
                         'website_id' => $webhookInfo['website_id'] ?? null,
                     ];
+                } elseif ($response->status() === 429) {
+                    // HTTP 429: Too Many Requests - Rate limiting
+                    // Don't treat as permanent failure, will retry via queue
+                    $errorMsg = "HTTP 429: Rate limited. Will retry.";
+                    $logService->logWebhookFailed($this->payment, $errorMsg);
+
+                    Log::warning('Payment webhook rate limited (429)', [
+                        'payment_id' => $this->payment->id,
+                        'transaction_id' => $this->payment->transaction_id,
+                        'webhook_url' => $webhookUrl,
+                        'webhook_type' => $webhookType,
+                        'status_code' => 429,
+                        'note' => 'Rate limited - will retry via queue',
+                    ]);
+
+                    // For 429, we want to retry, so throw exception to trigger retry
+                    throw new \Exception("Rate limited (429) for {$webhookUrl}");
                 } else {
                     // Log failed webhook
-                    $errorMsg = "HTTP {$response->status()}: {$response->body()}";
+                    $responseBody = $response->body();
+                    // Truncate very long error messages
+                    if (strlen($responseBody) > 500) {
+                        $responseBody = substr($responseBody, 0, 500) . '... (truncated)';
+                    }
+                    
+                    $errorMsg = "HTTP {$response->status()}: {$responseBody}";
                     $logService->logWebhookFailed($this->payment, $errorMsg);
 
                     Log::warning('Payment webhook failed', [
@@ -269,7 +293,7 @@ class SendWebhookNotification implements ShouldQueue
                         'webhook_url' => $webhookUrl,
                         'webhook_type' => $webhookType,
                         'status_code' => $response->status(),
-                        'response' => $response->body(),
+                        'response_preview' => substr($response->body(), 0, 200),
                     ]);
 
                     $failureCount++;
@@ -279,10 +303,16 @@ class SendWebhookNotification implements ShouldQueue
                         'type' => $webhookType,
                         'status' => 'failed',
                         'error' => $errorMsg,
+                        'status_code' => $response->status(),
                         'website_id' => $webhookInfo['website_id'] ?? null,
                     ];
                 }
             } catch (\Exception $e) {
+                // If it's a 429 rate limit exception, re-throw to trigger retry
+                if (strpos($e->getMessage(), '429') !== false || strpos($e->getMessage(), 'Rate limited') !== false) {
+                    throw $e;
+                }
+                
                 $logService->logWebhookFailed($this->payment, $e->getMessage());
 
                 Log::error('Payment webhook error', [
@@ -418,12 +448,14 @@ class SendWebhookNotification implements ShouldQueue
             ],
         ];
 
-        // Include email data if available
+        // Include email metadata if available (exclude large text/html bodies)
         if (!empty($emailData)) {
             $payload['email'] = [
                 'subject' => $emailData['subject'] ?? null,
                 'from' => $emailData['from'] ?? $emailData['from_email'] ?? null,
                 'date' => $emailData['date'] ?? $emailData['transaction_date'] ?? null,
+                // Only include previews, not full bodies
+                'text_preview' => $emailData['text_preview'] ?? null,
             ];
         }
 
