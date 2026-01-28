@@ -6,11 +6,12 @@
 @section('content')
 <div class="space-y-6">
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h3 class="text-lg font-semibold text-gray-900">Transaction: {{ $payment->transaction_id }}</h3>
+        <!-- Mobile-Optimized Header -->
+        <div class="mb-6">
+            <div class="mb-4">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 break-all mb-2">Transaction: {{ $payment->transaction_id }}</h3>
                 @if($statusChecksCount >= 3)
-                    <div class="mt-2 flex items-center space-x-2">
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
                         <span class="px-3 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
                             <i class="fas fa-exclamation-triangle mr-1"></i> Needs Review ({{ $statusChecksCount }} API checks)
                         </span>
@@ -20,57 +21,63 @@
                     </div>
                 @endif
             </div>
-            <div class="flex items-center gap-3">
-                @if($payment->status === 'pending')
-                    <button onclick="checkMatchForPayment({{ $payment->id }})" 
-                        id="check-match-btn"
-                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center check-match-payment-btn"
-                        data-payment-id="{{ $payment->id }}">
-                        <i class="fas fa-search mr-2"></i> Check Match
-                    </button>
-                    <button onclick="showManualVerifyModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
-                        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center">
-                        <i class="fas fa-check-double mr-2"></i> Manual Verify
-                    </button>
-                    <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
-                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center">
-                        <i class="fas fa-check-circle mr-2"></i> Manual Approve
-                    </button>
-                    @if(!$payment->expires_at || $payment->expires_at->isFuture())
-                        <button onclick="markAsExpired({{ $payment->id }})" 
-                            class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center">
-                            <i class="fas fa-clock mr-2"></i> Mark as Expired
-                        </button>
-                    @endif
-                @endif
-                <div class="relative group">
-                    <button onclick="showDeleteModal({{ $payment->id }}, '{{ $payment->transaction_id }}')" 
-                        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center">
-                        <i class="fas fa-trash mr-2"></i> Delete
-                    </button>
-                </div>
+            
+            <!-- Status Badge -->
+            <div class="mb-4">
                 @if($payment->status === 'approved')
-                    <button onclick="resendWebhook({{ $payment->id }})" 
-                        id="resend-webhook-btn"
-                        class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center"
-                        title="Resend webhook notification to business">
-                        <i class="fas fa-paper-plane mr-2"></i> Resend Webhook
-                    </button>
-                    <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
+                    <span class="px-3 py-1 text-xs sm:text-sm font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
                 @elseif($payment->status === 'pending')
-                    <span class="px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                    <span class="px-3 py-1 text-xs sm:text-sm font-medium bg-yellow-100 text-yellow-800 rounded-full">
                         Pending
                         @if($payment->expires_at && $payment->expires_at->isPast())
                             <span class="ml-1 text-red-600">(Expired)</span>
                         @endif
                     </span>
                 @else
-                    <span class="px-3 py-1 text-sm font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
+                    <span class="px-3 py-1 text-xs sm:text-sm font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
                 @endif
+            </div>
+            
+            <!-- Action Buttons - Mobile Stacked -->
+            <div class="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                @if($payment->status === 'approved')
+                    <button onclick="resendWebhook({{ $payment->id }})" 
+                        id="resend-webhook-btn"
+                        class="w-full sm:w-auto bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center justify-center text-sm"
+                        title="Resend webhook notification to business">
+                        <i class="fas fa-paper-plane mr-2"></i> <span>Resend Webhook</span>
+                    </button>
+                @elseif($payment->status === 'pending')
+                    <button onclick="checkMatchForPayment({{ $payment->id }})" 
+                        id="check-match-btn"
+                        class="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center text-sm check-match-payment-btn"
+                        data-payment-id="{{ $payment->id }}">
+                        <i class="fas fa-search mr-2"></i> <span>Check Match</span>
+                    </button>
+                    <button onclick="showManualVerifyModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
+                        class="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center text-sm">
+                        <i class="fas fa-check-double mr-2"></i> <span>Manual Verify</span>
+                    </button>
+                    <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
+                        class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm">
+                        <i class="fas fa-check-circle mr-2"></i> <span>Manual Approve</span>
+                    </button>
+                    @if(!$payment->expires_at || $payment->expires_at->isFuture())
+                        <button onclick="markAsExpired({{ $payment->id }})" 
+                            class="w-full sm:w-auto bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center justify-center text-sm">
+                            <i class="fas fa-clock mr-2"></i> <span>Mark as Expired</span>
+                        </button>
+                    @endif
+                @endif
+                <button onclick="showDeleteModal({{ $payment->id }}, '{{ $payment->transaction_id }}')" 
+                    class="w-full sm:w-auto bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center text-sm">
+                    <i class="fas fa-trash mr-2"></i> <span>Delete</span>
+                </button>
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-6">
+        <!-- Payment Details Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div>
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">Amount</label>
                 <p class="text-base sm:text-lg font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
