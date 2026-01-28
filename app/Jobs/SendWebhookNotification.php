@@ -64,10 +64,27 @@ class SendWebhookNotification implements ShouldQueue
 
         // 4. Add webhooks from ALL websites under the business (if payment has a business)
         if ($this->payment->business) {
-            $businessWebsites = $this->payment->business->websites()
+            // CRITICAL: Query websites directly to ensure we get all approved websites with webhooks
+            // Don't rely on the relationship being loaded - query fresh from database
+            $businessWebsites = \App\Models\BusinessWebsite::where('business_id', $this->payment->business_id)
                 ->where('is_approved', true)
                 ->whereNotNull('webhook_url')
+                ->where('webhook_url', '!=', '')
                 ->get();
+
+            Log::info('Loading business websites for webhook', [
+                'payment_id' => $this->payment->id,
+                'business_id' => $this->payment->business_id,
+                'business_name' => $this->payment->business->name,
+                'websites_found' => $businessWebsites->count(),
+                'website_details' => $businessWebsites->map(function($w) {
+                    return [
+                        'id' => $w->id,
+                        'url' => $w->website_url,
+                        'webhook_url' => $w->webhook_url,
+                    ];
+                })->toArray(),
+            ]);
 
             foreach ($businessWebsites as $website) {
                 // Skip if already added (the payment's specific website)
@@ -89,6 +106,19 @@ class SendWebhookNotification implements ShouldQueue
                         'type' => 'business_website',
                         'website_id' => $website->id,
                     ];
+                    
+                    Log::info('Added business website webhook URL', [
+                        'payment_id' => $this->payment->id,
+                        'website_id' => $website->id,
+                        'website_url' => $website->website_url,
+                        'webhook_url' => $website->webhook_url,
+                    ]);
+                } else {
+                    Log::info('Skipped business website webhook (already added)', [
+                        'payment_id' => $this->payment->id,
+                        'website_id' => $website->id,
+                        'webhook_url' => $website->webhook_url,
+                    ]);
                 }
             }
         }
@@ -128,6 +158,20 @@ class SendWebhookNotification implements ShouldQueue
 
         // Build webhook payload
         $payload = $this->buildWebhookPayload();
+
+        // Log all webhook URLs that will be sent to
+        Log::info('Sending webhooks to all URLs', [
+            'payment_id' => $this->payment->id,
+            'transaction_id' => $this->payment->transaction_id,
+            'total_webhook_urls' => count($webhookUrls),
+            'webhook_urls' => array_map(function($w) {
+                return [
+                    'url' => $w['url'],
+                    'type' => $w['type'],
+                    'website_id' => $w['website_id'] ?? null,
+                ];
+            }, $webhookUrls),
+        ]);
 
         // Send webhook to all URLs
         $successCount = 0;
