@@ -2,6 +2,27 @@
 
 This guide explains how to set up the Laravel queue worker on cPanel to ensure webhooks are processed automatically.
 
+## Finding Your Application Path
+
+First, find your Laravel application directory:
+
+```bash
+# SSH into your server and run:
+cd ~/public_html  # or wherever your Laravel app is
+pwd  # This shows your current path
+
+# Or find artisan file:
+find ~ -name "artisan" -type f 2>/dev/null | head -1
+```
+
+Common paths:
+- `/home/username/public_html` (cPanel default)
+- `/home/username/checkout`
+- `/var/www/checkout`
+- `/var/www/html`
+
+Replace `username` with your actual cPanel username.
+
 ## Method 1: cPanel Cron Job (Recommended)
 
 ### Step 1: Access cPanel Cron Jobs
@@ -12,6 +33,8 @@ This guide explains how to set up the Laravel queue worker on cPanel to ensure w
 
 ### Step 2: Configure the Cron Job
 
+**IMPORTANT**: Replace `/home/username/public_html` with YOUR actual application path!
+
 **Option A: Run Queue Worker Continuously (Best for Production)**
 
 - **Minute**: `*`
@@ -21,7 +44,7 @@ This guide explains how to set up the Laravel queue worker on cPanel to ensure w
 - **Weekday**: `*`
 - **Command**: 
 ```bash
-cd /var/www/checkout && /usr/bin/php artisan queue:work --queue=default --timeout=60 --memory=512 --sleep=3 --max-time=3600 --tries=3 --stop-when-empty=false >> /var/www/checkout/storage/logs/queue-worker.log 2>&1
+cd /home/username/public_html && /usr/bin/php artisan queue:work --queue=default --timeout=60 --memory=512 --sleep=3 --max-time=3600 --tries=3 --stop-when-empty=false >> /home/username/public_html/storage/logs/queue-worker.log 2>&1
 ```
 
 **Option B: Run Queue Worker Script (Auto-restart on crash)**
@@ -33,10 +56,10 @@ cd /var/www/checkout && /usr/bin/php artisan queue:work --queue=default --timeou
 - **Weekday**: `*`
 - **Command**: 
 ```bash
-/bin/bash /var/www/checkout/queue-worker.sh
+/bin/bash /home/username/public_html/queue-worker.sh
 ```
 
-**Option C: Process Jobs Every Minute (Simpler, but less efficient)**
+**Option C: Simple - Process Jobs Every Minute**
 
 - **Minute**: `*`
 - **Hour**: `*`
@@ -45,7 +68,7 @@ cd /var/www/checkout && /usr/bin/php artisan queue:work --queue=default --timeou
 - **Weekday**: `*`
 - **Command**: 
 ```bash
-cd /var/www/checkout && /usr/bin/php artisan queue:work --once --timeout=60
+cd /home/username/public_html && /usr/bin/php artisan queue:work --once --timeout=60
 ```
 
 ### Step 3: Verify Queue Worker is Running
@@ -53,14 +76,20 @@ cd /var/www/checkout && /usr/bin/php artisan queue:work --once --timeout=60
 After setting up the cron job, verify it's working:
 
 ```bash
+# SSH into your server first, then:
+
 # Check if queue worker process is running
 ps aux | grep "queue:work"
 
-# Check queue worker logs
-tail -f /var/www/checkout/storage/logs/queue-worker.log
+# Check queue worker logs (replace path with yours)
+tail -f /home/username/public_html/storage/logs/queue-worker.log
 
-# Check Laravel logs for webhook activity
-tail -f /var/www/checkout/storage/logs/laravel.log | grep -i webhook
+# Check Laravel logs for webhook activity (replace path with yours)
+tail -f /home/username/public_html/storage/logs/laravel.log | grep -i webhook
+
+# Or test manually
+cd /home/username/public_html
+php artisan queue:work --once
 ```
 
 ## Method 2: SSH Terminal (If you have SSH access)
@@ -68,14 +97,16 @@ tail -f /var/www/checkout/storage/logs/laravel.log | grep -i webhook
 If you have SSH access, you can run the queue worker in a screen or tmux session:
 
 ```bash
-# Install screen if not available
+# First, navigate to your Laravel application directory
+cd ~/public_html  # or your actual path
+
+# Install screen if not available (may need root)
 # yum install screen  # or apt-get install screen
 
 # Start a screen session
 screen -S queue-worker
 
 # Run the queue worker
-cd /var/www/checkout
 php artisan queue:work --queue=default --timeout=60 --memory=512 --sleep=3 --tries=3
 
 # Detach from screen: Press Ctrl+A then D
@@ -91,7 +122,7 @@ If Supervisor is installed on your server, create a supervisor config:
 ```ini
 [program:checkout-queue-worker]
 process_name=%(program_name)s_%(process_num)02d
-command=/usr/bin/php /var/www/checkout/artisan queue:work --queue=default --timeout=60 --memory=512 --sleep=3 --tries=3
+command=/usr/bin/php /home/username/public_html/artisan queue:work --queue=default --timeout=60 --memory=512 --sleep=3 --tries=3
 autostart=true
 autorestart=true
 stopasgroup=true
@@ -99,9 +130,11 @@ killasgroup=true
 user=www-data
 numprocs=1
 redirect_stderr=true
-stdout_logfile=/var/www/checkout/storage/logs/queue-worker.log
+stdout_logfile=/home/username/public_html/storage/logs/queue-worker.log
 stopwaitsecs=3600
 ```
+
+**Note**: Replace `/home/username/public_html` with your actual application path.
 
 Then run:
 ```bash
@@ -115,8 +148,10 @@ sudo supervisorctl start checkout-queue-worker:*
 After setting up, test that it's working:
 
 ```bash
+# SSH into your server first, then navigate to your app directory
+cd ~/public_html  # or your actual path
+
 # Check queue status
-cd /var/www/checkout
 php artisan queue:work --once
 
 # Verify webhook is sent
@@ -130,30 +165,35 @@ php artisan webhooks:resend-fadded-net
 
 ### Queue Worker Not Processing Jobs
 
-1. **Check if jobs table exists:**
+1. **SSH into your server and navigate to app directory:**
+```bash
+cd ~/public_html  # or your actual path
+```
+
+2. **Check if jobs table exists:**
 ```bash
 php artisan migrate
 ```
 
-2. **Check for failed jobs:**
+3. **Check for failed jobs:**
 ```bash
 php artisan queue:failed
 ```
 
-3. **Retry failed jobs:**
+4. **Retry failed jobs:**
 ```bash
 php artisan queue:retry all
 ```
 
-4. **Clear failed jobs:**
+5. **Clear failed jobs:**
 ```bash
 php artisan queue:flush
 ```
 
 ### Queue Worker Keeps Crashing
 
-1. Check logs: `/var/www/checkout/storage/logs/queue-worker.log`
-2. Check Laravel logs: `/var/www/checkout/storage/logs/laravel.log`
+1. Check logs (replace path with yours): `~/public_html/storage/logs/queue-worker.log`
+2. Check Laravel logs: `~/public_html/storage/logs/laravel.log`
 3. Increase memory limit in cron job: `--memory=1024`
 4. Increase timeout: `--timeout=120`
 
@@ -161,8 +201,8 @@ php artisan queue:flush
 
 1. Ensure queue worker is running: `ps aux | grep queue:work`
 2. Check if jobs are in queue: Check `jobs` table in database
-3. Manually process: `php artisan queue:work --once`
-4. Resend webhooks: `php artisan webhooks:resend-fadded-net`
+3. Manually process: `cd ~/public_html && php artisan queue:work --once`
+4. Resend webhooks: `cd ~/public_html && php artisan webhooks:resend-fadded-net`
 
 ## Recommended Settings
 
@@ -176,15 +216,34 @@ For production, use these settings:
 
 ## Monitoring
 
-Monitor the queue worker:
+Monitor the queue worker (replace paths with your actual paths):
 
 ```bash
+# SSH into your server first
+cd ~/public_html  # or your actual path
+
 # Watch queue worker log
-tail -f /var/www/checkout/storage/logs/queue-worker.log
+tail -f storage/logs/queue-worker.log
 
 # Check Laravel logs for webhook activity
-tail -f /var/www/checkout/storage/logs/laravel.log | grep -i "webhook\|SendWebhookNotification"
+tail -f storage/logs/laravel.log | grep -i "webhook\|SendWebhookNotification"
 
 # Check queue status
-cd /var/www/checkout && php artisan queue:work --once --verbose
+php artisan queue:work --once --verbose
 ```
+
+## Quick Setup for Your Server
+
+Since you're in `public_html` directory, here's the exact command for your cron job:
+
+**cPanel Cron Job Command:**
+```bash
+cd ~/public_html && /usr/bin/php artisan queue:work --queue=default --timeout=60 --memory=512 --sleep=3 --max-time=3600 --tries=3 --stop-when-empty=false >> ~/public_html/storage/logs/queue-worker.log 2>&1
+```
+
+Or if you want to use the script:
+```bash
+/bin/bash ~/public_html/queue-worker.sh
+```
+
+**Note**: The `~/public_html` path will automatically expand to `/home/your_username/public_html` in cron jobs.

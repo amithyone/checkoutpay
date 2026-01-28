@@ -2,14 +2,34 @@
 # Laravel Queue Worker Script for cPanel
 # This script runs the queue worker and automatically restarts it if it crashes
 
+# Auto-detect Laravel application directory
+# Try common paths, or set APP_PATH manually if needed
+if [ -d "/var/www/checkout" ]; then
+    APP_PATH="/var/www/checkout"
+elif [ -d "$HOME/public_html" ] && [ -f "$HOME/public_html/artisan" ]; then
+    APP_PATH="$HOME/public_html"
+elif [ -d "$HOME/checkout" ] && [ -f "$HOME/checkout/artisan" ]; then
+    APP_PATH="$HOME/checkout"
+elif [ -d "/home/$(whoami)/public_html" ] && [ -f "/home/$(whoami)/public_html/artisan" ]; then
+    APP_PATH="/home/$(whoami)/public_html"
+else
+    # If APP_PATH is set as environment variable, use it
+    if [ -z "$APP_PATH" ]; then
+        echo "Error: Could not find Laravel application directory."
+        echo "Please set APP_PATH environment variable or edit this script."
+        echo "Example: export APP_PATH=/home/username/public_html"
+        exit 1
+    fi
+fi
+
 # Change to the application directory
-cd /var/www/checkout || exit 1
+cd "$APP_PATH" || exit 1
 
 # Set the PHP path (adjust if needed)
 PHP_BIN="/usr/bin/php"
 
-# Log file location
-LOG_FILE="/var/www/checkout/storage/logs/queue-worker.log"
+# Log file location (relative to APP_PATH)
+LOG_FILE="$APP_PATH/storage/logs/queue-worker.log"
 
 # Maximum memory limit (in MB)
 MAX_MEMORY=512
