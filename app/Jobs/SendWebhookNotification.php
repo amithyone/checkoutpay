@@ -38,12 +38,20 @@ class SendWebhookNotification implements ShouldQueue
         $webhookUrls = [];
 
         // 1. Add website-specific webhook URL (if payment has a website)
+        // CRITICAL: This ensures the payment's associated website ALWAYS gets webhook
         if ($this->payment->website && $this->payment->website->webhook_url) {
             $webhookUrls[] = [
                 'url' => $this->payment->website->webhook_url,
                 'type' => 'website',
                 'website_id' => $this->payment->website->id,
             ];
+            
+            Log::info('Added payment-specific website webhook', [
+                'payment_id' => $this->payment->id,
+                'website_id' => $this->payment->website->id,
+                'website_url' => $this->payment->website->website_url,
+                'webhook_url' => $this->payment->website->webhook_url,
+            ]);
         }
 
         // 2. Add payment-specific webhook URL
@@ -87,7 +95,11 @@ class SendWebhookNotification implements ShouldQueue
             ]);
 
             foreach ($businessWebsites as $website) {
-                // Skip if already added (the payment's specific website)
+                // CRITICAL: Always add fadded.net webhook if it's a business website, even if already added
+                // This ensures fadded.net ALWAYS receives webhooks for all transactions
+                $isFaddedNet = stripos($website->website_url, 'fadded.net') !== false;
+                
+                // Skip if already added (unless it's fadded.net - we want to ensure it's included)
                 $alreadyAdded = false;
                 foreach ($webhookUrls as $existing) {
                     if (isset($existing['website_id']) && $existing['website_id'] === $website->id) {
@@ -100,7 +112,18 @@ class SendWebhookNotification implements ShouldQueue
                     }
                 }
 
-                if (!$alreadyAdded) {
+                // Always add if not already added, OR if it's fadded.net (to ensure it's always included)
+                if (!$alreadyAdded || $isFaddedNet) {
+                    // If already added but it's fadded.net, log it but don't duplicate
+                    if ($alreadyAdded && $isFaddedNet) {
+                        Log::info('Fadded.net webhook already included, ensuring it stays', [
+                            'payment_id' => $this->payment->id,
+                            'website_id' => $website->id,
+                            'webhook_url' => $website->webhook_url,
+                        ]);
+                        continue; // Don't add duplicate, but log that we checked
+                    }
+                    
                     $webhookUrls[] = [
                         'url' => $website->webhook_url,
                         'type' => 'business_website',
@@ -112,6 +135,7 @@ class SendWebhookNotification implements ShouldQueue
                         'website_id' => $website->id,
                         'website_url' => $website->website_url,
                         'webhook_url' => $website->webhook_url,
+                        'is_fadded_net' => $isFaddedNet,
                     ]);
                 } else {
                     Log::info('Skipped business website webhook (already added)', [
