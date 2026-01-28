@@ -71,6 +71,7 @@ class SendWebhookNotification implements ShouldQueue
         }
 
         // 4. Add webhooks from ALL websites under the business (if payment has a business)
+        // CRITICAL: We MUST send webhooks to ALL approved websites, not just the payment's website
         if ($this->payment->business) {
             // CRITICAL: Query websites directly to ensure we get all approved websites with webhooks
             // Don't rely on the relationship being loaded - query fresh from database
@@ -90,70 +91,66 @@ class SendWebhookNotification implements ShouldQueue
                         'id' => $w->id,
                         'url' => $w->website_url,
                         'webhook_url' => $w->webhook_url,
+                        'is_approved' => $w->is_approved,
                     ];
                 })->toArray(),
             ]);
 
-            foreach ($businessWebsites as $website) {
-                // CRITICAL: Always add fadded.net webhook if it's a business website, even if already added
-                // This ensures fadded.net ALWAYS receives webhooks for all transactions
-                $isFaddedNet = stripos($website->website_url, 'fadded.net') !== false;
-                
-                // Skip if already added (unless it's fadded.net - we want to ensure it's included)
-                $alreadyAdded = false;
-                foreach ($webhookUrls as $existing) {
-                    if (isset($existing['website_id']) && $existing['website_id'] === $website->id) {
-                        $alreadyAdded = true;
-                        break;
-                    }
-                    if ($existing['url'] === $website->webhook_url) {
-                        $alreadyAdded = true;
-                        break;
-                    }
+            // Track which website IDs we've already added (by website_id, not URL)
+            // This ensures each website gets its webhook sent, even if URLs are the same
+            $addedWebsiteIds = [];
+            foreach ($webhookUrls as $existing) {
+                if (isset($existing['website_id'])) {
+                    $addedWebsiteIds[] = $existing['website_id'];
                 }
+            }
 
-                // Always add if not already added, OR if it's fadded.net (to ensure it's always included)
-                if (!$alreadyAdded || $isFaddedNet) {
-                    // If already added but it's fadded.net, log it but don't duplicate
-                    if ($alreadyAdded && $isFaddedNet) {
-                        Log::info('Fadded.net webhook already included, ensuring it stays', [
-                            'payment_id' => $this->payment->id,
-                            'website_id' => $website->id,
-                            'webhook_url' => $website->webhook_url,
-                        ]);
-                        continue; // Don't add duplicate, but log that we checked
-                    }
-                    
+            foreach ($businessWebsites as $website) {
+                // CRITICAL: Add webhook for EVERY approved website, even if URL is duplicate
+                // Each website should receive webhooks independently
+                if (!in_array($website->id, $addedWebsiteIds)) {
                     $webhookUrls[] = [
                         'url' => $website->webhook_url,
                         'type' => 'business_website',
                         'website_id' => $website->id,
                     ];
                     
+                    $addedWebsiteIds[] = $website->id;
+                    
                     Log::info('Added business website webhook URL', [
                         'payment_id' => $this->payment->id,
                         'website_id' => $website->id,
                         'website_url' => $website->website_url,
                         'webhook_url' => $website->webhook_url,
-                        'is_fadded_net' => $isFaddedNet,
                     ]);
                 } else {
-                    Log::info('Skipped business website webhook (already added)', [
+                    Log::info('Skipped business website webhook (already added by website_id)', [
                         'payment_id' => $this->payment->id,
                         'website_id' => $website->id,
+                        'website_url' => $website->website_url,
                         'webhook_url' => $website->webhook_url,
                     ]);
                 }
             }
         }
 
-        // Remove duplicates (same URL)
+        // Remove duplicates by URL, but preserve website_id information
+        // CRITICAL: If multiple websites have the same webhook URL, we still want to send to that URL
+        // But we only need to send once per unique URL
         $uniqueUrls = [];
         $seenUrls = [];
         foreach ($webhookUrls as $webhook) {
             if (!in_array($webhook['url'], $seenUrls)) {
                 $uniqueUrls[] = $webhook;
                 $seenUrls[] = $webhook['url'];
+            } else {
+                // URL already seen, but log which website_id was skipped
+                Log::debug('Skipped duplicate webhook URL (already in list)', [
+                    'payment_id' => $this->payment->id,
+                    'url' => $webhook['url'],
+                    'website_id' => $webhook['website_id'] ?? null,
+                    'type' => $webhook['type'] ?? null,
+                ]);
             }
         }
         $webhookUrls = $uniqueUrls;
@@ -259,6 +256,7 @@ class SendWebhookNotification implements ShouldQueue
                         'type' => $webhookType,
                         'status' => 'success',
                         'status_code' => $response->status(),
+                        'website_id' => $webhookInfo['website_id'] ?? null,
                     ];
                 } else {
                     // Log failed webhook
@@ -281,6 +279,7 @@ class SendWebhookNotification implements ShouldQueue
                         'type' => $webhookType,
                         'status' => 'failed',
                         'error' => $errorMsg,
+                        'website_id' => $webhookInfo['website_id'] ?? null,
                     ];
                 }
             } catch (\Exception $e) {
@@ -301,6 +300,7 @@ class SendWebhookNotification implements ShouldQueue
                     'type' => $webhookType,
                     'status' => 'failed',
                     'error' => $e->getMessage(),
+                    'website_id' => $webhookInfo['website_id'] ?? null,
                 ];
             }
         }
