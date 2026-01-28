@@ -123,6 +123,7 @@ class SendWebhookNotification implements ShouldQueue
         $successCount = 0;
         $failureCount = 0;
         $errors = [];
+        $sentUrls = [];
 
         foreach ($webhookUrls as $webhookInfo) {
             $webhookUrl = $webhookInfo['url'];
@@ -150,6 +151,12 @@ class SendWebhookNotification implements ShouldQueue
                     ]);
 
                     $successCount++;
+                    $sentUrls[] = [
+                        'url' => $webhookUrl,
+                        'type' => $webhookType,
+                        'status' => 'success',
+                        'status_code' => $response->status(),
+                    ];
                 } else {
                     // Log failed webhook
                     $errorMsg = "HTTP {$response->status()}: {$response->body()}";
@@ -166,6 +173,12 @@ class SendWebhookNotification implements ShouldQueue
 
                     $failureCount++;
                     $errors[] = "{$webhookUrl}: {$errorMsg}";
+                    $sentUrls[] = [
+                        'url' => $webhookUrl,
+                        'type' => $webhookType,
+                        'status' => 'failed',
+                        'error' => $errorMsg,
+                    ];
                 }
             } catch (\Exception $e) {
                 $logService->logWebhookFailed($this->payment, $e->getMessage());
@@ -180,8 +193,36 @@ class SendWebhookNotification implements ShouldQueue
 
                 $failureCount++;
                 $errors[] = "{$webhookUrl}: {$e->getMessage()}";
+                $sentUrls[] = [
+                    'url' => $webhookUrl,
+                    'type' => $webhookType,
+                    'status' => 'failed',
+                    'error' => $e->getMessage(),
+                ];
             }
         }
+
+        // Update payment webhook status
+        $webhookStatus = 'pending';
+        $lastError = null;
+        
+        if ($successCount > 0 && $failureCount === 0) {
+            $webhookStatus = 'sent';
+        } elseif ($successCount > 0 && $failureCount > 0) {
+            $webhookStatus = 'partial';
+            $lastError = implode('; ', array_slice($errors, 0, 3)); // Store first 3 errors
+        } elseif ($failureCount > 0 && $successCount === 0) {
+            $webhookStatus = 'failed';
+            $lastError = implode('; ', array_slice($errors, 0, 3)); // Store first 3 errors
+        }
+
+        $this->payment->update([
+            'webhook_sent_at' => now(),
+            'webhook_status' => $webhookStatus,
+            'webhook_attempts' => $this->payment->webhook_attempts + 1,
+            'webhook_last_error' => $lastError,
+            'webhook_urls_sent' => $sentUrls,
+        ]);
 
         // If all webhooks failed, throw exception to trigger retry
         if ($failureCount > 0 && $successCount === 0) {
@@ -195,6 +236,7 @@ class SendWebhookNotification implements ShouldQueue
             'total_webhooks' => count($webhookUrls),
             'successful' => $successCount,
             'failed' => $failureCount,
+            'webhook_status' => $webhookStatus,
         ]);
     }
 

@@ -598,34 +598,23 @@ class PaymentController extends Controller
             ], 400);
         }
 
-        // Check if webhook URL exists
-        if (!$payment->webhook_url) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No webhook URL configured for this payment.',
-            ], 400);
-        }
-
         try {
             // Reload payment with relationships
             $payment->load(['business', 'accountNumberDetails', 'website']);
 
-            // Create job instance and execute synchronously
-            $job = new \App\Jobs\SendWebhookNotification($payment);
-            $logService = app(\App\Services\TransactionLogService::class);
-            $job->handle($logService);
+            // Dispatch webhook job (will send to all websites)
+            \App\Jobs\SendWebhookNotification::dispatch($payment);
 
             // Log the resend action
-            \Illuminate\Support\Facades\Log::info('Webhook resent by admin - executed successfully', [
+            \Illuminate\Support\Facades\Log::info('Webhook resent by admin - queued', [
                 'payment_id' => $payment->id,
                 'transaction_id' => $payment->transaction_id,
                 'admin_id' => auth('admin')->id(),
-                'webhook_url' => $payment->webhook_url,
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Webhook notification has been sent successfully.',
+                'message' => 'Webhook notification has been queued for resending to all configured webhook URLs.',
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Error resending webhook', [
@@ -646,6 +635,48 @@ class PaymentController extends Controller
                 'message' => 'Failed to resend webhook: ' . $errorMessage,
             ], 500);
         }
+    }
+
+    /**
+     * Resend webhooks for multiple approved payments
+     */
+    public function resendWebhooksBulk(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'payment_ids' => 'required|array',
+            'payment_ids.*' => 'exists:payments,id',
+        ]);
+
+        $payments = Payment::whereIn('id', $request->payment_ids)
+            ->where('status', Payment::STATUS_APPROVED)
+            ->get();
+
+        if ($payments->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No approved payments found to resend webhooks.',
+            ], 400);
+        }
+
+        $queuedCount = 0;
+        foreach ($payments as $payment) {
+            try {
+                $payment->load(['business', 'accountNumberDetails', 'website']);
+                \App\Jobs\SendWebhookNotification::dispatch($payment);
+                $queuedCount++;
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Error queueing webhook for bulk resend', [
+                    'payment_id' => $payment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Webhooks queued for {$queuedCount} payment(s).",
+            'queued_count' => $queuedCount,
+        ]);
     }
 
     /**

@@ -11,21 +11,28 @@
             <h3 class="text-lg font-semibold text-gray-900">Payments</h3>
             <p class="text-sm text-gray-600 mt-1">Manage all payment transactions</p>
         </div>
-        <a href="{{ route('admin.payments.needs-review') }}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center">
-            <i class="fas fa-exclamation-triangle mr-2"></i> Needs Review
-            @php
-                $needsReviewCount = \App\Models\Payment::withCount('statusChecks')
-                ->where('status', \App\Models\Payment::STATUS_PENDING)
-                ->where(function ($q) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                })
-                ->having('status_checks_count', '>=', 3)
-                ->count();
-            @endphp
-            @if($needsReviewCount > 0)
-                <span class="ml-2 bg-white text-red-600 rounded-full px-2 py-0.5 text-xs font-bold">{{ $needsReviewCount }}</span>
+        <div class="flex items-center gap-2">
+            @if(request('status') === 'approved' || !request('status'))
+            <button onclick="resendFailedWebhooks()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center">
+                <i class="fas fa-redo mr-2"></i> Resend Failed Webhooks
+            </button>
             @endif
-        </a>
+            <a href="{{ route('admin.payments.needs-review') }}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i> Needs Review
+                @php
+                    $needsReviewCount = \App\Models\Payment::withCount('statusChecks')
+                    ->where('status', \App\Models\Payment::STATUS_PENDING)
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->having('status_checks_count', '>=', 3)
+                    ->count();
+                @endphp
+                @if($needsReviewCount > 0)
+                    <span class="ml-2 bg-white text-red-600 rounded-full px-2 py-0.5 text-xs font-bold">{{ $needsReviewCount }}</span>
+                @endif
+            </a>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -126,6 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Number</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payer Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Webhook</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matching Time</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
@@ -166,6 +174,34 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </span>
                             @else
                                 <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4">
+                            @if($payment->status === 'approved')
+                                @if($payment->webhook_status === 'sent')
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full" title="Sent at: {{ $payment->webhook_sent_at?->format('M d, Y H:i') }}">
+                                        <i class="fas fa-check-circle mr-1"></i> Sent
+                                    </span>
+                                @elseif($payment->webhook_status === 'partial')
+                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full" title="Partially sent - some webhooks failed">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i> Partial
+                                    </span>
+                                @elseif($payment->webhook_status === 'failed')
+                                    <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full" title="Failed: {{ Str::limit($payment->webhook_last_error ?? 'Unknown error', 50) }}">
+                                        <i class="fas fa-times-circle mr-1"></i> Failed
+                                    </span>
+                                @else
+                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full" title="Not sent yet">
+                                        <i class="fas fa-clock mr-1"></i> Pending
+                                    </span>
+                                @endif
+                                @if($payment->webhook_urls_sent)
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        {{ count(array_filter($payment->webhook_urls_sent, fn($w) => $w['status'] === 'success')) }}/{{ count($payment->webhook_urls_sent) }} sent
+                                    </div>
+                                @endif
+                            @else
+                                <span class="text-gray-400 text-xs">N/A</span>
                             @endif
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $payment->created_at->format('M d, Y H:i') }}</td>
@@ -223,6 +259,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <i class="fas fa-list"></i>
                                     </a>
                                 @endif
+                                @if($payment->status === 'approved')
+                                    @if($payment->webhook_status !== 'sent')
+                                        <button onclick="resendWebhook({{ $payment->id }})" 
+                                            class="text-sm text-blue-600 hover:text-blue-800"
+                                            title="Resend Webhook">
+                                            <i class="fas fa-paper-plane"></i>
+                                        </button>
+                                    @endif
+                                @endif
                                 @if($payment->status === 'pending' && (!$payment->expires_at || $payment->expires_at->isFuture()))
                                     <button onclick="markAsExpired({{ $payment->id }})" 
                                         class="text-sm text-orange-600 hover:text-orange-800"
@@ -240,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="11" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
+                        <td colspan="12" class="px-6 py-4 text-center text-sm text-gray-500">No payments found</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -373,6 +418,87 @@ function showDeleteModal(paymentId, transactionId) {
     
     document.body.appendChild(form);
     form.submit();
+}
+
+function resendWebhook(paymentId) {
+    if (!confirm('Are you sure you want to resend webhook notification to all configured webhook URLs?')) {
+        return;
+    }
+
+    fetch(`/admin/payments/${paymentId}/resend-webhook`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            alert('❌ Error: ' + (data.message || 'Failed to resend webhook'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error: ' + error.message);
+    });
+}
+
+function resendFailedWebhooks() {
+    if (!confirm('This will resend webhooks for all approved payments that have failed or pending webhooks. Continue?')) {
+        return;
+    }
+
+    // Get all payment IDs from current page that are approved and have failed/pending webhooks
+    const paymentIds = [];
+    document.querySelectorAll('tr').forEach(row => {
+        const statusCell = row.querySelector('td:nth-child(7)'); // Status column
+        const webhookCell = row.querySelector('td:nth-child(8)'); // Webhook column
+        if (statusCell && webhookCell) {
+            const statusText = statusCell.textContent.trim();
+            const webhookText = webhookCell.textContent.trim();
+            if (statusText.includes('Approved') && (webhookText.includes('Failed') || webhookText.includes('Pending') || webhookText.includes('Partial'))) {
+                const paymentId = row.querySelector('a[href*="/admin/payments/"]')?.href.match(/\/admin\/payments\/(\d+)/)?.[1];
+                if (paymentId) {
+                    paymentIds.push(paymentId);
+                }
+            }
+        }
+    });
+
+    if (paymentIds.length === 0) {
+        alert('No payments with failed or pending webhooks found on this page.');
+        return;
+    }
+
+    fetch('/admin/payments/resend-webhooks-bulk', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ payment_ids: paymentIds }),
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ ${data.message}`);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            alert('❌ Error: ' + (data.message || 'Failed to resend webhooks'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('❌ Error: ' + error.message);
+    });
 }
 </script>
 @endsection

@@ -112,6 +112,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('payments/{payment}/unmatched-emails', [PaymentController::class, 'getUnmatchedEmails'])->name('payments.unmatched-emails');
         Route::post('payments/{payment}/mark-expired', [PaymentController::class, 'markAsExpired'])->name('payments.mark-expired');
         Route::post('payments/{payment}/resend-webhook', [PaymentController::class, 'resendWebhook'])->name('payments.resend-webhook');
+        Route::post('payments/resend-webhooks-bulk', [PaymentController::class, 'resendWebhooksBulk'])->name('payments.resend-webhooks-bulk');
         Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
 
         // Withdrawals

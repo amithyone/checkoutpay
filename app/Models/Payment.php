@@ -37,6 +37,11 @@ class Payment extends Model
         'total_charges',
         'business_receives',
         'charges_paid_by_customer',
+        'webhook_sent_at',
+        'webhook_status',
+        'webhook_attempts',
+        'webhook_last_error',
+        'webhook_urls_sent',
     ];
 
     /**
@@ -53,8 +58,10 @@ class Payment extends Model
         'business_receives' => 'decimal:2',
         'charges_paid_by_customer' => 'boolean',
         'email_data' => 'array',
+        'webhook_urls_sent' => 'array',
         'matched_at' => 'datetime',
         'expires_at' => 'datetime',
+        'webhook_sent_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
