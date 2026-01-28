@@ -6,19 +6,19 @@
 @section('content')
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h3 class="text-lg font-semibold text-gray-900">Payments</h3>
             <p class="text-sm text-gray-600 mt-1">Manage all payment transactions</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             @if(request('status') === 'approved' || !request('status'))
-            <button onclick="resendFailedWebhooks()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center">
-                <i class="fas fa-redo mr-2"></i> Resend Failed Webhooks
+            <button onclick="resendFailedWebhooks()" class="bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 flex items-center text-sm">
+                <i class="fas fa-redo mr-2"></i> <span class="hidden sm:inline">Resend Failed Webhooks</span><span class="sm:hidden">Resend</span>
             </button>
             @endif
-            <a href="{{ route('admin.payments.needs-review') }}" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center">
-                <i class="fas fa-exclamation-triangle mr-2"></i> Needs Review
+            <a href="{{ route('admin.payments.needs-review') }}" class="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 flex items-center text-sm">
+                <i class="fas fa-exclamation-triangle mr-2"></i> <span class="hidden sm:inline">Needs Review</span><span class="sm:hidden">Review</span>
                 @php
                     $needsReviewCount = \App\Models\Payment::withCount('statusChecks')
                     ->where('status', \App\Models\Payment::STATUS_PENDING)
@@ -37,45 +37,65 @@
 
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <form method="GET" class="flex items-center space-x-4 flex-wrap">
-            <div class="flex-1 min-w-[200px]">
+        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div class="sm:col-span-2 lg:col-span-1">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Search</label>
                 <input type="text" name="search" id="searchInput" value="{{ request('search') }}" 
-                    placeholder="Search by Transaction ID (TXN-...)..." 
+                    placeholder="Transaction ID..." 
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                     autocomplete="off">
             </div>
-            <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">All Status</option>
-                <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending (Not Expired)</option>
-                <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
-                <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
-            </select>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                <select name="status" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="">All Status</option>
+                    <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
+                    <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
+                    <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Business</label>
+                <select name="business_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="">All Businesses</option>
+                    @foreach(\App\Models\Business::all() as $business)
+                        <option value="{{ $business->id }}" {{ request('business_id') == $business->id ? 'selected' : '' }}>
+                            {{ $business->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
             @if(request('status') === 'pending' || !request('status'))
-            <label class="flex items-center space-x-2 text-sm">
-                <input type="checkbox" name="unmatched" value="1" {{ request('unmatched') === '1' ? 'checked' : '' }} 
-                    class="rounded border-gray-300 text-primary focus:ring-primary">
-                <span>Show only unmatched</span>
-            </label>
-            <label class="flex items-center space-x-2 text-sm">
-                <input type="checkbox" name="needs_review" value="1" {{ request('needs_review') === '1' ? 'checked' : '' }} 
-                    class="rounded border-gray-300 text-primary focus:ring-primary">
-                <span>Needs Review (3+ attempts)</span>
-            </label>
+            <div class="sm:col-span-2 lg:col-span-1">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Filters</label>
+                <div class="space-y-2">
+                    <label class="flex items-center space-x-2 text-sm">
+                        <input type="checkbox" name="unmatched" value="1" {{ request('unmatched') === '1' ? 'checked' : '' }} 
+                            class="rounded border-gray-300 text-primary focus:ring-primary">
+                        <span class="text-xs">Unmatched only</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-sm">
+                        <input type="checkbox" name="needs_review" value="1" {{ request('needs_review') === '1' ? 'checked' : '' }} 
+                            class="rounded border-gray-300 text-primary focus:ring-primary">
+                        <span class="text-xs">Needs Review</span>
+                    </label>
+                </div>
+            </div>
             @endif
-            <select name="business_id" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option value="">All Businesses</option>
-                @foreach(\App\Models\Business::all() as $business)
-                    <option value="{{ $business->id }}" {{ request('business_id') == $business->id ? 'selected' : '' }}>
-                        {{ $business->name }}
-                    </option>
-                @endforeach
-            </select>
-            <input type="date" name="from_date" value="{{ request('from_date') }}" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <input type="date" name="to_date" value="{{ request('to_date') }}" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark text-sm">
-                <i class="fas fa-search mr-2"></i> Search
-            </button>
-            <a href="{{ route('admin.payments.index') }}" class="text-gray-600 hover:text-gray-900 text-sm px-4 py-2">Clear</a>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">From Date</label>
+                <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">To Date</label>
+                <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div class="sm:col-span-2 lg:col-span-1 flex items-end gap-2">
+                <button type="submit" class="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark text-sm">
+                    <i class="fas fa-search mr-2"></i> Search
+                </button>
+                <a href="{{ route('admin.payments.index') }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">Clear</a>
+            </div>
         </form>
     </div>
 
@@ -122,7 +142,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- Table -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
+        <!-- Desktop Table View -->
+        <div class="hidden lg:block overflow-x-auto">
             <table class="w-full">
                 <thead class="bg-gray-50">
                     <tr>
@@ -291,8 +312,114 @@ document.addEventListener('DOMContentLoaded', function() {
                 </tbody>
             </table>
         </div>
+        
+        <!-- Mobile Card View -->
+        <div class="lg:hidden divide-y divide-gray-200">
+            @forelse($payments as $payment)
+            <a href="{{ route('admin.payments.show', $payment) }}" class="block p-4 hover:bg-gray-50 transition-colors">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate mb-1">{{ Str::limit($payment->transaction_id, 20) }}</p>
+                        <p class="text-xs text-gray-500">
+                            {{ $payment->business->name ?? 'N/A' }}
+                            @if($payment->website)
+                                • {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
+                            @endif
+                        </p>
+                        <p class="text-xs text-gray-400 mt-1">{{ $payment->created_at->format('M d, Y H:i') }}</p>
+                    </div>
+                    <div class="ml-3 text-right">
+                        @if($payment->status === 'approved')
+                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
+                        @elseif($payment->status === 'pending')
+                            <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                Pending
+                                @if($payment->expires_at && $payment->expires_at->isPast())
+                                    <span class="text-red-600">(Expired)</span>
+                                @endif
+                            </span>
+                        @else
+                            <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
+                        @endif
+                        @if($payment->status === 'approved' && $payment->webhook_status)
+                            <div class="mt-1">
+                                @if($payment->webhook_status === 'sent')
+                                    <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">
+                                        <i class="fas fa-check-circle text-xs"></i> Webhook Sent
+                                    </span>
+                                @elseif($payment->webhook_status === 'partial')
+                                    <span class="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                                        <i class="fas fa-exclamation-triangle text-xs"></i> Partial
+                                    </span>
+                                @elseif($payment->webhook_status === 'failed')
+                                    <span class="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded-full">
+                                        <i class="fas fa-times-circle text-xs"></i> Failed
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-800 rounded-full">
+                                        <i class="fas fa-clock text-xs"></i> Pending
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <p class="text-xs text-gray-600">Amount</p>
+                        <p class="text-base font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
+                    </div>
+                    @if($payment->payer_name)
+                    <div>
+                        <p class="text-xs text-gray-600">Payer</p>
+                        <p class="text-sm font-medium text-gray-900 truncate">{{ $payment->payer_name }}</p>
+                    </div>
+                    @endif
+                    @if($payment->account_number)
+                    <div>
+                        <p class="text-xs text-gray-600">Account</p>
+                        <p class="text-sm font-medium text-gray-900">{{ $payment->account_number }}</p>
+                    </div>
+                    @endif
+                    @if($payment->matched_at && $payment->status === 'approved')
+                    <div>
+                        <p class="text-xs text-gray-600">Matched</p>
+                        <p class="text-sm font-medium text-gray-900">
+                            {{ $payment->created_at->diffInMinutes($payment->matched_at) }} min
+                        </p>
+                    </div>
+                    @endif
+                </div>
+                <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <div class="flex items-center gap-2">
+                        @if($payment->status === 'pending' && (!$payment->expires_at || $payment->expires_at->isFuture()))
+                            <button onclick="event.stopPropagation(); checkMatchForPayment({{ $payment->id }})" 
+                                class="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded"
+                                title="Check Match">
+                                <i class="fas fa-search-dollar"></i>
+                            </button>
+                        @endif
+                        @if($payment->status === 'approved' && $payment->webhook_status !== 'sent')
+                            <button onclick="event.stopPropagation(); resendWebhook({{ $payment->id }})" 
+                                class="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded"
+                                title="Resend Webhook">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        @endif
+                    </div>
+                    <i class="fas fa-chevron-right text-gray-400"></i>
+                </div>
+            </a>
+            @empty
+            <div class="p-8 text-center">
+                <i class="fas fa-money-bill-wave text-gray-300 text-4xl mb-4"></i>
+                <p class="text-sm text-gray-500">No payments found</p>
+            </div>
+            @endforelse
+        </div>
+        
         @if($payments->hasPages())
-        <div class="px-6 py-4 border-t border-gray-200">
+        <div class="px-4 lg:px-6 py-4 border-t border-gray-200">
             {{ $payments->links() }}
         </div>
         @endif

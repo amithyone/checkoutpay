@@ -5,7 +5,7 @@
 
 @section('content')
 <div class="space-y-6">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Transaction: {{ $payment->transaction_id }}</h3>
@@ -163,8 +163,8 @@
         <!-- API Status Checks Section -->
         @if($payment->statusChecks->count() > 0)
         <div class="mt-6 pt-6 border-t border-gray-200">
-            <div class="flex items-center justify-between mb-4">
-                <h4 class="text-md font-semibold text-gray-900">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                <h4 class="text-sm sm:text-md font-semibold text-gray-900">
                     <i class="fas fa-sync-alt text-primary mr-2"></i>API Status Checks ({{ $payment->statusChecks->count() }})
                 </h4>
                 @if($statusChecksCount >= 3)
@@ -175,9 +175,9 @@
             </div>
             <div class="space-y-3">
                 @foreach($payment->statusChecks->take(5) as $check)
-                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-3">
+                <div class="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
                                 <i class="fas fa-api mr-1"></i> API Check
                             </span>
@@ -204,8 +204,8 @@
         <!-- Match Attempts Section -->
         @if($payment->matchAttempts->count() > 0)
         <div class="mt-6 pt-6 border-t border-gray-200">
-            <div class="flex items-center justify-between mb-4">
-                <h4 class="text-md font-semibold text-gray-900">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                <h4 class="text-sm sm:text-md font-semibold text-gray-900">
                     <i class="fas fa-search-dollar text-primary mr-2"></i>Match Attempts ({{ $payment->matchAttempts->count() }})
                 </h4>
                 <a href="{{ route('admin.match-attempts.index', ['transaction_id' => $payment->transaction_id]) }}" 
@@ -215,9 +215,9 @@
             </div>
             <div class="space-y-3">
                 @foreach($payment->matchAttempts->take(5) as $attempt)
-                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-3">
+                <div class="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             @if($attempt->match_result === 'matched')
                                 <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
                                     <i class="fas fa-check-circle mr-1"></i> Matched
@@ -243,7 +243,7 @@
                         </div>
                         <span class="text-xs text-gray-500">{{ $attempt->created_at->format('M d, H:i') }}</span>
                     </div>
-                    <p class="text-sm text-gray-700">{{ Str::limit($attempt->reason, 150) }}</p>
+                    <p class="text-xs sm:text-sm text-gray-700 break-words">{{ Str::limit($attempt->reason, 150) }}</p>
                 </div>
                 @endforeach
             </div>
@@ -253,7 +253,7 @@
         @if($payment->email_data)
         <div class="mt-6 pt-6 border-t border-gray-200">
             <label class="text-sm text-gray-600 mb-2 block">Email Data</label>
-            <pre class="bg-gray-50 p-4 rounded-lg text-xs overflow-x-auto">{{ json_encode($payment->email_data, JSON_PRETTY_PRINT) }}</pre>
+            <pre class="bg-gray-50 p-3 sm:p-4 rounded-lg text-xs overflow-x-auto">{{ json_encode($payment->email_data, JSON_PRETTY_PRINT) }}</pre>
         </div>
         @endif
     </div>
@@ -261,7 +261,7 @@
 
 <!-- Delete Confirmation Modal -->
 <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+    <div class="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Delete Transaction</h3>
         <p class="text-sm text-gray-700 mb-6">
             Are you sure you want to delete transaction <span id="delete-transaction-id" class="font-mono font-semibold"></span>? 
@@ -286,7 +286,7 @@
 
 <!-- Manual Verify Modal -->
 <div id="manualVerifyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+    <div class="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
             <i class="fas fa-check-double text-indigo-600 mr-2"></i>Manually Verify Transaction
         </h3>
@@ -334,7 +334,7 @@
 
 <!-- Manual Approve Modal -->
 <div id="manualApproveModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+    <div class="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Manually Approve Transaction</h3>
         <form id="manualApproveForm" method="POST">
             @csrf
