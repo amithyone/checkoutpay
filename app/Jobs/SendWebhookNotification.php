@@ -184,9 +184,22 @@ class SendWebhookNotification implements ShouldQueue
         $payload = $this->buildWebhookPayload();
 
         // Log all webhook URLs that will be sent to
+        // CRITICAL: Verify that payment's corresponding website webhook is included
+        $paymentWebsiteWebhookIncluded = false;
+        if ($this->payment->business_website_id) {
+            foreach ($webhookUrls as $webhook) {
+                if (isset($webhook['website_id']) && $webhook['website_id'] === $this->payment->business_website_id) {
+                    $paymentWebsiteWebhookIncluded = true;
+                    break;
+                }
+            }
+        }
+        
         Log::info('Sending webhooks to all URLs', [
             'payment_id' => $this->payment->id,
             'transaction_id' => $this->payment->transaction_id,
+            'business_website_id' => $this->payment->business_website_id,
+            'payment_website_webhook_included' => $paymentWebsiteWebhookIncluded,
             'total_webhook_urls' => count($webhookUrls),
             'webhook_urls' => array_map(function($w) {
                 return [
@@ -196,6 +209,18 @@ class SendWebhookNotification implements ShouldQueue
                 ];
             }, $webhookUrls),
         ]);
+        
+        // WARNING: If payment has a website but its webhook is not included, log a warning
+        if ($this->payment->business_website_id && !$paymentWebsiteWebhookIncluded) {
+            Log::warning('Payment website webhook NOT included in webhook list', [
+                'payment_id' => $this->payment->id,
+                'transaction_id' => $this->payment->transaction_id,
+                'business_website_id' => $this->payment->business_website_id,
+                'website_url' => $this->payment->website?->website_url ?? 'N/A',
+                'website_webhook_url' => $this->payment->website?->webhook_url ?? 'N/A',
+                'total_webhooks' => count($webhookUrls),
+            ]);
+        }
 
         // Send webhook to all URLs
         $successCount = 0;
@@ -307,15 +332,48 @@ class SendWebhookNotification implements ShouldQueue
             throw new \Exception("All webhooks failed: " . implode('; ', $errors));
         }
 
-        // Log summary
+        // Log summary with verification
+        $correspondingWebsiteWebhookSent = false;
+        if ($this->payment->business_website_id) {
+            foreach ($sentUrls as $sent) {
+                if (isset($sent['website_id']) && $sent['website_id'] === $this->payment->business_website_id && $sent['status'] === 'success') {
+                    $correspondingWebsiteWebhookSent = true;
+                    break;
+                }
+            }
+        }
+        
         Log::info('Payment webhook summary', [
             'payment_id' => $this->payment->id,
             'transaction_id' => $this->payment->transaction_id,
+            'business_website_id' => $this->payment->business_website_id,
+            'payment_website_webhook_sent' => $correspondingWebsiteWebhookSent,
             'total_webhooks' => count($webhookUrls),
             'successful' => $successCount,
             'failed' => $failureCount,
             'webhook_status' => $webhookStatus,
+            'sent_webhooks' => array_map(function($w) {
+                return [
+                    'url' => $w['url'] ?? 'N/A',
+                    'type' => $w['type'] ?? 'N/A',
+                    'status' => $w['status'] ?? 'N/A',
+                    'website_id' => $w['website_id'] ?? null,
+                ];
+            }, $sentUrls),
         ]);
+        
+        // CRITICAL: Verify corresponding website webhook was sent successfully
+        if ($this->payment->business_website_id && !$correspondingWebsiteWebhookSent && $successCount > 0) {
+            Log::warning('Payment website webhook may not have been sent successfully', [
+                'payment_id' => $this->payment->id,
+                'transaction_id' => $this->payment->transaction_id,
+                'business_website_id' => $this->payment->business_website_id,
+                'website_url' => $this->payment->website?->website_url ?? 'N/A',
+                'website_webhook_url' => $this->payment->website?->webhook_url ?? 'N/A',
+                'total_successful' => $successCount,
+                'sent_urls' => $sentUrls,
+            ]);
+        }
     }
 
     /**
