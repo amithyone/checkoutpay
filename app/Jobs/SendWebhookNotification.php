@@ -32,14 +32,15 @@ class SendWebhookNotification implements ShouldQueue
      */
     public function handle(TransactionLogService $logService): void
     {
-        // Reload payment with relationships - CRITICAL: Load business websites relationship
-        $this->payment->load(['business.websites', 'accountNumberDetails', 'website']);
+        // Reload payment with relationships
+        $this->payment->load(['accountNumberDetails', 'website']);
 
-        // Collect all webhook URLs to send to
+        // Collect webhook URLs to send to
+        // CRITICAL: Only send to the website that originated the transaction, not all business websites
         $webhookUrls = [];
 
         // 1. Add website-specific webhook URL (if payment has a website)
-        // CRITICAL: This ensures the payment's associated website ALWAYS gets webhook
+        // This is the ONLY website that should receive the webhook - the one that created the transaction
         if ($this->payment->website && $this->payment->website->webhook_url) {
             $webhookUrls[] = [
                 'url' => $this->payment->website->webhook_url,
@@ -47,7 +48,7 @@ class SendWebhookNotification implements ShouldQueue
                 'website_id' => $this->payment->website->id,
             ];
             
-            Log::info('Added payment-specific website webhook', [
+            Log::info('Added originating website webhook', [
                 'payment_id' => $this->payment->id,
                 'website_id' => $this->payment->website->id,
                 'website_url' => $this->payment->website->website_url,
@@ -55,89 +56,38 @@ class SendWebhookNotification implements ShouldQueue
             ]);
         }
 
-        // 2. Add payment-specific webhook URL
+        // 2. Add payment-specific webhook URL (if explicitly set on payment)
         if ($this->payment->webhook_url) {
             $webhookUrls[] = [
                 'url' => $this->payment->webhook_url,
                 'type' => 'payment',
             ];
+            
+            Log::info('Added payment-specific webhook URL', [
+                'payment_id' => $this->payment->id,
+                'webhook_url' => $this->payment->webhook_url,
+            ]);
         }
 
-        // 3. Add business webhook URL
-        if ($this->payment->business && $this->payment->business->webhook_url) {
+        // 3. Add business-level webhook URL (fallback if no website webhook)
+        // Only add if payment doesn't have a website webhook
+        if (empty($webhookUrls) && $this->payment->business && $this->payment->business->webhook_url) {
             $webhookUrls[] = [
                 'url' => $this->payment->business->webhook_url,
                 'type' => 'business',
             ];
-        }
-
-        // 4. Add webhooks from ALL websites under the business (if payment has a business)
-        // CRITICAL: We MUST send webhooks to ALL approved websites, not just the payment's website
-        if ($this->payment->business) {
-            // CRITICAL: Query websites directly to ensure we get all approved websites with webhooks
-            // Don't rely on the relationship being loaded - query fresh from database
-            $businessWebsites = \App\Models\BusinessWebsite::where('business_id', $this->payment->business_id)
-                ->where('is_approved', true)
-                ->whereNotNull('webhook_url')
-                ->where('webhook_url', '!=', '')
-                ->get();
-
-            Log::info('Loading business websites for webhook', [
+            
+            Log::info('Added business-level webhook URL (fallback)', [
                 'payment_id' => $this->payment->id,
                 'business_id' => $this->payment->business_id,
-                'business_name' => $this->payment->business->name,
-                'websites_found' => $businessWebsites->count(),
-                'website_details' => $businessWebsites->map(function($w) {
-                    return [
-                        'id' => $w->id,
-                        'url' => $w->website_url,
-                        'webhook_url' => $w->webhook_url,
-                        'is_approved' => $w->is_approved,
-                    ];
-                })->toArray(),
+                'webhook_url' => $this->payment->business->webhook_url,
             ]);
-
-            // Track which website IDs we've already added (by website_id, not URL)
-            // This ensures each website gets its webhook sent, even if URLs are the same
-            $addedWebsiteIds = [];
-            foreach ($webhookUrls as $existing) {
-                if (isset($existing['website_id'])) {
-                    $addedWebsiteIds[] = $existing['website_id'];
-                }
-            }
-
-            foreach ($businessWebsites as $website) {
-                // CRITICAL: Add webhook for EVERY approved website, even if URL is duplicate
-                // Each website should receive webhooks independently
-                if (!in_array($website->id, $addedWebsiteIds)) {
-                    $webhookUrls[] = [
-                        'url' => $website->webhook_url,
-                        'type' => 'business_website',
-                        'website_id' => $website->id,
-                    ];
-                    
-                    $addedWebsiteIds[] = $website->id;
-                    
-                    Log::info('Added business website webhook URL', [
-                        'payment_id' => $this->payment->id,
-                        'website_id' => $website->id,
-                        'website_url' => $website->website_url,
-                        'webhook_url' => $website->webhook_url,
-                    ]);
-                } else {
-                    Log::info('Skipped business website webhook (already added by website_id)', [
-                        'payment_id' => $this->payment->id,
-                        'website_id' => $website->id,
-                        'website_url' => $website->website_url,
-                        'webhook_url' => $website->webhook_url,
-                    ]);
-                }
-            }
         }
 
-        // Remove duplicates by URL, but preserve website_id information
-        // CRITICAL: If multiple websites have the same webhook URL, we still want to send to that URL
-        // But we only need to send once per unique URL
+        // REMOVED: We no longer send webhooks to ALL websites under the business
+        // Only the originating website (the one that created the transaction) receives the webhook
+
+        // Remove duplicates by URL (shouldn't happen now, but keep for safety)
         $uniqueUrls = [];
         $seenUrls = [];
         foreach ($webhookUrls as $webhook) {
@@ -145,8 +95,7 @@ class SendWebhookNotification implements ShouldQueue
                 $uniqueUrls[] = $webhook;
                 $seenUrls[] = $webhook['url'];
             } else {
-                // URL already seen, but log which website_id was skipped
-                Log::debug('Skipped duplicate webhook URL (already in list)', [
+                Log::debug('Skipped duplicate webhook URL', [
                     'payment_id' => $this->payment->id,
                     'url' => $webhook['url'],
                     'website_id' => $webhook['website_id'] ?? null,
@@ -181,23 +130,12 @@ class SendWebhookNotification implements ShouldQueue
         // Build webhook payload
         $payload = $this->buildWebhookPayload();
 
-        // Log all webhook URLs that will be sent to
-        // CRITICAL: Verify that payment's corresponding website webhook is included
-        $paymentWebsiteWebhookIncluded = false;
-        if ($this->payment->business_website_id) {
-            foreach ($webhookUrls as $webhook) {
-                if (isset($webhook['website_id']) && $webhook['website_id'] === $this->payment->business_website_id) {
-                    $paymentWebsiteWebhookIncluded = true;
-                    break;
-                }
-            }
-        }
-        
-        Log::info('Sending webhooks to all URLs', [
+        // Log webhook URLs that will be sent to
+        Log::info('Sending webhook to originating website', [
             'payment_id' => $this->payment->id,
             'transaction_id' => $this->payment->transaction_id,
             'business_website_id' => $this->payment->business_website_id,
-            'payment_website_webhook_included' => $paymentWebsiteWebhookIncluded,
+            'website_url' => $this->payment->website?->website_url ?? 'N/A',
             'total_webhook_urls' => count($webhookUrls),
             'webhook_urls' => array_map(function($w) {
                 return [
@@ -208,15 +146,13 @@ class SendWebhookNotification implements ShouldQueue
             }, $webhookUrls),
         ]);
         
-        // WARNING: If payment has a website but its webhook is not included, log a warning
-        if ($this->payment->business_website_id && !$paymentWebsiteWebhookIncluded) {
-            Log::warning('Payment website webhook NOT included in webhook list', [
+        // WARNING: If payment has a website but no webhook URL configured
+        if ($this->payment->business_website_id && empty($webhookUrls)) {
+            Log::warning('Payment has website but no webhook URL configured', [
                 'payment_id' => $this->payment->id,
                 'transaction_id' => $this->payment->transaction_id,
                 'business_website_id' => $this->payment->business_website_id,
                 'website_url' => $this->payment->website?->website_url ?? 'N/A',
-                'website_webhook_url' => $this->payment->website?->webhook_url ?? 'N/A',
-                'total_webhooks' => count($webhookUrls),
             ]);
         }
 
@@ -362,22 +298,12 @@ class SendWebhookNotification implements ShouldQueue
             throw new \Exception("All webhooks failed: " . implode('; ', $errors));
         }
 
-        // Log summary with verification
-        $correspondingWebsiteWebhookSent = false;
-        if ($this->payment->business_website_id) {
-            foreach ($sentUrls as $sent) {
-                if (isset($sent['website_id']) && $sent['website_id'] === $this->payment->business_website_id && $sent['status'] === 'success') {
-                    $correspondingWebsiteWebhookSent = true;
-                    break;
-                }
-            }
-        }
-        
+        // Log summary
         Log::info('Payment webhook summary', [
             'payment_id' => $this->payment->id,
             'transaction_id' => $this->payment->transaction_id,
             'business_website_id' => $this->payment->business_website_id,
-            'payment_website_webhook_sent' => $correspondingWebsiteWebhookSent,
+            'website_url' => $this->payment->website?->website_url ?? 'N/A',
             'total_webhooks' => count($webhookUrls),
             'successful' => $successCount,
             'failed' => $failureCount,
@@ -391,19 +317,6 @@ class SendWebhookNotification implements ShouldQueue
                 ];
             }, $sentUrls),
         ]);
-        
-        // CRITICAL: Verify corresponding website webhook was sent successfully
-        if ($this->payment->business_website_id && !$correspondingWebsiteWebhookSent && $successCount > 0) {
-            Log::warning('Payment website webhook may not have been sent successfully', [
-                'payment_id' => $this->payment->id,
-                'transaction_id' => $this->payment->transaction_id,
-                'business_website_id' => $this->payment->business_website_id,
-                'website_url' => $this->payment->website?->website_url ?? 'N/A',
-                'website_webhook_url' => $this->payment->website?->webhook_url ?? 'N/A',
-                'total_successful' => $successCount,
-                'sent_urls' => $sentUrls,
-            ]);
-        }
     }
 
     /**
