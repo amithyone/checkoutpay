@@ -113,6 +113,16 @@ class SendWebhookNotification implements ShouldQueue
                 'website_webhook' => $this->payment->website?->webhook_url ?? null,
                 'business_webhook' => $this->payment->business?->webhook_url ?? null,
             ]);
+            
+            // Update status even when no webhook URLs exist - mark as 'sent' since there's nothing to send
+            $this->payment->update([
+                'webhook_sent_at' => now(),
+                'webhook_status' => 'sent', // No URLs = nothing to send, so consider it "sent"
+                'webhook_attempts' => $this->payment->webhook_attempts + 1,
+                'webhook_last_error' => null,
+                'webhook_urls_sent' => [],
+            ]);
+            
             return;
         }
 
@@ -303,6 +313,22 @@ class SendWebhookNotification implements ShouldQueue
             'payment_id' => $this->payment->id,
             'transaction_id' => $this->payment->transaction_id,
             'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
         ]);
+        
+        // Update payment status to 'failed' when job fails permanently
+        try {
+            $this->payment->refresh();
+            $this->payment->update([
+                'webhook_status' => 'failed',
+                'webhook_last_error' => 'Job failed after ' . $this->tries . ' attempts: ' . $exception->getMessage(),
+                'webhook_attempts' => $this->payment->webhook_attempts + 1,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to update webhook status after job failure', [
+                'payment_id' => $this->payment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
