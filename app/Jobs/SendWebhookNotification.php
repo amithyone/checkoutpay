@@ -36,11 +36,11 @@ class SendWebhookNotification implements ShouldQueue
         $this->payment->load(['accountNumberDetails', 'website']);
 
         // Collect webhook URLs to send to
-        // CRITICAL: Only send to the website that originated the transaction, not all business websites
+        // CRITICAL: Only send to the website that originated the transaction, NOT to business-level webhooks
         $webhookUrls = [];
 
         // 1. Add website-specific webhook URL (if payment has a website)
-        // This is the ONLY website that should receive the webhook - the one that created the transaction
+        // This is the ONLY webhook that should be sent - the originating website
         if ($this->payment->website && $this->payment->website->webhook_url) {
             $webhookUrls[] = [
                 'url' => $this->payment->website->webhook_url,
@@ -55,29 +55,26 @@ class SendWebhookNotification implements ShouldQueue
                 'webhook_url' => $this->payment->website->webhook_url,
             ]);
         }
-
-        // 2. Add payment-specific webhook URL (if explicitly set on payment)
-        if ($this->payment->webhook_url) {
+        // 2. Fallback: Use payment-specific webhook_url ONLY if no website webhook exists
+        elseif ($this->payment->webhook_url) {
             $webhookUrls[] = [
                 'url' => $this->payment->webhook_url,
                 'type' => 'payment',
             ];
             
-            Log::info('Added payment-specific webhook URL', [
+            Log::info('Added payment-specific webhook URL (fallback - no website webhook)', [
                 'payment_id' => $this->payment->id,
                 'webhook_url' => $this->payment->webhook_url,
             ]);
         }
-
-        // 3. Add business-level webhook URL (fallback if no website webhook)
-        // Only add if payment doesn't have a website webhook
-        if (empty($webhookUrls) && $this->payment->business && $this->payment->business->webhook_url) {
+        // 3. Last resort: Business-level webhook URL ONLY if no website and no payment webhook
+        elseif ($this->payment->business && $this->payment->business->webhook_url) {
             $webhookUrls[] = [
                 'url' => $this->payment->business->webhook_url,
                 'type' => 'business',
             ];
             
-            Log::info('Added business-level webhook URL (fallback)', [
+            Log::info('Added business-level webhook URL (last resort - no website or payment webhook)', [
                 'payment_id' => $this->payment->id,
                 'business_id' => $this->payment->business_id,
                 'webhook_url' => $this->payment->business->webhook_url,
@@ -85,6 +82,7 @@ class SendWebhookNotification implements ShouldQueue
         }
 
         // REMOVED: We no longer send webhooks to ALL websites under the business
+        // REMOVED: We no longer send to business-level webhook if website webhook exists
         // Only the originating website (the one that created the transaction) receives the webhook
 
         // Remove duplicates by URL (shouldn't happen now, but keep for safety)
