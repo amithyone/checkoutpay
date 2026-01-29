@@ -14,26 +14,11 @@ class WebhookCronController extends Controller
      * Process pending webhooks via cron
      * This endpoint can be called by external cron services
      * 
-     * URL: /cron/process-webhooks?secret=YOUR_SECRET
+     * URL: /api/v1/cron/process-webhooks
+     * Public endpoint - no authentication required
      */
     public function processWebhooks(Request $request)
     {
-        // Verify secret token for security
-        $secret = $request->query('secret') ?? $request->header('X-Cron-Secret');
-        $expectedSecret = env('WEBHOOK_CRON_SECRET', 'change-me-in-production-' . md5(config('app.key')));
-        
-        if (empty($secret) || $secret !== $expectedSecret) {
-            Log::warning('Unauthorized webhook cron request', [
-                'ip' => $request->ip(),
-                'has_secret' => !empty($secret),
-            ]);
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized: Invalid or missing secret',
-            ], 401);
-        }
-
         try {
             // Get pending/failed webhooks that need to be sent
             $limit = min((int) ($request->query('limit', 50)), 100); // Max 100 per run

@@ -522,15 +522,12 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/api/v1/cron/process-webhooks') }}?secret=YOUR_SECRET</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/api/v1/cron/process-webhooks') }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Processes pending/failed webhooks.</strong> Sends webhook notifications for approved payments that haven't been sent yet.
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
                     <strong>Frequency:</strong> Every 1-5 minutes
-                </p>
-                <p class="text-xs text-yellow-600 mt-1">
-                    <strong>⚠️ Important:</strong> Add <code class="bg-yellow-100 px-1 rounded">WEBHOOK_CRON_SECRET=your-secret-here</code> to your <code>.env</code> file for security.
                 </p>
             </div>
         </div>
@@ -973,8 +970,7 @@ function copyCronUrl(type = 'direct') {
     } else if (type === 'extract-names') {
         url = '{{ url('/cron/extract-missing-names') }}';
     } else if (type === 'webhooks') {
-        const secret = prompt('Enter your WEBHOOK_CRON_SECRET (or leave empty to use default):', '');
-        url = '{{ url('/api/v1/cron/process-webhooks') }}' + (secret ? '?secret=' + encodeURIComponent(secret) : '');
+        url = '{{ url('/api/v1/cron/process-webhooks') }}';
     } else {
         url = '{{ url('/cron/read-emails-direct') }}';
     }
