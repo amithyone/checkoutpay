@@ -44,23 +44,22 @@ class WebhookCronController extends Controller
                 ->get();
 
             $processed = 0;
-            $queued = 0;
             $errors = [];
 
             foreach ($payments as $payment) {
                 try {
-                    // Dispatch webhook job to queue
-                    SendWebhookNotification::dispatch($payment);
-                    $queued++;
+                    // Run webhook SYNCHRONOUSLY - sends immediately without needing queue worker
+                    // This ensures webhooks are sent when cron runs, even if queue worker is not running
+                    SendWebhookNotification::dispatchSync($payment);
                     $processed++;
                     
-                    Log::info('Queued webhook for processing via cron', [
+                    Log::info('Webhook sent via cron (sync)', [
                         'payment_id' => $payment->id,
                         'transaction_id' => $payment->transaction_id,
                     ]);
                 } catch (\Exception $e) {
                     $errors[] = "Payment {$payment->id}: {$e->getMessage()}";
-                    Log::error('Failed to queue webhook via cron', [
+                    Log::error('Failed to send webhook via cron', [
                         'payment_id' => $payment->id,
                         'error' => $e->getMessage(),
                     ]);
@@ -70,7 +69,7 @@ class WebhookCronController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Processed {$processed} webhook(s)",
-                'queued' => $queued,
+                'sent' => $processed,
                 'errors' => $errors,
                 'total_found' => $payments->count(),
                 'timestamp' => now()->toISOString(),
