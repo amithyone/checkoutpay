@@ -269,10 +269,10 @@ class PaymentService
                     $payment->approve([
                         'subject' => $storedEmail->subject,
                         'from' => $storedEmail->from_email,
-                        'text' => $storedEmail->text_body,
-                        'html' => $storedEmail->html_body,
                         'date' => $storedEmail->email_date->toDateTimeString(),
                         'sender_name' => $storedEmail->sender_name, // Map sender_name to payer_name
+                        'amount' => $payment->amount,
+                        'processed_email_id' => $storedEmail->id,
                     ]);
                     
                     // Update business balance with charges applied
@@ -300,10 +300,10 @@ class PaymentService
                     $payment->approve([
                         'subject' => $matchedEmail->subject,
                         'from' => $matchedEmail->from_email,
-                        'text' => $matchedEmail->text_body,
-                        'html' => $matchedEmail->html_body,
                         'date' => $matchedEmail->email_date ? $matchedEmail->email_date->toDateTimeString() : null,
                         'sender_name' => $matchedEmail->sender_name, // Map sender_name to payer_name
+                        'amount' => $payment->amount,
+                        'processed_email_id' => $matchedEmail->id,
                     ]);
                     
                     // Update business balance with charges applied

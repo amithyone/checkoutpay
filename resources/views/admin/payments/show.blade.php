@@ -259,8 +259,164 @@
 
         @if($payment->email_data)
         <div class="mt-6 pt-6 border-t border-gray-200">
-            <label class="text-xs sm:text-sm text-gray-600 mb-2 block">Email Data</label>
-            <pre class="bg-gray-50 p-3 sm:p-4 rounded-lg text-xs overflow-x-auto break-words whitespace-pre-wrap">{{ json_encode($payment->email_data, JSON_PRETTY_PRINT) }}</pre>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                <h4 class="text-sm sm:text-md font-semibold text-gray-900">
+                    <i class="fas fa-envelope text-primary mr-2"></i>Email Data
+                </h4>
+            </div>
+            
+            @php
+                $emailData = $payment->email_data;
+            @endphp
+            
+            <div class="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200 space-y-3">
+                @php
+                    // Handle both new structure (name) and old structure (sender_name/payer_name)
+                    // Fallback to payment's payer_name if not in email_data
+                    $name = $emailData['name'] ?? $emailData['sender_name'] ?? $emailData['payer_name'] ?? $payment->payer_name ?? null;
+                    // Handle both new structure (time) and old structure (date/transaction_date)
+                    $time = $emailData['time'] ?? $emailData['date'] ?? $emailData['transaction_date'] ?? null;
+                    // Handle both new structure (email_id) and old structure (processed_email_id/linked_email_id)
+                    $emailId = $emailData['email_id'] ?? $emailData['processed_email_id'] ?? $emailData['linked_email_id'] ?? null;
+                    // Amount can be in email_data or use payment amount
+                    $amount = $emailData['amount'] ?? $emailData['received_amount'] ?? $payment->amount ?? null;
+                @endphp
+                
+                @if($name)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Name</label>
+                    <p class="text-xs sm:text-sm text-gray-900 break-words mt-1">{{ $name }}</p>
+                </div>
+                @endif
+                
+                @if($amount)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Amount</label>
+                    <p class="text-xs sm:text-sm font-bold text-gray-900 mt-1">
+                        ₦{{ number_format($amount, 2) }}
+                    </p>
+                </div>
+                @endif
+                
+                @if($time)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Time</label>
+                    <p class="text-xs sm:text-sm text-gray-900 mt-1">
+                        {{ \Carbon\Carbon::parse($time)->format('M d, Y H:i:s') }}
+                    </p>
+                </div>
+                @endif
+                
+                @if(isset($emailData['subject']))
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Subject</label>
+                    <p class="text-xs sm:text-sm text-gray-900 break-words mt-1">{{ $emailData['subject'] }}</p>
+                </div>
+                @endif
+                
+                @if(isset($emailData['from']))
+                <div>
+                    <label class="text-xs font-medium text-gray-600">From</label>
+                    <p class="text-xs sm:text-sm text-gray-900 break-words mt-1">{{ $emailData['from'] }}</p>
+                </div>
+                @endif
+                
+                @if($emailId)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Email ID</label>
+                    <p class="text-xs sm:text-sm text-gray-900 font-mono mt-1">{{ $emailId }}</p>
+                </div>
+                @endif
+            </div>
+        </div>
+        @endif
+
+        <!-- Matched Email Section -->
+        @if($payment->matchedEmail)
+        <div class="mt-6 pt-6 border-t border-gray-200">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                <h4 class="text-sm sm:text-md font-semibold text-gray-900">
+                    <i class="fas fa-envelope-open text-primary mr-2"></i>Matched Email
+                </h4>
+                <a href="{{ route('admin.processed-emails.show', $payment->matchedEmail) }}" 
+                   class="text-xs sm:text-sm text-primary hover:underline">
+                    View Full Email <i class="fas fa-arrow-right ml-1"></i>
+                </a>
+            </div>
+            
+            <div class="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200 space-y-3">
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Email ID</label>
+                    <p class="text-xs sm:text-sm text-gray-900 font-mono mt-1">#{{ $payment->matchedEmail->id }}</p>
+                </div>
+                
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Subject</label>
+                    <p class="text-xs sm:text-sm text-gray-900 break-words mt-1">{{ $payment->matchedEmail->subject }}</p>
+                </div>
+                
+                <div>
+                    <label class="text-xs font-medium text-gray-600">From</label>
+                    <p class="text-xs sm:text-sm text-gray-900 break-words mt-1">
+                        @if($payment->matchedEmail->from_name)
+                            {{ $payment->matchedEmail->from_name }} &lt;{{ $payment->matchedEmail->from_email }}&gt;
+                        @else
+                            {{ $payment->matchedEmail->from_email }}
+                        @endif
+                    </p>
+                </div>
+                
+                @if($payment->matchedEmail->email_date)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Email Date</label>
+                    <p class="text-xs sm:text-sm text-gray-900 mt-1">
+                        {{ $payment->matchedEmail->email_date->format('M d, Y H:i:s') }}
+                    </p>
+                </div>
+                @endif
+                
+                @if($payment->matchedEmail->sender_name)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Sender Name</label>
+                    <p class="text-xs sm:text-sm text-gray-900 break-words mt-1">{{ $payment->matchedEmail->sender_name }}</p>
+                </div>
+                @endif
+                
+                @if($payment->matchedEmail->amount)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Amount</label>
+                    <p class="text-xs sm:text-sm font-bold text-gray-900 mt-1">
+                        ₦{{ number_format($payment->matchedEmail->amount, 2) }}
+                    </p>
+                </div>
+                @endif
+                
+                @if($payment->matchedEmail->account_number)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Account Number</label>
+                    <p class="text-xs sm:text-sm text-gray-900 font-mono break-all mt-1">{{ $payment->matchedEmail->account_number }}</p>
+                </div>
+                @endif
+                
+                @if($payment->matchedEmail->extraction_method)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Extraction Method</label>
+                    <p class="text-xs sm:text-sm text-gray-900 mt-1">
+                        {{ ucfirst(str_replace('_', ' ', $payment->matchedEmail->extraction_method)) }}
+                    </p>
+                </div>
+                @endif
+                
+                @if($payment->matchedEmail->matched_at)
+                <div>
+                    <label class="text-xs font-medium text-gray-600">Matched At</label>
+                    <p class="text-xs sm:text-sm text-gray-900 mt-1">
+                        {{ $payment->matchedEmail->matched_at->format('M d, Y H:i:s') }}
+                        ({{ $payment->matchedEmail->matched_at->diffForHumans() }})
+                    </p>
+                </div>
+                @endif
+            </div>
         </div>
         @endif
         

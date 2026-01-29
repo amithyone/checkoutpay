@@ -117,6 +117,7 @@ class PaymentController extends Controller
         $payment->load([
             'business', 
             'accountNumberDetails',
+            'matchedEmail',
             'matchAttempts' => function($q) {
                 $q->latest()->limit(10);
             },
@@ -271,10 +272,10 @@ class PaymentController extends Controller
                     $payment->approve([
                         'subject' => $storedEmail->subject,
                         'from' => $storedEmail->from_email,
-                        'text' => $storedEmail->text_body,
-                        'html' => $storedEmail->html_body,
                         'date' => $storedEmail->email_date ? $storedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                         'sender_name' => $storedEmail->sender_name, // Map sender_name to payer_name
+                        'amount' => $payment->amount,
+                        'processed_email_id' => $storedEmail->id,
                     ]);
                     
                     // Update payer_account_number if extracted
@@ -357,7 +358,7 @@ class PaymentController extends Controller
 
         $verifiedAmount = $request->verified_amount ?? $payment->amount;
 
-        // Store verification data in email_data
+        // Store verification data in email_data (preserve essential fields, add manual_verification)
         $emailData = $payment->email_data ?? [];
         $emailData['manual_verification'] = [
             'verified' => true,
@@ -367,6 +368,9 @@ class PaymentController extends Controller
             'verification_notes' => $request->verification_notes,
             'verified_amount' => $verifiedAmount,
         ];
+        
+        // Sanitize to keep only essential fields + manual_verification
+        $emailData = Payment::sanitizeEmailData($emailData);
 
         $payment->update([
             'email_data' => $emailData,
@@ -433,18 +437,15 @@ class PaymentController extends Controller
                     ? $extractionResult['data'] 
                     : $extractionResult;
 
-                // Build email data for approval
-                $emailData = array_merge([
+                // Build email data for approval (only essential fields)
+                $emailData = [
                     'subject' => $linkedEmail->subject,
                     'from' => $linkedEmail->from_email,
-                    'text' => $linkedEmail->text_body ?? '',
-                    'html' => $linkedEmail->html_body ?? '',
                     'date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
-                    'payer_name' => $extractedInfo['sender_name'] ?? $payment->payer_name,
-                    'bank' => $extractedInfo['bank'] ?? null,
-                    'payer_account_number' => $extractedInfo['account_number'] ?? null,
-                    'transaction_date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
-                ], $extractedInfo ?? []);
+                    'sender_name' => $extractedInfo['sender_name'] ?? $payment->payer_name,
+                    'amount' => $payment->amount,
+                    'processed_email_id' => $linkedEmail->id,
+                ];
 
             }
         }

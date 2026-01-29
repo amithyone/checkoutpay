@@ -129,42 +129,50 @@ class Payment extends Model
     }
 
     /**
-     * Sanitize email data to remove large fields (text/html bodies)
-     * Keep only essential metadata for reference
+     * Sanitize email data to keep only essential fields
+     * Only stores: name, amount, time, subject, from, email_id
+     * Preserves manual_verification if it exists (for admin tracking)
      */
     public static function sanitizeEmailData(array $emailData): array
     {
-        // Keep only essential fields, remove large text/html bodies
         $sanitized = [];
         
-        // Essential metadata fields
-        $allowedFields = [
-            'subject', 'from', 'date', 'sender_name', 'payer_name', 
-            'bank', 'payer_account_number', 'account_number',
-            'transaction_date', 'amount', 'received_amount',
-            'name_mismatch', 'name_similarity_percent',
-            'manual_approval', 'approved_by', 'approved_by_name', 
-            'approved_at', 'admin_notes', 'linked_email_id',
-            'processed_email_id', 'extraction_method',
-        ];
-        
-        foreach ($allowedFields as $field) {
-            if (isset($emailData[$field])) {
-                $sanitized[$field] = $emailData[$field];
-            }
+        // Only keep these essential fields
+        if (isset($emailData['sender_name'])) {
+            $sanitized['name'] = $emailData['sender_name'];
+        } elseif (isset($emailData['payer_name'])) {
+            $sanitized['name'] = $emailData['payer_name'];
         }
         
-        // Store truncated text/html previews (first 500 chars) if needed for debugging
-        if (isset($emailData['text']) && strlen($emailData['text']) > 500) {
-            $sanitized['text_preview'] = substr($emailData['text'], 0, 500) . '...';
-        } elseif (isset($emailData['text'])) {
-            $sanitized['text_preview'] = $emailData['text'];
+        if (isset($emailData['amount'])) {
+            $sanitized['amount'] = $emailData['amount'];
+        } elseif (isset($emailData['received_amount'])) {
+            $sanitized['amount'] = $emailData['received_amount'];
         }
         
-        if (isset($emailData['html']) && strlen($emailData['html']) > 500) {
-            $sanitized['html_preview'] = substr(strip_tags($emailData['html']), 0, 500) . '...';
-        } elseif (isset($emailData['html'])) {
-            $sanitized['html_preview'] = substr(strip_tags($emailData['html']), 0, 500);
+        if (isset($emailData['date'])) {
+            $sanitized['time'] = $emailData['date'];
+        } elseif (isset($emailData['transaction_date'])) {
+            $sanitized['time'] = $emailData['transaction_date'];
+        }
+        
+        if (isset($emailData['subject'])) {
+            $sanitized['subject'] = $emailData['subject'];
+        }
+        
+        if (isset($emailData['from'])) {
+            $sanitized['from'] = $emailData['from'];
+        }
+        
+        if (isset($emailData['processed_email_id'])) {
+            $sanitized['email_id'] = $emailData['processed_email_id'];
+        } elseif (isset($emailData['linked_email_id'])) {
+            $sanitized['email_id'] = $emailData['linked_email_id'];
+        }
+        
+        // Preserve manual_verification if it exists (admin tracking metadata)
+        if (isset($emailData['manual_verification'])) {
+            $sanitized['manual_verification'] = $emailData['manual_verification'];
         }
         
         return $sanitized;
@@ -175,6 +183,11 @@ class Payment extends Model
      */
     public function approve(array $emailData = [], bool $isMismatch = false, ?float $receivedAmount = null, ?string $mismatchReason = null): bool
     {
+        // Ensure amount is in email_data if not provided
+        if (!isset($emailData['amount']) && !isset($emailData['received_amount'])) {
+            $emailData['amount'] = $this->amount;
+        }
+        
         // Sanitize email_data to remove large text/html bodies
         $sanitizedEmailData = self::sanitizeEmailData($emailData);
         
@@ -257,6 +270,14 @@ class Payment extends Model
     public function statusChecks()
     {
         return $this->hasMany(PaymentStatusCheck::class);
+    }
+
+    /**
+     * Get the processed email that matched with this payment
+     */
+    public function matchedEmail()
+    {
+        return $this->hasOne(ProcessedEmail::class, 'matched_payment_id');
     }
 
     /**

@@ -260,6 +260,46 @@ class SenderNameExtractor
             }
         }
         
+        // PRIORITY 1.4: Extract from Narration field for Moniepoint emails
+        // Format: "Narration: BOBOSNEH VENTURE - BOBOSNEH VENTURE TO CHECKOUT NOW LTD MONIEPOINT..."
+        // The name comes first, before "TO CHECKOUT NOW" or "TO CHECKOUT NOW LTD"
+        if (!$senderName && preg_match('/narration[\s]*:[\s]*([^\n\r]+)/i', $text, $narrationMatches)) {
+            $narrationLine = trim($narrationMatches[1]);
+            
+            // Pattern 1: "NAME - NAME TO CHECKOUT NOW" (extract first NAME)
+            if (preg_match('/^([A-Z][A-Z\s]{2,}?)[\s]*\-[\s]*[A-Z][A-Z\s]*[\s]+TO[\s]+CHECKOUT[\s]+NOW/i', $narrationLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 2: "NAME TO CHECKOUT NOW" (extract NAME before TO CHECKOUT NOW)
+            elseif (preg_match('/^([A-Z][A-Z\s]{2,}?)[\s]+TO[\s]+CHECKOUT[\s]+NOW/i', $narrationLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 3: "NAME - NAME TO CHECKOUT NOW LTD" (extract first NAME)
+            elseif (preg_match('/^([A-Z][A-Z\s]{2,}?)[\s]*\-[\s]*[A-Z][A-Z\s]*[\s]+TO[\s]+CHECKOUT[\s]+NOW[\s]+LTD/i', $narrationLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 4: "NAME TO CHECKOUT NOW LTD" (extract NAME before TO CHECKOUT NOW LTD)
+            elseif (preg_match('/^([A-Z][A-Z\s]{2,}?)[\s]+TO[\s]+CHECKOUT[\s]+NOW[\s]+LTD/i', $narrationLine, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+        }
+        
         // PRIORITY 1.5: Check Remarks field for Access Bank transactions
         // When Access Bank is detected in description, sender name is usually in Remarks
         if (!$senderName && preg_match('/[\-]ACCESS[\-]/i', $text)) {
@@ -557,6 +597,38 @@ class SenderNameExtractor
             $potentialName = trim($matches[1]);
             if ($this->isValidName($potentialName)) {
                 $senderName = strtolower($potentialName);
+            }
+        }
+        
+        // PRIORITY 3.5: Extract from Narration field for Moniepoint emails (HTML)
+        // Format: "Narration: BOBOSNEH VENTURE - BOBOSNEH VENTURE TO CHECKOUT NOW LTD MONIEPOINT..."
+        if (!$senderName && preg_match('/(?s)<td[^>]*>[\s]*narration[\s:]*<\/td>.*?<td[^>]*>[\s:]*<\/td>.*?<td[^>]*>([^<]+)<\/td>/i', $html, $narrationMatches)) {
+            $narrationCell = strip_tags($narrationMatches[1]);
+            $narrationCell = preg_replace('/\s+/', ' ', trim($narrationCell));
+            
+            // Pattern 1: "NAME - NAME TO CHECKOUT NOW" (extract first NAME)
+            if (preg_match('/^([A-Z][A-Z\s]{2,}?)[\s]*\-[\s]*[A-Z][A-Z\s]*[\s]+TO[\s]+CHECKOUT[\s]+NOW/i', $narrationCell, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 2: "NAME TO CHECKOUT NOW" (extract NAME before TO CHECKOUT NOW)
+            elseif (preg_match('/^([A-Z][A-Z\s]{2,}?)[\s]+TO[\s]+CHECKOUT[\s]+NOW/i', $narrationCell, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
+            }
+            // Pattern 3: "NAME TO CHECKOUT NOW LTD" (extract NAME before TO CHECKOUT NOW LTD)
+            elseif (preg_match('/^([A-Z][A-Z\s]{2,}?)[\s]+TO[\s]+CHECKOUT[\s]+NOW[\s]+LTD/i', $narrationCell, $nameMatches)) {
+                $potentialName = trim($nameMatches[1]);
+                $potentialName = preg_replace('/\s+/', ' ', $potentialName);
+                if ($this->isValidName($potentialName) && !$this->isGenericTransactionName($potentialName)) {
+                    $senderName = strtolower($potentialName);
+                }
             }
         }
         
