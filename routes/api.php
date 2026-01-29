@@ -41,6 +41,10 @@ Route::prefix('v1')->group(function () {
     // Transaction check endpoint (for external sites to trigger email checking)
     Route::post('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']);
     Route::get('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']); // Also support GET
+    
+    // Webhook processing cron endpoint (for external cron services)
+    Route::get('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']);
+    Route::post('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']); // Also support POST
 });
 
 // Health check
