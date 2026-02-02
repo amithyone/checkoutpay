@@ -217,7 +217,7 @@ class AccountNumberController extends Controller
             $nubanService = app(\App\Services\NubanValidationService::class);
             
             // Use the comprehensive validation method that tries multiple approaches
-            $result = $nubanService->validateAccountNumberComprehensive(
+            $result = $nubanService->validate(
                 $validated['account_number'],
                 $validated['bank_code'] ?? null
             );
