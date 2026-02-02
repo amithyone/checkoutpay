@@ -21,7 +21,7 @@ class FixNullAccountNumbers extends Command
      *
      * @var string
      */
-    protected $description = 'Fix payments that have null account_numbers by assigning them from the pool';
+    protected $description = 'Fix payments that have null account_numbers and/or null websites by assigning them';
 
     /**
      * Execute the console command.
@@ -30,21 +30,25 @@ class FixNullAccountNumbers extends Command
     {
         $limit = (int) $this->option('limit');
         
-        $this->info("Finding payments with null account_numbers...");
+        $this->info("Finding payments with null account_numbers or null websites...");
         
-        $payments = Payment::whereNull('account_number')
+        $payments = Payment::where(function($query) {
+                $query->whereNull('account_number')
+                      ->orWhereNull('business_website_id');
+            })
             ->where('status', Payment::STATUS_PENDING)
             ->limit($limit)
             ->get();
         
         if ($payments->isEmpty()) {
-            $this->info("No payments found with null account_numbers.");
+            $this->info("No payments found with null account_numbers or null websites.");
             return Command::SUCCESS;
         }
         
-        $this->info("Found {$payments->count()} payment(s) with null account_numbers.");
+        $this->info("Found {$payments->count()} payment(s) with null account_numbers or null websites.");
         
-        $fixed = 0;
+        $fixedAccount = 0;
+        $fixedWebsite = 0;
         $failed = 0;
         
         foreach ($payments as $payment) {
@@ -57,35 +61,60 @@ class FixNullAccountNumbers extends Command
                     continue;
                 }
                 
-                // Try to assign account number
-                $accountNumber = $accountNumberService->assignAccountNumber($business);
+                $updateData = [];
+                $fixes = [];
                 
-                if ($accountNumber) {
-                    $payment->update(['account_number' => $accountNumber->account_number]);
-                    $this->info("✓ Fixed payment {$payment->id} (TXN: {$payment->transaction_id}) - Assigned account: {$accountNumber->account_number}");
-                    $fixed++;
+                // Fix account number if null
+                if (!$payment->account_number) {
+                    $accountNumber = $accountNumberService->assignAccountNumber($business);
                     
-                    Log::info('Fixed null account_number for payment', [
+                    if ($accountNumber) {
+                        $updateData['account_number'] = $accountNumber->account_number;
+                        $fixes[] = "account: {$accountNumber->account_number}";
+                        $fixedAccount++;
+                    } else {
+                        $this->error("✗ Failed to assign account number to payment {$payment->id} (TXN: {$payment->transaction_id}) - No available accounts");
+                        Log::error('Failed to fix null account_number for payment - no available accounts', [
+                            'payment_id' => $payment->id,
+                            'transaction_id' => $payment->transaction_id,
+                            'business_id' => $business->id,
+                        ]);
+                    }
+                }
+                
+                // Fix website if null
+                if (!$payment->business_website_id) {
+                    $website = $this->identifyWebsite($payment, $business);
+                    
+                    if ($website) {
+                        $updateData['business_website_id'] = $website->id;
+                        $fixes[] = "website: {$website->website_url}";
+                        $fixedWebsite++;
+                    }
+                }
+                
+                // Update payment if we have fixes
+                if (!empty($updateData)) {
+                    $payment->update($updateData);
+                    $fixesList = implode(', ', $fixes);
+                    $this->info("✓ Fixed payment {$payment->id} (TXN: {$payment->transaction_id}) - {$fixesList}");
+                    
+                    Log::info('Fixed null account_number/website for payment', [
                         'payment_id' => $payment->id,
                         'transaction_id' => $payment->transaction_id,
-                        'account_number' => $accountNumber->account_number,
+                        'updates' => $updateData,
                         'business_id' => $business->id,
                     ]);
                 } else {
-                    $this->error("✗ Failed to assign account number to payment {$payment->id} (TXN: {$payment->transaction_id}) - No available accounts");
-                    $failed++;
-                    
-                    Log::error('Failed to fix null account_number for payment - no available accounts', [
-                        'payment_id' => $payment->id,
-                        'transaction_id' => $payment->transaction_id,
-                        'business_id' => $business->id,
-                    ]);
+                    if (!$payment->account_number) {
+                        $failed++;
+                    }
                 }
             } catch (\Exception $e) {
                 $this->error("✗ Error fixing payment {$payment->id} (TXN: {$payment->transaction_id}): {$e->getMessage()}");
                 $failed++;
                 
-                Log::error('Error fixing null account_number for payment', [
+                Log::error('Error fixing null account_number/website for payment', [
                     'payment_id' => $payment->id,
                     'transaction_id' => $payment->transaction_id,
                     'error' => $e->getMessage(),
@@ -95,10 +124,53 @@ class FixNullAccountNumbers extends Command
         
         $this->newLine();
         $this->info("Summary:");
-        $this->info("  Fixed: {$fixed}");
+        $this->info("  Fixed account numbers: {$fixedAccount}");
+        $this->info("  Fixed websites: {$fixedWebsite}");
         $this->info("  Failed: {$failed}");
-        $this->info("  Total: {$payments->count()}");
+        $this->info("  Total processed: {$payments->count()}");
         
         return Command::SUCCESS;
+    }
+    
+    /**
+     * Identify website from payment's webhook_url or email_data
+     */
+    protected function identifyWebsite(Payment $payment, $business)
+    {
+        // Try to get website from webhook_url
+        if ($payment->webhook_url) {
+            $websiteUrl = $payment->webhook_url;
+            $website = $business->websites()
+                ->where('website_url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')
+                ->where('is_approved', true)
+                ->first();
+            
+            if ($website) {
+                return $website;
+            }
+        }
+        
+        // Try to get website from email_data (return_url or website_url)
+        $emailData = $payment->email_data ?? [];
+        $url = $emailData['return_url'] ?? $emailData['website_url'] ?? null;
+        
+        if ($url) {
+            $website = $business->websites()
+                ->where('website_url', 'like', '%' . parse_url($url, PHP_URL_HOST) . '%')
+                ->where('is_approved', true)
+                ->first();
+            
+            if ($website) {
+                return $website;
+            }
+        }
+        
+        // If business has only one approved website, use that
+        $approvedWebsites = $business->websites()->where('is_approved', true)->get();
+        if ($approvedWebsites->count() === 1) {
+            return $approvedWebsites->first();
+        }
+        
+        return null;
     }
 }
