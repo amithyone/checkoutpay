@@ -144,10 +144,12 @@ class Payment extends Model
             $sanitized['name'] = $emailData['payer_name'];
         }
         
-        if (isset($emailData['amount'])) {
-            $sanitized['amount'] = $emailData['amount'];
-        } elseif (isset($emailData['received_amount'])) {
+        // Prioritize received_amount if it exists (for edited amounts in manual approval)
+        if (isset($emailData['received_amount'])) {
             $sanitized['amount'] = $emailData['received_amount'];
+            $sanitized['received_amount'] = $emailData['received_amount']; // Keep both for webhook
+        } elseif (isset($emailData['amount'])) {
+            $sanitized['amount'] = $emailData['amount'];
         }
         
         if (isset($emailData['date'])) {

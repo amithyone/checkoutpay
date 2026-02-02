@@ -105,6 +105,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Payments
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::get('payments/needs-review', [PaymentController::class, 'needsReview'])->name('payments.needs-review');
+        Route::get('payments/expired', [PaymentController::class, 'expired'])->name('payments.expired');
         Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
         Route::post('payments/{payment}/check-match', [PaymentController::class, 'checkMatch'])->name('payments.check-match');
         Route::post('payments/{payment}/manual-verify', [PaymentController::class, 'manualVerify'])->name('payments.manual-verify');
@@ -114,6 +115,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('payments/{payment}/resend-webhook', [PaymentController::class, 'resendWebhook'])->name('payments.resend-webhook');
         Route::post('payments/resend-webhooks-bulk', [PaymentController::class, 'resendWebhooksBulk'])->name('payments.resend-webhooks-bulk');
         Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+
+        // Invoices
+        Route::resource('invoices', \App\Http\Controllers\Admin\InvoiceController::class);
+        Route::get('invoices/{invoice}/pdf', [\App\Http\Controllers\Admin\InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+        Route::get('invoices/{invoice}/view-pdf', [\App\Http\Controllers\Admin\InvoiceController::class, 'viewPdf'])->name('invoices.view-pdf');
+        Route::post('invoices/{invoice}/send', [\App\Http\Controllers\Admin\InvoiceController::class, 'send'])->name('invoices.send');
 
         // Withdrawals
         Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
@@ -209,5 +216,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('scanner/check-in', [\App\Http\Controllers\Admin\TicketScannerController::class, 'checkIn'])->name('scanner.check-in');
             Route::post('scanner/manual-check-in', [\App\Http\Controllers\Admin\TicketScannerController::class, 'manualCheckIn'])->name('scanner.manual-check-in');
         });
+
+        // Rentals Management
+        Route::prefix('rentals')->name('rentals.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\RentalController::class, 'index'])->name('index');
+            Route::get('/{rental}', [\App\Http\Controllers\Admin\RentalController::class, 'show'])->name('show');
+            Route::post('/{rental}/update-status', [\App\Http\Controllers\Admin\RentalController::class, 'updateStatus'])->name('update-status');
+            Route::delete('/{rental}', [\App\Http\Controllers\Admin\RentalController::class, 'destroy'])->name('destroy');
+        });
+
+        // Rental Categories Management
+        Route::resource('rental-categories', \App\Http\Controllers\Admin\RentalCategoryController::class);
+
+        // Rental Items Management
+        Route::resource('rental-items', \App\Http\Controllers\Admin\RentalItemController::class);
     });
 });

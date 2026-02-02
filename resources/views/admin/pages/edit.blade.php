@@ -27,11 +27,21 @@
                     $contentValue = old('content', $page->content);
                     if (is_array($contentValue)) {
                         $contentValue = json_encode($contentValue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                    } elseif (is_string($contentValue)) {
+                        // Keep as is for HTML content
                     }
                 @endphp
-                <textarea name="content" rows="15" 
+                <textarea name="content" rows="20" 
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary font-mono text-sm">{{ $contentValue }}</textarea>
-                <p class="mt-1 text-xs text-gray-500">For home and pricing pages, content should be valid JSON. For other pages, HTML is supported.</p>
+                <p class="mt-1 text-xs text-gray-500">
+                    @if($page->slug === 'products-invoices')
+                        <strong>HTML Content:</strong> This page supports full HTML editing. You can use Tailwind CSS classes (already loaded) and Font Awesome icons. The content will be rendered between the navigation and footer.
+                    @elseif(in_array($page->slug, ['home', 'pricing']))
+                        Content should be valid JSON for structured data.
+                    @else
+                        HTML content is supported. Use HTML tags and Tailwind CSS classes.
+                    @endif
+                </p>
             </div>
 
             <div class="grid grid-cols-2 gap-4">

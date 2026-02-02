@@ -61,9 +61,21 @@ class PageController extends Controller
             'order' => 'nullable|integer|min:0',
         ]);
 
-        // If content is array, encode it to JSON
-        if (is_array($validated['content'] ?? null)) {
-            $validated['content'] = json_encode($validated['content']);
+        // Handle content: For HTML pages (like products-invoices), keep as string
+        // For JSON pages (like home, pricing), encode to JSON if it's an array
+        if (isset($validated['content'])) {
+            // Check if it's a JSON page that expects array content
+            if (in_array($page->slug, ['home', 'pricing'])) {
+                // Try to decode JSON string to array
+                if (is_string($validated['content'])) {
+                    $decoded = json_decode($validated['content'], true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $validated['content'] = $decoded;
+                    }
+                }
+            }
+            // For HTML pages (like products-invoices), content is already a string, keep it as is
+            // The Page model's setContentAttribute will handle it correctly
         }
 
         $page->update($validated);

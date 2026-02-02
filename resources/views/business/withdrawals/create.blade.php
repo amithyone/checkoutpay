@@ -39,32 +39,52 @@
                 </div>
 
                 @if(!$hasAccountNumber)
+                <!-- Saved Accounts -->
+                @if(isset($savedAccounts) && $savedAccounts->count() > 0)
                 <div>
-                        <label for="bank_code" class="block text-sm font-medium text-gray-700 mb-1">Bank</label>
-                        <select name="bank_code" id="bank_code" required
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
-                            <option value="">Select Bank</option>
-                            @foreach(config('banks') as $bank)
-                                <option value="{{ $bank['code'] }}" data-bank-name="{{ $bank['bank_name'] }}">
-                                    {{ $bank['bank_name'] }}
-                                </option>
-                            @endforeach
-                        </select>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Use Saved Account</label>
+                    <select name="saved_account_id" id="saved_account_id" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        onchange="handleSavedAccountChange(this.value)">
+                        <option value="">-- Select saved account or enter new --</option>
+                        @foreach($savedAccounts as $saved)
+                            <option value="{{ $saved->id }}" 
+                                data-account-number="{{ $saved->account_number }}"
+                                data-account-name="{{ $saved->account_name }}"
+                                data-bank-name="{{ $saved->bank_name }}"
+                                data-bank-code="{{ $saved->bank_code }}">
+                                {{ $saved->bank_name }} - {{ $saved->account_name }} ({{ $saved->account_number }}){{ $saved->is_default ? ' [Default]' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Select a saved account or fill in new details below</p>
+                </div>
+                @endif
+
+                <div>
+                    <label for="bank_code" class="block text-sm font-medium text-gray-700 mb-1">Bank</label>
+                    <div class="relative">
+                        <input type="text" id="bank_search" autocomplete="off" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                            placeholder="Search bank...">
+                        <input type="hidden" name="bank_code" id="bank_code" required>
                         <input type="hidden" name="bank_name" id="bank_name">
+                        <div id="bank_dropdown" class="hidden absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1"></div>
+                    </div>
                     @error('bank_name')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
-                        @error('bank_code')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
+                    @error('bank_code')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div>
                     <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
-                        <input type="text" name="account_number" id="account_number" required maxlength="10"
+                    <input type="text" name="account_number" id="account_number" required maxlength="10"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                            placeholder="Enter 10-digit account number">
-                        <div id="account_number_validation" class="mt-1 text-sm hidden"></div>
+                        placeholder="Enter 10-digit account number">
+                    <div id="account_number_validation" class="mt-1 text-sm hidden"></div>
                     @error('account_number')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -72,14 +92,26 @@
 
                 <div>
                     <label for="account_name" class="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
-                        <input type="text" name="account_name" id="account_name" required readonly
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-gray-50"
-                            placeholder="Account name will be auto-filled after validation">
-                        <p id="account_name_hint" class="mt-1 text-sm text-gray-500">Enter and validate account number above to auto-fill account name</p>
-                        @error('account_name')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
+                    <input type="text" name="account_name" id="account_name" required readonly
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-gray-50"
+                        placeholder="Account name will be auto-filled after validation">
+                    <p id="account_name_hint" class="mt-1 text-sm text-gray-500">Enter and validate account number above to auto-fill account name</p>
+                    @error('account_name')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <!-- Save Account Option -->
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" name="save_account" id="save_account" value="1"
+                        class="rounded border-gray-300 text-primary focus:ring-primary">
+                    <label for="save_account" class="text-sm text-gray-700">Save this account for future withdrawals</label>
+                </div>
+                <div id="default_account_option" class="hidden ml-6 mt-2">
+                    <input type="checkbox" name="is_default" id="is_default" value="1"
+                        class="rounded border-gray-300 text-primary focus:ring-primary">
+                    <label for="is_default" class="text-sm text-gray-700">Set as default account</label>
+                </div>
                 @else
                     <input type="hidden" name="bank_name" value="{{ $accountDetails->bank_name }}">
                     <input type="hidden" name="account_number" value="{{ $accountDetails->account_number }}">
@@ -123,30 +155,132 @@
 @push('scripts')
 <script>
     (function() {
+        const banks = @json(config('banks', []));
         const accountNumberInput = document.getElementById('account_number');
         const accountNameInput = document.getElementById('account_name');
-        const bankCodeSelect = document.getElementById('bank_code');
+        const bankCodeInput = document.getElementById('bank_code');
         const bankNameInput = document.getElementById('bank_name');
+        const bankSearchInput = document.getElementById('bank_search');
+        const bankDropdown = document.getElementById('bank_dropdown');
+        const savedAccountSelect = document.getElementById('saved_account_id');
         const validationDiv = document.getElementById('account_number_validation');
         const accountNameHint = document.getElementById('account_name_hint');
         const submitBtn = document.getElementById('submit_btn');
         const form = document.querySelector('form');
+        const saveAccountCheckbox = document.getElementById('save_account');
+        const defaultAccountOption = document.getElementById('default_account_option');
         let validationTimeout = null;
         let isAccountValidated = false;
+        let usingSavedAccount = false;
 
-        // Update bank name when bank is selected
-        if (bankCodeSelect) {
-            bankCodeSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                if (selectedOption.value) {
-                    bankNameInput.value = selectedOption.getAttribute('data-bank-name');
-                    // Reset validation if bank changes
-                    isAccountValidated = false;
-                    if (submitBtn) {
-                        submitBtn.disabled = true;
-                    }
+        // Bank search functionality
+        if (bankSearchInput && bankDropdown) {
+            bankSearchInput.addEventListener('input', function() {
+                const search = this.value.toLowerCase();
+                if (search.length < 2) {
+                    bankDropdown.classList.add('hidden');
+                    return;
+                }
+
+                const filtered = banks.filter(bank => 
+                    bank.bank_name.toLowerCase().includes(search)
+                ).slice(0, 10);
+
+                if (filtered.length > 0) {
+                    bankDropdown.innerHTML = filtered.map(bank => {
+                        const code = bank.code.replace(/'/g, "\\'");
+                        const name = bank.bank_name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        return `<div class="px-4 py-2 hover:bg-gray-100 cursor-pointer" onclick="selectBank('${code}', '${name}')">${bank.bank_name}</div>`;
+                    }).join('');
+                    bankDropdown.classList.remove('hidden');
                 } else {
-                    bankNameInput.value = '';
+                    bankDropdown.classList.add('hidden');
+                }
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!bankSearchInput.contains(e.target) && !bankDropdown.contains(e.target)) {
+                    bankDropdown.classList.add('hidden');
+                }
+            });
+        }
+
+        window.selectBank = function(code, name) {
+            bankCodeInput.value = code;
+            bankNameInput.value = name;
+            bankSearchInput.value = name;
+            bankDropdown.classList.add('hidden');
+            
+            // Reset validation if bank changes
+            isAccountValidated = false;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+            }
+            
+            // Trigger account validation if account number is already entered
+            if (accountNumberInput && accountNumberInput.value.length === 10) {
+                validateAccountNumber(accountNumberInput.value, code);
+            }
+        };
+
+        // Handle saved account selection
+        function handleSavedAccountChange(value) {
+            if (!value) {
+                usingSavedAccount = false;
+                // Clear fields
+                accountNumberInput.value = '';
+                accountNameInput.value = '';
+                bankCodeInput.value = '';
+                bankNameInput.value = '';
+                bankSearchInput.value = '';
+                isAccountValidated = false;
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                }
+                return;
+            }
+
+            const option = savedAccountSelect.options[savedAccountSelect.selectedIndex];
+            const accountNumber = option.getAttribute('data-account-number');
+            const accountName = option.getAttribute('data-account-name');
+            const bankName = option.getAttribute('data-bank-name');
+            const bankCode = option.getAttribute('data-bank-code');
+
+            // Fill in the form fields
+            accountNumberInput.value = accountNumber;
+            accountNameInput.value = accountName;
+            bankCodeInput.value = bankCode;
+            bankNameInput.value = bankName;
+            bankSearchInput.value = bankName;
+
+            // Mark as validated since it's a saved account
+            usingSavedAccount = true;
+            isAccountValidated = true;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+            }
+
+            // Show validation success
+            validationDiv.classList.remove('hidden');
+            validationDiv.textContent = '✓ Using saved account: ' + accountName;
+            validationDiv.className = 'mt-1 text-sm text-green-600';
+
+            if (accountNameHint) {
+                accountNameHint.textContent = '✓ Using saved account';
+                accountNameHint.className = 'mt-1 text-sm text-green-600';
+            }
+        }
+
+        window.handleSavedAccountChange = handleSavedAccountChange;
+
+        // Show/hide default account option when save checkbox is checked
+        if (saveAccountCheckbox && defaultAccountOption) {
+            saveAccountCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    defaultAccountOption.classList.remove('hidden');
+                } else {
+                    defaultAccountOption.classList.add('hidden');
                 }
             });
         }
@@ -193,12 +327,18 @@
 
             // Only validate if account number is exactly 10 digits and bank is selected
             if (accountNumber.length === 10) {
-                const bankCode = bankCodeSelect ? bankCodeSelect.value : '';
+                const bankCode = bankCodeInput ? bankCodeInput.value : '';
                 if (!bankCode) {
                     validationDiv.classList.remove('hidden');
                     validationDiv.textContent = 'Please select a bank first';
                     validationDiv.className = 'mt-1 text-sm text-yellow-600';
                     return;
+                }
+
+                // Clear saved account selection if manually entering
+                if (savedAccountSelect) {
+                    savedAccountSelect.value = '';
+                    usingSavedAccount = false;
                 }
 
                 validationDiv.classList.remove('hidden');
@@ -234,9 +374,9 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success && data.valid) {
+                if (data.success && data.valid && data.is_active) {
                     isAccountValidated = true;
-                    validationDiv.textContent = '✓ Account number validated: ' + (data.account_name || 'Account verified');
+                    validationDiv.textContent = '✓ Account number validated and active: ' + (data.account_name || 'Account verified');
                     validationDiv.className = 'mt-1 text-sm text-green-600';
                     
                     // Auto-fill account name
@@ -250,9 +390,15 @@
                         accountNameHint.className = 'mt-1 text-sm text-green-600';
                     }
                     
-                    // Auto-fill bank name
+                    // Auto-fill bank name and code
                     if (bankNameInput && data.bank_name) {
                         bankNameInput.value = data.bank_name;
+                    }
+                    if (bankCodeInput && data.bank_code) {
+                        bankCodeInput.value = data.bank_code;
+                    }
+                    if (bankSearchInput && data.bank_name) {
+                        bankSearchInput.value = data.bank_name;
                     }
 
                     // Enable submit button
@@ -261,7 +407,7 @@
                     }
                 } else {
                     isAccountValidated = false;
-                    validationDiv.textContent = data.message || 'Invalid account number. Please verify and try again.';
+                    validationDiv.textContent = data.message || 'Invalid or inactive account number. Please verify and try again.';
                     validationDiv.className = 'mt-1 text-sm text-red-600';
                     
                     // Clear account name and bank name
@@ -271,11 +417,17 @@
                         accountNameInput.setAttribute('readonly', 'readonly');
                     }
                     if (accountNameHint) {
-                        accountNameHint.textContent = 'Invalid account number. Please verify and try again.';
+                        accountNameHint.textContent = 'Invalid or inactive account number. Please verify and try again.';
                         accountNameHint.className = 'mt-1 text-sm text-red-600';
                     }
                     if (bankNameInput) {
                         bankNameInput.value = '';
+                    }
+                    if (bankCodeInput) {
+                        bankCodeInput.value = '';
+                    }
+                    if (bankSearchInput) {
+                        bankSearchInput.value = '';
                     }
 
                     // Keep submit button disabled
@@ -297,9 +449,14 @@
             });
         }
 
-        // Prevent form submission if account number is not validated
+        // Prevent form submission if account number is not validated (unless using saved account)
         if (form) {
             form.addEventListener('submit', function(e) {
+                // Allow submission if using saved account
+                if (usingSavedAccount && savedAccountSelect && savedAccountSelect.value) {
+                    return true;
+                }
+
                 if (!isAccountValidated && accountNumberInput.value.length === 10) {
                     e.preventDefault();
                     validationDiv.classList.remove('hidden');

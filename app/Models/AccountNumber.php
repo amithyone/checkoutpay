@@ -16,12 +16,14 @@ class AccountNumber extends Model
         'bank_name',
         'business_id',
         'is_pool',
+        'is_invoice_pool',
         'is_active',
         'usage_count',
     ];
 
     protected $casts = [
         'is_pool' => 'boolean',
+        'is_invoice_pool' => 'boolean',
         'is_active' => 'boolean',
         'usage_count' => 'integer',
         'created_at' => 'datetime',
@@ -50,7 +52,15 @@ class AccountNumber extends Model
      */
     public function scopePool($query)
     {
-        return $query->where('is_pool', true);
+        return $query->where('is_pool', true)->where('is_invoice_pool', false);
+    }
+
+    /**
+     * Scope for invoice pool account numbers
+     */
+    public function scopeInvoicePool($query)
+    {
+        return $query->where('is_invoice_pool', true)->where('is_active', true);
     }
 
     /**
@@ -103,14 +113,20 @@ class AccountNumber extends Model
         });
 
         // Invalidate cache when account numbers are created or updated
-        static::created(function () {
-            app(\App\Services\AccountNumberService::class)->invalidatePendingAccountsCache();
+        static::created(function ($accountNumber) {
+            $service = app(\App\Services\AccountNumberService::class);
+            $service->invalidatePendingAccountsCache();
+            if ($accountNumber->is_invoice_pool) {
+                $service->invalidateInvoicePoolCache();
+            }
         });
 
         static::updated(function ($accountNumber) {
             // Invalidate cache if pool status or active status changed
-            if ($accountNumber->isDirty(['is_pool', 'is_active', 'business_id'])) {
-                app(\App\Services\AccountNumberService::class)->invalidatePendingAccountsCache();
+            if ($accountNumber->isDirty(['is_pool', 'is_invoice_pool', 'is_active', 'business_id'])) {
+                $service = app(\App\Services\AccountNumberService::class);
+                $service->invalidatePendingAccountsCache();
+                $service->invalidateInvoicePoolCache();
             }
         });
     }

@@ -184,6 +184,51 @@ class ChargeService
     }
 
     /**
+     * Calculate charges for invoice payment
+     * Invoices are free by default, but charges apply when amount exceeds threshold
+     *
+     * @param float $amount Invoice amount
+     * @param Business|null $business Business that owns the invoice
+     * @return array
+     */
+    public function calculateInvoiceCharges(float $amount, ?Business $business = null): array
+    {
+        // Check if invoice charges are enabled
+        $chargesEnabled = Setting::get('invoice_charges_enabled', false);
+        $threshold = Setting::get('invoice_charge_threshold', 0);
+        
+        // If charges disabled or amount below threshold, no charges
+        if (!$chargesEnabled || $amount <= $threshold) {
+            return [
+                'original_amount' => $amount,
+                'charge_percentage' => 0,
+                'charge_fixed' => 0,
+                'total_charges' => 0,
+                'business_receives' => $amount,
+                'exempt' => true,
+            ];
+        }
+
+        // Get invoice charge settings
+        $percentage = (float) Setting::get('invoice_charge_percentage', 0);
+        $fixed = (float) Setting::get('invoice_charge_fixed', 0);
+
+        // Calculate charges
+        $percentageCharge = ($amount * $percentage) / 100;
+        $totalCharges = $percentageCharge + $fixed;
+        $businessReceives = $amount - $totalCharges;
+
+        return [
+            'original_amount' => $amount,
+            'charge_percentage' => round($percentageCharge, 2),
+            'charge_fixed' => $fixed,
+            'total_charges' => round($totalCharges, 2),
+            'business_receives' => max(0, round($businessReceives, 2)),
+            'exempt' => false,
+        ];
+    }
+
+    /**
      * Round business receives to nearest nice round number
      * Rounds to nearest 500 for amounts >= 1000, nearest 100 for amounts < 1000
      *

@@ -17,6 +17,17 @@
                 <i class="fas fa-redo mr-2"></i> <span class="hidden sm:inline">Resend Failed Webhooks</span><span class="sm:hidden">Resend</span>
             </button>
             @endif
+            <a href="{{ route('admin.payments.expired') }}" class="bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 flex items-center text-sm">
+                <i class="fas fa-clock mr-2"></i> <span class="hidden sm:inline">Expired</span><span class="sm:hidden">Expired</span>
+                @php
+                    $expiredCount = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
+                    ->where('expires_at', '<=', now())
+                    ->count();
+                @endphp
+                @if($expiredCount > 0)
+                    <span class="ml-2 bg-white text-orange-600 rounded-full px-2 py-0.5 text-xs font-bold">{{ $expiredCount }}</span>
+                @endif
+            </a>
             <a href="{{ route('admin.payments.needs-review') }}" class="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 flex items-center text-sm">
                 <i class="fas fa-exclamation-triangle mr-2"></i> <span class="hidden sm:inline">Needs Review</span><span class="sm:hidden">Review</span>
                 @php

@@ -5,6 +5,28 @@
 
 @section('content')
 <div class="space-y-4 lg:space-y-6 pb-20 lg:pb-0">
+    @php
+        $hasRenterAccount = \App\Models\Renter::where('email', auth('business')->user()->email)->exists();
+    @endphp
+    @if($hasRenterAccount)
+        <!-- Dashboard Toggle Banner -->
+        <div class="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exchange-alt text-primary"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-900">You also have a Rentals account</p>
+                    <p class="text-xs text-gray-600">Switch to view your rental requests and items</p>
+                </div>
+            </div>
+            <a href="{{ route('renter.dashboard') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium flex items-center gap-2">
+                <i class="fas fa-camera"></i>
+                Switch to Rentals Dashboard
+            </a>
+        </div>
+    @endif
+
     <!-- Business ID Card -->
     <div class="bg-gradient-to-r from-primary to-primary/90 rounded-xl shadow-sm p-5 lg:p-6 text-white">
         <div class="flex items-center justify-between">

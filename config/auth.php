@@ -19,6 +19,10 @@ return [
             'driver' => 'session',
             'provider' => 'businesses',
         ],
+        'renter' => [
+            'driver' => 'session',
+            'provider' => 'renters',
+        ],
     ],
 
     'providers' => [
@@ -34,6 +38,10 @@ return [
             'driver' => 'eloquent',
             'model' => App\Models\Business::class,
         ],
+        'renters' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Renter::class,
+        ],
     ],
 
     'passwords' => [
@@ -45,6 +53,12 @@ return [
         ],
         'businesses' => [
             'provider' => 'businesses',
+            'table' => 'password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+        'renters' => [
+            'provider' => 'renters',
             'table' => 'password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,

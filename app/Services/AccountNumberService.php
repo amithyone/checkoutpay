@@ -26,6 +26,16 @@ class AccountNumberService
     const CACHE_KEY_POOL_ACCOUNTS = 'account_number_service:pool_accounts';
     
     /**
+     * Cache key for invoice pool accounts list
+     */
+    const CACHE_KEY_INVOICE_POOL_ACCOUNTS = 'account_number_service:invoice_pool_accounts';
+    
+    /**
+     * Cache key for last used invoice account
+     */
+    const CACHE_KEY_LAST_USED_INVOICE_ACCOUNT = 'account_number_service:last_used_invoice_account';
+    
+    /**
      * Cache TTL in seconds (300 seconds = 5 minutes)
      * Increased from 60s to 300s to prevent frequent cache expiration
      */
@@ -233,6 +243,8 @@ class AccountNumberService
         Cache::forget(self::CACHE_KEY_PENDING_ACCOUNTS);
         Cache::forget(self::CACHE_KEY_LAST_USED_ACCOUNT);
         Cache::forget(self::CACHE_KEY_POOL_ACCOUNTS);
+        // Also invalidate invoice pool cache when regular pool cache is invalidated
+        $this->invalidateInvoicePoolCache();
     }
 
     /**
@@ -279,6 +291,22 @@ class AccountNumberService
             'account_name' => $data['account_name'],
             'bank_name' => $data['bank_name'],
             'is_pool' => true,
+            'is_invoice_pool' => false,
+            'is_active' => true,
+        ]);
+    }
+
+    /**
+     * Create invoice pool account number
+     */
+    public function createInvoicePoolAccount(array $data): AccountNumber
+    {
+        return AccountNumber::create([
+            'account_number' => $data['account_number'],
+            'account_name' => $data['account_name'],
+            'bank_name' => $data['bank_name'],
+            'is_pool' => false, // Invoice pool accounts are separate from regular pool
+            'is_invoice_pool' => true,
             'is_active' => true,
         ]);
     }
@@ -304,5 +332,197 @@ class AccountNumberService
     public function getAvailablePoolCount(): int
     {
         return AccountNumber::pool()->active()->count();
+    }
+
+    /**
+     * Assign account number from invoice pool
+     * Similar to assignAccountNumber but uses invoice pool instead
+     */
+    public function assignInvoiceAccountNumber(?Business $business = null): ?AccountNumber
+    {
+        $startTime = microtime(true);
+
+        // Get invoice pool accounts from cache
+        $invoicePoolAccounts = Cache::remember(self::CACHE_KEY_INVOICE_POOL_ACCOUNTS, self::CACHE_TTL, function () {
+            return AccountNumber::invoicePool()
+                ->orderBy('id')
+                ->get();
+        });
+
+        if ($invoicePoolAccounts->isEmpty()) {
+            Log::warning('No available invoice pool account number found');
+            return null;
+        }
+
+        // Get pending invoice account numbers (payments with invoice service)
+        $pendingInvoiceAccountNumbers = $this->getPendingInvoiceAccountNumbers();
+        
+        // Get last used invoice account number
+        $lastUsedInvoiceAccountNumber = $this->getLastUsedInvoiceAccountNumber();
+        $lastUsedInvoiceAccountId = null;
+        
+        // Create lookup arrays
+        $invoicePoolAccountsById = [];
+        $invoicePoolAccountsByNumber = [];
+        foreach ($invoicePoolAccounts as $account) {
+            $invoicePoolAccountsById[$account->id] = $account;
+            $invoicePoolAccountsByNumber[$account->account_number] = $account;
+        }
+        
+        if ($lastUsedInvoiceAccountNumber) {
+            $lastUsedAccount = $invoicePoolAccountsByNumber[$lastUsedInvoiceAccountNumber] ?? null;
+            if ($lastUsedAccount) {
+                $lastUsedInvoiceAccountId = $lastUsedAccount->id;
+            }
+        }
+
+        $invoicePoolAccountsArray = $invoicePoolAccounts->values()->all();
+        $poolCount = count($invoicePoolAccountsArray);
+        
+        // Find starting point: next account after last used (by ID)
+        $startIndex = 0;
+        if ($lastUsedInvoiceAccountId && isset($invoicePoolAccountsById[$lastUsedInvoiceAccountId])) {
+            $lastUsedIndex = array_search($lastUsedInvoiceAccountId, array_column($invoicePoolAccountsArray, 'id'));
+            
+            if ($lastUsedIndex !== false) {
+                $startIndex = $lastUsedIndex + 1;
+            }
+        }
+
+        // Use array key lookup for pending check
+        $pendingInvoiceAccountNumbersSet = array_flip($pendingInvoiceAccountNumbers);
+        
+        // Try to find the next available account
+        $selectedAccount = null;
+        
+        // First pass: Try to find account without pending payments
+        for ($i = 0; $i < $poolCount; $i++) {
+            $index = ($startIndex + $i) % $poolCount;
+            $account = $invoicePoolAccountsArray[$index];
+            
+            // Skip if this is the last used account
+            if ($lastUsedInvoiceAccountNumber && $account->account_number === $lastUsedInvoiceAccountNumber) {
+                continue;
+            }
+            
+            // Skip if account has pending payments
+            if (isset($pendingInvoiceAccountNumbersSet[$account->account_number])) {
+                continue;
+            }
+            
+            // Found an available account
+            $selectedAccount = $account;
+            break;
+        }
+
+        // Second pass: If no account found without pending, wrap around
+        if (!$selectedAccount) {
+            if ($lastUsedInvoiceAccountId) {
+                $lastUsedIndex = array_search($lastUsedInvoiceAccountId, array_column($invoicePoolAccountsArray, 'id'));
+                
+                if ($lastUsedIndex !== false) {
+                    $nextIndex = ($lastUsedIndex + 1) % $poolCount;
+                    $selectedAccount = $invoicePoolAccountsArray[$nextIndex];
+                } else {
+                    $selectedAccount = $invoicePoolAccountsArray[0];
+                }
+            } else {
+                $selectedAccount = $invoicePoolAccountsArray[0];
+            }
+        }
+
+        $duration = (microtime(true) - $startTime) * 1000;
+        Log::info('Assigned invoice pool account number', [
+            'business_id' => $business?->id,
+            'account_number' => $selectedAccount->account_number,
+            'account_id' => $selectedAccount->id,
+            'pool_size' => $invoicePoolAccounts->count(),
+            'pending_accounts_count' => count($pendingInvoiceAccountNumbers),
+            'last_used_account' => $lastUsedInvoiceAccountNumber,
+            'duration_ms' => round($duration, 2),
+        ]);
+
+        return $selectedAccount;
+    }
+
+    /**
+     * Get pending invoice account numbers (cached)
+     */
+    protected function getPendingInvoiceAccountNumbers(): array
+    {
+        return Cache::remember(
+            self::CACHE_KEY_INVOICE_POOL_ACCOUNTS . ':pending',
+            self::CACHE_TTL,
+            function () {
+                if (!class_exists(Payment::class)) {
+                    return [];
+                }
+                
+                return Payment::where('status', Payment::STATUS_PENDING)
+                    ->whereNotNull('account_number')
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', now());
+                    })
+                    ->where(function ($query) {
+                        // Check if payment is for invoice (has invoice_id in email_data or service is 'invoice')
+                        $query->whereJsonContains('email_data->service', 'invoice')
+                            ->orWhereJsonContains('email_data->invoice_id');
+                    })
+                    ->pluck('account_number')
+                    ->unique()
+                    ->toArray();
+            }
+        );
+    }
+
+    /**
+     * Get last used invoice account number (cached)
+     */
+    protected function getLastUsedInvoiceAccountNumber(): ?string
+    {
+        return Cache::remember(
+            self::CACHE_KEY_LAST_USED_INVOICE_ACCOUNT,
+            self::CACHE_TTL,
+            function () {
+                if (!class_exists(Payment::class)) {
+                    return null;
+                }
+                
+                $lastPayment = Payment::where('status', Payment::STATUS_PENDING)
+                    ->whereNotNull('account_number')
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', now());
+                    })
+                    ->where(function ($query) {
+                        $query->whereJsonContains('email_data->service', 'invoice')
+                            ->orWhereJsonContains('email_data->invoice_id');
+                    })
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+                
+                return $lastPayment ? $lastPayment->account_number : null;
+            }
+        );
+    }
+
+    /**
+     * Invalidate cache for invoice pool accounts
+     */
+    public function invalidateInvoicePoolCache(): void
+    {
+        Cache::forget(self::CACHE_KEY_INVOICE_POOL_ACCOUNTS);
+        Cache::forget(self::CACHE_KEY_LAST_USED_INVOICE_ACCOUNT);
+        Cache::forget(self::CACHE_KEY_INVOICE_POOL_ACCOUNTS . ':pending');
+    }
+
+    /**
+     * Invalidate all account number caches
+     */
+    public function invalidateAllCaches(): void
+    {
+        $this->invalidatePendingAccountsCache();
+        $this->invalidateInvoicePoolCache();
     }
 }

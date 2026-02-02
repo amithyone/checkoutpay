@@ -19,9 +19,11 @@ class AccountNumberController extends Controller
 
         // Filter by type
         if ($request->type === 'pool') {
-            $query->where('is_pool', true);
+            $query->where('is_pool', true)->where('is_invoice_pool', false);
+        } elseif ($request->type === 'invoice_pool') {
+            $query->where('is_invoice_pool', true);
         } elseif ($request->type === 'business') {
-            $query->where('is_pool', false);
+            $query->where('is_pool', false)->where('is_invoice_pool', false);
         }
 
         // Filter by status
@@ -80,24 +82,42 @@ class AccountNumberController extends Controller
             'account_name' => 'required|string|max:255',
             'bank_name' => 'required|string|max:255',
             'bank_code' => 'nullable|string|max:10',
-            'is_pool' => 'required|boolean',
-            'business_id' => 'nullable|exists:businesses,id|required_if:is_pool,0',
+            'account_type' => 'required|in:regular_pool,invoice_pool,business',
+            'business_id' => 'nullable|exists:businesses,id',
             'is_active' => 'boolean',
         ]);
 
-        // Set business_id to null for pool accounts
-        if ($validated['is_pool']) {
+        // Handle account type from radio button
+        $accountType = $validated['account_type'];
+        if ($accountType === 'invoice_pool') {
+            $validated['is_invoice_pool'] = true;
+            $validated['is_pool'] = false;
             $validated['business_id'] = null;
+        } elseif ($accountType === 'regular_pool') {
+            $validated['is_invoice_pool'] = false;
+            $validated['is_pool'] = true;
+            $validated['business_id'] = null;
+        } else {
+            // Business-specific
+            $validated['is_invoice_pool'] = false;
+            $validated['is_pool'] = false;
+            // business_id is required for business-specific accounts
+            if (empty($validated['business_id'])) {
+                return back()->withInput()->with('error', 'Business is required for business-specific accounts.');
+            }
         }
 
-        // Remove bank_code if not needed (we store bank_name)
-        unset($validated['bank_code']);
+        // Remove bank_code and account_type (not stored in DB)
+        unset($validated['bank_code'], $validated['account_type']);
 
         // Handle is_active checkbox
-        $validated['is_active'] = $request->has('is_active') ? (bool)$request->input('is_active') : false;
+        $validated['is_active'] = $request->has('is_active') ? (bool)$request->input('is_active') : true;
 
         try {
             AccountNumber::create($validated);
+            
+            // Invalidate caches
+            app(\App\Services\AccountNumberService::class)->invalidateAllCaches();
             return redirect()->route('admin.account-numbers.index')
                 ->with('success', 'Account number created successfully!');
         } catch (\Exception $e) {
@@ -128,8 +148,8 @@ class AccountNumberController extends Controller
             'business_id' => 'nullable|exists:businesses,id',
         ]);
 
-        // Set business_id to null for pool accounts
-        if ($accountNumber->is_pool) {
+        // Set business_id to null for pool accounts (regular or invoice)
+        if ($accountNumber->is_pool || $accountNumber->is_invoice_pool) {
             $validated['business_id'] = null;
         }
 
@@ -143,6 +163,10 @@ class AccountNumberController extends Controller
 
         try {
             $accountNumber->update($validated);
+            
+            // Invalidate caches
+            app(\App\Services\AccountNumberService::class)->invalidateAllCaches();
+            
             return redirect()->route('admin.account-numbers.index')
                 ->with('success', 'Account number updated successfully!');
         } catch (\Exception $e) {

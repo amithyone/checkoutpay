@@ -96,6 +96,47 @@ class SettingsController extends Controller
             );
         }
 
+        // Update invoice charge settings
+        if ($request->has('invoice_charge_threshold')) {
+            Setting::set(
+                'invoice_charge_threshold',
+                $request->invoice_charge_threshold,
+                'float',
+                'charges',
+                'Invoice amount threshold above which charges apply. 0 = free for all invoices.'
+            );
+        }
+
+        if ($request->has('invoice_charge_percentage')) {
+            Setting::set(
+                'invoice_charge_percentage',
+                $request->invoice_charge_percentage,
+                'float',
+                'charges',
+                'Percentage charge for invoice payments above threshold'
+            );
+        }
+
+        if ($request->has('invoice_charge_fixed')) {
+            Setting::set(
+                'invoice_charge_fixed',
+                $request->invoice_charge_fixed,
+                'float',
+                'charges',
+                'Fixed charge amount for invoice payments above threshold'
+            );
+        }
+
+        if ($request->has('invoice_charges_enabled')) {
+            Setting::set(
+                'invoice_charges_enabled',
+                $request->invoice_charges_enabled == '1',
+                'boolean',
+                'charges',
+                'Enable or disable charges for invoice payments'
+            );
+        }
+
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');
     }

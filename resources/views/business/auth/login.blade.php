@@ -29,13 +29,13 @@
         <div class="max-w-md w-full space-y-8">
             <div>
                 <div class="mx-auto h-16 w-16 bg-primary rounded-lg flex items-center justify-center">
-                    <i class="fas fa-building text-white text-2xl"></i>
+                    <i class="fas fa-sign-in-alt text-white text-2xl"></i>
                 </div>
                 <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                    Business Login
+                    Login
                 </h2>
                 <p class="mt-2 text-center text-sm text-gray-600">
-                    Access your payment gateway dashboard
+                    Access your dashboard
                 </p>
             </div>
             <form class="mt-8 space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-gray-200" action="{{ route('business.login') }}" method="POST">

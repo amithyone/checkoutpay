@@ -11,16 +11,23 @@
             <div class="space-y-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
-                    <div class="flex items-center space-x-4">
+                    <div class="space-y-2">
                         <label class="flex items-center">
-                            <input type="radio" name="is_pool" value="1" checked class="mr-2" onchange="toggleBusinessSelect()">
-                            <span>Pool Account</span>
+                            <input type="radio" name="account_type" value="regular_pool" checked class="mr-2" onchange="toggleAccountType()">
+                            <span>Regular Pool Account</span>
                         </label>
                         <label class="flex items-center">
-                            <input type="radio" name="is_pool" value="0" class="mr-2" onchange="toggleBusinessSelect()">
+                            <input type="radio" name="account_type" value="invoice_pool" class="mr-2" onchange="toggleAccountType()">
+                            <span>Invoice Pool Account</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="account_type" value="business" class="mr-2" onchange="toggleAccountType()">
                             <span>Business-Specific</span>
                         </label>
                     </div>
+                    <input type="hidden" name="is_pool" id="is_pool" value="1">
+                    <input type="hidden" name="is_invoice_pool" id="is_invoice_pool" value="0">
+                    <p class="mt-2 text-xs text-gray-500">Invoice pool accounts are dedicated for invoice payments only.</p>
                 </div>
 
                 <div id="business-select" style="display: none;">
@@ -111,11 +118,26 @@
 
 @push('scripts')
 <script>
-    function toggleBusinessSelect() {
-        const isPool = document.querySelector('input[name="is_pool"]:checked').value === '1';
-        document.getElementById('business-select').style.display = isPool ? 'none' : 'block';
-        if (isPool) {
+    function toggleAccountType() {
+        const accountType = document.querySelector('input[name="account_type"]:checked')?.value;
+        const isPoolInput = document.getElementById('is_pool');
+        const isInvoicePoolInput = document.getElementById('is_invoice_pool');
+        const businessSelect = document.getElementById('business-select');
+        
+        if (accountType === 'regular_pool') {
+            isPoolInput.value = '1';
+            isInvoicePoolInput.value = '0';
+            businessSelect.style.display = 'none';
             document.getElementById('business_id').value = '';
+        } else if (accountType === 'invoice_pool') {
+            isPoolInput.value = '0';
+            isInvoicePoolInput.value = '1';
+            businessSelect.style.display = 'none';
+            document.getElementById('business_id').value = '';
+        } else if (accountType === 'business') {
+            isPoolInput.value = '0';
+            isInvoicePoolInput.value = '0';
+            businessSelect.style.display = 'block';
         }
     }
 

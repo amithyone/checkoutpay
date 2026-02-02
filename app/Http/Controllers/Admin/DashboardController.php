@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountNumber;
 use App\Models\Business;
 use App\Models\BusinessWebsite;
+use App\Models\Invoice;
 use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
@@ -90,6 +91,18 @@ class DashboardController extends Controller
                 'total_score' => MatchAttempt::whereNotNull('name_similarity_percent')->sum('name_similarity_percent'),
                 'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
                 'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
+            ],
+            'invoices' => [
+                'total' => Invoice::count(),
+                'draft' => Invoice::where('status', 'draft')->count(),
+                'sent' => Invoice::where('status', 'sent')->count(),
+                'viewed' => Invoice::where('status', 'viewed')->count(),
+                'paid' => Invoice::where('status', 'paid')->count(),
+                'overdue' => Invoice::where('status', 'overdue')->count(),
+                'cancelled' => Invoice::where('status', 'cancelled')->count(),
+                'total_amount' => Invoice::sum('total_amount'),
+                'paid_amount' => Invoice::where('status', 'paid')->sum('paid_amount'),
+                'pending_amount' => Invoice::whereNotIn('status', ['paid', 'cancelled'])->sum('total_amount'),
             ],
             'matching_time' => [
                 'average_minutes' => Payment::where('status', Payment::STATUS_APPROVED)

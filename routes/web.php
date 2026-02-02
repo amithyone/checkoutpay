@@ -7,6 +7,7 @@ use App\Http\Controllers\TestEmailController;
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
+Route::get('/products/invoices', [\App\Http\Controllers\ProductsController::class, 'invoices'])->name('products.invoices');
 Route::get('/payout', [\App\Http\Controllers\PayoutController::class, 'index'])->name('payout.index');
 Route::get('/collections', [\App\Http\Controllers\CollectionsController::class, 'index'])->name('collections.index');
 Route::get('/checkout-demo', [\App\Http\Controllers\CheckoutDemoController::class, 'index'])->name('checkout-demo.index');
@@ -87,6 +88,58 @@ Route::prefix('tickets')->name('tickets.')->group(function () {
     Route::post('{event}/purchase', [\App\Http\Controllers\Public\TicketController::class, 'purchase'])->name('purchase');
     Route::get('order/{orderNumber}', [\App\Http\Controllers\Public\TicketController::class, 'order'])->name('order');
     Route::get('order/{orderNumber}/download', [\App\Http\Controllers\Public\TicketController::class, 'download'])->name('download');
+});
+
+// Public invoice payment routes
+Route::prefix('invoices')->name('invoices.')->group(function () {
+    Route::get('pay/{code}', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'show'])->name('pay');
+    Route::post('pay/{code}/webhook', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'webhook'])->name('payment.webhook');
+});
+
+// Public rentals routes
+Route::prefix('rentals')->name('rentals.')->group(function () {
+    // Public browsing (no auth required)
+    Route::get('/', [\App\Http\Controllers\Public\RentalController::class, 'index'])->name('index');
+    Route::get('item/{slug}', [\App\Http\Controllers\Public\RentalController::class, 'show'])->name('show');
+    
+    // Cart operations (no auth required)
+    Route::post('cart/add', [\App\Http\Controllers\Public\RentalRequestController::class, 'addToCart'])->name('cart.add');
+    Route::delete('cart/{itemId}', [\App\Http\Controllers\Public\RentalRequestController::class, 'removeFromCart'])->name('cart.remove');
+    
+    // Checkout flow (auth required after account creation)
+    Route::get('checkout', [\App\Http\Controllers\Public\RentalRequestController::class, 'checkout'])->name('checkout');
+    Route::post('account/create', [\App\Http\Controllers\Public\RentalRequestController::class, 'createAccount'])->name('account.create');
+    
+    // Email verification
+    Route::get('verify-email', [\App\Http\Controllers\Public\RentalRequestController::class, 'verifyEmail'])->name('verify-email')->middleware('auth:renter');
+    Route::get('verification/verify/{id}/{hash}', [\App\Http\Controllers\Public\RentalRequestController::class, 'verify'])->name('verification.verify');
+    Route::post('verification/resend', [\App\Http\Controllers\Public\RentalRequestController::class, 'resendVerification'])->name('verification.resend');
+    Route::post('verification/verify-pin', [\App\Http\Controllers\Public\RentalRequestController::class, 'verifyPin'])->name('verification.verify-pin');
+    
+    // KYC verification (public AJAX endpoint for checkout form)
+    Route::post('kyc/verify', [\App\Http\Controllers\Public\RentalRequestController::class, 'verifyKycAjax'])->name('kyc.verify');
+    
+    // KYC verification (authenticated)
+    Route::get('kyc', [\App\Http\Controllers\Public\RentalRequestController::class, 'kyc'])->name('kyc')->middleware('auth:renter');
+    Route::post('kyc', [\App\Http\Controllers\Public\RentalRequestController::class, 'kyc'])->middleware('auth:renter');
+    
+    // Review and submit
+    Route::get('review', [\App\Http\Controllers\Public\RentalRequestController::class, 'review'])->name('review')->middleware('auth:renter');
+    Route::post('review', [\App\Http\Controllers\Public\RentalRequestController::class, 'review'])->middleware('auth:renter');
+    
+    // Success page
+    Route::get('success', [\App\Http\Controllers\Public\RentalRequestController::class, 'success'])->name('success')->middleware('auth:renter');
+});
+
+// Renter authentication routes (login now handled by business login)
+Route::prefix('renter')->name('renter.')->group(function () {
+    Route::post('/logout', [\App\Http\Controllers\Renter\Auth\LoginController::class, 'logout'])->name('logout');
+    
+    // Protected renter routes
+    Route::middleware('auth:renter')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\Renter\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/rental/{rental}', [\App\Http\Controllers\Renter\DashboardController::class, 'show'])->name('dashboard.show');
+    });
 });
 
 // Cron job endpoints (for external cron services)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessWebsite;
+use App\Models\Renter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +21,9 @@ class RegisterController extends Controller
 
     public function register(Request $request): RedirectResponse|View
     {
+        // Check if email exists as renter
+        $renter = Renter::where('email', $request->email)->first();
+        
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:businesses,email|max:255',
@@ -28,6 +32,13 @@ class RegisterController extends Controller
             'address' => 'nullable|string|max:1000',
             'website' => 'required|url|max:500',
         ]);
+
+        // If renter exists, verify password matches
+        if ($renter && !Hash::check($validated['password'], $renter->password)) {
+            return back()->withErrors([
+                'password' => 'The password does not match your renter account. Please use the same password or reset it.',
+            ])->withInput($request->except('password', 'password_confirmation'));
+        }
 
         $business = Business::create([
             'name' => $validated['name'],
@@ -50,8 +61,12 @@ class RegisterController extends Controller
         $business->sendEmailVerificationNotification();
 
         // Redirect to verify email page with email in session
+        $message = $renter 
+            ? 'Business account created! You can now access both your renter and business dashboards. Please check your email to verify your business account.'
+            : 'Registration successful! Please check your email to verify your account.';
+
         return redirect()->route('business.verification.notice')
             ->with('registered_email', $business->email)
-            ->with('success', 'Registration successful! Please check your email to verify your account.');
+            ->with('success', $message);
     }
 }

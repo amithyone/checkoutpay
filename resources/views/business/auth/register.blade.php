@@ -37,6 +37,9 @@
                 <p class="mt-2 text-center text-sm text-gray-600">
                     Register your business to start accepting payments
                 </p>
+                <p class="mt-1 text-center text-xs text-gray-500">
+                    Already have a renter account? Use the same email and password to upgrade.
+                </p>
             </div>
             <form class="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-sm border border-gray-200" action="{{ route('business.register') }}" method="POST">
                 @csrf

@@ -21,7 +21,8 @@
         <form method="GET" class="flex items-center space-x-4">
             <select name="type" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All Types</option>
-                <option value="pool" {{ request('type') === 'pool' ? 'selected' : '' }}>Pool Accounts</option>
+                <option value="pool" {{ request('type') === 'pool' ? 'selected' : '' }}>Regular Pool</option>
+                <option value="invoice_pool" {{ request('type') === 'invoice_pool' ? 'selected' : '' }}>Invoice Pool</option>
                 <option value="business" {{ request('type') === 'business' ? 'selected' : '' }}>Business Accounts</option>
             </select>
             <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
@@ -58,8 +59,10 @@
                         <td class="px-6 py-4 text-sm text-gray-900">{{ $account->account_name }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $account->bank_name }}</td>
                         <td class="px-6 py-4">
-                            @if($account->is_pool)
-                                <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Pool</span>
+                            @if($account->is_invoice_pool)
+                                <span class="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">Invoice Pool</span>
+                            @elseif($account->is_pool)
+                                <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Regular Pool</span>
                             @else
                                 <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Business</span>
                             @endif

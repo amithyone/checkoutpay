@@ -38,7 +38,16 @@ class WithdrawalController extends Controller
     public function create()
     {
         $business = Auth::guard('business')->user();
-        return view('business.withdrawals.create', compact('business'));
+        
+        // Get saved withdrawal accounts
+        $savedAccounts = $business->withdrawalAccounts()
+            ->where('is_active', true)
+            ->orderBy('is_default', 'desc')
+            ->orderBy('last_used_at', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        return view('business.withdrawals.create', compact('business', 'savedAccounts'));
     }
 
     public function validateAccount(Request $request)
@@ -52,19 +61,100 @@ class WithdrawalController extends Controller
         $validationResult = $nubanService->validate($request->account_number, $request->bank_code);
 
         if ($validationResult && $validationResult['valid']) {
+            // Account is valid and active (NUBAN API validates active accounts)
             return response()->json([
                 'success' => true,
                 'valid' => true,
                 'account_name' => $validationResult['account_name'],
                 'bank_name' => $validationResult['bank_name'],
+                'bank_code' => $validationResult['bank_code'] ?? $request->bank_code,
+                'is_active' => true, // If NUBAN validates it, it's active
             ]);
         }
 
         return response()->json([
             'success' => false,
             'valid' => false,
-            'message' => 'Invalid account number. Please verify and try again.',
+            'message' => 'Invalid or inactive account number. Please verify and try again.',
         ], 400);
+    }
+
+    /**
+     * Save withdrawal account for future use
+     */
+    public function saveAccount(Request $request)
+    {
+        $business = Auth::guard('business')->user();
+        
+        $validated = $request->validate([
+            'account_number' => 'required|string|size:10',
+            'account_name' => 'required|string|max:255',
+            'bank_name' => 'required|string|max:255',
+            'bank_code' => 'required|string|max:10',
+            'is_default' => 'boolean',
+        ]);
+
+        // Check if account already exists for this business
+        $existing = $business->withdrawalAccounts()
+            ->where('account_number', $validated['account_number'])
+            ->where('bank_code', $validated['bank_code'])
+            ->first();
+
+        if ($existing) {
+            // Update existing account
+            $existing->update([
+                'account_name' => $validated['account_name'],
+                'bank_name' => $validated['bank_name'],
+                'is_active' => true,
+            ]);
+            
+            if ($validated['is_default'] ?? false) {
+                $existing->setAsDefault();
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Account updated successfully',
+                'account' => $existing,
+            ]);
+        }
+
+        // Create new saved account
+        $account = $business->withdrawalAccounts()->create([
+            'account_number' => $validated['account_number'],
+            'account_name' => $validated['account_name'],
+            'bank_name' => $validated['bank_name'],
+            'bank_code' => $validated['bank_code'],
+            'is_default' => $validated['is_default'] ?? false,
+            'is_active' => true,
+        ]);
+
+        // If set as default, unset others
+        if ($account->is_default) {
+            $account->setAsDefault();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account saved successfully',
+            'account' => $account,
+        ]);
+    }
+
+    /**
+     * Delete saved withdrawal account
+     */
+    public function deleteAccount($id)
+    {
+        $business = Auth::guard('business')->user();
+        
+        $account = $business->withdrawalAccounts()->findOrFail($id);
+        $account->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account deleted successfully',
+        ]);
     }
 
     public function store(Request $request)
@@ -85,10 +175,24 @@ class WithdrawalController extends Controller
             'amount' => 'required|numeric|min:1|max:' . $business->balance,
             'password' => 'required',
             'notes' => 'nullable|string|max:1000',
+            'saved_account_id' => 'nullable|exists:business_withdrawal_accounts,id',
+            'save_account' => 'boolean',
+            'is_default' => 'boolean',
         ];
 
-        // Only require account fields if business doesn't have account number set
-        if (!$hasAccountNumber) {
+        // Check if using saved account first
+        $savedAccountId = $request->input('saved_account_id');
+        $savedAccount = null;
+        
+        if ($savedAccountId) {
+            $savedAccount = $business->withdrawalAccounts()
+                ->where('id', $savedAccountId)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        // Only require account fields if business doesn't have account number set and not using saved account
+        if (!$hasAccountNumber && !$savedAccount) {
             $rules['bank_code'] = 'required|string';
             $rules['bank_name'] = 'required|string|max:255';
             $rules['account_number'] = 'required|string|max:255';
@@ -97,19 +201,34 @@ class WithdrawalController extends Controller
 
         $validated = $request->validate($rules);
 
-        // Use stored account details if available, otherwise use form input
-        $bankName = $hasAccountNumber ? $accountDetails->bank_name : $validated['bank_name'];
-        $accountNumber = $hasAccountNumber ? $accountDetails->account_number : $validated['account_number'];
-        $accountName = $hasAccountNumber ? $accountDetails->account_name : $validated['account_name'];
+        // Determine which account details to use (priority: saved account > business account > form input)
+        if ($savedAccount) {
+            $bankName = $savedAccount->bank_name;
+            $accountNumber = $savedAccount->account_number;
+            $accountName = $savedAccount->account_name;
+        } elseif ($hasAccountNumber) {
+            $bankName = $accountDetails->bank_name;
+            $accountNumber = $accountDetails->account_number;
+            $accountName = $accountDetails->account_name;
+        } else {
+            $bankName = $validated['bank_name'];
+            $accountNumber = $validated['account_number'];
+            $accountName = $validated['account_name'];
+        }
 
-        // Validate account number using NUBAN API if not using stored account
-        if (!$hasAccountNumber) {
+        // Mark saved account as used if applicable
+        if ($savedAccount) {
+            $savedAccount->markAsUsed();
+        }
+        
+        // Validate account number using NUBAN API if not using stored account or saved account
+        if (!$hasAccountNumber && !$savedAccount) {
             $nubanService = app(NubanValidationService::class);
             $bankCode = $validated['bank_code'] ?? null;
             $validationResult = $nubanService->validate($accountNumber, $bankCode);
 
             if (!$validationResult || !$validationResult['valid']) {
-                return back()->withErrors(['account_number' => 'Invalid account number. Please verify the account number and try again.'])->withInput();
+                return back()->withErrors(['account_number' => 'Invalid or inactive account number. Please verify and try again.'])->withInput();
             }
 
             // Use validated account name and bank name from NUBAN API
@@ -118,6 +237,41 @@ class WithdrawalController extends Controller
             }
             if (!empty($validationResult['bank_name'])) {
                 $bankName = $validationResult['bank_name'];
+            }
+            
+            // Save account if requested
+            if ($request->input('save_account')) {
+                // Check if account already exists
+                $existing = $business->withdrawalAccounts()
+                    ->where('account_number', $accountNumber)
+                    ->where('bank_code', $bankCode ?? $validated['bank_code'])
+                    ->first();
+                
+                if ($existing) {
+                    // Update existing
+                    $existing->update([
+                        'account_name' => $accountName,
+                        'bank_name' => $bankName,
+                        'is_active' => true,
+                    ]);
+                    if ($request->input('is_default')) {
+                        $existing->setAsDefault();
+                    }
+                } else {
+                    // Create new
+                    $savedAccount = $business->withdrawalAccounts()->create([
+                        'account_number' => $accountNumber,
+                        'account_name' => $accountName,
+                        'bank_name' => $bankName,
+                        'bank_code' => $bankCode ?? $validated['bank_code'],
+                        'is_default' => $request->input('is_default', false),
+                        'is_active' => true,
+                    ]);
+                    
+                    if ($savedAccount->is_default) {
+                        $savedAccount->setAsDefault();
+                    }
+                }
             }
         }
 

@@ -100,6 +100,26 @@
                     <span>Transactions</span>
                 </a>
 
+                <a href="{{ route('business.invoices.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.invoices.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-file-invoice w-5 mr-3"></i>
+                    <span>Invoices</span>
+                </a>
+
+                <a href="{{ route('business.rentals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.rentals.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-camera w-5 mr-3"></i>
+                    <span>Rentals</span>
+                </a>
+
+                @php
+                    $hasRenterAccount = \App\Models\Renter::where('email', auth('business')->user()->email)->exists();
+                @endphp
+                @if($hasRenterAccount)
+                    <a href="{{ route('renter.dashboard') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 border-t border-gray-200 mt-4 pt-4 {{ request()->routeIs('renter.*') ? 'bg-primary/10 text-primary' : '' }}">
+                        <i class="fas fa-user w-5 mr-3"></i>
+                        <span>My Rentals Dashboard</span>
+                    </a>
+                @endif
+
                 <a href="{{ route('business.withdrawals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.withdrawals.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-hand-holding-usd w-5 mr-3"></i>
                     <span>Withdrawals</span>

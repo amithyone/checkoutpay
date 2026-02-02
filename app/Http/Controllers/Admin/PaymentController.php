@@ -406,8 +406,14 @@ class PaymentController extends Controller
                 ->with('error', 'Payment is already ' . $payment->status);
         }
 
-        $receivedAmount = $request->received_amount ?? $payment->amount;
-        $isMismatch = $request->is_mismatch ?? ($receivedAmount != $payment->amount);
+        $receivedAmount = $request->filled('received_amount') ? (float)$request->received_amount : $payment->amount;
+        // Check if mismatch checkbox was checked (it sends '1' or 'on' when checked, or is missing when unchecked)
+        $isMismatch = $request->has('is_mismatch') && ($request->is_mismatch == '1' || $request->is_mismatch == 'on' || $request->is_mismatch === true);
+        
+        // Also check if amounts differ
+        if (!$isMismatch && abs($receivedAmount - $payment->amount) > 0.01) {
+            $isMismatch = true;
+        }
 
         // Get email data if email is linked
         $emailData = $payment->email_data ?? [];
@@ -438,12 +444,15 @@ class PaymentController extends Controller
                     : $extractionResult;
 
                 // Build email data for approval (only essential fields)
+                // Use receivedAmount if different from payment amount (edited amount)
+                $emailAmount = $receivedAmount != $payment->amount ? $receivedAmount : ($extractedInfo['amount'] ?? $payment->amount);
                 $emailData = [
                     'subject' => $linkedEmail->subject,
                     'from' => $linkedEmail->from_email,
                     'date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                     'sender_name' => $extractedInfo['sender_name'] ?? $payment->payer_name,
-                    'amount' => $payment->amount,
+                    'amount' => $emailAmount,
+                    'received_amount' => $receivedAmount, // Include received amount for webhook
                     'processed_email_id' => $linkedEmail->id,
                 ];
 
@@ -500,34 +509,105 @@ class PaymentController extends Controller
 
     /**
      * Get unmatched emails for a payment (AJAX endpoint)
+     * Shows ALL unmatched emails from the time the transaction was created
+     * No amount filter - shows all emails to help find the right one
      */
     public function getUnmatchedEmails(Request $request, Payment $payment): \Illuminate\Http\JsonResponse
     {
         $amount = $request->query('amount', $payment->amount);
+        $search = $request->query('search', ''); // Search by sender name or email
         
-        $unmatchedEmails = \App\Models\ProcessedEmail::unmatched()
-            ->where(function($q) use ($amount) {
-                $q->where('amount', $amount)
-                  ->orWhereBetween('amount', [$amount - 50, $amount + 50]);
-            })
+        // Get ALL unmatched emails from the time the transaction was created onwards
+        $query = \App\Models\ProcessedEmail::unmatched()
+            ->where('created_at', '>=', $payment->created_at) // From transaction creation time
             ->when($payment->business && $payment->business->email_account_id, function($q) use ($payment) {
                 $q->where('email_account_id', $payment->business->email_account_id);
-            })
-            ->latest()
-            ->limit(10)
-            ->get(['id', 'subject', 'from_email', 'amount', 'email_date']);
+            });
+        
+        // Apply search filter if provided
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('sender_name', 'like', "%{$search}%")
+                  ->orWhere('from_name', 'like', "%{$search}%")
+                  ->orWhere('from_email', 'like', "%{$search}%")
+                  ->orWhere('subject', 'like', "%{$search}%");
+            });
+        }
+        
+        $unmatchedEmails = $query->orderBy('email_date', 'desc') // Order by email date, newest first
+            ->limit(200) // Increased limit to show more options
+            ->get(['id', 'subject', 'from_email', 'from_name', 'sender_name', 'amount', 'email_date', 'created_at']);
 
         return response()->json([
-            'emails' => $unmatchedEmails->map(function($email) {
+            'emails' => $unmatchedEmails->map(function($email) use ($amount) {
+                $difference = $email->amount ? ($email->amount - $amount) : null;
+                $differenceText = $difference !== null 
+                    ? ($difference > 0 ? '+' . number_format($difference, 2) : number_format($difference, 2))
+                    : null;
+                
+                // Get sender name (prefer sender_name, then from_name, then from_email)
+                $senderName = $email->sender_name ?? $email->from_name ?? $email->from_email ?? 'Unknown';
+                
                 return [
                     'id' => $email->id,
                     'subject' => $email->subject,
                     'from_email' => $email->from_email,
+                    'from_name' => $email->from_name,
+                    'sender_name' => $email->sender_name,
+                    'display_name' => $senderName, // Combined display name
                     'amount' => $email->amount,
+                    'difference' => $difference,
+                    'difference_text' => $differenceText,
                     'email_date' => $email->email_date?->format('M d, Y H:i'),
+                    'created_at' => $email->created_at->format('M d, Y H:i'),
                 ];
             }),
         ]);
+    }
+
+    /**
+     * Show expired transactions (some may need revisiting)
+     */
+    public function expired(Request $request): View
+    {
+        $query = Payment::with(['business', 'website'])
+            ->withCount(['matchAttempts', 'statusChecks'])
+            ->where('status', Payment::STATUS_PENDING)
+            ->where('expires_at', '<=', now())
+            ->latest('expires_at');
+
+        // Filter by business
+        if ($request->filled('business_id')) {
+            $query->where('business_id', $request->business_id);
+        }
+
+        // Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('transaction_id', 'like', "%{$search}%")
+                  ->orWhere('payer_name', 'like', "%{$search}%")
+                  ->orWhere('payer_account_number', 'like', "%{$search}%")
+                  ->orWhereHas('business', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Filter by date range
+        if ($request->filled('from_date')) {
+            $query->where('created_at', '>=', $request->from_date . ' 00:00:00');
+        }
+
+        if ($request->filled('to_date')) {
+            $query->where('created_at', '<=', $request->to_date . ' 23:59:59');
+        }
+
+        $payments = $query->paginate(20)->withQueryString();
+        $businesses = \App\Models\Business::orderBy('name')->get(['id', 'name']);
+
+        return view('admin.payments.expired', compact('payments', 'businesses'));
     }
 
     /**

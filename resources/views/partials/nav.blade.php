@@ -31,11 +31,13 @@
             </div>
             <div class="hidden md:flex items-center space-x-3">
                 <div class="relative group">
-                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('products.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') ? 'text-primary border-b-2 border-primary' : '' }}">
+                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('products.*') || request()->routeIs('rentals.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') ? 'text-primary border-b-2 border-primary' : '' }}">
                         Products <i class="fas fa-chevron-down ml-1 text-xs"></i>
                     </a>
                     <div class="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <a href="{{ route('products.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Products</a>
+                        <a href="{{ route('products.invoices') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Invoices</a>
+                        <a href="{{ route('rentals.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Rentals</a>
                         <a href="{{ route('payout.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Payout</a>
                         <a href="{{ route('collections.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Collections</a>
                         <a href="{{ route('checkout-demo.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Checkout Demo</a>
@@ -73,16 +75,24 @@
                         <a href="{{ route('faqs.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">FAQs</a>
                     </div>
                 </div>
-                <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
-                <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors">Get Started</a>
+                @auth('renter')
+                    <a href="{{ route('renter.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Rentals Dashboard</a>
+                @elseauth('business')
+                    <a href="{{ route('business.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
+                @else
+                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
+                    <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors">Get Started</a>
+                @endauth
             </div>
             <button id="mobile-menu-btn" class="md:hidden p-2 rounded-md text-gray-700 hover:text-primary focus:outline-none">
                 <i class="fas fa-bars text-xl"></i>
             </button>
         </div>
         <div id="mobile-menu" class="hidden md:hidden pb-4 border-t border-gray-200 mt-2">
-            <div class="flex flex-col space-y-2 pt-4">
+                <div class="flex flex-col space-y-2 pt-4">
                 <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Products</a>
+                <a href="{{ route('products.invoices') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Invoices</a>
+                <a href="{{ route('rentals.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Rentals</a>
                 <a href="{{ route('payout.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Payout</a>
                 <a href="{{ route('collections.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Collections</a>
                 <a href="{{ route('checkout-demo.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Checkout Demo</a>
@@ -96,8 +106,14 @@
                 <a href="{{ route('blog.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Blog</a>
                 <a href="{{ route('status.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Status</a>
                 <a href="{{ route('faqs.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">FAQs</a>
-                <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
-                <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors text-center">Get Started</a>
+                @auth('renter')
+                    <a href="{{ route('renter.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Rentals Dashboard</a>
+                @elseauth('business')
+                    <a href="{{ route('business.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
+                @else
+                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
+                    <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors text-center">Get Started</a>
+                @endauth
             </div>
         </div>
     </div>

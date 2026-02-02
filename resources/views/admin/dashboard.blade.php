@@ -217,6 +217,41 @@
             </div>
         </div>
 
+        <!-- Invoices -->
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Invoices</p>
+                    <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['invoices']['total']) }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-file-invoice text-blue-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <span class="text-green-600">Paid: {{ $stats['invoices']['paid'] }}</span>
+                <span class="mx-2">•</span>
+                <span class="text-yellow-600">Pending: {{ $stats['invoices']['sent'] + $stats['invoices']['viewed'] }}</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-gray-200">
+                <div class="text-xs text-gray-500">
+                    <div class="mb-1">
+                        <i class="fas fa-money-bill-wave text-green-500 mr-1"></i>
+                        Paid Amount: <span class="font-semibold text-gray-900">₦{{ number_format($stats['invoices']['paid_amount'] ?? 0, 2) }}</span>
+                    </div>
+                    <div>
+                        <i class="fas fa-clock text-yellow-500 mr-1"></i>
+                        Pending: <span class="font-semibold text-gray-900">₦{{ number_format($stats['invoices']['pending_amount'] ?? 0, 2) }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-gray-200">
+                <a href="{{ route('admin.invoices.index') }}" class="text-xs text-primary hover:underline inline-flex items-center">
+                    Manage Invoices <i class="fas fa-arrow-right ml-1"></i>
+                </a>
+            </div>
+        </div>
+
         <!-- Stored Emails -->
         <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div class="flex items-center justify-between">

@@ -167,6 +167,25 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
+     * Get saved withdrawal accounts for this business
+     */
+    public function withdrawalAccounts()
+    {
+        return $this->hasMany(BusinessWithdrawalAccount::class);
+    }
+
+    /**
+     * Get default withdrawal account
+     */
+    public function defaultWithdrawalAccount()
+    {
+        return $this->withdrawalAccounts()
+            ->where('is_active', true)
+            ->where('is_default', true)
+            ->first();
+    }
+
+    /**
      * Get primary account number
      */
     public function primaryAccountNumber()

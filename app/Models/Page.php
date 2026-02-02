@@ -21,10 +21,40 @@ class Page extends Model
 
     protected $casts = [
         'is_published' => 'boolean',
-        'content' => 'array', // Cast content to array for JSON storage
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    /**
+     * Get content attribute - handle both JSON and HTML content
+     */
+    public function getContentAttribute($value)
+    {
+        // If value is JSON string, decode it
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+            // Return as string if not valid JSON (HTML content)
+            return $value;
+        }
+        return $value;
+    }
+
+    /**
+     * Set content attribute - handle both JSON and HTML content
+     */
+    public function setContentAttribute($value)
+    {
+        // If it's an array, encode to JSON
+        if (is_array($value)) {
+            $this->attributes['content'] = json_encode($value);
+        } else {
+            // Store as string (for HTML content)
+            $this->attributes['content'] = $value;
+        }
+    }
 
     /**
      * Get page by slug

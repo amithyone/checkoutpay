@@ -127,6 +127,16 @@
                     @endif
                 </a>
 
+                <a href="{{ route('admin.invoices.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.invoices.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-file-invoice w-5 mr-3"></i>
+                    <span>Invoices</span>
+                </a>
+
+                <a href="{{ route('admin.rentals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.rentals.*') || request()->routeIs('admin.rental-categories.*') || request()->routeIs('admin.rental-items.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-camera w-5 mr-3"></i>
+                    <span>Rentals</span>
+                </a>
+
                 <a href="{{ route('admin.withdrawals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.withdrawals.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-hand-holding-usd w-5 mr-3"></i>
                     <span>Withdrawals</span>

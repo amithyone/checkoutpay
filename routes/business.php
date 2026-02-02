@@ -52,6 +52,8 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::post('/withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
         Route::get('/withdrawals/{withdrawal}', [WithdrawalController::class, 'show'])->name('withdrawals.show');
         Route::post('/withdrawals/validate-account', [WithdrawalController::class, 'validateAccount'])->name('withdrawals.validate-account');
+        Route::post('/withdrawals/save-account', [WithdrawalController::class, 'saveAccount'])->name('withdrawals.save-account');
+        Route::delete('/withdrawals/accounts/{account}', [WithdrawalController::class, 'deleteAccount'])->name('withdrawals.delete-account');
 
         // Statistics
         Route::get('/statistics', [StatisticsController::class, 'index'])->name('statistics.index');
@@ -67,6 +69,21 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         // Settings
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+
+        // Rentals
+        Route::prefix('rentals')->name('rentals.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Business\RentalController::class, 'index'])->name('index');
+            Route::get('/items', [\App\Http\Controllers\Business\RentalController::class, 'items'])->name('items');
+            Route::get('/items/create', [\App\Http\Controllers\Business\RentalController::class, 'createItem'])->name('items.create');
+            Route::post('/items', [\App\Http\Controllers\Business\RentalController::class, 'storeItem'])->name('items.store');
+            Route::get('/items/{item}/edit', [\App\Http\Controllers\Business\RentalController::class, 'editItem'])->name('items.edit');
+            Route::put('/items/{item}', [\App\Http\Controllers\Business\RentalController::class, 'updateItem'])->name('items.update');
+            Route::delete('/items/{item}', [\App\Http\Controllers\Business\RentalController::class, 'deleteItem'])->name('items.destroy');
+            Route::get('/{rental}', [\App\Http\Controllers\Business\RentalController::class, 'show'])->name('show');
+            Route::post('/{rental}/approve', [\App\Http\Controllers\Business\RentalController::class, 'approve'])->name('approve');
+            Route::post('/{rental}/reject', [\App\Http\Controllers\Business\RentalController::class, 'reject'])->name('reject');
+            Route::post('/{rental}/update-status', [\App\Http\Controllers\Business\RentalController::class, 'updateStatus'])->name('update-status');
+        });
         Route::post('/settings/regenerate-api-key', [SettingsController::class, 'regenerateApiKey'])->name('settings.regenerate-api-key');
         Route::delete('/settings/profile-picture', [SettingsController::class, 'removeProfilePicture'])->name('settings.remove-profile-picture');
         Route::get('/settings/2fa/setup', [SettingsController::class, 'setupTwoFactor'])->name('settings.2fa.setup');
@@ -87,6 +104,12 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         // Verification/KYC
         Route::get('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'index'])->name('verification.index');
         Route::post('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'store'])->name('verification.store');
+
+        // Invoices
+        Route::resource('invoices', \App\Http\Controllers\Business\InvoiceController::class);
+        Route::post('invoices/{invoice}/send', [\App\Http\Controllers\Business\InvoiceController::class, 'send'])->name('invoices.send');
+        Route::get('invoices/{invoice}/pdf', [\App\Http\Controllers\Business\InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+        Route::get('invoices/{invoice}/view-pdf', [\App\Http\Controllers\Business\InvoiceController::class, 'viewPdf'])->name('invoices.view-pdf');
         Route::get('/verification/{verification}/download', [\App\Http\Controllers\Business\VerificationController::class, 'download'])->name('verification.download');
 
         // Activity Logs

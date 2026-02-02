@@ -421,5 +421,116 @@
             </div>
         </form>
     </div>
+
+    <!-- Invoice Charge Settings -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-file-invoice-dollar mr-2 text-primary"></i>Invoice Charge Settings
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">
+            Configure charges for invoice payments. By default, invoices are free. You can set charges when invoice amount exceeds a particular threshold.
+        </p>
+
+        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="invoice_charge_threshold" class="block text-sm font-medium text-gray-700 mb-2">
+                        Charge Threshold Amount (₦)
+                    </label>
+                    <input 
+                        type="number" 
+                        id="invoice_charge_threshold" 
+                        name="invoice_charge_threshold" 
+                        value="{{ \App\Models\Setting::get('invoice_charge_threshold', 0) }}"
+                        step="0.01"
+                        min="0"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="0 = Free (no charges)"
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        Invoices below this amount are free. Charges apply when invoice amount exceeds this threshold.
+                    </p>
+                </div>
+
+                <div>
+                    <label for="invoice_charge_percentage" class="block text-sm font-medium text-gray-700 mb-2">
+                        Invoice Charge Percentage (%)
+                    </label>
+                    <input 
+                        type="number" 
+                        id="invoice_charge_percentage" 
+                        name="invoice_charge_percentage" 
+                        value="{{ \App\Models\Setting::get('invoice_charge_percentage', 0) }}"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        Percentage charge applied to invoice payments above the threshold (e.g., 1.5 = 1.5%)
+                    </p>
+                </div>
+
+                <div>
+                    <label for="invoice_charge_fixed" class="block text-sm font-medium text-gray-700 mb-2">
+                        Invoice Fixed Charge (₦)
+                    </label>
+                    <input 
+                        type="number" 
+                        id="invoice_charge_fixed" 
+                        name="invoice_charge_fixed" 
+                        value="{{ \App\Models\Setting::get('invoice_charge_fixed', 0) }}"
+                        step="0.01"
+                        min="0"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        Fixed charge amount added to invoice payments above the threshold
+                    </p>
+                </div>
+
+                <div>
+                    <label for="invoice_charges_enabled" class="block text-sm font-medium text-gray-700 mb-2">
+                        Enable Invoice Charges
+                    </label>
+                    <select 
+                        id="invoice_charges_enabled" 
+                        name="invoice_charges_enabled" 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                        <option value="0" {{ \App\Models\Setting::get('invoice_charges_enabled', false) ? '' : 'selected' }}>Disabled (Free)</option>
+                        <option value="1" {{ \App\Models\Setting::get('invoice_charges_enabled', false) ? 'selected' : '' }}>Enabled</option>
+                    </select>
+                    <p class="mt-2 text-sm text-gray-500">
+                        Enable or disable charges for invoice payments
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-blue-600 mt-0.5 mr-3"></i>
+                    <div class="text-sm text-blue-800">
+                        <p class="font-medium mb-1">How Invoice Charges Work:</p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>If threshold is 0 or charges are disabled, all invoices are free</li>
+                            <li>If invoice amount exceeds the threshold, charges are calculated</li>
+                            <li>Charges = (Amount × Percentage%) + Fixed Amount</li>
+                            <li>Charges are deducted from the business balance when invoice is paid</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save Invoice Charge Settings
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

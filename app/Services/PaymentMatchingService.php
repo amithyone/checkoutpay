@@ -269,14 +269,16 @@ class PaymentMatchingService
                     $result['name_match'] = false; // Name not required for transaction ID match
                     $result['reason'] = 'Matched: Exact transaction ID match (name not required)';
                     
-                    // Still try to match name if available
+                    // Still try to match name if available (for logging, but transaction ID match is sufficient)
                     $extractedSenderName = $extractedInfo['sender_name'] ?? null;
                     if ($extractedSenderName && $this->isValidExtractedName($extractedSenderName)) {
                         $nameMatch = $this->matchNames($payment->payer_name, $extractedSenderName);
-                        $result['name_match'] = $nameMatch['matched'];
+                        $result['name_match'] = $nameMatch['matched'] && ($nameMatch['similarity'] ?? 0) >= 50;
                         $result['name_similarity_percent'] = $nameMatch['similarity'] ?? null;
-                        if ($nameMatch['matched']) {
-                            $result['reason'] = 'Matched: Exact transaction ID and name match';
+                        if ($result['name_match']) {
+                            $result['reason'] = 'Matched: Exact transaction ID and name match (similarity: ' . ($nameMatch['similarity'] ?? 0) . '%)';
+                        } else {
+                            $result['reason'] = 'Matched: Exact transaction ID match (name similarity: ' . ($nameMatch['similarity'] ?? 0) . '% < 50%)';
                         }
                     }
                     
@@ -313,14 +315,20 @@ class PaymentMatchingService
         }
         
         // STEP 2: Name matching (check if names match or are similar)
+        // CRITICAL: Require at least 50% similarity to prevent matching wrong persons
         $nameMatch = $this->matchNames($payment->payer_name, $extractedSenderName);
-        $result['name_match'] = $nameMatch['matched'];
-        $result['name_similarity_percent'] = $nameMatch['similarity'] ?? null;
-        $result['name_mismatch'] = !$nameMatch['matched'];
+        $minSimilarityRequired = 50;
+        $similarity = $nameMatch['similarity'] ?? 0;
         
-        // Check for charges mismatch scenario: name matches but amount differs by charges amount
+        // Only consider it a match if similarity >= 50%
+        $result['name_match'] = $nameMatch['matched'] && $similarity >= $minSimilarityRequired;
+        $result['name_similarity_percent'] = $similarity;
+        $result['name_mismatch'] = !$result['name_match'];
+        
+        // Check for charges mismatch scenario: name matches (with >= 50% similarity) but amount differs by charges amount
         $chargesMismatchDetected = false;
-        if ($result['name_match'] && $amountDiff > 1 && $payment->business_id) {
+        $minSimilarityForChargesMismatch = 50;
+        if ($result['name_match'] && ($result['name_similarity_percent'] ?? 0) >= $minSimilarityForChargesMismatch && $amountDiff > 1 && $payment->business_id) {
             $business = $payment->business;
             $website = $payment->website; // Get website from payment if available
             $chargeService = app(\App\Services\ChargeService::class);
@@ -416,26 +424,39 @@ class PaymentMatchingService
         }
         
         if ($result['amount_match']) {
-            if ($result['name_match']) {
-                // Amount + Name match = STRONG MATCH
+            // CRITICAL: Require at least 50% name similarity before matching
+            $minSimilarityRequired = 50;
+            $hasMinimumSimilarity = $result['name_similarity_percent'] !== null && $result['name_similarity_percent'] >= $minSimilarityRequired;
+            
+            if ($result['name_match'] && $hasMinimumSimilarity) {
+                // Amount + Name match = STRONG MATCH (only if similarity >= 50%)
                 $result['matched'] = true;
-                $result['reason'] = 'Matched: Amount and name match';
+                $result['reason'] = 'Matched: Amount and name match (similarity: ' . $result['name_similarity_percent'] . '%)';
+            } elseif ($result['name_match'] && !$hasMinimumSimilarity) {
+                // Name matched but similarity too low - reject
+                $result['matched'] = false;
+                $result['name_match'] = false;
+                $result['reason'] = 'Name similarity too low (' . $result['name_similarity_percent'] . '% < ' . $minSimilarityRequired . '%) - potential wrong person';
             } elseif ($result['account_match']) {
-                // Amount + Account match = MATCH
+                // Amount + Account match = MATCH (but still prefer name match)
                 $result['matched'] = true;
-                $result['reason'] = 'Matched: Amount and account number match';
+                $result['reason'] = 'Matched: Amount and account number match (name similarity: ' . ($result['name_similarity_percent'] ?? 'N/A') . '%)';
             } elseif ($result['time_match']) {
-                // Amount + Time match = WEAK MATCH (only if time is very close)
-                if ($emailDate && $payment->created_at->diffInMinutes($emailDate) <= 15) {
+                // Amount + Time match = WEAK MATCH (only if time is very close AND name similarity >= 50%)
+                if ($emailDate && $payment->created_at->diffInMinutes($emailDate) <= 15 && $hasMinimumSimilarity) {
                     $result['matched'] = true;
-                    $result['reason'] = 'Matched: Amount and time match (name mismatch)';
+                    $result['reason'] = 'Matched: Amount and time match (name similarity: ' . $result['name_similarity_percent'] . '%)';
                     $result['is_mismatch'] = true;
-                    $result['mismatch_reason'] = 'Name mismatch but amount and time match';
+                    $result['mismatch_reason'] = 'Name similarity acceptable (' . $result['name_similarity_percent'] . '%) but not exact match';
                 } else {
-                    $result['reason'] = 'Amount matches but name and account do not match, and time window too large';
+                    if (!$hasMinimumSimilarity && $result['name_similarity_percent'] !== null) {
+                        $result['reason'] = 'Amount and time match but name similarity too low (' . $result['name_similarity_percent'] . '% < ' . $minSimilarityRequired . '%) - potential wrong person';
+                    } else {
+                        $result['reason'] = 'Amount matches but name and account do not match, and time window too large';
+                    }
                 }
             } else {
-                $result['reason'] = 'Amount matches but name, account, and time do not match';
+                $result['reason'] = 'Amount matches but name similarity too low (' . ($result['name_similarity_percent'] ?? 'N/A') . '% < ' . $minSimilarityRequired . '%), account mismatch, and time mismatch';
             }
         }
         
@@ -517,17 +538,29 @@ class PaymentMatchingService
         $paymentNoSpace = str_replace(' ', '', $paymentNameNorm);
         $emailNoSpace = str_replace(' ', '', $emailNameNorm);
         
-        // If payment name is contained in email name (or vice versa), it's a match
+        // Calculate similarity first to ensure minimum threshold
+        $similarity = 0;
+        similar_text($paymentNameNorm, $emailNameNorm, $similarity);
+        
+        // If payment name is contained in email name (or vice versa), check similarity before matching
         // This allows "john doe" to match "john doe from opay" or "via gtbank john doe"
-        // IMPORTANT: Only match if the contained name is at least 3 characters (to avoid false matches)
+        // IMPORTANT: Only match if the contained name is at least 3 characters AND similarity >= 50%
         if (strlen($paymentNoSpace) >= 3 && strlen($emailNoSpace) >= 3) {
             if (strpos($emailNoSpace, $paymentNoSpace) !== false) {
-                // Payment name found in email name - MATCH (even if email has additional words like bank names)
-                return ['matched' => true, 'similarity' => 90, 'reason' => 'Payment name contained in email name'];
+                // Payment name found in email name - MATCH only if similarity >= 50%
+                if ($similarity >= 50) {
+                    return ['matched' => true, 'similarity' => round($similarity), 'reason' => 'Payment name contained in email name (similarity: ' . round($similarity) . '%)'];
+                } else {
+                    return ['matched' => false, 'similarity' => round($similarity), 'reason' => 'Payment name contained but similarity too low (' . round($similarity) . '% < 50%)'];
+                }
             }
             if (strpos($paymentNoSpace, $emailNoSpace) !== false) {
-                // Email name found in payment name - MATCH (even if payment has additional words)
-                return ['matched' => true, 'similarity' => 90, 'reason' => 'Email name contained in payment name'];
+                // Email name found in payment name - MATCH only if similarity >= 50%
+                if ($similarity >= 50) {
+                    return ['matched' => true, 'similarity' => round($similarity), 'reason' => 'Email name contained in payment name (similarity: ' . round($similarity) . '%)'];
+                } else {
+                    return ['matched' => false, 'similarity' => round($similarity), 'reason' => 'Email name contained but similarity too low (' . round($similarity) . '% < 50%)'];
+                }
             }
         }
 
@@ -536,24 +569,81 @@ class PaymentMatchingService
         $emailNoSpace = str_replace(' ', '', $emailNameNorm);
         
         if ($paymentNoSpace === $emailNoSpace) {
-            return ['matched' => true, 'similarity' => 95];
-        }
-        
-        // Check if one contains the other (partial match)
-        if (strlen($paymentNoSpace) >= 3 && strlen($emailNoSpace) >= 3) {
-            if (strpos($paymentNoSpace, $emailNoSpace) !== false || strpos($emailNoSpace, $paymentNoSpace) !== false) {
-                return ['matched' => true, 'similarity' => 80];
+            // Calculate actual similarity to ensure it meets threshold
+            $similarity = 0;
+            similar_text($paymentNameNorm, $emailNameNorm, $similarity);
+            // No-space match is typically high similarity, but verify >= 50%
+            if ($similarity >= 50) {
+                return ['matched' => true, 'similarity' => round($similarity)];
+            } else {
+                return ['matched' => false, 'similarity' => round($similarity), 'reason' => 'No-space match but similarity too low (' . round($similarity) . '% < 50%)'];
             }
         }
         
-        // Word-by-word matching (at least 2 words must match)
-        $paymentWords = array_filter(explode(' ', $paymentNameNorm));
-        $emailWords = array_filter(explode(' ', $emailNameNorm));
+        // Check if one contains the other (partial match) - but require similarity check
+        if (strlen($paymentNoSpace) >= 3 && strlen($emailNoSpace) >= 3) {
+            if (strpos($paymentNoSpace, $emailNoSpace) !== false || strpos($emailNoSpace, $paymentNoSpace) !== false) {
+                // Calculate similarity to ensure it meets minimum threshold
+                $similarity = 0;
+                similar_text($paymentNameNorm, $emailNameNorm, $similarity);
+                if ($similarity >= 50) {
+                    return ['matched' => true, 'similarity' => round($similarity), 'reason' => 'Partial name match (similarity: ' . round($similarity) . '%)'];
+                } else {
+                    return ['matched' => false, 'similarity' => round($similarity), 'reason' => 'Partial match but similarity too low (' . round($similarity) . '% < 50%)'];
+                }
+            }
+        }
+        
+        // Word-by-word matching - handles reordered names (e.g., "adeniyi timilehin okikiola" vs "okikiola timilehin adeniyi")
+        $paymentWords = array_filter(explode(' ', $paymentNameNorm), function($word) {
+            return strlen(trim($word)) >= 2; // Only consider words with 2+ characters
+        });
+        $emailWords = array_filter(explode(' ', $emailNameNorm), function($word) {
+            return strlen(trim($word)) >= 2; // Only consider words with 2+ characters
+        });
+        
+        // Remove duplicates and normalize
+        $paymentWords = array_unique(array_map('trim', $paymentWords));
+        $emailWords = array_unique(array_map('trim', $emailWords));
         
         if (count($paymentWords) >= 2 && count($emailWords) >= 2) {
             $matchingWords = array_intersect($paymentWords, $emailWords);
-            if (count($matchingWords) >= 2) {
-                return ['matched' => true, 'similarity' => 70];
+            $matchingCount = count($matchingWords);
+            $totalWords = max(count($paymentWords), count($emailWords));
+            
+            // If all words match (regardless of order), it's a strong match
+            // Example: "adeniyi timilehin okikiola" vs "okikiola timilehin adeniyi" = all 3 words match
+            if ($matchingCount === count($paymentWords) && $matchingCount === count($emailWords)) {
+                // All words match - this is a STRONG MATCH (same person, different order)
+                $similarity = 0;
+                similar_text($paymentNameNorm, $emailNameNorm, $similarity);
+                // Even if similarity is slightly below 50%, if all words match, consider it a match
+                // But still require minimum 40% similarity to avoid false positives
+                if ($similarity >= 40) {
+                    return ['matched' => true, 'similarity' => max(round($similarity), 85), 'reason' => 'All words match (reordered names, similarity: ' . round($similarity) . '%)'];
+                }
+            }
+            
+            // If at least 2 words match and they represent a significant portion
+            if ($matchingCount >= 2) {
+                $wordMatchRatio = $matchingCount / $totalWords;
+                // If at least 70% of words match, consider it a match
+                if ($wordMatchRatio >= 0.7) {
+                    $similarity = 0;
+                    similar_text($paymentNameNorm, $emailNameNorm, $similarity);
+                    if ($similarity >= 50) {
+                        return ['matched' => true, 'similarity' => round($similarity), 'reason' => 'Most words match (' . $matchingCount . '/' . $totalWords . ' words, similarity: ' . round($similarity) . '%)'];
+                    }
+                }
+                
+                // Standard check: at least 2 words match and similarity >= 50%
+                $similarity = 0;
+                similar_text($paymentNameNorm, $emailNameNorm, $similarity);
+                if ($similarity >= 50) {
+                    return ['matched' => true, 'similarity' => round($similarity), 'reason' => 'Word match (' . $matchingCount . ' words, similarity: ' . round($similarity) . '%)'];
+                } else {
+                    return ['matched' => false, 'similarity' => round($similarity), 'reason' => 'Word match but similarity too low (' . round($similarity) . '% < 50%)'];
+                }
             }
         }
         
@@ -561,12 +651,13 @@ class PaymentMatchingService
         $similarity = 0;
         similar_text($paymentNameNorm, $emailNameNorm, $similarity);
         
-        // Match if similarity is >= 70%
-        if ($similarity >= 70) {
-            return ['matched' => true, 'similarity' => round($similarity)];
+        // CRITICAL: Require at least 50% similarity before matching
+        // This prevents matching wrong persons
+        if ($similarity >= 50) {
+            return ['matched' => true, 'similarity' => round($similarity), 'reason' => 'Similarity match (' . round($similarity) . '%)'];
         }
         
-        return ['matched' => false, 'similarity' => round($similarity)];
+        return ['matched' => false, 'similarity' => round($similarity), 'reason' => 'Similarity too low (' . round($similarity) . '% < 50%)'];
     }
 
     /**

@@ -583,10 +583,11 @@
             </div>
             <div class="mb-4">
                 <label class="flex items-center space-x-2">
-                    <input type="checkbox" name="is_mismatch" id="is-mismatch-checkbox" 
+                    <input type="checkbox" name="is_mismatch" id="is-mismatch-checkbox" value="1"
                         class="rounded border-gray-300 text-primary focus:ring-primary">
                     <span class="text-sm text-gray-700">Mark as amount mismatch</span>
                 </label>
+                <p class="text-xs text-gray-500 mt-1">This will be automatically checked if received amount differs from expected</p>
             </div>
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Link Email (Optional)</label>
@@ -754,7 +755,83 @@ function showManualApproveModal(paymentId, transactionId, expectedAmount) {
     document.getElementById('modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
     document.getElementById('modal-received-amount').value = expectedAmount;
     
+    // Reset mismatch checkbox
+    const mismatchCheckbox = document.getElementById('is-mismatch-checkbox');
+    if (mismatchCheckbox) {
+        mismatchCheckbox.checked = false;
+    }
+    
+    // Reset email search
+    const emailSearch = document.getElementById('email-search');
+    if (emailSearch) {
+        emailSearch.value = '';
+    }
+    
+    // Load unmatched emails for this payment
+    loadUnmatchedEmails(paymentId, expectedAmount);
+    
     document.getElementById('manualApproveModal').classList.remove('hidden');
+}
+
+function loadUnmatchedEmails(paymentId, amount) {
+    const emailSelect = document.getElementById('email-select');
+    if (!emailSelect) return;
+    
+    emailSelect.innerHTML = '<option value="">-- Loading emails... --</option>';
+    
+    fetch(`/admin/payments/${paymentId}/unmatched-emails?amount=${amount}`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        emailSelect.innerHTML = '<option value="">-- No email link --</option>';
+        if (data.emails && data.emails.length > 0) {
+            data.emails.forEach(email => {
+                const option = document.createElement('option');
+                const diffText = email.difference_text && email.difference !== null && parseFloat(email.difference) != 0 
+                    ? `${email.difference_text} ` 
+                    : '';
+                const senderName = email.display_name || email.sender_name || email.from_name || email.from_email || 'Unknown';
+                const searchText = (senderName + ' ' + email.from_email + ' ' + email.subject).toLowerCase();
+                
+                option.value = email.id;
+                option.setAttribute('data-search-text', searchText);
+                option.textContent = `${senderName} - ${email.subject} - ₦${parseFloat(email.amount || 0).toLocaleString('en-NG', {minimumFractionDigits: 2})} (${diffText}${email.email_date || email.created_at})`;
+                emailSelect.appendChild(option);
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error loading emails:', error);
+        emailSelect.innerHTML = '<option value="">-- Error loading emails --</option>';
+    });
+}
+
+function filterEmails(searchTerm) {
+    const emailSelect = document.getElementById('email-select');
+    if (!emailSelect) return;
+    
+    const search = searchTerm.toLowerCase();
+    const options = emailSelect.querySelectorAll('option');
+    
+    options.forEach(option => {
+        if (option.value === '') {
+            // Always show the "No email link" option
+            option.style.display = '';
+            return;
+        }
+        
+        const searchText = option.getAttribute('data-search-text') || option.textContent.toLowerCase();
+        if (searchText.includes(search)) {
+            option.style.display = '';
+        } else {
+            option.style.display = 'none';
+        }
+    });
 }
 
 function closeManualApproveModal() {

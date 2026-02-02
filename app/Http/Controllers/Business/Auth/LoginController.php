@@ -23,6 +23,7 @@ class LoginController extends Controller
             'password' => 'required',
         ]);
 
+        // Try business login first
         if (Auth::guard('business')->attempt($credentials, $request->filled('remember'))) {
             $business = Auth::guard('business')->user();
 
@@ -59,6 +60,30 @@ class LoginController extends Controller
             $request->session()->regenerate();
 
             return redirect()->intended(route('business.dashboard'));
+        }
+
+        // Try renter login if business login failed
+        if (Auth::guard('renter')->attempt($credentials, $request->filled('remember'))) {
+            $renter = Auth::guard('renter')->user();
+
+            // Check if email is verified
+            if (!$renter->hasVerifiedEmail()) {
+                Auth::guard('renter')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->route('business.login')
+                    ->withErrors([
+                        'email' => 'Please verify your email address before logging in.',
+                    ])
+                    ->with('unverified_email', $renter->email)
+                    ->onlyInput('email');
+            }
+
+            $request->session()->regenerate();
+
+            return redirect()->intended(route('renter.dashboard'))
+                ->with('success', 'Welcome back!');
         }
 
         return back()->withErrors([

@@ -212,7 +212,7 @@
                     class="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-xs sm:text-sm">
                     <option value="">-- Loading emails... --</option>
                 </select>
-                <p class="text-xs text-gray-500 mt-1">Select an email to link to this transaction. This will include email data in the webhook sent to the business.</p>
+                <p class="text-xs text-gray-500 mt-1">Select an email to link to this transaction. Shows emails within ±₦500 range (some users don't include charges). This will include email data in the webhook sent to the business.</p>
             </div>
             <div class="mb-3 sm:mb-4">
                 <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Admin Notes</label>
@@ -283,6 +283,12 @@ function showManualApproveModal(paymentId, transactionId, expectedAmount) {
     document.getElementById('modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
     document.getElementById('modal-received-amount').value = expectedAmount;
     
+    // Reset email search
+    const emailSearch = document.getElementById('email-search');
+    if (emailSearch) {
+        emailSearch.value = '';
+    }
+    
     // Load unmatched emails for this payment
     loadUnmatchedEmails(paymentId, expectedAmount);
     
@@ -308,8 +314,15 @@ function loadUnmatchedEmails(paymentId, amount) {
         if (data.emails && data.emails.length > 0) {
             data.emails.forEach(email => {
                 const option = document.createElement('option');
+                const diffText = email.difference_text && email.difference !== null && parseFloat(email.difference) != 0 
+                    ? `${email.difference_text} ` 
+                    : '';
+                const senderName = email.display_name || email.sender_name || email.from_name || email.from_email || 'Unknown';
+                const searchText = (senderName + ' ' + email.from_email + ' ' + email.subject).toLowerCase();
+                
                 option.value = email.id;
-                option.textContent = email.subject.substring(0, 40) + ' - ₦' + parseFloat(email.amount || 0).toLocaleString('en-NG', {minimumFractionDigits: 2});
+                option.setAttribute('data-search-text', searchText);
+                option.textContent = `${senderName} - ${email.subject.substring(0, 40)} - ₦${parseFloat(email.amount || 0).toLocaleString('en-NG', {minimumFractionDigits: 2})}${diffText ? ` (${diffText.trim()})` : ''}`;
                 select.appendChild(option);
             });
         }
@@ -317,6 +330,29 @@ function loadUnmatchedEmails(paymentId, amount) {
     .catch(error => {
         console.error('Error loading emails:', error);
         select.innerHTML = '<option value="">-- Error loading emails --</option>';
+    });
+}
+
+function filterEmails(searchTerm) {
+    const emailSelect = document.getElementById('email-select');
+    if (!emailSelect) return;
+    
+    const search = searchTerm.toLowerCase();
+    const options = emailSelect.querySelectorAll('option');
+    
+    options.forEach(option => {
+        if (option.value === '') {
+            // Always show the "No email link" option
+            option.style.display = '';
+            return;
+        }
+        
+        const searchText = option.getAttribute('data-search-text') || option.textContent.toLowerCase();
+        if (searchText.includes(search)) {
+            option.style.display = '';
+        } else {
+            option.style.display = 'none';
+        }
     });
 }
 
