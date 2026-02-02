@@ -53,7 +53,7 @@
             z-index: 1000;
             transition: all 0.3s ease;
         }
-        .floating-cart.hidden {
+        .floating-cart[style*="display: none"] {
             opacity: 0;
             pointer-events: none;
             transform: translateY(20px);
@@ -384,10 +384,10 @@
     </div>
 
     <!-- Floating Cart Button -->
-    <div id="floating-cart" class="floating-cart hidden">
+    <div id="floating-cart" class="floating-cart" style="display: none;">
         <button type="button" 
                 onclick="toggleCartSummary()" 
-                class="bg-gradient-primary text-white w-16 h-16 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center relative">
+                class="bg-gradient-primary text-white w-16 h-16 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center relative transition-all">
             <i class="fas fa-shopping-cart text-xl"></i>
             <span id="cart-badge" class="cart-badge">0</span>
         </button>
