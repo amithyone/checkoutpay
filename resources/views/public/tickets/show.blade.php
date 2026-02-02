@@ -187,8 +187,8 @@
                     </div>
 
                     <!-- Submit Button -->
-                    <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90">
-                        Proceed to Payment
+                    <button type="submit" id="submit-btn" class="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90" onclick="return validateForm()">
+                        <span id="submit-text">Proceed to Payment</span>
                     </button>
                 @else
                     <div class="text-center py-8 text-gray-500">
@@ -216,12 +216,22 @@
         
         function calculateTotal() {
             let subtotal = 0;
-            document.querySelectorAll('input[type="number"]').forEach(input => {
+            // Only calculate from ticket quantity inputs (not other number inputs)
+            document.querySelectorAll('input[name^="tickets"][name$="[quantity]"]').forEach(input => {
                 const quantity = parseInt(input.value) || 0;
-                const ticketTypeId = input.closest('.border').querySelector('input[type="hidden"]').value;
-                const ticketType = ticketTypes.find(t => t.id == ticketTypeId);
-                if (ticketType) {
-                    subtotal += quantity * ticketType.price;
+                if (quantity > 0) {
+                    // Find the hidden ticket_type_id input in the same container
+                    const ticketContainer = input.closest('.border');
+                    if (ticketContainer) {
+                        const ticketTypeIdInput = ticketContainer.querySelector('input[type="hidden"][name*="[ticket_type_id]"]');
+                        if (ticketTypeIdInput) {
+                            const ticketTypeId = parseInt(ticketTypeIdInput.value);
+                            const ticketType = ticketTypes.find(t => t.id == ticketTypeId);
+                            if (ticketType) {
+                                subtotal += quantity * ticketType.price;
+                            }
+                        }
+                    }
                 }
             });
             
@@ -294,8 +304,77 @@
             }
         }
         
+        // Validate form before submission
+        function validateForm() {
+            let hasTickets = false;
+            let totalAmount = 0;
+            
+            document.querySelectorAll('input[name^="tickets"][name$="[quantity]"]').forEach(input => {
+                const quantity = parseInt(input.value) || 0;
+                if (quantity > 0) {
+                    hasTickets = true;
+                    const ticketContainer = input.closest('.border');
+                    if (ticketContainer) {
+                        const ticketTypeIdInput = ticketContainer.querySelector('input[type="hidden"][name*="[ticket_type_id]"]');
+                        if (ticketTypeIdInput) {
+                            const ticketTypeId = parseInt(ticketTypeIdInput.value);
+                            const ticketType = ticketTypes.find(t => t.id == ticketTypeId);
+                            if (ticketType) {
+                                totalAmount += quantity * ticketType.price;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            if (!hasTickets) {
+                alert('Please select at least one ticket');
+                return false;
+            }
+            
+            // Apply coupon discount if any
+            if (appliedCoupon && totalAmount > 0) {
+                let discount = 0;
+                if (appliedCoupon.discount_type === 'percentage') {
+                    discount = (totalAmount * appliedCoupon.discount_value) / 100;
+                } else {
+                    discount = Math.min(appliedCoupon.discount_value, totalAmount);
+                }
+                totalAmount = Math.max(0, totalAmount - discount);
+            }
+            
+            // Update button text for free tickets
+            const submitBtn = document.getElementById('submit-btn');
+            const submitText = document.getElementById('submit-text');
+            if (totalAmount === 0 && hasTickets) {
+                submitText.textContent = 'Confirm Free Tickets';
+            } else {
+                submitText.textContent = 'Proceed to Payment';
+            }
+            
+            return true;
+        }
+        
         // Calculate total on page load
         calculateTotal();
+        
+        // Update button text when quantities change
+        document.querySelectorAll('input[name^="tickets"][name$="[quantity]"]').forEach(input => {
+            input.addEventListener('change', function() {
+                calculateTotal();
+                // Update button text based on total
+                setTimeout(() => {
+                    const totalText = document.getElementById('total-amount').textContent;
+                    const totalValue = parseFloat(totalText.replace(/[₦,]/g, ''));
+                    const submitText = document.getElementById('submit-text');
+                    if (totalValue === 0 && this.value > 0) {
+                        submitText.textContent = 'Confirm Free Tickets';
+                    } else {
+                        submitText.textContent = 'Proceed to Payment';
+                    }
+                }, 100);
+            });
+        });
     </script>
 </body>
 </html>
