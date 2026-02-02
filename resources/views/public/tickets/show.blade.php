@@ -415,12 +415,13 @@
                     <span id="cart-total-amount" class="text-teal-400">₦0.00</span>
                 </div>
             </div>
-            <button type="submit" 
-                    form="ticket-form"
-                    onclick="return validateForm()"
-                    class="w-full mt-4 bg-gradient-primary text-white py-3 rounded-lg font-semibold hover:opacity-90 active:opacity-80 transition">
-                <span id="cart-submit-text">Checkout</span>
-            </button>
+                        <button type="submit" 
+                                form="ticket-form"
+                                onclick="return validateForm()"
+                                id="cart-checkout-btn"
+                                class="w-full mt-4 bg-gradient-primary text-white py-3 rounded-lg font-semibold hover:opacity-90 active:opacity-80 transition">
+                            <span id="cart-submit-text">Checkout</span>
+                        </button>
         </div>
     </div>
 
@@ -605,7 +606,13 @@
             }
         }
         
+        let isSubmitting = false;
+        
         function validateForm() {
+            if (isSubmitting) {
+                return false; // Prevent double submission
+            }
+            
             let hasTickets = false;
             let totalAmount = 0;
             
@@ -632,6 +639,22 @@
                 return false;
             }
             
+            // Validate customer info
+            const name = document.getElementById('customer_name').value.trim();
+            const email = document.getElementById('customer_email').value.trim();
+            
+            if (!name || !email) {
+                alert('Please fill in your name and email');
+                return false;
+            }
+            
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email address');
+                return false;
+            }
+            
             if (appliedCoupon && totalAmount > 0) {
                 let discount = 0;
                 if (appliedCoupon.discount_type === 'percentage') {
@@ -642,8 +665,49 @@
                 totalAmount = Math.max(0, totalAmount - discount);
             }
             
+            // Set submitting flag and show loading state
+            isSubmitting = true;
+            const submitBtns = document.querySelectorAll('button[form="ticket-form"][type="submit"]');
+            const cartSubmitText = document.getElementById('cart-submit-text');
+            const mainSubmitText = document.getElementById('main-submit-text');
+            
+            submitBtns.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            });
+            
+            if (cartSubmitText) {
+                cartSubmitText.textContent = 'Processing...';
+            }
+            if (mainSubmitText) {
+                mainSubmitText.textContent = 'Processing...';
+            }
+            
             return true;
         }
+        
+        // Handle form submission
+        document.getElementById('ticket-form').addEventListener('submit', function(e) {
+            if (!validateForm()) {
+                isSubmitting = false;
+                e.preventDefault();
+                const submitBtns = document.querySelectorAll('button[form="ticket-form"][type="submit"]');
+                const cartSubmitText = document.getElementById('cart-submit-text');
+                const mainSubmitText = document.getElementById('main-submit-text');
+                
+                submitBtns.forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+                
+                if (cartSubmitText) {
+                    cartSubmitText.textContent = 'Checkout';
+                }
+                if (mainSubmitText) {
+                    mainSubmitText.textContent = 'Checkout';
+                }
+            }
+        });
         
         // Calculate total on page load
         calculateTotal();
