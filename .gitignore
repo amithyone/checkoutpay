@@ -31,3 +31,10 @@ deploy.sh
 
 # Documentation files
 docs/
+
+# Beta badge component (ignore when pushing to git)
+resources/views/components/beta-badge.blade.php
+
+# Database backups (too large for git)
+database/backups/*.sql
+database/backups/*.zip

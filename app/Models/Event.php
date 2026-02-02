@@ -27,6 +27,7 @@ class Event extends Model
         'refund_policy',
         'commission_percentage',
         'status',
+        'view_count',
     ];
 
     /**
@@ -87,6 +88,7 @@ class Event extends Model
         'commission_percentage' => 'decimal:2',
         'max_attendees' => 'integer',
         'max_tickets_per_customer' => 'integer',
+        'view_count' => 'integer',
     ];
 
     // Status constants
@@ -143,5 +145,60 @@ class Event extends Model
             return null;
         }
         return \Illuminate\Support\Facades\Storage::url($this->cover_image);
+    }
+
+    /**
+     * Get coupons for this event
+     */
+    public function coupons()
+    {
+        return $this->hasMany(EventCoupon::class);
+    }
+
+    /**
+     * Get active coupons for this event
+     */
+    public function activeCoupons()
+    {
+        return $this->hasMany(EventCoupon::class)->where('is_active', true);
+    }
+
+    /**
+     * Get public event URL
+     */
+    public function getPublicUrlAttribute(): string
+    {
+        return route('tickets.show', $this);
+    }
+
+    /**
+     * Increment view count
+     */
+    public function incrementViews(): void
+    {
+        $this->increment('view_count');
+    }
+
+    /**
+     * Get total unique buyers count
+     */
+    public function getUniqueBuyersCountAttribute(): int
+    {
+        return $this->ticketOrders()
+            ->where('payment_status', 'paid')
+            ->distinct('customer_email')
+            ->count('customer_email');
+    }
+
+    /**
+     * Get total tickets sold count
+     */
+    public function getTicketsSoldCountAttribute(): int
+    {
+        return $this->tickets()
+            ->whereHas('ticketOrder', function ($q) {
+                $q->where('payment_status', 'paid');
+            })
+            ->count();
     }
 }

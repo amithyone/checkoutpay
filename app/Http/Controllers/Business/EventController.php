@@ -124,7 +124,11 @@ class EventController extends Controller
             'total_tickets_sold' => $event->tickets()->whereHas('ticketOrder', function ($q) {
                 $q->where('payment_status', 'paid');
             })->count(),
+            'unique_buyers' => $event->unique_buyers_count,
+            'view_count' => $event->view_count ?? 0,
         ];
+
+        $event->load('coupons');
 
         return view('business.tickets.events.show', compact('event', 'stats'));
     }

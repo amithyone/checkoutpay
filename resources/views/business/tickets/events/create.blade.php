@@ -87,7 +87,8 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Price (₦) *</label>
-                            <input type="number" name="ticket_types[0][price]" required min="0" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <input type="number" name="ticket_types[0][price]" required min="0" step="0.01" value="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0 for free tickets">
+                            <p class="text-xs text-gray-500 mt-1">Enter 0 for free tickets</p>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

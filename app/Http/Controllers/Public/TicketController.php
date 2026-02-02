@@ -28,9 +28,12 @@ class TicketController extends Controller
             abort(404);
         }
 
+        // Track view count
+        $event->incrementViews();
+
         $event->load(['ticketTypes' => function ($query) {
             $query->available()->orderBy('price');
-        }]);
+        }, 'activeCoupons']);
 
         return view('public.tickets.show', compact('event'));
     }
@@ -48,7 +51,21 @@ class TicketController extends Controller
         // Prepare ticket data
         $ticketData = [];
         foreach ($request->tickets as $ticketRequest) {
-            $ticketData[$ticketRequest['ticket_type_id']] = $ticketRequest['quantity'];
+            if (($ticketRequest['quantity'] ?? 0) > 0) {
+                $ticketData[$ticketRequest['ticket_type_id']] = $ticketRequest['quantity'];
+            }
+        }
+
+        // Validate and get coupon if provided
+        $coupon = null;
+        if ($request->filled('applied_coupon_id')) {
+            $coupon = \App\Models\EventCoupon::where('id', $request->applied_coupon_id)
+                ->where('event_id', $event->id)
+                ->first();
+            
+            if ($coupon && !$coupon->isValid()) {
+                return back()->withInput()->with('error', 'Coupon code is not valid or has expired');
+            }
         }
 
         try {
@@ -61,16 +78,24 @@ class TicketController extends Controller
                     'email' => $request->customer_email,
                     'phone' => $request->customer_phone,
                 ],
-                $event->business
+                $event->business,
+                $coupon
             );
 
-            // Redirect to payment page
-            if ($order->payment) {
-                return redirect()->route('checkout.payment', $order->payment->transaction_id)
-                    ->with('success', 'Ticket order created! Please complete payment.');
+            // Handle free tickets vs paid tickets
+            if ($order->total_amount == 0) {
+                // Free tickets - redirect to order confirmation
+                return redirect()->route('tickets.order', $order->order_number)
+                    ->with('success', 'Free tickets confirmed! Your tickets are ready.');
+            } else {
+                // Paid tickets - redirect to payment page
+                if ($order->payment) {
+                    return redirect()->route('checkout.payment', $order->payment->transaction_id)
+                        ->with('success', 'Ticket order created! Please complete payment.');
+                }
+                
+                return back()->with('error', 'Payment creation failed. Please try again.');
             }
-            
-            return back()->with('error', 'Payment creation failed. Please try again.');
         } catch (\Exception $e) {
             Log::error('Ticket purchase error', [
                 'event_id' => $event->id,

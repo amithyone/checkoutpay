@@ -29,9 +29,9 @@ class TicketService
      * @param Business $business
      * @return TicketOrder
      */
-    public function createOrder(Event $event, array $ticketData, array $customerData, Business $business): TicketOrder
+    public function createOrder(Event $event, array $ticketData, array $customerData, Business $business, ?\App\Models\EventCoupon $coupon = null): TicketOrder
     {
-        return DB::transaction(function () use ($event, $ticketData, $customerData, $business) {
+        return DB::transaction(function () use ($event, $ticketData, $customerData, $business, $coupon) {
             // Validate ticket types and calculate total
             $totalAmount = 0;
             $ticketItems = [];
@@ -65,7 +65,8 @@ class TicketService
                 ];
             }
 
-            if ($totalAmount <= 0) {
+            // Allow free tickets (totalAmount can be 0)
+            if ($totalAmount < 0) {
                 throw new \Exception('Invalid ticket selection');
             }
 
@@ -76,9 +77,20 @@ class TicketService
                 throw new \Exception("Maximum {$maxTickets} tickets per customer");
             }
 
-            // Calculate commission
+            // Apply coupon discount if provided and valid
+            $discountAmount = 0;
+            $couponId = null;
+            if ($coupon && $coupon->isValid() && $coupon->event_id === $event->id) {
+                $discountAmount = $coupon->calculateDiscount($totalAmount);
+                $totalAmount = max(0, $totalAmount - $discountAmount);
+                $couponId = $coupon->id;
+                $coupon->incrementUsage();
+            }
+
+            // Calculate commission (on original amount before discount)
+            $originalAmount = $totalAmount + $discountAmount;
             $commissionPercentage = $event->commission_percentage ?? 0;
-            $commissionAmount = ($totalAmount * $commissionPercentage) / 100;
+            $commissionAmount = ($originalAmount * $commissionPercentage) / 100;
 
             // Create ticket order
             $order = TicketOrder::create([
@@ -91,6 +103,8 @@ class TicketService
                 'commission_amount' => $commissionAmount,
                 'payment_status' => TicketOrder::PAYMENT_STATUS_PENDING,
                 'status' => TicketOrder::STATUS_PENDING,
+                'coupon_id' => $couponId,
+                'discount_amount' => $discountAmount,
             ]);
 
             // Create payment using existing PaymentService

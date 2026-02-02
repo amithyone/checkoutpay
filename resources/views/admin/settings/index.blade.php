@@ -310,6 +310,40 @@
                 <p class="mt-2 text-xs text-gray-500">Recommended: PNG, JPG, or SVG. Max size: 2MB. This logo will be used in all email templates.</p>
             </div>
 
+            <!-- Beta Badge Toggle -->
+            <div class="border-t border-gray-200 pt-6">
+                <h4 class="text-md font-semibold text-gray-900 mb-4">Display Settings</h4>
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex-1">
+                        <label for="show_beta_badge" class="block text-sm font-medium text-gray-700 mb-1">
+                            Show Beta Badge
+                        </label>
+                        <p class="text-xs text-gray-500">
+                            Display a floating "BETA" badge on all pages. 
+                            @if(env('SHOW_BETA_BADGE') !== null)
+                                <span class="text-orange-600 font-medium">Note: ENV variable SHOW_BETA_BADGE is set and takes priority.</span>
+                            @else
+                                You can also control this via <code class="text-xs bg-gray-200 px-1 rounded">SHOW_BETA_BADGE</code> in your .env file.
+                            @endif
+                        </p>
+                    </div>
+                    <div class="ml-4">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                id="show_beta_badge" 
+                                name="show_beta_badge" 
+                                value="1"
+                                {{ \App\Models\Setting::get('show_beta_badge', true) ? 'checked' : '' }}
+                                {{ env('SHOW_BETA_BADGE') !== null ? 'disabled' : '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <!-- Contact Information -->
             <div class="border-t border-gray-200 pt-6">
                 <h4 class="text-md font-semibold text-gray-900 mb-4">Contact Information</h4>

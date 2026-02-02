@@ -21,6 +21,8 @@ class TicketOrder extends Model
         'total_amount',
         'commission_amount',
         'payment_id',
+        'coupon_id',
+        'discount_amount',
         'payment_status',
         'status',
         'purchased_at',
@@ -32,6 +34,7 @@ class TicketOrder extends Model
     protected $casts = [
         'total_amount' => 'decimal:2',
         'commission_amount' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
         'purchased_at' => 'datetime',
         'refunded_at' => 'datetime',
         'created_at' => 'datetime',
@@ -84,6 +87,14 @@ class TicketOrder extends Model
     public function payment()
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    /**
+     * Get the coupon used for this order
+     */
+    public function coupon()
+    {
+        return $this->belongsTo(EventCoupon::class);
     }
 
     /**

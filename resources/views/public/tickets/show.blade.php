@@ -58,7 +58,11 @@
                                         </p>
                                     </div>
                                     <div class="text-right">
-                                        <div class="text-2xl font-bold text-primary">₦{{ number_format($ticketType->price, 2) }}</div>
+                                        @if($ticketType->price == 0)
+                                            <div class="text-2xl font-bold text-green-600">FREE</div>
+                                        @else
+                                            <div class="text-2xl font-bold text-primary">₦{{ number_format($ticketType->price, 2) }}</div>
+                                        @endif
                                     </div>
                                 </div>
                                 <div class="flex items-center">
@@ -95,9 +99,39 @@
                         </div>
                     </div>
 
+                    <!-- Coupon Code -->
+                    @if($event->activeCoupons->count() > 0)
+                    <div class="border-t border-gray-200 pt-6 mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Have a Coupon Code?</h3>
+                        <div class="flex gap-2">
+                            <input type="text" 
+                                   id="coupon-code" 
+                                   name="coupon_code" 
+                                   placeholder="Enter coupon code"
+                                   class="flex-1 px-4 py-2 border border-gray-300 rounded-lg uppercase"
+                                   onchange="applyCoupon()">
+                            <button type="button" 
+                                    onclick="applyCoupon()" 
+                                    class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                                Apply
+                            </button>
+                        </div>
+                        <div id="coupon-message" class="mt-2 text-sm hidden"></div>
+                        <input type="hidden" id="applied-coupon-id" name="applied_coupon_id" value="">
+                    </div>
+                    @endif
+
                     <!-- Total -->
                     <div class="border-t border-gray-200 pt-4 mb-6">
-                        <div class="flex justify-between items-center text-xl font-bold">
+                        <div id="subtotal-section" class="flex justify-between items-center text-gray-600 mb-2 hidden">
+                            <span>Subtotal:</span>
+                            <span id="subtotal-amount">₦0.00</span>
+                        </div>
+                        <div id="discount-section" class="flex justify-between items-center text-green-600 mb-2 hidden">
+                            <span>Discount:</span>
+                            <span id="discount-amount">-₦0.00</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xl font-bold border-t border-gray-200 pt-2">
                             <span>Total:</span>
                             <span id="total-amount" class="text-primary">₦0.00</span>
                         </div>
@@ -119,19 +153,100 @@
 
     <script>
         const ticketTypes = @json($event->ticketTypes->map(fn($t) => ['id' => $t->id, 'price' => $t->price]));
+        const coupons = @json($event->activeCoupons->map(fn($c) => [
+            'id' => $c->id,
+            'code' => $c->code,
+            'discount_type' => $c->discount_type,
+            'discount_value' => $c->discount_value
+        ]));
+        let appliedCoupon = null;
+        
+        function formatCurrency(amount) {
+            return '₦' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
         
         function calculateTotal() {
-            let total = 0;
+            let subtotal = 0;
             document.querySelectorAll('input[type="number"]').forEach(input => {
                 const quantity = parseInt(input.value) || 0;
                 const ticketTypeId = input.closest('.border').querySelector('input[type="hidden"]').value;
                 const ticketType = ticketTypes.find(t => t.id == ticketTypeId);
                 if (ticketType) {
-                    total += quantity * ticketType.price;
+                    subtotal += quantity * ticketType.price;
                 }
             });
-            document.getElementById('total-amount').textContent = '₦' + total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            
+            const subtotalEl = document.getElementById('subtotal-amount');
+            const discountEl = document.getElementById('discount-amount');
+            const totalEl = document.getElementById('total-amount');
+            const subtotalSection = document.getElementById('subtotal-section');
+            const discountSection = document.getElementById('discount-section');
+            
+            if (subtotal > 0) {
+                subtotalSection.classList.remove('hidden');
+                subtotalEl.textContent = formatCurrency(subtotal);
+            } else {
+                subtotalSection.classList.add('hidden');
+            }
+            
+            let discount = 0;
+            if (appliedCoupon && subtotal > 0) {
+                if (appliedCoupon.discount_type === 'percentage') {
+                    discount = (subtotal * appliedCoupon.discount_value) / 100;
+                } else {
+                    discount = Math.min(appliedCoupon.discount_value, subtotal);
+                }
+                
+                if (discount > 0) {
+                    discountSection.classList.remove('hidden');
+                    discountEl.textContent = '-' + formatCurrency(discount);
+                } else {
+                    discountSection.classList.add('hidden');
+                }
+            } else {
+                discountSection.classList.add('hidden');
+            }
+            
+            const total = Math.max(0, subtotal - discount);
+            totalEl.textContent = formatCurrency(total);
         }
+        
+        function applyCoupon() {
+            const codeInput = document.getElementById('coupon-code');
+            const code = codeInput.value.trim().toUpperCase();
+            const messageEl = document.getElementById('coupon-message');
+            const couponIdInput = document.getElementById('applied-coupon-id');
+            
+            if (!code) {
+                appliedCoupon = null;
+                couponIdInput.value = '';
+                messageEl.classList.add('hidden');
+                calculateTotal();
+                return;
+            }
+            
+            const coupon = coupons.find(c => c.code === code);
+            if (coupon) {
+                appliedCoupon = coupon;
+                couponIdInput.value = coupon.id;
+                messageEl.classList.remove('hidden');
+                messageEl.classList.remove('text-red-600');
+                messageEl.classList.add('text-green-600');
+                messageEl.textContent = 'Coupon applied successfully!';
+                calculateTotal();
+            } else {
+                appliedCoupon = null;
+                couponIdInput.value = '';
+                messageEl.classList.remove('hidden');
+                messageEl.classList.remove('text-green-600');
+                messageEl.classList.add('text-red-600');
+                messageEl.textContent = 'Invalid coupon code';
+                calculateTotal();
+            }
+        }
+        
+        // Calculate total on page load
+        calculateTotal();
     </script>
 </body>
 </html>

@@ -378,5 +378,6 @@
         });
     </script>
     @stack('scripts')
+    @includeIf('components.beta-badge')
 </body>
 </html>

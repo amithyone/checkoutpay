@@ -28,6 +28,8 @@ class PurchaseTicketRequest extends FormRequest
             'tickets' => 'required|array|min:1',
             'tickets.*.ticket_type_id' => 'required|exists:ticket_types,id',
             'tickets.*.quantity' => 'required|integer|min:1|max:100',
+            'coupon_code' => 'nullable|string|max:20',
+            'applied_coupon_id' => 'nullable|exists:event_coupons,id',
         ];
     }
 }

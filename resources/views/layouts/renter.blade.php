@@ -68,5 +68,6 @@
             </div>
         </main>
     </div>
+    @includeIf('components.beta-badge')
 </body>
 </html>

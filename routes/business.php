@@ -138,6 +138,10 @@ Route::prefix('dashboard')->name('business.')->group(function () {
             Route::post('events/{event}/publish', [\App\Http\Controllers\Business\EventController::class, 'publish'])->name('events.publish');
             Route::post('events/{event}/cancel', [\App\Http\Controllers\Business\EventController::class, 'cancel'])->name('events.cancel');
             
+            // Event Coupons
+            Route::post('events/{event}/coupons', [\App\Http\Controllers\Business\EventCouponController::class, 'store'])->name('events.coupons.store');
+            Route::delete('events/{event}/coupons/{coupon}', [\App\Http\Controllers\Business\EventCouponController::class, 'destroy'])->name('events.coupons.destroy');
+            
             // Orders
             Route::get('orders', [\App\Http\Controllers\Business\TicketOrderController::class, 'index'])->name('orders.index');
             Route::get('orders/{order}', [\App\Http\Controllers\Business\TicketOrderController::class, 'show'])->name('orders.show');

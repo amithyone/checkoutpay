@@ -182,6 +182,7 @@ class SettingsController extends Controller
             'contact_email' => 'nullable|email|max:255',
             'contact_phone' => 'nullable|string|max:50',
             'contact_address' => 'nullable|string|max:500',
+            'show_beta_badge' => 'nullable|boolean',
             'logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
             'admin_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
             'business_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg|max:2048',
@@ -236,6 +237,12 @@ class SettingsController extends Controller
         }
         if (isset($validated['contact_address'])) {
             Setting::set('contact_address', $validated['contact_address'], 'string', 'general', 'Contact address');
+        }
+        
+        // Update beta badge setting (only if ENV variable is not set)
+        if (env('SHOW_BETA_BADGE') === null) {
+            $showBetaBadge = $request->has('show_beta_badge') && $request->input('show_beta_badge') == '1';
+            Setting::set('show_beta_badge', $showBetaBadge ? '1' : '0', 'boolean', 'general', 'Show floating beta badge on all pages');
         }
 
         return redirect()->route('admin.settings.index')
