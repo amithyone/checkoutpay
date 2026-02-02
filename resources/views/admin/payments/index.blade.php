@@ -52,7 +52,7 @@
             <div class="sm:col-span-2 lg:col-span-1">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Search</label>
                 <input type="text" name="search" id="searchInput" value="{{ request('search') }}" 
-                    placeholder="Transaction ID..." 
+                    placeholder="Transaction ID or Payer Name..." 
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                     autocomplete="off">
             </div>

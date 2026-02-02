@@ -90,20 +90,24 @@ class PaymentController extends Controller
             $query->where('created_at', '<=', $request->to_date . ' 23:59:59');
         }
 
-        // Search by transaction ID
+        // Search by transaction ID or payer name
         if ($request->filled('search')) {
             $search = trim($request->search);
             
             // Remove TXN- prefix if present for flexible searching
             $searchClean = str_ireplace('TXN-', '', $search);
+            $searchLower = strtolower($search);
+            $searchCleanLower = strtolower($searchClean);
             
             // Use case-insensitive search with LIKE
             // MySQL LIKE is case-insensitive by default for most collations
-            $query->where(function ($q) use ($search, $searchClean) {
-                // Search with original term (handles both with and without TXN-)
-                $q->whereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($search) . '%'])
-                  ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%' . strtolower($searchClean) . '%'])
-                  ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%txn-' . strtolower($searchClean) . '%']);
+            $query->where(function ($q) use ($search, $searchClean, $searchLower, $searchCleanLower) {
+                // Search by transaction ID (handles both with and without TXN-)
+                $q->whereRaw('LOWER(transaction_id) LIKE ?', ['%' . $searchLower . '%'])
+                  ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%' . $searchCleanLower . '%'])
+                  ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%txn-' . $searchCleanLower . '%'])
+                  // Search by payer name
+                  ->orWhereRaw('LOWER(payer_name) LIKE ?', ['%' . $searchLower . '%']);
             });
         }
 
