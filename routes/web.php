@@ -95,6 +95,7 @@ Route::prefix('tickets')->name('tickets.')->group(function () {
     Route::post('event/{event}/purchase', [\App\Http\Controllers\Public\TicketController::class, 'purchase'])->name('purchase');
     Route::get('order/{orderNumber}', [\App\Http\Controllers\Public\TicketController::class, 'order'])->name('order');
     Route::get('order/{orderNumber}/download', [\App\Http\Controllers\Public\TicketController::class, 'download'])->name('download');
+    Route::post('payment/webhook/{orderNumber}', [\App\Http\Controllers\Public\TicketController::class, 'paymentWebhook'])->name('payment.webhook');
     // Legacy route for backward compatibility
     Route::get('{event}', [\App\Http\Controllers\Public\TicketController::class, 'show'])->name('show-legacy');
 });

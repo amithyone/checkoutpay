@@ -107,17 +107,35 @@ class TicketService
                 'discount_amount' => $discountAmount,
             ]);
 
-            // Create payment using existing PaymentService
-            $payment = $this->paymentService->createPayment([
-                'amount' => $totalAmount,
-                'payer_name' => $customerData['name'],
-                'service' => 'ticket_sale',
-                'transaction_id' => 'TKT-' . $order->order_number,
-                'business_website_id' => null,
-            ], $business);
+            $payment = null;
+            
+            // Only create payment if total amount is greater than 0
+            if ($totalAmount > 0) {
+                // Generate webhook URL for ticket payment confirmation
+                $webhookUrl = route('tickets.payment.webhook', ['orderNumber' => $order->order_number]);
+                $returnUrl = route('tickets.order', ['orderNumber' => $order->order_number]);
+                
+                // Create payment using existing PaymentService
+                $payment = $this->paymentService->createPayment([
+                    'amount' => $totalAmount,
+                    'payer_name' => $customerData['name'],
+                    'service' => 'ticket_sale',
+                    'transaction_id' => 'TKT-' . $order->order_number,
+                    'webhook_url' => $webhookUrl,
+                    'return_url' => $returnUrl,
+                    'business_website_id' => null,
+                ], $business);
 
-            // Link payment to order
-            $order->update(['payment_id' => $payment->id]);
+                // Link payment to order
+                $order->update(['payment_id' => $payment->id]);
+            } else {
+                // Free tickets - auto-confirm
+                $order->update([
+                    'payment_status' => TicketOrder::PAYMENT_STATUS_PAID,
+                    'status' => TicketOrder::STATUS_CONFIRMED,
+                    'purchased_at' => now(),
+                ]);
+            }
 
             // Create ticket records (but don't generate QR codes until payment is confirmed)
             foreach ($ticketItems as $item) {

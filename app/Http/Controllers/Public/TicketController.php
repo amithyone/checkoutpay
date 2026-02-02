@@ -99,16 +99,22 @@ class TicketController extends Controller
             // Handle free tickets vs paid tickets
             if ($order->total_amount == 0) {
                 // Free tickets - redirect to order confirmation
-                return redirect()->route('tickets.order', $order->order_number)
+                return redirect()->route('tickets.order', ['orderNumber' => $order->order_number])
                     ->with('success', 'Free tickets confirmed! Your tickets are ready.');
             } else {
                 // Paid tickets - redirect to payment page
-                if ($order->payment) {
-                    return redirect()->route('checkout.payment', $order->payment->transaction_id)
+                if ($order->payment && $order->payment->account_number) {
+                    return redirect()->route('checkout.payment', ['transactionId' => $order->payment->transaction_id])
                         ->with('success', 'Ticket order created! Please complete payment.');
                 }
                 
-                return back()->with('error', 'Payment creation failed. Please try again.');
+                Log::error('Ticket payment creation failed', [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'payment_id' => $order->payment_id,
+                ]);
+                
+                return back()->with('error', 'Payment creation failed. Please try again.')->withInput();
             }
         } catch (\Exception $e) {
             Log::error('Ticket purchase error', [
@@ -157,6 +163,45 @@ class TicketController extends Controller
             ]);
 
             return back()->with('error', 'Failed to generate ticket PDF');
+        }
+    }
+
+    /**
+     * Handle payment webhook for ticket orders
+     * This is called when payment is approved via the payment gateway
+     */
+    public function paymentWebhook(Request $request, string $orderNumber)
+    {
+        try {
+            $order = TicketOrder::where('order_number', $orderNumber)
+                ->with('payment')
+                ->firstOrFail();
+
+            // Verify payment is approved
+            if ($order->payment && $order->payment->status === \App\Models\Payment::STATUS_APPROVED) {
+                // Confirm the order (this will generate QR codes)
+                $this->ticketService->confirmOrder($order);
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Ticket order confirmed',
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment not approved yet',
+            ], 400);
+        } catch (\Exception $e) {
+            Log::error('Ticket payment webhook error', [
+                'order_number' => $orderNumber,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Webhook processing failed',
+            ], 500);
         }
     }
 }
