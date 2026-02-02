@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             GtbankTemplateSeeder::class,
             EmailTemplateSeeder::class,
             SuperAdminBusinessSeeder::class,
+            EventSeeder::class,
         ]);
     }
 }
