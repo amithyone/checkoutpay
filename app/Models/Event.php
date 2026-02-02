@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Event extends Model
 {
@@ -12,6 +13,7 @@ class Event extends Model
     protected $fillable = [
         'business_id',
         'title',
+        'slug',
         'description',
         'venue',
         'address',
@@ -26,6 +28,57 @@ class Event extends Model
         'commission_percentage',
         'status',
     ];
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($event) {
+            // Generate slug from title if not provided
+            if (empty($event->slug)) {
+                $event->slug = static::generateUniqueSlug($event->title, $event->business_id);
+            }
+        });
+
+        static::updating(function ($event) {
+            // Regenerate slug if title changed and slug is empty
+            if ($event->isDirty('title') && empty($event->slug)) {
+                $event->slug = static::generateUniqueSlug($event->title, $event->business_id, $event->id);
+            }
+        });
+    }
+
+    /**
+     * Generate a unique slug from title
+     */
+    protected static function generateUniqueSlug(string $title, int $businessId, ?int $excludeId = null): string
+    {
+        $baseSlug = Str::slug($title);
+        $slug = $baseSlug;
+        $counter = 1;
+
+        // Check for uniqueness within the same business
+        while (true) {
+            $query = static::where('business_id', $businessId)
+                ->where('slug', $slug);
+            
+            if ($excludeId) {
+                $query->where('id', '!=', $excludeId);
+            }
+
+            if (!$query->exists()) {
+                break;
+            }
+
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
 
     protected $casts = [
         'start_date' => 'datetime',
