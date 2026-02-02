@@ -139,14 +139,19 @@ class FixNullAccountNumbers extends Command
     {
         // Try to get website from webhook_url
         if ($payment->webhook_url) {
-            $websiteUrl = $payment->webhook_url;
-            $website = $business->websites()
-                ->where('website_url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')
-                ->where('is_approved', true)
-                ->first();
-            
-            if ($website) {
-                return $website;
+            $webhookHost = parse_url($payment->webhook_url, PHP_URL_HOST);
+            if ($webhookHost) {
+                $website = $business->websites()
+                    ->where(function($q) use ($webhookHost) {
+                        $q->where('website_url', 'like', '%' . $webhookHost . '%')
+                          ->orWhere('webhook_url', 'like', '%' . $webhookHost . '%');
+                    })
+                    ->where('is_approved', true)
+                    ->first();
+                
+                if ($website) {
+                    return $website;
+                }
             }
         }
         
@@ -155,13 +160,19 @@ class FixNullAccountNumbers extends Command
         $url = $emailData['return_url'] ?? $emailData['website_url'] ?? null;
         
         if ($url) {
-            $website = $business->websites()
-                ->where('website_url', 'like', '%' . parse_url($url, PHP_URL_HOST) . '%')
-                ->where('is_approved', true)
-                ->first();
-            
-            if ($website) {
-                return $website;
+            $urlHost = parse_url($url, PHP_URL_HOST);
+            if ($urlHost) {
+                $website = $business->websites()
+                    ->where(function($q) use ($urlHost) {
+                        $q->where('website_url', 'like', '%' . $urlHost . '%')
+                          ->orWhere('webhook_url', 'like', '%' . $urlHost . '%');
+                    })
+                    ->where('is_approved', true)
+                    ->first();
+                
+                if ($website) {
+                    return $website;
+                }
             }
         }
         
