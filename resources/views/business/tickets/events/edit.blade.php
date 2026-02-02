@@ -47,13 +47,14 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Start Date & Time *</label>
-                    <input type="datetime-local" name="start_date" required value="{{ old('start_date', $event->start_date->format('Y-m-d\TH:i')) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <input type="datetime-local" name="start_date" id="start_date" required value="{{ old('start_date', $event->start_date->format('Y-m-d\TH:i')) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
                     @error('start_date')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">End Date & Time *</label>
-                    <input type="datetime-local" name="end_date" required value="{{ old('end_date', $event->end_date->format('Y-m-d\TH:i')) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <input type="datetime-local" name="end_date" id="end_date" required value="{{ old('end_date', $event->end_date->format('Y-m-d\TH:i')) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
                     @error('end_date')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                    <p id="end_date_error" class="text-red-500 text-xs mt-1 hidden">End date must be after start date</p>
                 </div>
             </div>
 
@@ -110,4 +111,70 @@
         </div>
     </form>
 </div>
+
+<script>
+// Date validation: Ensure end date is after start date
+(function() {
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+    const endDateError = document.getElementById('end_date_error');
+    const form = startDateInput.closest('form');
+
+    function updateEndDateMin() {
+        const startDate = startDateInput.value;
+        if (startDate) {
+            endDateInput.min = startDate;
+            
+            // If end date is set and is before start date, clear it and show error
+            if (endDateInput.value && endDateInput.value < startDate) {
+                endDateInput.value = '';
+                endDateInput.classList.add('border-red-500');
+                endDateError.classList.remove('hidden');
+            } else {
+                endDateInput.classList.remove('border-red-500');
+                endDateError.classList.add('hidden');
+            }
+        }
+    }
+
+    function validateEndDate() {
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+        
+        if (startDate && endDate && endDate < startDate) {
+            endDateInput.classList.add('border-red-500');
+            endDateError.classList.remove('hidden');
+            return false;
+        } else {
+            endDateInput.classList.remove('border-red-500');
+            endDateError.classList.add('hidden');
+            return true;
+        }
+    }
+
+    // Update min when start date changes
+    startDateInput.addEventListener('change', function() {
+        updateEndDateMin();
+    });
+
+    // Validate when end date changes
+    endDateInput.addEventListener('change', function() {
+        validateEndDate();
+    });
+
+    // Validate on form submit
+    form.addEventListener('submit', function(e) {
+        if (!validateEndDate()) {
+            e.preventDefault();
+            endDateInput.focus();
+            return false;
+        }
+    });
+
+    // Set initial min value if start date is already set
+    if (startDateInput.value) {
+        updateEndDateMin();
+    }
+})();
+</script>
 @endsection
