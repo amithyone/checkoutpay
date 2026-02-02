@@ -128,27 +128,44 @@ class TicketService
 
                 // Link payment to order
                 $order->update(['payment_id' => $payment->id]);
+                
+                // Create ticket records (but don't generate QR codes until payment is confirmed)
+                foreach ($ticketItems as $item) {
+                    for ($i = 0; $i < $item['quantity']; $i++) {
+                        Ticket::create([
+                            'ticket_order_id' => $order->id,
+                            'ticket_type_id' => $item['ticket_type']->id,
+                            'status' => Ticket::STATUS_VALID,
+                        ]);
+                    }
+
+                    // Update ticket type sold count
+                    $item['ticket_type']->increment('quantity_sold', $item['quantity']);
+                }
             } else {
-                // Free tickets - auto-confirm
+                // Free tickets - auto-confirm and generate QR codes immediately
                 $order->update([
                     'payment_status' => TicketOrder::PAYMENT_STATUS_PAID,
                     'status' => TicketOrder::STATUS_CONFIRMED,
                     'purchased_at' => now(),
                 ]);
-            }
+                
+                // Create ticket records and generate QR codes immediately for free tickets
+                foreach ($ticketItems as $item) {
+                    for ($i = 0; $i < $item['quantity']; $i++) {
+                        $ticket = Ticket::create([
+                            'ticket_order_id' => $order->id,
+                            'ticket_type_id' => $item['ticket_type']->id,
+                            'status' => Ticket::STATUS_VALID,
+                        ]);
+                        
+                        // Generate QR code immediately for free tickets
+                        $this->qrCodeService->generateForTicket($ticket);
+                    }
 
-            // Create ticket records (but don't generate QR codes until payment is confirmed)
-            foreach ($ticketItems as $item) {
-                for ($i = 0; $i < $item['quantity']; $i++) {
-                    Ticket::create([
-                        'ticket_order_id' => $order->id,
-                        'ticket_type_id' => $item['ticket_type']->id,
-                        'status' => Ticket::STATUS_VALID,
-                    ]);
+                    // Update ticket type sold count
+                    $item['ticket_type']->increment('quantity_sold', $item['quantity']);
                 }
-
-                // Update ticket type sold count
-                $item['ticket_type']->increment('quantity_sold', $item['quantity']);
             }
 
             return $order->fresh();
