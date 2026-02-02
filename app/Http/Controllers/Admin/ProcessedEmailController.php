@@ -597,7 +597,20 @@ class ProcessedEmailController extends Controller
                 // Mark email as matched
                 $processedEmail->markAsMatched($matchedPayment);
                 
-                // Approve payment
+                // Get match result details (including received_amount for mismatches)
+                $matchResult = $matchedPayment->getAttribute('_match_result');
+                $isMismatch = $matchResult['is_mismatch'] ?? false;
+                $receivedAmount = $matchResult['received_amount'] ?? null;
+                $mismatchReason = $matchResult['mismatch_reason'] ?? null;
+                
+                // If edited amount differs from payment amount, use edited amount as received_amount
+                if (!$receivedAmount && abs($amount - $matchedPayment->amount) > 0.01) {
+                    $receivedAmount = $amount;
+                    $isMismatch = true;
+                    $mismatchReason = 'Amount manually edited. Expected: ₦' . number_format($matchedPayment->amount, 2) . ', Received: ₦' . number_format($amount, 2);
+                }
+                
+                // Approve payment with mismatch info if applicable
                 $matchedPayment->approve([
                     'subject' => $processedEmail->subject,
                     'from' => $processedEmail->from_email,
@@ -605,11 +618,14 @@ class ProcessedEmailController extends Controller
                     'html' => $processedEmail->html_body,
                     'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                     'sender_name' => $processedEmail->sender_name, // Map sender_name to payer_name
-                ]);
+                    'amount' => $amount, // Use edited amount
+                    'received_amount' => $receivedAmount ?? $amount, // Include received amount
+                ], $isMismatch, $receivedAmount ?? $amount, $mismatchReason);
                 
-                // Update business balance
+                // Update business balance - use received amount if mismatch, otherwise edited amount
                 if ($matchedPayment->business_id) {
-                    $matchedPayment->business->incrementBalanceWithCharges($matchedPayment->amount, $matchedPayment);
+                    $balanceAmount = $receivedAmount ?? $amount;
+                    $matchedPayment->business->incrementBalanceWithCharges($matchedPayment->amount, $matchedPayment, $balanceAmount);
                     $matchedPayment->business->refresh(); // Refresh to get updated balance
                     
                     // Check for auto-withdrawal
