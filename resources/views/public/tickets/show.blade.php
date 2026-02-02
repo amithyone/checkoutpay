@@ -201,13 +201,17 @@
     </div>
 
     <script>
-        const ticketTypes = @json($event->ticketTypes->map(fn($t) => ['id' => $t->id, 'price' => $t->price]));
-        const coupons = @json($event->activeCoupons->map(fn($c) => [
-            'id' => $c->id,
-            'code' => $c->code,
-            'discount_type' => $c->discount_type,
-            'discount_value' => $c->discount_value
-        ]));
+        const ticketTypes = @json($event->ticketTypes->map(function($t) {
+            return ['id' => $t->id, 'price' => $t->price];
+        }));
+        const coupons = @json($event->activeCoupons->map(function($c) {
+            return [
+                'id' => $c->id,
+                'code' => $c->code,
+                'discount_type' => $c->discount_type,
+                'discount_value' => $c->discount_value
+            ];
+        }));
         let appliedCoupon = null;
         
         function formatCurrency(amount) {
