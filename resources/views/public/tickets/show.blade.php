@@ -525,13 +525,7 @@
                 }
             }
             
-            const subtotalEl = document.getElementById('subtotal-amount');
-            const discountEl = document.getElementById('discount-amount');
-            const totalEl = document.getElementById('total-amount');
-            const subtotalSection = document.getElementById('subtotal-section');
-            const discountSection = document.getElementById('discount-section');
-            
-            // Cart summary elements
+            // Cart summary elements only (order summary sidebar removed)
             const cartSubtotalEl = document.getElementById('cart-subtotal-amount');
             const cartDiscountEl = document.getElementById('cart-discount-amount');
             const cartTotalEl = document.getElementById('cart-total-amount');
@@ -539,12 +533,9 @@
             const cartDiscountSection = document.getElementById('cart-discount');
             
             if (subtotal > 0) {
-                if (subtotalSection) subtotalSection.classList.remove('hidden');
-                if (subtotalEl) subtotalEl.textContent = formatCurrency(subtotal);
                 if (cartSubtotalSection) cartSubtotalSection.classList.remove('hidden');
                 if (cartSubtotalEl) cartSubtotalEl.textContent = formatCurrency(subtotal);
             } else {
-                if (subtotalSection) subtotalSection.classList.add('hidden');
                 if (cartSubtotalSection) cartSubtotalSection.classList.add('hidden');
             }
             
@@ -557,35 +548,26 @@
                 }
                 
                 if (discount > 0) {
-                    if (discountSection) discountSection.classList.remove('hidden');
-                    if (discountEl) discountEl.textContent = '-' + formatCurrency(discount);
                     if (cartDiscountSection) cartDiscountSection.classList.remove('hidden');
                     if (cartDiscountEl) cartDiscountEl.textContent = '-' + formatCurrency(discount);
                 } else {
-                    if (discountSection) discountSection.classList.add('hidden');
                     if (cartDiscountSection) cartDiscountSection.classList.add('hidden');
                 }
             } else {
-                if (discountSection) discountSection.classList.add('hidden');
                 if (cartDiscountSection) cartDiscountSection.classList.add('hidden');
             }
             
             const total = Math.max(0, subtotal - discount);
-            if (totalEl) totalEl.textContent = formatCurrency(total);
             if (cartTotalEl) cartTotalEl.textContent = formatCurrency(total);
             
             // Update button text
-            const submitText = document.getElementById('submit-text');
             const cartSubmitText = document.getElementById('cart-submit-text');
             
             if (total === 0 && totalTickets > 0) {
-                if (submitText) submitText.textContent = 'Confirm Free Tickets →';
                 if (cartSubmitText) cartSubmitText.textContent = 'Confirm Free Tickets';
             } else if (totalTickets > 0) {
-                if (submitText) submitText.textContent = `Get ${totalTickets} Ticket${totalTickets > 1 ? 's' : ''} →`;
                 if (cartSubmitText) cartSubmitText.textContent = `Pay ${formatCurrency(total)}`;
             } else {
-                if (submitText) submitText.textContent = 'Get Tickets →';
                 if (cartSubmitText) cartSubmitText.textContent = 'Checkout';
             }
         }
