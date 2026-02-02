@@ -57,6 +57,9 @@ class TicketController extends Controller
      */
     public function purchase(PurchaseTicketRequest $request, Event $event)
     {
+        // Increase execution time for account assignment
+        set_time_limit(60);
+        
         // Verify event is published
         if (!$event->isPublished()) {
             return back()->with('error', 'Event is not available for ticket sales');
@@ -83,6 +86,12 @@ class TicketController extends Controller
         }
 
         try {
+            Log::info('Starting ticket purchase', [
+                'event_id' => $event->id,
+                'ticket_count' => count($ticketData),
+                'business_id' => $event->business_id,
+            ]);
+            
             // Create ticket order and payment
             $order = $this->ticketService->createOrder(
                 $event,
@@ -95,6 +104,13 @@ class TicketController extends Controller
                 $event->business,
                 $coupon
             );
+            
+            Log::info('Ticket order created', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'total_amount' => $order->total_amount,
+                'payment_id' => $order->payment_id,
+            ]);
 
             // Handle free tickets vs paid tickets
             if ($order->total_amount == 0) {

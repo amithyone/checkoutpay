@@ -111,20 +111,42 @@ class TicketService
             
             // Only create payment if total amount is greater than 0
             if ($totalAmount > 0) {
-                // Generate webhook URL for ticket payment confirmation
-                $webhookUrl = route('tickets.payment.webhook', ['orderNumber' => $order->order_number]);
-                $returnUrl = route('tickets.order', ['orderNumber' => $order->order_number]);
-                
-                // Create payment using existing PaymentService
-                $payment = $this->paymentService->createPayment([
-                    'amount' => $totalAmount,
-                    'payer_name' => $customerData['name'],
-                    'service' => 'ticket_sale',
-                    'transaction_id' => 'TKT-' . $order->order_number,
-                    'webhook_url' => $webhookUrl,
-                    'return_url' => $returnUrl,
-                    'business_website_id' => null,
-                ], $business);
+                try {
+                    // Generate webhook URL for ticket payment confirmation
+                    $webhookUrl = route('tickets.payment.webhook', ['orderNumber' => $order->order_number]);
+                    $returnUrl = route('tickets.order', ['orderNumber' => $order->order_number]);
+                    
+                    Log::info('Creating payment for ticket order', [
+                        'order_number' => $order->order_number,
+                        'amount' => $totalAmount,
+                        'business_id' => $business->id,
+                    ]);
+                    
+                    // Create payment using existing PaymentService
+                    $payment = $this->paymentService->createPayment([
+                        'amount' => $totalAmount,
+                        'payer_name' => $customerData['name'],
+                        'service' => 'ticket_sale',
+                        'transaction_id' => 'TKT-' . $order->order_number,
+                        'webhook_url' => $webhookUrl,
+                        'return_url' => $returnUrl,
+                        'business_website_id' => null,
+                    ], $business);
+                    
+                    Log::info('Payment created for ticket order', [
+                        'payment_id' => $payment->id,
+                        'transaction_id' => $payment->transaction_id,
+                        'account_number' => $payment->account_number,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to create payment for ticket order', [
+                        'order_id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                    throw new \Exception('Failed to create payment: ' . $e->getMessage());
+                }
 
                 // Link payment to order
                 $order->update(['payment_id' => $payment->id]);
