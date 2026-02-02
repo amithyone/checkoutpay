@@ -498,10 +498,6 @@
                 }
             });
             
-            if (orderItems && orderItems.children.length === 0) {
-                orderItems.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">Select tickets to see order summary</p>';
-            }
-            
             if (cartItems && cartItems.children.length === 0) {
                 cartItems.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No tickets selected</p>';
             }
