@@ -46,6 +46,59 @@
         .quantity-btn:active {
             transform: scale(0.95);
         }
+        .floating-cart {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        .floating-cart.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(20px);
+        }
+        .cart-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .cart-summary {
+            position: absolute;
+            bottom: 70px;
+            right: 0;
+            width: 320px;
+            max-width: calc(100vw - 40px);
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+        .cart-summary.show {
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .floating-cart {
+                bottom: 15px;
+                right: 15px;
+            }
+            .cart-summary {
+                width: calc(100vw - 30px);
+                right: -15px;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -330,6 +383,47 @@
         </div>
     </div>
 
+    <!-- Floating Cart Button -->
+    <div id="floating-cart" class="floating-cart hidden">
+        <button type="button" 
+                onclick="toggleCartSummary()" 
+                class="bg-gradient-primary text-white w-16 h-16 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center relative">
+            <i class="fas fa-shopping-cart text-xl"></i>
+            <span id="cart-badge" class="cart-badge">0</span>
+        </button>
+        <div id="cart-summary" class="cart-summary">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-white font-bold">Order Summary</h3>
+                <button type="button" onclick="toggleCartSummary()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="cart-items" class="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                <p class="text-gray-400 text-sm text-center py-4">No tickets selected</p>
+            </div>
+            <div class="border-t border-gray-700 pt-3 space-y-2">
+                <div id="cart-subtotal" class="flex justify-between text-sm text-gray-300 hidden">
+                    <span>Subtotal:</span>
+                    <span id="cart-subtotal-amount">₦0.00</span>
+                </div>
+                <div id="cart-discount" class="flex justify-between text-sm text-green-400 hidden">
+                    <span>Discount:</span>
+                    <span id="cart-discount-amount">-₦0.00</span>
+                </div>
+                <div class="flex justify-between text-lg font-bold border-t border-gray-700 pt-2">
+                    <span class="text-white">Total:</span>
+                    <span id="cart-total-amount" class="text-teal-400">₦0.00</span>
+                </div>
+            </div>
+            <button type="submit" 
+                    form="ticket-form"
+                    onclick="return validateForm()"
+                    class="w-full mt-4 bg-gradient-primary text-white py-3 rounded-lg font-semibold hover:opacity-90 active:opacity-80 transition">
+                <span id="cart-submit-text">Checkout</span>
+            </button>
+        </div>
+    </div>
+
     <script>
         const ticketTypes = @json($ticketTypesData);
         const coupons = @json($couponsData);
@@ -360,12 +454,16 @@
         
         function calculateTotal() {
             let subtotal = 0;
+            let totalTickets = 0;
             const orderItems = document.getElementById('order-items');
+            const cartItems = document.getElementById('cart-items');
             orderItems.innerHTML = '';
+            cartItems.innerHTML = '';
             
             document.querySelectorAll('input[name^="tickets"][name$="[quantity]"]').forEach(input => {
                 const quantity = parseInt(input.value) || 0;
                 if (quantity > 0) {
+                    totalTickets += quantity;
                     const ticketContainer = input.closest('.ticket-card');
                     if (ticketContainer) {
                         const ticketTypeIdInput = ticketContainer.querySelector('input[type="hidden"][name*="[ticket_type_id]"]');
@@ -376,7 +474,7 @@
                                 const itemTotal = quantity * ticketType.price;
                                 subtotal += itemTotal;
                                 
-                                // Add to order summary
+                                // Add to order summary sidebar
                                 const itemDiv = document.createElement('div');
                                 itemDiv.className = 'flex justify-between items-center text-sm';
                                 itemDiv.innerHTML = `
@@ -384,6 +482,15 @@
                                     <span class="text-white font-semibold">${formatCurrency(itemTotal)}</span>
                                 `;
                                 orderItems.appendChild(itemDiv);
+                                
+                                // Add to floating cart summary
+                                const cartItemDiv = document.createElement('div');
+                                cartItemDiv.className = 'flex justify-between items-center text-sm';
+                                cartItemDiv.innerHTML = `
+                                    <span class="text-gray-300">${ticketType.name || 'Ticket'} x ${quantity}</span>
+                                    <span class="text-white font-semibold">${formatCurrency(itemTotal)}</span>
+                                `;
+                                cartItems.appendChild(cartItemDiv);
                             }
                         }
                     }
@@ -394,17 +501,42 @@
                 orderItems.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">Select tickets to see order summary</p>';
             }
             
+            if (cartItems.children.length === 0) {
+                cartItems.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No tickets selected</p>';
+            }
+            
+            // Update floating cart badge
+            const floatingCart = document.getElementById('floating-cart');
+            const cartBadge = document.getElementById('cart-badge');
+            if (totalTickets > 0) {
+                floatingCart.classList.remove('hidden');
+                cartBadge.textContent = totalTickets;
+            } else {
+                floatingCart.classList.add('hidden');
+                cartBadge.textContent = '0';
+            }
+            
             const subtotalEl = document.getElementById('subtotal-amount');
             const discountEl = document.getElementById('discount-amount');
             const totalEl = document.getElementById('total-amount');
             const subtotalSection = document.getElementById('subtotal-section');
             const discountSection = document.getElementById('discount-section');
             
+            // Cart summary elements
+            const cartSubtotalEl = document.getElementById('cart-subtotal-amount');
+            const cartDiscountEl = document.getElementById('cart-discount-amount');
+            const cartTotalEl = document.getElementById('cart-total-amount');
+            const cartSubtotalSection = document.getElementById('cart-subtotal');
+            const cartDiscountSection = document.getElementById('cart-discount');
+            
             if (subtotal > 0) {
                 subtotalSection.classList.remove('hidden');
                 subtotalEl.textContent = formatCurrency(subtotal);
+                cartSubtotalSection.classList.remove('hidden');
+                cartSubtotalEl.textContent = formatCurrency(subtotal);
             } else {
                 subtotalSection.classList.add('hidden');
+                cartSubtotalSection.classList.add('hidden');
             }
             
             let discount = 0;
@@ -418,29 +550,50 @@
                 if (discount > 0) {
                     discountSection.classList.remove('hidden');
                     discountEl.textContent = '-' + formatCurrency(discount);
+                    cartDiscountSection.classList.remove('hidden');
+                    cartDiscountEl.textContent = '-' + formatCurrency(discount);
                 } else {
                     discountSection.classList.add('hidden');
+                    cartDiscountSection.classList.add('hidden');
                 }
             } else {
                 discountSection.classList.add('hidden');
+                cartDiscountSection.classList.add('hidden');
             }
             
             const total = Math.max(0, subtotal - discount);
             totalEl.textContent = formatCurrency(total);
+            cartTotalEl.textContent = formatCurrency(total);
             
             // Update button text
             const submitText = document.getElementById('submit-text');
-            const totalTickets = Array.from(document.querySelectorAll('input[name^="tickets"][name$="[quantity]"]'))
-                .reduce((sum, input) => sum + (parseInt(input.value) || 0), 0);
+            const cartSubmitText = document.getElementById('cart-submit-text');
             
             if (total === 0 && totalTickets > 0) {
                 submitText.textContent = 'Confirm Free Tickets →';
+                cartSubmitText.textContent = 'Confirm Free Tickets';
             } else if (totalTickets > 0) {
                 submitText.textContent = `Get ${totalTickets} Ticket${totalTickets > 1 ? 's' : ''} →`;
+                cartSubmitText.textContent = `Pay ${formatCurrency(total)}`;
             } else {
                 submitText.textContent = 'Get Tickets →';
+                cartSubmitText.textContent = 'Checkout';
             }
         }
+        
+        function toggleCartSummary() {
+            const cartSummary = document.getElementById('cart-summary');
+            cartSummary.classList.toggle('show');
+        }
+        
+        // Close cart summary when clicking outside
+        document.addEventListener('click', function(event) {
+            const floatingCart = document.getElementById('floating-cart');
+            const cartSummary = document.getElementById('cart-summary');
+            if (!floatingCart.contains(event.target) && cartSummary.classList.contains('show')) {
+                cartSummary.classList.remove('show');
+            }
+        });
         
         function applyCoupon() {
             const codeInput = document.getElementById('coupon-code');
