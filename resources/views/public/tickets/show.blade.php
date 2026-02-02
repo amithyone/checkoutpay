@@ -544,5 +544,7 @@
         // Calculate total on page load
         calculateTotal();
     </script>
+    
+    @include('partials.footer')
 </body>
 </html>
