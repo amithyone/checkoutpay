@@ -509,11 +509,19 @@
             const floatingCart = document.getElementById('floating-cart');
             const cartBadge = document.getElementById('cart-badge');
             if (totalTickets > 0) {
-                floatingCart.classList.remove('hidden');
-                cartBadge.textContent = totalTickets;
+                if (floatingCart) {
+                    floatingCart.style.display = 'block';
+                }
+                if (cartBadge) {
+                    cartBadge.textContent = totalTickets;
+                }
             } else {
-                floatingCart.classList.add('hidden');
-                cartBadge.textContent = '0';
+                if (floatingCart) {
+                    floatingCart.style.display = 'none';
+                }
+                if (cartBadge) {
+                    cartBadge.textContent = '0';
+                }
             }
             
             const subtotalEl = document.getElementById('subtotal-amount');
