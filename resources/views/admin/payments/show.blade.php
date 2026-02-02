@@ -455,26 +455,39 @@
                 <div class="space-y-2">
                     <p class="text-xs font-medium text-gray-700">Webhook URLs:</p>
                     @foreach($payment->webhook_urls_sent as $webhook)
-                        <div class="bg-gray-50 rounded p-2 text-xs">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="font-mono text-gray-700 break-all">{{ Str::limit($webhook['url'], 60) }}</span>
-                                @if($webhook['status'] === 'success')
-                                    <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs ml-2">
-                                        <i class="fas fa-check"></i> Sent
-                                    </span>
-                                @else
-                                    <span class="px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs ml-2">
-                                        <i class="fas fa-times"></i> Failed
-                                    </span>
+                        @php
+                            // Handle both formats: array of strings or array of associative arrays
+                            $webhookUrl = is_array($webhook) && isset($webhook['url']) ? $webhook['url'] : (is_string($webhook) ? $webhook : '');
+                            $webhookStatus = is_array($webhook) && isset($webhook['status']) ? $webhook['status'] : 'success';
+                            $webhookType = is_array($webhook) && isset($webhook['type']) ? $webhook['type'] : null;
+                            $webhookError = is_array($webhook) && isset($webhook['error']) ? $webhook['error'] : null;
+                        @endphp
+                        @if($webhookUrl)
+                            <div class="bg-gray-50 rounded p-2 text-xs">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="font-mono text-gray-700 break-all">{{ Str::limit($webhookUrl, 60) }}</span>
+                                    @if($webhookStatus === 'success')
+                                        <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs ml-2">
+                                            <i class="fas fa-check"></i> Sent
+                                        </span>
+                                    @else
+                                        <span class="px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs ml-2">
+                                            <i class="fas fa-times"></i> Failed
+                                        </span>
+                                    @endif
+                                </div>
+                                @if($webhookType || $webhookError)
+                                    <p class="text-xs text-gray-500">
+                                        @if($webhookType)
+                                            Type: {{ ucfirst(str_replace('_', ' ', $webhookType)) }}
+                                        @endif
+                                        @if($webhookError)
+                                            @if($webhookType) • @endif Error: {{ Str::limit($webhookError, 50) }}
+                                        @endif
+                                    </p>
                                 @endif
                             </div>
-                            <p class="text-xs text-gray-500">
-                                Type: {{ ucfirst(str_replace('_', ' ', $webhook['type'])) }}
-                                @if(isset($webhook['error']))
-                                    • Error: {{ Str::limit($webhook['error'], 50) }}
-                                @endif
-                            </p>
-                        </div>
+                        @endif
                     @endforeach
                 </div>
             @endif
