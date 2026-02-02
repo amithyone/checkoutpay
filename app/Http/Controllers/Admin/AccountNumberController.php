@@ -204,7 +204,7 @@ class AccountNumberController extends Controller
     }
 
     /**
-     * Validate account number
+     * Validate account number using NUBAN API
      */
     public function validateAccount(Request $request)
     {
@@ -216,33 +216,32 @@ class AccountNumberController extends Controller
         try {
             $nubanService = app(\App\Services\NubanValidationService::class);
             
-            if ($validated['bank_code']) {
-                $result = $nubanService->validateAccountNumberWithBankCode(
-                    $validated['account_number'],
-                    $validated['bank_code']
-                );
-            } else {
-                $result = $nubanService->validateAccountNumber($validated['account_number']);
-            }
+            // Use the comprehensive validation method that tries multiple approaches
+            $result = $nubanService->validateAccountNumberComprehensive(
+                $validated['account_number'],
+                $validated['bank_code'] ?? null
+            );
 
-            if ($result && isset($result['account_name'])) {
+            if ($result && isset($result['account_name']) && !empty($result['account_name'])) {
                 return response()->json([
                     'success' => true,
                     'valid' => true,
                     'account_name' => $result['account_name'],
                     'bank_name' => $result['bank_name'] ?? null,
+                    'bank_code' => $result['bank_code'] ?? null,
                 ]);
             }
 
             return response()->json([
                 'success' => false,
                 'valid' => false,
-                'message' => 'Could not validate account number. Please verify and try again.',
+                'message' => 'Could not validate account number. Please verify the account number and bank are correct.',
             ]);
         } catch (\Exception $e) {
             Log::error('Error validating account number', [
                 'error' => $e->getMessage(),
                 'account_number' => $validated['account_number'],
+                'bank_code' => $validated['bank_code'] ?? null,
             ]);
 
             return response()->json([

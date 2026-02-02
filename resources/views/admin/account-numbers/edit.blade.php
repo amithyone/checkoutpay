@@ -266,30 +266,45 @@
             validationDiv.classList.add('hidden');
             validationDiv.textContent = '';
 
-            // Only validate if account number changed and is exactly 10 digits
+            // Validate if account number changed and is exactly 10 digits
             if (accountNumber !== originalAccountNumber && accountNumber.length === 10) {
                 const bankCode = bankCodeSelect ? bankCodeSelect.value : '';
-                if (!bankCode) {
-                    validationDiv.classList.remove('hidden');
-                    validationDiv.textContent = 'Please select a bank first';
-                    validationDiv.className = 'mt-1 text-sm text-yellow-600';
-                    return;
-                }
-
+                
                 validationDiv.classList.remove('hidden');
                 validationDiv.textContent = 'Validating account number...';
                 validationDiv.className = 'mt-1 text-sm text-blue-600';
 
-                // Debounce validation
+                // Debounce validation (try with or without bank code)
                 validationTimeout = setTimeout(() => {
                     validateAccountNumber(accountNumber, bankCode);
                 }, 500);
-            } else if (accountNumber !== originalAccountNumber && accountNumber.length > 0) {
+            } else if (accountNumber !== originalAccountNumber && accountNumber.length > 0 && accountNumber.length < 10) {
                 validationDiv.classList.remove('hidden');
                 validationDiv.textContent = 'Account number must be 10 digits';
                 validationDiv.className = 'mt-1 text-sm text-yellow-600';
             }
         });
+        
+        // Also validate when bank is selected/changed
+        if (bankCodeSelect) {
+            bankCodeSelect.addEventListener('change', function() {
+                const accountNumber = accountNumberInput.value.replace(/\D/g, '');
+                if (accountNumber.length === 10 && accountNumber !== originalAccountNumber) {
+                    // Clear previous timeout
+                    if (validationTimeout) {
+                        clearTimeout(validationTimeout);
+                    }
+                    
+                    validationDiv.classList.remove('hidden');
+                    validationDiv.textContent = 'Validating account number...';
+                    validationDiv.className = 'mt-1 text-sm text-blue-600';
+                    
+                    validationTimeout = setTimeout(() => {
+                        validateAccountNumber(accountNumber, bankCodeSelect.value);
+                    }, 500);
+                }
+            });
+        }
 
         function validateAccountNumber(accountNumber, bankCode) {
             fetch('{{ route("admin.account-numbers.validate-account") }}', {
@@ -309,14 +324,40 @@
                     validationDiv.textContent = '✓ Account number validated';
                     validationDiv.className = 'mt-1 text-sm text-green-600';
                     
-                    // Auto-fill account name if empty or user wants to update
+                    // Always auto-fill account name from API
                     if (accountNameInput && data.account_name) {
                         accountNameInput.value = data.account_name;
+                        accountNameInput.classList.add('bg-green-50');
+                        setTimeout(() => {
+                            accountNameInput.classList.remove('bg-green-50');
+                        }, 2000);
                     }
                     
-                    // Auto-fill bank name if empty or user wants to update
-                    if (bankNameInput && data.bank_name) {
+                    // Auto-fill bank name if returned from API
+                    if (data.bank_name && bankNameInput) {
                         bankNameInput.value = data.bank_name;
+                        const bankSearchInput = document.getElementById('bank_search');
+                        if (bankSearchInput) {
+                            bankSearchInput.value = data.bank_name;
+                        }
+                        
+                        // Try to find and select matching bank code
+                        if (bankCodeSelect) {
+                            const options = bankCodeSelect.options;
+                            for (let i = 0; i < options.length; i++) {
+                                const optionBankName = options[i].getAttribute('data-bank-name') || options[i].textContent.trim();
+                                if (optionBankName.toLowerCase() === data.bank_name.toLowerCase()) {
+                                    bankCodeSelect.value = options[i].value;
+                                    bankCodeSelect.dispatchEvent(new Event('change'));
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        bankNameInput.classList.add('bg-green-50');
+                        setTimeout(() => {
+                            bankNameInput.classList.remove('bg-green-50');
+                        }, 2000);
                     }
                 } else {
                     validationDiv.textContent = data.message || 'Invalid account number. Please verify and try again.';
