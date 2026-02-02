@@ -228,8 +228,22 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </span>
                                 @endif
                                 @if($payment->webhook_urls_sent)
+                                    @php
+                                        // Handle both formats: array of strings (URLs) or array of associative arrays
+                                        $webhookUrls = $payment->webhook_urls_sent ?? [];
+                                        $sentCount = 0;
+                                        foreach ($webhookUrls as $w) {
+                                            // If it's a string (URL), count as sent (new format stores only sent URLs)
+                                            // If it's an array, check the status
+                                            if (is_string($w)) {
+                                                $sentCount++;
+                                            } elseif (is_array($w) && isset($w['status']) && $w['status'] === 'success') {
+                                                $sentCount++;
+                                            }
+                                        }
+                                    @endphp
                                     <div class="text-xs text-gray-400 mt-1">
-                                        {{ count(array_filter($payment->webhook_urls_sent, fn($w) => $w['status'] === 'success')) }}/{{ count($payment->webhook_urls_sent) }} sent
+                                        {{ $sentCount }}/{{ count($webhookUrls) }} sent
                                     </div>
                                 @endif
                             @else
