@@ -126,6 +126,18 @@
             </button>
         </div>
 
+        <!-- Speakers/Artists -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-xl font-bold mb-4">Speakers/Artists (Optional)</h2>
+            <p class="text-sm text-gray-600 mb-4">Add up to 10 speakers or artists for this event</p>
+            <div id="speakers-container" class="space-y-4">
+                <!-- Speakers will be added here dynamically -->
+            </div>
+            <button type="button" onclick="addSpeaker()" class="mt-4 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300" id="add-speaker-btn">
+                <i class="fas fa-plus mr-2"></i> Add Speaker/Artist
+            </button>
+        </div>
+
         <!-- Settings -->
         <div class="bg-white rounded-xl shadow-sm p-6">
             <h2 class="text-xl font-bold mb-4">Settings</h2>
@@ -152,6 +164,69 @@
 
     <script>
 let ticketTypeIndex = 1;
+let speakerIndex = 0;
+const MAX_SPEAKERS = 10;
+
+function addSpeaker() {
+    if (speakerIndex >= MAX_SPEAKERS) {
+        alert('Maximum of ' + MAX_SPEAKERS + ' speakers allowed');
+        return;
+    }
+    
+    const container = document.getElementById('speakers-container');
+    const speakerDiv = document.createElement('div');
+    speakerDiv.className = 'border border-gray-200 rounded-lg p-4 speaker-item';
+    speakerDiv.innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold">Speaker/Artist ${speakerIndex + 1}</h3>
+            <button type="button" onclick="removeSpeaker(this)" class="text-red-600 hover:text-red-800">
+                <i class="fas fa-times"></i> Remove
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input type="text" name="speakers[${speakerIndex}][name]" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Speaker/Artist name">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Topic/Performance</label>
+                <input type="text" name="speakers[${speakerIndex}][topic]" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="What they'll speak about or perform">
+            </div>
+        </div>
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Photo</label>
+            <input type="file" name="speakers[${speakerIndex}][photo]" accept="image/*" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            <p class="text-xs text-gray-500 mt-1">Recommended: Square image, max 2MB</p>
+        </div>
+        <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Bio/Description (Optional)</label>
+            <textarea name="speakers[${speakerIndex}][bio]" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Brief bio or description"></textarea>
+        </div>
+    `;
+    container.appendChild(speakerDiv);
+    speakerIndex++;
+    
+    // Hide add button if max reached
+    if (speakerIndex >= MAX_SPEAKERS) {
+        document.getElementById('add-speaker-btn').style.display = 'none';
+    }
+}
+
+function removeSpeaker(button) {
+    button.closest('.speaker-item').remove();
+    speakerIndex--;
+    
+    // Show add button if under max
+    if (speakerIndex < MAX_SPEAKERS) {
+        document.getElementById('add-speaker-btn').style.display = 'block';
+    }
+    
+    // Renumber speakers
+    const speakers = document.querySelectorAll('.speaker-item');
+    speakers.forEach((speaker, index) => {
+        speaker.querySelector('h3').textContent = `Speaker/Artist ${index + 1}`;
+    });
+}
 
 // Toggle address field based on event type
 function toggleAddressField() {

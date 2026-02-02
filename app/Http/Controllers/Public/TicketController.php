@@ -33,7 +33,7 @@ class TicketController extends Controller
 
         $event->load(['ticketTypes' => function ($query) {
             $query->available()->orderBy('price');
-        }, 'activeCoupons']);
+        }, 'activeCoupons', 'speakers']);
 
         return view('public.tickets.show', compact('event'));
     }

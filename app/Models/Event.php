@@ -165,6 +165,14 @@ class Event extends Model
     }
 
     /**
+     * Get speakers/artists for this event
+     */
+    public function speakers()
+    {
+        return $this->hasMany(EventSpeaker::class)->orderBy('display_order');
+    }
+
+    /**
      * Get public event URL
      */
     public function getPublicUrlAttribute(): string

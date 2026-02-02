@@ -247,6 +247,30 @@
         @endif
     </div>
 
+    <!-- Speakers/Artists -->
+    @if($event->speakers->count() > 0)
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="text-xl font-bold mb-4">Speakers/Artists</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            @foreach($event->speakers as $speaker)
+                <div class="text-center border border-gray-200 rounded-lg p-4">
+                    @if($speaker->photo)
+                        <img src="{{ asset('storage/' . $speaker->photo) }}" alt="{{ $speaker->name }}" class="w-20 h-20 rounded-full object-cover mx-auto mb-2 border-2 border-gray-200">
+                    @else
+                        <div class="w-20 h-20 rounded-full bg-gray-200 mx-auto mb-2 flex items-center justify-center">
+                            <i class="fas fa-user text-gray-400 text-2xl"></i>
+                        </div>
+                    @endif
+                    <h3 class="font-semibold text-sm mb-1">{{ $speaker->name }}</h3>
+                    @if($speaker->topic)
+                        <p class="text-xs text-gray-600">{{ $speaker->topic }}</p>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     <!-- Coupon Codes -->
     <div class="bg-white rounded-xl shadow-sm p-6">
         <div class="flex justify-between items-center mb-4">

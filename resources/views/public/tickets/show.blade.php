@@ -53,6 +53,39 @@
                 </div>
             </div>
 
+            <!-- Speakers/Artists Section -->
+            @if($event->speakers->count() > 0)
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">
+                        @if(($event->event_type ?? 'offline') === 'online')
+                            Speakers
+                        @else
+                            Speakers/Artists
+                        @endif
+                    </h2>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                        @foreach($event->speakers as $speaker)
+                            <div class="text-center">
+                                @if($speaker->photo)
+                                    <img src="{{ asset('storage/' . $speaker->photo) }}" alt="{{ $speaker->name }}" class="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-gray-200">
+                                @else
+                                    <div class="w-24 h-24 rounded-full bg-gray-200 mx-auto mb-3 flex items-center justify-center">
+                                        <i class="fas fa-user text-gray-400 text-3xl"></i>
+                                    </div>
+                                @endif
+                                <h3 class="font-semibold text-gray-900 mb-1">{{ $speaker->name }}</h3>
+                                @if($speaker->topic)
+                                    <p class="text-sm text-gray-600 mb-2">{{ $speaker->topic }}</p>
+                                @endif
+                                @if($speaker->bio)
+                                    <p class="text-xs text-gray-500">{{ Str::limit($speaker->bio, 60) }}</p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <!-- Ticket Selection Form -->
             <form action="{{ route('tickets.purchase', $event) }}" method="POST" class="bg-white rounded-xl shadow-lg p-6">
                 @csrf

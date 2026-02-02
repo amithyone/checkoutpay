@@ -43,6 +43,11 @@ class StoreEventRequest extends FormRequest
             'ticket_types.*.quantity_available' => 'required|integer|min:1',
             'ticket_types.*.sales_start_date' => 'nullable|date',
             'ticket_types.*.sales_end_date' => 'nullable|date|after:ticket_types.*.sales_start_date',
+            'speakers' => 'nullable|array|max:10',
+            'speakers.*.name' => 'required|string|max:255',
+            'speakers.*.topic' => 'nullable|string|max:255',
+            'speakers.*.bio' => 'nullable|string|max:1000',
+            'speakers.*.photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ];
 
         // Address is required for offline events

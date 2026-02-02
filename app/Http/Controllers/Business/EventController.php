@@ -86,6 +86,30 @@ class EventController extends Controller
                 ]);
             }
 
+            // Create speakers/artists (max 10)
+            if ($request->has('speakers') && is_array($request->speakers)) {
+                $speakers = array_slice($request->speakers, 0, 10); // Limit to 10
+                foreach ($speakers as $index => $speakerData) {
+                    if (empty($speakerData['name'])) {
+                        continue; // Skip if name is empty
+                    }
+                    
+                    $photoPath = null;
+                    if (isset($speakerData['photo']) && $request->hasFile("speakers.{$index}.photo")) {
+                        $photoPath = $request->file("speakers.{$index}.photo")->store('events/speakers', 'public');
+                    }
+                    
+                    \App\Models\EventSpeaker::create([
+                        'event_id' => $event->id,
+                        'name' => $speakerData['name'],
+                        'topic' => $speakerData['topic'] ?? null,
+                        'bio' => $speakerData['bio'] ?? null,
+                        'photo' => $photoPath,
+                        'display_order' => $index,
+                    ]);
+                }
+            }
+
             DB::commit();
 
             return redirect()->route('business.tickets.events.show', $event)
@@ -145,7 +169,7 @@ class EventController extends Controller
             abort(403);
         }
 
-        $event->load('ticketTypes');
+        $event->load(['ticketTypes', 'speakers']);
 
         return view('business.tickets.events.edit', compact('event'));
     }
@@ -195,6 +219,41 @@ class EventController extends Controller
             }
 
             $event->update($validated);
+
+            // Handle speakers update
+            if ($request->has('speakers') && is_array($request->speakers)) {
+                // Delete existing speakers
+                $event->speakers()->delete();
+                
+                // Create new speakers (max 10)
+                $speakers = array_slice($request->speakers, 0, 10);
+                foreach ($speakers as $index => $speakerData) {
+                    if (empty($speakerData['name'])) {
+                        continue;
+                    }
+                    
+                    $photoPath = null;
+                    // Handle new photo upload
+                    if (isset($speakerData['photo']) && $request->hasFile("speakers.{$index}.photo")) {
+                        $photoPath = $request->file("speakers.{$index}.photo")->store('events/speakers', 'public');
+                    } elseif (isset($speakerData['existing_photo']) && !empty($speakerData['existing_photo'])) {
+                        // Keep existing photo
+                        $photoPath = $speakerData['existing_photo'];
+                    }
+                    
+                    \App\Models\EventSpeaker::create([
+                        'event_id' => $event->id,
+                        'name' => $speakerData['name'],
+                        'topic' => $speakerData['topic'] ?? null,
+                        'bio' => $speakerData['bio'] ?? null,
+                        'photo' => $photoPath,
+                        'display_order' => $index,
+                    ]);
+                }
+            } elseif ($request->has('remove_all_speakers')) {
+                // Delete all speakers if explicitly requested
+                $event->speakers()->delete();
+            }
 
             return redirect()->route('business.tickets.events.show', $event)
                 ->with('success', 'Event updated successfully!');
