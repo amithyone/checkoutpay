@@ -122,30 +122,25 @@ class SendWebhookNotification implements ShouldQueue
     }
 
     /**
-     * Get all webhook URLs for this payment
+     * Get webhook URLs for this payment
+     * Only sends to the website that generated the transaction, not all business websites
      */
     protected function getWebhookUrls(): array
     {
         $urls = [];
 
-        // Get webhook URL from payment (legacy support)
-        if ($this->payment->webhook_url) {
-            $urls[] = $this->payment->webhook_url;
+        // PRIORITY 1: Get webhook URL from the specific website that generated this payment
+        if ($this->payment->business_website_id) {
+            $website = $this->payment->website;
+            if ($website && $website->is_approved && $website->webhook_url) {
+                $urls[] = $website->webhook_url;
+            }
         }
 
-        // Get webhook URLs from all approved business websites
-        if ($this->payment->business) {
-            $business = $this->payment->business;
-            $business->load('websites');
-            
-            foreach ($business->websites as $website) {
-                if ($website->is_approved && $website->webhook_url) {
-                    // Avoid duplicates
-                    if (!in_array($website->webhook_url, $urls)) {
-                        $urls[] = $website->webhook_url;
-                    }
-                }
-            }
+        // PRIORITY 2: Fallback to webhook_url from payment (legacy support for old payments)
+        // Only use this if no website was found above
+        if (empty($urls) && $this->payment->webhook_url) {
+            $urls[] = $this->payment->webhook_url;
         }
 
         return array_unique($urls);
