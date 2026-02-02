@@ -457,8 +457,9 @@
             let totalTickets = 0;
             const orderItems = document.getElementById('order-items');
             const cartItems = document.getElementById('cart-items');
-            orderItems.innerHTML = '';
-            cartItems.innerHTML = '';
+            
+            if (orderItems) orderItems.innerHTML = '';
+            if (cartItems) cartItems.innerHTML = '';
             
             document.querySelectorAll('input[name^="tickets"][name$="[quantity]"]').forEach(input => {
                 const quantity = parseInt(input.value) || 0;
@@ -497,11 +498,11 @@
                 }
             });
             
-            if (orderItems.children.length === 0) {
+            if (orderItems && orderItems.children.length === 0) {
                 orderItems.innerHTML = '<p class="text-gray-400 text-sm text-center py-8">Select tickets to see order summary</p>';
             }
             
-            if (cartItems.children.length === 0) {
+            if (cartItems && cartItems.children.length === 0) {
                 cartItems.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No tickets selected</p>';
             }
             
@@ -538,13 +539,13 @@
             const cartDiscountSection = document.getElementById('cart-discount');
             
             if (subtotal > 0) {
-                subtotalSection.classList.remove('hidden');
-                subtotalEl.textContent = formatCurrency(subtotal);
-                cartSubtotalSection.classList.remove('hidden');
-                cartSubtotalEl.textContent = formatCurrency(subtotal);
+                if (subtotalSection) subtotalSection.classList.remove('hidden');
+                if (subtotalEl) subtotalEl.textContent = formatCurrency(subtotal);
+                if (cartSubtotalSection) cartSubtotalSection.classList.remove('hidden');
+                if (cartSubtotalEl) cartSubtotalEl.textContent = formatCurrency(subtotal);
             } else {
-                subtotalSection.classList.add('hidden');
-                cartSubtotalSection.classList.add('hidden');
+                if (subtotalSection) subtotalSection.classList.add('hidden');
+                if (cartSubtotalSection) cartSubtotalSection.classList.add('hidden');
             }
             
             let discount = 0;
@@ -556,36 +557,36 @@
                 }
                 
                 if (discount > 0) {
-                    discountSection.classList.remove('hidden');
-                    discountEl.textContent = '-' + formatCurrency(discount);
-                    cartDiscountSection.classList.remove('hidden');
-                    cartDiscountEl.textContent = '-' + formatCurrency(discount);
+                    if (discountSection) discountSection.classList.remove('hidden');
+                    if (discountEl) discountEl.textContent = '-' + formatCurrency(discount);
+                    if (cartDiscountSection) cartDiscountSection.classList.remove('hidden');
+                    if (cartDiscountEl) cartDiscountEl.textContent = '-' + formatCurrency(discount);
                 } else {
-                    discountSection.classList.add('hidden');
-                    cartDiscountSection.classList.add('hidden');
+                    if (discountSection) discountSection.classList.add('hidden');
+                    if (cartDiscountSection) cartDiscountSection.classList.add('hidden');
                 }
             } else {
-                discountSection.classList.add('hidden');
-                cartDiscountSection.classList.add('hidden');
+                if (discountSection) discountSection.classList.add('hidden');
+                if (cartDiscountSection) cartDiscountSection.classList.add('hidden');
             }
             
             const total = Math.max(0, subtotal - discount);
-            totalEl.textContent = formatCurrency(total);
-            cartTotalEl.textContent = formatCurrency(total);
+            if (totalEl) totalEl.textContent = formatCurrency(total);
+            if (cartTotalEl) cartTotalEl.textContent = formatCurrency(total);
             
             // Update button text
             const submitText = document.getElementById('submit-text');
             const cartSubmitText = document.getElementById('cart-submit-text');
             
             if (total === 0 && totalTickets > 0) {
-                submitText.textContent = 'Confirm Free Tickets →';
-                cartSubmitText.textContent = 'Confirm Free Tickets';
+                if (submitText) submitText.textContent = 'Confirm Free Tickets →';
+                if (cartSubmitText) cartSubmitText.textContent = 'Confirm Free Tickets';
             } else if (totalTickets > 0) {
-                submitText.textContent = `Get ${totalTickets} Ticket${totalTickets > 1 ? 's' : ''} →`;
-                cartSubmitText.textContent = `Pay ${formatCurrency(total)}`;
+                if (submitText) submitText.textContent = `Get ${totalTickets} Ticket${totalTickets > 1 ? 's' : ''} →`;
+                if (cartSubmitText) cartSubmitText.textContent = `Pay ${formatCurrency(total)}`;
             } else {
-                submitText.textContent = 'Get Tickets →';
-                cartSubmitText.textContent = 'Checkout';
+                if (submitText) submitText.textContent = 'Get Tickets →';
+                if (cartSubmitText) cartSubmitText.textContent = 'Checkout';
             }
         }
         
