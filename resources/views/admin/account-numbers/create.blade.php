@@ -373,10 +373,15 @@
                     bank_code: bankCode || null
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success && data.valid) {
-                    validationDiv.textContent = '✓ Account number validated';
+                    validationDiv.textContent = '✓ Account number validated - Account name updated';
                     validationDiv.className = 'mt-1 text-sm text-green-600';
                     
                     // Always auto-fill account name from API
@@ -384,10 +389,10 @@
                         accountNameInput.value = data.account_name;
                         accountNameInput.classList.remove('bg-gray-50');
                         accountNameInput.removeAttribute('readonly');
-                        accountNameInput.classList.add('bg-green-50');
+                        accountNameInput.classList.add('bg-green-50', 'border-green-300');
                         setTimeout(() => {
-                            accountNameInput.classList.remove('bg-green-50');
-                        }, 2000);
+                            accountNameInput.classList.remove('bg-green-50', 'border-green-300');
+                        }, 3000);
                     }
                     
                     // Auto-fill bank name if returned from API
@@ -418,10 +423,10 @@
                             }
                         }
                         
-                        bankNameInput.classList.add('bg-green-50');
+                        bankNameInput.classList.add('bg-green-50', 'border-green-300');
                         setTimeout(() => {
-                            bankNameInput.classList.remove('bg-green-50');
-                        }, 2000);
+                            bankNameInput.classList.remove('bg-green-50', 'border-green-300');
+                        }, 3000);
                     }
                 } else {
                     validationDiv.textContent = data.message || 'Invalid account number. Please verify and try again.';
@@ -433,7 +438,7 @@
                         accountNameInput.classList.add('bg-gray-50');
                         accountNameInput.setAttribute('readonly', 'readonly');
                     }
-                    if (bankNameInput && !bankCodeSelect || !bankCodeSelect.value) {
+                    if (bankNameInput && (!bankCodeSelect || !bankCodeSelect.value)) {
                         bankNameInput.value = '';
                         bankNameInput.classList.add('bg-gray-50');
                         bankNameInput.setAttribute('readonly', 'readonly');
