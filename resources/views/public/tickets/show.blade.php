@@ -455,10 +455,8 @@
         function calculateTotal() {
             let subtotal = 0;
             let totalTickets = 0;
-            const orderItems = document.getElementById('order-items');
             const cartItems = document.getElementById('cart-items');
             
-            if (orderItems) orderItems.innerHTML = '';
             if (cartItems) cartItems.innerHTML = '';
             
             document.querySelectorAll('input[name^="tickets"][name$="[quantity]"]').forEach(input => {
