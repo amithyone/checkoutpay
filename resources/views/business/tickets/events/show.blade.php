@@ -51,13 +51,36 @@
                 @endif
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="text-sm text-gray-500">Venue</label>
-                        <p class="font-semibold">{{ $event->venue }}</p>
+                        <label class="text-sm text-gray-500">Event Type</label>
+                        <p class="font-semibold">
+                            @if(($event->event_type ?? 'offline') === 'online')
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Online Event</span>
+                            @else
+                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">Offline Event</span>
+                            @endif
+                        </p>
                     </div>
                     <div>
                         <label class="text-sm text-gray-500">Date & Time</label>
                         <p class="font-semibold">{{ $event->start_date->format('F d, Y h:i A') }}</p>
                     </div>
+                    <div>
+                        <label class="text-sm text-gray-500">Venue/Location</label>
+                        <p class="font-semibold">{{ $event->venue }}</p>
+                    </div>
+                    @if(($event->event_type ?? 'offline') === 'offline' && $event->address)
+                        <div>
+                            <label class="text-sm text-gray-500">Address</label>
+                            <p class="font-semibold">{{ $event->address }}</p>
+                        </div>
+                    @elseif(($event->event_type ?? 'offline') === 'online' && $event->address)
+                        <div>
+                            <label class="text-sm text-gray-500">Platform Link</label>
+                            <p class="font-semibold">
+                                <a href="{{ $event->address }}" target="_blank" class="text-primary hover:underline">{{ $event->address }}</a>
+                            </p>
+                        </div>
+                    @endif
                 </div>
             </div>
             <div>

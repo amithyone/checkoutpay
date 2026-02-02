@@ -27,9 +27,12 @@
                     @error('title')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Venue *</label>
-                    <input type="text" name="venue" required value="{{ old('venue', $event->venue) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    @error('venue')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Event Type *</label>
+                    <select name="event_type" id="event_type" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="toggleAddressField()">
+                        <option value="offline" {{ old('event_type', $event->event_type ?? 'offline') === 'offline' ? 'selected' : '' }}>Offline (Physical Event)</option>
+                        <option value="online" {{ old('event_type', $event->event_type ?? 'offline') === 'online' ? 'selected' : '' }}>Online (Virtual Event)</option>
+                    </select>
+                    @error('event_type')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
             </div>
 
@@ -39,9 +42,27 @@
                 @error('description')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
             </div>
 
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <input type="text" name="address" value="{{ old('address', $event->address) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Venue/Location *</label>
+                    <input type="text" name="venue" id="venue" required value="{{ old('venue', $event->venue) }}" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                           placeholder="{{ ($event->event_type ?? 'offline') === 'online' ? 'e.g., Zoom, Google Meet' : 'e.g., Conference Hall' }}">
+                    <p class="text-xs text-gray-500 mt-1" id="venue-hint">
+                        {{ ($event->event_type ?? 'offline') === 'online' ? 'Online platform or virtual location' : 'Physical venue name' }}
+                    </p>
+                    @error('venue')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
+                <div id="address-field-container">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Address <span id="address-required" class="text-red-500 {{ ($event->event_type ?? 'offline') === 'online' ? 'hidden' : '' }}">*</span>
+                    </label>
+                    <input type="text" name="address" id="address" value="{{ old('address', $event->address) }}" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                           placeholder="{{ ($event->event_type ?? 'offline') === 'online' ? 'Optional: Online platform link' : 'Full address for physical events' }}"
+                           {{ ($event->event_type ?? 'offline') === 'offline' ? 'required' : '' }}>
+                    @error('address')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -113,6 +134,34 @@
 </div>
 
 <script>
+// Toggle address field based on event type
+function toggleAddressField() {
+    const eventType = document.getElementById('event_type').value;
+    const addressField = document.getElementById('address');
+    const addressRequired = document.getElementById('address-required');
+    const venueField = document.getElementById('venue');
+    const venueHint = document.getElementById('venue-hint');
+    
+    if (eventType === 'online') {
+        addressField.removeAttribute('required');
+        addressRequired.classList.add('hidden');
+        addressField.placeholder = 'Optional: Online platform link';
+        venueField.placeholder = 'e.g., Zoom, Google Meet, YouTube Live';
+        venueHint.textContent = 'Online platform or virtual location';
+    } else {
+        addressField.setAttribute('required', 'required');
+        addressRequired.classList.remove('hidden');
+        addressField.placeholder = 'Full address for physical events';
+        venueField.placeholder = 'e.g., Conference Hall, Stadium';
+        venueHint.textContent = 'Physical venue name';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleAddressField();
+});
+
 // Date validation: Ensure end date is after start date
 (function() {
     const startDateInput = document.getElementById('start_date');

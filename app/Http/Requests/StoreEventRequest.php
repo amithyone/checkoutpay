@@ -22,9 +22,10 @@ class StoreEventRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'event_type' => 'required|in:online,offline',
             'venue' => 'required|string|max:255',
             'address' => 'nullable|string|max:500',
             'start_date' => 'required|date|after:now',
@@ -43,5 +44,12 @@ class StoreEventRequest extends FormRequest
             'ticket_types.*.sales_start_date' => 'nullable|date',
             'ticket_types.*.sales_end_date' => 'nullable|date|after:ticket_types.*.sales_start_date',
         ];
+
+        // Address is required for offline events
+        if ($this->input('event_type') === 'offline') {
+            $rules['address'] = 'required|string|max:500';
+        }
+
+        return $rules;
     }
 }

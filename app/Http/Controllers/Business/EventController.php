@@ -57,6 +57,7 @@ class EventController extends Controller
                 'business_id' => $business->id,
                 'title' => $request->title,
                 'description' => $request->description,
+                'event_type' => $request->event_type ?? 'offline',
                 'venue' => $request->venue,
                 'address' => $request->address,
                 'start_date' => $request->start_date,
@@ -160,9 +161,10 @@ class EventController extends Controller
             abort(403);
         }
 
-        $validated = $request->validate([
+        $rules = [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'event_type' => 'required|in:online,offline',
             'venue' => 'required|string|max:255',
             'address' => 'nullable|string|max:500',
             'start_date' => 'required|date',
@@ -174,7 +176,14 @@ class EventController extends Controller
             'allow_refunds' => 'nullable|boolean',
             'refund_policy' => 'nullable|string|max:1000',
             'status' => 'nullable|in:draft,published,cancelled',
-        ]);
+        ];
+
+        // Address is required for offline events
+        if ($request->input('event_type') === 'offline') {
+            $rules['address'] = 'required|string|max:500';
+        }
+
+        $validated = $request->validate($rules);
 
         try {
             // Handle cover image upload

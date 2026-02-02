@@ -16,6 +16,7 @@ class Event extends Model
         'slug',
         'description',
         'venue',
+        'event_type',
         'address',
         'start_date',
         'end_date',

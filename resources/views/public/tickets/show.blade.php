@@ -27,9 +27,25 @@
                             {{ $event->start_date->format('h:i A') }}
                         </div>
                         <div class="flex items-center">
-                            <i class="fas fa-map-marker-alt mr-2"></i>
+                            @if(($event->event_type ?? 'offline') === 'online')
+                                <i class="fas fa-video mr-2"></i>
+                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs mr-2">Online Event</span>
+                            @else
+                                <i class="fas fa-map-marker-alt mr-2"></i>
+                            @endif
                             {{ $event->venue }}
                         </div>
+                        @if(($event->event_type ?? 'offline') === 'offline' && $event->address)
+                            <div class="flex items-center">
+                                <i class="fas fa-location-dot mr-2"></i>
+                                {{ $event->address }}
+                            </div>
+                        @elseif(($event->event_type ?? 'offline') === 'online' && $event->address)
+                            <div class="flex items-center">
+                                <i class="fas fa-link mr-2"></i>
+                                <a href="{{ $event->address }}" target="_blank" class="text-blue-600 hover:underline">{{ $event->address }}</a>
+                            </div>
+                        @endif
                     </div>
                     @if($event->description)
                         <p class="text-gray-700 mb-4">{{ $event->description }}</p>
