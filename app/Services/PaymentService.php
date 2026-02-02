@@ -54,14 +54,49 @@ class PaymentService
         // Set website if provided
         if (isset($data['business_website_id'])) {
             $payment->update(['business_website_id' => $data['business_website_id']]);
-        } elseif (isset($data['website_url']) || isset($data['return_url'])) {
-            // Try to identify website from URL
+        } else {
+            // Try to identify website from various URL sources
+            $website = null;
+            
+            // Priority 1: Try website_url or return_url from data
             $websiteUrl = $data['website_url'] ?? $data['return_url'] ?? null;
             if ($websiteUrl) {
-                $website = $business->websites()->where('website_url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')->first();
-                if ($website) {
-                    $payment->update(['business_website_id' => $website->id]);
+                $website = $business->websites()
+                    ->where('website_url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')
+                    ->where('is_approved', true)
+                    ->first();
+            }
+            
+            // Priority 2: Try webhook_url from data (if website not found yet)
+            if (!$website && isset($data['webhook_url'])) {
+                $webhookHost = parse_url($data['webhook_url'], PHP_URL_HOST);
+                if ($webhookHost) {
+                    $website = $business->websites()
+                        ->where(function($q) use ($webhookHost) {
+                            $q->where('website_url', 'like', '%' . $webhookHost . '%')
+                              ->orWhere('webhook_url', 'like', '%' . $webhookHost . '%');
+                        })
+                        ->where('is_approved', true)
+                        ->first();
                 }
+            }
+            
+            // Priority 3: Try webhook_url from payment (after creation)
+            if (!$website && $payment->webhook_url) {
+                $webhookHost = parse_url($payment->webhook_url, PHP_URL_HOST);
+                if ($webhookHost) {
+                    $website = $business->websites()
+                        ->where(function($q) use ($webhookHost) {
+                            $q->where('website_url', 'like', '%' . $webhookHost . '%')
+                              ->orWhere('webhook_url', 'like', '%' . $webhookHost . '%');
+                        })
+                        ->where('is_approved', true)
+                        ->first();
+                }
+            }
+            
+            if ($website) {
+                $payment->update(['business_website_id' => $website->id]);
             }
         }
         
@@ -161,46 +196,76 @@ class PaymentService
      */
     protected function identifyWebsiteFromPayment(Payment $payment, Business $business, array $data)
     {
-        // Try webhook_url first
+        // Priority 1: Try webhook_url from payment
         if ($payment->webhook_url) {
-            $website = $business->websites()
-                ->where('website_url', 'like', '%' . parse_url($payment->webhook_url, PHP_URL_HOST) . '%')
-                ->where('is_approved', true)
-                ->first();
-            
-            if ($website) {
-                return $website;
+            $webhookHost = parse_url($payment->webhook_url, PHP_URL_HOST);
+            if ($webhookHost) {
+                $website = $business->websites()
+                    ->where(function($q) use ($webhookHost) {
+                        $q->where('website_url', 'like', '%' . $webhookHost . '%')
+                          ->orWhere('webhook_url', 'like', '%' . $webhookHost . '%');
+                    })
+                    ->where('is_approved', true)
+                    ->first();
+                
+                if ($website) {
+                    return $website;
+                }
             }
         }
         
-        // Try from data
+        // Priority 2: Try webhook_url from data
+        if (isset($data['webhook_url'])) {
+            $webhookHost = parse_url($data['webhook_url'], PHP_URL_HOST);
+            if ($webhookHost) {
+                $website = $business->websites()
+                    ->where(function($q) use ($webhookHost) {
+                        $q->where('website_url', 'like', '%' . $webhookHost . '%')
+                          ->orWhere('webhook_url', 'like', '%' . $webhookHost . '%');
+                    })
+                    ->where('is_approved', true)
+                    ->first();
+                
+                if ($website) {
+                    return $website;
+                }
+            }
+        }
+        
+        // Priority 3: Try from data (website_url or return_url)
         $url = $data['website_url'] ?? $data['return_url'] ?? null;
         if ($url) {
-            $website = $business->websites()
-                ->where('website_url', 'like', '%' . parse_url($url, PHP_URL_HOST) . '%')
-                ->where('is_approved', true)
-                ->first();
-            
-            if ($website) {
-                return $website;
+            $urlHost = parse_url($url, PHP_URL_HOST);
+            if ($urlHost) {
+                $website = $business->websites()
+                    ->where('website_url', 'like', '%' . $urlHost . '%')
+                    ->where('is_approved', true)
+                    ->first();
+                
+                if ($website) {
+                    return $website;
+                }
             }
         }
         
-        // Try from email_data
+        // Priority 4: Try from email_data
         $emailData = $payment->email_data ?? [];
         $url = $emailData['return_url'] ?? $emailData['website_url'] ?? null;
         if ($url) {
-            $website = $business->websites()
-                ->where('website_url', 'like', '%' . parse_url($url, PHP_URL_HOST) . '%')
-                ->where('is_approved', true)
-                ->first();
-            
-            if ($website) {
-                return $website;
+            $urlHost = parse_url($url, PHP_URL_HOST);
+            if ($urlHost) {
+                $website = $business->websites()
+                    ->where('website_url', 'like', '%' . $urlHost . '%')
+                    ->where('is_approved', true)
+                    ->first();
+                
+                if ($website) {
+                    return $website;
+                }
             }
         }
         
-        // If business has only one approved website, use that
+        // Priority 5: If business has only one approved website, use that
         $approvedWebsites = $business->websites()->where('is_approved', true)->get();
         if ($approvedWebsites->count() === 1) {
             return $approvedWebsites->first();
