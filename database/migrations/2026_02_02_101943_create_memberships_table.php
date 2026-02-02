@@ -39,7 +39,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('business_id')->references('id')->on('businesses')->onDelete('cascade');
-            $table->foreign('category_id')->references('id')->on('membership_categories')->onDelete('set null');
+            // Foreign key for category_id will be added in a separate migration after membership_categories table exists
             $table->index(['business_id', 'is_active']);
             $table->index(['category_id', 'is_active']);
         });
