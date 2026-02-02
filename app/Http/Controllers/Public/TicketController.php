@@ -35,7 +35,21 @@ class TicketController extends Controller
             $query->available()->orderBy('price');
         }, 'activeCoupons', 'speakers']);
 
-        return view('public.tickets.show', compact('event'));
+        // Prepare data for JavaScript
+        $ticketTypesData = $event->ticketTypes->map(function($t) {
+            return ['id' => $t->id, 'price' => $t->price];
+        })->values();
+        
+        $couponsData = $event->activeCoupons->map(function($c) {
+            return [
+                'id' => $c->id,
+                'code' => $c->code,
+                'discount_type' => $c->discount_type,
+                'discount_value' => $c->discount_value
+            ];
+        })->values();
+
+        return view('public.tickets.show', compact('event', 'ticketTypesData', 'couponsData'));
     }
 
     /**
