@@ -51,6 +51,20 @@ class PaymentService
             'expires_at' => now()->addHours(24), // Payments expire after 24 hours
         ]);
 
+        // Set website if provided
+        if (isset($data['business_website_id'])) {
+            $payment->update(['business_website_id' => $data['business_website_id']]);
+        } elseif (isset($data['website_url']) || isset($data['return_url'])) {
+            // Try to identify website from URL
+            $websiteUrl = $data['website_url'] ?? $data['return_url'] ?? null;
+            if ($websiteUrl) {
+                $website = $business->websites()->where('website_url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')->first();
+                if ($website) {
+                    $payment->update(['business_website_id' => $website->id]);
+                }
+            }
+        }
+        
         // CRITICAL: Ensure account_number is set (safeguard against database issues)
         if (!$payment->account_number) {
             Log::error('Payment created without account_number - attempting to assign', [
@@ -66,11 +80,22 @@ class PaymentService
                 : $this->accountNumberService->assignAccountNumber($business);
             
             if ($retryAccountNumber) {
-                $payment->update(['account_number' => $retryAccountNumber->account_number]);
+                $updateData = ['account_number' => $retryAccountNumber->account_number];
+                
+                // Also ensure website is set if still null
+                if (!$payment->business_website_id) {
+                    $website = $this->identifyWebsiteFromPayment($payment, $business, $data);
+                    if ($website) {
+                        $updateData['business_website_id'] = $website->id;
+                    }
+                }
+                
+                $payment->update($updateData);
                 Log::warning('Account number assigned retroactively to payment', [
                     'payment_id' => $payment->id,
                     'transaction_id' => $payment->transaction_id,
                     'account_number' => $retryAccountNumber->account_number,
+                    'website_id' => $updateData['business_website_id'] ?? null,
                 ]);
             } else {
                 Log::error('CRITICAL: Unable to assign account number to payment after creation', [
@@ -79,20 +104,6 @@ class PaymentService
                     'business_id' => $business->id,
                 ]);
                 throw new \Exception('Payment created but account number assignment failed. Payment ID: ' . $payment->id);
-            }
-        }
-
-        // Set website if provided
-        if (isset($data['business_website_id'])) {
-            $payment->update(['business_website_id' => $data['business_website_id']]);
-        } elseif (isset($data['website_url']) || isset($data['return_url'])) {
-            // Try to identify website from URL
-            $websiteUrl = $data['website_url'] ?? $data['return_url'] ?? null;
-            if ($websiteUrl) {
-                $website = $business->websites()->where('website_url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')->first();
-                if ($website) {
-                    $payment->update(['business_website_id' => $website->id]);
-                }
             }
         }
 
@@ -143,5 +154,58 @@ class PaymentService
         }
 
         return $emailData ?: [];
+    }
+    
+    /**
+     * Identify website from payment data
+     */
+    protected function identifyWebsiteFromPayment(Payment $payment, Business $business, array $data)
+    {
+        // Try webhook_url first
+        if ($payment->webhook_url) {
+            $website = $business->websites()
+                ->where('website_url', 'like', '%' . parse_url($payment->webhook_url, PHP_URL_HOST) . '%')
+                ->where('is_approved', true)
+                ->first();
+            
+            if ($website) {
+                return $website;
+            }
+        }
+        
+        // Try from data
+        $url = $data['website_url'] ?? $data['return_url'] ?? null;
+        if ($url) {
+            $website = $business->websites()
+                ->where('website_url', 'like', '%' . parse_url($url, PHP_URL_HOST) . '%')
+                ->where('is_approved', true)
+                ->first();
+            
+            if ($website) {
+                return $website;
+            }
+        }
+        
+        // Try from email_data
+        $emailData = $payment->email_data ?? [];
+        $url = $emailData['return_url'] ?? $emailData['website_url'] ?? null;
+        if ($url) {
+            $website = $business->websites()
+                ->where('website_url', 'like', '%' . parse_url($url, PHP_URL_HOST) . '%')
+                ->where('is_approved', true)
+                ->first();
+            
+            if ($website) {
+                return $website;
+            }
+        }
+        
+        // If business has only one approved website, use that
+        $approvedWebsites = $business->websites()->where('is_approved', true)->get();
+        if ($approvedWebsites->count() === 1) {
+            return $approvedWebsites->first();
+        }
+        
+        return null;
     }
 }
