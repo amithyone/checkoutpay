@@ -117,42 +117,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
             <!-- Left Column: Ticket Selection -->
-            <div class="lg:col-span-2 order-2 lg:order-1">
-                <!-- Speakers/Artists Section -->
-                @if($event->speakers->count() > 0)
-                    <div class="bg-gray-800 rounded-xl md:rounded-2xl p-4 md:p-8 mb-6 md:mb-8 border border-gray-700">
-                        <h2 class="text-2xl md:text-3xl font-bold mb-4 md:mb-6 text-white">
-                            @if(($event->event_type ?? 'offline') === 'online')
-                                Speakers
-                            @else
-                                Speakers & Artists
-                            @endif
-                        </h2>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-                            @foreach($event->speakers as $speaker)
-                                <div class="text-center">
-                                    @if($speaker->photo)
-                                        <img src="{{ asset('storage/' . $speaker->photo) }}" 
-                                             alt="{{ $speaker->name }}" 
-                                             class="w-24 h-24 rounded-full object-cover mx-auto mb-3 border-2 border-teal-500">
-                                    @else
-                                        <div class="w-24 h-24 rounded-full bg-gradient-primary mx-auto mb-3 flex items-center justify-center">
-                                            <i class="fas fa-user text-white text-3xl"></i>
-                                        </div>
-                                    @endif
-                                    <h3 class="font-semibold text-white mb-1">{{ $speaker->name }}</h3>
-                                    @if($speaker->topic)
-                                        <p class="text-sm text-teal-400 mb-2">{{ $speaker->topic }}</p>
-                                    @endif
-                                    @if($speaker->bio)
-                                        <p class="text-xs text-gray-400">{{ Str::limit($speaker->bio, 60) }}</p>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-
+            <div class="lg:col-span-2 order-2">
                 <!-- Ticket Selection Form -->
                 <form action="{{ route('tickets.purchase', $event) }}" method="POST" id="ticket-form">
                     @csrf
@@ -315,6 +280,49 @@
                         </div>
                     @endif
                 </form>
+
+                <!-- Speakers/Artists Section - Dropdown -->
+                @if($event->speakers->count() > 0)
+                    <div class="bg-gray-800 rounded-lg md:rounded-xl border border-gray-700 mt-4 md:mt-6">
+                        <button type="button" 
+                                onclick="toggleSpeakers()" 
+                                class="w-full flex items-center justify-between p-4 md:p-6 text-left focus:outline-none">
+                            <h2 class="text-lg md:text-xl font-bold text-white">
+                                @if(($event->event_type ?? 'offline') === 'online')
+                                    Speakers
+                                @else
+                                    Speakers & Artists
+                                @endif
+                                <span class="text-sm font-normal text-gray-400 ml-2">({{ $event->speakers->count() }})</span>
+                            </h2>
+                            <i id="speakers-icon" class="fas fa-chevron-down text-teal-400 transition-transform duration-200"></i>
+                        </button>
+                        <div id="speakers-content" class="hidden px-4 md:px-6 pb-4 md:pb-6">
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+                                @foreach($event->speakers as $speaker)
+                                    <div class="text-center">
+                                        @if($speaker->photo)
+                                            <img src="{{ asset('storage/' . $speaker->photo) }}" 
+                                                 alt="{{ $speaker->name }}" 
+                                                 class="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover mx-auto mb-2 md:mb-3 border-2 border-teal-500">
+                                        @else
+                                            <div class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-primary mx-auto mb-2 md:mb-3 flex items-center justify-center">
+                                                <i class="fas fa-user text-white text-2xl md:text-3xl"></i>
+                                            </div>
+                                        @endif
+                                        <h3 class="font-semibold text-white mb-1 text-sm md:text-base">{{ $speaker->name }}</h3>
+                                        @if($speaker->topic)
+                                            <p class="text-xs md:text-sm text-teal-400 mb-1 md:mb-2">{{ $speaker->topic }}</p>
+                                        @endif
+                                        @if($speaker->bio)
+                                            <p class="text-xs text-gray-400">{{ Str::limit($speaker->bio, 50) }}</p>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
