@@ -1,11 +1,15 @@
 @extends('layouts.admin')
 
+@php
+    use Illuminate\Support\Facades\Storage;
+@endphp
+
 @section('title', 'Edit Page')
 @section('page-title', 'Edit Page')
 
 @section('content')
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-    <form action="{{ route('admin.pages.update', $page) }}" method="POST">
+    <form action="{{ route('admin.pages.update', $page) }}" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')
         <div class="space-y-4">

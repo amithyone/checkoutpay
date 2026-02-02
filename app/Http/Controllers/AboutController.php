@@ -8,7 +8,12 @@ class AboutController extends Controller
 {
     public function index(): View
     {
-        $page = \App\Models\Page::getBySlug('about-us') ?? new \App\Models\Page(['title' => 'About Us', 'content' => '']);
-        return view('about.index', compact('page'));
+        $page = \App\Models\Page::getBySlug('about-us');
+        
+        if ($page) {
+            return view('about.index-editable', compact('page'));
+        }
+
+        return view('about.index', ['page' => new \App\Models\Page(['title' => 'About Us', 'content' => ''])]);
     }
 }

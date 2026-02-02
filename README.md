@@ -5,7 +5,7 @@ CheckoutPay is an intelligent payment gateway solution that enables businesses t
 ## Features
 
 - **Intelligent Payment Processing**: Smart payment verification and automatic reconciliation
-- **Lowest Rates**: Just 1% + ₦50 per transaction - the cheapest rates in the market
+- **Competitive Rates**: Just 1% + ₦50 per transaction - the finest rates in the market
 - **API Integration**: RESTful API for seamless integration
 - **Hosted Checkout**: Ready-to-use hosted payment page option
 - **Real-time Webhooks**: Instant notifications for payment status updates

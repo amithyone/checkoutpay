@@ -13,6 +13,8 @@ class Page extends Model
         'slug',
         'title',
         'content',
+        'featured_image',
+        'images',
         'meta_title',
         'meta_description',
         'is_published',
@@ -21,6 +23,7 @@ class Page extends Model
 
     protected $casts = [
         'is_published' => 'boolean',
+        'images' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -88,5 +91,30 @@ class Page extends Model
         static::deleted(function ($page) {
             \Illuminate\Support\Facades\Cache::forget("page_{$page->slug}");
         });
+    }
+
+    /**
+     * Get featured image URL
+     */
+    public function getFeaturedImageUrlAttribute(): ?string
+    {
+        if (!$this->featured_image) {
+            return null;
+        }
+        return \Illuminate\Support\Facades\Storage::url($this->featured_image);
+    }
+
+    /**
+     * Get images URLs array
+     */
+    public function getImagesUrlsAttribute(): array
+    {
+        if (!$this->images || !is_array($this->images)) {
+            return [];
+        }
+        
+        return array_map(function ($image) {
+            return \Illuminate\Support\Facades\Storage::url($image);
+        }, $this->images);
     }
 }

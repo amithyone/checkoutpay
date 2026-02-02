@@ -59,6 +59,20 @@ class PaymentController extends Controller
             // Load account number details
             $payment->load('accountNumberDetails', 'website');
 
+            // Ensure account number exists
+            if (!$payment->account_number) {
+                Log::error('Payment created without account number via API', [
+                    'payment_id' => $payment->id,
+                    'transaction_id' => $payment->transaction_id,
+                    'business_id' => $business->id,
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to assign account number. Please contact support.',
+                ], 500);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Payment request created successfully',

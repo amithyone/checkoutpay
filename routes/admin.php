@@ -217,6 +217,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('scanner/manual-check-in', [\App\Http\Controllers\Admin\TicketScannerController::class, 'manualCheckIn'])->name('scanner.manual-check-in');
         });
 
+        // Memberships Management
+        Route::prefix('memberships')->name('memberships.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\MembershipController::class, 'index'])->name('index');
+            Route::get('{membership}', [\App\Http\Controllers\Admin\MembershipController::class, 'show'])->name('show');
+            Route::post('{membership}/status', [\App\Http\Controllers\Admin\MembershipController::class, 'updateStatus'])->name('update-status');
+            Route::delete('{membership}', [\App\Http\Controllers\Admin\MembershipController::class, 'destroy'])->name('destroy');
+        });
+        Route::resource('membership-categories', \App\Http\Controllers\Admin\MembershipCategoryController::class);
+
         // Rentals Management
         Route::prefix('rentals')->name('rentals.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\RentalController::class, 'index'])->name('index');

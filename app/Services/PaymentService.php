@@ -58,7 +58,7 @@ class PaymentService
             // Try to identify website from URL
             $websiteUrl = $data['website_url'] ?? $data['return_url'] ?? null;
             if ($websiteUrl) {
-                $website = $business->websites()->where('url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')->first();
+                $website = $business->websites()->where('website_url', 'like', '%' . parse_url($websiteUrl, PHP_URL_HOST) . '%')->first();
                 if ($website) {
                     $payment->update(['business_website_id' => $website->id]);
                 }

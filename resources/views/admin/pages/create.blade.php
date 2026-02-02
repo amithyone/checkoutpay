@@ -5,7 +5,7 @@
 
 @section('content')
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-    <form action="{{ route('admin.pages.store') }}" method="POST">
+    <form action="{{ route('admin.pages.store') }}" method="POST" enctype="multipart/form-data">
         @csrf
         <div class="space-y-4">
             <div>
@@ -27,6 +27,20 @@
                 <textarea name="content" rows="15" 
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary font-mono text-sm">{{ old('content') }}</textarea>
                 <p class="mt-1 text-xs text-gray-500">For home and pricing pages, content should be valid JSON. For other pages, HTML is supported.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Featured Image</label>
+                <input type="file" name="featured_image" accept="image/*"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                <p class="mt-1 text-xs text-gray-500">Upload a featured image for this page (optional)</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Additional Images</label>
+                <input type="file" name="images[]" accept="image/*" multiple
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                <p class="mt-1 text-xs text-gray-500">Upload multiple images for this page (optional, hold Ctrl/Cmd to select multiple)</p>
             </div>
 
             <div class="grid grid-cols-2 gap-4">

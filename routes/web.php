@@ -8,6 +8,12 @@ Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('h
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
 Route::get('/products/invoices', [\App\Http\Controllers\ProductsController::class, 'invoices'])->name('products.invoices');
+Route::get('/products/memberships', [\App\Http\Controllers\ProductsController::class, 'memberships'])->name('products.memberships');
+Route::get('/products/memberships-info', [\App\Http\Controllers\ProductsController::class, 'membershipsInfo'])->name('products.memberships-info');
+Route::get('/products/rentals-info', [\App\Http\Controllers\ProductsController::class, 'rentalsInfo'])->name('products.rentals-info');
+Route::get('/products/tickets-info', [\App\Http\Controllers\ProductsController::class, 'ticketsInfo'])->name('products.tickets-info');
+Route::get('/marketplace', [\App\Http\Controllers\Public\MarketplaceController::class, 'index'])->name('marketplace.index');
+Route::get('/tickets', [\App\Http\Controllers\Public\TicketsController::class, 'index'])->name('tickets.index');
 Route::get('/payout', [\App\Http\Controllers\PayoutController::class, 'index'])->name('payout.index');
 Route::get('/collections', [\App\Http\Controllers\CollectionsController::class, 'index'])->name('collections.index');
 Route::get('/checkout-demo', [\App\Http\Controllers\CheckoutDemoController::class, 'index'])->name('checkout-demo.index');
@@ -84,16 +90,35 @@ Route::get('/pay/{transactionId}/status', [\App\Http\Controllers\CheckoutControl
 
 // Public ticket routes
 Route::prefix('tickets')->name('tickets.')->group(function () {
-    Route::get('{event}', [\App\Http\Controllers\Public\TicketController::class, 'show'])->name('show');
-    Route::post('{event}/purchase', [\App\Http\Controllers\Public\TicketController::class, 'purchase'])->name('purchase');
+    Route::get('/', [\App\Http\Controllers\Public\TicketsController::class, 'index'])->name('index');
+    Route::get('event/{event}', [\App\Http\Controllers\Public\TicketController::class, 'show'])->name('show');
+    Route::post('event/{event}/purchase', [\App\Http\Controllers\Public\TicketController::class, 'purchase'])->name('purchase');
     Route::get('order/{orderNumber}', [\App\Http\Controllers\Public\TicketController::class, 'order'])->name('order');
     Route::get('order/{orderNumber}/download', [\App\Http\Controllers\Public\TicketController::class, 'download'])->name('download');
+    // Legacy route for backward compatibility
+    Route::get('{event}', [\App\Http\Controllers\Public\TicketController::class, 'show'])->name('show-legacy');
 });
 
 // Public invoice payment routes
 Route::prefix('invoices')->name('invoices.')->group(function () {
     Route::get('pay/{code}', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'show'])->name('pay');
     Route::post('pay/{code}/webhook', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'webhook'])->name('payment.webhook');
+});
+
+// Public memberships routes
+Route::prefix('memberships')->name('memberships.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Public\MembershipController::class, 'index'])->name('index');
+    Route::get('{slug}', [\App\Http\Controllers\Public\MembershipController::class, 'show'])->name('show');
+    
+    // Payment flow
+    Route::get('{slug}/payment', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'show'])->name('payment.show');
+    Route::post('{slug}/payment', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'process'])->name('payment.process');
+    Route::post('{slug}/payment/webhook', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'webhook'])->name('payment.webhook');
+    Route::get('success/{subscriptionNumber}', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'success'])->name('payment.success');
+    
+    // Card download
+    Route::get('card/{subscriptionNumber}/download', [\App\Http\Controllers\Public\MembershipCardController::class, 'download'])->name('card.download');
+    Route::get('card/{subscriptionNumber}/view', [\App\Http\Controllers\Public\MembershipCardController::class, 'view'])->name('card.view');
 });
 
 // Public rentals routes

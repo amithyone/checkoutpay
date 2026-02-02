@@ -12,6 +12,11 @@
                     <li><a href="{{ route('products.index') }}" class="hover:text-white transition-colors">Products</a></li>
                     <li><a href="{{ route('products.invoices') }}" class="hover:text-white transition-colors">Invoices</a></li>
                     <li><a href="{{ route('rentals.index') }}" class="hover:text-white transition-colors">Rentals</a></li>
+                    <li><a href="{{ route('products.rentals-info') }}" class="hover:text-white transition-colors text-gray-400">What are Rentals?</a></li>
+                    <li><a href="{{ route('memberships.index') }}" class="hover:text-white transition-colors">Memberships</a></li>
+                    <li><a href="{{ route('products.memberships-info') }}" class="hover:text-white transition-colors text-gray-400">What are Memberships?</a></li>
+                    <li><a href="{{ route('tickets.index') }}" class="hover:text-white transition-colors">Tickets</a></li>
+                    <li><a href="{{ route('products.tickets-info') }}" class="hover:text-white transition-colors text-gray-400">What are Tickets?</a></li>
                     <li><a href="{{ route('payout.index') }}" class="hover:text-white transition-colors">Payout</a></li>
                     <li><a href="{{ route('collections.index') }}" class="hover:text-white transition-colors">Collections</a></li>
                     <li><a href="{{ route('checkout-demo.index') }}" class="hover:text-white transition-colors">Checkout Demo</a></li>

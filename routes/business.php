@@ -70,6 +70,9 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
 
+        // Memberships
+        Route::resource('memberships', \App\Http\Controllers\Business\MembershipController::class);
+
         // Rentals
         Route::prefix('rentals')->name('rentals.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Business\RentalController::class, 'index'])->name('index');

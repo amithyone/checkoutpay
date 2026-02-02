@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $page->meta_title ?? 'Pricing - CheckoutPay' }}</title>
-    <meta name="description" content="{{ $page->meta_description ?? 'The cheapest payment gateway rates in Nigeria. Just 1% + ₦100 per transaction. No hidden fees, no monthly charges.' }}">
+    <meta name="description" content="{{ $page->meta_description ?? 'The finest payment gateway rates in Nigeria. Just 1% + ₦50 per transaction. No hidden fees, no monthly charges.' }}">
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">

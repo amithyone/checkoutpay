@@ -19,7 +19,7 @@ class PageSeeder extends Seeder
                 'title' => 'CheckoutPay - Intelligent Payment Gateway',
                 'content' => $this->getHomeContent(),
                 'meta_title' => 'CheckoutPay - Intelligent Payment Gateway',
-                'meta_description' => 'Intelligent payment gateway for businesses. Accept payments with the cheapest rates in the market - just 1% + ₦50 per transaction.',
+                'meta_description' => 'Intelligent payment gateway for businesses. Accept payments with the finest rates in the market - just 1% + ₦50 per transaction.',
                 'is_published' => true,
                 'order' => 1,
             ]
@@ -29,10 +29,10 @@ class PageSeeder extends Seeder
         Page::updateOrCreate(
             ['slug' => 'pricing'],
             [
-                'title' => 'Pricing - CheckoutPay | Cheapest Payment Gateway in Nigeria',
+                'title' => 'Pricing - CheckoutPay | Finest Payment Gateway in Nigeria',
                 'content' => $this->getPricingContent(),
-                'meta_title' => 'Pricing - CheckoutPay | Cheapest Payment Gateway in Nigeria',
-                'meta_description' => 'The cheapest payment gateway rates in Nigeria. Just 1% + ₦50 per transaction. No hidden fees, no monthly charges.',
+                'meta_title' => 'Pricing - CheckoutPay | Finest Payment Gateway in Nigeria',
+                'meta_description' => 'The finest payment gateway rates in Nigeria. Just 1% + ₦50 per transaction. No hidden fees, no monthly charges.',
                 'is_published' => true,
                 'order' => 2,
             ]
@@ -70,7 +70,7 @@ class PageSeeder extends Seeder
         // Return as JSON string - Laravel will auto-cast to array when retrieved
         return json_encode([
             'hero' => [
-                'badge_text' => 'Cheapest Rates in the Market',
+                'badge_text' => 'Finest Rates in the Market',
                 'badge_icon' => 'fas fa-tag',
                 'title' => 'Intelligent Payment Gateway',
                 'title_highlight' => 'For Your Business',
@@ -90,8 +90,8 @@ class PageSeeder extends Seeder
                     ],
                     [
                         'icon' => 'fas fa-money-bill-wave',
-                        'title' => 'Lowest Rates',
-                        'description' => 'The cheapest payment gateway in the market. Just 1% + ₦50 per transaction. No hidden fees.',
+                        'title' => 'Competitive Rates',
+                        'description' => 'The finest payment gateway in the market. Just 1% + ₦50 per transaction. No hidden fees.',
                     ],
                     [
                         'icon' => 'fas fa-bolt',
@@ -117,7 +117,7 @@ class PageSeeder extends Seeder
             ],
             'pricing_section' => [
                 'title' => 'Simple, Transparent Pricing',
-                'subtitle' => 'The cheapest rates in the market. No hidden fees, no surprises.',
+                'subtitle' => 'The finest rates in the market. No hidden fees, no surprises.',
                 'badge_text' => 'Best Value',
                 'plan_name' => 'Pay As You Go',
                 'rate_percentage' => '1%',
@@ -140,7 +140,7 @@ class PageSeeder extends Seeder
                 ],
                 'cta_text' => 'Get Started Now',
                 'cta_note' => 'No setup fees. No monthly fees. Pay only for successful transactions.',
-                'comparison_badge' => 'Cheapest payment gateway rates in Nigeria',
+                'comparison_badge' => 'Finest payment gateway rates in Nigeria',
             ],
             'how_it_works' => [
                 'title' => 'How It Works',
@@ -154,12 +154,12 @@ class PageSeeder extends Seeder
             ],
             'cta' => [
                 'title' => 'Ready to Get Started?',
-                'description' => 'Join businesses using CheckoutPay - the intelligent payment gateway with the cheapest rates',
+                'description' => 'Join businesses using CheckoutPay - the intelligent payment gateway with the finest rates',
                 'cta_primary' => 'Create Your Account',
                 'cta_secondary' => 'View Pricing',
             ],
             'footer' => [
-                'description' => 'The cheapest payment gateway in the market. Just 1% + ₦50 per transaction.',
+                'description' => 'The finest payment gateway in the market. Just 1% + ₦50 per transaction.',
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }
@@ -169,10 +169,10 @@ class PageSeeder extends Seeder
         // Return as JSON string - Laravel will auto-cast to array when retrieved
         return json_encode([
             'hero' => [
-                'badge_text' => 'Cheapest Rates in Nigeria',
+                'badge_text' => 'Finest Rates in Nigeria',
                 'badge_icon' => 'fas fa-trophy',
                 'title' => 'Simple, Transparent Pricing',
-                'description' => 'The most affordable payment gateway in the market. Pay only for successful transactions.',
+                'description' => 'Premium payment gateway with competitive rates. Pay only for successful transactions.',
                 'rate_percentage' => '1%',
                 'rate_fixed' => '₦50',
                 'rate_description' => 'per successful transaction',
@@ -272,7 +272,7 @@ class PageSeeder extends Seeder
             ],
             'cta' => [
                 'title' => 'Ready to Get Started?',
-                'description' => 'Join businesses using the cheapest payment gateway in Nigeria',
+                'description' => 'Join businesses using the finest payment gateway in Nigeria',
                 'cta_text' => 'Create Your Account',
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

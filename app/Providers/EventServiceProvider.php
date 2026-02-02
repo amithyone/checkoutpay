@@ -18,6 +18,7 @@ class EventServiceProvider extends ServiceProvider
             SendPaymentWebhook::class,
             \App\Listeners\ProcessTicketOrderOnPayment::class,
             \App\Listeners\MarkInvoicePaidOnPaymentApproved::class,
+            \App\Listeners\CreateMembershipSubscriptionOnPaymentApproved::class,
         ],
         \App\Events\PaymentExpired::class => [
             \App\Listeners\SendExpiredPaymentWebhook::class,
