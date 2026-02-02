@@ -475,15 +475,6 @@
                                 const itemTotal = quantity * ticketType.price;
                                 subtotal += itemTotal;
                                 
-                                // Add to order summary sidebar
-                                const itemDiv = document.createElement('div');
-                                itemDiv.className = 'flex justify-between items-center text-sm';
-                                itemDiv.innerHTML = `
-                                    <span class="text-gray-300">${ticketType.name || 'Ticket'} x ${quantity}</span>
-                                    <span class="text-white font-semibold">${formatCurrency(itemTotal)}</span>
-                                `;
-                                orderItems.appendChild(itemDiv);
-                                
                                 // Add to floating cart summary
                                 const cartItemDiv = document.createElement('div');
                                 cartItemDiv.className = 'flex justify-between items-center text-sm';
