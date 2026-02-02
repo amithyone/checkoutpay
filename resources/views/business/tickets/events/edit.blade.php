@@ -81,15 +81,28 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cover Image (Featured Image)</label>
                     @if($event->cover_image)
                         <div class="mb-2">
-                            <img src="{{ asset('storage/' . $event->cover_image) }}" alt="Current cover" class="h-32 object-cover rounded-lg">
+                            <img src="{{ asset('storage/' . $event->cover_image) }}" alt="Current cover" class="w-32 h-20 object-cover rounded-lg border border-gray-300">
                         </div>
                     @endif
                     <input type="file" name="cover_image" accept="image/*" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <p class="text-xs text-gray-500 mt-1">Recommended: 1200x600px. Leave empty to keep current image.</p>
                     @error('cover_image')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+                    <div class="flex gap-2">
+                        <input type="color" name="background_color" value="{{ old('background_color', $event->background_color ?? '#1e293b') }}" class="h-10 w-20 border border-gray-300 rounded-lg cursor-pointer">
+                        <input type="text" name="background_color_text" id="background_color_text" value="{{ old('background_color', $event->background_color ?? '#1e293b') }}" placeholder="#1e293b" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg" onchange="updateColorPicker(this.value)">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Used as fallback if no cover image is uploaded.</p>
+                    @error('background_color')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Max Attendees</label>
                     <input type="number" name="max_attendees" min="1" value="{{ old('max_attendees', $event->max_attendees) }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
@@ -340,5 +353,18 @@ function updateSpeakerCount() {
         updateEndDateMin();
     }
 })();
+</script>
+
+<script>
+// Sync color picker and text input
+document.querySelector('input[name="background_color"]')?.addEventListener('input', function(e) {
+    document.getElementById('background_color_text').value = e.target.value;
+});
+
+function updateColorPicker(value) {
+    if (/^#[0-9A-F]{6}$/i.test(value)) {
+        document.querySelector('input[name="background_color"]').value = value;
+    }
+}
 </script>
 @endsection

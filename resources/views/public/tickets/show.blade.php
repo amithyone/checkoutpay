@@ -57,6 +57,8 @@
             <img src="{{ asset('storage/' . $event->cover_image) }}" 
                  alt="{{ $event->title }}" 
                  class="absolute inset-0 w-full h-full object-cover">
+        @elseif($event->background_color)
+            <div class="absolute inset-0" style="background: {{ $event->background_color }};"></div>
         @else
             <div class="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-teal-900"></div>
         @endif

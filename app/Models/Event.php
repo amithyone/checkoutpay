@@ -22,6 +22,7 @@ class Event extends Model
         'end_date',
         'timezone',
         'cover_image',
+        'background_color',
         'max_attendees',
         'max_tickets_per_customer',
         'allow_refunds',

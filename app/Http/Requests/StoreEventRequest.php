@@ -32,6 +32,7 @@ class StoreEventRequest extends FormRequest
             'end_date' => 'required|date|after:start_date',
             'timezone' => 'nullable|string|max:50',
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'background_color' => 'nullable|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/',
             'max_attendees' => 'nullable|integer|min:1',
             'max_tickets_per_customer' => 'nullable|integer|min:1',
             'allow_refunds' => 'nullable|boolean',
