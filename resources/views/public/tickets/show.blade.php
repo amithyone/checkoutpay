@@ -507,6 +507,21 @@
         
         // Calculate total on page load
         calculateTotal();
+        
+        // Toggle speakers dropdown
+        function toggleSpeakers() {
+            const content = document.getElementById('speakers-content');
+            const icon = document.getElementById('speakers-icon');
+            const isHidden = content.classList.contains('hidden');
+            
+            if (isHidden) {
+                content.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+            }
+        }
     </script>
     
     @include('partials.footer')
