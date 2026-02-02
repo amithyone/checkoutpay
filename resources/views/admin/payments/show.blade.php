@@ -79,9 +79,26 @@
         <!-- Payment Details Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div>
-                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Amount</label>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Expected Amount</label>
                 <p class="text-base sm:text-lg font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
+                @if($payment->received_amount && abs($payment->received_amount - $payment->amount) > 0.01)
+                    <p class="text-xs text-gray-500 mt-1">
+                        <span class="font-medium text-orange-600">Received: ₦{{ number_format($payment->received_amount, 2) }}</span>
+                        @if($payment->is_mismatch)
+                            <span class="ml-2 px-2 py-0.5 bg-orange-100 text-orange-800 rounded text-xs">Amount Mismatch</span>
+                        @endif
+                    </p>
+                @endif
             </div>
+            @if($payment->received_amount && abs($payment->received_amount - $payment->amount) > 0.01)
+            <div>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Received Amount</label>
+                <p class="text-base sm:text-lg font-bold text-orange-600">₦{{ number_format($payment->received_amount, 2) }}</p>
+                @if($payment->mismatch_reason)
+                    <p class="text-xs text-gray-500 mt-1">{{ $payment->mismatch_reason }}</p>
+                @endif
+            </div>
+            @endif
             <div>
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">Business</label>
                 <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">{{ $payment->business->name ?? 'N/A' }}</p>
