@@ -73,7 +73,12 @@ class InvoicePaymentController extends Controller
                 $emailData = $payment->email_data ?? [];
                 $emailData['invoice_id'] = $invoice->id;
                 $emailData['invoice_number'] = $invoice->invoice_number;
-                $payment->update(['email_data' => $emailData]);
+                
+                // Invoice payments never expire - ensure expires_at is null
+                $payment->update([
+                    'email_data' => $emailData,
+                    'expires_at' => null,
+                ]);
 
                 $invoice->refresh();
             } catch (\Exception $e) {
@@ -85,6 +90,11 @@ class InvoicePaymentController extends Controller
         }
 
         $invoice->load('payment');
+        
+        // Ensure existing invoice payment never expires
+        if ($invoice->payment && $invoice->payment->expires_at !== null) {
+            $invoice->payment->update(['expires_at' => null]);
+        }
 
         return view('invoices.payment', compact('invoice'));
     }

@@ -63,6 +63,14 @@
                     {{ $invoice->notes }}
                 </div>
                 @endif
+                @if(isset($qrCodeBase64) && $qrCodeBase64)
+                <div style="text-align: center; margin: 30px 0;">
+                    <div style="margin-bottom: 15px;">
+                        <strong style="color: #1a202c; font-size: 14px;">Scan QR Code to Pay</strong>
+                    </div>
+                    <img src="{{ $qrCodeBase64 }}" alt="Payment QR Code" style="max-width: 200px; height: auto; border: 2px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fff;">
+                </div>
+                @endif
                 <div style="text-align: center; margin-top: 30px;">
                     <a href="{{ $invoice->payment_link_url }}" class="cta-button">View & Pay Invoice</a>
                 </div>

@@ -24,4 +24,12 @@ return [
         'python_command' => env('PYTHON_EXTRACTOR_COMMAND', 'python3'), // 'python3' or 'python'
     ],
 
+    'recaptcha' => [
+        'site_key' => env('RECAPTCHA_SITE_KEY', ''),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY', ''),
+        'enabled' => env('RECAPTCHA_ENABLED', true),
+        'version' => env('RECAPTCHA_VERSION', 'v3'), // 'v2' or 'v3'
+        'score_threshold' => (float) env('RECAPTCHA_SCORE_THRESHOLD', 0.5), // v3 only: 0.0-1.0, allow if score >= this
+    ],
+
 ];

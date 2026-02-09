@@ -15,8 +15,8 @@
             background: #f5f5f5;
         }
         .card {
-            width: 324pt; /* 85.6mm */
-            height: 204pt; /* 53.98mm */
+            width: 204pt; /* 53.98mm - landscape width */
+            height: 324pt; /* 85.6mm - landscape height */
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 12pt;
             padding: 20pt;
@@ -40,13 +40,24 @@
             z-index: 1;
             height: 100%;
             display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: stretch;
+        }
+        .card-left {
+            flex: 1;
+            display: flex;
             flex-direction: column;
             justify-content: space-between;
+            padding-right: 15pt;
+        }
+        .card-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
             margin-bottom: 15pt;
         }
         .card-logo {
@@ -62,46 +73,68 @@
             flex: 1;
         }
         .member-name {
-            font-size: 18pt;
+            font-size: 20pt;
             font-weight: bold;
-            margin-bottom: 8pt;
+            margin-bottom: 10pt;
             text-transform: uppercase;
+            line-height: 1.2;
         }
         .membership-name {
-            font-size: 12pt;
+            font-size: 14pt;
             opacity: 0.9;
-            margin-bottom: 4pt;
+            margin-bottom: 6pt;
+            font-weight: 600;
+        }
+        .membership-category {
+            font-size: 11pt;
+            opacity: 0.85;
+            margin-bottom: 8pt;
+            text-transform: uppercase;
+            font-weight: 500;
         }
         .subscription-number {
             font-size: 10pt;
             opacity: 0.8;
             font-family: 'Courier New', monospace;
+            margin-bottom: 15pt;
         }
         .card-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-top: 15pt;
+            margin-top: auto;
         }
-        .expiry-date {
-            font-size: 10pt;
-            opacity: 0.9;
+        .expiry-section {
+            margin-bottom: 10pt;
         }
         .expiry-label {
             font-size: 8pt;
             opacity: 0.7;
-            margin-bottom: 2pt;
+            margin-bottom: 4pt;
+            text-transform: uppercase;
+        }
+        .expiry-date {
+            font-size: 12pt;
+            opacity: 0.9;
+            font-weight: 600;
+        }
+        .business-name {
+            font-size: 9pt;
+            opacity: 0.8;
+            margin-top: 10pt;
         }
         .qr-code {
-            width: 60pt;
-            height: 60pt;
+            width: 80pt;
+            height: 80pt;
             background: white;
-            padding: 4pt;
-            border-radius: 4pt;
+            padding: 6pt;
+            border-radius: 6pt;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .qr-code img {
-            width: 100%;
-            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
         }
     </style>
 </head>
@@ -112,36 +145,44 @@
         @endif
         
         <div class="card-content">
-            <div class="card-header">
+            <!-- Left Side: Member Info -->
+            <div class="card-left">
                 <div>
-                    @if($subscription->membership->card_logo)
-                        <div class="card-logo">
-                            <img src="{{ public_path('storage/' . $subscription->membership->card_logo) }}" alt="Logo">
-                        </div>
-                    @elseif($subscription->membership->business->logo)
-                        <div class="card-logo">
-                            <img src="{{ public_path('storage/' . $subscription->membership->business->logo) }}" alt="Logo">
-                        </div>
-                    @endif
+                    <div class="card-header">
+                        @if($subscription->membership->card_logo)
+                            <div class="card-logo">
+                                <img src="{{ public_path('storage/' . $subscription->membership->card_logo) }}" alt="Logo">
+                            </div>
+                        @elseif($subscription->membership->business->logo)
+                            <div class="card-logo">
+                                <img src="{{ public_path('storage/' . $subscription->membership->business->logo) }}" alt="Logo">
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="card-body">
+                        <div class="member-name">{{ $subscription->member_name }}</div>
+                        <div class="membership-name">{{ $subscription->membership->name }}</div>
+                        @if($subscription->membership->category)
+                        <div class="membership-category">{{ $subscription->membership->category->name }}</div>
+                        @endif
+                        <div class="subscription-number">{{ $subscription->subscription_number }}</div>
+                    </div>
                 </div>
+
+                <div class="card-footer">
+                    <div class="expiry-section">
+                        <div class="expiry-label">EXPIRES</div>
+                        <div class="expiry-date">{{ $subscription->expires_at->format('M d, Y') }}</div>
+                    </div>
+                    <div class="business-name">{{ $subscription->membership->business->name }}</div>
+                </div>
+            </div>
+
+            <!-- Right Side: QR Code -->
+            <div class="card-right">
                 <div class="qr-code">
-                    <img src="data:image/png;base64,{{ $qrCodeBase64 }}" alt="QR Code">
-                </div>
-            </div>
-
-            <div class="card-body">
-                <div class="member-name">{{ $subscription->member_name }}</div>
-                <div class="membership-name">{{ $subscription->membership->name }}</div>
-                <div class="subscription-number">{{ $subscription->subscription_number }}</div>
-            </div>
-
-            <div class="card-footer">
-                <div>
-                    <div class="expiry-label">EXPIRES</div>
-                    <div class="expiry-date">{{ $subscription->expires_at->format('M d, Y') }}</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 8pt; opacity: 0.7;">{{ $subscription->membership->business->name }}</div>
+                    <img src="data:image/svg+xml;base64,{{ $qrCodeBase64 }}" alt="QR Code">
                 </div>
             </div>
         </div>

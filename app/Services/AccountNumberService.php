@@ -36,6 +36,16 @@ class AccountNumberService
     const CACHE_KEY_LAST_USED_INVOICE_ACCOUNT = 'account_number_service:last_used_invoice_account';
     
     /**
+     * Cache key for membership pool accounts list
+     */
+    const CACHE_KEY_MEMBERSHIP_POOL_ACCOUNTS = 'account_number_service:membership_pool_accounts';
+    
+    /**
+     * Cache key for last used membership account
+     */
+    const CACHE_KEY_LAST_USED_MEMBERSHIP_ACCOUNT = 'account_number_service:last_used_membership_account';
+    
+    /**
      * Cache TTL in seconds (300 seconds = 5 minutes)
      * Increased from 60s to 300s to prevent frequent cache expiration
      */
@@ -467,7 +477,7 @@ class AccountNumberService
                     ->where(function ($query) {
                         // Check if payment is for invoice (has invoice_id in email_data or service is 'invoice')
                         $query->whereJsonContains('email_data->service', 'invoice')
-                            ->orWhereJsonContains('email_data->invoice_id');
+                            ->orWhereNotNull('email_data->invoice_id');
                     })
                     ->pluck('account_number')
                     ->unique()
@@ -497,7 +507,7 @@ class AccountNumberService
                     })
                     ->where(function ($query) {
                         $query->whereJsonContains('email_data->service', 'invoice')
-                            ->orWhereJsonContains('email_data->invoice_id');
+                            ->orWhereNotNull('email_data->invoice_id');
                     })
                     ->orderBy('created_at', 'desc')
                     ->first();
@@ -518,11 +528,178 @@ class AccountNumberService
     }
 
     /**
+     * Assign membership pool account number to payment request
+     * Similar to invoice pool but for membership payments
+     */
+    public function assignMembershipAccountNumber(?Business $business = null): ?AccountNumber
+    {
+        $startTime = microtime(true);
+
+        // Get membership pool accounts from cache
+        $membershipPoolAccounts = Cache::remember(self::CACHE_KEY_MEMBERSHIP_POOL_ACCOUNTS, self::CACHE_TTL, function () {
+            return AccountNumber::membershipPool()
+                ->orderBy('id')
+                ->get();
+        });
+
+        if ($membershipPoolAccounts->isEmpty()) {
+            Log::warning('No available membership pool account number found');
+            return null;
+        }
+
+        // Get pending membership account numbers
+        $pendingMembershipAccountNumbers = $this->getPendingMembershipAccountNumbers();
+        
+        // Get last used membership account number
+        $lastUsedMembershipAccountNumber = $this->getLastUsedMembershipAccountNumber();
+        $lastUsedMembershipAccountId = null;
+        
+        // Create lookup arrays
+        $membershipPoolAccountsById = [];
+        $membershipPoolAccountsByNumber = [];
+        foreach ($membershipPoolAccounts as $account) {
+            $membershipPoolAccountsById[$account->id] = $account;
+            $membershipPoolAccountsByNumber[$account->account_number] = $account;
+        }
+        
+        if ($lastUsedMembershipAccountNumber) {
+            $lastUsedAccount = $membershipPoolAccountsByNumber[$lastUsedMembershipAccountNumber] ?? null;
+            if ($lastUsedAccount) {
+                $lastUsedMembershipAccountId = $lastUsedAccount->id;
+            }
+        }
+
+        $membershipPoolAccountsArray = $membershipPoolAccounts->values()->all();
+        $poolCount = count($membershipPoolAccountsArray);
+        
+        // Find starting point: next account after last used (by ID)
+        $startIndex = 0;
+        if ($lastUsedMembershipAccountId && isset($membershipPoolAccountsById[$lastUsedMembershipAccountId])) {
+            $lastUsedIndex = array_search($lastUsedMembershipAccountId, array_column($membershipPoolAccountsArray, 'id'));
+            
+            if ($lastUsedIndex !== false) {
+                $startIndex = $lastUsedIndex + 1;
+            }
+        }
+
+        // Use array key lookup for pending check
+        $pendingMembershipAccountNumbersSet = array_flip($pendingMembershipAccountNumbers);
+        
+        // Try to find the next available account
+        $selectedAccount = null;
+        
+        // First pass: Try to find account without pending payments
+        for ($i = 0; $i < $poolCount; $i++) {
+            $index = ($startIndex + $i) % $poolCount;
+            $account = $membershipPoolAccountsArray[$index];
+            
+            if (!isset($pendingMembershipAccountNumbersSet[$account->account_number])) {
+                $selectedAccount = $account;
+                break;
+            }
+        }
+        
+        // Second pass: If all accounts have pending payments, use the next one sequentially
+        if (!$selectedAccount) {
+            $selectedAccount = $membershipPoolAccountsArray[$startIndex % $poolCount] ?? $membershipPoolAccountsArray[0];
+        }
+
+        // Update cache with last used account
+        Cache::put(self::CACHE_KEY_LAST_USED_MEMBERSHIP_ACCOUNT, $selectedAccount->account_number, self::CACHE_TTL);
+
+        $duration = (microtime(true) - $startTime) * 1000;
+        Log::info('Assigned membership pool account number', [
+            'business_id' => $business?->id,
+            'account_number' => $selectedAccount->account_number,
+            'account_id' => $selectedAccount->id,
+            'pool_size' => $membershipPoolAccounts->count(),
+            'pending_accounts_count' => count($pendingMembershipAccountNumbers),
+            'last_used_account' => $lastUsedMembershipAccountNumber,
+            'duration_ms' => round($duration, 2),
+        ]);
+
+        return $selectedAccount;
+    }
+
+    /**
+     * Get pending membership account numbers (cached)
+     */
+    protected function getPendingMembershipAccountNumbers(): array
+    {
+        return Cache::remember(
+            self::CACHE_KEY_MEMBERSHIP_POOL_ACCOUNTS . ':pending',
+            self::CACHE_TTL,
+            function () {
+                if (!class_exists(Payment::class)) {
+                    return [];
+                }
+                
+                return Payment::where('status', Payment::STATUS_PENDING)
+                    ->whereNotNull('account_number')
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', now());
+                    })
+                    ->where(function ($query) {
+                        // Check if payment is for membership (has membership_id in email_data or service is 'membership')
+                        $query->whereJsonContains('email_data->service', 'membership')
+                            ->orWhereNotNull('email_data->membership_id');
+                    })
+                    ->pluck('account_number')
+                    ->unique()
+                    ->toArray();
+            }
+        );
+    }
+
+    /**
+     * Get last used membership account number (cached)
+     */
+    protected function getLastUsedMembershipAccountNumber(): ?string
+    {
+        return Cache::remember(
+            self::CACHE_KEY_LAST_USED_MEMBERSHIP_ACCOUNT,
+            self::CACHE_TTL,
+            function () {
+                if (!class_exists(Payment::class)) {
+                    return null;
+                }
+                
+                $lastPayment = Payment::where('status', Payment::STATUS_PENDING)
+                    ->whereNotNull('account_number')
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', now());
+                    })
+                    ->where(function ($query) {
+                        $query->whereJsonContains('email_data->service', 'membership')
+                            ->orWhereNotNull('email_data->membership_id');
+                    })
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+                
+                return $lastPayment ? $lastPayment->account_number : null;
+            }
+        );
+    }
+
+    /**
+     * Invalidate cache for membership pool accounts
+     */
+    public function invalidateMembershipPoolCache(): void
+    {
+        Cache::forget(self::CACHE_KEY_MEMBERSHIP_POOL_ACCOUNTS);
+        Cache::forget(self::CACHE_KEY_LAST_USED_MEMBERSHIP_ACCOUNT);
+        Cache::forget(self::CACHE_KEY_MEMBERSHIP_POOL_ACCOUNTS . ':pending');
+    }
+
+    /**
      * Invalidate all account number caches
      */
     public function invalidateAllCaches(): void
     {
         $this->invalidatePendingAccountsCache();
         $this->invalidateInvoicePoolCache();
+        $this->invalidateMembershipPoolCache();
     }
 }

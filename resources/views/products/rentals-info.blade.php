@@ -32,17 +32,14 @@
                     <i class="fas fa-box text-primary text-3xl"></i>
                 </div>
                 <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
-                    Equipment Rentals Made Easy
+                    Rentals
                 </h1>
                 <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
-                    A flexible platform for businesses to rent out equipment, vehicles, properties, and more to customers on a short-term or long-term basis.
+                    Rent equipment, vehicles, properties. Manage availability and bookings.
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                     <a href="{{ route('rentals.index') }}" class="w-full sm:w-auto bg-primary text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/90 font-medium text-base sm:text-lg transition-colors shadow-lg">
                         Browse Rentals
-                    </a>
-                    <a href="#features" class="w-full sm:w-auto bg-white text-primary border-2 border-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/5 font-medium text-base sm:text-lg transition-colors">
-                        Learn More
                     </a>
                 </div>
             </div>
@@ -53,8 +50,8 @@
     <section id="features" class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Everything You Need for Rental Management</h2>
-                <p class="text-lg text-gray-600 max-w-2xl mx-auto">Powerful rental features with flexible pricing and availability tracking</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">List items. Set availability. Accept bookings.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 <!-- Feature 1 -->
@@ -73,9 +70,9 @@
                     <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-check-circle text-green-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Availability Management</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Availability</h3>
                     <p class="text-gray-600">
-                        Track item availability and prevent double bookings. Automatic calendar management for seamless rentals.
+                        Track availability. Prevent double bookings.
                     </p>
                 </div>
 
@@ -97,7 +94,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-3">Location-Based</h3>
                     <p class="text-gray-600">
-                        Filter rentals by city to find items near you. Perfect for local equipment and property rentals.
+                        Filter rentals by city.
                     </p>
                 </div>
 
@@ -185,14 +182,14 @@
     <section class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Perfect For</h2>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Use Cases</h2>
                 <p class="text-lg text-gray-600">Whether you're renting equipment, vehicles, or properties</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-camera text-primary text-3xl mb-4"></i>
                     <h3 class="font-bold text-gray-900 mb-2">Camera & Equipment</h3>
-                    <p class="text-sm text-gray-600">Professional cameras, lenses, lighting equipment, and video gear</p>
+                    <p class="text-sm text-gray-600">Camera and equipment</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-car text-primary text-3xl mb-4"></i>
@@ -202,12 +199,12 @@
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-building text-primary text-3xl mb-4"></i>
                     <h3 class="font-bold text-gray-900 mb-2">Properties</h3>
-                    <p class="text-sm text-gray-600">Apartments, houses, event spaces, and commercial properties</p>
+                    <p class="text-sm text-gray-600">Properties</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-tools text-primary text-3xl mb-4"></i>
                     <h3 class="font-bold text-gray-900 mb-2">Tools & Equipment</h3>
-                    <p class="text-sm text-gray-600">Construction tools, party equipment, furniture, and more</p>
+                    <p class="text-sm text-gray-600">Tools and equipment</p>
                 </div>
             </div>
         </div>
@@ -216,14 +213,11 @@
     <!-- CTA Section -->
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Renting?</h2>
-            <p class="text-lg md:text-xl text-primary-100 mb-8">List your items or browse available rentals today!</p>
+            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Get Started</h2>
+            <p class="text-lg md:text-xl text-primary-100 mb-8">Create an account.</p>
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                 <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                    Create Free Account
-                </a>
-                <a href="{{ route('rentals.index') }}" class="w-full sm:w-auto bg-transparent text-white border-2 border-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-white/10 font-medium text-base sm:text-lg transition-colors">
-                    Browse Rentals
+                    Create Account
                 </a>
             </div>
         </div>

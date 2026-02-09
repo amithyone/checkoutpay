@@ -83,12 +83,51 @@
                     @error('cover_image')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
-                    <div class="flex gap-2">
-                        <input type="color" name="background_color" value="{{ old('background_color', '#1e293b') }}" class="h-10 w-20 border border-gray-300 rounded-lg cursor-pointer">
-                        <input type="text" name="background_color_text" id="background_color_text" value="{{ old('background_color', '#1e293b') }}" placeholder="#1e293b" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg" onchange="updateColorPicker(this.value)">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Background Color</label>
+                    
+                    <!-- Selected Color Preview -->
+                    @php
+                        $colorOptions = [
+                            ['value' => '#1e3a5f', 'name' => 'Oxford Blue', 'class' => 'bg-[#1e3a5f]'],
+                            ['value' => '#0f4c3c', 'name' => 'Deep Teal', 'class' => 'bg-[#0f4c3c]'],
+                            ['value' => '#7c2d12', 'name' => 'Burgundy', 'class' => 'bg-[#7c2d12]'],
+                            ['value' => '#1e3a1e', 'name' => 'Forest Green', 'class' => 'bg-[#1e3a1e]'],
+                            ['value' => '#4c1d4f', 'name' => 'Slate Purple', 'class' => 'bg-[#4c1d4f]'],
+                            ['value' => '#000000', 'name' => 'Black', 'class' => 'bg-[#000000]'],
+                            ['value' => '#ffffff', 'name' => 'White', 'class' => 'bg-[#ffffff] border-2'],
+                        ];
+                        $selectedColor = old('background_color', '#1e3a5f');
+                        $selectedColorName = collect($colorOptions)->firstWhere('value', $selectedColor)['name'] ?? 'Oxford Blue';
+                    @endphp
+                    
+                    <div class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex items-center gap-3">
+                            <div class="w-16 h-16 rounded-lg border-2 border-gray-300 shadow-sm" 
+                                 style="background-color: {{ $selectedColor }};"
+                                 id="selected-color-preview"></div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-700">Selected Color</p>
+                                <p class="text-xs text-gray-500">{{ $selectedColorName }} ({{ $selectedColor }})</p>
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Used as fallback if no cover image is uploaded. Default: Dark gray gradient.</p>
+                    
+                    <div class="flex gap-3 flex-wrap">
+                        @foreach($colorOptions as $color)
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="background_color" value="{{ $color['value'] }}" 
+                                       {{ $selectedColor === $color['value'] ? 'checked' : '' }} 
+                                       class="hidden color-radio">
+                                <div class="flex flex-col items-center gap-1">
+                                    <div class="w-12 h-12 {{ $color['class'] }} rounded-lg border-2 transition-all 
+                                                {{ $selectedColor === $color['value'] ? 'border-gray-800 ring-2 ring-gray-400 ring-offset-2' : ($color['value'] === '#ffffff' ? 'border-gray-400' : 'border-gray-300 hover:border-gray-400') }} 
+                                                shadow-sm"></div>
+                                    <span class="text-xs text-gray-600 group-hover:text-gray-800">{{ $color['name'] }}</span>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Select a color for your event page background. White text will be used for readability.</p>
                     @error('background_color')<p class="text-red-500 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
             </div>
@@ -371,15 +410,37 @@ function addTicketType() {
     }
 })();
 
-// Sync color picker and text input
-document.querySelector('input[name="background_color"]').addEventListener('input', function(e) {
-    document.getElementById('background_color_text').value = e.target.value;
+// Handle color selection with radio buttons
+document.querySelectorAll('input[name="background_color"].color-radio').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        // Update preview
+        const preview = document.getElementById('selected-color-preview');
+        const previewText = preview?.nextElementSibling?.querySelector('p:last-child');
+        if (preview) {
+            preview.style.backgroundColor = this.value;
+        }
+        if (previewText) {
+            const colorName = this.closest('label').querySelector('span').textContent.trim();
+            previewText.textContent = colorName + ' (' + this.value + ')';
+        }
+        
+        // Update visual selection state
+        document.querySelectorAll('.color-radio').forEach(function(r) {
+            const colorDiv = r.closest('label').querySelector('div > div');
+            const isWhite = r.value === '#ffffff';
+            if (r.checked) {
+                colorDiv.classList.remove('border-gray-300', 'border-gray-400', 'hover:border-gray-400');
+                colorDiv.classList.add('border-gray-800', 'ring-2', 'ring-gray-400', 'ring-offset-2');
+            } else {
+                colorDiv.classList.remove('border-gray-800', 'ring-2', 'ring-gray-400', 'ring-offset-2');
+                if (isWhite) {
+                    colorDiv.classList.add('border-gray-400');
+                } else {
+                    colorDiv.classList.add('border-gray-300', 'hover:border-gray-400');
+                }
+            }
+        });
+    });
 });
-
-function updateColorPicker(value) {
-    if (/^#[0-9A-F]{6}$/i.test(value)) {
-        document.querySelector('input[name="background_color"]').value = value;
-    }
-}
 </script>
 @endsection

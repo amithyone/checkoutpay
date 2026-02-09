@@ -22,14 +22,20 @@ class PaymentService
         // Generate transaction ID if not provided
         $transactionId = $data['transaction_id'] ?? $this->generateTransactionId();
 
-        // Assign account number - use invoice pool if this is an invoice payment
+        // Assign account number based on payment type
+        $isMembership = isset($data['service']) && $data['service'] === 'membership';
+        
         if ($isInvoice) {
+            // Invoice payments use invoice pool
             $accountNumber = $this->accountNumberService->assignInvoiceAccountNumber($business);
-            // Invalidate invoice pool cache
             $this->accountNumberService->invalidateInvoicePoolCache();
+        } elseif ($isMembership) {
+            // Membership payments use membership pool
+            $accountNumber = $this->accountNumberService->assignMembershipAccountNumber($business);
+            $this->accountNumberService->invalidateMembershipPoolCache();
         } else {
+            // Regular payments use regular pool
             $accountNumber = $this->accountNumberService->assignAccountNumber($business);
-            // Invalidate regular pool cache
             $this->accountNumberService->invalidatePendingAccountsCache();
         }
         
@@ -38,6 +44,10 @@ class PaymentService
         }
 
         // Create payment
+        // Invoice payments never expire - they remain active until paid
+        // Regular payments expire after 24 hours
+        $expiresAt = $isInvoice ? null : now()->addHours(24);
+        
         $payment = Payment::create([
             'transaction_id' => $transactionId,
             'amount' => $data['amount'],
@@ -48,7 +58,7 @@ class PaymentService
             'business_id' => $business->id,
             'status' => Payment::STATUS_PENDING,
             'email_data' => $this->buildEmailData($data, $request),
-            'expires_at' => now()->addHours(24), // Payments expire after 24 hours
+            'expires_at' => $expiresAt,
         ]);
 
         // Set website if provided

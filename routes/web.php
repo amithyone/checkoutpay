@@ -120,6 +120,9 @@ Route::prefix('memberships')->name('memberships.')->group(function () {
     // Card download
     Route::get('card/{subscriptionNumber}/download', [\App\Http\Controllers\Public\MembershipCardController::class, 'download'])->name('card.download');
     Route::get('card/{subscriptionNumber}/view', [\App\Http\Controllers\Public\MembershipCardController::class, 'view'])->name('card.view');
+    
+    // Find membership
+    Route::post('find', [\App\Http\Controllers\Public\MembershipController::class, 'findMembership'])->name('find');
 });
 
 // Public rentals routes

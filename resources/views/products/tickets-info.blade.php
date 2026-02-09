@@ -32,17 +32,14 @@
                     <i class="fas fa-ticket-alt text-primary text-3xl"></i>
                 </div>
                 <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
-                    Event Ticketing Made Simple
+                    Event Tickets
                 </h1>
                 <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
-                    A comprehensive event ticketing solution for businesses to sell tickets, manage events, and verify attendees with QR codes.
+                    Sell tickets for events. QR code verification. Digital delivery.
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                     <a href="{{ route('tickets.index') }}" class="w-full sm:w-auto bg-primary text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/90 font-medium text-base sm:text-lg transition-colors shadow-lg">
                         Browse Events
-                    </a>
-                    <a href="#features" class="w-full sm:w-auto bg-white text-primary border-2 border-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/5 font-medium text-base sm:text-lg transition-colors">
-                        Learn More
                     </a>
                 </div>
             </div>
@@ -53,8 +50,8 @@
     <section id="features" class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Everything You Need for Event Ticketing</h2>
-                <p class="text-lg text-gray-600 max-w-2xl mx-auto">Powerful ticketing features with QR code verification and digital delivery</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">Create events. Sell tickets. Verify with QR codes.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 <!-- Feature 1 -->
@@ -62,9 +59,9 @@
                     <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-calendar-alt text-blue-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Event Management</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Events</h3>
                     <p class="text-gray-600">
-                        Create and manage multiple events with detailed information, dates, venues, and descriptions. Full event lifecycle management.
+                        Create events. Set dates, venues, descriptions.
                     </p>
                 </div>
 
@@ -73,9 +70,9 @@
                     <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-ticket-alt text-green-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Multiple Ticket Types</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Ticket Types</h3>
                     <p class="text-gray-600">
-                        Offer different ticket tiers (VIP, General Admission, Early Bird, etc.) with varying prices and benefits.
+                        Multiple ticket tiers. Set prices and quantities.
                     </p>
                 </div>
 
@@ -131,7 +128,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
-                <p class="text-lg text-gray-600">Get started in minutes</p>
+                <p class="text-lg text-gray-600">Create events. Sell tickets. Verify with QR codes.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <!-- Step 1 -->
@@ -185,8 +182,8 @@
     <section class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Perfect For</h2>
-                <p class="text-lg text-gray-600">Whether you're hosting concerts, conferences, or any event</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Use Cases</h2>
+                <p class="text-lg text-gray-600">For businesses hosting events.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
@@ -197,7 +194,7 @@
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-users text-primary text-3xl mb-4"></i>
                     <h3 class="font-bold text-gray-900 mb-2">Conferences</h3>
-                    <p class="text-sm text-gray-600">Manage professional conferences, workshops, and training sessions</p>
+                    <p class="text-sm text-gray-600">Conferences and workshops</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-theater-masks text-primary text-3xl mb-4"></i>
@@ -207,7 +204,7 @@
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-running text-primary text-3xl mb-4"></i>
                     <h3 class="font-bold text-gray-900 mb-2">Sports Events</h3>
-                    <p class="text-sm text-gray-600">Manage tickets for sports matches, tournaments, and competitions</p>
+                    <p class="text-sm text-gray-600">Sports events</p>
                 </div>
             </div>
         </div>
@@ -216,14 +213,11 @@
     <!-- CTA Section -->
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Selling Tickets?</h2>
-            <p class="text-lg md:text-xl text-primary-100 mb-8">Create your first event and start selling tickets today!</p>
+            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Get Started</h2>
+            <p class="text-lg md:text-xl text-primary-100 mb-8">Create an account.</p>
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                 <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                    Create Free Account
-                </a>
-                <a href="{{ route('tickets.index') }}" class="w-full sm:w-auto bg-transparent text-white border-2 border-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-white/10 font-medium text-base sm:text-lg transition-colors">
-                    Browse Events
+                    Create Account
                 </a>
             </div>
         </div>

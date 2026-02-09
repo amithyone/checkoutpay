@@ -21,6 +21,7 @@ class MembershipSubscription extends Model
         'subscription_number',
         'start_date',
         'expires_at',
+        'expiration_email_sent_at',
         'status',
         'qr_code_data',
         'card_pdf_path',
@@ -29,6 +30,7 @@ class MembershipSubscription extends Model
     protected $casts = [
         'start_date' => 'date',
         'expires_at' => 'date',
+        'expiration_email_sent_at' => 'datetime',
     ];
 
     protected static function boot()

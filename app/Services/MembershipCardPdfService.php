@@ -30,11 +30,13 @@ class MembershipCardPdfService
             'business' => $subscription->membership->business->name,
         ]);
 
-        // Generate QR code as base64 image
-        $qrCode = QrCode::format('png')
+        // Generate QR code as SVG (doesn't require imagick)
+        $qrCode = QrCode::format('svg')
             ->size(200)
+            ->margin(2)
             ->generate($qrData);
 
+        // SVG is already a string, return as base64
         return base64_encode($qrCode);
     }
 
@@ -57,8 +59,9 @@ class MembershipCardPdfService
                 'qrCodeBase64' => $qrCodeBase64,
             ]);
 
-            // Set paper size to card size (credit card size: 85.60mm x 53.98mm)
-            $pdf->setPaper([0, 0, 324, 204], 'portrait'); // ~85.6mm x 53.98mm in points
+            // Set paper size to landscape card size (credit card size: 85.60mm x 53.98mm)
+            // Landscape: width=204pt, height=324pt
+            $pdf->setPaper([0, 0, 204, 324], 'landscape'); // ~53.98mm x 85.6mm in points (landscape)
 
             // Save to storage
             $filename = "membership-cards/card-{$subscription->subscription_number}.pdf";
@@ -122,7 +125,7 @@ class MembershipCardPdfService
             'qrCodeBase64' => $qrCodeBase64,
         ]);
 
-        $pdf->setPaper([0, 0, 324, 204], 'portrait');
+        $pdf->setPaper([0, 0, 204, 324], 'landscape');
 
         return $pdf->stream("Membership-Card-{$subscription->subscription_number}.pdf");
     }

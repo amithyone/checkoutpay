@@ -7,6 +7,7 @@ use App\Models\Rental;
 use App\Models\RentalItem;
 use App\Models\Renter;
 use App\Services\NubanValidationService;
+use App\Services\RecaptchaService;
 use App\Mail\RentalRequestReceived;
 use App\Mail\RentalReceipt;
 use Illuminate\Http\Request;
@@ -21,7 +22,8 @@ use Illuminate\Http\RedirectResponse;
 class RentalRequestController extends Controller
 {
     public function __construct(
-        protected NubanValidationService $nubanService
+        protected NubanValidationService $nubanService,
+        protected RecaptchaService $recaptcha
     ) {}
 
     /**
@@ -81,6 +83,20 @@ class RentalRequestController extends Controller
      */
     public function createAccount(Request $request): RedirectResponse
     {
+        if ($this->recaptcha->isEnabled()) {
+            $request->validate([
+                'g-recaptcha-response' => 'required',
+            ], [
+                'g-recaptcha-response.required' => 'Please complete the reCAPTCHA verification.',
+            ]);
+
+            if (!$this->recaptcha->verify($request->input('g-recaptcha-response'), $request->ip())) {
+                return back()->withErrors([
+                    'g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.',
+                ])->withInput($request->except('password', 'password_confirmation'));
+            }
+        }
+
         $validated = $request->validate([
             'email' => 'required|email|max:255|unique:renters,email',
             'password' => 'required|string|min:8|confirmed',

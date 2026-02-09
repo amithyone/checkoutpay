@@ -32,17 +32,14 @@
                     <i class="fas fa-file-invoice text-primary text-3xl"></i>
                 </div>
                 <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
-                    Professional Invoices Made Simple
+                    Invoices
                 </h1>
                 <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
-                    Create beautiful, professional invoices for your clients. Free to use with integrated payment links for seamless payment collection.
+                    Create invoices with payment links. PDF export included.
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                     <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-primary text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/90 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                        Get Started Free
-                    </a>
-                    <a href="#features" class="w-full sm:w-auto bg-white text-primary border-2 border-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/5 font-medium text-base sm:text-lg transition-colors">
-                        Learn More
+                        Create Account
                     </a>
                 </div>
             </div>
@@ -62,9 +59,9 @@
                     <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-gift text-green-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">100% Free</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Free</h3>
                     <p class="text-gray-600">
-                        Create unlimited invoices at no cost. No hidden fees, no subscription required. Professional invoicing for everyone.
+                        Create invoices. No subscription required.
                     </p>
                 </div>
 
@@ -73,9 +70,9 @@
                     <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-paint-brush text-blue-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Professional Templates</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Templates</h3>
                     <p class="text-gray-600">
-                        Beautiful, customizable invoice templates that reflect your brand. Add your logo, colors, and branding.
+                        Customizable invoice templates. Add logo and branding.
                     </p>
                 </div>
 
@@ -95,9 +92,9 @@
                     <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-envelope text-orange-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Email Invoices</h3>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Email</h3>
                     <p class="text-gray-600">
-                        Send invoices directly to clients via email. Professional email templates with invoice PDF attachments.
+                        Send invoices via email. PDF attachments included.
                     </p>
                 </div>
 
@@ -108,7 +105,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-3">PDF Export</h3>
                     <p class="text-gray-600">
-                        Download invoices as professional PDF files. Perfect for record-keeping and offline sharing.
+                        Download invoices as PDF files.
                     </p>
                 </div>
 
@@ -119,7 +116,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-3">Track Payments</h3>
                     <p class="text-gray-600">
-                        Monitor invoice status in real-time. See which invoices are paid, pending, or overdue at a glance.
+                        Monitor invoice status. View paid, pending, or overdue.
                     </p>
                 </div>
 
@@ -141,7 +138,7 @@
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-3">QR Code Payments</h3>
                     <p class="text-gray-600">
-                        Generate QR codes for payment links. Clients can scan and pay instantly using their mobile banking apps.
+                        Generate QR codes for payment links.
                     </p>
                 </div>
 
@@ -256,14 +253,14 @@
     <section class="py-12 sm:py-16 md:py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Perfect For</h2>
-                <p class="text-lg text-gray-600">Whether you're a freelancer, small business, or enterprise</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Use Cases</h2>
+                <p class="text-lg text-gray-600">For businesses that need to invoice clients.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-user-tie text-primary text-3xl mb-4"></i>
                     <h3 class="font-bold text-gray-900 mb-2">Freelancers</h3>
-                    <p class="text-sm text-gray-600">Professional invoices for your clients</p>
+                    <p class="text-sm text-gray-600">Create invoices for clients</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-store text-primary text-3xl mb-4"></i>
@@ -273,7 +270,7 @@
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-building text-primary text-3xl mb-4"></i>
                     <h3 class="font-bold text-gray-900 mb-2">Agencies</h3>
-                    <p class="text-sm text-gray-600">Manage multiple client invoices</p>
+                    <p class="text-sm text-gray-600">Invoice multiple clients</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 text-center shadow-sm border border-gray-200">
                     <i class="fas fa-briefcase text-primary text-3xl mb-4"></i>
@@ -287,14 +284,11 @@
     <!-- CTA Section -->
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Invoicing?</h2>
-            <p class="text-lg md:text-xl text-primary-100 mb-8">Create your first professional invoice in minutes. It's completely free!</p>
+            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Get Started</h2>
+            <p class="text-lg md:text-xl text-primary-100 mb-8">Create an account.</p>
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                 <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                    Create Free Account
-                </a>
-                <a href="{{ route('business.login') }}" class="w-full sm:w-auto bg-transparent text-white border-2 border-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-white/10 font-medium text-base sm:text-lg transition-colors">
-                    Already have an account? Login
+                    Create Account
                 </a>
             </div>
         </div>

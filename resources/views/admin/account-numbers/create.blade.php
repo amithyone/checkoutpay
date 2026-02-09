@@ -21,13 +21,21 @@
                             <span>Invoice Pool Account</span>
                         </label>
                         <label class="flex items-center">
+                            <input type="radio" name="account_type" value="membership_pool" class="mr-2" onchange="toggleAccountType()">
+                            <span>Membership Pool Account</span>
+                        </label>
+                        <label class="flex items-center">
                             <input type="radio" name="account_type" value="business" class="mr-2" onchange="toggleAccountType()">
                             <span>Business-Specific</span>
                         </label>
                     </div>
                     <input type="hidden" name="is_pool" id="is_pool" value="1">
                     <input type="hidden" name="is_invoice_pool" id="is_invoice_pool" value="0">
-                    <p class="mt-2 text-xs text-gray-500">Invoice pool accounts are dedicated for invoice payments only.</p>
+                    <input type="hidden" name="is_membership_pool" id="is_membership_pool" value="0">
+                    <p class="mt-2 text-xs text-gray-500">
+                        <strong>Invoice Pool:</strong> Dedicated for invoice payments only.<br>
+                        <strong>Membership Pool:</strong> Dedicated for membership payments only.
+                    </p>
                 </div>
 
                 <div id="business-select" style="display: none;">
@@ -122,21 +130,31 @@
         const accountType = document.querySelector('input[name="account_type"]:checked')?.value;
         const isPoolInput = document.getElementById('is_pool');
         const isInvoicePoolInput = document.getElementById('is_invoice_pool');
+        const isMembershipPoolInput = document.getElementById('is_membership_pool');
         const businessSelect = document.getElementById('business-select');
         
         if (accountType === 'regular_pool') {
             isPoolInput.value = '1';
             isInvoicePoolInput.value = '0';
+            isMembershipPoolInput.value = '0';
             businessSelect.style.display = 'none';
             document.getElementById('business_id').value = '';
         } else if (accountType === 'invoice_pool') {
             isPoolInput.value = '0';
             isInvoicePoolInput.value = '1';
+            isMembershipPoolInput.value = '0';
+            businessSelect.style.display = 'none';
+            document.getElementById('business_id').value = '';
+        } else if (accountType === 'membership_pool') {
+            isPoolInput.value = '0';
+            isInvoicePoolInput.value = '0';
+            isMembershipPoolInput.value = '1';
             businessSelect.style.display = 'none';
             document.getElementById('business_id').value = '';
         } else if (accountType === 'business') {
             isPoolInput.value = '0';
             isInvoicePoolInput.value = '0';
+            isMembershipPoolInput.value = '0';
             businessSelect.style.display = 'block';
         }
     }

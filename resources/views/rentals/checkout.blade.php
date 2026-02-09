@@ -19,6 +19,9 @@
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    @if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+    <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}" async defer></script>
+    @endif
 </head>
 <body class="bg-gray-50">
     @include('partials.nav')
@@ -113,6 +116,13 @@
                         <input type="text" name="address" class="w-full border-gray-300 rounded-md" value="{{ old('address') }}">
                     </div>
                 </div>
+
+                @if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response" value="">
+                @error('g-recaptcha-response')
+                    <p class="text-red-600 text-sm mt-1 mb-2">{{ $message }}</p>
+                @enderror
+                @endif
 
                 <button type="submit" id="submitBtn" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">
                     <i class="fas fa-user-check mr-2"></i> Verify & Create Account
@@ -227,6 +237,28 @@
                     bankDropdown.classList.add('hidden');
                 }
             });
+
+            // reCAPTCHA v3: get token on form submit
+            @if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+            const recaptchaSiteKey = @json(config('services.recaptcha.site_key'));
+            const accountForm = document.getElementById('accountForm');
+            const recaptchaInput = document.getElementById('g-recaptcha-response');
+            accountForm.addEventListener('submit', function(e) {
+                if (!recaptchaInput || recaptchaInput.value) return; // already have token or no recaptcha
+                e.preventDefault();
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Please wait...';
+                grecaptcha.ready(function() {
+                    grecaptcha.execute(recaptchaSiteKey, { action: 'rental_register' }).then(function(token) {
+                        recaptchaInput.value = token;
+                        accountForm.submit();
+                    }).catch(function() {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-user-check mr-2"></i> Verify & Create Account';
+                    });
+                });
+            });
+            @endif
         </script>
     </div>
 

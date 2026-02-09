@@ -23,6 +23,7 @@
                 <option value="">All Types</option>
                 <option value="pool" {{ request('type') === 'pool' ? 'selected' : '' }}>Regular Pool</option>
                 <option value="invoice_pool" {{ request('type') === 'invoice_pool' ? 'selected' : '' }}>Invoice Pool</option>
+                <option value="membership_pool" {{ request('type') === 'membership_pool' ? 'selected' : '' }}>Membership Pool</option>
                 <option value="business" {{ request('type') === 'business' ? 'selected' : '' }}>Business Accounts</option>
             </select>
             <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
@@ -61,6 +62,8 @@
                         <td class="px-6 py-4">
                             @if($account->is_invoice_pool)
                                 <span class="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">Invoice Pool</span>
+                            @elseif($account->is_membership_pool)
+                                <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">Membership Pool</span>
                             @elseif($account->is_pool)
                                 <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Regular Pool</span>
                             @else

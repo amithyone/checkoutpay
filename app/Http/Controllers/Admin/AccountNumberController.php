@@ -19,11 +19,13 @@ class AccountNumberController extends Controller
 
         // Filter by type
         if ($request->type === 'pool') {
-            $query->where('is_pool', true)->where('is_invoice_pool', false);
+            $query->where('is_pool', true)->where('is_invoice_pool', false)->where('is_membership_pool', false);
         } elseif ($request->type === 'invoice_pool') {
             $query->where('is_invoice_pool', true);
+        } elseif ($request->type === 'membership_pool') {
+            $query->where('is_membership_pool', true);
         } elseif ($request->type === 'business') {
-            $query->where('is_pool', false)->where('is_invoice_pool', false);
+            $query->where('is_pool', false)->where('is_invoice_pool', false)->where('is_membership_pool', false);
         }
 
         // Filter by status
@@ -82,7 +84,7 @@ class AccountNumberController extends Controller
             'account_name' => 'required|string|max:255',
             'bank_name' => 'required|string|max:255',
             'bank_code' => 'nullable|string|max:10',
-            'account_type' => 'required|in:regular_pool,invoice_pool,business',
+            'account_type' => 'required|in:regular_pool,invoice_pool,membership_pool,business',
             'business_id' => 'nullable|exists:businesses,id',
             'is_active' => 'boolean',
         ]);
@@ -91,15 +93,23 @@ class AccountNumberController extends Controller
         $accountType = $validated['account_type'];
         if ($accountType === 'invoice_pool') {
             $validated['is_invoice_pool'] = true;
+            $validated['is_membership_pool'] = false;
+            $validated['is_pool'] = false;
+            $validated['business_id'] = null;
+        } elseif ($accountType === 'membership_pool') {
+            $validated['is_membership_pool'] = true;
+            $validated['is_invoice_pool'] = false;
             $validated['is_pool'] = false;
             $validated['business_id'] = null;
         } elseif ($accountType === 'regular_pool') {
             $validated['is_invoice_pool'] = false;
+            $validated['is_membership_pool'] = false;
             $validated['is_pool'] = true;
             $validated['business_id'] = null;
         } else {
             // Business-specific
             $validated['is_invoice_pool'] = false;
+            $validated['is_membership_pool'] = false;
             $validated['is_pool'] = false;
             // business_id is required for business-specific accounts
             if (empty($validated['business_id'])) {
@@ -148,8 +158,8 @@ class AccountNumberController extends Controller
             'business_id' => 'nullable|exists:businesses,id',
         ]);
 
-        // Set business_id to null for pool accounts (regular or invoice)
-        if ($accountNumber->is_pool || $accountNumber->is_invoice_pool) {
+        // Set business_id to null for pool accounts (regular, invoice, or membership)
+        if ($accountNumber->is_pool || $accountNumber->is_invoice_pool || $accountNumber->is_membership_pool) {
             $validated['business_id'] = null;
         }
 

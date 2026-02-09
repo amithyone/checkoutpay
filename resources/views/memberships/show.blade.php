@@ -122,18 +122,24 @@
                     @endif
 
                     <!-- CTA Button -->
-                    <div class="mt-8">
+                    <div class="mt-8 space-y-3">
                         @if($membership->isAvailable())
                             <a href="{{ route('memberships.payment.show', $membership->slug) }}" class="block w-full bg-primary text-white text-center py-3 rounded-lg hover:bg-primary/90 font-medium text-lg">
                                 <i class="fas fa-id-card mr-2"></i> Join Now
                             </a>
-                            <p class="text-sm text-gray-600 text-center mt-2">Complete payment to activate your membership</p>
+                            <p class="text-sm text-gray-600 text-center">Complete payment to activate your membership</p>
                         @else
                             <button disabled class="block w-full bg-gray-300 text-gray-600 text-center py-3 rounded-lg font-medium text-lg cursor-not-allowed">
                                 Membership Full
                             </button>
-                            <p class="text-sm text-gray-600 text-center mt-2">This membership has reached its capacity limit</p>
+                            <p class="text-sm text-gray-600 text-center">This membership has reached its capacity limit</p>
                         @endif
+                        
+                        <!-- Find My Membership Button -->
+                        <button onclick="openFindModal()" class="block w-full bg-gray-100 text-gray-700 text-center py-3 rounded-lg hover:bg-gray-200 font-medium text-lg border border-gray-300">
+                            <i class="fas fa-search mr-2"></i> Find My Membership Card
+                        </button>
+                        <p class="text-sm text-gray-600 text-center">Lost your card? Find and download it here</p>
                     </div>
                 </div>
             </div>
@@ -175,5 +181,158 @@
     </div>
 
     @include('partials.footer')
+
+    <!-- Find Membership Modal -->
+    <div id="findModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">Find My Membership</h2>
+                    <button onclick="closeFindModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="findMembershipForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                        <input type="email" name="email" id="findEmail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="your@email.com">
+                    </div>
+                    
+                    <div class="relative">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-gray-300"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-2 bg-white text-gray-500">OR</span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                        <input type="tel" name="phone" id="findPhone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="+234 800 000 0000">
+                    </div>
+                    
+                    <div id="findError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"></div>
+                    
+                    <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">
+                        <i class="fas fa-search mr-2"></i> Find Membership
+                    </button>
+                </form>
+                
+                <!-- Results Section -->
+                <div id="findResults" class="hidden mt-6 space-y-4">
+                    <h3 class="font-semibold text-lg">Your Memberships</h3>
+                    <div id="findResultsList" class="space-y-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openFindModal() {
+            document.getElementById('findModal').classList.remove('hidden');
+        }
+        
+        function closeFindModal() {
+            document.getElementById('findModal').classList.add('hidden');
+            document.getElementById('findError').classList.add('hidden');
+            document.getElementById('findResults').classList.add('hidden');
+            document.getElementById('findMembershipForm').reset();
+        }
+        
+        document.getElementById('findMembershipForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('findEmail').value.trim();
+            const phone = document.getElementById('findPhone').value.trim();
+            const errorDiv = document.getElementById('findError');
+            const resultsDiv = document.getElementById('findResults');
+            const resultsList = document.getElementById('findResultsList');
+            
+            if (!email && !phone) {
+                errorDiv.textContent = 'Please enter either an email address or phone number.';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            errorDiv.classList.add('hidden');
+            resultsDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch('{{ route("memberships.find") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ email, phone })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    errorDiv.textContent = data.message || 'No membership found. Please check your email or phone number.';
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+                
+                // Display results
+                resultsList.innerHTML = '';
+                data.subscriptions.forEach(function(subscription) {
+                    const isExpired = subscription.is_expired || subscription.status === 'expired';
+                    const cardHtml = `
+                        <div class="border border-gray-200 rounded-lg p-4 ${isExpired ? 'bg-red-50 border-red-200' : 'bg-white'}">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <h4 class="font-semibold text-lg">${subscription.membership_name}</h4>
+                                    <p class="text-sm text-gray-600">${subscription.business_name}</p>
+                                </div>
+                                ${isExpired ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-semibold">EXPIRED</span>' : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-semibold">ACTIVE</span>'}
+                            </div>
+                            <div class="text-sm text-gray-600 space-y-1 mb-3">
+                                <p><strong>Member:</strong> ${subscription.member_name}</p>
+                                <p><strong>Category:</strong> ${subscription.category}</p>
+                                <p><strong>Subscription #:</strong> ${subscription.subscription_number}</p>
+                                <p><strong>Expires:</strong> ${subscription.expires_at}</p>
+                            </div>
+                            ${isExpired ? `
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                                    <p class="text-sm text-yellow-800 font-semibold mb-2">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i> This membership has expired
+                                    </p>
+                                    <a href="${subscription.renewal_url}" class="block w-full bg-primary text-white text-center py-2 rounded-lg hover:bg-primary/90 text-sm font-medium">
+                                        <i class="fas fa-sync-alt mr-1"></i> Renew Membership
+                                    </a>
+                                </div>
+                            ` : ''}
+                            <div class="flex gap-2">
+                                <a href="${subscription.download_url}" class="flex-1 bg-primary text-white text-center py-2 rounded-lg hover:bg-primary/90 text-sm font-medium">
+                                    <i class="fas fa-download mr-1"></i> Download Card
+                                </a>
+                                <a href="${subscription.view_url}" target="_blank" class="flex-1 bg-gray-100 text-gray-700 text-center py-2 rounded-lg hover:bg-gray-200 text-sm font-medium">
+                                    <i class="fas fa-eye mr-1"></i> View Card
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    resultsList.innerHTML += cardHtml;
+                });
+                
+                resultsDiv.classList.remove('hidden');
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred. Please try again.';
+                errorDiv.classList.remove('hidden');
+                console.error('Error:', error);
+            }
+        });
+        
+        // Close modal on outside click
+        document.getElementById('findModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeFindModal();
+            }
+        });
+    </script>
 </body>
 </html>

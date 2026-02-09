@@ -23,51 +23,67 @@
             background: #fff;
         }
         .header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
             padding-bottom: 20px;
-            border-bottom: 3px solid #3C50E0;
+            border-bottom: 2px solid #3C50E0;
         }
-        .header-left {
+        .header-logo-section {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header .logo-container {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto;
             display: flex;
-            align-items: flex-start;
-            gap: 20px;
+            align-items: center;
+            justify-content: center;
         }
-        .header-left .logo-container {
-            max-width: 150px;
-            max-height: 80px;
-        }
-        .header-left .logo-container img {
-            max-width: 100%;
-            max-height: 100%;
+        .header .logo-container img {
+            max-width: 100px;
+            max-height: 100px;
+            width: auto;
+            height: auto;
             object-fit: contain;
         }
-        .header-left .invoice-info {
+        .header-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .header-left {
             flex: 1;
-        }
-        .header-left h1 {
-            font-size: 32px;
-            color: #3C50E0;
-            margin-bottom: 5px;
-        }
-        .header-left .invoice-label {
-            font-size: 14px;
-            color: #666;
+            text-align: left;
         }
         .header-right {
+            flex: 1;
             text-align: right;
         }
-        .header-right .business-name {
+        .header .business-name {
             font-size: 18px;
             font-weight: bold;
             color: #1a202c;
             margin-bottom: 5px;
         }
-        .header-right .business-details {
+        .header .business-details {
             font-size: 11px;
             color: #666;
             line-height: 1.5;
+            word-wrap: break-word;
+            word-break: break-word;
+            max-width: 350px;
+        }
+        .header h1 {
+            font-size: 36px;
+            color: #3C50E0;
+            margin: 0 0 5px 0;
+            font-weight: bold;
+        }
+        .header .invoice-label {
+            font-size: 14px;
+            color: #666;
+            margin: 0;
         }
         .invoice-info {
             display: flex;
@@ -194,35 +210,175 @@
             background-color: #fee2e2;
             color: #991b1b;
         }
+        .qr-code-section {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+        }
+        .qr-code-section img {
+            max-width: 150px;
+            height: auto;
+            border: 2px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 10px;
+            background: #fff;
+        }
+        .paid-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 72px;
+            font-weight: bold;
+            color: rgba(16, 185, 129, 0.15);
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .checkoutnow-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 120px;
+            font-weight: bold;
+            color: rgba(60, 80, 224, 0.2);
+            z-index: 999;
+            pointer-events: none;
+        }
+        .paid-badge-large {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            background-color: #10b981;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        .status-ribbon {
+            position: absolute;
+            top: 20px;
+            right: -40px;
+            width: 200px;
+            padding: 15px 0;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+            text-transform: uppercase;
+            transform: rotate(45deg);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+        }
+        .status-ribbon.paid {
+            background-color: #10b981;
+        }
+        .status-ribbon.unpaid {
+            background-color: #ef4444;
+        }
+        .status-ribbon-container {
+            position: relative;
+            overflow: hidden;
+        }
+        .payment-button {
+            display: inline-block;
+            background-color: #3C50E0;
+            color: #ffffff !important;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            text-decoration: none;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .payment-link-text {
+            font-weight: bold;
+            font-size: 12px;
+            color: #3C50E0;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        .powered-by {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .powered-by-text {
+            font-size: 10px;
+            color: #999;
+        }
+        .powered-by-logo {
+            max-height: 20px;
+            max-width: 120px;
+        }
     </style>
 </head>
 <body>
-    <div class="invoice-container">
+    <div class="invoice-container status-ribbon-container" style="position: relative;">
+        <!-- Status Ribbon Badge -->
+        @if(isset($isPaid) && $isPaid)
+        <div class="status-ribbon paid">PAID</div>
+        @else
+        <div class="status-ribbon unpaid">UNPAID</div>
+        @endif
+        
+        <!-- CheckOutNow Watermark (always shown) -->
+        <div class="checkoutnow-watermark">CheckOutNow</div>
+        @if(isset($isPaid) && $isPaid)
+        <div class="paid-watermark">PAID</div>
+        @endif
         <!-- Header -->
         <div class="header">
-            <div class="header-left">
+            <!-- Logo Section (First, Centered at Top) -->
+            <div class="header-logo-section">
                 @if($invoice->logo && Storage::disk('public')->exists($invoice->logo))
                 <div class="logo-container">
                     <img src="{{ storage_path('app/public/' . $invoice->logo) }}" alt="Logo">
                 </div>
                 @endif
-                <div class="invoice-info">
+            </div>
+            
+            <!-- Top Row: Business Name (Left) and Invoice Title (Right) - Aligned at Top -->
+            <div class="header-top-row">
+                <!-- Business Name Section (Left) -->
+                <div class="header-left">
+                    <div class="business-name">{{ $invoice->business->name }}</div>
+                </div>
+                
+                <!-- Invoice Heading Section (Right) -->
+                <div class="header-right">
                     <h1>INVOICE</h1>
-                    <div class="invoice-label">Invoice #{{ $invoice->invoice_number }}</div>
                 </div>
             </div>
-            <div class="header-right">
-                <div class="business-name">{{ $invoice->business->name }}</div>
-                <div class="business-details">
-                    @if($invoice->business->email)
-                        {{ $invoice->business->email }}<br>
-                    @endif
-                    @if($invoice->business->phone)
-                        {{ $invoice->business->phone }}<br>
-                    @endif
-                    @if($invoice->business->address)
-                        {{ $invoice->business->address }}
-                    @endif
+            
+            <!-- Second Row: Business Details (Left) and Invoice Number (Right) -->
+            <div class="header-top-row">
+                <!-- Business Details Section (Left, Below Business Name) -->
+                <div class="header-left">
+                    <div class="business-details">
+                        @if($invoice->business->email)
+                            {{ $invoice->business->email }}@if($invoice->business->phone || $invoice->business->address)<br>@endif
+                        @endif
+                        @if($invoice->business->phone)
+                            {{ $invoice->business->phone }}@if($invoice->business->address)<br>@endif
+                        @endif
+                        @if($invoice->business->address)
+                            {{ $invoice->business->address }}
+                        @endif
+                    </div>
+                </div>
+                
+                <!-- Invoice Number Section (Right, Below Invoice Title) -->
+                <div class="header-right">
+                    <div class="invoice-label">Invoice #{{ $invoice->invoice_number }}</div>
                 </div>
             </div>
         </div>
@@ -256,9 +412,13 @@
                     <p><strong>Reference:</strong> {{ $invoice->reference_number }}</p>
                 @endif
                 <p>
-                    <span class="status-badge status-{{ $invoice->status }}">
-                        {{ ucfirst($invoice->status) }}
-                    </span>
+                    @if(isset($isPaid) && $isPaid)
+                        <span class="paid-badge-large">PAID</span>
+                    @else
+                        <span class="status-badge status-{{ $invoice->status }}">
+                            {{ ucfirst($invoice->status) }}
+                        </span>
+                    @endif
                 </p>
             </div>
         </div>
@@ -328,6 +488,29 @@
             @endif
         </div>
 
+        <!-- QR Code Section (only show if not paid) -->
+        @if(!isset($isPaid) || !$isPaid)
+            @if(isset($qrCodeBase64) && $qrCodeBase64)
+            <div class="qr-code-section">
+                <h3 style="font-size: 14px; color: #3C50E0; margin-bottom: 15px; text-transform: uppercase;">Scan QR Code to Pay</h3>
+                <img src="{{ $qrCodeBase64 }}" alt="Payment QR Code">
+                <div style="margin-top: 20px;">
+                    <a href="{{ $invoice->payment_link_url }}" class="payment-button">Click Here to Pay</a>
+                </div>
+                <div class="payment-link-text">
+                    {{ $invoice->payment_link_url }}
+                </div>
+            </div>
+            @else
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ $invoice->payment_link_url }}" class="payment-button">Click Here to Pay</a>
+                <div class="payment-link-text">
+                    {{ $invoice->payment_link_url }}
+                </div>
+            </div>
+            @endif
+        @endif
+
         <!-- Notes and Terms -->
         @if($invoice->notes || $invoice->terms_and_conditions)
         <div class="notes-section">
@@ -350,6 +533,14 @@
         <div class="footer">
             <p>This is a computer-generated invoice. No signature required.</p>
             <p>Generated on {{ now()->format('F d, Y \a\t g:i A') }}</p>
+            <div class="powered-by">
+                <span class="powered-by-text">Powered by</span>
+                @if(file_exists(public_path('logo.png')))
+                <img src="{{ public_path('logo.png') }}" alt="CheckOutNow" class="powered-by-logo">
+                @else
+                <span class="powered-by-text" style="font-weight: bold; color: #3C50E0;">CheckOutNow</span>
+                @endif
+            </div>
         </div>
     </div>
 </body>

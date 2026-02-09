@@ -232,6 +232,12 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->withoutOverlapping()
             ->name('move-orphaned-accounts-to-pool');
+        
+        // Check for expired memberships and send expiration notifications
+        $schedule->command('memberships:check-expired')
+            ->daily()
+            ->withoutOverlapping()
+            ->name('check-expired-memberships');
     }
 
     /**

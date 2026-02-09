@@ -23,6 +23,9 @@
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    @if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+    <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}" async defer></script>
+    @endif
 </head>
 <body class="bg-gray-50">
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -135,8 +138,15 @@
                     </div>
                 </div>
 
+                @if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response" value="">
+                @error('g-recaptcha-response')
+                    <p class="text-red-600 text-sm mt-1">{{ $message }}</p>
+                @enderror
+                @endif
+
                 <div>
-                    <button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200">
+                    <button type="submit" id="registerSubmitBtn" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200">
                         <span class="absolute left-0 inset-y-0 flex items-center pl-3">
                             <i class="fas fa-user-plus text-white"></i>
                         </span>
@@ -153,5 +163,26 @@
             </form>
         </div>
     </div>
+    @if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+    <script>
+        document.querySelector('form').addEventListener('submit', function(e) {
+            var recaptchaInput = document.getElementById('g-recaptcha-response');
+            if (!recaptchaInput || recaptchaInput.value) return;
+            e.preventDefault();
+            var btn = document.getElementById('registerSubmitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="absolute left-0 inset-y-0 flex items-center pl-3"><i class="fas fa-spinner fa-spin text-white"></i></span> Please wait...';
+            grecaptcha.ready(function() {
+                grecaptcha.execute({{ json_encode(config('services.recaptcha.site_key')) }}, { action: 'business_register' }).then(function(token) {
+                    recaptchaInput.value = token;
+                    document.querySelector('form').submit();
+                }).catch(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="absolute left-0 inset-y-0 flex items-center pl-3"><i class="fas fa-user-plus text-white"></i></span> Create Account';
+                });
+            });
+        });
+    </script>
+    @endif
 </body>
 </html>

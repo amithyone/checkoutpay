@@ -11,8 +11,13 @@ class InvoicePdfService
 {
     /**
      * Generate PDF for invoice
+     * 
+     * @param Invoice $invoice
+     * @param string|null $qrCodeBase64 QR code as base64 string (optional)
+     * @param bool $isPaid Whether to show PAID status (optional)
+     * @return string|null Path to generated PDF
      */
-    public function generatePdf(Invoice $invoice): ?string
+    public function generatePdf(Invoice $invoice, ?string $qrCodeBase64 = null, bool $isPaid = false): ?string
     {
         try {
             $invoice->load(['business', 'items']);
@@ -20,13 +25,17 @@ class InvoicePdfService
             // Generate PDF using DomPDF
             $pdf = PdfFacade::loadView('invoices.pdf', [
                 'invoice' => $invoice,
+                'qrCodeBase64' => $qrCodeBase64,
+                'isPaid' => $isPaid || $invoice->isPaid(),
             ]);
 
             // Set paper size and orientation
             $pdf->setPaper('a4', 'portrait');
 
             // Save to storage
-            $filename = "invoices/invoice-{$invoice->invoice_number}.pdf";
+            $filename = $isPaid || $invoice->isPaid() 
+                ? "invoices/invoice-{$invoice->invoice_number}-PAID.pdf"
+                : "invoices/invoice-{$invoice->invoice_number}.pdf";
             $path = storage_path('app/public/' . $filename);
             
             // Ensure directory exists
@@ -53,13 +62,24 @@ class InvoicePdfService
      */
     public function downloadPdf(Invoice $invoice)
     {
-        $path = $this->generatePdf($invoice);
+        // Generate QR code if not paid
+        $qrCodeBase64 = null;
+        if (!$invoice->isPaid()) {
+            $invoiceService = app(\App\Services\InvoiceService::class);
+            $qrCodeBase64 = $invoiceService->generateQrCode($invoice);
+        }
+        
+        $path = $this->generatePdf($invoice, $qrCodeBase64, $invoice->isPaid());
         
         if (!$path || !file_exists($path)) {
             abort(404, 'PDF not found');
         }
 
-        return response()->download($path, "Invoice-{$invoice->invoice_number}.pdf");
+        $filename = $invoice->isPaid() 
+            ? "Invoice-{$invoice->invoice_number}-PAID.pdf"
+            : "Invoice-{$invoice->invoice_number}.pdf";
+
+        return response()->download($path, $filename);
     }
 
     /**
@@ -69,12 +89,25 @@ class InvoicePdfService
     {
         $invoice->load(['business', 'items']);
 
+        // Generate QR code if not paid
+        $qrCodeBase64 = null;
+        if (!$invoice->isPaid()) {
+            $invoiceService = app(\App\Services\InvoiceService::class);
+            $qrCodeBase64 = $invoiceService->generateQrCode($invoice);
+        }
+
         $pdf = PdfFacade::loadView('invoices.pdf', [
             'invoice' => $invoice,
+            'qrCodeBase64' => $qrCodeBase64,
+            'isPaid' => $invoice->isPaid(),
         ]);
 
         $pdf->setPaper('a4', 'portrait');
 
-        return $pdf->stream("Invoice-{$invoice->invoice_number}.pdf");
+        $filename = $invoice->isPaid() 
+            ? "Invoice-{$invoice->invoice_number}-PAID.pdf"
+            : "Invoice-{$invoice->invoice_number}.pdf";
+
+        return $pdf->stream($filename);
     }
 }

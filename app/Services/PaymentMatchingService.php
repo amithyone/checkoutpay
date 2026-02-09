@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
+use App\Models\AccountNumber;
 use App\Services\DescriptionFieldExtractor;
 use App\Services\MatchAttemptLogger;
 use App\Services\TransactionLogService;
@@ -169,11 +170,22 @@ class PaymentMatchingService
                 $query->where('created_at', '<=', $emailDate);
             }
             
-            // Filter by amount first (within 1 naira tolerance)
-            $query->whereBetween('amount', [
-                $extractedInfo['amount'] - 1,
-                $extractedInfo['amount'] + 1
-            ]);
+            // Filter by amount - use ±3% tolerance for Moniepoint emails, ±1 naira for others
+            $isMoniepoint = $this->isMoniepointEmail($emailData);
+            if ($isMoniepoint && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
+                // For Moniepoint: ±3% tolerance
+                $tolerance = ($extractedInfo['amount'] * 3) / 100;
+                $query->whereBetween('amount', [
+                    $extractedInfo['amount'] - $tolerance,
+                    $extractedInfo['amount'] + $tolerance
+                ]);
+            } else {
+                // For other banks: ±1 naira tolerance
+                $query->whereBetween('amount', [
+                    $extractedInfo['amount'] - 1,
+                    $extractedInfo['amount'] + 1
+                ]);
+            }
             
             // Filter by email account if available
             if (isset($emailData['email_account_id'])) {
@@ -190,7 +202,7 @@ class PaymentMatchingService
             
             // Try to match each payment using proper matching order
             foreach ($potentialPayments as $payment) {
-                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate);
+                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate, $emailData);
                 
                 // Log match attempt
                 $this->matchLogger->logAttempt([
@@ -228,9 +240,10 @@ class PaymentMatchingService
      * @param Payment $payment
      * @param array $extractedInfo ['amount', 'sender_name', 'account_number', etc.]
      * @param Carbon|null $emailDate Email received date
+     * @param array|null $emailData Original email data ['from', 'subject', etc.] - optional, used for Moniepoint detection
      * @return array ['matched' => bool, 'reason' => string, 'amount_match' => bool, 'name_match' => bool, 'time_match' => bool]
      */
-    public function matchPayment(Payment $payment, array $extractedInfo, ?Carbon $emailDate = null): array
+    public function matchPayment(Payment $payment, array $extractedInfo, ?Carbon $emailDate = null, ?array $emailData = null): array
     {
         $result = [
             'matched' => false,
@@ -298,6 +311,83 @@ class PaymentMatchingService
                 } else {
                     $result['reason'] = "Transaction ID matches but amount mismatch: payment={$requestedAmount}, email={$receivedAmount}";
                     return $result;
+                }
+            }
+        }
+        
+        // STEP 0.5: Moniepoint-specific matching (runs alongside standard matching)
+        // This allows matching when account number matches and name is similar, even if amount is slightly off
+        $emailFrom = $emailData['from'] ?? $extractedInfo['from'] ?? '';
+        if ($emailFrom && $this->isMoniepointEmail(['from' => $emailFrom])) {
+            $receivedAmount = $extractedInfo['amount'] ?? 0;
+            $requestedAmount = $payment->amount;
+            $extractedAccountNumber = $extractedInfo['account_number'] ?? null;
+            
+            // Check if payment has Moniepoint account number
+            if ($payment->account_number && $this->isMoniepointAccountNumber($payment->account_number)) {
+                // Check if account numbers match
+                if ($extractedAccountNumber && $payment->account_number === $extractedAccountNumber) {
+                    // Account numbers match - now check name and amount
+                    $extractedSenderName = $extractedInfo['sender_name'] ?? null;
+                    
+                    // Validate extracted sender name
+                    if ($extractedSenderName && $this->isValidExtractedName($extractedSenderName)) {
+                        // Check name similarity (must be >= 50%)
+                        $nameMatch = $this->matchNames($payment->payer_name, $extractedSenderName);
+                        $similarity = $nameMatch['similarity'] ?? 0;
+                        
+                        if ($similarity >= 50) {
+                            // Name matches - check amount tolerance (±3%)
+                            if ($this->isAmountWithinTolerance($requestedAmount, $receivedAmount, 3.0)) {
+                                // All conditions met: Moniepoint account match!
+                                $amountDiff = abs($requestedAmount - $receivedAmount);
+                                $isExactAmountMatch = $amountDiff <= 1;
+                                
+                                $result['matched'] = true;
+                                $result['account_match'] = true;
+                                $result['name_match'] = true;
+                                $result['name_similarity_percent'] = $similarity;
+                                $result['received_amount'] = $receivedAmount;
+                                
+                                // Check time window
+                                if ($emailDate) {
+                                    if ($emailDate->lt($payment->created_at)) {
+                                        $result['reason'] = "Moniepoint account and name match but email received before transaction creation";
+                                        return $result;
+                                    }
+                                    $timeDiffMinutes = $payment->created_at->diffInMinutes($emailDate);
+                                    $result['time_match'] = ($timeDiffMinutes <= 120); // 2 hours window
+                                } else {
+                                    $result['time_match'] = true;
+                                }
+                                
+                                // Mark as mismatch if amount doesn't match exactly
+                                if (!$isExactAmountMatch) {
+                                    $result['amount_match'] = false;
+                                    $result['is_mismatch'] = true;
+                                    $result['mismatch_reason'] = "Amount mismatch: Expected ₦" . number_format($requestedAmount, 2) . ", Received ₦" . number_format($receivedAmount, 2) . ", but account number and name match";
+                                    $result['reason'] = 'Matched: Moniepoint account number and name match (similarity: ' . $similarity . '%), but amount differs by ₦' . number_format($amountDiff, 2);
+                                } else {
+                                    $result['amount_match'] = true;
+                                    $result['reason'] = 'Matched: Moniepoint account number, name, and amount match (similarity: ' . $similarity . '%)';
+                                }
+                                
+                                return $result;
+                            } else {
+                                // Amount outside tolerance
+                                $result['reason'] = "Moniepoint account and name match but amount outside ±3% tolerance: Expected ₦" . number_format($requestedAmount, 2) . ", Received ₦" . number_format($receivedAmount, 2);
+                            }
+                        } else {
+                            // Name similarity too low
+                            $result['reason'] = "Moniepoint account number matches but name similarity too low ({$similarity}% < 50%)";
+                        }
+                    } else {
+                        // Invalid or missing sender name
+                        $result['reason'] = "Moniepoint account number matches but sender name is invalid or missing";
+                    }
+                } else {
+                    // Account numbers don't match
+                    $result['reason'] = "Email is from Moniepoint but account numbers don't match: payment={$payment->account_number}, email={$extractedAccountNumber}";
                 }
             }
         }
@@ -1104,7 +1194,7 @@ class PaymentMatchingService
                 
                 $extractedInfo = $extractionResult['data'];
                 $emailDate = $email->email_date ? Carbon::parse($email->email_date) : null;
-                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate);
+                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate, $emailData);
                 
                 if ($matchResult['matched']) {
                     return $email;
@@ -1213,7 +1303,7 @@ class PaymentMatchingService
                 $emailDate = $email->email_date ? Carbon::parse($email->email_date) : null;
                 
                 // Use matchPayment to verify the match (checks amount, time, etc.)
-                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate);
+                $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate, $emailData);
                 
                 if ($matchResult['matched']) {
                     Log::info('Reverse search found match', [
@@ -1234,5 +1324,47 @@ class PaymentMatchingService
             ]);
             return null;
         }
+    }
+
+    /**
+     * Check if email is from Moniepoint
+     */
+    protected function isMoniepointEmail(array $emailData): bool
+    {
+        $from = strtolower($emailData['from'] ?? '');
+        return str_contains($from, 'moniepoint.com');
+    }
+
+    /**
+     * Check if account number is a Moniepoint account
+     */
+    protected function isMoniepointAccountNumber(?string $accountNumber): bool
+    {
+        if (!$accountNumber) {
+            return false;
+        }
+        
+        $account = AccountNumber::where('account_number', $accountNumber)->first();
+        if (!$account || !$account->bank_name) {
+            return false;
+        }
+        
+        return stripos($account->bank_name, 'moniepoint') !== false;
+    }
+
+    /**
+     * Check if amount is within ±3% tolerance
+     */
+    protected function isAmountWithinTolerance(float $expectedAmount, float $receivedAmount, float $tolerancePercent = 3.0): bool
+    {
+        if ($expectedAmount <= 0) {
+            return false;
+        }
+        
+        $tolerance = ($expectedAmount * $tolerancePercent) / 100;
+        $minAmount = $expectedAmount - $tolerance;
+        $maxAmount = $expectedAmount + $tolerance;
+        
+        return $receivedAmount >= $minAmount && $receivedAmount <= $maxAmount;
     }
 }

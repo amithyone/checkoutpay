@@ -10,6 +10,7 @@ use App\Services\ChargeService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class InvoiceService
 {
@@ -68,6 +69,25 @@ class InvoiceService
     }
 
     /**
+     * Generate QR code for invoice payment link
+     * Uses SVG format which doesn't require imagick extension
+     */
+    public function generateQrCode(Invoice $invoice): string
+    {
+        $paymentUrl = $invoice->payment_link_url;
+        
+        // Use SVG format (doesn't require imagick extension)
+        // SVG works well in PDFs and emails and scales better
+        $qrCode = QrCode::format('svg')
+            ->size(200)
+            ->margin(2)
+            ->generate($paymentUrl);
+        
+        // SVG is already a string, return as data URI
+        return 'data:image/svg+xml;base64,' . base64_encode($qrCode);
+    }
+
+    /**
      * Send invoice via email to both sender and receiver
      */
     public function sendInvoice(Invoice $invoice, $attachPdf = true): bool
@@ -75,11 +95,14 @@ class InvoiceService
         try {
             $invoice->load(['business', 'items']);
 
+            // Generate QR code for email
+            $qrCodeBase64 = $this->generateQrCode($invoice);
+
             // Send to receiver (client)
-            $receiverMail = new InvoiceSent($invoice, false);
+            $receiverMail = new InvoiceSent($invoice, false, $qrCodeBase64);
             if ($attachPdf) {
                 $pdfService = app(InvoicePdfService::class);
-                $pdfPath = $pdfService->generatePdf($invoice);
+                $pdfPath = $pdfService->generatePdf($invoice, $qrCodeBase64);
                 if ($pdfPath && file_exists($pdfPath)) {
                     $receiverMail->attach($pdfPath, [
                         'as' => "Invoice-{$invoice->invoice_number}.pdf",
@@ -91,10 +114,10 @@ class InvoiceService
 
             // Send to sender (business)
             if ($invoice->business->email && $invoice->business->shouldReceiveEmailNotifications()) {
-                $senderMail = new InvoiceSent($invoice, true);
+                $senderMail = new InvoiceSent($invoice, true, $qrCodeBase64);
                 if ($attachPdf) {
                     $pdfService = app(InvoicePdfService::class);
-                    $pdfPath = $pdfService->generatePdf($invoice);
+                    $pdfPath = $pdfService->generatePdf($invoice, $qrCodeBase64);
                     if ($pdfPath && file_exists($pdfPath)) {
                         $senderMail->attach($pdfPath, [
                             'as' => "Invoice-{$invoice->invoice_number}.pdf",
@@ -181,19 +204,37 @@ class InvoiceService
     }
 
     /**
-     * Send payment confirmation emails to both parties
+     * Send payment confirmation emails to both parties with updated PDF
      */
     public function sendPaymentConfirmation(Invoice $invoice): bool
     {
         try {
             $invoice->load(['business', 'items']);
 
-            // Send to receiver (client)
-            Mail::to($invoice->client_email)->send(new \App\Mail\InvoicePaid($invoice, false));
+            // Regenerate PDF with PAID status
+            $pdfService = app(InvoicePdfService::class);
+            $pdfPath = $pdfService->generatePdf($invoice, null, true); // Pass true for paid status
 
-            // Send to sender (business)
+            // Send to receiver (client) with updated PDF
+            $receiverMail = new \App\Mail\InvoicePaid($invoice, false);
+            if ($pdfPath && file_exists($pdfPath)) {
+                $receiverMail->attach($pdfPath, [
+                    'as' => "Invoice-{$invoice->invoice_number}-PAID.pdf",
+                    'mime' => 'application/pdf',
+                ]);
+            }
+            Mail::to($invoice->client_email)->send($receiverMail);
+
+            // Send to sender (business) with updated PDF
             if ($invoice->business->email && $invoice->business->shouldReceivePaymentNotifications()) {
-                Mail::to($invoice->business->email)->send(new \App\Mail\InvoicePaid($invoice, true));
+                $senderMail = new \App\Mail\InvoicePaid($invoice, true);
+                if ($pdfPath && file_exists($pdfPath)) {
+                    $senderMail->attach($pdfPath, [
+                        'as' => "Invoice-{$invoice->invoice_number}-PAID.pdf",
+                        'mime' => 'application/pdf',
+                    ]);
+                }
+                Mail::to($invoice->business->email)->send($senderMail);
             }
 
             // Update flags

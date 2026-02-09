@@ -29,10 +29,10 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center">
                 <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
-                    Complete Payment & Business Solutions
+                    Business Solutions
                 </h1>
                 <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
-                    Everything you need to accept payments, manage invoices, rent equipment, sell tickets, and grow your business. All in one platform.
+                    Payments. Invoices. Rentals. Tickets. Memberships.
                 </p>
             </div>
         </div>
@@ -43,7 +43,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Payment Solutions</h2>
-                <p class="text-lg text-gray-600">Flexible payment integration options for every business</p>
+                <p class="text-lg text-gray-600">Accept payments in NGN.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 <!-- Payment Gateway API -->
@@ -53,7 +53,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Payment Gateway API</h3>
                     <p class="text-gray-600 mb-4">
-                        Integrate payments directly into your application with our RESTful API. Full control over the payment experience with real-time webhooks.
+                        RESTful API for payment integration. Real-time webhooks included.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -81,7 +81,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Hosted Checkout Page</h3>
                     <p class="text-gray-600 mb-4">
-                        Redirect customers to our secure hosted payment page. No integration required - perfect for quick setup.
+                        Redirect to hosted payment page. No integration required.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -109,7 +109,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">WordPress / WooCommerce</h3>
                     <p class="text-gray-600 mb-4">
-                        Quick integration for WooCommerce stores. Install our plugin and start accepting payments in minutes.
+                        Plugin for WooCommerce stores. Install and configure.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -138,7 +138,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Business Products</h2>
-                <p class="text-lg text-gray-600">Complete solutions for managing your business operations</p>
+                <p class="text-lg text-gray-600">Available services.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 <!-- Invoices -->
@@ -148,7 +148,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Invoices</h3>
                     <p class="text-gray-600 mb-4">
-                        Create professional invoices with integrated payment links. Free to use with automatic payment tracking and PDF export.
+                        Create invoices with payment links. PDF export included.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -165,7 +165,7 @@
                         </li>
                     </ul>
                     <a href="{{ route('products.invoices') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Learn More <i class="fas fa-arrow-right ml-2"></i>
+                        View Details <i class="fas fa-arrow-right ml-2"></i>
                     </a>
                 </div>
 
@@ -176,7 +176,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Rentals</h3>
                     <p class="text-gray-600 mb-4">
-                        Rent out equipment, vehicles, properties, and more. Manage availability, bookings, and payments all in one place.
+                        Rent equipment, vehicles, properties. Manage availability and bookings.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -193,7 +193,7 @@
                         </li>
                     </ul>
                     <a href="{{ route('products.rentals-info') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Learn More <i class="fas fa-arrow-right ml-2"></i>
+                        View Details <i class="fas fa-arrow-right ml-2"></i>
                     </a>
                 </div>
 
@@ -204,7 +204,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Memberships</h3>
                     <p class="text-gray-600 mb-4">
-                        Manage subscription-based memberships with digital membership cards. Perfect for gyms, fitness centers, and clubs.
+                        Subscription memberships with digital cards. QR codes included.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -221,7 +221,7 @@
                         </li>
                     </ul>
                     <a href="{{ route('products.memberships-info') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Learn More <i class="fas fa-arrow-right ml-2"></i>
+                        View Details <i class="fas fa-arrow-right ml-2"></i>
                     </a>
                 </div>
 
@@ -232,7 +232,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Event Tickets</h3>
                     <p class="text-gray-600 mb-4">
-                        Sell tickets for concerts, conferences, workshops, and any event. QR code verification and digital ticket delivery.
+                        Sell tickets for events. QR code verification. Digital delivery.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -249,7 +249,7 @@
                         </li>
                     </ul>
                     <a href="{{ route('products.tickets-info') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Learn More <i class="fas fa-arrow-right ml-2"></i>
+                        View Details <i class="fas fa-arrow-right ml-2"></i>
                     </a>
                 </div>
 
@@ -260,7 +260,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Payout</h3>
                     <p class="text-gray-600 mb-4">
-                        Withdraw your earnings directly to your bank account. Fast, secure, and reliable payout processing.
+                        Withdraw earnings to bank account. Transaction history available.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -277,7 +277,7 @@
                         </li>
                     </ul>
                     <a href="{{ route('payout.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Learn More <i class="fas fa-arrow-right ml-2"></i>
+                        View Details <i class="fas fa-arrow-right ml-2"></i>
                     </a>
                 </div>
 
@@ -288,7 +288,7 @@
                     </div>
                     <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Collections</h3>
                     <p class="text-gray-600 mb-4">
-                        Track and manage all your payment collections in one place. View transaction history, balances, and analytics.
+                        Track payment collections. View balances and transaction history.
                     </p>
                     <ul class="space-y-2 mb-6 text-sm text-gray-600">
                         <li class="flex items-start">
@@ -305,7 +305,7 @@
                         </li>
                     </ul>
                     <a href="{{ route('collections.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Learn More <i class="fas fa-arrow-right ml-2"></i>
+                        View Details <i class="fas fa-arrow-right ml-2"></i>
                     </a>
                 </div>
             </div>
@@ -316,51 +316,51 @@
     <section class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Why Choose CheckoutPay?</h2>
-                <p class="text-lg text-gray-600">Powerful features that make payment processing simple</p>
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">How It Works</h2>
+                <p class="text-lg text-gray-600">Process payments.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
                 <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                     <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-bolt text-primary text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Fast Integration</h3>
-                    <p class="text-gray-600 text-sm">Get up and running in minutes with our simple API or hosted checkout page.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Integration</h3>
+                    <p class="text-gray-600 text-sm">API or hosted checkout page.</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                     <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-shield-alt text-primary text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Secure & Reliable</h3>
-                    <p class="text-gray-600 text-sm">Bank-level security with automatic payment verification and fraud protection.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Security</h3>
+                    <p class="text-gray-600 text-sm">Automatic payment verification.</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                     <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-chart-line text-primary text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Competitive Rates</h3>
-                    <p class="text-gray-600 text-sm">Simple, transparent pricing with the finest rates in the market. Just 1% + ₦50 per transaction.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Rates</h3>
+                    <p class="text-gray-600 text-sm">Competitive rates. 1% + ₦50 per transaction.</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                     <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-mobile-alt text-primary text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Mobile Optimized</h3>
-                    <p class="text-gray-600 text-sm">All our payment solutions are fully optimized for mobile devices.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Mobile</h3>
+                    <p class="text-gray-600 text-sm">Optimized for mobile devices.</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                     <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-headset text-primary text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">24/7 Support</h3>
-                    <p class="text-gray-600 text-sm">Get help when you need it with our dedicated support team.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Support</h3>
+                    <p class="text-gray-600 text-sm">Documentation available.</p>
                 </div>
                 <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                     <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                         <i class="fas fa-cog text-primary text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Flexible Charges</h3>
-                    <p class="text-gray-600 text-sm">Choose whether you or your customers pay transaction fees.</p>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Charges</h3>
+                    <p class="text-gray-600 text-sm">Choose who pays transaction fees.</p>
                 </div>
             </div>
         </div>
@@ -369,8 +369,8 @@
     <!-- CTA Section -->
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Ready to Get Started?</h2>
-            <p class="text-lg md:text-xl text-primary-100 mb-8">Join thousands of businesses using CheckoutPay to accept payments and manage operations</p>
+            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Get Started</h2>
+            <p class="text-lg md:text-xl text-primary-100 mb-8">Create an account.</p>
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                 <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
                     Create Your Account

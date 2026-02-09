@@ -56,7 +56,7 @@ class MembershipPaymentController extends Controller
         $validated = $request->validate([
             'member_name' => 'required|string|max:255',
             'member_email' => 'required|email|max:255',
-            'member_phone' => 'nullable|string|max:20',
+            'member_phone' => 'required|string|max:20',
         ]);
 
         try {
@@ -85,7 +85,7 @@ class MembershipPaymentController extends Controller
             $payment->update(['email_data' => $emailData]);
 
             // Redirect to payment page
-            return redirect()->route('payments.show', $payment->transaction_id)
+            return redirect()->route('checkout.payment', $payment->transaction_id)
                 ->with('success', 'Payment initiated. Please complete the payment to activate your membership.');
 
         } catch (\Exception $e) {

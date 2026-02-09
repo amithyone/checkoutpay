@@ -6,7 +6,9 @@ use App\Events\PaymentApproved;
 use App\Models\Membership;
 use App\Models\MembershipSubscription;
 use App\Services\MembershipCardPdfService;
+use App\Mail\MembershipActivated;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 
 class CreateMembershipSubscriptionOnPaymentApproved
@@ -90,6 +92,26 @@ class CreateMembershipSubscriptionOnPaymentApproved
 
             // Generate membership card PDF
             $this->cardPdfService->generatePdf($subscription);
+            
+            // Refresh subscription to get updated card_pdf_path
+            $subscription->refresh();
+
+            // Send activation email to member
+            if ($subscription->member_email) {
+                try {
+                    Mail::to($subscription->member_email)->send(new MembershipActivated($subscription));
+                    Log::info('Membership activation email sent', [
+                        'subscription_id' => $subscription->id,
+                        'member_email' => $subscription->member_email,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to send membership activation email', [
+                        'subscription_id' => $subscription->id,
+                        'member_email' => $subscription->member_email,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
 
             Log::info('Membership subscription created on payment approval', [
                 'subscription_id' => $subscription->id,

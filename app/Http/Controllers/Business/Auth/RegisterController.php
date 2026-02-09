@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\BusinessWebsite;
 use App\Models\Renter;
+use App\Services\RecaptchaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,8 +20,22 @@ class RegisterController extends Controller
         return view('business.auth.register');
     }
 
-    public function register(Request $request): RedirectResponse|View
+    public function register(Request $request, RecaptchaService $recaptcha): RedirectResponse|View
     {
+        if ($recaptcha->isEnabled()) {
+            $request->validate([
+                'g-recaptcha-response' => 'required',
+            ], [
+                'g-recaptcha-response.required' => 'Please complete the reCAPTCHA verification.',
+            ]);
+
+            if (!$recaptcha->verify($request->input('g-recaptcha-response'), $request->ip())) {
+                return back()->withErrors([
+                    'g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.',
+                ])->withInput($request->except('password', 'password_confirmation'));
+            }
+        }
+
         // Check if email exists as renter
         $renter = Renter::where('email', $request->email)->first();
         

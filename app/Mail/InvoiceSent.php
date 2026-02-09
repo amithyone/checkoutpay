@@ -16,14 +16,16 @@ class InvoiceSent extends Mailable
 
     public Invoice $invoice;
     public bool $isForSender;
+    public ?string $qrCodeBase64 = null;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(Invoice $invoice, bool $isForSender = false)
+    public function __construct(Invoice $invoice, bool $isForSender = false, ?string $qrCodeBase64 = null)
     {
         $this->invoice = $invoice;
         $this->isForSender = $isForSender;
+        $this->qrCodeBase64 = $qrCodeBase64;
     }
 
     /**
@@ -53,6 +55,7 @@ class InvoiceSent extends Mailable
             view: $view,
             with: [
                 'invoice' => $this->invoice,
+                'qrCodeBase64' => $this->qrCodeBase64 ?? null,
             ],
         );
     }

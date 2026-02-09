@@ -101,52 +101,75 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white">
+@php
+    // Normalize background color (remove spaces, ensure lowercase for comparison)
+    $bgColor = trim(strtolower($event->background_color ?? ''));
+    // Check if background is white - if so, use dark text colors
+    $isWhiteBackground = ($bgColor === '#ffffff' || $bgColor === 'ffffff' || $bgColor === '#fff' || $bgColor === 'fff');
+    $textColorClass = $isWhiteBackground ? 'text-gray-900' : 'text-white';
+    $textColorSecondaryClass = $isWhiteBackground ? 'text-gray-700' : 'text-gray-200';
+    $textColorTertiaryClass = $isWhiteBackground ? 'text-blue-700' : 'text-gray-200';
+    // Get the actual background color value (with # if missing)
+    $actualBgColor = $event->background_color ?? '#1e293b';
+    if ($actualBgColor && !str_starts_with($actualBgColor, '#')) {
+        $actualBgColor = '#' . $actualBgColor;
+    }
+@endphp
+<body class="{{ $textColorClass }}" style="@if($event->background_color && !$event->cover_image)background: {{ $actualBgColor }};@else background: #0f172a;@endif">
     @include('partials.nav')
 
     <!-- Hero Section - Compact on Mobile -->
     <div class="relative min-h-[35vh] md:min-h-[60vh] flex items-center justify-center overflow-hidden">
+        <!-- Always show background color first -->
+        @if($event->background_color)
+            <div class="absolute inset-0 z-0" style="background-color: {{ $actualBgColor }} !important;"></div>
+        @else
+            <div class="absolute inset-0 z-0 bg-gradient-to-br from-purple-900 via-blue-900 to-teal-900"></div>
+        @endif
+        
+        <!-- Cover image behind text -->
         @if($event->cover_image)
             <img src="{{ asset('storage/' . $event->cover_image) }}" 
                  alt="{{ $event->title }}" 
-                 class="absolute inset-0 w-full h-full object-cover">
-        @elseif($event->background_color)
-            <div class="absolute inset-0" style="background: {{ $event->background_color }};"></div>
-        @else
-            <div class="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-teal-900"></div>
+                 class="absolute inset-0 w-full h-full object-cover z-10">
         @endif
-        <div class="hero-overlay absolute inset-0"></div>
         
-        <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-16 text-center">
+        <!-- Dark overlay only if not white background -->
+        @if(!$isWhiteBackground)
+            <div class="hero-overlay absolute inset-0 z-20"></div>
+        @endif
+        
+        <!-- Text content on top -->
+        <div class="relative z-30 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-16 text-center">
             @if($event->status === 'published')
-                <span class="inline-block px-2 py-1 md:px-4 md:py-2 mb-2 md:mb-4 bg-teal-500 text-white text-xs font-semibold rounded-full">
+                <span class="inline-block px-2 py-1 md:px-4 md:py-2 mb-2 md:mb-4 {{ $isWhiteBackground ? 'bg-blue-600 text-white' : 'bg-teal-500 text-white' }} text-xs font-semibold rounded-full">
                     LIVE EVENT
                 </span>
             @endif
             
-            <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold mb-2 md:mb-4 text-white px-2 leading-tight">
+            <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold mb-2 md:mb-4 {{ $textColorClass }} px-2 leading-tight">
                 {{ $event->title }}
             </h1>
             
-            <p class="text-sm sm:text-base md:text-lg lg:text-xl text-gray-200 mb-3 md:mb-6 max-w-3xl mx-auto px-4 line-clamp-2 md:line-clamp-none">
+            <p class="text-sm sm:text-base md:text-lg lg:text-xl {{ $textColorSecondaryClass }} mb-3 md:mb-6 max-w-3xl mx-auto px-4 line-clamp-2 md:line-clamp-none">
                 {{ $event->description ?? 'Join us for an unforgettable experience' }}
             </p>
             
-            <div class="flex flex-wrap justify-center gap-2 md:gap-4 text-xs md:text-sm text-gray-200 px-2">
+            <div class="flex flex-wrap justify-center gap-2 md:gap-4 text-xs md:text-sm {{ $textColorSecondaryClass }} px-2">
                 <div class="flex items-center space-x-1">
-                    <i class="fas fa-calendar text-teal-400 text-xs"></i>
+                    <i class="fas fa-calendar {{ $isWhiteBackground ? 'text-blue-600' : 'text-teal-400' }} text-xs"></i>
                     <span>{{ $event->start_date->format('M d, Y') }}</span>
                 </div>
                 <div class="flex items-center space-x-1">
-                    <i class="fas fa-clock text-teal-400 text-xs"></i>
+                    <i class="fas fa-clock {{ $isWhiteBackground ? 'text-blue-600' : 'text-teal-400' }} text-xs"></i>
                     <span>{{ $event->start_date->format('h:i A') }}</span>
                 </div>
                 <div class="flex items-center space-x-1">
                     @if(($event->event_type ?? 'offline') === 'online')
-                        <i class="fas fa-video text-teal-400 text-xs"></i>
-                        <span class="px-1.5 py-0.5 md:px-3 md:py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">Online</span>
+                        <i class="fas fa-video {{ $isWhiteBackground ? 'text-blue-600' : 'text-teal-400' }} text-xs"></i>
+                        <span class="px-1.5 py-0.5 md:px-3 md:py-1 {{ $isWhiteBackground ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-300' }} rounded-full text-xs">Online</span>
                     @else
-                        <i class="fas fa-map-marker-alt text-teal-400 text-xs"></i>
+                        <i class="fas fa-map-marker-alt {{ $isWhiteBackground ? 'text-blue-600' : 'text-teal-400' }} text-xs"></i>
                         <span class="break-words text-xs">{{ Str::limit($event->venue, 20) }}</span>
                     @endif
                 </div>
@@ -154,12 +177,12 @@
             
             @if(($event->event_type ?? 'offline') === 'offline' && $event->address)
                 <div class="mt-2 md:mt-4 px-4">
-                    <i class="fas fa-location-dot text-teal-400 mr-1 text-xs"></i>
-                    <span class="text-gray-300 text-xs md:text-sm break-words">{{ Str::limit($event->address, 40) }}</span>
+                    <i class="fas fa-location-dot {{ $isWhiteBackground ? 'text-blue-600' : 'text-teal-400' }} mr-1 text-xs"></i>
+                    <span class="{{ $isWhiteBackground ? 'text-gray-700' : 'text-gray-300' }} text-xs md:text-sm break-words">{{ Str::limit($event->address, 40) }}</span>
                 </div>
             @elseif(($event->event_type ?? 'offline') === 'online' && $event->address)
                 <div class="mt-2 md:mt-4 px-4">
-                    <a href="{{ $event->address }}" target="_blank" class="text-teal-400 hover:text-teal-300 inline-flex items-center text-xs md:text-sm">
+                    <a href="{{ $event->address }}" target="_blank" class="{{ $isWhiteBackground ? 'text-blue-600 hover:text-blue-700' : 'text-teal-400 hover:text-teal-300' }} inline-flex items-center text-xs md:text-sm">
                         <i class="fas fa-link mr-1"></i>
                         <span>Join Online</span>
                     </a>
@@ -169,7 +192,7 @@
     </div>
 
     <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12" style="@if($event->background_color && !$event->cover_image)background: {{ $actualBgColor }};@endif">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
             <!-- Left Column: Ticket Selection -->
             <div class="lg:col-span-2 order-2">

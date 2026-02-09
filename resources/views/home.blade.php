@@ -8,7 +8,7 @@
         <link rel="icon" type="image/png" href="{{ asset('storage/' . $settings['site_favicon']) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . $settings['site_favicon']) }}">
     @endif
-    <meta name="description" content="{{ $page->meta_description ?? 'Intelligent payment gateway for businesses. Accept payments with the finest rates in the market - just 1% + ₦50 per transaction.' }}">
+    <meta name="description" content="{{ $page->meta_description ?? 'Payments for Nigerian businesses.' }}">
     <!-- OPTIMIZED: Preconnect to CDN domains for faster loading -->
     <link rel="preconnect" href="https://cdn.tailwindcss.com">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -36,9 +36,12 @@
 
     @php
         $hero = $content['hero'] ?? [];
+        $whatItIs = $content['what_it_is'] ?? [];
         $features = $content['features'] ?? [];
+        $whoItsFor = $content['who_its_for'] ?? [];
         $pricingSection = $content['pricing_section'] ?? [];
         $howItWorks = $content['how_it_works'] ?? [];
+        $security = $content['security'] ?? [];
         $cta = $content['cta'] ?? [];
         $footer = $content['footer'] ?? [];
     @endphp
@@ -47,14 +50,14 @@
     <section class="bg-gradient-to-br from-primary/10 via-white to-primary/5 py-12 sm:py-16 md:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center">
-                @if(isset($hero['badge_text']))
+                @if(isset($hero['badge_text']) && !empty($hero['badge_text']))
                 <div class="inline-block bg-green-100 text-green-800 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6">
                     <i class="{{ $hero['badge_icon'] ?? 'fas fa-tag' }} mr-1 sm:mr-2"></i> {{ $hero['badge_text'] }}
                 </div>
                 @endif
                 <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
-                    {{ $hero['title'] ?? 'Intelligent Payment Gateway' }}<br class="hidden sm:block">
-                    @if(isset($hero['title_highlight']))
+                    {{ $hero['title'] ?? 'CheckoutPay' }}<br class="hidden sm:block">
+                    @if(isset($hero['title_highlight']) && !empty($hero['title_highlight']))
                     <span class="text-primary block sm:inline">{{ $hero['title_highlight'] }}</span>
                     @endif
                 </h1>
@@ -70,25 +73,24 @@
                 @endif
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 px-4">
                     <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-primary text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/90 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                        <i class="fas fa-rocket mr-2"></i> {{ $hero['cta_primary'] ?? 'Get Started Free' }}
+                        {{ $hero['cta_primary'] ?? 'Get started' }}
                     </a>
                     <a href="{{ route('pricing') }}" class="w-full sm:w-auto bg-white text-primary border-2 border-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/5 font-medium text-base sm:text-lg transition-colors">
-                        {{ $hero['cta_secondary'] ?? 'View Pricing' }}
+                        {{ $hero['cta_secondary'] ?? 'View pricing' }}
                     </a>
                 </div>
                 
                 <!-- WordPress Plugin Badge -->
                 <div class="mt-6 sm:mt-8 flex flex-col items-center">
-                    <div class="inline-flex items-center bg-white border border-purple-200 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 shadow-sm hover:shadow-md transition-shadow">
-                        <i class="fab fa-wordpress text-purple-600 text-lg sm:text-xl mr-2 sm:mr-3"></i>
-                        <span class="text-xs sm:text-sm text-gray-700 font-medium mr-2 sm:mr-3">WordPress Plugin Available</span>
-                        <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="text-purple-600 hover:text-purple-700 font-semibold text-xs sm:text-sm flex items-center">
+                    <div class="inline-flex items-center bg-white border border-gray-200 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 shadow-sm hover:shadow-md transition-shadow">
+                        <i class="fab fa-wordpress text-gray-600 text-lg sm:text-xl mr-2 sm:mr-3"></i>
+                        <span class="text-xs sm:text-sm text-gray-700 font-medium mr-2 sm:mr-3">WordPress Plugin</span>
+                        <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="text-gray-600 hover:text-gray-700 font-medium text-xs sm:text-sm flex items-center">
                             Download
                             <i class="fas fa-arrow-right ml-1.5 text-xs"></i>
                         </a>
                     </div>
                     <p class="mt-2 text-xs text-gray-500">
-                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
                         Works with WooCommerce
                     </p>
                 </div>
@@ -96,18 +98,44 @@
         </div>
     </section>
 
+    <!-- What It Is Section -->
+    @if(isset($whatItIs['description']) && !empty($whatItIs['description']))
+    <section class="py-12 sm:py-16 md:py-20 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                @if(isset($whatItIs['title']) && !empty($whatItIs['title']))
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">{{ $whatItIs['title'] }}</h2>
+                @endif
+                <p class="text-base sm:text-lg md:text-xl text-gray-700 leading-relaxed">
+                    {{ $whatItIs['description'] }}
+                </p>
+            </div>
+        </div>
+    </section>
+    @endif
+
+    <!-- Philosophy Statement 2 -->
+    <section class="py-6 sm:py-8 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm sm:text-base text-gray-500 italic">
+                Because the work should speak for itself.
+            </p>
+        </div>
+    </section>
+
     <!-- Features Section -->
-    @if(isset($features['title']))
-    <section id="features" class="py-12 sm:py-16 md:py-20 bg-white">
+    @if(isset($features['items']) && is_array($features['items']) && count($features['items']) > 0)
+    <section id="features" class="py-12 sm:py-16 md:py-20 bg-gray-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            @if(isset($features['title']) && !empty($features['title']))
             <div class="text-center mb-8 sm:mb-12 md:mb-16">
                 <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{{ $features['title'] }}</h2>
-                @if(isset($features['subtitle']))
+                @if(isset($features['subtitle']) && !empty($features['subtitle']))
                 <p class="text-base sm:text-lg text-gray-600 px-2">{{ $features['subtitle'] }}</p>
                 @endif
             </div>
+            @endif
 
-            @if(isset($features['items']) && is_array($features['items']))
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
                 @foreach($features['items'] as $feature)
                 <div class="bg-white p-6 sm:p-8 rounded-lg border border-gray-200 hover:shadow-lg transition-shadow">
@@ -119,10 +147,43 @@
                 </div>
                 @endforeach
             </div>
-            @endif
         </div>
     </section>
     @endif
+
+    <!-- Philosophy Statement 3 -->
+    <section class="py-6 sm:py-8 bg-gray-50">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm sm:text-base text-gray-500 italic">
+                A system that doesn't interrupt the moment.
+            </p>
+        </div>
+    </section>
+
+    <!-- Who It's For Section -->
+    @if(isset($whoItsFor['description']) && !empty($whoItsFor['description']))
+    <section class="py-12 sm:py-16 md:py-20 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                @if(isset($whoItsFor['title']) && !empty($whoItsFor['title']))
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">{{ $whoItsFor['title'] }}</h2>
+                @endif
+                <p class="text-base sm:text-lg md:text-xl text-gray-700 leading-relaxed">
+                    {{ $whoItsFor['description'] }}
+                </p>
+            </div>
+        </div>
+    </section>
+    @endif
+
+    <!-- Philosophy Statement 4 -->
+    <section class="py-6 sm:py-8 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm sm:text-base text-gray-500 italic">
+                Nothing to manage. Nothing to announce.
+            </p>
+        </div>
+    </section>
 
     <!-- Pricing Section -->
     @if(isset($pricingSection['title']))
@@ -130,7 +191,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-8 sm:mb-12 md:mb-16">
                 <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{{ $pricingSection['title'] }}</h2>
-                @if(isset($pricingSection['subtitle']))
+                @if(isset($pricingSection['subtitle']) && !empty($pricingSection['subtitle']))
                 <p class="text-base sm:text-lg text-gray-600 px-2">{{ $pricingSection['subtitle'] }}</p>
                 @endif
             </div>
@@ -138,7 +199,7 @@
             <div class="max-w-4xl mx-auto">
                 <div class="bg-white rounded-2xl shadow-xl border-2 border-primary p-6 sm:p-8 md:p-12">
                     <div class="text-center mb-6 sm:mb-8">
-                        @if(isset($pricingSection['badge_text']))
+                        @if(isset($pricingSection['badge_text']) && !empty($pricingSection['badge_text']))
                         <div class="inline-block bg-green-100 text-green-800 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-3 sm:mb-4">
                             <i class="fas fa-check-circle mr-1 sm:mr-2"></i> {{ $pricingSection['badge_text'] }}
                         </div>
@@ -184,7 +245,7 @@
 
                     <div class="text-center pt-6 sm:pt-8 border-t border-gray-200">
                         <a href="{{ route('business.register') }}" class="w-full sm:w-auto inline-block bg-primary text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-primary/90 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                            {{ $pricingSection['cta_text'] ?? 'Get Started Now' }}
+                            {{ $pricingSection['cta_text'] ?? 'Get started' }}
                         </a>
                         @if(isset($pricingSection['cta_note']))
                         <p class="text-xs sm:text-sm text-gray-500 mt-3 sm:mt-4 px-2">{{ $pricingSection['cta_note'] }}</p>
@@ -192,7 +253,7 @@
                     </div>
                 </div>
 
-                @if(isset($pricingSection['comparison_badge']))
+                @if(isset($pricingSection['comparison_badge']) && !empty($pricingSection['comparison_badge']))
                 <div class="mt-8 text-center">
                     <div class="inline-flex items-center bg-yellow-50 border border-yellow-200 rounded-lg px-6 py-3">
                         <i class="fas fa-trophy text-yellow-600 mr-3"></i>
@@ -205,6 +266,15 @@
     </section>
     @endif
 
+    <!-- Philosophy Statement 5 -->
+    <section class="py-6 sm:py-8 bg-gray-50">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm sm:text-base text-gray-500 italic">
+                The part you never have to think about.
+            </p>
+        </div>
+    </section>
+
     <!-- WordPress Plugin Section -->
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-br from-purple-50 via-white to-purple-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -216,46 +286,45 @@
                             <i class="fab fa-wordpress mr-2"></i> WooCommerce Integration
                         </div>
                         <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4 sm:mb-6">
-                            WordPress Plugin Available
+                            WordPress Plugin
                         </h2>
                         <p class="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8">
-                            Quick integration for WooCommerce stores. Install our plugin and start accepting payments in minutes. No coding required!
+                            Works with WooCommerce. Install the plugin and configure your API key.
                         </p>
                         <div class="space-y-4 mb-6 sm:mb-8">
                             <div class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i>
+                                <i class="fas fa-check-circle text-gray-400 mt-1 mr-3 flex-shrink-0"></i>
                                 <div>
-                                    <h3 class="font-semibold text-gray-900 mb-1">Easy Installation</h3>
-                                    <p class="text-sm text-gray-600">Upload and activate in seconds. Works with WordPress 5.0+ and WooCommerce 5.0+</p>
+                                    <h3 class="font-semibold text-gray-900 mb-1">Installation</h3>
+                                    <p class="text-sm text-gray-600">Upload and activate. Works with WordPress 5.0+ and WooCommerce 5.0+</p>
                                 </div>
                             </div>
                             <div class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i>
+                                <i class="fas fa-check-circle text-gray-400 mt-1 mr-3 flex-shrink-0"></i>
                                 <div>
-                                    <h3 class="font-semibold text-gray-900 mb-1">Automatic Configuration</h3>
-                                    <p class="text-sm text-gray-600">Enter your API key and you're ready to accept payments. No complex setup needed.</p>
+                                    <h3 class="font-semibold text-gray-900 mb-1">Configuration</h3>
+                                    <p class="text-sm text-gray-600">Enter your API key to start accepting payments.</p>
                                 </div>
                             </div>
                             <div class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i>
+                                <i class="fas fa-check-circle text-gray-400 mt-1 mr-3 flex-shrink-0"></i>
                                 <div>
                                     <h3 class="font-semibold text-gray-900 mb-1">Charge Management</h3>
-                                    <p class="text-sm text-gray-600">Choose whether you or your customers pay transaction fees. Fully customizable.</p>
+                                    <p class="text-sm text-gray-600">Choose who pays transaction fees.</p>
                                 </div>
                             </div>
                         </div>
                         <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
                             <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                                <i class="fas fa-download mr-2"></i> Download Plugin
+                                Download
                             </a>
                             <a href="{{ route('business.register') }}" class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 border-2 border-purple-300 rounded-lg hover:bg-purple-50 font-medium text-base sm:text-lg transition-colors">
-                                <i class="fas fa-key mr-2"></i> Get API Key
+                                Get API Key
                             </a>
                         </div>
                         <div class="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
                             <p class="text-xs sm:text-sm text-gray-600">
-                                <i class="fas fa-info-circle mr-2 text-purple-600"></i>
-                                <strong>Version 1.0.0</strong> | Requires WordPress 5.0+ and WooCommerce 5.0+ | Free to use
+                                Version 1.0.0 | Requires WordPress 5.0+ and WooCommerce 5.0+
                             </p>
                         </div>
                     </div>
@@ -298,7 +367,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-8 sm:mb-12 md:mb-16">
                 <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{{ $howItWorks['title'] }}</h2>
-                @if(isset($howItWorks['subtitle']))
+                @if(isset($howItWorks['subtitle']) && !empty($howItWorks['subtitle']))
                 <p class="text-base sm:text-lg text-gray-600 px-2">{{ $howItWorks['subtitle'] }}</p>
                 @endif
             </div>
@@ -320,20 +389,36 @@
     </section>
     @endif
 
+    <!-- Security Section -->
+    @if(isset($security['description']) && !empty($security['description']))
+    <section class="py-12 sm:py-16 md:py-20 bg-gray-50">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                @if(isset($security['title']) && !empty($security['title']))
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">{{ $security['title'] }}</h2>
+                @endif
+                <p class="text-base sm:text-lg md:text-xl text-gray-700 leading-relaxed">
+                    {{ $security['description'] }}
+                </p>
+            </div>
+        </div>
+    </section>
+    @endif
+
     <!-- CTA Section -->
     @if(isset($cta['title']))
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4 px-2">{{ $cta['title'] }}</h2>
-            @if(isset($cta['description']))
+            @if(isset($cta['description']) && !empty($cta['description']))
             <p class="text-base sm:text-lg md:text-xl text-primary-100 mb-6 sm:mb-8 px-2">{{ $cta['description'] }}</p>
             @endif
             <div class="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 px-4">
-                <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                    {{ $cta['cta_primary'] ?? 'Create Your Account' }}
+                    <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
+                    {{ $cta['cta_primary'] ?? 'Get started' }}
                 </a>
                 <a href="{{ route('pricing') }}" class="w-full sm:w-auto bg-transparent text-white border-2 border-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-white/10 font-medium text-base sm:text-lg transition-colors">
-                    {{ $cta['cta_secondary'] ?? 'View Pricing' }}
+                    {{ $cta['cta_secondary'] ?? 'View pricing' }}
                 </a>
             </div>
         </div>
