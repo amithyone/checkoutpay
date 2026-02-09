@@ -24,6 +24,10 @@ return [
         'python_command' => env('PYTHON_EXTRACTOR_COMMAND', 'python3'), // 'python3' or 'python'
     ],
 
+    'match_attempts' => [
+        'retention_days' => (int) env('MATCH_ATTEMPTS_RETENTION_DAYS', 30),
+    ],
+
     'recaptcha' => [
         'site_key' => env('RECAPTCHA_SITE_KEY', ''),
         'secret_key' => env('RECAPTCHA_SECRET_KEY', ''),

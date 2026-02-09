@@ -238,6 +238,12 @@ class Kernel extends ConsoleKernel
             ->daily()
             ->withoutOverlapping()
             ->name('check-expired-memberships');
+
+        // Delete old match attempt logs to prevent database bloat (retention from MATCH_ATTEMPTS_RETENTION_DAYS)
+        $schedule->command('match-attempts:cleanup')
+            ->dailyAt('02:00')
+            ->withoutOverlapping()
+            ->name('cleanup-match-attempts');
     }
 
     /**

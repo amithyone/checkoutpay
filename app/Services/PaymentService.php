@@ -15,16 +15,87 @@ class PaymentService
     ) {}
 
     /**
+     * Normalize payer name for comparison (trim, lowercase, collapse spaces).
+     */
+    public static function normalizePayerName(?string $name): string
+    {
+        if ($name === null || $name === '') {
+            return '';
+        }
+        $normalized = trim(preg_replace('/\s+/', ' ', $name));
+        return strtolower($normalized);
+    }
+
+    /**
+     * Find an existing pending payment for the same business, amount, and similar payer name.
+     * Reusing it reduces duplicate account numbers when users retry without paying.
+     */
+    protected function findReusablePendingPayment(array $data, Business $business): ?Payment
+    {
+        $amount = (float) ($data['amount'] ?? 0);
+        $payerName = $data['payer_name'] ?? null;
+        if ($amount < 0.01 || !$payerName || trim((string) $payerName) === '') {
+            return null;
+        }
+
+        $normalizedName = self::normalizePayerName($payerName);
+        if ($normalizedName === '') {
+            return null;
+        }
+
+        $tolerance = 0.01;
+        $candidates = Payment::pending()
+            ->where('business_id', $business->id)
+            ->whereBetween('amount', [$amount - $tolerance, $amount + $tolerance])
+            ->whereNotNull('account_number')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        foreach ($candidates as $payment) {
+            if (self::normalizePayerName($payment->payer_name) === $normalizedName) {
+                return $payment;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Create a payment request
      */
     public function createPayment(array $data, Business $business, ?Request $request = null, bool $isInvoice = false): Payment
     {
+        $isMembership = isset($data['service']) && $data['service'] === 'membership';
+
+        // For regular (non-invoice, non-membership) payments: reuse existing pending if same name + amount
+        if (!$isInvoice && !$isMembership) {
+            $existing = $this->findReusablePendingPayment($data, $business);
+            if ($existing) {
+                $existing->load('accountNumberDetails');
+                $emailData = array_merge($existing->email_data ?? [], $this->buildEmailData($data, $request));
+                $updatePayload = ['email_data' => $emailData];
+                if (!empty($data['webhook_url'])) {
+                    $updatePayload['webhook_url'] = $data['webhook_url'];
+                }
+                $existing->update($updatePayload);
+                // Extend expiry so they have another 24h to pay
+                $existing->update(['expires_at' => now()->addHours(24)]);
+                Log::info('Reused existing pending payment (same name + amount)', [
+                    'payment_id' => $existing->id,
+                    'transaction_id' => $existing->transaction_id,
+                    'business_id' => $business->id,
+                    'amount' => $existing->amount,
+                    'payer_name' => $existing->payer_name,
+                ]);
+                return $existing;
+            }
+        }
+
         // Generate transaction ID if not provided
         $transactionId = $data['transaction_id'] ?? $this->generateTransactionId();
 
         // Assign account number based on payment type
-        $isMembership = isset($data['service']) && $data['service'] === 'membership';
-        
         if ($isInvoice) {
             // Invoice payments use invoice pool
             $accountNumber = $this->accountNumberService->assignInvoiceAccountNumber($business);
