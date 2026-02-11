@@ -45,6 +45,9 @@ class Invoice extends Model
         'email_sent_to_receiver',
         'payment_email_sent_to_sender',
         'payment_email_sent_to_receiver',
+        'allow_split_payment',
+        'split_installments',
+        'split_percentages',
     ];
 
     protected $casts = [
@@ -64,6 +67,9 @@ class Invoice extends Model
         'email_sent_to_receiver' => 'boolean',
         'payment_email_sent_to_sender' => 'boolean',
         'payment_email_sent_to_receiver' => 'boolean',
+        'allow_split_payment' => 'boolean',
+        'split_installments' => 'integer',
+        'split_percentages' => 'array',
     ];
 
     /**
@@ -127,15 +133,51 @@ class Invoice extends Model
     }
 
     /**
-     * Get the payment associated with this invoice
+     * Get the primary payment (legacy single payment or first linked payment)
      */
     public function payment()
     {
-        // Payment model may not exist, so use a conditional relationship
         if (class_exists(\App\Models\Payment::class)) {
             return $this->belongsTo(\App\Models\Payment::class);
         }
         return null;
+    }
+
+    /**
+     * Get all payments linked to this invoice (for split payments)
+     */
+    public function invoicePayments()
+    {
+        return $this->hasMany(InvoicePayment::class);
+    }
+
+    /**
+     * Get all payments (via invoice_payments pivot) - for split payment
+     */
+    public function payments()
+    {
+        return $this->hasManyThrough(
+            \App\Models\Payment::class,
+            InvoicePayment::class,
+            'invoice_id',
+            'id',
+            'id',
+            'payment_id'
+        );
+    }
+
+    /**
+     * Total amount paid so far (from linked payments that are approved)
+     */
+    public function getPaidAmountTotalAttribute(): float
+    {
+        $fromPivot = (float) $this->invoicePayments()
+            ->whereHas('payment', fn ($q) => $q->where('status', \App\Models\Payment::STATUS_APPROVED))
+            ->sum('amount');
+        if ($fromPivot > 0) {
+            return $fromPivot;
+        }
+        return (float) ($this->paid_amount ?? 0);
     }
 
     /**
@@ -163,6 +205,25 @@ class Invoice extends Model
     public function getPaymentLinkUrlAttribute(): string
     {
         return route('invoices.pay', ['code' => $this->payment_link_code]);
+    }
+
+    /**
+     * Get suggested split amounts by percentage (for display on payment page).
+     * Returns array of ['percent' => 33.33, 'amount' => 206664.00] for each installment.
+     */
+    public function getSuggestedSplitAmounts(): array
+    {
+        if (!$this->allow_split_payment || empty($this->split_percentages) || !$this->total_amount) {
+            return [];
+        }
+        $total = (float) $this->total_amount;
+        $amounts = [];
+        foreach ($this->split_percentages as $i => $pct) {
+            $pct = (float) $pct;
+            $amount = round($total * $pct / 100, 2);
+            $amounts[] = ['percent' => $pct, 'amount' => $amount];
+        }
+        return $amounts;
     }
 
     /**

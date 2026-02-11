@@ -134,7 +134,18 @@ class InvoiceController extends Controller
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.notes' => 'nullable|string|max:500',
             'send_email' => 'nullable|boolean',
+            'allow_split_payment' => 'nullable|boolean',
+            'split_installments' => 'nullable|integer|min:2|max:12',
+            'split_percentages' => 'nullable|array',
+            'split_percentages.*' => 'nullable|numeric|min:0|max:100',
         ]);
+
+        if (!empty($validated['allow_split_payment']) && !empty($validated['split_percentages'])) {
+            $sum = array_sum(array_map('floatval', $validated['split_percentages']));
+            if (abs($sum - 100) > 0.01) {
+                return back()->withInput()->with('error', 'Split percentages must add up to 100% (current total: ' . round($sum, 2) . '%).');
+            }
+        }
 
         try {
             $invoice = $this->invoiceService->createInvoice($validated, $business);
@@ -232,7 +243,22 @@ class InvoiceController extends Controller
             'items.*.unit' => 'nullable|string|max:50',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.notes' => 'nullable|string|max:500',
+            'allow_split_payment' => 'nullable|boolean',
+            'split_installments' => 'nullable|integer|min:2|max:12',
+            'split_percentages' => 'nullable|array',
+            'split_percentages.*' => 'nullable|numeric|min:0|max:100',
         ]);
+
+        if (!empty($validated['allow_split_payment']) && isset($validated['split_percentages'])) {
+            $sum = array_sum(array_map('floatval', $validated['split_percentages']));
+            if (abs($sum - 100) > 0.01) {
+                return back()->withInput()->with('error', 'Split percentages must add up to 100% (current total: ' . round($sum, 2) . '%).');
+            }
+            $validated['split_installments'] = $validated['split_installments'] ?? count($validated['split_percentages']);
+        } elseif (empty($validated['allow_split_payment'])) {
+            $validated['split_installments'] = null;
+            $validated['split_percentages'] = null;
+        }
 
         try {
             $this->invoiceService->updateInvoice($invoice, $validated);

@@ -44,6 +44,11 @@ class InvoiceService
             'terms_and_conditions' => $data['terms_and_conditions'] ?? null,
             'reference_number' => $data['reference_number'] ?? null,
             'status' => $data['status'] ?? 'draft',
+            'allow_split_payment' => !empty($data['allow_split_payment']),
+            'split_installments' => $data['split_installments'] ?? null,
+            'split_percentages' => isset($data['split_percentages']) && is_array($data['split_percentages'])
+                ? array_values(array_map('floatval', $data['split_percentages']))
+                : null,
         ]);
 
         // Add invoice items
@@ -144,6 +149,39 @@ class InvoiceService
             ]);
             return false;
         }
+    }
+
+    /**
+     * Record a split payment approval: credit business for this slice, update paid_amount, mark fully paid when total reached.
+     */
+    public function recordSplitPaymentApproved(Invoice $invoice, \App\Models\Payment $payment, float $sliceAmount): bool
+    {
+        $invoice->load(['business', 'invoicePayments.payment']);
+
+        $chargeService = app(ChargeService::class);
+        $charges = $chargeService->calculateInvoiceCharges($sliceAmount, $invoice->business);
+        $businessReceives = $charges['business_receives'] ?? $sliceAmount;
+
+        $invoice->business->increment('balance', $businessReceives);
+
+        $totalPaid = (float) $invoice->invoicePayments()
+            ->whereHas('payment', fn ($q) => $q->where('status', \App\Models\Payment::STATUS_APPROVED))
+            ->sum('amount');
+
+        $invoice->update([
+            'paid_amount' => $totalPaid,
+            'payment_id' => $invoice->payment_id ?? $payment->id,
+        ]);
+
+        if ($totalPaid >= (float) $invoice->total_amount) {
+            $invoice->update([
+                'status' => 'paid',
+                'paid_at' => now(),
+            ]);
+            $this->sendPaymentConfirmation($invoice);
+        }
+
+        return true;
     }
 
     /**
@@ -273,6 +311,11 @@ class InvoiceService
         }
 
         $invoice->update([
+            'allow_split_payment' => !empty($data['allow_split_payment']),
+            'split_installments' => $data['split_installments'] ?? null,
+            'split_percentages' => isset($data['split_percentages']) && is_array($data['split_percentages'])
+                ? array_values(array_map('floatval', $data['split_percentages']))
+                : null,
             'client_name' => $data['client_name'] ?? $invoice->client_name,
             'client_email' => $data['client_email'] ?? $invoice->client_email,
             'client_phone' => $data['client_phone'] ?? $invoice->client_phone,

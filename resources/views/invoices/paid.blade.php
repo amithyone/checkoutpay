@@ -58,8 +58,8 @@
             </p>
 
             <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href="{{ route('business.invoices.view-pdf', $invoice) }}" target="_blank" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
-                    <i class="fas fa-file-pdf mr-2"></i> Download Invoice PDF
+                <a href="{{ route('invoices.view.pdf', $invoice->payment_link_code) }}" target="_blank" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    <i class="fas fa-file-pdf mr-2"></i> View / Download Invoice PDF
                 </a>
             </div>
         </div>

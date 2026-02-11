@@ -55,7 +55,7 @@
                     • Track the invoice status from your dashboard
                 </div>
                 <div style="text-align: center; margin-top: 30px;">
-                    <a href="{{ route('business.invoices.show', $invoice) }}" style="display: inline-block; background: linear-gradient(135deg, #3C50E0 0%, #2E40C7 100%); color: #ffffff !important; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Invoice</a>
+                    <a href="{{ route('invoices.view', $invoice->payment_link_code) }}" style="display: inline-block; background: linear-gradient(135deg, #3C50E0 0%, #2E40C7 100%); color: #ffffff !important; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px;">View Invoice</a>
                 </div>
             </div>
             <div class="email-footer">

@@ -100,9 +100,12 @@ Route::prefix('tickets')->name('tickets.')->group(function () {
     Route::get('{event}', [\App\Http\Controllers\Public\TicketController::class, 'show'])->name('show-legacy');
 });
 
-// Public invoice payment routes
+// Public invoice payment routes (no auth – anyone with link can view/pay)
 Route::prefix('invoices')->name('invoices.')->group(function () {
+    Route::get('view/{code}', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'view'])->name('view');
+    Route::get('view/{code}/pdf', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'viewPdf'])->name('view.pdf');
     Route::get('pay/{code}', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'show'])->name('pay');
+    Route::post('pay/{code}/create-payment', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'createPaymentSlice'])->name('pay.create-payment');
     Route::post('pay/{code}/webhook', [\App\Http\Controllers\Public\InvoicePaymentController::class, 'webhook'])->name('payment.webhook');
 });
 

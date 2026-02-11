@@ -679,4 +679,146 @@ class ProcessedEmailController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get pending payments for quick-match dropdown (AJAX).
+     * Similar to payment page's unmatched-emails but from email side: list pending payments with simple labels.
+     */
+    public function getPendingPayments(\Illuminate\Http\Request $request, ProcessedEmail $processedEmail): \Illuminate\Http\JsonResponse
+    {
+        $search = trim((string) $request->query('search', ''));
+        $emailAmount = $processedEmail->amount ? (float) $processedEmail->amount : null;
+
+        $query = \App\Models\Payment::with('business')
+            ->where('status', \App\Models\Payment::STATUS_PENDING)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->where('created_at', '<=', $processedEmail->created_at); // Payment created before email was stored
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('transaction_id', 'like', "%{$search}%")
+                    ->orWhere('payer_name', 'like', "%{$search}%")
+                    ->orWhere('payer_account_number', 'like', "%{$search}%")
+                    ->orWhereHas('business', function ($bq) use ($search) {
+                        $bq->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $payments = $query->orderBy('created_at', 'desc')
+            ->limit(200)
+            ->get(['id', 'transaction_id', 'payer_name', 'amount', 'created_at', 'business_id']);
+
+        return response()->json([
+            'payments' => $payments->map(function ($p) use ($emailAmount) {
+                $diff = $emailAmount !== null && $p->amount
+                    ? ($emailAmount - (float) $p->amount)
+                    : null;
+                $diffText = $diff !== null
+                    ? ($diff > 0 ? '+' . number_format($diff, 2) : number_format($diff, 2))
+                    : null;
+                $businessName = $p->relationLoaded('business') && $p->business
+                    ? $p->business->name
+                    : '';
+                return [
+                    'id' => $p->id,
+                    'transaction_id' => $p->transaction_id,
+                    'payer_name' => $p->payer_name ?? '—',
+                    'amount' => (float) $p->amount,
+                    'amount_formatted' => '₦' . number_format($p->amount, 2),
+                    'business_name' => $businessName,
+                    'created_at' => $p->created_at->format('M d, Y H:i'),
+                    'difference' => $diff,
+                    'difference_text' => $diffText,
+                ];
+            }),
+        ]);
+    }
+
+    /**
+     * Match this email to a pending payment and approve the payment (same flow as manual approve from payment page).
+     */
+    public function matchToPayment(\Illuminate\Http\Request $request, ProcessedEmail $processedEmail): \Illuminate\Http\RedirectResponse
+    {
+        $request->validate([
+            'payment_id' => 'required|exists:payments,id',
+        ]);
+
+        if ($processedEmail->is_matched) {
+            return redirect()->route('admin.processed-emails.show', $processedEmail)
+                ->with('error', 'This email is already matched to a payment.');
+        }
+
+        $payment = \App\Models\Payment::with('business')->findOrFail($request->payment_id);
+
+        if ($payment->status !== \App\Models\Payment::STATUS_PENDING) {
+            return redirect()->route('admin.processed-emails.show', $processedEmail)
+                ->with('error', 'That payment is not pending (already ' . $payment->status . ').');
+        }
+
+        $linkedEmail = $processedEmail;
+        $linkedEmail->markAsMatched($payment);
+
+        $matchingService = new \App\Services\PaymentMatchingService(new \App\Services\TransactionLogService());
+        $emailDataForExtraction = [
+            'subject' => $linkedEmail->subject,
+            'from' => $linkedEmail->from_email,
+            'text' => $linkedEmail->text_body ?? '',
+            'html' => $linkedEmail->html_body ?? '',
+            'date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : null,
+        ];
+        $extractionResult = $matchingService->extractPaymentInfo($emailDataForExtraction);
+        $extractedInfo = is_array($extractionResult) && isset($extractionResult['data'])
+            ? $extractionResult['data']
+            : $extractionResult;
+
+        $receivedAmount = $linkedEmail->amount ? (float) $linkedEmail->amount : $payment->amount;
+        $emailAmount = $receivedAmount != $payment->amount ? $receivedAmount : ($extractedInfo['amount'] ?? $payment->amount);
+        $isMismatch = abs($receivedAmount - $payment->amount) > 0.01;
+
+        $emailData = [
+            'subject' => $linkedEmail->subject,
+            'from' => $linkedEmail->from_email,
+            'date' => $linkedEmail->email_date ? $linkedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+            'sender_name' => $extractedInfo['sender_name'] ?? $payment->payer_name,
+            'amount' => $emailAmount,
+            'received_amount' => $receivedAmount,
+            'processed_email_id' => $linkedEmail->id,
+            'manual_approval' => true,
+            'approved_by' => auth('admin')->user()->id,
+            'approved_by_name' => auth('admin')->user()->name,
+            'approved_at' => now()->toDateTimeString(),
+            'admin_notes' => 'Quick match from inbox',
+            'linked_email_id' => $linkedEmail->id,
+        ];
+
+        $payment->approve(
+            emailData: $emailData,
+            isMismatch: $isMismatch,
+            receivedAmount: $receivedAmount,
+            mismatchReason: $isMismatch ? 'Quick match from inbox – amount differs from expected' : null
+        );
+
+        if ($payment->business_id) {
+            $payment->business->incrementBalanceWithCharges($payment->amount, $payment, $receivedAmount);
+            $payment->business->refresh();
+            $payment->business->triggerAutoWithdrawal();
+        }
+
+        \Illuminate\Support\Facades\Log::info('Payment quick-matched from inbox', [
+            'payment_id' => $payment->id,
+            'processed_email_id' => $linkedEmail->id,
+            'admin_id' => auth('admin')->id(),
+        ]);
+
+        $payment->refresh();
+        $payment->load(['business.websites', 'website']);
+        event(new \App\Events\PaymentApproved($payment));
+
+        return redirect()->route('admin.processed-emails.show', $processedEmail)
+            ->with('success', 'Email matched and payment approved. Business credited and webhook sent.');
+    }
 }

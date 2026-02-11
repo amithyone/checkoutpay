@@ -109,13 +109,85 @@
                             <span>Total</span>
                             <span>{{ $invoice->currency }} {{ number_format($invoice->total_amount, 2) }}</span>
                         </div>
+                        @if($allowSplit && $paidSoFar > 0)
+                        <div class="flex justify-between text-sm pt-2">
+                            <span class="text-gray-600">Paid so far</span>
+                            <span class="font-medium text-green-700">{{ $invoice->currency }} {{ number_format($paidSoFar, 2) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm font-semibold">
+                            <span class="text-gray-700">Remaining</span>
+                            <span>{{ $invoice->currency }} {{ number_format($remaining, 2) }}</span>
+                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
 
             <!-- Payment Details -->
             <div class="lg:col-span-2">
-                @if($invoice->payment && $invoice->payment->account_number)
+                @if($allowSplit)
+                <!-- Split payment: form to create a payment slice -->
+                @php $suggestedAmounts = $invoice->getSuggestedSplitAmounts(); @endphp
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Pay in parts</h2>
+                    <p class="text-gray-600 mb-4">You can pay the invoice in multiple transfers. Enter the amount you want to pay now and get payment details.</p>
+                    @if(count($suggestedAmounts) > 0)
+                    <div class="mb-4">
+                        <p class="text-sm font-medium text-gray-700 mb-2">Suggested installments (by percentage):</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($suggestedAmounts as $idx => $sug)
+                                @if($sug['amount'] <= $remaining && $sug['amount'] >= 0.01)
+                                <button type="button" onclick="document.querySelector('input[name=amount]').value={{ number_format($sug['amount'], 2, '.', '') }}"
+                                    class="px-3 py-1.5 text-sm border border-primary text-primary rounded-lg hover:bg-primary/10">
+                                    {{ number_format($sug['percent'], 1) }}% — {{ $invoice->currency }} {{ number_format($sug['amount'], 2) }}
+                                </button>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+                    @if(session('error'))
+                    <p class="text-red-600 text-sm mb-4">{{ session('error') }}</p>
+                    @endif
+                    @if(session('success'))
+                    <p class="text-green-600 text-sm mb-4">{{ session('success') }}</p>
+                    @endif
+                    <form action="{{ route('invoices.pay.create-payment', $invoice->payment_link_code) }}" method="POST" class="space-y-4">
+                        @csrf
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Amount to pay ({{ $invoice->currency }})</label>
+                            <input type="number" name="amount" step="0.01" min="0.01" max="{{ $remaining }}" value="{{ $remaining > 0 ? number_format($remaining, 2, '.', '') : '' }}"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" required>
+                            <p class="text-xs text-gray-500 mt-1">Remaining balance: {{ $invoice->currency }} {{ number_format($remaining, 2) }}</p>
+                        </div>
+                        <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">
+                            <i class="fas fa-plus-circle mr-2"></i>Get payment details
+                        </button>
+                    </form>
+                </div>
+                @if($invoice->invoicePayments->isNotEmpty())
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-3">Your payments</h3>
+                    <ul class="space-y-2 text-sm">
+                        @foreach($invoice->invoicePayments as $ip)
+                        <li class="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                            <span>{{ $invoice->currency }} {{ number_format($ip->amount, 2) }} — {{ $ip->payment->transaction_id ?? 'N/A' }}</span>
+                            @if($ip->payment)
+                            <span class="px-2 py-0.5 rounded text-xs font-medium
+                                @if($ip->payment->status === 'approved') bg-green-100 text-green-800
+                                @elseif($ip->payment->status === 'pending') bg-yellow-100 text-yellow-800
+                                @else bg-gray-100 text-gray-800 @endif">
+                                {{ $ip->payment->status }}
+                            </span>
+                            @endif
+                        </li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
+                @endif
+
+                @if($selectedPayment && $selectedPayment->account_number)
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                     <h2 class="text-lg font-semibold text-gray-900 mb-4">Payment Instructions</h2>
                     <p class="text-gray-600 mb-6">Transfer the exact amount to the account below:</p>
@@ -127,7 +199,7 @@
                                 <i class="fas fa-university text-gray-400 mr-3"></i>
                                 <span class="text-sm font-medium text-gray-600">Bank Name</span>
                             </div>
-                            <span class="text-sm font-semibold text-gray-900">{{ $invoice->payment->accountNumberDetails->bank_name ?? 'N/A' }}</span>
+                            <span class="text-sm font-semibold text-gray-900">{{ $selectedPayment->accountNumberDetails->bank_name ?? 'N/A' }}</span>
                         </div>
 
                         <div class="flex items-center justify-between pb-4 border-b border-gray-200">
@@ -135,7 +207,7 @@
                                 <i class="fas fa-user text-gray-400 mr-3"></i>
                                 <span class="text-sm font-medium text-gray-600">Account Name</span>
                             </div>
-                            <span class="text-sm font-semibold text-gray-900">{{ $invoice->payment->accountNumberDetails->account_name ?? 'N/A' }}</span>
+                            <span class="text-sm font-semibold text-gray-900">{{ $selectedPayment->accountNumberDetails->account_name ?? 'N/A' }}</span>
                         </div>
 
                         <div class="flex items-center justify-between">
@@ -144,7 +216,7 @@
                                 <span class="text-sm font-medium text-gray-600">Account Number</span>
                             </div>
                             <div class="flex items-center">
-                                <span id="accountNumber" class="text-lg font-mono font-semibold text-gray-900 mr-3">{{ $invoice->payment->account_number }}</span>
+                                <span id="accountNumber" class="text-lg font-mono font-semibold text-gray-900 mr-3">{{ $selectedPayment->account_number }}</span>
                                 <button onclick="copyAccountNumber()" class="text-primary hover:text-primary/80 focus:outline-none" title="Copy account number">
                                     <i class="fas fa-copy text-xl"></i>
                                 </button>
@@ -156,14 +228,14 @@
                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                         <div class="flex items-center justify-between">
                             <span class="text-sm font-medium text-blue-900">Amount to Pay</span>
-                            <span class="text-2xl font-bold text-blue-900">{{ $invoice->currency }} {{ number_format($invoice->total_amount, 2) }}</span>
+                            <span class="text-2xl font-bold text-blue-900">{{ $invoice->currency }} {{ number_format($selectedPayment->amount, 2) }}</span>
                         </div>
                     </div>
 
                     <!-- Transaction ID -->
                     <div class="bg-gray-50 rounded-lg p-4 mb-6">
                         <p class="text-xs text-gray-600 mb-1">Transaction ID</p>
-                        <p class="text-sm font-mono text-gray-900">{{ $invoice->payment->transaction_id }}</p>
+                        <p class="text-sm font-mono text-gray-900">{{ $selectedPayment->transaction_id }}</p>
                     </div>
 
                     <!-- Info -->
@@ -181,11 +253,25 @@
                         </div>
                     </div>
                 </div>
+                @elseif($allowSplit && !$selectedPayment)
+                <p class="text-gray-600">Enter an amount above and click &quot;Get payment details&quot; to see where to pay.</p>
+                @elseif(!empty($paymentSetupError))
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div class="text-center py-8">
+                        <i class="fas fa-exclamation-triangle text-amber-500 text-4xl mb-4"></i>
+                        <p class="text-gray-800 font-medium mb-2">Payment setup issue</p>
+                        <p class="text-gray-600 mb-6">{{ $paymentSetupError }}</p>
+                        <a href="{{ route('invoices.pay', $invoice->payment_link_code) }}" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                            <i class="fas fa-redo mr-2"></i> Try again
+                        </a>
+                    </div>
+                </div>
                 @else
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <div class="text-center py-8">
                         <i class="fas fa-spinner fa-spin text-primary text-4xl mb-4"></i>
                         <p class="text-gray-600">Setting up payment...</p>
+                        <p class="text-sm text-gray-500 mt-2">This usually takes a few seconds. <a href="{{ route('invoices.pay', $invoice->payment_link_code) }}" class="text-primary hover:underline">Refresh page</a> if it takes too long.</p>
                     </div>
                 </div>
                 @endif
@@ -195,23 +281,28 @@
 
     <script>
         function copyAccountNumber() {
-            const accountNumber = document.getElementById('accountNumber').textContent;
+            const el = document.getElementById('accountNumber');
+            if (!el) return;
+            const accountNumber = el.textContent;
             navigator.clipboard.writeText(accountNumber).then(() => {
                 const btn = event.target.closest('button');
+                if (!btn) return;
                 const icon = btn.querySelector('i');
-                icon.classList.remove('fa-copy');
-                icon.classList.add('fa-check');
-                setTimeout(() => {
-                    icon.classList.remove('fa-check');
-                    icon.classList.add('fa-copy');
-                }, 2000);
+                if (icon) {
+                    icon.classList.remove('fa-copy');
+                    icon.classList.add('fa-check');
+                    setTimeout(() => {
+                        icon.classList.remove('fa-check');
+                        icon.classList.add('fa-copy');
+                    }, 2000);
+                }
             });
         }
 
-        // Auto-refresh payment status every 10 seconds
-        @if($invoice->payment)
+        // Auto-refresh payment status every 10 seconds when we have a pending payment
+        @if($selectedPayment && $selectedPayment->status === 'pending')
         setInterval(function() {
-            fetch('{{ route("checkout.status", $invoice->payment->transaction_id) }}')
+            fetch('{{ route("checkout.status", $selectedPayment->transaction_id) }}')
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'approved') {

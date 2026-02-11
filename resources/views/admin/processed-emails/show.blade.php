@@ -239,6 +239,35 @@
         </div>
     </div>
     @endif
+
+    <!-- Quick match to payment (unmatched emails only) -->
+    @if(!$processedEmail->is_matched)
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-link text-primary mr-2"></i>Quick match to payment
+        </h3>
+        <p class="text-xs sm:text-sm text-gray-600 mb-4">Select a pending payment below to link this email and approve the transaction (same as Manual Approve on the payment page).</p>
+        <form id="quick-match-form" action="{{ route('admin.processed-emails.match-to-payment', $processedEmail) }}" method="POST" class="space-y-4">
+            @csrf
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Search payments</label>
+                <input type="text" id="quick-match-search" placeholder="Payer name, transaction ID, business..."
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Pending payment <span class="text-red-500">*</span></label>
+                <select name="payment_id" id="quick-match-payment-select" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm min-h-[120px]">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            <button type="submit" id="quick-match-submit" disabled
+                class="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                <i class="fas fa-check-circle mr-2"></i>Match & Approve
+            </button>
+        </form>
+    </div>
+    @endif
 </div>
 
 <script>
@@ -434,5 +463,59 @@ function retryEmailMatch(emailId) {
         alert('❌ Error retrying match: ' + error.message);
     });
 }
+
+@if(!$processedEmail->is_matched)
+(function() {
+    const emailId = {{ $processedEmail->id }};
+    const selectEl = document.getElementById('quick-match-payment-select');
+    const searchEl = document.getElementById('quick-match-search');
+    const submitBtn = document.getElementById('quick-match-submit');
+    let searchTimeout = null;
+
+    function buildOption(p) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        const diff = p.difference_text ? ' (' + p.difference_text + ')' : '';
+        opt.textContent = p.transaction_id + ' — ' + p.payer_name + ' — ' + p.amount_formatted + (p.business_name ? ' — ' + p.business_name : '') + diff;
+        return opt;
+    }
+
+    function loadPendingPayments(search) {
+        if (!selectEl) return;
+        selectEl.innerHTML = '<option value="">Loading...</option>';
+        submitBtn && (submitBtn.disabled = true);
+        const url = '/admin/processed-emails/' + emailId + '/pending-payments' + (search ? '?search=' + encodeURIComponent(search) : '');
+        fetch(url, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            selectEl.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = '— Select a pending payment —';
+            selectEl.appendChild(opt0);
+            (data.payments || []).forEach(p => selectEl.appendChild(buildOption(p)));
+            submitBtn && (submitBtn.disabled = false);
+        })
+        .catch(err => {
+            selectEl.innerHTML = '<option value="">Error loading list</option>';
+            submitBtn && (submitBtn.disabled = false);
+        });
+    }
+
+    if (searchEl) {
+        searchEl.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() { loadPendingPayments(searchEl.value.trim()); }, 300);
+        });
+    }
+    if (selectEl) {
+        selectEl.addEventListener('change', function() { if (submitBtn) submitBtn.disabled = !selectEl.value; });
+    }
+
+    loadPendingPayments('');
+})();
+@endif
 </script>
 @endsection
