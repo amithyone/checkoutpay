@@ -56,6 +56,12 @@
                     <div class="label">Payment Date</div>
                     <div class="value">{{ ($invoice->paid_at ?? now())->format('F d, Y \a\t g:i A') }}</div>
                 </div>
+                @if($invoice->due_date)
+                <div class="info-box">
+                    <div class="label">Due Date (on receipt)</div>
+                    <div class="value">{{ $invoice->due_date->format('F d, Y') }}</div>
+                </div>
+                @endif
                 @if($invoice->payment)
                 <div class="info-box">
                     <div class="label">Transaction ID</div>

@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Business;
 use App\Mail\InvoiceSent;
+use App\Mail\InvoicePaymentReceipt;
 use App\Services\ChargeService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -173,6 +174,21 @@ class InvoiceService
             'payment_id' => $invoice->payment_id ?? $payment->id,
         ]);
 
+        // Send receipt to both parties for this payment (amount, due date, next payment reminder)
+        $remainingAfter = max(0, (float) $invoice->total_amount - $totalPaid);
+        $nextAmount = null;
+        if ($remainingAfter >= 0.01 && $invoice->allow_split_payment && !empty($invoice->split_percentages)) {
+            $suggested = $invoice->getSuggestedSplitAmounts();
+            foreach ($suggested as $s) {
+                $a = (float) $s['amount'];
+                if ($a >= 0.01 && $a <= $remainingAfter) {
+                    $nextAmount = round($a, 2);
+                    break;
+                }
+            }
+        }
+        $this->sendPaymentReceipt($invoice, $payment, $sliceAmount, $remainingAfter, $nextAmount);
+
         if ($totalPaid >= (float) $invoice->total_amount) {
             $invoice->update([
                 'status' => 'paid',
@@ -235,6 +251,50 @@ class InvoiceService
         } catch (\Exception $e) {
             Log::error('Failed to mark invoice as paid', [
                 'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Send payment receipt to both parties (for each payment, e.g. split). Includes amount, due date, and next payment reminder.
+     */
+    public function sendPaymentReceipt(
+        Invoice $invoice,
+        \App\Models\Payment $payment,
+        float $amount,
+        float $remaining = 0,
+        ?float $nextPaymentAmount = null
+    ): bool {
+        try {
+            $invoice->load(['business']);
+
+            Mail::to($invoice->client_email)->send(new InvoicePaymentReceipt(
+                $invoice,
+                $payment,
+                $amount,
+                false,
+                $remaining,
+                $nextPaymentAmount
+            ));
+
+            if ($invoice->business->email && $invoice->business->shouldReceivePaymentNotifications()) {
+                Mail::to($invoice->business->email)->send(new InvoicePaymentReceipt(
+                    $invoice,
+                    $payment,
+                    $amount,
+                    true,
+                    $remaining,
+                    $nextPaymentAmount
+                ));
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to send payment receipt emails', [
+                'invoice_id' => $invoice->id,
+                'payment_id' => $payment->id,
                 'error' => $e->getMessage(),
             ]);
             return false;

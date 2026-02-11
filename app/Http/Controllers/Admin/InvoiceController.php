@@ -133,6 +133,10 @@ class InvoiceController extends Controller
             'terms_and_conditions' => 'nullable|string',
             'reference_number' => 'nullable|string|max:255',
             'status' => 'required|in:draft,sent,viewed,paid,overdue,cancelled',
+            'allow_split_payment' => 'nullable|boolean',
+            'split_installments' => 'nullable|integer|min:2|max:12',
+            'split_percentages' => 'nullable|array',
+            'split_percentages.*' => 'nullable|numeric|min:0|max:100',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string|max:500',
             'items.*.quantity' => 'required|numeric|min:0.01',
@@ -140,6 +144,15 @@ class InvoiceController extends Controller
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.notes' => 'nullable|string|max:500',
         ]);
+
+        // When split payment is enabled, percentages must sum to 100
+        $allowSplit = filter_var($request->input('allow_split_payment'), FILTER_VALIDATE_BOOLEAN);
+        if ($allowSplit && is_array($request->input('split_percentages'))) {
+            $sum = array_sum(array_map('floatval', $request->input('split_percentages')));
+            if (abs($sum - 100) > 0.01) {
+                return back()->withInput()->withErrors(['split_percentages' => 'Split percentages must add up to 100%.']);
+            }
+        }
 
         try {
             // Handle logo upload
@@ -171,6 +184,11 @@ class InvoiceController extends Controller
                 'terms_and_conditions' => $validated['terms_and_conditions'] ?? null,
                 'reference_number' => $validated['reference_number'] ?? null,
                 'status' => $validated['status'],
+                'allow_split_payment' => $allowSplit,
+                'split_installments' => $allowSplit ? (int) ($validated['split_installments'] ?? 2) : null,
+                'split_percentages' => $allowSplit && ! empty($validated['split_percentages'] ?? [])
+                    ? array_map('floatval', array_values($validated['split_percentages']))
+                    : null,
             ];
 
             if ($logoPath) {

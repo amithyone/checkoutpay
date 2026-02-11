@@ -64,7 +64,8 @@ class InvoicePaymentController extends Controller
                 $selectedPayment = $firstPending?->payment;
             }
             $paymentSetupError = null;
-            return view('invoices.payment', compact('invoice', 'allowSplit', 'remaining', 'paidSoFar', 'selectedPayment', 'paymentSetupError'));
+            $allowedPaymentOptions = $invoice->getAllowedPaymentOptions($remaining);
+            return view('invoices.payment', compact('invoice', 'allowSplit', 'remaining', 'paidSoFar', 'selectedPayment', 'paymentSetupError', 'allowedPaymentOptions'));
         }
 
         // Single payment: create one payment if not exists
@@ -125,8 +126,11 @@ class InvoicePaymentController extends Controller
         $paidSoFar = (float) $invoice->invoicePayments()->whereHas('payment', fn ($q) => $q->where('status', 'approved'))->sum('amount');
         $remaining = max(0, (float) $invoice->total_amount - $paidSoFar);
         $amount = (float) $request->amount;
-        if ($amount > $remaining) {
-            return redirect()->back()->with('error', 'Amount cannot exceed remaining balance (' . number_format($remaining, 2) . ').')->withInput();
+        if ($amount > $remaining || $amount < 0.01) {
+            return redirect()->back()->with('error', 'Amount must be between 0.01 and the remaining balance.')->withInput();
+        }
+        if (!$invoice->isAllowedSplitAmount($amount, $remaining)) {
+            return redirect()->back()->with('error', 'Please select one of the predefined payment options (pay in full or an installment amount).')->withInput();
         }
 
         try {

@@ -41,6 +41,7 @@ class Invoice extends Model
         'sent_at',
         'viewed_at',
         'view_count',
+        'last_reminder_sent_at',
         'email_sent_to_sender',
         'email_sent_to_receiver',
         'payment_email_sent_to_sender',
@@ -63,6 +64,7 @@ class Invoice extends Model
         'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'view_count' => 'integer',
+        'last_reminder_sent_at' => 'datetime',
         'email_sent_to_sender' => 'boolean',
         'email_sent_to_receiver' => 'boolean',
         'payment_email_sent_to_sender' => 'boolean',
@@ -224,6 +226,50 @@ class Invoice extends Model
             $amounts[] = ['percent' => $pct, 'amount' => $amount];
         }
         return $amounts;
+    }
+
+    /**
+     * Get allowed payment options for split payment: pay in full or one predefined installment.
+     * Only options with amount <= remaining and >= 0.01 are returned. Used to restrict payment to predefined amounts only.
+     *
+     * @return array<int, array{label: string, amount: float}>
+     */
+    public function getAllowedPaymentOptions(float $remaining): array
+    {
+        $options = [];
+        if ($remaining >= 0.01) {
+            $options[] = [
+                'label' => 'Pay in full',
+                'amount' => round($remaining, 2),
+            ];
+        }
+        $suggested = $this->getSuggestedSplitAmounts();
+        foreach ($suggested as $i => $s) {
+            $amount = (float) $s['amount'];
+            if ($amount < 0.01 || $amount > $remaining) {
+                continue;
+            }
+            $percent = (float) $s['percent'];
+            $options[] = [
+                'label' => 'Pay installment ' . ($i + 1) . ' (' . number_format($percent, 1) . '%)',
+                'amount' => round($amount, 2),
+            ];
+        }
+        return $options;
+    }
+
+    /**
+     * Check if an amount is one of the allowed split payment amounts (with tolerance).
+     */
+    public function isAllowedSplitAmount(float $amount, float $remaining): bool
+    {
+        $options = $this->getAllowedPaymentOptions($remaining);
+        foreach ($options as $opt) {
+            if (abs((float) $opt['amount'] - $amount) < 0.005) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

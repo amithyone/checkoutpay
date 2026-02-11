@@ -126,43 +126,36 @@
             <!-- Payment Details -->
             <div class="lg:col-span-2">
                 @if($allowSplit)
-                <!-- Split payment: form to create a payment slice -->
-                @php $suggestedAmounts = $invoice->getSuggestedSplitAmounts(); @endphp
+                <!-- Split payment: choose one predefined option only -->
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Pay in parts</h2>
-                    <p class="text-gray-600 mb-4">You can pay the invoice in multiple transfers. Enter the amount you want to pay now and get payment details.</p>
-                    @if(count($suggestedAmounts) > 0)
-                    <div class="mb-4">
-                        <p class="text-sm font-medium text-gray-700 mb-2">Suggested installments (by percentage):</p>
-                        <div class="flex flex-wrap gap-2">
-                            @foreach($suggestedAmounts as $idx => $sug)
-                                @if($sug['amount'] <= $remaining && $sug['amount'] >= 0.01)
-                                <button type="button" onclick="document.querySelector('input[name=amount]').value={{ number_format($sug['amount'], 2, '.', '') }}"
-                                    class="px-3 py-1.5 text-sm border border-primary text-primary rounded-lg hover:bg-primary/10">
-                                    {{ number_format($sug['percent'], 1) }}% — {{ $invoice->currency }} {{ number_format($sug['amount'], 2) }}
-                                </button>
-                                @endif
-                            @endforeach
-                        </div>
-                    </div>
-                    @endif
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">How would you like to pay?</h2>
+                    <p class="text-gray-600 mb-4">Select one option below. You can pay in full or one of the predefined installments.</p>
                     @if(session('error'))
                     <p class="text-red-600 text-sm mb-4">{{ session('error') }}</p>
                     @endif
                     @if(session('success'))
                     <p class="text-green-600 text-sm mb-4">{{ session('success') }}</p>
                     @endif
-                    <form action="{{ route('invoices.pay.create-payment', $invoice->payment_link_code) }}" method="POST" class="space-y-4">
+                    <form action="{{ route('invoices.pay.create-payment', $invoice->payment_link_code) }}" method="POST" id="split-payment-form" class="space-y-4">
                         @csrf
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Amount to pay ({{ $invoice->currency }})</label>
-                            <input type="number" name="amount" step="0.01" min="0.01" max="{{ $remaining }}" value="{{ $remaining > 0 ? number_format($remaining, 2, '.', '') : '' }}"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" required>
-                            <p class="text-xs text-gray-500 mt-1">Remaining balance: {{ $invoice->currency }} {{ number_format($remaining, 2) }}</p>
+                        <input type="hidden" name="amount" id="split-amount-input" value="">
+                        <div class="space-y-3">
+                            @foreach($allowedPaymentOptions ?? [] as $option)
+                            <label class="flex items-center gap-4 p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
+                                <input type="radio" name="payment_option" value="{{ number_format($option['amount'], 2, '.', '') }}" class="text-primary focus:ring-primary" required
+                                    data-amount="{{ number_format($option['amount'], 2, '.', '') }}">
+                                <span class="flex-1 font-medium text-gray-900">{{ $option['label'] }}</span>
+                                <span class="text-lg font-semibold text-gray-900">{{ $invoice->currency }} {{ number_format($option['amount'], 2) }}</span>
+                            </label>
+                            @endforeach
                         </div>
-                        <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">
-                            <i class="fas fa-plus-circle mr-2"></i>Get payment details
+                        @if(empty($allowedPaymentOptions))
+                        <p class="text-gray-500 text-sm">No payment options available. Remaining balance: {{ $invoice->currency }} {{ number_format($remaining, 2) }}</p>
+                        @else
+                        <button type="submit" id="split-submit-btn" disabled class="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-arrow-right mr-2"></i>Get payment details
                         </button>
+                        @endif
                     </form>
                 </div>
                 @if($invoice->invoicePayments->isNotEmpty())
@@ -254,7 +247,7 @@
                     </div>
                 </div>
                 @elseif($allowSplit && !$selectedPayment)
-                <p class="text-gray-600">Enter an amount above and click &quot;Get payment details&quot; to see where to pay.</p>
+                <p class="text-gray-600">Select a payment option above and click &quot;Get payment details&quot; to see where to pay.</p>
                 @elseif(!empty($paymentSetupError))
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                     <div class="text-center py-8">
@@ -298,6 +291,27 @@
                 }
             });
         }
+
+        // Split payment: sync selected option to hidden amount and enable submit
+        (function() {
+            var radios = document.querySelectorAll('input[name="payment_option"]');
+            var amountInput = document.getElementById('split-amount-input');
+            var btn = document.getElementById('split-submit-btn');
+            function updateAmount() {
+                var checked = document.querySelector('input[name="payment_option"]:checked');
+                if (amountInput && btn && checked) {
+                    amountInput.value = checked.value;
+                    btn.disabled = false;
+                }
+            }
+            radios.forEach(function(radio) {
+                radio.addEventListener('change', updateAmount);
+            });
+            if (radios.length > 0 && !document.querySelector('input[name="payment_option"]:checked')) {
+                radios[0].checked = true;
+                updateAmount();
+            }
+        })();
 
         // Auto-refresh payment status every 10 seconds when we have a pending payment
         @if($selectedPayment && $selectedPayment->status === 'pending')

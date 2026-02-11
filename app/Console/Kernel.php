@@ -239,6 +239,12 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->name('check-expired-memberships');
 
+        // Send invoice due/overdue reminders to client and business (due within 3 days or overdue)
+        $schedule->command('invoice:send-reminders')
+            ->dailyAt('09:00')
+            ->withoutOverlapping()
+            ->name('invoice-send-reminders');
+
         // Delete old match attempt logs to prevent database bloat (retention from MATCH_ATTEMPTS_RETENTION_DAYS)
         $schedule->command('match-attempts:cleanup')
             ->dailyAt('02:00')

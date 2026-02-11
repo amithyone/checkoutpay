@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
 use App\Models\AccountNumber;
+use App\Models\InvoicePayment;
 use App\Services\DescriptionFieldExtractor;
 use App\Services\MatchAttemptLogger;
 use App\Services\TransactionLogService;
@@ -314,6 +315,40 @@ class PaymentMatchingService
                 }
             }
         }
+
+        // STEP 0.4: Invoice payment – account number + amount only (name not required)
+        // When the payment is for an invoice and the account number is from the invoice pool,
+        // match only on account number and amount.
+        $isInvoicePayment = ($payment->email_data['service'] ?? null) === 'invoice'
+            || InvoicePayment::where('payment_id', $payment->id)->exists();
+        $accountIsInvoicePool = $payment->account_number
+            && AccountNumber::invoicePool()->where('account_number', $payment->account_number)->exists();
+
+        if ($isInvoicePayment && $accountIsInvoicePool) {
+            $receivedAmount = $extractedInfo['amount'] ?? 0;
+            $requestedAmount = $payment->amount;
+            $amountDiff = abs($requestedAmount - $receivedAmount);
+            $extractedAccountNumber = $extractedInfo['account_number'] ?? null;
+
+            if ($extractedAccountNumber && $payment->account_number === $extractedAccountNumber && $amountDiff <= 1) {
+                if ($emailDate && $emailDate->lt($payment->created_at)) {
+                    $result['reason'] = "Invoice account and amount match but email received before transaction creation";
+                    return $result;
+                }
+                $result['matched'] = true;
+                $result['amount_match'] = true;
+                $result['account_match'] = true;
+                $result['name_match'] = false;
+                $result['reason'] = 'Matched: Invoice payment – account number and amount match (name not required)';
+                $result['time_match'] = !$emailDate || $payment->created_at->diffInMinutes($emailDate) <= 120;
+                $result['received_amount'] = $receivedAmount;
+                return $result;
+            }
+            if ($extractedAccountNumber && $payment->account_number === $extractedAccountNumber && $amountDiff > 1) {
+                $result['reason'] = "Invoice account match but amount mismatch: payment={$requestedAmount}, email={$receivedAmount}";
+                return $result;
+            }
+        }
         
         // STEP 0.5: Moniepoint-specific matching (runs alongside standard matching)
         // This allows matching when account number matches and name is similar, even if amount is slightly off
@@ -450,10 +485,22 @@ class PaymentMatchingService
         // STEP 1 (continued): Strict amount matching (if not charges mismatch)
         if (!$chargesMismatchDetected) {
             if ($amountDiff > 1) { // Allow 1 naira tolerance
-                $result['reason'] = "Amount mismatch: payment={$requestedAmount}, email={$receivedAmount}";
-                return $result;
+                // To approve a higher amount we require name similarity > 75% so we're sure the money belongs to the person
+                $minSimilarityForHigherAmount = 75;
+                $nameSimilarity = $result['name_similarity_percent'] ?? 0;
+                $higherAmountAllowed = $receivedAmount > $requestedAmount && $nameSimilarity > $minSimilarityForHigherAmount;
+                if ($higherAmountAllowed) {
+                    $result['amount_match'] = true;
+                    $result['received_amount'] = $receivedAmount;
+                    $result['is_mismatch'] = true; // So we persist received_amount when approving
+                    $result['mismatch_reason'] = 'Customer sent higher amount than requested. Requested: ₦' . number_format($requestedAmount, 2) . ', Received: ₦' . number_format($receivedAmount, 2) . ' – transaction updated with received amount.';
+                } else {
+                    $result['reason'] = "Amount mismatch: payment={$requestedAmount}, email={$receivedAmount}";
+                    return $result;
+                }
+            } else {
+                $result['amount_match'] = true;
             }
-            $result['amount_match'] = true;
         }
         
         // STEP 3: Time matching (CRITICAL: Email must be received AFTER transaction creation)
@@ -521,7 +568,11 @@ class PaymentMatchingService
             if ($result['name_match'] && $hasMinimumSimilarity) {
                 // Amount + Name match = STRONG MATCH (only if similarity >= 50%)
                 $result['matched'] = true;
-                $result['reason'] = 'Matched: Amount and name match (similarity: ' . $result['name_similarity_percent'] . '%)';
+                if (!empty($result['received_amount']) && $result['received_amount'] > $payment->amount) {
+                    $result['reason'] = 'Matched: Name match (similarity: ' . $result['name_similarity_percent'] . '%), customer sent higher amount – transaction updated with ₦' . number_format($result['received_amount'], 2);
+                } else {
+                    $result['reason'] = 'Matched: Amount and name match (similarity: ' . $result['name_similarity_percent'] . '%)';
+                }
             } elseif ($result['name_match'] && !$hasMinimumSimilarity) {
                 // Name matched but similarity too low - reject
                 $result['matched'] = false;
@@ -785,19 +836,46 @@ class PaymentMatchingService
                 }
             }
             
-            // Extract sender name if missing (using simple patterns)
+            // Extract sender name if missing (from text first; then from_name only when it looks like a real person)
             if (!$email->sender_name) {
                 $senderName = $this->extractSenderNameFromText($textBody, $htmlBody);
+                $usedFromName = false;
+                if (!$senderName && $this->isFromNameUsableAsSender($email->from_name)) {
+                    $senderName = strtolower(trim($email->from_name));
+                    $usedFromName = true;
+                }
+                // GTBank fallback: use dedicated parser when email is from GTBank and standard extraction found nothing
+                if (!$senderName && stripos($email->from_email ?? '', 'gtbank.com') !== false) {
+                    $gtbankParser = new \App\Services\GtbankTransactionParser();
+                    $emailData = ['from' => $email->from_email, 'subject' => $email->subject, 'html' => $htmlBody, 'text' => $textBody];
+                    if ($gtbankParser->isGtbankTransaction($emailData)) {
+                        $reflection = new \ReflectionClass($gtbankParser);
+                        $method = $reflection->getMethod('extractSenderName');
+                        $method->setAccessible(true);
+                        $gtbankName = $method->invoke($gtbankParser, $htmlBody, $textBody);
+                        if ($gtbankName && $this->isValidExtractedName($gtbankName)) {
+                            $senderName = strtolower(trim($gtbankName));
+                        }
+                        // GTBank Remarks fallback: when name not in Description, it's often in Remarks (e.g. "Remarks : ACCESS-OMO ABUMEN SAMUEL JOHN Time of Transaction")
+                        if (!$senderName && preg_match('/remark[s]*\s*:\s*([^\n\r]+?)(?:\s+Time\s+of\s+Transaction|\s+Document\s+Number)/i', $textBody, $remarksMatch)) {
+                            $remarksValue = trim(preg_replace('/\s+/', ' ', $remarksMatch[1]));
+                            // Format often "CODE-CODE NAME NAME" – take name part (after first token that contains a dash)
+                            $parts = preg_split('/\s+/', $remarksValue, 2);
+                            $namePart = (count($parts) >= 2 && strpos($parts[0], '-') !== false) ? $parts[1] : $remarksValue;
+                            $namePart = trim($namePart);
+                            if (strlen($namePart) >= 4 && $this->isValidExtractedName($namePart)) {
+                                $senderName = strtolower($namePart);
+                            }
+                        }
+                    }
+                }
                 if ($senderName) {
                     $email->sender_name = $senderName;
-                    // Update extracted_data
-                    $extractedData['sender_name'] = strtolower($senderName);
-                    // Also update if nested in 'data' key
+                    $extractedData['sender_name'] = $senderName;
                     if (isset($extractedData['data']) && is_array($extractedData['data'])) {
-                        $extractedData['data']['sender_name'] = strtolower($senderName);
+                        $extractedData['data']['sender_name'] = $senderName;
                     }
-                    // Add extraction method info
-                    $extractedData['extraction_method'] = 'text_body_re_extraction';
+                    $extractedData['extraction_method'] = $usedFromName ? 'from_name_fallback' : 'text_body_re_extraction';
                     $extractedData['extraction_timestamp'] = now()->toDateTimeString();
                     $updated = true;
                 }
@@ -817,6 +895,32 @@ class PaymentMatchingService
             ]);
             return false;
         }
+    }
+
+    /**
+     * Whether the email "From" name can be used as sender_name (payer name).
+     * Bank alerts usually come from "noreply@bank.com" or "Alerts" – we do not use those.
+     */
+    protected function isFromNameUsableAsSender(?string $fromName): bool
+    {
+        if ($fromName === null || trim($fromName) === '') {
+            return false;
+        }
+        $name = trim($fromName);
+        if (strlen($name) < 3) {
+            return false;
+        }
+        if (str_contains($name, '@') || filter_var($name, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+        $lower = strtolower($name);
+        $generic = ['noreply', 'no-reply', 'alerts', 'alert', 'notifications', 'notification', 'support', 'info', 'mailer', 'donotreply', 'do not reply', 'bank', 'gtbank', 'opay', 'kuda', 'first bank', 'zenith', 'access bank', 'uba'];
+        foreach ($generic as $g) {
+            if ($lower === $g || str_starts_with($lower, $g . ' ') || str_ends_with($lower, ' ' . $g)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
