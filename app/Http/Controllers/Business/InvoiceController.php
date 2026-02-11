@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
+use App\Models\Business;
 use App\Models\Invoice;
 use App\Services\InvoiceService;
 use App\Services\InvoicePdfService;
@@ -17,6 +18,23 @@ class InvoiceController extends Controller
         protected InvoiceService $invoiceService,
         protected InvoicePdfService $pdfService
     ) {}
+
+    /**
+     * Authorize access to the invoice: allow admin for any invoice, or the business that owns it.
+     * Returns the Business to use for the request (owner or invoice's business when admin).
+     */
+    protected function authorizeInvoiceForBusiness(Invoice $invoice, string $action): Business
+    {
+        if (Auth::guard('admin')->check()) {
+            $invoice->loadMissing('business');
+            return $invoice->business;
+        }
+        $business = Auth::guard('business')->user();
+        if (!$business || (int) $invoice->business_id !== (int) $business->id) {
+            abort(403, 'You do not have permission to ' . $action . ' this invoice.');
+        }
+        return $business;
+    }
 
     /**
      * Display a listing of invoices
@@ -167,11 +185,14 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice): View
     {
+        // Allow admin to view any invoice; otherwise require the business that owns the invoice
+        if (Auth::guard('admin')->check()) {
+            $invoice->load(['business', 'items', 'payment']);
+            return view('business.invoices.show', compact('invoice'));
+        }
         $business = Auth::guard('business')->user();
-
-        // Ensure invoice belongs to business
-        if ($invoice->business_id !== $business->id) {
-            abort(403);
+        if (!$business || (int) $invoice->business_id !== (int) $business->id) {
+            abort(403, 'You do not have permission to view this invoice.');
         }
 
         $invoice->load(['business', 'items', 'payment']);
@@ -184,12 +205,7 @@ class InvoiceController extends Controller
      */
     public function edit(Invoice $invoice): View
     {
-        $business = Auth::guard('business')->user();
-
-        // Ensure invoice belongs to business
-        if ($invoice->business_id !== $business->id) {
-            abort(403);
-        }
+        $business = $this->authorizeInvoiceForBusiness($invoice, 'edit');
 
         // Don't allow editing paid invoices
         if ($invoice->isPaid()) {
@@ -207,12 +223,7 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, Invoice $invoice): RedirectResponse
     {
-        $business = Auth::guard('business')->user();
-
-        // Ensure invoice belongs to business
-        if ($invoice->business_id !== $business->id) {
-            abort(403);
-        }
+        $business = $this->authorizeInvoiceForBusiness($invoice, 'update');
 
         // Don't allow editing paid invoices
         if ($invoice->isPaid()) {
@@ -275,12 +286,7 @@ class InvoiceController extends Controller
      */
     public function destroy(Invoice $invoice): RedirectResponse
     {
-        $business = Auth::guard('business')->user();
-
-        // Ensure invoice belongs to business
-        if ($invoice->business_id !== $business->id) {
-            abort(403);
-        }
+        $this->authorizeInvoiceForBusiness($invoice, 'delete');
 
         // Don't allow deleting sent or paid invoices
         if (in_array($invoice->status, ['sent', 'paid'])) {
@@ -299,12 +305,7 @@ class InvoiceController extends Controller
      */
     public function send(Invoice $invoice): RedirectResponse
     {
-        $business = Auth::guard('business')->user();
-
-        // Ensure invoice belongs to business
-        if ($invoice->business_id !== $business->id) {
-            abort(403);
-        }
+        $this->authorizeInvoiceForBusiness($invoice, 'send');
 
         try {
             $this->invoiceService->sendInvoice($invoice, true);
@@ -322,12 +323,7 @@ class InvoiceController extends Controller
      */
     public function downloadPdf(Invoice $invoice)
     {
-        $business = Auth::guard('business')->user();
-
-        // Ensure invoice belongs to business
-        if ($invoice->business_id !== $business->id) {
-            abort(403);
-        }
+        $this->authorizeInvoiceForBusiness($invoice, 'download');
 
         return $this->pdfService->downloadPdf($invoice);
     }
@@ -337,12 +333,7 @@ class InvoiceController extends Controller
      */
     public function viewPdf(Invoice $invoice)
     {
-        $business = Auth::guard('business')->user();
-
-        // Ensure invoice belongs to business
-        if ($invoice->business_id !== $business->id) {
-            abort(403);
-        }
+        $this->authorizeInvoiceForBusiness($invoice, 'viewPdf');
 
         return $this->pdfService->streamPdf($invoice);
     }
