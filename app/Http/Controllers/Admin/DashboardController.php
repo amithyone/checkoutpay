@@ -18,21 +18,17 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // Daily statistics
+        // Daily statistics (same logic as Stats page for accuracy)
         $today = now()->startOfDay();
         $yesterday = now()->subDay()->startOfDay();
-        
+
         $dailyStats = [
-            'amount_received' => Payment::where('status', Payment::STATUS_APPROVED)
+            'amount_received' => (float) Payment::where('status', Payment::STATUS_APPROVED)
                 ->whereDate('created_at', $today)
-                ->sum('received_amount') ?: Payment::where('status', Payment::STATUS_APPROVED)
-                ->whereDate('created_at', $today)
-                ->sum('amount'),
-            'amount_received_yesterday' => Payment::where('status', Payment::STATUS_APPROVED)
+                ->sum(DB::raw('COALESCE(received_amount, amount)')),
+            'amount_received_yesterday' => (float) Payment::where('status', Payment::STATUS_APPROVED)
                 ->whereDate('created_at', $yesterday)
-                ->sum('received_amount') ?: Payment::where('status', Payment::STATUS_APPROVED)
-                ->whereDate('created_at', $yesterday)
-                ->sum('amount'),
+                ->sum(DB::raw('COALESCE(received_amount, amount)')),
             'transactions_count' => Payment::whereDate('created_at', $today)->count(),
             'approved_count' => Payment::where('status', Payment::STATUS_APPROVED)
                 ->whereDate('created_at', $today)
@@ -55,9 +51,8 @@ class DashboardController extends Controller
                 'pending' => Payment::where('status', Payment::STATUS_PENDING)->count(),
                 'approved' => Payment::where('status', Payment::STATUS_APPROVED)->count(),
                 'rejected' => Payment::where('status', Payment::STATUS_REJECTED)->count(),
-                'total_amount' => Payment::where('status', Payment::STATUS_APPROVED)
-                    ->sum('received_amount') ?: Payment::where('status', Payment::STATUS_APPROVED)
-                    ->sum('amount'),
+                'total_amount' => (float) Payment::where('status', Payment::STATUS_APPROVED)
+                    ->sum(DB::raw('COALESCE(received_amount, amount)')),
             ],
             'businesses' => [
                 'total' => Business::count(),
@@ -75,7 +70,7 @@ class DashboardController extends Controller
                 'total_payments_received_count' => Payment::where('status', Payment::STATUS_APPROVED)
                     ->whereNotNull('account_number')
                     ->count(),
-                'total_payments_received_amount' => Payment::where('status', Payment::STATUS_APPROVED)
+                'total_payments_received_amount' => (float) Payment::where('status', Payment::STATUS_APPROVED)
                     ->whereNotNull('account_number')
                     ->sum(DB::raw('COALESCE(received_amount, amount)')),
             ],
@@ -104,40 +99,12 @@ class DashboardController extends Controller
                 'paid_amount' => Invoice::where('status', 'paid')->sum('paid_amount'),
                 'pending_amount' => Invoice::whereNotIn('status', ['paid', 'cancelled'])->sum('total_amount'),
             ],
-            'matching_time' => [
-                'average_minutes' => Payment::where('status', Payment::STATUS_APPROVED)
-                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
-                    ->whereNotNull('matched_at')
-                    ->get()
-                    ->map(function ($payment) {
-                        return $payment->created_at->diffInMinutes($payment->matched_at);
-                    })
-                    ->avg() ?: 0,
-                'average_minutes_today' => Payment::where('status', Payment::STATUS_APPROVED)
-                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
-                    ->whereNotNull('matched_at')
-                    ->whereDate('created_at', $today)
-                    ->get()
-                    ->map(function ($payment) {
-                        return $payment->created_at->diffInMinutes($payment->matched_at);
-                    })
-                    ->avg() ?: 0,
-                'total_matched' => Payment::where('status', Payment::STATUS_APPROVED)
-                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
-                    ->whereNotNull('matched_at')
-                    ->count(),
-                'total_matched_today' => Payment::where('status', Payment::STATUS_APPROVED)
-                    ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
-                    ->whereNotNull('matched_at')
-                    ->whereDate('created_at', $today)
-                    ->count(),
-            ],
+            'matching_time' => $this->getMatchingTimeStats($today),
             'charges' => [
-                'total_collected' => BusinessWebsite::sum('total_charges_collected'),
-                'today_collected' => Payment::where('status', Payment::STATUS_APPROVED)
+                'total_collected' => (float) BusinessWebsite::sum('total_charges_collected'),
+                'today_collected' => (float) Payment::where('status', Payment::STATUS_APPROVED)
                     ->whereDate('created_at', $today)
-                    ->whereNotNull('total_charges')
-                    ->sum('total_charges'),
+                    ->sum(DB::raw('COALESCE(total_charges, 0)')),
                 'websites_with_charges_enabled' => BusinessWebsite::where('charges_enabled', true)->count(),
                 'websites_with_charges_disabled' => BusinessWebsite::where('charges_enabled', false)->count(),
             ],
@@ -203,6 +170,33 @@ class DashboardController extends Controller
             ->get();
 
         return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails'));
+    }
+
+    /**
+     * Matching time stats: only from payments that were actually matched (have a linked processed_email).
+     * Excludes approved-but-unmatched / manually approved transactions.
+     */
+    private function getMatchingTimeStats($today): array
+    {
+        $base = Payment::query()->where('status', Payment::STATUS_APPROVED)
+            ->whereNotNull('matched_at')
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('processed_emails')
+                    ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                    ->where('processed_emails.is_matched', true);
+            });
+
+        return [
+            'average_minutes' => (float) (clone $base)->get()
+                ->map(fn ($p) => $p->created_at->diffInMinutes($p->matched_at))
+                ->avg() ?: 0,
+            'average_minutes_today' => (float) (clone $base)->whereDate('created_at', $today)->get()
+                ->map(fn ($p) => $p->created_at->diffInMinutes($p->matched_at))
+                ->avg() ?: 0,
+            'total_matched' => (clone $base)->count(),
+            'total_matched_today' => (clone $base)->whereDate('created_at', $today)->count(),
+        ];
     }
 
     /**

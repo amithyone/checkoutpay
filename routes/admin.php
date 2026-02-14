@@ -123,6 +123,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('invoices/{invoice}/pdf', [\App\Http\Controllers\Admin\InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
         Route::get('invoices/{invoice}/view-pdf', [\App\Http\Controllers\Admin\InvoiceController::class, 'viewPdf'])->name('invoices.view-pdf');
         Route::post('invoices/{invoice}/send', [\App\Http\Controllers\Admin\InvoiceController::class, 'send'])->name('invoices.send');
+        Route::post('invoices/{invoice}/mark-paid', [\App\Http\Controllers\Admin\InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
+
+        // Charity / GoFund campaigns
+        Route::resource('charity', \App\Http\Controllers\Admin\CharityController::class)->parameters(['charity' => 'campaign'])->names('charity');
 
         // Withdrawals
         Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');

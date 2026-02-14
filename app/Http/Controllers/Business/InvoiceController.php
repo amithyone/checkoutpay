@@ -337,4 +337,32 @@ class InvoiceController extends Controller
 
         return $this->pdfService->streamPdf($invoice);
     }
+
+    /**
+     * Mark invoice as paid (client paid business directly). Sends receipt to both parties.
+     */
+    public function markPaid(Invoice $invoice): RedirectResponse
+    {
+        $this->authorizeInvoiceForBusiness($invoice, 'mark as paid');
+
+        if ($invoice->isPaid()) {
+            return redirect()->route('business.invoices.show', $invoice)
+                ->with('info', 'This invoice is already marked as paid.');
+        }
+
+        if (! in_array($invoice->status, ['sent', 'viewed', 'overdue'], true)) {
+            return redirect()->route('business.invoices.show', $invoice)
+                ->with('error', 'Only sent, viewed, or overdue invoices can be marked as paid.');
+        }
+
+        $ok = $this->invoiceService->markAsPaid($invoice, null, (float) $invoice->total_amount);
+
+        if (! $ok) {
+            return redirect()->route('business.invoices.show', $invoice)
+                ->with('error', 'Failed to mark invoice as paid. Please try again.');
+        }
+
+        return redirect()->route('business.invoices.show', $invoice)
+            ->with('success', 'Invoice marked as paid. Receipt sent to both parties.');
+    }
 }

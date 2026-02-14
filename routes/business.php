@@ -53,6 +53,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/withdrawals/{withdrawal}', [WithdrawalController::class, 'show'])->name('withdrawals.show');
         Route::post('/withdrawals/validate-account', [WithdrawalController::class, 'validateAccount'])->name('withdrawals.validate-account');
         Route::post('/withdrawals/save-account', [WithdrawalController::class, 'saveAccount'])->name('withdrawals.save-account');
+        Route::put('/withdrawals/auto-withdraw-settings', [WithdrawalController::class, 'updateAutoWithdrawSettings'])->name('withdrawals.auto-withdraw-settings');
         Route::delete('/withdrawals/accounts/{account}', [WithdrawalController::class, 'deleteAccount'])->name('withdrawals.delete-account');
 
         // Statistics
@@ -111,9 +112,17 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         // Invoices
         Route::resource('invoices', \App\Http\Controllers\Business\InvoiceController::class);
         Route::post('invoices/{invoice}/send', [\App\Http\Controllers\Business\InvoiceController::class, 'send'])->name('invoices.send');
+        Route::post('invoices/{invoice}/mark-paid', [\App\Http\Controllers\Business\InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
         Route::get('invoices/{invoice}/pdf', [\App\Http\Controllers\Business\InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
         Route::get('invoices/{invoice}/view-pdf', [\App\Http\Controllers\Business\InvoiceController::class, 'viewPdf'])->name('invoices.view-pdf');
         Route::get('/verification/{verification}/download', [\App\Http\Controllers\Business\VerificationController::class, 'download'])->name('verification.download');
+
+        // Charity / GoFund campaigns
+        Route::get('charity', [\App\Http\Controllers\Business\CharityController::class, 'index'])->name('charity.index');
+        Route::get('charity/create', [\App\Http\Controllers\Business\CharityController::class, 'create'])->name('charity.create');
+        Route::post('charity', [\App\Http\Controllers\Business\CharityController::class, 'store'])->name('charity.store');
+        Route::get('charity/{campaign}/edit', [\App\Http\Controllers\Business\CharityController::class, 'edit'])->name('charity.edit');
+        Route::put('charity/{campaign}', [\App\Http\Controllers\Business\CharityController::class, 'update'])->name('charity.update');
 
         // Activity Logs
         Route::get('/activity', [\App\Http\Controllers\Business\ActivityLogController::class, 'index'])->name('activity.index');

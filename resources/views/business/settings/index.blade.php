@@ -266,7 +266,7 @@
     </div>
 
     <!-- General Settings -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div id="auto-withdraw" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-6">
             <i class="fas fa-cog mr-2"></i> General Settings
         </h3>
@@ -310,10 +310,22 @@
                         step="0.01" min="0"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                         placeholder="0.00">
-                    <p class="mt-1 text-xs text-gray-500">Automatically request withdrawal when balance reaches this amount (leave empty to disable)</p>
+                    <p class="mt-1 text-xs text-gray-500">Automatically request withdrawal when balance reaches this amount (leave empty to disable). You must <strong>save a withdrawal account</strong> first (on Withdrawals → Request Withdrawal, check &quot;Save this account&quot;).</p>
                     @error('auto_withdraw_threshold')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
+                </div>
+                <div class="flex items-start">
+                    <div class="flex items-center h-5">
+                        <input type="hidden" name="auto_withdraw_end_of_day" value="0">
+                        <input type="checkbox" name="auto_withdraw_end_of_day" id="auto_withdraw_end_of_day" value="1"
+                            {{ old('auto_withdraw_end_of_day', $business->auto_withdraw_end_of_day ?? false) ? 'checked' : '' }}
+                            class="rounded border-gray-300 text-primary focus:ring-primary">
+                    </div>
+                    <div class="ml-3">
+                        <label for="auto_withdraw_end_of_day" class="text-sm font-medium text-gray-700">Withdraw at end of day (5pm)</label>
+                        <p class="text-xs text-gray-500 mt-0.5">If enabled, auto-withdrawal runs once daily at 5pm instead of immediately when balance reaches threshold.</p>
+                    </div>
                 </div>
             </div>
 

@@ -48,20 +48,20 @@ class StatsController extends Controller
         ];
         
         // Add average matching time (applies to all periods)
-        // Only include approved payments with matched_at - explicitly exclude pending transactions
+        // Only include payments that were actually matched (have a linked processed_email); exclude unmatched/manually approved
+        $matchedBase = Payment::where('status', Payment::STATUS_APPROVED)
+            ->whereNotNull('matched_at')
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('processed_emails')
+                    ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                    ->where('processed_emails.is_matched', true);
+            });
         $stats['matching_time'] = [
-            'average_minutes' => Payment::where('status', Payment::STATUS_APPROVED)
-                ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
-                ->whereNotNull('matched_at')
-                ->get()
-                ->map(function ($payment) {
-                    return $payment->created_at->diffInMinutes($payment->matched_at);
-                })
+            'average_minutes' => (float) (clone $matchedBase)->get()
+                ->map(fn ($p) => $p->created_at->diffInMinutes($p->matched_at))
                 ->avg() ?: 0,
-            'total_matched' => Payment::where('status', Payment::STATUS_APPROVED)
-                ->where('status', '!=', Payment::STATUS_PENDING) // Explicitly exclude pending
-                ->whereNotNull('matched_at')
-                ->count(),
+            'total_matched' => (clone $matchedBase)->count(),
         ];
         
         // Add account numbers payment stats (applies to all periods)

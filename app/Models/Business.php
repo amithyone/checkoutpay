@@ -38,6 +38,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'timezone',
         'currency',
         'auto_withdraw_threshold',
+        'auto_withdraw_end_of_day',
         'two_factor_enabled',
         'two_factor_secret',
         'charges_paid_by_customer',
@@ -93,6 +94,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'last_yearly_revenue_update' => 'datetime',
         'two_factor_enabled' => 'boolean',
         'auto_withdraw_threshold' => 'decimal:2',
+        'auto_withdraw_end_of_day' => 'boolean',
         'charges_paid_by_customer' => 'boolean',
         'charge_percentage' => 'decimal:2',
         'charge_fixed' => 'decimal:2',
@@ -489,7 +491,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
-     * Get default withdrawal details (from last withdrawal or profile)
+     * Get default withdrawal details (from last approved withdrawal or saved withdrawal account)
      */
     public function getDefaultWithdrawalDetails(): ?array
     {
@@ -506,15 +508,41 @@ class Business extends Authenticatable implements CanResetPasswordContract
             ];
         }
 
+        // Fall back to default saved withdrawal account (required for auto-withdraw when no past withdrawal)
+        $saved = $this->defaultWithdrawalAccount()
+            ?? $this->withdrawalAccounts()->where('is_active', true)->first();
+
+        if ($saved) {
+            return [
+                'bank_name' => $saved->bank_name,
+                'account_number' => $saved->account_number,
+                'account_name' => $saved->account_name,
+            ];
+        }
+
         return null;
     }
 
     /**
-     * Trigger auto-withdrawal if threshold is reached
+     * Whether the business has at least one saved withdrawal account (for auto-withdrawal)
      */
-    public function triggerAutoWithdrawal(): ?\App\Models\WithdrawalRequest
+    public function hasSavedWithdrawalAccount(): bool
+    {
+        return $this->withdrawalAccounts()->where('is_active', true)->exists();
+    }
+
+    /**
+     * Trigger auto-withdrawal if threshold is reached.
+     * When auto_withdraw_end_of_day is true, only the daily 5pm scheduler should trigger (not on payment).
+     */
+    public function triggerAutoWithdrawal(bool $fromEndOfDayScheduler = false): ?\App\Models\WithdrawalRequest
     {
         if (!$this->shouldTriggerAutoWithdrawal()) {
+            return null;
+        }
+
+        // If business chose "end of day" (5pm), only run from the scheduled job, not on payment
+        if ($this->auto_withdraw_end_of_day && !$fromEndOfDayScheduler) {
             return null;
         }
 
@@ -552,8 +580,11 @@ class Business extends Authenticatable implements CanResetPasswordContract
             'status' => 'pending',
         ]);
 
-        // Send notification
+        // Send notification to business
         $this->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
+
+        // Notify admin (Telegram + email) so they can treat withdrawal ASAP
+        app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
 
         \Log::info('Auto-withdrawal triggered', [
             'business_id' => $this->id,

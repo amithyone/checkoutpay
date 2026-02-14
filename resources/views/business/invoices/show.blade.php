@@ -11,7 +11,7 @@
             <h2 class="text-xl lg:text-2xl font-bold text-gray-900">{{ $invoice->invoice_number }}</h2>
             <p class="text-sm text-gray-600 mt-1">Created {{ $invoice->created_at->format('M d, Y') }}</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             @if(!$invoice->isPaid())
                 <a href="{{ route('business.invoices.edit', $invoice) }}" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">
                     <i class="fas fa-edit mr-1"></i> Edit
@@ -22,6 +22,14 @@
                         <i class="fas fa-paper-plane mr-1"></i> Send Email
                     </button>
                 </form>
+                @if(in_array($invoice->status, ['sent', 'viewed', 'overdue']))
+                <form action="{{ route('business.invoices.mark-paid', $invoice) }}" method="POST" class="inline" onsubmit="return confirm('Mark this invoice as paid? A receipt will be sent to you and the client.');">
+                    @csrf
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                        <i class="fas fa-check-circle mr-1"></i> Mark as paid
+                    </button>
+                </form>
+                @endif
             @endif
             <a href="{{ route('business.invoices.view-pdf', $invoice) }}" target="_blank" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">
                 <i class="fas fa-file-pdf mr-1"></i> View PDF

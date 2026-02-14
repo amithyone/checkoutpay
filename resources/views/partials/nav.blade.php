@@ -31,7 +31,7 @@
             </div>
             <div class="hidden md:flex items-center space-x-3">
                 <div class="relative group">
-                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('products.*') || request()->routeIs('rentals.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') ? 'text-primary border-b-2 border-primary' : '' }}">
+                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('products.*') || request()->routeIs('rentals.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') || request()->routeIs('charity.*') ? 'text-primary border-b-2 border-primary' : '' }}">
                         Products <i class="fas fa-chevron-down ml-1 text-xs"></i>
                     </a>
                     <div class="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
@@ -42,6 +42,7 @@
                         <a href="{{ route('tickets.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Tickets</a>
                         <a href="{{ route('payout.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Payout</a>
                         <a href="{{ route('collections.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Collections</a>
+                        <a href="{{ route('charity.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">GoFund & Charity</a>
                         <a href="{{ route('checkout-demo.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Checkout Demo</a>
                     </div>
                 </div>
@@ -99,6 +100,7 @@
                 <a href="{{ route('tickets.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Tickets</a>
                 <a href="{{ route('payout.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Payout</a>
                 <a href="{{ route('collections.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Collections</a>
+                <a href="{{ route('charity.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">GoFund & Charity</a>
                 <a href="{{ route('checkout-demo.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Checkout Demo</a>
                 <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Pricing</a>
                 <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Developers</a>

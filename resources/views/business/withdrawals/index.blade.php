@@ -16,6 +16,47 @@
         </a>
     </div>
 
+    <!-- Auto-withdrawal settings -->
+    @php
+        $authBusiness = auth('business')->user();
+        $hasSavedAccount = isset($hasSavedAccount) ? $hasSavedAccount : ($authBusiness && $authBusiness->hasSavedWithdrawalAccount());
+        $businessForForm = $business ?? $authBusiness;
+    @endphp
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+        <h3 class="text-base lg:text-lg font-semibold text-gray-900 mb-3">
+            <i class="fas fa-magic mr-2 text-primary"></i> Auto-withdrawal
+        </h3>
+        @if(!$hasSavedAccount)
+            <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                <strong>Save an account first.</strong> To enable auto-withdrawal, request a withdrawal and check <strong>Save this account for future withdrawals</strong>, or select a saved account. Then you can turn on auto-withdrawal here or in <a href="{{ route('business.settings.index') }}#auto-withdraw" class="underline font-medium">Settings</a>.
+            </div>
+        @endif
+        <form action="{{ route('business.withdrawals.auto-withdraw-settings') }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+            <div class="flex flex-col sm:flex-row sm:items-end gap-4">
+                <div class="flex-1">
+                    <label for="auto_withdraw_threshold" class="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Auto-withdraw when balance reaches (₦)</label>
+                    <input type="number" name="auto_withdraw_threshold" id="auto_withdraw_threshold" step="0.01" min="0"
+                        value="{{ old('auto_withdraw_threshold', $businessForForm ? $businessForForm->auto_withdraw_threshold : '') }}"
+                        placeholder="Leave empty to disable"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm">
+                    <p class="mt-1 text-xs text-gray-500">Leave empty to disable auto-withdrawal.</p>
+                </div>
+                <div class="flex items-center">
+                    <input type="hidden" name="auto_withdraw_end_of_day" value="0">
+                    <input type="checkbox" name="auto_withdraw_end_of_day" id="auto_withdraw_end_of_day" value="1"
+                        {{ old('auto_withdraw_end_of_day', $businessForForm && ($businessForForm->auto_withdraw_end_of_day ?? false)) ? 'checked' : '' }}
+                        class="rounded border-gray-300 text-primary focus:ring-primary">
+                    <label for="auto_withdraw_end_of_day" class="ml-2 text-sm text-gray-700">Withdraw at end of day (5pm)</label>
+                </div>
+                <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium whitespace-nowrap">
+                    <i class="fas fa-save mr-2"></i> Save
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Filters -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
         <form method="GET" action="{{ route('business.withdrawals.index') }}" class="flex flex-col sm:flex-row gap-4">

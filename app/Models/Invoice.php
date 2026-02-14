@@ -38,6 +38,7 @@ class Invoice extends Model
         'payment_id',
         'paid_at',
         'paid_amount',
+        'paid_confirmation_notes',
         'sent_at',
         'viewed_at',
         'view_count',

@@ -133,6 +133,7 @@ class InvoiceController extends Controller
             'terms_and_conditions' => 'nullable|string',
             'reference_number' => 'nullable|string|max:255',
             'status' => 'required|in:draft,sent,viewed,paid,overdue,cancelled',
+            'paid_confirmation_notes' => 'nullable|string|max:500',
             'allow_split_payment' => 'nullable|boolean',
             'split_installments' => 'nullable|integer|min:2|max:12',
             'split_percentages' => 'nullable|array',
@@ -184,6 +185,7 @@ class InvoiceController extends Controller
                 'terms_and_conditions' => $validated['terms_and_conditions'] ?? null,
                 'reference_number' => $validated['reference_number'] ?? null,
                 'status' => $validated['status'],
+                'paid_confirmation_notes' => $validated['paid_confirmation_notes'] ?? null,
                 'allow_split_payment' => $allowSplit,
                 'split_installments' => $allowSplit ? (int) ($validated['split_installments'] ?? 2) : null,
                 'split_percentages' => $allowSplit && ! empty($validated['split_percentages'] ?? [])
@@ -194,6 +196,8 @@ class InvoiceController extends Controller
             if ($logoPath) {
                 $updateData['logo'] = $logoPath;
             }
+
+            $wasAlreadyPaid = $invoice->status === 'paid' && $invoice->paid_at !== null;
 
             $invoice->update($updateData);
 
@@ -212,8 +216,14 @@ class InvoiceController extends Controller
 
             $invoice->calculateTotals();
 
+            // If admin just marked invoice as paid (was not paid before), set paid_at/paid_amount, credit business, and send receipt to both parties
+            if ($validated['status'] === 'paid' && !$wasAlreadyPaid) {
+                $invoice->refresh();
+                $this->invoiceService->markAsPaid($invoice, null, (float) $invoice->total_amount);
+            }
+
             return redirect()->route('admin.invoices.show', $invoice)
-                ->with('success', 'Invoice updated successfully!');
+                ->with('success', 'Invoice updated successfully!' . ($validated['status'] === 'paid' && !$wasAlreadyPaid ? ' Receipt sent to both parties.' : ''));
         } catch (\Exception $e) {
             return back()->withInput()->with('error', 'Failed to update invoice: ' . $e->getMessage());
         }
@@ -259,6 +269,35 @@ class InvoiceController extends Controller
         } catch (\Exception $e) {
             return redirect()->route('admin.invoices.show', $invoice)
                 ->with('error', 'Failed to send invoice: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Mark invoice as paid from admin (e.g. after business confirmed via email). Sends receipt to both parties.
+     */
+    public function markPaid(Request $request, Invoice $invoice): RedirectResponse
+    {
+        $request->validate([
+            'paid_confirmation_notes' => 'nullable|string|max:500',
+        ]);
+
+        if ($invoice->isPaid()) {
+            return redirect()->route('admin.invoices.index')
+                ->with('info', 'Invoice ' . $invoice->invoice_number . ' is already marked as paid.');
+        }
+
+        try {
+            if ($request->filled('paid_confirmation_notes')) {
+                $invoice->update(['paid_confirmation_notes' => $request->paid_confirmation_notes]);
+            }
+            $invoice->refresh();
+            $this->invoiceService->markAsPaid($invoice, null, (float) $invoice->total_amount);
+
+            return redirect()->route('admin.invoices.index')
+                ->with('success', 'Invoice ' . $invoice->invoice_number . ' marked as paid. Receipt sent to both parties.');
+        } catch (\Exception $e) {
+            return redirect()->route('admin.invoices.index')
+                ->with('error', 'Failed to mark invoice as paid: ' . $e->getMessage());
         }
     }
 }

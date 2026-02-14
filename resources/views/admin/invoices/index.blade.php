@@ -224,13 +224,19 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $invoice->created_at->format('M d, Y') }}</td>
                         <td class="px-6 py-4">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <a href="{{ route('admin.invoices.show', $invoice) }}" class="text-sm text-primary hover:underline">
                                     View
                                 </a>
                                 <a href="{{ route('admin.invoices.edit', $invoice) }}" class="text-sm text-gray-600 hover:text-primary">
                                     <i class="fas fa-edit"></i>
                                 </a>
+                                @if(!$invoice->isPaid() && in_array($invoice->status, ['sent', 'viewed', 'overdue']))
+                                <button type="button" onclick="showMarkPaidModal({{ $invoice->id }}, '{{ addslashes($invoice->invoice_number) }}', {{ $invoice->total_amount }}, '{{ addslashes($invoice->currency) }}')"
+                                    class="text-sm text-green-600 hover:text-green-700 font-medium">
+                                    <i class="fas fa-check-circle mr-1"></i> Mark as paid
+                                </button>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -256,4 +262,63 @@
         @endif
     </div>
 </div>
+
+<!-- Mark as Paid Modal (like Manually Approve Transaction) -->
+<div id="markPaidModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+        <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Mark Invoice as Paid</h3>
+        <form id="markPaidForm" method="POST">
+            @csrf
+            <div class="mb-3 sm:mb-4">
+                <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Invoice</label>
+                <p class="text-sm font-mono text-gray-900 bg-gray-50 p-2 rounded" id="modal-invoice-number"></p>
+            </div>
+            <div class="mb-3 sm:mb-4">
+                <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Total Amount</label>
+                <p class="text-base sm:text-lg font-bold text-gray-900" id="modal-invoice-amount"></p>
+            </div>
+            <div class="mb-3 sm:mb-4">
+                <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Link to received email / confirmation note</label>
+                <input type="text" name="paid_confirmation_notes" id="modal-paid-confirmation-notes" maxlength="500"
+                    class="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-xs sm:text-sm"
+                    placeholder="e.g. Gmail link or 'Confirmed via email from business on ...'">
+                <p class="text-xs text-gray-500 mt-1">Optional. Paste the email link or a short note for audit.</p>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+                <button type="button" onclick="closeMarkPaidModal()"
+                    class="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-xs sm:text-sm">
+                    Cancel
+                </button>
+                <button type="submit"
+                    class="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs sm:text-sm">
+                    <i class="fas fa-check-circle mr-2"></i> Mark as paid & send receipt
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+function showMarkPaidModal(invoiceId, invoiceNumber, totalAmount, currency) {
+    const form = document.getElementById('markPaidForm');
+    form.action = "{{ route('admin.invoices.mark-paid', ['invoice' => '__ID__']) }}".replace('__ID__', invoiceId);
+
+    document.getElementById('modal-invoice-number').textContent = invoiceNumber;
+    const sym = currency === 'NGN' ? '₦' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : currency + ' ';
+    document.getElementById('modal-invoice-amount').textContent = sym + Number(totalAmount).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+    document.getElementById('modal-paid-confirmation-notes').value = '';
+
+    document.getElementById('markPaidModal').classList.remove('hidden');
+}
+
+function closeMarkPaidModal() {
+    document.getElementById('markPaidModal').classList.add('hidden');
+}
+
+document.getElementById('markPaidModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeMarkPaidModal();
+});
+</script>
+@endpush
 @endsection

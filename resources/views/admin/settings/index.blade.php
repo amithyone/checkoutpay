@@ -77,6 +77,51 @@
         </form>
     </div>
 
+    <!-- Withdrawal Notifications (Admin) -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-bell mr-2 text-primary"></i>Withdrawal Notifications (Admin)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">Get notified on every new withdrawal request so you can process them ASAP. Configure email and/or Telegram.</p>
+
+        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+
+            <div>
+                <label for="admin_withdrawal_notification_email" class="block text-sm font-medium text-gray-700 mb-2">Admin email for withdrawal alerts</label>
+                <input type="email" id="admin_withdrawal_notification_email" name="admin_withdrawal_notification_email"
+                    value="{{ old('admin_withdrawal_notification_email', \App\Models\Setting::get('admin_withdrawal_notification_email')) }}"
+                    placeholder="admin@example.com"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                <p class="mt-1 text-xs text-gray-500">One email per new withdrawal request.</p>
+            </div>
+
+            <div>
+                <label for="admin_telegram_bot_token" class="block text-sm font-medium text-gray-700 mb-2">Telegram bot token (for admin alerts)</label>
+                <input type="text" id="admin_telegram_bot_token" name="admin_telegram_bot_token"
+                    value="{{ old('admin_telegram_bot_token', \App\Models\Setting::get('admin_telegram_bot_token')) }}"
+                    placeholder="123456:ABC-DEF..."
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+
+            <div>
+                <label for="admin_telegram_chat_id" class="block text-sm font-medium text-gray-700 mb-2">Telegram chat ID (admin)</label>
+                <input type="text" id="admin_telegram_chat_id" name="admin_telegram_chat_id"
+                    value="{{ old('admin_telegram_chat_id', \App\Models\Setting::get('admin_telegram_chat_id')) }}"
+                    placeholder="-1001234567890"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                <p class="mt-1 text-xs text-gray-500">Create a bot with @BotFather, add it to a group or use your chat ID. One Telegram message per new withdrawal request.</p>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save Withdrawal Notifications
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Email Settings -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">

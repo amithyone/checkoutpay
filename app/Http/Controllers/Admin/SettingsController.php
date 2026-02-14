@@ -137,6 +137,37 @@ class SettingsController extends Controller
             );
         }
 
+        // Admin withdrawal notifications (Telegram + email per withdrawal request)
+        if ($request->has('admin_withdrawal_notification_email') || $request->has('admin_telegram_bot_token') || $request->has('admin_telegram_chat_id')) {
+            if ($request->has('admin_withdrawal_notification_email')) {
+                Setting::set(
+                    'admin_withdrawal_notification_email',
+                    $request->admin_withdrawal_notification_email ?: null,
+                    'string',
+                    'notifications',
+                    'Admin email to receive a notification on each withdrawal request'
+                );
+            }
+            if ($request->has('admin_telegram_bot_token')) {
+                Setting::set(
+                    'admin_telegram_bot_token',
+                    $request->admin_telegram_bot_token ?: null,
+                    'string',
+                    'notifications',
+                    'Telegram bot token for admin withdrawal alerts'
+                );
+            }
+            if ($request->has('admin_telegram_chat_id')) {
+                Setting::set(
+                    'admin_telegram_chat_id',
+                    $request->admin_telegram_chat_id ?: null,
+                    'string',
+                    'notifications',
+                    'Telegram chat ID for admin withdrawal alerts'
+                );
+            }
+        }
+
         return redirect()->route('admin.settings.index')
             ->with('success', 'Settings updated successfully!');
     }

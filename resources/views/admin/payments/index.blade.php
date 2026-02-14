@@ -183,6 +183,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                     {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
                                     <i class="fas fa-external-link-alt text-xs ml-1"></i>
                                 </a>
+                            @elseif($payment->webhook_url)
+                                <span class="text-gray-600" title="Webhook sent to: {{ $payment->webhook_url }}">{{ parse_url($payment->webhook_url, PHP_URL_HOST) ?? 'Webhook' }}</span>
                             @else
                                 <span class="text-gray-400">N/A</span>
                             @endif

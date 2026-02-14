@@ -245,6 +245,12 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()
             ->name('invoice-send-reminders');
 
+        // End of day (5pm) auto-withdrawal for businesses that chose "withdraw at end of day"
+        $schedule->command('withdrawals:trigger-end-of-day')
+            ->dailyAt('17:00')
+            ->withoutOverlapping()
+            ->name('withdrawals-trigger-end-of-day');
+
         // Delete old match attempt logs to prevent database bloat (retention from MATCH_ATTEMPTS_RETENTION_DAYS)
         $schedule->command('match-attempts:cleanup')
             ->dailyAt('02:00')

@@ -46,6 +46,9 @@ class WithdrawalController extends Controller
         // Send notification to business
         $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
 
+        // Notify admin (Telegram + email)
+        app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
+
         return response()->json([
             'success' => true,
             'message' => 'Withdrawal request submitted successfully',

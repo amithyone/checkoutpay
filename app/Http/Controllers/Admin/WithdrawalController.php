@@ -78,6 +78,9 @@ class WithdrawalController extends Controller
         // Send notification to business
         $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
 
+        // Notify admin (Telegram + email) so they can treat withdrawal ASAP
+        app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
+
         return redirect()->route('admin.withdrawals.show', $withdrawal)
             ->with('success', 'Withdrawal request created successfully');
     }

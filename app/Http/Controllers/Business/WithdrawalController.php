@@ -23,8 +23,9 @@ class WithdrawalController extends Controller
         }
 
         $withdrawals = $query->paginate(20);
+        $hasSavedAccount = $business->hasSavedWithdrawalAccount();
 
-        return view('business.withdrawals.index', compact('withdrawals'));
+        return view('business.withdrawals.index', compact('withdrawals', 'business', 'hasSavedAccount'));
     }
 
     public function show($id)
@@ -287,7 +288,44 @@ class WithdrawalController extends Controller
         // Send notification to business
         $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
 
+        // Notify admin (Telegram + email) so they can treat withdrawal ASAP
+        app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
+
         return redirect()->route('business.withdrawals.show', $withdrawal)
             ->with('success', 'Withdrawal request submitted successfully');
+    }
+
+    /**
+     * Update auto-withdrawal settings from the withdrawals page.
+     * Requires at least one saved withdrawal account to enable.
+     */
+    public function updateAutoWithdrawSettings(Request $request)
+    {
+        $business = Auth::guard('business')->user();
+
+        $validated = $request->validate([
+            'auto_withdraw_threshold' => 'nullable|numeric|min:0',
+            'auto_withdraw_end_of_day' => 'boolean',
+        ]);
+
+        $threshold = isset($validated['auto_withdraw_threshold']) ? (float) $validated['auto_withdraw_threshold'] : null;
+        $enableAutoWithdraw = $threshold > 0;
+
+        if ($enableAutoWithdraw && !$business->hasSavedWithdrawalAccount()) {
+            return redirect()->route('business.withdrawals.index')
+                ->with('error', 'Save a withdrawal account first to enable auto-withdrawal. Request a withdrawal and check "Save this account for future withdrawals", or use a saved account.');
+        }
+
+        $business->update([
+            'auto_withdraw_threshold' => $enableAutoWithdraw ? $threshold : null,
+            'auto_withdraw_end_of_day' => $request->boolean('auto_withdraw_end_of_day'),
+        ]);
+
+        $message = $enableAutoWithdraw
+            ? 'Auto-withdrawal enabled. Withdrawals will be requested when balance reaches ₦' . number_format($threshold, 2) . ($business->auto_withdraw_end_of_day ? ' (daily at 5pm).' : '.')
+            : 'Auto-withdrawal disabled.';
+
+        return redirect()->route('business.withdrawals.index')
+            ->with('success', $message);
     }
 }

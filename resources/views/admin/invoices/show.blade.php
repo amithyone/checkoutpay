@@ -252,6 +252,19 @@
                 <span>Paid on {{ $invoice->paid_at->format('M d, Y H:i') }}</span>
             </div>
             @endif
+            @if($invoice->isPaid() && $invoice->paid_confirmation_notes)
+            <div class="flex items-start text-gray-600 mt-2">
+                <i class="fas fa-envelope-open-text text-gray-500 mr-3 mt-0.5"></i>
+                <div>
+                    <span class="font-medium text-gray-700">Paid confirmation:</span>
+                    @if(\Illuminate\Support\Str::startsWith(trim($invoice->paid_confirmation_notes), ['http://', 'https://']))
+                        <a href="{{ $invoice->paid_confirmation_notes }}" target="_blank" rel="noopener" class="text-primary hover:underline ml-1">View received email</a>
+                    @else
+                        <span class="ml-1">{{ $invoice->paid_confirmation_notes }}</span>
+                    @endif
+                </div>
+            </div>
+            @endif
         </div>
     </div>
     @endif

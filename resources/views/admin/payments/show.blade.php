@@ -104,6 +104,21 @@
                 <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">{{ $payment->business->name ?? 'N/A' }}</p>
             </div>
             <div>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Website</label>
+                @if($payment->website)
+                    <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">
+                        <a href="{{ $payment->website->website_url }}" target="_blank" class="text-primary hover:underline">{{ $payment->website->website_url }}</a>
+                    </p>
+                @elseif($payment->webhook_url)
+                    <p class="text-xs sm:text-sm font-medium text-gray-600 break-words" title="Webhook sent to this URL">
+                        {{ parse_url($payment->webhook_url, PHP_URL_HOST) ?? $payment->webhook_url }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1 break-all">Webhook: {{ $payment->webhook_url }}</p>
+                @else
+                    <p class="text-xs sm:text-sm font-medium text-gray-400">N/A</p>
+                @endif
+            </div>
+            <div>
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">Payer Name</label>
                 <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">{{ $payment->payer_name ?? 'N/A' }}</p>
             </div>

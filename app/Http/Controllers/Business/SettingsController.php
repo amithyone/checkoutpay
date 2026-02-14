@@ -38,6 +38,7 @@ class SettingsController extends Controller
             'timezone' => 'nullable|string|max:50',
             'currency' => 'nullable|string|size:3',
             'auto_withdraw_threshold' => 'nullable|numeric|min:0',
+            'auto_withdraw_end_of_day' => 'boolean',
             'two_factor_enabled' => 'boolean',
         ]);
 
@@ -69,6 +70,7 @@ class SettingsController extends Controller
             'telegram_payment_enabled',
             'telegram_login_enabled',
             'telegram_admin_login_enabled',
+            'auto_withdraw_end_of_day',
             'two_factor_enabled',
         ];
 
@@ -79,6 +81,15 @@ class SettingsController extends Controller
             } else {
                 $validated[$field] = false;
             }
+        }
+
+        // Require saved withdrawal account to enable auto-withdrawal (threshold > 0)
+        $threshold = isset($validated['auto_withdraw_threshold']) ? (float) $validated['auto_withdraw_threshold'] : null;
+        if ($threshold > 0 && !$business->hasSavedWithdrawalAccount()) {
+            $validated['auto_withdraw_threshold'] = null;
+            return redirect()->route('business.settings.index')
+                ->with('error', 'Save a withdrawal account first to enable auto-withdrawal. On the Withdrawals page, request a withdrawal and check "Save this account for future withdrawals".')
+                ->withInput();
         }
 
         $business->update($validated);

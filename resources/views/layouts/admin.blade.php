@@ -132,6 +132,11 @@
                     <span>Invoices</span>
                 </a>
 
+                <a href="{{ route('admin.charity.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.charity.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-hand-holding-heart w-5 mr-3"></i>
+                    <span>Go Fund</span>
+                </a>
+
                 <a href="{{ route('admin.rentals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.rentals.*') || request()->routeIs('admin.rental-categories.*') || request()->routeIs('admin.rental-items.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-camera w-5 mr-3"></i>
                     <span>Rentals</span>
@@ -283,6 +288,13 @@
                     <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center">
                         <i class="fas fa-exclamation-circle mr-2"></i>
                         <span class="text-sm">{{ session('error') }}</span>
+                    </div>
+                @endif
+
+                @if(session('info'))
+                    <div class="mb-4 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg flex items-center">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <span class="text-sm">{{ session('info') }}</span>
                     </div>
                 @endif
 

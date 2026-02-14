@@ -114,19 +114,9 @@
                     <span>Memberships</span>
                 </a>
 
-                @php
-                    $hasRenterAccount = \App\Models\Renter::where('email', auth('business')->user()->email)->exists();
-                @endphp
-                @if($hasRenterAccount)
-                    <a href="{{ route('renter.dashboard') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 border-t border-gray-200 mt-4 pt-4 {{ request()->routeIs('renter.*') ? 'bg-primary/10 text-primary' : '' }}">
-                        <i class="fas fa-user w-5 mr-3"></i>
-                        <span>My Rentals Dashboard</span>
-                    </a>
-                @endif
-
-                <a href="{{ route('business.withdrawals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.withdrawals.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-hand-holding-usd w-5 mr-3"></i>
-                    <span>Withdrawals</span>
+                <a href="{{ route('business.charity.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.charity.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-hand-holding-heart w-5 mr-3"></i>
+                    <span>Go Fund</span>
                 </a>
 
                 <a href="{{ route('business.tickets.events.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.tickets.*') && !request()->routeIs('business.tickets.scanner*') ? 'bg-primary/10 text-primary' : '' }}">
@@ -137,6 +127,21 @@
                     <i class="fas fa-qrcode w-5 mr-3"></i>
                     <span>QR Scanner</span>
                 </a>
+
+                <a href="{{ route('business.withdrawals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.withdrawals.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-hand-holding-usd w-5 mr-3"></i>
+                    <span>Withdrawals</span>
+                </a>
+
+                @php
+                    $hasRenterAccount = \App\Models\Renter::where('email', auth('business')->user()->email)->exists();
+                @endphp
+                @if($hasRenterAccount)
+                    <a href="{{ route('renter.dashboard') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 border-t border-gray-200 mt-4 pt-4 {{ request()->routeIs('renter.*') ? 'bg-primary/10 text-primary' : '' }}">
+                        <i class="fas fa-user w-5 mr-3"></i>
+                        <span>My Rentals Dashboard</span>
+                    </a>
+                @endif
 
                 <a href="{{ route('business.statistics.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.statistics.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-chart-bar w-5 mr-3"></i>
@@ -251,6 +256,13 @@
                     <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center">
                         <i class="fas fa-exclamation-circle mr-2"></i>
                         <span class="text-sm">{{ session('error') }}</span>
+                    </div>
+                @endif
+
+                @if(session('info'))
+                    <div class="mb-4 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg flex items-center">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <span class="text-sm">{{ session('info') }}</span>
                     </div>
                 @endif
 

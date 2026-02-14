@@ -106,6 +106,14 @@
                             <option value="cancelled" {{ old('status', $invoice->status) === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
                         </select>
                     </div>
+                    <div class="md:col-span-2" id="paid-confirmation-notes-wrap" style="{{ old('status', $invoice->status) === 'paid' ? '' : 'display: none' }}">
+                        <label for="paid_confirmation_notes" class="block text-sm font-medium text-gray-700 mb-1">Link to received email / confirmation note</label>
+                        <input type="text" name="paid_confirmation_notes" id="paid_confirmation_notes" maxlength="500"
+                            value="{{ old('paid_confirmation_notes', $invoice->paid_confirmation_notes) }}"
+                            placeholder="e.g. Gmail link or 'Confirmed via email from business on ...'"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                        <p class="text-xs text-gray-500 mt-1">When marking as paid (e.g. business confirmed client paid directly), paste the email link or a short note for audit.</p>
+                    </div>
                     <div>
                         <label for="reference_number" class="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
                         <input type="text" name="reference_number" id="reference_number" value="{{ old('reference_number', $invoice->reference_number) }}"
@@ -396,6 +404,14 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('currency').addEventListener('change', function() {
         calculateTotals();
     });
+
+    function togglePaidConfirmationNotes() {
+        const status = document.getElementById('status').value;
+        const wrap = document.getElementById('paid-confirmation-notes-wrap');
+        if (wrap) wrap.style.display = status === 'paid' ? 'block' : 'none';
+    }
+    document.getElementById('status').addEventListener('change', togglePaidConfirmationNotes);
+    togglePaidConfirmationNotes();
 });
 
 // Logo preview function
