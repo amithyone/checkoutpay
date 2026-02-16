@@ -16,6 +16,7 @@ class RentalController extends Controller
     public function index(Request $request): View
     {
         $query = RentalItem::with(['business', 'category'])
+            ->withCount('rentals')
             ->where('is_active', true)
             ->where('is_available', true);
 
@@ -54,6 +55,9 @@ class RentalController extends Controller
                 break;
             case 'newest':
                 $query->latest();
+                break;
+            case 'most_rented':
+                $query->orderBy('rentals_count', 'desc')->latest();
                 break;
             default:
                 $query->orderBy('is_featured', 'desc')->latest();

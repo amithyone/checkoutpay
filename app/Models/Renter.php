@@ -33,6 +33,7 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'verified_bank_name',
         'verified_bank_code',
         'kyc_verified_at',
+        'kyc_id_card_path',
         'is_active',
         'email_verified_at',
     ];

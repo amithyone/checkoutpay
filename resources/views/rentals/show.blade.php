@@ -10,9 +10,7 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: {
-                            DEFAULT: '#3C50E0',
-                        },
+                        primary: { DEFAULT: '#3C50E0' },
                     }
                 }
             }
@@ -21,60 +19,66 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-gray-50">
+    @php $rentalsColor = \App\Models\Setting::get('rentals_accent_color', '#000000'); @endphp
     @include('partials.nav')
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <a href="{{ route('rentals.index') }}" class="text-primary hover:underline mb-4 inline-block">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 sm:pb-8">
+        <a href="{{ route('rentals.index') }}" class="text-gray-700 hover:text-gray-900 mb-3 sm:mb-4 inline-flex items-center gap-1 text-sm sm:text-base">
             <i class="fas fa-arrow-left"></i> Back to Rentals
         </a>
 
-        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6">
-                <!-- Images -->
-                <div>
+        <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 p-4 sm:p-6">
+                <!-- Images: smaller on mobile -->
+                <div class="lg:min-w-0">
                     @if($item->images && count($item->images) > 0)
-                        <img src="{{ asset('storage/' . $item->images[0]) }}" alt="{{ $item->name }}" class="w-full h-96 object-cover rounded-lg mb-4">
+                        <img src="{{ asset('storage/' . $item->images[0]) }}" alt="{{ $item->name }}" class="w-full h-48 sm:h-72 lg:h-96 object-cover rounded-xl sm:rounded-2xl">
                         @if(count($item->images) > 1)
-                            <div class="grid grid-cols-4 gap-2">
+                            <div class="grid grid-cols-4 gap-1.5 sm:gap-2 mt-2">
                                 @foreach(array_slice($item->images, 1, 4) as $image)
-                                    <img src="{{ asset('storage/' . $image) }}" alt="{{ $item->name }}" class="w-full h-20 object-cover rounded">
+                                    <img src="{{ asset('storage/' . $image) }}" alt="{{ $item->name }}" class="w-full h-14 sm:h-20 object-cover rounded-lg">
                                 @endforeach
                             </div>
                         @endif
                     @else
-                        <div class="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-image text-gray-400 text-6xl"></i>
+                        <div class="w-full h-48 sm:h-72 lg:h-96 bg-gray-100 rounded-xl sm:rounded-2xl flex items-center justify-center">
+                            <i class="fas fa-image text-gray-300 text-4xl sm:text-5xl"></i>
                         </div>
                     @endif
                 </div>
 
-                <!-- Details -->
-                <div>
-                    <h1 class="text-3xl font-bold mb-4">{{ $item->name }}</h1>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">{{ $item->category->name }}</span>
-                        <span class="text-gray-600"><i class="fas fa-map-marker-alt"></i> {{ $item->city }}</span>
-                    </div>
-
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold text-primary mb-2">₦{{ number_format($item->daily_rate, 2) }} <span class="text-lg text-gray-600 font-normal">/ day</span></h2>
-                        @if($item->weekly_rate)
-                            <p class="text-gray-600">Weekly: ₦{{ number_format($item->weekly_rate, 2) }}</p>
+                <!-- Details: smaller text on mobile -->
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 sm:mb-4">{{ $item->name }}</h1>
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
+                        @if($item->category)
+                            <span class="text-xs sm:text-sm font-medium px-2.5 py-1 rounded-full" style="background-color: {{ $rentalsColor }}20; color: {{ $rentalsColor }};">{{ $item->category->name }}</span>
                         @endif
-                        @if($item->monthly_rate)
-                            <p class="text-gray-600">Monthly: ₦{{ number_format($item->monthly_rate, 2) }}</p>
+                        @if($item->city)
+                            <span class="text-gray-600 text-xs sm:text-sm"><i class="fas fa-map-marker-alt mr-0.5"></i> {{ $item->city }}</span>
                         @endif
                     </div>
 
-                    <div class="mb-6">
-                        <h3 class="font-semibold mb-2">Description</h3>
-                        <p class="text-gray-700">{{ $item->description }}</p>
+                    <div class="mb-4 sm:mb-6">
+                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">₦{{ number_format($item->daily_rate, 2) }} <span class="text-sm sm:text-base text-gray-600 font-normal">/ day</span></p>
+                        @if($item->weekly_rate || $item->monthly_rate)
+                            <p class="text-gray-600 text-xs sm:text-sm mt-1">
+                                @if($item->weekly_rate) Weekly: ₦{{ number_format($item->weekly_rate, 2) }}@endif
+                                @if($item->weekly_rate && $item->monthly_rate) · @endif
+                                @if($item->monthly_rate) Monthly: ₦{{ number_format($item->monthly_rate, 2) }}@endif
+                            </p>
+                        @endif
                     </div>
 
-                    @if($item->specifications)
-                        <div class="mb-6">
-                            <h3 class="font-semibold mb-2">Specifications</h3>
-                            <ul class="list-disc list-inside text-gray-700">
+                    <div class="mb-4 sm:mb-6">
+                        <h3 class="text-sm sm:text-base font-semibold text-gray-900 mb-1 sm:mb-2">Description</h3>
+                        <p class="text-gray-700 text-sm sm:text-base leading-relaxed">{{ $item->description }}</p>
+                    </div>
+
+                    @if($item->specifications && count($item->specifications) > 0)
+                        <div class="mb-4 sm:mb-6">
+                            <h3 class="text-sm sm:text-base font-semibold text-gray-900 mb-1 sm:mb-2">Specifications</h3>
+                            <ul class="list-disc list-inside text-gray-700 text-sm sm:text-base space-y-0.5">
                                 @foreach($item->specifications as $key => $value)
                                     <li><strong>{{ ucfirst(str_replace('_', ' ', $key)) }}:</strong> {{ $value }}</li>
                                 @endforeach
@@ -82,37 +86,24 @@
                         </div>
                     @endif
 
-                    <!-- Rental Form -->
-                    <form action="{{ route('rentals.cart.add') }}" method="POST" class="bg-gray-50 p-4 rounded-lg" id="addToCartForm">
+                    <!-- Add to cart: dates are chosen on the cart/checkout page -->
+                    <form action="{{ route('rentals.cart.add') }}" method="POST" class="bg-gray-50 p-3 sm:p-4 rounded-xl" id="addToCartForm">
                         @csrf
                         <input type="hidden" name="item_id" value="{{ $item->id }}">
-                        
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-medium mb-1">Start Date</label>
-                                <input type="date" name="start_date" required min="{{ date('Y-m-d') }}" class="w-full border-gray-300 rounded-md">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium mb-1">End Date</label>
-                                <input type="date" name="end_date" required min="{{ date('Y-m-d') }}" class="w-full border-gray-300 rounded-md">
-                            </div>
+                        <div class="mb-3 sm:mb-4">
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                            <input type="number" name="quantity" value="1" min="1" max="{{ $item->quantity_available }}" required class="w-full text-sm sm:text-base border border-gray-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-gray-400">
+                            <p class="text-xs text-gray-500 mt-1">{{ $item->quantity_available }} available. You’ll choose start date and number of days on the cart page.</p>
                         </div>
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-1">Quantity</label>
-                            <input type="number" name="quantity" value="1" min="1" max="{{ $item->quantity_available }}" required class="w-full border-gray-300 rounded-md">
-                            <p class="text-xs text-gray-500 mt-1">{{ $item->quantity_available }} available</p>
-                        </div>
-
-                        <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">
+                        <button type="submit" class="w-full text-white py-2.5 sm:py-3 rounded-xl font-medium text-sm sm:text-base hover:opacity-90 transition" style="background-color: {{ $rentalsColor }};">
                             <i class="fas fa-shopping-cart mr-2"></i> Add to Cart
                         </button>
                     </form>
 
-                    <div class="mt-4 text-sm text-gray-600">
-                        <p><i class="fas fa-building"></i> <strong>Business:</strong> {{ $item->business->name }}</p>
+                    <div class="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600 space-y-1">
+                        <p><i class="fas fa-building w-4"></i> <strong>Business:</strong> {{ $item->business->name }}</p>
                         @if($item->business->phone)
-                            <p><i class="fas fa-phone"></i> <strong>Phone:</strong> {{ $item->business->phone }}</p>
+                            <p><i class="fas fa-phone w-4"></i> <strong>Phone:</strong> {{ $item->business->phone }}</p>
                         @endif
                     </div>
                 </div>
@@ -127,7 +118,7 @@
     @php
         $cartCount = count(session('rental_cart', []));
     @endphp
-    <a href="{{ route('rentals.checkout') }}" class="fixed bottom-6 right-6 bg-primary text-white rounded-full p-4 shadow-lg hover:bg-primary/90 transition-all z-50 group">
+    <a href="{{ route('rentals.checkout') }}" class="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 text-white rounded-full p-4 shadow-lg transition-all z-50 group" style="background-color: {{ $rentalsColor }};">
         <i class="fas fa-shopping-cart text-xl"></i>
         @if($cartCount > 0)
             <span id="cart-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
@@ -200,21 +191,27 @@
                 body: formData,
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
                 }
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+            .then(response => {
+                const ct = response.headers.get('content-type') || '';
+                const isJson = ct.includes('application/json');
+                if (isJson) return response.json().then(data => ({ ok: response.ok, data }));
+                if (!response.ok) throw new Error('Request failed');
+                return response.text().then(() => ({ ok: false, data: { success: false, message: 'Invalid response' } }));
+            })
+            .then(({ ok, data }) => {
+                if (ok && data.success) {
                     showToast(data.message || 'Item added to cart!', 'success');
                     updateCartCount();
-                    // Optionally reset form or keep values
                 } else {
-                    showToast(data.message || 'Failed to add item to cart', 'error');
+                    const msg = (data && (data.message || data.errors && Object.values(data.errors).flat().join(' '))) || 'Failed to add to cart';
+                    showToast(msg, 'error');
                 }
             })
-            .catch(error => {
-                // Fallback to normal form submission
-                form.submit();
+            .catch(() => {
+                showToast('Could not add to cart. Please try again.', 'error');
             })
             .finally(() => {
                 submitBtn.disabled = false;

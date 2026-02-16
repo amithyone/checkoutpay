@@ -29,7 +29,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('rentals.kyc') }}" method="POST">
+            <form action="{{ route('rentals.kyc') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 
                 <div class="mb-4">
@@ -82,6 +82,16 @@
                     <div class="bg-blue-50 border border-blue-200 rounded p-3">
                         <p class="text-sm"><strong>Account Name:</strong> <span id="account_name_display"></span></p>
                     </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-1">ID card (photo or scan) *</label>
+                    <input type="file" name="id_card" accept=".jpg,.jpeg,.png,.pdf" required
+                           class="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer border border-gray-300 rounded-lg">
+                    <p class="text-xs text-gray-500 mt-1">JPEG, PNG or PDF, max 5MB</p>
+                    @error('id_card')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">

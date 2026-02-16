@@ -130,4 +130,22 @@ class RentalItem extends Model
 
         return ($this->quantity_available - $totalRented) > 0;
     }
+
+    /**
+     * Get dates in range where this item has no availability (fully booked).
+     * Returns array of 'Y-m-d' strings.
+     */
+    public function getUnavailableDatesInRange($rangeStart, $rangeEnd): array
+    {
+        $start = \Carbon\Carbon::parse($rangeStart)->startOfDay();
+        $end = \Carbon\Carbon::parse($rangeEnd)->endOfDay();
+        $unavailable = [];
+        for ($d = $start->copy(); $d->lte($end); $d->addDay()) {
+            $dateStr = $d->format('Y-m-d');
+            if (!$this->isAvailableForDates($dateStr, $dateStr)) {
+                $unavailable[] = $dateStr;
+            }
+        }
+        return $unavailable;
+    }
 }

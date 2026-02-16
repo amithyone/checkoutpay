@@ -138,11 +138,14 @@ Route::prefix('rentals')->name('rentals.')->group(function () {
     
     // Cart operations (no auth required)
     Route::post('cart/add', [\App\Http\Controllers\Public\RentalRequestController::class, 'addToCart'])->name('cart.add');
+    Route::post('cart/dates', [\App\Http\Controllers\Public\RentalRequestController::class, 'updateCartDates'])->name('cart.dates');
     Route::delete('cart/{itemId}', [\App\Http\Controllers\Public\RentalRequestController::class, 'removeFromCart'])->name('cart.remove');
     
-    // Checkout flow (auth required after account creation)
+    // Checkout flow
     Route::get('checkout', [\App\Http\Controllers\Public\RentalRequestController::class, 'checkout'])->name('checkout');
+    Route::get('checkout/unavailable-dates', [\App\Http\Controllers\Public\RentalRequestController::class, 'unavailableDates'])->name('checkout.unavailable-dates');
     Route::post('account/create', [\App\Http\Controllers\Public\RentalRequestController::class, 'createAccount'])->name('account.create');
+    Route::post('checkout/continue', [\App\Http\Controllers\Public\RentalRequestController::class, 'checkoutContinue'])->name('checkout.continue')->middleware('auth:renter,web');
     
     // Email verification
     Route::get('verify-email', [\App\Http\Controllers\Public\RentalRequestController::class, 'verifyEmail'])->name('verify-email')->middleware('auth:renter');
