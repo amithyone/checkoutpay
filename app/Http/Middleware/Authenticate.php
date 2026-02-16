@@ -74,6 +74,11 @@ class Authenticate extends Middleware
             return route('business.login');
         }
 
+        // My Account (web user)
+        if ($request->is('my-account') || $request->is('my-account/*')) {
+            return route('account.login');
+        }
+
         // Default to admin login
         return route('admin.login');
     }

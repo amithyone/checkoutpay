@@ -252,8 +252,8 @@ class RentalController extends Controller
             $rental->update(['started_at' => now()]);
         }
 
-        if ($validated['status'] === 'completed' && !$rental->completed_at) {
-            $rental->update(['completed_at' => now()]);
+        if ($validated['status'] === 'completed') {
+            $rental->markAsReturned();
         }
 
         if ($validated['status'] === 'cancelled' && !$rental->cancelled_at) {

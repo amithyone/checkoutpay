@@ -78,12 +78,15 @@
                         <a href="{{ route('faqs.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">FAQs</a>
                     </div>
                 </div>
-                @auth('renter')
+                @auth('web')
+                    <a href="{{ route('user.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
+                @elseauth('renter')
                     <a href="{{ route('renter.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Rentals Dashboard</a>
                 @elseauth('business')
                     <a href="{{ route('business.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
                 @else
-                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
+                    <a href="{{ route('account.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
+                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Business</a>
                     <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors">Get Started</a>
                 @endauth
             </div>
@@ -112,12 +115,15 @@
                 <a href="{{ route('blog.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Blog</a>
                 <a href="{{ route('status.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Status</a>
                 <a href="{{ route('faqs.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">FAQs</a>
-                @auth('renter')
+                @auth('web')
+                    <a href="{{ route('user.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
+                @elseauth('renter')
                     <a href="{{ route('renter.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Rentals Dashboard</a>
                 @elseauth('business')
                     <a href="{{ route('business.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
                 @else
-                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Login</a>
+                    <a href="{{ route('account.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
+                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Business</a>
                     <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors text-center">Get Started</a>
                 @endauth
             </div>

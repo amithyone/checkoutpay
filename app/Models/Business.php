@@ -142,6 +142,18 @@ class Business extends Authenticatable implements CanResetPasswordContract
                 $business->business_id = self::generateBusinessId();
             }
         });
+
+        static::created(function ($business) {
+            \App\Models\User::where('email', $business->email)->whereNull('business_id')->update(['business_id' => $business->id]);
+        });
+    }
+
+    /**
+     * User linked to this business (same email).
+     */
+    public function user()
+    {
+        return $this->hasOne(User::class, 'business_id');
     }
 
     /**

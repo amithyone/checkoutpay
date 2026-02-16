@@ -24,6 +24,7 @@ class Payment extends Model
         'account_number',
         'payer_account_number',
         'business_id',
+        'user_id',
         'business_website_id',
         'status',
         'email_data',
@@ -219,7 +220,31 @@ class Payment extends Model
             $updateData['payer_account_number'] = $emailData['payer_account_number'];
         }
 
-        return $this->update($updateData);
+        $updated = $this->update($updateData);
+        if ($updated && $this->user_id) {
+            $this->creditUserWallet($receivedAmount ?? (float) $this->amount);
+        }
+        return $updated;
+    }
+
+    /**
+     * Credit user wallet for wallet top-up payment and record transaction.
+     */
+    public function creditUserWallet(float $amount): void
+    {
+        $user = \App\Models\User::find($this->user_id);
+        if (! $user) {
+            return;
+        }
+        $user->increment('wallet_bal', $amount);
+        \App\Models\UserWalletTransaction::create([
+            'user_id' => $user->id,
+            'type' => 'funding',
+            'amount' => $amount,
+            'description' => 'Wallet top-up',
+            'reference_type' => self::class,
+            'reference_id' => $this->id,
+        ]);
     }
 
     /**
@@ -240,6 +265,14 @@ class Payment extends Model
     public function business()
     {
         return $this->belongsTo(Business::class);
+    }
+
+    /**
+     * Get the user (for wallet top-up payments)
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

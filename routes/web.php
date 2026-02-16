@@ -165,6 +165,23 @@ Route::prefix('rentals')->name('rentals.')->group(function () {
     Route::get('success', [\App\Http\Controllers\Public\RentalRequestController::class, 'success'])->name('success')->middleware('auth:renter');
 });
 
+// Unified / My Account login (password or one-time code) – guest only
+Route::middleware('guest')->group(function () {
+    Route::get('/my-account/login', [\App\Http\Controllers\Account\Auth\LoginController::class, 'showLoginForm'])->name('account.login');
+    Route::post('/my-account/login', [\App\Http\Controllers\Account\Auth\LoginController::class, 'login'])->name('account.login.post');
+    Route::post('/my-account/login/send-otp', [\App\Http\Controllers\Account\Auth\LoginController::class, 'sendOtp'])->name('account.login.send-otp');
+    Route::get('/my-account/login/verify-otp', [\App\Http\Controllers\Account\Auth\LoginController::class, 'showVerifyOtp'])->name('account.login.verify-otp');
+    Route::post('/my-account/login/verify-otp', [\App\Http\Controllers\Account\Auth\LoginController::class, 'verifyOtp'])->name('account.login.verify-otp');
+});
+
+// Web (user) logout for my-account
+Route::post('/logout', function () {
+    auth()->logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+    return redirect('/');
+})->name('logout')->middleware('auth');
+
 // Renter authentication routes (login now handled by business login)
 Route::prefix('renter')->name('renter.')->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Renter\Auth\LoginController::class, 'logout'])->name('logout');
@@ -174,6 +191,24 @@ Route::prefix('renter')->name('renter.')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Renter\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/dashboard/rental/{rental}', [\App\Http\Controllers\Renter\DashboardController::class, 'show'])->name('dashboard.show');
     });
+});
+
+// My Account (web guard user: dashboard, wallet, invoices, etc.)
+Route::prefix('my-account')->name('user.')->middleware(['auth'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Account\UserDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/purchases', [\App\Http\Controllers\Account\UserDashboardController::class, 'purchases'])->name('purchases');
+    Route::get('/invoices', [\App\Http\Controllers\Account\UserDashboardController::class, 'invoices'])->name('invoices');
+    Route::get('/wallet', [\App\Http\Controllers\Account\WalletController::class, 'index'])->name('wallet');
+    Route::get('/wallet/fund', [\App\Http\Controllers\Account\WalletController::class, 'create'])->name('wallet.fund');
+    Route::post('/wallet/fund', [\App\Http\Controllers\Account\WalletController::class, 'store'])->name('wallet.store');
+    Route::get('/wallet/history', [\App\Http\Controllers\Account\WalletController::class, 'history'])->name('wallet.history');
+    Route::get('/reviews', [\App\Http\Controllers\Account\UserDashboardController::class, 'reviewsIndex'])->name('reviews.index');
+    Route::get('/profile', [\App\Http\Controllers\Account\UserDashboardController::class, 'profile'])->name('profile');
+    Route::put('/profile', [\App\Http\Controllers\Account\UserDashboardController::class, 'updateProfile'])->name('profile.update');
+    Route::get('/support', [\App\Http\Controllers\Account\UserDashboardController::class, 'supportIndex'])->name('support.index');
+    Route::get('/settings', [\App\Http\Controllers\Account\UserDashboardController::class, 'settings'])->name('settings');
+    Route::get('/referral', [\App\Http\Controllers\Account\UserDashboardController::class, 'referral'])->name('referral');
+    Route::get('/switch-to-business', [\App\Http\Controllers\Account\SwitchToBusinessController::class, '__invoke'])->name('switch-to-business');
 });
 
 // Cron job endpoints (for external cron services)
