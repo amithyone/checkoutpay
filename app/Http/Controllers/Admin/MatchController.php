@@ -191,7 +191,8 @@ class MatchController extends Controller
                     $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
                     
                     // Find payments with matching amount (same as PaymentController::checkMatch)
-                    $potentialPayments = Payment::where('status', Payment::STATUS_PENDING)
+                    $extractedAccountNumber = isset($extractedInfo['account_number']) ? trim((string) $extractedInfo['account_number']) : null;
+                    $potentialPaymentsQuery = Payment::where('status', Payment::STATUS_PENDING)
                         ->where(function ($q) {
                             $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                         })
@@ -199,9 +200,11 @@ class MatchController extends Controller
                             $extractedInfo['amount'] - 1,
                             $extractedInfo['amount'] + 1
                         ])
-                        ->where('created_at', '<=', $emailDate ?? now()) // Payment must be created BEFORE email
-                        ->orderBy('created_at', 'desc')
-                        ->get();
+                        ->where('created_at', '<=', $emailDate ?? now()); // Payment must be created BEFORE email
+                    if ($extractedAccountNumber !== null && $extractedAccountNumber !== '') {
+                        $potentialPaymentsQuery->where('account_number', $extractedAccountNumber);
+                    }
+                    $potentialPayments = $potentialPaymentsQuery->orderBy('created_at', 'desc')->get();
 
                     $matchedPayment = null;
                     foreach ($potentialPayments as $potentialPayment) {

@@ -1123,20 +1123,27 @@ Route::get('/cron/global-match', function () {
 
                 // OPTIMIZED: Filter pre-loaded payments instead of querying database
                 $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
-                
+                $extractedAccountNumber = isset($extractedInfo['account_number']) ? trim((string) $extractedInfo['account_number']) : null;
+
                 // CRITICAL: Only check payments created BEFORE email was received
-                // Filter from pre-loaded collection instead of querying
-                $potentialPayments = $allPendingPayments->filter(function ($payment) use ($extractedInfo, $emailDate) {
+                // When email has Account Number, only consider payments with that same account (must match our pool)
+                $potentialPayments = $allPendingPayments->filter(function ($payment) use ($extractedInfo, $emailDate, $extractedAccountNumber) {
                     // Amount match (within 1 naira tolerance)
                     $amountMatch = abs($payment->amount - $extractedInfo['amount']) <= 1;
-                    
+
+                    // Account number: when email has "Account Number", only consider payments that showed that same account (our pool)
+                    $accountOk = true;
+                    if ($extractedAccountNumber !== null && $extractedAccountNumber !== '') {
+                        $accountOk = $payment->account_number === $extractedAccountNumber;
+                    }
+
                     // Time constraint: Payment must be created BEFORE email
                     $timeMatch = !$emailDate || $payment->created_at <= $emailDate;
-                    
+
                     // Not expired
                     $notExpired = !$payment->expires_at || $payment->expires_at > now();
-                    
-                    return $amountMatch && $timeMatch && $notExpired;
+
+                    return $amountMatch && $accountOk && $timeMatch && $notExpired;
                 })->sortByDesc('created_at')->values(); // Sort by newest first
                 
                 // Use same logic as PaymentController::checkMatch (which works!)

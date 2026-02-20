@@ -259,6 +259,12 @@ class PaymentMatchingService
             'received_amount' => null,
             'mismatch_reason' => null,
         ];
+
+        // Expired transactions must never be automatically matched
+        if ($payment->isExpired()) {
+            $result['reason'] = 'Transaction has expired';
+            return $result;
+        }
         
         // STEP 0: Transaction ID matching (HIGHEST PRIORITY - if transaction ID matches exactly, match even without name)
         $extractedTransactionId = $extractedInfo['transaction_id'] ?? null;
@@ -313,6 +319,29 @@ class PaymentMatchingService
                     $result['reason'] = "Transaction ID matches but amount mismatch: payment={$requestedAmount}, email={$receivedAmount}";
                     return $result;
                 }
+            }
+        }
+
+        // STEP 0.3: When payment page gave an account number AND email has an extracted account number, they must match and be in our pool
+        // Exception: if account number is not pulled from the email (null), skip account comparison and allow other matching (amount/name/time)
+        if ($payment->account_number) {
+            $paymentAccountNum = trim($payment->account_number);
+            $extractedAccountNumber = isset($extractedInfo['account_number']) ? trim((string) $extractedInfo['account_number']) : null;
+
+            // Only enforce account rules when the email actually has an extracted account number
+            if ($extractedAccountNumber !== null && $extractedAccountNumber !== '') {
+                // 1) Payment account number must be in our account pool or a business account
+                if (!$this->isAccountInOurPoolOrBusiness($paymentAccountNum, $payment)) {
+                    $result['reason'] = "Payment account number ({$paymentAccountNum}) is not in our account pool";
+                    return $result;
+                }
+
+                // 2) Email account number must match the payment page account number
+                if ($paymentAccountNum !== $extractedAccountNumber) {
+                    $result['reason'] = "Account number in email ({$extractedAccountNumber}) does not match payment page account number ({$paymentAccountNum})";
+                    return $result;
+                }
+                $result['account_match'] = true;
             }
         }
 
@@ -1428,6 +1457,25 @@ class PaymentMatchingService
             ]);
             return null;
         }
+    }
+
+    /**
+     * Check if an account number is one of ours (in pool or business-specific).
+     * Used to ensure payment page account number is from our account pool or the business's account.
+     */
+    protected function isAccountInOurPoolOrBusiness(string $accountNumber, Payment $payment): bool
+    {
+        $account = AccountNumber::where('account_number', $accountNumber)->where('is_active', true)->first();
+        if (!$account) {
+            return false;
+        }
+        if ($account->is_pool || $account->is_invoice_pool || $account->is_membership_pool) {
+            return true;
+        }
+        if ($account->business_id && $payment->business_id && $account->business_id === $payment->business_id) {
+            return true;
+        }
+        return false;
     }
 
     /**
