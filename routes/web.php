@@ -76,6 +76,10 @@ Route::get('/contact', function () {
     return view('contact');
 })->name('contact');
 
+Route::get('/careers', function () {
+    return view('careers');
+})->name('careers');
+
 // Setup routes (must be before any middleware that requires database)
 Route::get('/setup', [SetupController::class, 'index'])->name('setup');
 Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);

@@ -30,6 +30,8 @@
                 <ul class="space-y-2 text-xs sm:text-sm">
                     <li><a href="{{ route('about.index') }}" class="hover:text-white transition-colors">About Us</a></li>
                     <li><a href="{{ route('pricing') }}" class="hover:text-white transition-colors">Pricing</a></li>
+                    <li><a href="{{ route('careers') }}" class="hover:text-white transition-colors">Careers</a></li>
+                    <li><a href="{{ route('contact') }}" class="hover:text-white transition-colors">Contact Us</a></li>
                 </ul>
             </div>
 

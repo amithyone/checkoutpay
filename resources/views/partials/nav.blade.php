@@ -90,48 +90,72 @@
                     <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors">Get Started</a>
                 @endauth
             </div>
-            <button id="mobile-menu-btn" class="md:hidden p-2 rounded-md text-gray-700 hover:text-primary focus:outline-none">
-                <i class="fas fa-bars text-xl"></i>
+            <button type="button" id="mobile-menu-btn" class="md:hidden p-2 rounded-md text-gray-700 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
+                <i class="fas fa-bars text-xl" id="mobile-menu-icon"></i>
             </button>
         </div>
-        <div id="mobile-menu" class="hidden md:hidden pb-4 border-t border-gray-200 mt-2">
-                <div class="flex flex-col space-y-2 pt-4">
-                <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Products</a>
-                <a href="{{ route('products.invoices') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Invoices</a>
-                <a href="{{ route('rentals.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Rentals</a>
-                <a href="{{ route('memberships.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Memberships</a>
-                <a href="{{ route('tickets.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Tickets</a>
-                <a href="{{ route('payout.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Payout</a>
-                <a href="{{ route('collections.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Collections</a>
-                <a href="{{ route('charity.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">GoFund & Charity</a>
-                <a href="{{ route('checkout-demo.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Checkout Demo</a>
-                <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Pricing</a>
-                <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Developers</a>
-                <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Support</a>
-                <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Resources</a>
-                <a href="{{ route('api-docs') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4 font-semibold">
-                    <i class="fas fa-code mr-2 text-primary"></i>API Documentation
-                </a>
-                <a href="{{ route('blog.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Blog</a>
-                <a href="{{ route('status.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">Status</a>
-                <a href="{{ route('faqs.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium ml-4">FAQs</a>
-                @auth('web')
-                    <a href="{{ route('user.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
-                @elseauth('renter')
-                    <a href="{{ route('renter.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Rentals Dashboard</a>
-                @elseauth('business')
-                    <a href="{{ route('business.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
-                @else
-                    <a href="{{ route('account.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
-                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Business</a>
-                    <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors text-center">Get Started</a>
-                @endauth
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 mt-2" role="menu" aria-label="Mobile navigation">
+            <div class="pt-3 pb-4 px-2">
+                <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Products</a>
+                    <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Pricing</a>
+                    <a href="{{ route('products.invoices') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Invoices</a>
+                    <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Developers</a>
+                    <a href="{{ route('rentals.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Rentals</a>
+                    <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Support</a>
+                    <a href="{{ route('memberships.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Memberships</a>
+                    <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Resources</a>
+                    <a href="{{ route('tickets.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Tickets</a>
+                    <a href="{{ route('api-docs') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium"><i class="fas fa-code mr-1 text-primary text-xs"></i>API Docs</a>
+                    <a href="{{ route('payout.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Payout</a>
+                    <a href="{{ route('blog.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Blog</a>
+                    <a href="{{ route('collections.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Collections</a>
+                    <a href="{{ route('status.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Status</a>
+                    <a href="{{ route('charity.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Charity</a>
+                    <a href="{{ route('faqs.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">FAQs</a>
+                    <a href="{{ route('checkout-demo.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Checkout Demo</a>
+                    <a href="{{ route('careers') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Careers</a>
+                    <a href="{{ route('contact') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Contact Us</a>
+                    @auth('web')
+                        <a href="{{ route('user.dashboard') }}" class="text-primary font-semibold hover:bg-primary/10 px-2.5 py-2 rounded-lg col-span-2">My Account</a>
+                    @elseauth('renter')
+                        <a href="{{ route('renter.dashboard') }}" class="text-primary font-semibold hover:bg-primary/10 px-2.5 py-2 rounded-lg col-span-2">Rentals Dashboard</a>
+                    @elseauth('business')
+                        <a href="{{ route('business.dashboard') }}" class="text-primary font-semibold hover:bg-primary/10 px-2.5 py-2 rounded-lg col-span-2">Dashboard</a>
+                    @else
+                        <a href="{{ route('account.login') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">My Account</a>
+                        <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Business</a>
+                        <a href="{{ route('business.register') }}" class="bg-primary text-white hover:bg-primary/90 px-2.5 py-2 rounded-lg font-semibold text-center col-span-2">Get Started</a>
+                    @endauth
+                </div>
             </div>
         </div>
     </div>
 </nav>
 <script>
-    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-        document.getElementById('mobile-menu')?.classList.toggle('hidden');
-    });
+(function() {
+    function initMobileMenu() {
+        var btn = document.getElementById('mobile-menu-btn');
+        var menu = document.getElementById('mobile-menu');
+        var icon = document.getElementById('mobile-menu-icon');
+        if (!btn || !menu) return;
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var isHidden = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+            if (icon) {
+                icon.classList.toggle('fa-bars', isHidden);
+                icon.classList.toggle('fa-times', !isHidden);
+            }
+            btn.setAttribute('aria-expanded', !isHidden);
+            btn.setAttribute('aria-label', isHidden ? 'Close menu' : 'Open menu');
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMobileMenu);
+    } else {
+        initMobileMenu();
+    }
+})();
 </script>

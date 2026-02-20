@@ -428,25 +428,6 @@
 
     @include('partials.footer')
 
-    <script>
-        // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        const mobileMenu = document.getElementById('mobile-menu');
-        
-        if (mobileMenuBtn && mobileMenu) {
-            mobileMenuBtn.addEventListener('click', function() {
-                mobileMenu.classList.toggle('hidden');
-                const icon = this.querySelector('i');
-                if (mobileMenu.classList.contains('hidden')) {
-                    icon.classList.remove('fa-times');
-                    icon.classList.add('fa-bars');
-                } else {
-                    icon.classList.remove('fa-bars');
-                    icon.classList.add('fa-times');
-                }
-            });
-        }
-    </script>
     @include('partials.pwa-sw')
 </body>
 </html>
