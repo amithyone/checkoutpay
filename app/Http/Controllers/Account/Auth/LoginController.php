@@ -33,6 +33,7 @@ class LoginController extends Controller
 
         if (Auth::guard('web')->attempt($credentials, $request->filled('remember'))) {
             $request->session()->regenerate();
+            $request->session()->put('show_welcome_back', true);
             return redirect()->intended(route('user.dashboard'));
         }
         if (Auth::guard('business')->attempt($credentials, $request->filled('remember'))) {
@@ -117,6 +118,7 @@ class LoginController extends Controller
         if ($guard === 'web') {
             Auth::guard('web')->loginUsingId($id, true);
             $request->session()->regenerate();
+            $request->session()->put('show_welcome_back', true);
             return redirect()->intended(route('user.dashboard'));
         }
         if ($guard === 'business') {

@@ -49,22 +49,15 @@ class TicketsController extends Controller
                 $query->oldest('created_at');
                 break;
             case 'price_low':
-                $query->join('ticket_types', 'events.id', '=', 'ticket_types.event_id')
-                    ->select('events.*')
-                    ->orderBy('ticket_types.price', 'asc')
-                    ->groupBy('events.id');
+                $query->orderByRaw('(SELECT MIN(price) FROM ticket_types WHERE ticket_types.event_id = events.id) ASC');
                 break;
             case 'price_high':
-                $query->join('ticket_types', 'events.id', '=', 'ticket_types.event_id')
-                    ->select('events.*')
-                    ->orderBy('ticket_types.price', 'desc')
-                    ->groupBy('events.id');
+                $query->orderByRaw('(SELECT MIN(price) FROM ticket_types WHERE ticket_types.event_id = events.id) DESC');
                 break;
             case 'upcoming':
             default:
-                $query->where('start_date', '>=', now())
-                    ->orderBy('start_date', 'asc')
-                    ->latest('created_at');
+                $query->orderByRaw('CASE WHEN start_date >= ? THEN 0 ELSE 1 END', [now()])
+                    ->orderBy('start_date', 'asc');
                 break;
         }
 

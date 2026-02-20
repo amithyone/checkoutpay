@@ -8,6 +8,7 @@
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif
+    @include('partials.pwa-meta')
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -68,6 +69,7 @@
             </div>
         </main>
     </div>
+    @include('partials.pwa-sw')
     @includeIf('components.beta-badge')
 </body>
 </html>

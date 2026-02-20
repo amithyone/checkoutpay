@@ -20,143 +20,231 @@
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .group:hover .memberships-card-btn { background-color: var(--memberships-accent) !important; color: white !important; }
+    </style>
 </head>
 <body class="bg-gray-50">
+    @php $membershipsColor = \App\Models\Setting::get('rentals_accent_color', '#000000'); @endphp
     @include('partials.nav')
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">Memberships</h1>
-            <p class="text-gray-600">Find the perfect membership plan for your fitness journey, classes, and more</p>
-        </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-24 sm:pb-8">
+        <form method="GET" action="{{ route('memberships.index') }}" class="space-y-4 mb-6" id="memberships-filter-form">
+            <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 pointer-events-none">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" name="search" value="{{ request('search') }}"
+                    placeholder="Search memberships, categories or businesses..."
+                    class="w-full pl-11 pr-12 py-3 rounded-2xl border-0 bg-gray-200 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-gray-400 shadow-sm">
+                <button type="button" id="open-filter-modal" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-600 hover:text-gray-900 rounded-lg transition" title="Filter">
+                    <i class="fas fa-filter"></i>
+                </button>
+            </div>
 
-        <!-- Filters -->
-        <div class="bg-white rounded-lg shadow p-4 mb-6">
-            <form method="GET" action="{{ route('memberships.index') }}" class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <select name="category" class="w-full border-gray-300 rounded-md">
-                        <option value="">All Categories</option>
-                        @foreach($categories as $category)
-                            <option value="{{ $category->slug }}" {{ request('category') == $category->slug ? 'selected' : '' }}>
-                                {{ $category->name }}
-                            </option>
-                        @endforeach
-                    </select>
+            <input type="hidden" name="category" id="form-category" value="{{ request('category') }}">
+            <input type="hidden" name="city" id="form-city" value="{{ request('city') }}">
+            <input type="hidden" name="sort" id="form-sort" value="{{ request('sort', 'featured') }}">
+
+            <div class="hidden sm:flex flex-wrap items-center gap-3" id="desktop-filters">
+                <select id="desktop-category" class="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 focus:ring-2 focus:ring-gray-800">
+                    <option value="">All categories</option>
+                    @foreach($categories as $category)
+                        <option value="{{ $category->slug }}" {{ request('category') == $category->slug ? 'selected' : '' }}>{{ $category->name }}</option>
+                    @endforeach
+                </select>
+                <select id="desktop-city" class="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 focus:ring-2 focus:ring-gray-800">
+                    <option value="">All cities</option>
+                    @foreach($cities as $city)
+                        <option value="{{ $city }}" {{ request('city') == $city ? 'selected' : '' }}>{{ $city }}</option>
+                    @endforeach
+                </select>
+                <select id="desktop-sort" class="flex-1 min-w-[120px] px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 focus:ring-2 focus:ring-gray-800">
+                    <option value="featured" {{ request('sort', 'featured') == 'featured' ? 'selected' : '' }}>Featured</option>
+                    <option value="newest" {{ request('sort') == 'newest' ? 'selected' : '' }}>Newest</option>
+                    <option value="price_low" {{ request('sort') == 'price_low' ? 'selected' : '' }}>Price: Low to High</option>
+                    <option value="price_high" {{ request('sort') == 'price_high' ? 'selected' : '' }}>Price: High to Low</option>
+                </select>
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-medium transition shadow-sm" style="background-color: {{ $membershipsColor }};">
+                    <i class="fas fa-filter"></i> Apply
+                </button>
+            </div>
+
+            @if($categories->count() > 0)
+                <div class="flex gap-2 overflow-x-auto pb-1" style="scrollbar-width: thin;">
+                    <a href="{{ route('memberships.index', array_filter(['search' => request('search'), 'city' => request('city'), 'sort' => request('sort')])) }}"
+                        class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ !request('category') ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+                        @if(!request('category')) style="background-color: {{ $membershipsColor }};" @endif>
+                        All
+                    </a>
+                    @foreach($categories as $category)
+                        <a href="{{ route('memberships.index', array_filter(['category' => $category->slug, 'search' => request('search'), 'city' => request('city'), 'sort' => request('sort')])) }}"
+                            class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ request('category') == $category->slug ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+                            @if(request('category') == $category->slug) style="background-color: {{ $membershipsColor }};" @endif>
+                            {{ $category->name }}
+                        </a>
+                    @endforeach
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
-                    <select name="city" class="w-full border-gray-300 rounded-md">
-                        <option value="">All Cities</option>
-                        @foreach($cities as $city)
-                            <option value="{{ $city }}" {{ request('city') == $city ? 'selected' : '' }}>
-                                {{ $city }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search memberships..." class="w-full border-gray-300 rounded-md">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-                    <select name="sort" class="w-full border-gray-300 rounded-md">
-                        <option value="featured" {{ request('sort') == 'featured' ? 'selected' : '' }}>Featured</option>
-                        <option value="price_low" {{ request('sort') == 'price_low' ? 'selected' : '' }}>Price: Low to High</option>
-                        <option value="price_high" {{ request('sort') == 'price_high' ? 'selected' : '' }}>Price: High to Low</option>
-                        <option value="newest" {{ request('sort') == 'newest' ? 'selected' : '' }}>Newest</option>
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <button type="submit" class="w-full bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90">
-                        <i class="fas fa-filter mr-2"></i> Filter
+            @endif
+        </form>
+
+        <div id="filter-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+            <div class="absolute inset-0 bg-black/50" id="filter-modal-backdrop"></div>
+            <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-xl max-h-[85vh] overflow-hidden flex flex-col animate-slide-up">
+                <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Filter & sort</h3>
+                    <button type="button" id="close-filter-modal" class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
+                        <i class="fas fa-times text-xl"></i>
                     </button>
                 </div>
-            </form>
-        </div>
-
-        <!-- Memberships Grid -->
-        @if($memberships->count() > 0)
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                @foreach($memberships as $membership)
-                    <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow">
-                        @if($membership->images && count($membership->images) > 0)
-                            <img src="{{ asset('storage/' . $membership->images[0]) }}" alt="{{ $membership->name }}" class="w-full h-48 object-cover rounded-t-lg">
-                        @else
-                            <div class="w-full h-48 bg-gradient-to-br from-primary/20 to-primary/5 rounded-t-lg flex items-center justify-center">
-                                <i class="fas fa-id-card text-primary text-5xl"></i>
-                            </div>
-                        @endif
-                        <div class="p-6">
-                            <div class="flex items-start justify-between mb-2">
-                                <h3 class="font-semibold text-lg">{{ $membership->name }}</h3>
-                                @if($membership->is_featured)
-                                    <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">Featured</span>
-                                @endif
-                            </div>
-                            <div class="flex items-center gap-2 mb-2">
-                                @if($membership->category)
-                                    <span class="text-sm text-gray-500">{{ $membership->category->name }}</span>
-                                @endif
-                                @if($membership->is_global)
-                                    <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Global</span>
-                                @elseif($membership->city)
-                                    <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                        <i class="fas fa-map-marker-alt mr-1"></i>{{ $membership->city }}
-                                    </span>
-                                @endif
-                            </div>
-                            <p class="text-gray-600 text-sm mb-4">{{ \Illuminate\Support\Str::limit($membership->description, 100) }}</p>
-                            
-                            <!-- Who is it for -->
-                            @if($membership->who_is_it_for)
-                                <div class="mb-4">
-                                    <p class="text-xs font-semibold text-gray-700 mb-1">Who is it for:</p>
-                                    <p class="text-sm text-gray-600">{{ \Illuminate\Support\Str::limit($membership->who_is_it_for, 80) }}</p>
-                                </div>
-                            @endif
-
-                            <div class="flex justify-between items-center mb-4">
-                                <div>
-                                    <span class="text-primary font-bold text-xl">₦{{ number_format($membership->price, 2) }}</span>
-                                    <span class="text-sm text-gray-500">/ {{ $membership->formatted_duration }}</span>
-                                </div>
-                                @if($membership->max_members)
-                                    <span class="text-xs text-gray-500">{{ $membership->current_members }}/{{ $membership->max_members }} members</span>
-                                @endif
-                            </div>
-
-                            @if($membership->features && count($membership->features) > 0)
-                                <ul class="text-xs text-gray-600 mb-4 space-y-1">
-                                    @foreach(array_slice($membership->features, 0, 3) as $feature)
-                                        <li><i class="fas fa-check text-green-500 mr-1"></i> {{ $feature }}</li>
-                                    @endforeach
-                                    @if(count($membership->features) > 3)
-                                        <li class="text-gray-400">+{{ count($membership->features) - 3 }} more</li>
-                                    @endif
-                                </ul>
-                            @endif
-
-                            <a href="{{ route('memberships.show', $membership->slug) }}" class="block w-full bg-primary text-white text-center py-2 rounded-md hover:bg-primary/90">
-                                View Details
-                            </a>
+                <div class="p-4 space-y-5 overflow-y-auto flex-1">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                        <select id="modal-category" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-gray-700 focus:border-gray-700">
+                            <option value="">All categories</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->slug }}" {{ request('category') == $category->slug ? 'selected' : '' }}>{{ $category->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">City</label>
+                        <select id="modal-city" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-gray-700 focus:border-gray-700">
+                            <option value="">All cities</option>
+                            @foreach($cities as $city)
+                                <option value="{{ $city }}" {{ request('city') == $city ? 'selected' : '' }}>{{ $city }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Sort by</label>
+                        <div class="space-y-2">
+                            @foreach([
+                                'featured' => ['Featured', 'fa-star'],
+                                'newest' => ['Newest', 'fa-clock'],
+                                'price_low' => ['Price: Low to High', 'fa-arrow-up'],
+                                'price_high' => ['Price: High to Low', 'fa-arrow-down'],
+                            ] as $value => $label)
+                                <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer hover:bg-gray-50 {{ request('sort', 'featured') == $value ? 'border-2' : 'border-gray-200' }}"
+                                    @if(request('sort', 'featured') == $value) style="border-color: {{ $membershipsColor }}; background-color: {{ $membershipsColor }}15;" @endif>
+                                    <input type="radio" name="modal-sort" value="{{ $value }}" {{ request('sort', 'featured') == $value ? 'checked' : '' }} class="focus:ring-gray-700">
+                                    <i class="fas {{ $label[1] }} text-gray-500 w-5"></i>
+                                    <span class="text-gray-900">{{ $label[0] }}</span>
+                                </label>
+                            @endforeach
                         </div>
                     </div>
+                </div>
+                <div class="p-4 border-t border-gray-200 flex gap-3">
+                    <button type="button" id="filter-modal-clear" class="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">Clear</button>
+                    <button type="button" id="filter-modal-apply" class="flex-1 py-3 rounded-xl text-white font-medium" style="background-color: {{ $membershipsColor }};">Show results</button>
+                </div>
+            </div>
+        </div>
+        <style>@keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.25s ease-out; }</style>
+
+        @if($memberships->count() > 0)
+            <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+                @foreach($memberships as $membership)
+                    <a href="{{ route('memberships.show', $membership->slug) }}" class="group bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg hover:border-primary/20 transition-all duration-200 flex flex-col">
+                        @if($membership->images && count($membership->images) > 0)
+                            <img src="{{ asset('storage/' . $membership->images[0]) }}" alt="{{ $membership->name }}" class="w-full h-36 sm:h-48 object-cover group-hover:scale-[1.02] transition-transform duration-200">
+                        @else
+                            <div class="w-full h-36 sm:h-48 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                                <i class="fas fa-id-card text-primary text-3xl sm:text-4xl"></i>
+                            </div>
+                        @endif
+                        <div class="p-3 sm:p-4 flex-1 flex flex-col">
+                            @if($membership->category)
+                                <span class="text-xs font-medium text-primary">{{ $membership->category->name }}</span>
+                            @endif
+                            <h3 class="font-semibold text-gray-900 mt-0.5 sm:mt-1 group-hover:text-primary transition text-sm sm:text-base line-clamp-2">{{ $membership->name }}</h3>
+                            <p class="text-gray-600 text-xs sm:text-sm mt-1 line-clamp-2 hidden sm:block">{{ Str::limit($membership->description, 90) }}</p>
+                            <div class="flex justify-between items-center mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-100 gap-1">
+                                <span class="text-primary font-bold text-sm sm:text-base">₦{{ number_format($membership->price, 0) }}<span class="text-gray-500 font-normal text-xs sm:text-sm">/ {{ $membership->formatted_duration }}</span></span>
+                                @if($membership->city && !$membership->is_global)
+                                    <span class="text-xs text-gray-500 flex items-center gap-0.5 truncate max-w-[50%]"><i class="fas fa-map-marker-alt flex-shrink-0"></i> <span class="truncate">{{ $membership->city }}</span></span>
+                                @endif
+                            </div>
+                            <span class="memberships-card-btn mt-2 sm:mt-3 inline-flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs sm:text-sm font-medium transition"
+                                style="--memberships-accent: {{ $membershipsColor }}; background-color: {{ $membershipsColor }}22; color: {{ $membershipsColor }};">
+                                <i class="fas fa-id-card sm:hidden"></i>
+                                <span class="sm:hidden">View</span>
+                                <span class="hidden sm:inline">View details</span>
+                            </span>
+                        </div>
+                    </a>
                 @endforeach
             </div>
-
-            <div class="mt-6">
-                {{ $memberships->links() }}
+            <div class="mt-8">
+                {{ $memberships->withQueryString()->links() }}
             </div>
         @else
-            <div class="bg-white rounded-lg shadow p-8 text-center">
-                <i class="fas fa-search text-gray-400 text-5xl mb-4"></i>
-                <p class="text-gray-600">No memberships found.</p>
+            <div class="rounded-2xl bg-white border border-gray-200 p-10 sm:p-12 text-center">
+                <i class="fas fa-search text-gray-300 text-5xl mb-4"></i>
+                <p class="text-gray-600 font-medium">No memberships found</p>
+                <p class="text-sm text-gray-500 mt-1">Try changing your search or filters.</p>
+                <a href="{{ route('memberships.index') }}" class="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl text-white text-sm font-medium" style="background-color: {{ $membershipsColor }};">Clear filters</a>
             </div>
         @endif
     </div>
 
-    @include('partials.footer')
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 sm:hidden safe-area-pb">
+        <div class="flex justify-around items-center h-16">
+            <a href="{{ route('memberships.index') }}" class="flex flex-col items-center justify-center flex-1 py-2 {{ request()->routeIs('memberships.index') ? 'text-primary' : 'text-gray-600 hover:text-primary' }} transition">
+                <i class="fas fa-home text-lg mb-0.5"></i>
+                <span class="text-xs">Home</span>
+            </a>
+            <a href="{{ auth()->check() ? route('user.purchases') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition">
+                <i class="fas fa-shopping-bag text-lg mb-0.5"></i>
+                <span class="text-xs">Purchases</span>
+            </a>
+            <a href="{{ route('support.index') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition">
+                <i class="fas fa-headset text-lg mb-0.5"></i>
+                <span class="text-xs">Support</span>
+            </a>
+            <a href="{{ auth()->check() ? route('user.profile') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition">
+                <i class="fas fa-user text-lg mb-0.5"></i>
+                <span class="text-xs">Profile</span>
+            </a>
+            <a href="{{ auth()->check() ? route('user.dashboard') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition">
+                <i class="fas fa-bars text-lg mb-0.5"></i>
+                <span class="text-xs">More</span>
+            </a>
+        </div>
+    </nav>
+
+    <div id="toast-container" class="fixed top-20 right-4 z-50 space-y-2"></div>
+
+    <script>
+        (function() {
+            var form = document.getElementById('memberships-filter-form');
+            var modal = document.getElementById('filter-modal');
+            var openBtn = document.getElementById('open-filter-modal');
+            var closeBtn = document.getElementById('close-filter-modal');
+            var backdrop = document.getElementById('filter-modal-backdrop');
+            var applyBtn = document.getElementById('filter-modal-apply');
+            var clearBtn = document.getElementById('filter-modal-clear');
+            var formCategory = document.getElementById('form-category');
+            var formCity = document.getElementById('form-city');
+            var formSort = document.getElementById('form-sort');
+            var desktopCategory = document.getElementById('desktop-category');
+            var desktopCity = document.getElementById('desktop-city');
+            var desktopSort = document.getElementById('desktop-sort');
+            function openModal() { modal.classList.remove('hidden'); document.body.style.overflow = 'hidden'; document.getElementById('modal-category').value = formCategory.value; document.getElementById('modal-city').value = formCity.value; var r = document.querySelector('input[name="modal-sort"][value="' + formSort.value + '"]'); if (r) r.checked = true; }
+            function closeModal() { modal.classList.add('hidden'); document.body.style.overflow = ''; }
+            function applyModalAndSubmit() { formCategory.value = document.getElementById('modal-category').value; formCity.value = document.getElementById('modal-city').value; var r = document.querySelector('input[name="modal-sort"]:checked'); formSort.value = r ? r.value : 'featured'; if (desktopCategory) desktopCategory.value = formCategory.value; if (desktopCity) desktopCity.value = formCity.value; if (desktopSort) desktopSort.value = formSort.value; closeModal(); form.requestSubmit(); }
+            function clearFilters() { formCategory.value = ''; formCity.value = ''; formSort.value = 'featured'; document.getElementById('modal-category').value = ''; document.getElementById('modal-city').value = ''; var r = document.querySelector('input[name="modal-sort"][value="featured"]'); if (r) r.checked = true; if (desktopCategory) desktopCategory.value = ''; if (desktopCity) desktopCity.value = ''; if (desktopSort) desktopSort.value = 'featured'; closeModal(); form.requestSubmit(); }
+            if (openBtn) openBtn.addEventListener('click', openModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeModal);
+            if (backdrop) backdrop.addEventListener('click', closeModal);
+            if (applyBtn) applyBtn.addEventListener('click', applyModalAndSubmit);
+            if (clearBtn) clearBtn.addEventListener('click', clearFilters);
+            if (desktopCategory) desktopCategory.addEventListener('change', function() { formCategory.value = this.value; });
+            if (desktopCity) desktopCity.addEventListener('change', function() { formCity.value = this.value; });
+            if (desktopSort) desktopSort.addEventListener('change', function() { formSort.value = this.value; });
+            form.addEventListener('submit', function() { if (desktopCategory && window.getComputedStyle(desktopCategory).display !== 'none') { formCategory.value = desktopCategory.value; formCity.value = desktopCity.value; formSort.value = desktopSort.value; } });
+        })();
+    </script>
 </body>
 </html>

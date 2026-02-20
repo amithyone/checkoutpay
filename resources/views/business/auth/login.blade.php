@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Login - Payment Gateway</title>
+    <meta name="theme-color" content="#ffffff">
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif
+    <style>
+        #pwa-splash { position: fixed; inset: 0; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; transition: opacity 0.3s ease; }
+        #pwa-splash.pwa-splash-hidden { opacity: 0; pointer-events: none; }
+    </style>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -25,6 +30,24 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-gray-50">
+    {{-- PWA splash: white screen with logo centered (shown first when app opens) --}}
+    <div id="pwa-splash" aria-hidden="true">
+        @php
+            $splashLogo = \App\Models\Setting::get('site_logo') ?: \App\Models\Setting::get('site_favicon');
+            $splashLogoPath = $splashLogo ? storage_path('app/public/' . $splashLogo) : null;
+            $splashLogoExists = $splashLogoPath && file_exists($splashLogoPath);
+        @endphp
+        @if($splashLogoExists)
+            <img src="{{ asset('storage/' . $splashLogo) }}" alt="" class="max-w-[200px] w-1/3 h-auto object-contain" width="200" height="200">
+        @else
+            <div class="w-20 h-20 rounded-xl flex items-center justify-center" style="background:#3C50E0;">
+                <i class="fas fa-shield-alt text-white text-4xl"></i>
+            </div>
+        @endif
+    </div>
+    <script>
+        (function(){ var s=document.getElementById('pwa-splash'); if(s){ function hide(){ s.classList.add('pwa-splash-hidden'); setTimeout(function(){ s.remove(); }, 350); } if(document.readyState==='complete') hide(); else window.addEventListener('load', hide); setTimeout(hide, 1200); } })();
+    </script>
     <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div class="max-w-md w-full space-y-8">
             <div>

@@ -10,6 +10,8 @@ use App\Models\MembershipSubscription;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\URL;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class UserDashboardController extends Controller
 {
@@ -52,6 +54,8 @@ class UserDashboardController extends Controller
         $reviewCount = 0;
         $reviewAvg = 0;
 
+        $showWelcomeBack = $request->session()->pull('show_welcome_back', false);
+
         return view('account.dashboard', compact(
             'user',
             'activeRentals',
@@ -60,7 +64,8 @@ class UserDashboardController extends Controller
             'validTicketOrders',
             'activeMemberships',
             'reviewCount',
-            'reviewAvg'
+            'reviewAvg',
+            'showWelcomeBack'
         ));
     }
 
@@ -124,5 +129,57 @@ class UserDashboardController extends Controller
     public function referral(Request $request): RedirectResponse
     {
         return redirect()->route('user.dashboard');
+    }
+
+    /**
+     * Show rental detail (details, status, QR code). User must own the rental.
+     */
+    public function showRental(Request $request, Rental $rental): View|RedirectResponse
+    {
+        if ($rental->renter_email !== $request->user()->email) {
+            abort(403, 'You do not have access to this rental.');
+        }
+        $rental->load(['business', 'items']);
+        $verifyUrl = URL::signedRoute('verify.rental', ['rental' => $rental]);
+        $qrSvg = QrCode::format('svg')->size(200)->margin(2)->generate($verifyUrl);
+        $rentalQrBase64 = 'data:image/svg+xml;base64,' . base64_encode($qrSvg);
+        return view('account.purchases.rental', compact('rental', 'rentalQrBase64'));
+    }
+
+    /**
+     * Show ticket order detail (details, status, QR codes for tickets). User must own the order.
+     */
+    public function showTicketOrder(Request $request, string $orderNumber): View|RedirectResponse
+    {
+        $order = TicketOrder::where('order_number', $orderNumber)
+            ->where('customer_email', $request->user()->email)
+            ->with(['event', 'tickets.ticketType', 'tickets.ticketOrder.event'])
+            ->firstOrFail();
+        $ticketQrs = [];
+        foreach ($order->tickets as $ticket) {
+            try {
+                $verifyUrl = route('verify.ticket', ['token' => $ticket->verification_token]);
+                $qrPng = QrCode::format('png')->size(200)->margin(1)->generate($verifyUrl);
+                $ticketQrs[$ticket->id] = 'data:image/png;base64,' . base64_encode($qrPng);
+            } catch (\Throwable $e) {
+                $ticketQrs[$ticket->id] = null;
+            }
+        }
+        return view('account.purchases.ticket', compact('order', 'ticketQrs'));
+    }
+
+    /**
+     * Show membership subscription detail (details, status, QR code). User must own the subscription.
+     */
+    public function showMembership(Request $request, MembershipSubscription $membership): View|RedirectResponse
+    {
+        if ($membership->member_email !== $request->user()->email) {
+            abort(403, 'You do not have access to this membership.');
+        }
+        $membership->load('membership.business');
+        $verifyUrl = URL::signedRoute('verify.membership', ['membership' => $membership]);
+        $qrSvg = QrCode::format('svg')->size(200)->margin(2)->generate($verifyUrl);
+        $membershipQrBase64 = 'data:image/svg+xml;base64,' . base64_encode($qrSvg);
+        return view('account.purchases.membership', compact('membership', 'membershipQrBase64'));
     }
 }

@@ -355,6 +355,36 @@
                 <p class="mt-2 text-xs text-gray-500">Recommended: PNG, JPG, or SVG. Max size: 2MB. This logo will be used in all email templates.</p>
             </div>
 
+            <!-- Rentals Page Accent Color -->
+            <div class="border-t border-gray-200 pt-6">
+                <h4 class="text-md font-semibold text-gray-900 mb-4">Rentals Page</h4>
+                <p class="text-sm text-gray-600 mb-4">Color used for the search bar, filter button, active category pills, &quot;Add to cart&quot; button, and floating cart icon on the public rentals page.</p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <div>
+                        <label for="rentals_accent_color" class="block text-sm font-medium text-gray-700 mb-2">Accent color</label>
+                        <div class="flex items-center gap-2">
+                            <input type="color" id="rentals_accent_color" name="rentals_accent_color" value="{{ \App\Models\Setting::get('rentals_accent_color', '#000000') }}" class="h-10 w-14 rounded border border-gray-300 cursor-pointer">
+                            <input type="text" id="rentals_accent_color_hex" value="{{ \App\Models\Setting::get('rentals_accent_color', '#000000') }}" maxlength="7" placeholder="#000000" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary font-mono text-sm w-24">
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">Default: black (#000000).</p>
+                    </div>
+                </div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var c = document.getElementById('rentals_accent_color');
+                        var h = document.getElementById('rentals_accent_color_hex');
+                        var form = c && c.closest('form');
+                        if (c && h) {
+                            c.addEventListener('input', function() { h.value = this.value; });
+                            h.addEventListener('input', function() { if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) c.value = this.value; });
+                            if (form) form.addEventListener('submit', function() {
+                                if (h && /^#[0-9A-Fa-f]{6}$/.test(h.value)) c.value = h.value;
+                            });
+                        }
+                    });
+                </script>
+            </div>
+
             <!-- Beta Badge Toggle -->
             <div class="border-t border-gray-200 pt-6">
                 <h4 class="text-md font-semibold text-gray-900 mb-4">Display Settings</h4>

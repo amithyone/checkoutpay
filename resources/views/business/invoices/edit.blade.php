@@ -10,21 +10,45 @@
         @method('PUT')
 
         <div class="space-y-6">
-            <!-- Logo Upload -->
+            <!-- Logo: current, business default, previous (up to 3), or upload new -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Invoice Logo</h3>
-                <div>
-                    <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">Upload Logo (Optional)</label>
-                    @if($invoice->logo)
-                        <div class="mb-3">
-                            <p class="text-sm text-gray-600 mb-2">Current Logo:</p>
-                            <img src="{{ Storage::url($invoice->logo) }}" alt="Current Logo" class="max-w-xs max-h-32 object-contain border border-gray-300 rounded-lg p-2">
+                <p class="text-sm text-gray-600 mb-4">Keep current, use business logo, pick a previous logo, or upload a new one.</p>
+                @php
+                    $currentLogoPath = $invoice->logo && \Illuminate\Support\Facades\Storage::disk('public')->exists($invoice->logo) ? $invoice->logo : null;
+                    $editLogoPath = old('logo_path', $currentLogoPath ?: (($defaultLogo ?? null) ? 'business' : ''));
+                @endphp
+                <input type="hidden" name="logo_path" id="logo_path" value="{{ $editLogoPath === 'business' ? 'business' : $editLogoPath }}">
+
+                <div class="flex flex-wrap items-start gap-4 mb-4">
+                    @if($currentLogoPath)
+                        <div class="logo-option border-2 rounded-lg p-2 cursor-pointer hover:border-primary transition-colors {{ $editLogoPath === $currentLogoPath ? 'logo-selected border-primary' : '' }}" data-logo-path="{{ $currentLogoPath }}" title="Keep current logo">
+                            <img src="{{ Storage::url($currentLogoPath) }}" alt="Current logo" class="w-20 h-20 object-contain">
+                            <p class="text-xs text-center mt-1 text-gray-600">Current</p>
                         </div>
                     @endif
+                    @if($defaultLogo ?? null)
+                        <div class="logo-option border-2 rounded-lg p-2 cursor-pointer hover:border-primary transition-colors {{ $editLogoPath === 'business' ? 'logo-selected border-primary' : '' }}" data-logo-path="business" title="Use business logo">
+                            <img src="{{ Storage::url($defaultLogo) }}" alt="Business logo" class="w-20 h-20 object-contain">
+                            <p class="text-xs text-center mt-1 text-gray-600">Business logo</p>
+                        </div>
+                    @endif
+                    @foreach($previousLogos ?? [] as $path)
+                        @if($path !== $currentLogoPath)
+                            <div class="logo-option border-2 rounded-lg p-2 cursor-pointer hover:border-primary transition-colors {{ $editLogoPath === $path ? 'logo-selected border-primary' : '' }}" data-logo-path="{{ $path }}" title="Use this logo">
+                                <img src="{{ Storage::url($path) }}" alt="Previous logo" class="w-20 h-20 object-contain">
+                                <p class="text-xs text-center mt-1 text-gray-600">Previous</p>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+
+                <div class="pt-3 border-t border-gray-200">
+                    <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">Or upload a new logo</label>
                     <input type="file" name="logo" id="logo" accept="image/*"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                         onchange="previewLogo(this)">
-                    <p class="mt-1 text-xs text-gray-500">Recommended: PNG or JPG, max 2MB. Leave empty to keep current logo.</p>
+                    <p class="mt-1 text-xs text-gray-500">PNG or JPG, max 2MB. Uploading clears the selection above.</p>
                     @error('logo')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -398,6 +422,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Logo preview function
 function previewLogo(input) {
+    document.getElementById('logo_path').value = '';
+    document.querySelectorAll('.logo-option').forEach(function(el) { el.classList.remove('logo-selected', 'border-primary'); });
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -409,5 +435,14 @@ function previewLogo(input) {
         reader.readAsDataURL(input.files[0]);
     }
 }
+document.querySelectorAll('.logo-option').forEach(function(el) {
+    el.addEventListener('click', function() {
+        document.querySelectorAll('.logo-option').forEach(function(o) { o.classList.remove('logo-selected', 'border-primary'); });
+        this.classList.add('logo-selected', 'border-primary');
+        document.getElementById('logo_path').value = this.dataset.logoPath || '';
+        document.getElementById('logo').value = '';
+        document.getElementById('logo-preview').classList.add('hidden');
+    });
+});
 </script>
 @endsection

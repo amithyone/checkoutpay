@@ -8,6 +8,7 @@
         <link rel="icon" type="image/png" href="{{ asset('storage/' . $settings['site_favicon']) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . $settings['site_favicon']) }}">
     @endif
+    @include('partials.pwa-meta')
     <meta name="description" content="{{ $page->meta_description ?? 'Payments for Nigerian businesses.' }}">
     <!-- OPTIMIZED: Preconnect to CDN domains for faster loading -->
     <link rel="preconnect" href="https://cdn.tailwindcss.com">
@@ -446,5 +447,6 @@
             });
         }
     </script>
+    @include('partials.pwa-sw')
 </body>
 </html>

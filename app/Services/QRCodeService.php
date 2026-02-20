@@ -132,6 +132,33 @@ class QRCodeService
     }
 
     /**
+     * Verify ticket by verification token (e.g. when QR contains verification page URL).
+     *
+     * @param string $token
+     * @return array Same shape as verify()
+     */
+    public function verifyByToken(string $token): array
+    {
+        $ticket = Ticket::where('verification_token', $token)->with('ticketOrder.event')->first();
+
+        if (!$ticket) {
+            return [
+                'valid' => false,
+                'ticket' => null,
+                'message' => 'Ticket not found',
+            ];
+        }
+
+        $qrData = $ticket->qr_code_data ?? [
+            'ticket_id' => $ticket->id,
+            'verification_token' => $ticket->verification_token,
+            'expires_at' => $ticket->ticketOrder->event->end_date?->toIso8601String(),
+        ];
+
+        return $this->verify(is_array($qrData) ? $qrData : []);
+    }
+
+    /**
      * Get QR code image URL
      *
      * @param Ticket $ticket

@@ -101,7 +101,8 @@ class DashboardController extends Controller
             ],
             'matching_time' => $this->getMatchingTimeStats($today),
             'charges' => [
-                'total_collected' => (float) BusinessWebsite::sum('total_charges_collected'),
+                'total_collected' => (float) Payment::where('status', Payment::STATUS_APPROVED)
+                    ->sum(DB::raw('COALESCE(total_charges, 0)')),
                 'today_collected' => (float) Payment::where('status', Payment::STATUS_APPROVED)
                     ->whereDate('created_at', $today)
                     ->sum(DB::raw('COALESCE(total_charges, 0)')),

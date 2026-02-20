@@ -9,15 +9,33 @@
         @csrf
 
         <div class="space-y-6">
-            <!-- Logo Upload -->
+            <!-- Logo: default (business), previous (up to 3), or upload new -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Invoice Logo</h3>
-                <div>
-                    <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">Upload Logo (Optional)</label>
+                <p class="text-sm text-gray-600 mb-4">Use your business logo by default, pick a previous logo, or upload a new one.</p>
+                <input type="hidden" name="logo_path" id="logo_path" value="{{ old('logo_path', $defaultLogo ? 'business' : '') }}">
+
+                <div class="flex flex-wrap items-start gap-4 mb-4">
+                    @if($defaultLogo ?? null)
+                        <div class="logo-option border-2 rounded-lg p-2 cursor-pointer hover:border-primary transition-colors logo-selected border-primary" data-logo-path="business" title="Use business logo (default)">
+                            <img src="{{ Storage::url($defaultLogo) }}" alt="Business logo" class="w-20 h-20 object-contain">
+                            <p class="text-xs text-center mt-1 text-gray-600">Business logo</p>
+                        </div>
+                    @endif
+                    @foreach($previousLogos ?? [] as $path)
+                        <div class="logo-option border-2 rounded-lg p-2 cursor-pointer hover:border-primary transition-colors {{ old('logo_path') === $path ? 'logo-selected border-primary' : '' }}" data-logo-path="{{ $path }}" title="Use this logo">
+                            <img src="{{ Storage::url($path) }}" alt="Previous logo" class="w-20 h-20 object-contain">
+                            <p class="text-xs text-center mt-1 text-gray-600">Previous</p>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="pt-3 border-t border-gray-200">
+                    <label for="logo" class="block text-sm font-medium text-gray-700 mb-2">Or upload a new logo</label>
                     <input type="file" name="logo" id="logo" accept="image/*"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                         onchange="previewLogo(this)">
-                    <p class="mt-1 text-xs text-gray-500">Recommended: PNG or JPG, max 2MB. Logo will appear on the invoice.</p>
+                    <p class="mt-1 text-xs text-gray-500">PNG or JPG, max 2MB. Uploading clears the selection above.</p>
                     @error('logo')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -377,6 +395,8 @@ function calculateTotals() {
 
 // Logo preview function
 function previewLogo(input) {
+    document.getElementById('logo_path').value = '';
+    document.querySelectorAll('.logo-option').forEach(function(el) { el.classList.remove('logo-selected', 'border-primary'); });
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -388,6 +408,15 @@ function previewLogo(input) {
         reader.readAsDataURL(input.files[0]);
     }
 }
+document.querySelectorAll('.logo-option').forEach(function(el) {
+    el.addEventListener('click', function() {
+        document.querySelectorAll('.logo-option').forEach(function(o) { o.classList.remove('logo-selected', 'border-primary'); });
+        this.classList.add('logo-selected', 'border-primary');
+        document.getElementById('logo_path').value = this.dataset.logoPath || '';
+        document.getElementById('logo').value = '';
+        document.getElementById('logo-preview').classList.add('hidden');
+    });
+});
 
 // Add first item on page load
 document.addEventListener('DOMContentLoaded', function() {

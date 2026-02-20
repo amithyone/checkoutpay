@@ -20,9 +20,11 @@ class InvoiceService
      */
     public function createInvoice(array $data, Business $business): Invoice
     {
-        // Handle logo upload
+        // Logo: uploaded file, or pre-selected path (e.g. business logo / previous invoice logo)
         $logoPath = null;
-        if (isset($data['logo']) && $data['logo']->isValid()) {
+        if (isset($data['logo_path']) && is_string($data['logo_path']) && Storage::disk('public')->exists($data['logo_path'])) {
+            $logoPath = $data['logo_path'];
+        } elseif (isset($data['logo']) && $data['logo']->isValid()) {
             $logoPath = $data['logo']->store('invoices/logos', 'public');
         }
 
@@ -356,19 +358,17 @@ class InvoiceService
      */
     public function updateInvoice(Invoice $invoice, array $data): Invoice
     {
-        // Handle logo upload
+        // Logo: new file, selected path (business/previous), or keep current
+        $logoPath = null;
         if (isset($data['logo']) && $data['logo']->isValid()) {
-            // Delete old logo if exists
             if ($invoice->logo && Storage::disk('public')->exists($invoice->logo)) {
                 Storage::disk('public')->delete($invoice->logo);
             }
-            // Store new logo
             $logoPath = $data['logo']->store('invoices/logos', 'public');
-            $data['logo'] = $logoPath;
-        } else {
-            // Keep existing logo if no new logo uploaded
-            unset($data['logo']);
+        } elseif (isset($data['logo_path']) && is_string($data['logo_path']) && Storage::disk('public')->exists($data['logo_path'])) {
+            $logoPath = $data['logo_path'];
         }
+        unset($data['logo'], $data['logo_path']);
 
         $invoice->update([
             'allow_split_payment' => !empty($data['allow_split_payment']),
@@ -393,9 +393,8 @@ class InvoiceService
             'reference_number' => $data['reference_number'] ?? $invoice->reference_number,
         ]);
 
-        // Update logo if provided
-        if (isset($data['logo'])) {
-            $invoice->update(['logo' => $data['logo']]);
+        if ($logoPath !== null) {
+            $invoice->update(['logo' => $logoPath]);
         }
 
         // Update items if provided

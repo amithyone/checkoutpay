@@ -113,12 +113,33 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Get up to 3 most recently used invoice logo paths for this business (for logo selection).
+     */
+    protected function getPreviousInvoiceLogos(Business $business): array
+    {
+        return Invoice::where('business_id', $business->id)
+            ->whereNotNull('logo')
+            ->orderByDesc('updated_at')
+            ->get()
+            ->pluck('logo')
+            ->unique()
+            ->filter(fn ($path) => $path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path))
+            ->take(3)
+            ->values()
+            ->all();
+    }
+
+    /**
      * Show the form for creating a new invoice
      */
     public function create(): View
     {
         $business = Auth::guard('business')->user();
-        return view('business.invoices.create', compact('business'));
+        $previousLogos = $this->getPreviousInvoiceLogos($business);
+        $defaultLogo = $business->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($business->profile_picture)
+            ? $business->profile_picture
+            : null;
+        return view('business.invoices.create', compact('business', 'previousLogos', 'defaultLogo'));
     }
 
     /**
@@ -130,6 +151,7 @@ class InvoiceController extends Controller
 
         $validated = $request->validate([
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'logo_path' => 'nullable|string|max:500',
             'client_name' => 'required|string|max:255',
             'client_email' => 'required|email|max:255',
             'client_phone' => 'nullable|string|max:50',
@@ -166,7 +188,25 @@ class InvoiceController extends Controller
         }
 
         try {
-            $invoice = $this->invoiceService->createInvoice($validated, $business);
+            // Resolve logo: upload > selected previous/business default
+            $logoInput = $validated;
+            if ($request->hasFile('logo')) {
+                $logoInput['logo'] = $request->file('logo');
+                $logoInput['logo_path'] = null;
+            } else {
+                $logoInput['logo'] = null;
+                $logoPath = $validated['logo_path'] ?? null;
+                if ($logoPath === 'business' && $business->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($business->profile_picture)) {
+                    $logoInput['logo_path'] = $business->profile_picture;
+                } elseif ($logoPath && in_array($logoPath, $this->getPreviousInvoiceLogos($business), true)) {
+                    $logoInput['logo_path'] = $logoPath;
+                } elseif ($business->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($business->profile_picture)) {
+                    $logoInput['logo_path'] = $business->profile_picture;
+                } else {
+                    $logoInput['logo_path'] = null;
+                }
+            }
+            $invoice = $this->invoiceService->createInvoice($logoInput, $business);
 
             // Send email if requested
             if ($request->boolean('send_email')) {
@@ -214,8 +254,12 @@ class InvoiceController extends Controller
         }
 
         $invoice->load('items');
+        $previousLogos = $this->getPreviousInvoiceLogos($business);
+        $defaultLogo = $business->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($business->profile_picture)
+            ? $business->profile_picture
+            : null;
 
-        return view('business.invoices.edit', compact('invoice', 'business'));
+        return view('business.invoices.edit', compact('invoice', 'business', 'previousLogos', 'defaultLogo'));
     }
 
     /**
@@ -233,6 +277,7 @@ class InvoiceController extends Controller
 
         $validated = $request->validate([
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'logo_path' => 'nullable|string|max:500',
             'client_name' => 'required|string|max:255',
             'client_email' => 'required|email|max:255',
             'client_phone' => 'nullable|string|max:50',
@@ -269,6 +314,26 @@ class InvoiceController extends Controller
         } elseif (empty($validated['allow_split_payment'])) {
             $validated['split_installments'] = null;
             $validated['split_percentages'] = null;
+        }
+
+        // Resolve logo for update: upload > selected previous/business default > keep current
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo');
+            $validated['logo_path'] = null;
+        } else {
+            $validated['logo'] = null;
+            $logoPath = $validated['logo_path'] ?? null;
+            $allowedLogos = $this->getPreviousInvoiceLogos($business);
+            if ($invoice->logo && \Illuminate\Support\Facades\Storage::disk('public')->exists($invoice->logo) && !in_array($invoice->logo, $allowedLogos, true)) {
+                $allowedLogos[] = $invoice->logo;
+            }
+            if ($logoPath === 'business' && $business->profile_picture && \Illuminate\Support\Facades\Storage::disk('public')->exists($business->profile_picture)) {
+                $validated['logo_path'] = $business->profile_picture;
+            } elseif ($logoPath && in_array($logoPath, $allowedLogos, true)) {
+                $validated['logo_path'] = $logoPath;
+            } else {
+                $validated['logo_path'] = null; // keep current invoice logo
+            }
         }
 
         try {

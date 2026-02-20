@@ -34,18 +34,28 @@ class TicketScannerController extends Controller
         ]);
 
         try {
-            // Decode QR data (should be JSON)
-            $qrData = json_decode($request->qr_data, true);
+            $qrDataRaw = $request->qr_data;
+            $verification = null;
 
-            if (!$qrData) {
-                return response()->json([
-                    'valid' => false,
-                    'message' => 'Invalid QR code format',
-                ], 400);
+            // If QR contains verification page URL, verify by token
+            if (is_string($qrDataRaw) && (str_starts_with($qrDataRaw, 'http') || str_starts_with($qrDataRaw, '/')) && str_contains($qrDataRaw, '/verify/ticket/')) {
+                $rest = trim(explode('/verify/ticket/', $qrDataRaw, 2)[1] ?? '');
+                $token = trim(explode('?', $rest)[0]);
+                if ($token !== '') {
+                    $verification = $this->qrCodeService->verifyByToken($token);
+                }
             }
 
-            // Verify QR code
-            $verification = $this->qrCodeService->verify($qrData);
+            if (!$verification) {
+                $qrData = is_string($qrDataRaw) ? json_decode($qrDataRaw, true) : $qrDataRaw;
+                if (!is_array($qrData)) {
+                    return response()->json([
+                        'valid' => false,
+                        'message' => 'Invalid QR code format',
+                    ], 400);
+                }
+                $verification = $this->qrCodeService->verify($qrData);
+            }
 
             if (!$verification['valid']) {
                 return response()->json([

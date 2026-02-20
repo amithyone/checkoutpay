@@ -6,6 +6,8 @@ use App\Http\Controllers\TestEmailController;
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
+Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
+
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
 Route::get('/products/invoices', [\App\Http\Controllers\ProductsController::class, 'invoices'])->name('products.invoices');
 Route::get('/products/memberships', [\App\Http\Controllers\ProductsController::class, 'memberships'])->name('products.memberships');
@@ -130,6 +132,13 @@ Route::prefix('memberships')->name('memberships.')->group(function () {
     Route::post('find', [\App\Http\Controllers\Public\MembershipController::class, 'findMembership'])->name('find');
 });
 
+// Public purchase verification (scan QR → open this page)
+Route::prefix('verify')->name('verify.')->group(function () {
+    Route::get('rental/{rental}', [\App\Http\Controllers\Public\PurchaseVerificationController::class, 'showRental'])->name('rental')->middleware('signed');
+    Route::get('ticket/{token}', [\App\Http\Controllers\Public\PurchaseVerificationController::class, 'showTicket'])->name('ticket');
+    Route::get('membership/{membership}', [\App\Http\Controllers\Public\PurchaseVerificationController::class, 'showMembership'])->name('membership')->middleware('signed');
+});
+
 // Public rentals routes
 Route::prefix('rentals')->name('rentals.')->group(function () {
     // Public browsing (no auth required)
@@ -200,6 +209,9 @@ Route::prefix('renter')->name('renter.')->group(function () {
 Route::prefix('my-account')->name('user.')->middleware(['auth'])->group(function () {
     Route::get('/', [\App\Http\Controllers\Account\UserDashboardController::class, 'index'])->name('dashboard');
     Route::get('/purchases', [\App\Http\Controllers\Account\UserDashboardController::class, 'purchases'])->name('purchases');
+    Route::get('/purchases/rental/{rental}', [\App\Http\Controllers\Account\UserDashboardController::class, 'showRental'])->name('purchases.rental');
+    Route::get('/purchases/ticket/{orderNumber}', [\App\Http\Controllers\Account\UserDashboardController::class, 'showTicketOrder'])->name('purchases.ticket');
+    Route::get('/purchases/membership/{membership}', [\App\Http\Controllers\Account\UserDashboardController::class, 'showMembership'])->name('purchases.membership');
     Route::get('/invoices', [\App\Http\Controllers\Account\UserDashboardController::class, 'invoices'])->name('invoices');
     Route::get('/wallet', [\App\Http\Controllers\Account\WalletController::class, 'index'])->name('wallet');
     Route::get('/wallet/fund', [\App\Http\Controllers\Account\WalletController::class, 'create'])->name('wallet.fund');
