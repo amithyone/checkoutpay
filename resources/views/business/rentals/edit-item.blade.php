@@ -114,14 +114,14 @@
                 <button type="submit" class="flex-1 bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">
                     Update Item
                 </button>
-                <form action="{{ route('business.rentals.items.destroy', $item) }}" method="POST" class="flex-1" onsubmit="return confirm('Are you sure you want to delete this item?');">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-medium">
-                        Delete Item
-                    </button>
-                </form>
             </div>
+        </form>
+        <form action="{{ route('business.rentals.items.destroy', $item) }}" method="POST" class="mt-4" onsubmit="return confirm('Are you sure you want to delete this item?');">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 font-medium">
+                Delete Item
+            </button>
         </form>
     </div>
 </div>

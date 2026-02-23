@@ -7,6 +7,7 @@ use App\Models\Rental;
 use App\Models\RentalItem;
 use App\Models\RentalCategory;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -212,6 +213,49 @@ class RentalController extends Controller
 
         return redirect()->route('business.rentals.items')
             ->with('success', 'Rental item updated successfully.');
+    }
+
+    /**
+     * Quick-update daily rate (inline edit from items list)
+     */
+    public function updateDailyRate(Request $request, RentalItem $item): JsonResponse
+    {
+        $business = $request->user('business');
+        if ($item->business_id !== $business->id) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'daily_rate' => 'required|numeric|min:0',
+        ]);
+        $item->update(['daily_rate' => $validated['daily_rate']]);
+        return response()->json([
+            'success' => true,
+            'daily_rate' => (float) $item->daily_rate,
+            'formatted' => '₦' . number_format($item->daily_rate, 2),
+        ]);
+    }
+
+    /**
+     * Add a photo to a rental item (quick upload from items list)
+     */
+    public function addItemPhoto(Request $request, RentalItem $item): JsonResponse
+    {
+        $business = $request->user('business');
+        if ($item->business_id !== $business->id) {
+            abort(403);
+        }
+        $request->validate([
+            'photo' => 'required|image|max:2048',
+        ]);
+        $path = $request->file('photo')->store('rental-items', 'public');
+        $images = $item->images ?? [];
+        $images[] = $path;
+        $item->update(['images' => $images]);
+        return response()->json([
+            'success' => true,
+            'image_path' => $path,
+            'image_url' => asset('storage/' . $path),
+        ]);
     }
 
     /**

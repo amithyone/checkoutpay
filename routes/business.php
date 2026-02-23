@@ -82,6 +82,8 @@ Route::prefix('dashboard')->name('business.')->group(function () {
             Route::post('/items', [\App\Http\Controllers\Business\RentalController::class, 'storeItem'])->name('items.store');
             Route::get('/items/{item}/edit', [\App\Http\Controllers\Business\RentalController::class, 'editItem'])->name('items.edit');
             Route::put('/items/{item}', [\App\Http\Controllers\Business\RentalController::class, 'updateItem'])->name('items.update');
+            Route::patch('/items/{item}/daily-rate', [\App\Http\Controllers\Business\RentalController::class, 'updateDailyRate'])->name('items.update-daily-rate');
+            Route::post('/items/{item}/photo', [\App\Http\Controllers\Business\RentalController::class, 'addItemPhoto'])->name('items.add-photo');
             Route::delete('/items/{item}', [\App\Http\Controllers\Business\RentalController::class, 'deleteItem'])->name('items.destroy');
             Route::get('/{rental}', [\App\Http\Controllers\Business\RentalController::class, 'show'])->name('show');
             Route::post('/{rental}/approve', [\App\Http\Controllers\Business\RentalController::class, 'approve'])->name('approve');

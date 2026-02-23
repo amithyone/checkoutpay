@@ -61,6 +61,7 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photo</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">City</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Daily Rate</th>
@@ -71,9 +72,25 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 @forelse($items as $item)
-                    <tr>
+                    <tr data-item-id="{{ $item->id }}">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="font-medium">{{ $item->name }}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2 flex-wrap item-photos-container">
+                                @if($item->images && count($item->images) > 0)
+                                    @foreach(array_slice($item->images, 0, 3) as $img)
+                                        <img src="{{ asset('storage/' . $img) }}" alt="" class="w-10 h-10 object-cover rounded border border-gray-200">
+                                    @endforeach
+                                @else
+                                    <span class="no-photo-placeholder text-gray-400 text-xs">No photo</span>
+                                @endif
+                                <label class="cursor-pointer text-primary hover:underline text-xs whitespace-nowrap">
+                                    <input type="file" accept="image/*" class="hidden item-photo-input" data-item-id="{{ $item->id }}" data-url="{{ route('business.rentals.items.add-photo', $item) }}">
+                                    <i class="fas fa-plus mr-1"></i> Upload
+                                </label>
+                            </div>
+                            <div class="item-photo-feedback mt-1 text-xs hidden text-green-600"></div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="text-sm">{{ $item->category->name }}</span>
@@ -82,7 +99,11 @@
                             <span class="text-sm">{{ $item->city ?? 'N/A' }}</span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="font-semibold">₦{{ number_format($item->daily_rate, 2) }}</span>
+                            <div class="daily-rate-cell inline-flex items-center gap-1" data-item-id="{{ $item->id }}" data-url="{{ route('business.rentals.items.update-daily-rate', $item) }}">
+                                <span class="daily-rate-display font-semibold cursor-pointer hover:text-primary" title="Click to edit">₦{{ number_format($item->daily_rate, 2) }}</span>
+                                <input type="number" step="0.01" min="0" class="daily-rate-input hidden w-24 border border-gray-300 rounded px-2 py-1 text-sm" value="{{ $item->daily_rate }}">
+                                <span class="daily-rate-saving hidden text-xs text-gray-500">Saving...</span>
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="text-sm">{{ $item->quantity_available }}</span>
@@ -113,7 +134,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                             No rental items found. <a href="{{ route('business.rentals.items.create') }}" class="text-primary hover:underline">Create one</a>
                         </td>
                     </tr>
@@ -121,6 +142,116 @@
             </tbody>
         </table>
     </div>
+
+    @push('scripts')
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+        var token = csrf ? csrf.getAttribute('content') : '';
+
+        // Inline daily rate edit
+        document.querySelectorAll('.daily-rate-cell').forEach(function(cell) {
+            var display = cell.querySelector('.daily-rate-display');
+            var input = cell.querySelector('.daily-rate-input');
+            var saving = cell.querySelector('.daily-rate-saving');
+            var url = cell.getAttribute('data-url');
+            var itemId = cell.getAttribute('data-item-id');
+
+            display.addEventListener('click', function() {
+                display.classList.add('hidden');
+                input.classList.remove('hidden');
+                input.focus();
+                input.select();
+            });
+
+            function saveRate() {
+                var val = parseFloat(input.value);
+                if (isNaN(val) || val < 0) {
+                    input.classList.add('hidden');
+                    display.classList.remove('hidden');
+                    return;
+                }
+                saving.classList.remove('hidden');
+                input.classList.add('hidden');
+                fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ daily_rate: val })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    saving.classList.add('hidden');
+                    display.textContent = data.formatted || ('₦' + Number(data.daily_rate).toLocaleString('en-NG', { minimumFractionDigits: 2 }));
+                    display.classList.remove('hidden');
+                })
+                .catch(function() {
+                    saving.classList.add('hidden');
+                    display.classList.remove('hidden');
+                    input.classList.remove('hidden');
+                    alert('Failed to update rate.');
+                });
+            }
+
+            input.addEventListener('blur', saveRate);
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); saveRate(); }
+                if (e.key === 'Escape') {
+                    input.value = input.getAttribute('value');
+                    input.classList.add('hidden');
+                    display.classList.remove('hidden');
+                }
+            });
+        });
+
+        // Quick photo upload
+        document.querySelectorAll('.item-photo-input').forEach(function(inp) {
+            inp.addEventListener('change', function() {
+                var file = this.files[0];
+                if (!file) return;
+                var url = this.getAttribute('data-url');
+                var itemId = this.getAttribute('data-item-id');
+                var row = document.querySelector('tr[data-item-id="' + itemId + '"]');
+                var feedback = row ? row.querySelector('.item-photo-feedback') : null;
+                var container = row ? row.querySelector('.item-photos-container') : null;
+
+                if (feedback) feedback.classList.remove('hidden'), feedback.textContent = 'Uploading...';
+
+                var formData = new FormData();
+                formData.append('photo', file);
+                formData.append('_token', token);
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    body: formData
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success && container) {
+                        var placeholder = container.querySelector('.no-photo-placeholder');
+                        if (placeholder) placeholder.classList.add('hidden');
+                        var img = document.createElement('img');
+                        img.src = data.image_url;
+                        img.alt = '';
+                        img.className = 'w-10 h-10 object-cover rounded border border-gray-200';
+                        container.insertBefore(img, container.firstChild);
+                    }
+                    if (feedback) feedback.textContent = 'Photo added.', feedback.classList.remove('hidden');
+                    inp.value = '';
+                })
+                .catch(function() {
+                    if (feedback) feedback.textContent = 'Upload failed.', feedback.classList.add('text-red-600');
+                });
+            });
+        });
+    });
+    </script>
+    @endpush
 
     <div class="mt-4">
         {{ $items->links() }}
