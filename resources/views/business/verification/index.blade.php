@@ -75,8 +75,7 @@
                         'nin' => 'fa-id-card',
                         'cac_certificate' => 'fa-file-certificate',
                         'cac_application' => 'fa-file-alt',
-                        'account_number' => 'fa-hashtag',
-                        'bank_address' => 'fa-map-marker-alt',
+                        'account_number' => 'fa-university',
                         'utility_bill' => 'fa-file-invoice',
                     ];
                     $icon = $icons[$type] ?? 'fa-file';
@@ -135,8 +134,7 @@
                         <option value="nin">NIN (National Identification Number)</option>
                         <option value="cac_certificate">CAC Certificate</option>
                         <option value="cac_application">CAC Application</option>
-                        <option value="account_number">Account Number</option>
-                        <option value="bank_address">Bank Address</option>
+                        <option value="account_number">Business Bank Account</option>
                         <option value="utility_bill">Utility Bill</option>
                     </select>
                     @error('verification_type')
@@ -144,7 +142,7 @@
                     @enderror
                 </div>
 
-                <!-- Text-based fields (BVN, NIN, Account Number, Bank Address) -->
+                <!-- Text-based fields (BVN, NIN, Business Bank Account) -->
                 <div id="text-fields" class="hidden space-y-4">
                     <div id="bvn-field" class="hidden">
                         <label for="bvn" class="block text-sm font-medium text-gray-700 mb-1">BVN <span class="text-red-500">*</span></label>
@@ -166,25 +164,32 @@
                         @enderror
                     </div>
 
-                    <div id="account-number-field" class="hidden">
-                        <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
-                        <input type="text" name="account_number" id="account_number"
-                            placeholder="Enter your bank account number"
-                            value="{{ old('account_number', $business->account_number) }}"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
-                        @error('account_number')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <div id="bank-address-field" class="hidden">
-                        <label for="bank_address" class="block text-sm font-medium text-gray-700 mb-1">Bank Address <span class="text-red-500">*</span></label>
-                        <textarea name="bank_address" id="bank_address" rows="3"
-                            placeholder="Enter your bank's full address"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">{{ old('bank_address', $business->bank_address) }}</textarea>
-                        @error('bank_address')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
+                    <div id="account-number-field" class="hidden space-y-3">
+                        <p class="text-xs text-gray-500">We use NUBAN to verify your account and pull the account name automatically.</p>
+                        <div>
+                            <label for="bank_search_kyc" class="block text-sm font-medium text-gray-700 mb-1">Bank <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <input type="text" id="bank_search_kyc" autocomplete="off"
+                                    placeholder="Search bank..."
+                                    value="{{ old('bank_search_kyc', $business->bank_name) }}"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                                <input type="hidden" name="bank_code" id="bank_code_kyc" value="{{ old('bank_code', $business->bank_code) }}">
+                                <div id="bank_dropdown_kyc" class="hidden absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1"></div>
+                            </div>
+                            @error('bank_code')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number <span class="text-red-500">*</span></label>
+                            <input type="text" name="account_number" id="account_number" maxlength="10"
+                                placeholder="Enter 10-digit NUBAN account number"
+                                value="{{ old('account_number', $business->account_number) }}"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                            @error('account_number')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
                 </div>
 
@@ -275,52 +280,81 @@
 
 @push('scripts')
 <script>
+const banksKyc = @json(config('banks', []));
+
 document.getElementById('verification_type').addEventListener('change', function() {
     const type = this.value;
     const textFields = document.getElementById('text-fields');
     const fileFields = document.getElementById('file-fields');
-    
-    // Hide all fields
+
     document.getElementById('bvn-field').classList.add('hidden');
     document.getElementById('nin-field').classList.add('hidden');
     document.getElementById('account-number-field').classList.add('hidden');
-    document.getElementById('bank-address-field').classList.add('hidden');
     textFields.classList.add('hidden');
     fileFields.classList.add('hidden');
-    
-    // Show relevant fields
-    if (['bvn', 'nin', 'account_number', 'bank_address'].includes(type)) {
+
+    document.getElementById('bvn').required = false;
+    document.getElementById('nin').required = false;
+    document.getElementById('account_number').required = false;
+    document.getElementById('bank_code_kyc').removeAttribute('required');
+    document.getElementById('document').required = false;
+
+    if (['bvn', 'nin', 'account_number'].includes(type)) {
         textFields.classList.remove('hidden');
         if (type === 'bvn') {
             document.getElementById('bvn-field').classList.remove('hidden');
             document.getElementById('bvn').required = true;
-        } else {
-            document.getElementById('bvn').required = false;
         }
         if (type === 'nin') {
             document.getElementById('nin-field').classList.remove('hidden');
             document.getElementById('nin').required = true;
-        } else {
-            document.getElementById('nin').required = false;
         }
         if (type === 'account_number') {
             document.getElementById('account-number-field').classList.remove('hidden');
             document.getElementById('account_number').required = true;
-        } else {
-            document.getElementById('account_number').required = false;
+            document.getElementById('bank_code_kyc').setAttribute('required', 'required');
         }
-        if (type === 'bank_address') {
-            document.getElementById('bank-address-field').classList.remove('hidden');
-            document.getElementById('bank_address').required = true;
-        } else {
-            document.getElementById('bank_address').required = false;
-        }
-        document.getElementById('document').required = false;
     } else if (['cac_certificate', 'cac_application', 'utility_bill'].includes(type)) {
         fileFields.classList.remove('hidden');
         document.getElementById('document').required = true;
     }
 });
+
+// Bank search for KYC
+const bankSearchKyc = document.getElementById('bank_search_kyc');
+const bankCodeKyc = document.getElementById('bank_code_kyc');
+const bankDropdownKyc = document.getElementById('bank_dropdown_kyc');
+if (bankSearchKyc && bankCodeKyc && bankDropdownKyc) {
+    bankSearchKyc.addEventListener('focus', function() {
+        const v = (this.value || '').toLowerCase();
+        const filtered = banksKyc.filter(bank => (bank.bank_name || '').toLowerCase().includes(v)).slice(0, 15);
+        bankDropdownKyc.innerHTML = filtered.length ? filtered.map(bank =>
+            '<div class="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm" data-code="' + (bank.code || '') + '" data-name="' + (bank.bank_name || '').replace(/"/g, '&quot;') + '">' + (bank.bank_name || '') + '</div>'
+        ).join('') : '<div class="px-4 py-2 text-gray-500 text-sm">No bank found</div>';
+        bankDropdownKyc.classList.remove('hidden');
+    });
+    bankSearchKyc.addEventListener('input', function() {
+        const v = (this.value || '').toLowerCase();
+        const filtered = banksKyc.filter(bank => (bank.bank_name || '').toLowerCase().includes(v)).slice(0, 15);
+        bankDropdownKyc.innerHTML = filtered.length ? filtered.map(bank =>
+            '<div class="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm" data-code="' + (bank.code || '') + '" data-name="' + (bank.bank_name || '').replace(/"/g, '&quot;') + '">' + (bank.bank_name || '') + '</div>'
+        ).join('') : '<div class="px-4 py-2 text-gray-500 text-sm">No bank found</div>';
+        bankDropdownKyc.classList.remove('hidden');
+    });
+    bankDropdownKyc.addEventListener('click', function(e) {
+        const el = e.target.closest('[data-code]');
+        if (el) {
+            bankCodeKyc.value = el.getAttribute('data-code') || '';
+            bankSearchKyc.value = el.getAttribute('data-name') || '';
+            bankDropdownKyc.classList.add('hidden');
+        }
+    });
+    document.addEventListener('click', function(e) {
+        if (!bankSearchKyc.contains(e.target) && !bankDropdownKyc.contains(e.target)) {
+            bankDropdownKyc.classList.add('hidden');
+        }
+    });
+}
 </script>
 @endpush
 @endsection

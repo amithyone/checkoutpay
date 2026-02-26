@@ -8,7 +8,7 @@
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div class="mb-4 sm:mb-6">
             <h3 class="text-base sm:text-lg font-semibold text-gray-900">Request Withdrawal</h3>
-            <p class="text-xs sm:text-sm text-gray-600 mt-1">Available Balance: <span class="font-semibold text-primary">₦{{ number_format($business->balance, 2) }}</span></p>
+            <p class="text-xs sm:text-sm text-gray-600 mt-1">Available to withdraw: <span class="font-semibold text-primary">₦{{ number_format($business->getAvailableBalance(), 2) }}</span></p>
         </div>
 
         @php
@@ -30,7 +30,7 @@
             <div class="space-y-4">
                 <div>
                     <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                    <input type="number" name="amount" id="amount" step="0.01" min="1" max="{{ $business->balance }}" required
+                    <input type="number" name="amount" id="amount" step="0.01" min="1" max="{{ max(0, $business->getAvailableBalance()) }}" required
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                         placeholder="Enter amount">
                     @error('amount')

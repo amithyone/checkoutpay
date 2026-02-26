@@ -81,6 +81,46 @@
                     @endif
                 </div>
             </div>
+            <div class="md:col-span-2">
+                <label class="text-xs text-gray-600">Overdraft</label>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                    @if($business->hasOverdraftApproved())
+                        <span class="text-sm font-medium text-green-700">Approved</span>
+                        <span class="text-sm text-gray-700">Limit: ₦{{ number_format($business->overdraft_limit, 2) }}</span>
+                        <span class="text-xs text-gray-500">Available: ₦{{ number_format($business->getAvailableBalance(), 2) }}</span>
+                    @elseif($business->overdraft_status === 'pending')
+                        <span class="text-sm font-medium text-amber-600">Pending application</span>
+                        @if(auth('admin')->user()->isSuperAdmin())
+                        <form action="{{ route('admin.businesses.overdraft-approve', $business) }}" method="POST" class="inline flex items-center gap-2">
+                            @csrf
+                            <select name="overdraft_limit" class="text-sm border border-gray-300 rounded px-2 py-1" required>
+                                <option value="200000">₦200,000</option>
+                                <option value="500000">₦500,000</option>
+                                <option value="1000000">₦1,000,000</option>
+                            </select>
+                            <button type="submit" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
+                        </form>
+                        <form action="{{ route('admin.businesses.overdraft-reject', $business) }}" method="POST" class="inline" onsubmit="return confirm('Reject overdraft application?');">
+                            @csrf
+                            <button type="submit" class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">Reject</button>
+                        </form>
+                        @endif
+                    @else
+                        <span class="text-sm text-gray-500">{{ $business->overdraft_status === 'rejected' ? 'Rejected' : 'Not applied' }}</span>
+                        @if(auth('admin')->user()->isSuperAdmin())
+                        <form action="{{ route('admin.businesses.overdraft-approve', $business) }}" method="POST" class="inline flex items-center gap-2">
+                            @csrf
+                            <select name="overdraft_limit" class="text-sm border border-gray-300 rounded px-2 py-1" required>
+                                <option value="200000">₦200,000</option>
+                                <option value="500000">₦500,000</option>
+                                <option value="1000000">₦1,000,000</option>
+                            </select>
+                            <button type="submit" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Enable overdraft</button>
+                        </form>
+                        @endif
+                    @endif
+                </div>
+            </div>
             @if(auth('admin')->user()->isSuperAdmin() || auth('admin')->user()->role === 'admin')
             <div>
                 <label class="text-xs text-gray-600">Daily Revenue <span class="text-gray-400">(sum of all websites)</span></label>

@@ -56,6 +56,10 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::put('/withdrawals/auto-withdraw-settings', [WithdrawalController::class, 'updateAutoWithdrawSettings'])->name('withdrawals.auto-withdraw-settings');
         Route::delete('/withdrawals/accounts/{account}', [WithdrawalController::class, 'deleteAccount'])->name('withdrawals.delete-account');
 
+        // Overdraft
+        Route::get('/overdraft', [\App\Http\Controllers\Business\OverdraftController::class, 'index'])->name('overdraft.index');
+        Route::post('/overdraft', [\App\Http\Controllers\Business\OverdraftController::class, 'store'])->name('overdraft.store');
+
         // Statistics
         Route::get('/statistics', [StatisticsController::class, 'index'])->name('statistics.index');
 

@@ -41,6 +41,8 @@ class Rental extends Model
         'business_phone',
         'renter_notes',
         'business_notes',
+        'payment_link_code',
+        'payment_id',
         'approved_at',
         'started_at',
         'completed_at',
@@ -101,6 +103,14 @@ class Rental extends Model
     public function business()
     {
         return $this->belongsTo(Business::class);
+    }
+
+    /**
+     * Get the payment for this rental (when approved, renter pays via this payment)
+     */
+    public function payment()
+    {
+        return $this->belongsTo(Payment::class);
     }
 
     /**

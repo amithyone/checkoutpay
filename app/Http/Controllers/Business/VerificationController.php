@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
 use App\Models\BusinessVerification;
+use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -45,27 +46,34 @@ class VerificationController extends Controller
             ])],
             'document_type' => 'nullable|string|max:255',
             'document' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120', // 5MB max
-            'account_number' => 'nullable|string|max:255',
-            'bank_address' => 'nullable|string|max:1000',
+            'account_number' => 'nullable|string|max:15',
+            'bank_code' => 'nullable|string|max:20',
             'bvn' => 'nullable|string|max:11|min:11',
             'nin' => 'nullable|string|max:11|min:11',
         ]);
 
-        // Handle text-based verifications (account_number, bank_address, BVN, NIN)
+        // Handle text-based verifications (account_number + bank, BVN, NIN)
         $textBasedTypes = [
             BusinessVerification::TYPE_ACCOUNT_NUMBER,
-            BusinessVerification::TYPE_BANK_ADDRESS,
             BusinessVerification::TYPE_BVN,
             BusinessVerification::TYPE_NIN,
         ];
 
         if (in_array($validated['verification_type'], $textBasedTypes)) {
             // Validate required fields for text-based types
-            if ($validated['verification_type'] === BusinessVerification::TYPE_ACCOUNT_NUMBER && empty($validated['account_number'])) {
-                return back()->withErrors(['account_number' => 'Account number is required.']);
-            }
-            if ($validated['verification_type'] === BusinessVerification::TYPE_BANK_ADDRESS && empty($validated['bank_address'])) {
-                return back()->withErrors(['bank_address' => 'Bank address is required.']);
+            if ($validated['verification_type'] === BusinessVerification::TYPE_ACCOUNT_NUMBER) {
+                if (empty($validated['account_number']) || empty($validated['bank_code'])) {
+                    return back()->withErrors(['account_number' => 'Account number and bank are required.']);
+                }
+                $accountNumber = preg_replace('/[^0-9]/', '', $validated['account_number']);
+                if (strlen($accountNumber) !== 10) {
+                    return back()->withErrors(['account_number' => 'Account number must be 10 digits.']);
+                }
+                $nubanService = app(NubanValidationService::class);
+                $nubanResult = $nubanService->validate($accountNumber, $validated['bank_code']);
+                if (!$nubanResult || !($nubanResult['valid'] ?? false)) {
+                    return back()->withErrors(['account_number' => 'Invalid account number or bank. We could not verify this account. Please check and try again.']);
+                }
             }
             if ($validated['verification_type'] === BusinessVerification::TYPE_BVN && empty($validated['bvn'])) {
                 return back()->withErrors(['bvn' => 'BVN is required.']);
@@ -84,24 +92,32 @@ class VerificationController extends Controller
                 return back()->withErrors(['verification_type' => 'You already have a pending verification for this type.']);
             }
 
-            // For text-based verifications, store in business model
-            if ($validated['verification_type'] === BusinessVerification::TYPE_ACCOUNT_NUMBER && isset($validated['account_number'])) {
-                $business->update(['account_number' => $validated['account_number']]);
-            } elseif ($validated['verification_type'] === BusinessVerification::TYPE_BANK_ADDRESS && isset($validated['bank_address'])) {
-                $business->update(['bank_address' => $validated['bank_address']]);
+            // For account_number: save to business and set document_type with verified name
+            if ($validated['verification_type'] === BusinessVerification::TYPE_ACCOUNT_NUMBER) {
+                $accountNumber = preg_replace('/[^0-9]/', '', $validated['account_number']);
+                $nubanService = app(NubanValidationService::class);
+                $nubanResult = $nubanService->validate($accountNumber, $validated['bank_code']);
+                $business->update([
+                    'account_number' => $accountNumber,
+                    'bank_code' => $nubanResult['bank_code'] ?? $validated['bank_code'],
+                    'bank_name' => $nubanResult['bank_name'] ?? null,
+                    'name' => $nubanResult['account_name'] ?? $business->name,
+                ]);
+                $documentType = sprintf(
+                    'Account: %s, Bank: %s, Name: %s (NUBAN verified)',
+                    $accountNumber,
+                    $nubanResult['bank_name'] ?? $validated['bank_code'],
+                    $nubanResult['account_name'] ?? ''
+                );
+            } elseif ($validated['verification_type'] === BusinessVerification::TYPE_BVN) {
+                $documentType = 'BVN: ' . ($validated['bvn'] ?? '');
+            } elseif ($validated['verification_type'] === BusinessVerification::TYPE_NIN) {
+                $documentType = 'NIN: ' . ($validated['nin'] ?? '');
+            } else {
+                $documentType = $validated['document_type'] ?? '';
             }
-
-            // Create verification record with text data
-            $documentType = match($validated['verification_type']) {
-                BusinessVerification::TYPE_ACCOUNT_NUMBER => 'Account Number: ' . ($validated['account_number'] ?? ''),
-                BusinessVerification::TYPE_BANK_ADDRESS => 'Bank Address: ' . ($validated['bank_address'] ?? ''),
-                BusinessVerification::TYPE_BVN => 'BVN: ' . ($validated['bvn'] ?? ''),
-                BusinessVerification::TYPE_NIN => 'NIN: ' . ($validated['nin'] ?? ''),
-                default => $validated['document_type'] ?? '',
-            };
             $path = null;
         } else {
-            // For file-based verifications
             if (!$request->hasFile('document')) {
                 return back()->withErrors(['document' => 'Document file is required for this verification type.']);
             }

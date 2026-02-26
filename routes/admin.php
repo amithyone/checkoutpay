@@ -87,6 +87,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
             ->middleware('super_admin')
             ->name('businesses.update-balance');
+        Route::post('businesses/{business}/overdraft-approve', [BusinessController::class, 'approveOverdraft'])
+            ->middleware('super_admin')
+            ->name('businesses.overdraft-approve');
+        Route::post('businesses/{business}/overdraft-reject', [BusinessController::class, 'rejectOverdraft'])
+            ->middleware('super_admin')
+            ->name('businesses.overdraft-reject');
         Route::post('businesses/{business}/update-charges', [BusinessController::class, 'updateCharges'])
             ->middleware('super_admin')
             ->name('businesses.update-charges');

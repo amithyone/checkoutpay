@@ -319,6 +319,43 @@ class BusinessController extends Controller
             ->with('success', "Balance updated from ₦" . number_format($oldBalance, 2) . " to ₦" . number_format($request->balance, 2));
     }
 
+    /** Overdraft limit tiers (in Naira). */
+    public const OVERDRAFT_LIMITS = [200000, 500000, 1000000];
+
+    public function approveOverdraft(Request $request, Business $business): RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        if (!$admin->isSuperAdmin()) {
+            abort(403, 'Only super admins can approve overdraft.');
+        }
+        $request->validate([
+            'overdraft_limit' => 'required|numeric|in:' . implode(',', self::OVERDRAFT_LIMITS),
+        ]);
+        $limit = (float) $request->overdraft_limit;
+        $business->update([
+            'overdraft_limit' => $limit,
+            'overdraft_approved_at' => now(),
+            'overdraft_approved_by' => $admin->id,
+            'overdraft_status' => 'approved',
+        ]);
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Overdraft approved with limit ₦' . number_format($limit, 2));
+    }
+
+    public function rejectOverdraft(Business $business): RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        if (!$admin->isSuperAdmin()) {
+            abort(403, 'Only super admins can reject overdraft.');
+        }
+        $business->update([
+            'overdraft_status' => 'rejected',
+            'overdraft_requested_at' => $business->overdraft_requested_at, // keep for history
+        ]);
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Overdraft application rejected.');
+    }
+
     /**
      * Preview transactions for transfer (Super Admin only)
      */
@@ -658,15 +695,16 @@ class BusinessController extends Controller
         // For text-based verifications, return business data
         $textBasedTypes = [
             BusinessVerification::TYPE_ACCOUNT_NUMBER,
-            BusinessVerification::TYPE_BANK_ADDRESS,
             BusinessVerification::TYPE_BVN,
             BusinessVerification::TYPE_NIN,
         ];
 
         if (in_array($verification->verification_type, $textBasedTypes)) {
             $data = match($verification->verification_type) {
-                BusinessVerification::TYPE_ACCOUNT_NUMBER => ['Account Number' => $business->account_number],
-                BusinessVerification::TYPE_BANK_ADDRESS => ['Bank Address' => $business->bank_address],
+                BusinessVerification::TYPE_ACCOUNT_NUMBER => [
+                    'Account Number' => $business->account_number,
+                    'Bank' => $business->bank_name ?? $business->bank_code,
+                ],
                 default => ['Details' => $verification->document_type],
             };
             return response()->json($data);

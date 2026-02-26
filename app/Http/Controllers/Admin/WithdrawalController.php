@@ -100,11 +100,12 @@ class WithdrawalController extends Controller
         }
 
         $business = $withdrawal->business;
+        $available = $business->getAvailableBalance();
 
-        // Check if business has sufficient balance
-        if ($business->balance < $withdrawal->amount) {
+        // Check if business has sufficient balance (including overdraft when approved)
+        if ($available < $withdrawal->amount) {
             return redirect()->route('admin.withdrawals.show', $withdrawal)
-                ->with('error', 'Business has insufficient balance. Available: ₦' . number_format($business->balance, 2));
+                ->with('error', 'Business has insufficient balance. Available: ₦' . number_format($available, 2));
         }
 
         $admin = auth('admin')->user();

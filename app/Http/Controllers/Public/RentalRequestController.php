@@ -10,6 +10,8 @@ use App\Services\NubanValidationService;
 use App\Services\RecaptchaService;
 use App\Mail\RentalRequestReceived;
 use App\Mail\RentalReceipt;
+use App\Mail\RentalApprovedPayNow;
+use App\Services\RentalPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -607,13 +609,38 @@ class RentalRequestController extends Controller
 
                 // Send receipt to renter
                 Mail::to($renter->email)->send(new RentalReceipt($rental));
+
+                // Auto-approve and send payment link if business has rental_auto_approve
+                if ($business->rental_auto_approve ?? false) {
+                    $rental->approve();
+                    try {
+                        $paymentService = app(RentalPaymentService::class);
+                        $paymentService->createPaymentForRental($rental->fresh());
+                        Mail::to($rental->renter_email)->send(new RentalApprovedPayNow($rental->fresh()));
+                    } catch (\Exception $e) {
+                        Log::error('Rental auto-approve: failed to create payment or send pay link', [
+                            'rental_id' => $rental->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             }
 
             // Clear cart
             session()->forget('rental_cart');
 
+            $autoApproved = false;
+            foreach ($businesses as $businessData) {
+                if ($businessData['business']->rental_auto_approve ?? false) {
+                    $autoApproved = true;
+                    break;
+                }
+            }
+
             return redirect()->route('rentals.success')
-                ->with('success', 'Rental request submitted successfully!');
+                ->with('success', $autoApproved
+                    ? 'Rental request submitted and approved! Check your email for the payment link.'
+                    : 'Rental request submitted successfully!');
         } catch (\Exception $e) {
             Log::error('Failed to submit rental request', [
                 'renter_id' => $renter->id,

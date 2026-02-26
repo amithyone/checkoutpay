@@ -40,6 +40,7 @@ class SettingsController extends Controller
             'auto_withdraw_threshold' => 'nullable|numeric|min:0',
             'auto_withdraw_end_of_day' => 'boolean',
             'two_factor_enabled' => 'boolean',
+            'rental_auto_approve' => 'boolean',
         ]);
 
         // Handle profile picture upload
@@ -72,6 +73,7 @@ class SettingsController extends Controller
             'telegram_admin_login_enabled',
             'auto_withdraw_end_of_day',
             'two_factor_enabled',
+            'rental_auto_approve',
         ];
 
         foreach ($booleanFields as $field) {

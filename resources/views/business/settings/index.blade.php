@@ -158,6 +158,34 @@
         </form>
     </div>
 
+    <!-- Rentals -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-6">
+            <i class="fas fa-box-open mr-2"></i> Rentals
+        </h3>
+        <form method="POST" action="{{ route('business.settings.update') }}">
+            @csrf
+            @method('PUT')
+            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div class="flex-1">
+                    <label class="text-sm font-medium text-gray-900">Auto-approve rental requests</label>
+                    <p class="text-xs text-gray-500 mt-1">When enabled, new rental requests are approved automatically and the renter receives a payment link by email. They pay when approved.</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="rental_auto_approve" value="1"
+                        {{ old('rental_auto_approve', $business->rental_auto_approve ?? false) ? 'checked' : '' }}
+                        class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+            </div>
+            <div class="mt-4">
+                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    <i class="fas fa-save mr-2"></i> Save
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Telegram Notifications -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-6">

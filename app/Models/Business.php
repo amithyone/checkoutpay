@@ -26,7 +26,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'webhook_url',
         'email_account_id',
         'is_active',
+        'rental_auto_approve',
         'balance',
+        'overdraft_limit',
+        'overdraft_approved_at',
+        'overdraft_approved_by',
+        'overdraft_interest_last_charged_at',
+        'overdraft_status',
+        'overdraft_requested_at',
         'business_id',
         'email_verified_at',
         'profile_picture',
@@ -46,6 +53,8 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_fixed',
         'charge_exempt',
         'account_number',
+        'bank_code',
+        'bank_name',
         'bank_address',
         'telegram_bot_token',
         'telegram_chat_id',
@@ -69,8 +78,13 @@ class Business extends Authenticatable implements CanResetPasswordContract
 
     protected $casts = [
         'is_active' => 'boolean',
+        'rental_auto_approve' => 'boolean',
         'website_approved' => 'boolean',
         'balance' => 'decimal:2',
+        'overdraft_limit' => 'decimal:2',
+        'overdraft_approved_at' => 'datetime',
+        'overdraft_interest_last_charged_at' => 'datetime',
+        'overdraft_requested_at' => 'datetime',
         'password' => 'hashed',
         'email_verified_at' => 'datetime',
         'created_at' => 'datetime',
@@ -493,6 +507,35 @@ class Business extends Authenticatable implements CanResetPasswordContract
     /**
      * Check if auto-withdrawal should be triggered
      */
+    /**
+     * Whether overdraft is approved and has a limit.
+     */
+    public function hasOverdraftApproved(): bool
+    {
+        return $this->overdraft_approved_at !== null
+            && (float) $this->overdraft_limit > 0;
+    }
+
+    /**
+     * Ledger balance = current book balance (can be negative with overdraft).
+     */
+    public function getLedgerBalance(): float
+    {
+        return (float) $this->balance;
+    }
+
+    /**
+     * Available to withdraw: balance + overdraft limit when overdraft is approved.
+     */
+    public function getAvailableBalance(): float
+    {
+        $balance = (float) $this->balance;
+        if ($this->hasOverdraftApproved()) {
+            return $balance + (float) $this->overdraft_limit;
+        }
+        return $balance;
+    }
+
     public function shouldTriggerAutoWithdrawal(): bool
     {
         if (!$this->auto_withdraw_threshold || $this->auto_withdraw_threshold <= 0) {

@@ -6,6 +6,7 @@ use App\Events\PaymentApproved;
 use App\Events\PaymentExpired;
 use App\Listeners\CreateMembershipSubscriptionOnPaymentApproved;
 use App\Listeners\MarkInvoicePaidOnPaymentApproved;
+use App\Listeners\MarkRentalPaidOnPaymentApproved;
 use App\Listeners\ProcessTicketOrderOnPayment;
 use App\Listeners\SendExpiredPaymentWebhook;
 use App\Listeners\SendPaymentWebhook;
@@ -22,6 +23,7 @@ class EventServiceProvider extends ServiceProvider
         PaymentApproved::class => [
             CreateMembershipSubscriptionOnPaymentApproved::class,
             MarkInvoicePaidOnPaymentApproved::class,
+            MarkRentalPaidOnPaymentApproved::class,
             ProcessTicketOrderOnPayment::class,
             SendPaymentWebhook::class,
         ],

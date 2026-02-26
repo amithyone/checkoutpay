@@ -66,17 +66,42 @@
         <div class="bg-white rounded-xl shadow-sm p-5 lg:p-6 border border-gray-200 hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between mb-4">
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs lg:text-sm text-gray-600 mb-1">Current Balance</p>
-                    <h3 class="text-xl lg:text-2xl font-bold text-gray-900 truncate">₦{{ number_format($stats['balance'], 2) }}</h3>
+                    <p class="text-xs lg:text-sm text-gray-600 mb-1">Account balance</p>
+                    @php $bal = (float) ($stats['balance'] ?? 0); @endphp
+                    <h3 class="text-xl lg:text-2xl font-bold truncate {{ $bal < 0 ? 'text-red-600' : 'text-gray-900' }}">
+                        {{ $bal < 0 ? '−' : '' }}₦{{ number_format(abs($bal), 2) }}
+                    </h3>
                 </div>
-                <div class="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-3">
-                    <i class="fas fa-wallet text-blue-600 text-lg lg:text-xl"></i>
+                <div class="w-10 h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ml-3 {{ $bal < 0 ? 'bg-red-100' : 'bg-blue-100' }}">
+                    <i class="fas fa-wallet text-lg lg:text-xl {{ $bal < 0 ? 'text-red-600' : 'text-blue-600' }}"></i>
                 </div>
             </div>
-            <div class="pt-3 border-t border-gray-100">
-                <a href="{{ route('business.withdrawals.create') }}" class="text-xs text-primary hover:underline inline-flex items-center">
-                    Request Withdrawal <i class="fas fa-arrow-right ml-1 text-xs"></i>
-                </a>
+            <div class="pt-3 border-t border-gray-100 space-y-1">
+                <p class="text-xs text-gray-600">
+                    @if($bal < 0)
+                        Amount owing: <span class="font-medium text-red-600">₦{{ number_format(abs($bal), 2) }}</span> <span class="text-gray-500">(left to pay)</span>
+                    @else
+                        Amount owing: <span class="font-medium text-gray-900">₦0</span>
+                    @endif
+                </p>
+                @if($stats['has_overdraft'] ?? false)
+                    <p class="text-xs text-gray-600">Overdraft limit: <span class="font-medium text-gray-900">₦{{ number_format($stats['overdraft_limit'], 2) }}</span></p>
+                    <p class="text-xs text-gray-600">Available to withdraw: <span class="font-medium text-green-600">₦{{ number_format($stats['available_balance'], 2) }}</span></p>
+                @endif
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                    <a href="{{ route('business.withdrawals.create') }}" class="text-xs text-primary hover:underline inline-flex items-center">
+                        Request Withdrawal <i class="fas fa-arrow-right ml-1 text-xs"></i>
+                    </a>
+                    @if(!($stats['has_overdraft'] ?? false) && ($stats['overdraft_status'] ?? null) !== 'pending')
+                        <a href="{{ route('business.overdraft.index') }}" class="text-xs text-primary hover:underline inline-flex items-center">
+                            Apply for overdraft <i class="fas fa-arrow-right ml-1 text-xs"></i>
+                        </a>
+                    @elseif(($stats['overdraft_status'] ?? null) === 'pending')
+                        <a href="{{ route('business.overdraft.index') }}" class="text-xs text-amber-600 hover:underline inline-flex items-center">
+                            Overdraft pending <i class="fas fa-arrow-right ml-1 text-xs"></i>
+                        </a>
+                    @endif
+                </div>
             </div>
         </div>
 

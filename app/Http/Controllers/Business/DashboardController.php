@@ -46,6 +46,11 @@ class DashboardController extends Controller
             'monthly_revenue' => $monthlyRevenue, // Calculated from actual transactions
             'yearly_revenue' => $yearlyRevenue, // Calculated from actual transactions
             'balance' => $business->balance,
+            'ledger_balance' => $business->getLedgerBalance(),
+            'overdraft_limit' => (float) $business->overdraft_limit,
+            'available_balance' => $business->getAvailableBalance(),
+            'has_overdraft' => $business->hasOverdraftApproved(),
+            'overdraft_status' => $business->overdraft_status,
         ];
 
         // Get website statistics with daily and monthly breakdowns

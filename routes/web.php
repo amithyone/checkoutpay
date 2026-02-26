@@ -4,6 +4,14 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\TestEmailController;
 
+// Rental domains: camrentals.ng and abjrentals.ng — root shows rentals page directly (no redirect)
+$rentalDomains = ['camrentals.ng', 'abjrentals.ng', 'www.camrentals.ng', 'www.abjrentals.ng'];
+foreach ($rentalDomains as $domain) {
+    Route::domain($domain)->group(function () {
+        Route::get('/', [\App\Http\Controllers\Public\RentalController::class, 'index']);
+    });
+}
+
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
@@ -179,6 +187,9 @@ Route::prefix('rentals')->name('rentals.')->group(function () {
     
     // Success page
     Route::get('success', [\App\Http\Controllers\Public\RentalRequestController::class, 'success'])->name('success')->middleware('auth:renter');
+
+    // Pay for approved rental (renter pays via bank transfer; link sent by email)
+    Route::get('pay/{code}', [\App\Http\Controllers\Public\RentalPaymentController::class, 'show'])->name('pay');
 });
 
 // Unified / My Account login (password or one-time code) – guest only

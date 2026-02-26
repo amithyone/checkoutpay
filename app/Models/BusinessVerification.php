@@ -58,7 +58,6 @@ class BusinessVerification extends Model
             self::TYPE_CAC_CERTIFICATE,
             self::TYPE_CAC_APPLICATION,
             self::TYPE_ACCOUNT_NUMBER,
-            self::TYPE_BANK_ADDRESS,
             self::TYPE_UTILITY_BILL,
         ];
     }
@@ -73,7 +72,7 @@ class BusinessVerification extends Model
             self::TYPE_NIN => 'NIN (National Identification Number)',
             self::TYPE_CAC_CERTIFICATE => 'CAC Certificate',
             self::TYPE_CAC_APPLICATION => 'CAC Application',
-            self::TYPE_ACCOUNT_NUMBER => 'Account Number',
+            self::TYPE_ACCOUNT_NUMBER => 'Business Bank Account',
             self::TYPE_BANK_ADDRESS => 'Bank Address',
             self::TYPE_UTILITY_BILL => 'Utility Bill',
             self::TYPE_BASIC => 'Basic Information',

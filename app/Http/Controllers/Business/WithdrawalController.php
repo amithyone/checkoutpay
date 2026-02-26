@@ -171,9 +171,13 @@ class WithdrawalController extends Controller
             return back()->withErrors(['password' => 'Invalid password.'])->withInput();
         }
 
+        $maxWithdraw = $business->getAvailableBalance();
+        if ($maxWithdraw < 1) {
+            return back()->withErrors(['amount' => 'Insufficient balance. Available: ₦' . number_format($maxWithdraw, 2)])->withInput();
+        }
         // Build validation rules
         $rules = [
-            'amount' => 'required|numeric|min:1|max:' . $business->balance,
+            'amount' => 'required|numeric|min:1|max:' . max(0, $maxWithdraw),
             'password' => 'required',
             'notes' => 'nullable|string|max:1000',
             'saved_account_id' => 'nullable|exists:business_withdrawal_accounts,id',

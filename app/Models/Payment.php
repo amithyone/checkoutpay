@@ -26,6 +26,7 @@ class Payment extends Model
         'business_id',
         'user_id',
         'business_website_id',
+        'rental_id',
         'status',
         'email_data',
         'matched_at',
@@ -281,6 +282,14 @@ class Payment extends Model
     public function website()
     {
         return $this->belongsTo(BusinessWebsite::class, 'business_website_id');
+    }
+
+    /**
+     * Get the rental this payment is for (when payment is for an approved rental)
+     */
+    public function rental()
+    {
+        return $this->belongsTo(Rental::class);
     }
 
     /**

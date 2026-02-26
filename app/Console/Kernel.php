@@ -256,6 +256,12 @@ class Kernel extends ConsoleKernel
             ->dailyAt('02:00')
             ->withoutOverlapping()
             ->name('cleanup-match-attempts');
+
+        // Overdraft: 5% interest weekly (after 7 days)
+        $schedule->command('overdraft:charge-interest')
+            ->weeklyOn(1, '03:00')
+            ->withoutOverlapping()
+            ->name('overdraft-charge-interest');
     }
 
     /**

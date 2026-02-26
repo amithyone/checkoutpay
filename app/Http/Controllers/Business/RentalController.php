@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Rental;
 use App\Models\RentalItem;
 use App\Models\RentalCategory;
+use App\Services\RentalPaymentService;
+use App\Mail\RentalApprovedPayNow;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -290,7 +293,21 @@ class RentalController extends Controller
             'status' => 'required|in:pending,approved,active,completed,cancelled,rejected',
         ]);
 
+        $wasApproved = $rental->isApproved();
         $rental->update(['status' => $validated['status']]);
+
+        if ($validated['status'] === 'approved' && !$wasApproved) {
+            try {
+                $paymentService = app(RentalPaymentService::class);
+                $paymentService->createPaymentForRental($rental->fresh());
+                Mail::to($rental->renter_email)->send(new RentalApprovedPayNow($rental->fresh()));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to create rental payment on status update', [
+                    'rental_id' => $rental->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         if ($validated['status'] === 'active' && !$rental->started_at) {
             $rental->update(['started_at' => now()]);
@@ -325,12 +342,12 @@ class RentalController extends Controller
     }
 
     /**
-     * Approve a rental request
+     * Approve a rental request (creates payment; renter pays via link in email)
      */
     public function approve(Request $request, Rental $rental): RedirectResponse
     {
         $business = $request->user('business');
-        
+
         if ($rental->business_id !== $business->id) {
             abort(403);
         }
@@ -341,8 +358,21 @@ class RentalController extends Controller
 
         $rental->approve($validated['business_notes'] ?? null);
 
+        try {
+            $paymentService = app(RentalPaymentService::class);
+            $paymentService->createPaymentForRental($rental->fresh());
+            Mail::to($rental->renter_email)->send(new RentalApprovedPayNow($rental->fresh()));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to create rental payment or send email', [
+                'rental_id' => $rental->id,
+                'error' => $e->getMessage(),
+            ]);
+            return redirect()->route('business.rentals.show', $rental)
+                ->with('error', 'Rental approved but payment link could not be created. Please try again or contact support.');
+        }
+
         return redirect()->route('business.rentals.show', $rental)
-            ->with('success', 'Rental request approved successfully.');
+            ->with('success', 'Rental approved. The renter has been sent a payment link.');
     }
 
     /**
