@@ -49,6 +49,8 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         // Withdrawals
         Route::get('/withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
         Route::get('/withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');
+        Route::post('/withdrawals/create/account', [WithdrawalController::class, 'storeAccountStep'])->name('withdrawals.create.account');
+        Route::get('/withdrawals/create/confirm', [WithdrawalController::class, 'createConfirm'])->name('withdrawals.create.confirm');
         Route::post('/withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
         Route::get('/withdrawals/{withdrawal}', [WithdrawalController::class, 'show'])->name('withdrawals.show');
         Route::post('/withdrawals/validate-account', [WithdrawalController::class, 'validateAccount'])->name('withdrawals.validate-account');

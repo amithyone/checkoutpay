@@ -111,6 +111,13 @@
                     @csrf
                     @if(session('registered_email'))
                         <input type="hidden" name="email" value="{{ session('registered_email') }}">
+                    @else
+                        <div class="mb-3 text-left">
+                            <label for="resend_email" class="block text-sm font-medium text-gray-700 mb-1">Your email</label>
+                            <input type="email" name="email" id="resend_email" value="{{ old('email') }}" required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                placeholder="Enter your email">
+                        </div>
                     @endif
                     <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
                         <i class="fas fa-paper-plane mr-2"></i>

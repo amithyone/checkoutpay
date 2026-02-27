@@ -70,12 +70,12 @@
                                 <li>{{ $error }}</li>
                             @endforeach
                         </ul>
-                        @if(session('unverified_email'))
+                        @if(session('unverified_email') || old('email'))
                             <div class="mt-3 pt-3 border-t border-red-200">
                                 <p class="text-sm mb-2">Didn't receive the verification email?</p>
                                 <form action="{{ route('business.verification.resend-without-auth') }}" method="POST" class="inline">
                                     @csrf
-                                    <input type="hidden" name="email" value="{{ session('unverified_email') }}">
+                                    <input type="hidden" name="email" value="{{ session('unverified_email') ?? old('email') }}">
                                     <button type="submit" class="text-sm text-primary hover:underline font-medium">
                                         <i class="fas fa-paper-plane mr-1"></i> Resend verification email
                                     </button>

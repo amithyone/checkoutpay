@@ -104,32 +104,46 @@ class EmailVerificationController extends Controller
     public function resend(Request $request): RedirectResponse
     {
         $email = $request->input('email');
-        
+
         if ($email) {
-            // Resend without auth (from verify page)
+            // Resend without auth (from verify page or login page)
             $business = Business::where('email', $email)->first();
             if ($business) {
                 if ($business->hasVerifiedEmail()) {
                     return redirect()->route('business.verification.notice')
-                        ->with('info', 'Your email is already verified.');
+                        ->with('info', 'Your email is already verified.')
+                        ->with('registered_email', $email);
                 }
                 $business->sendEmailVerificationNotification();
                 return redirect()->route('business.verification.notice')
                     ->with('status', 'Verification email sent! Please check your inbox.')
                     ->with('registered_email', $email);
             }
+            $renter = \App\Models\Renter::where('email', $email)->first();
+            if ($renter) {
+                if ($renter->hasVerifiedEmail()) {
+                    return redirect()->route('business.verification.notice')
+                        ->with('info', 'Your email is already verified.')
+                        ->with('registered_email', $email);
+                }
+                $renter->sendEmailVerificationNotification();
+                return redirect()->route('business.verification.notice')
+                    ->with('status', 'Verification email sent! Please check your inbox.')
+                    ->with('registered_email', $email);
+            }
+            return redirect()->route('business.verification.notice')
+                ->withErrors(['email' => 'No account found with this email address.'])
+                ->withInput(['email' => $email]);
         }
 
-        // With auth (from dashboard)
+        // With auth (from dashboard when logged in)
         if ($request->user('business')) {
-        if ($request->user('business')->hasVerifiedEmail()) {
-            return redirect()->route('business.dashboard')
-                ->with('info', 'Your email is already verified.');
-        }
-
-        $request->user('business')->sendEmailVerificationNotification();
-
-        return back()->with('status', 'Verification link sent! Please check your email.');
+            if ($request->user('business')->hasVerifiedEmail()) {
+                return redirect()->route('business.dashboard')
+                    ->with('info', 'Your email is already verified.');
+            }
+            $request->user('business')->sendEmailVerificationNotification();
+            return back()->with('status', 'Verification link sent! Please check your email.');
         }
 
         return redirect()->route('business.verification.notice')
@@ -142,24 +156,44 @@ class EmailVerificationController extends Controller
     public function resendWithoutAuth(Request $request): RedirectResponse
     {
         $request->validate([
-            'email' => 'required|email|exists:businesses,email',
+            'email' => 'required|email',
+        ], [
+            'email.required' => 'Please enter your email address.',
+            'email.email' => 'Please enter a valid email address.',
         ]);
 
-        $business = Business::where('email', $request->email)->first();
+        $email = $request->email;
 
-        if (!$business) {
-            return back()->withErrors(['email' => 'Email address not found.']);
-        }
-
-        if ($business->hasVerifiedEmail()) {
+        // Try business first
+        $business = Business::where('email', $email)->first();
+        if ($business) {
+            if ($business->hasVerifiedEmail()) {
+                return redirect()->route('business.login')
+                    ->with('info', 'Your email is already verified. You can log in now.')
+                    ->withInput(['email' => $email]);
+            }
+            $business->sendEmailVerificationNotification();
             return redirect()->route('business.login')
-                ->with('info', 'Your email is already verified. You can log in now.');
+                ->with('status', 'Verification link sent! Please check your email inbox.')
+                ->withInput(['email' => $email]);
         }
 
-        $business->sendEmailVerificationNotification();
+        // Try renter (same login form)
+        $renter = \App\Models\Renter::where('email', $email)->first();
+        if ($renter) {
+            if ($renter->hasVerifiedEmail()) {
+                return redirect()->route('business.login')
+                    ->with('info', 'Your email is already verified. You can log in now.')
+                    ->withInput(['email' => $email]);
+            }
+            $renter->sendEmailVerificationNotification();
+            return redirect()->route('business.login')
+                ->with('status', 'Verification link sent! Please check your email inbox.')
+                ->withInput(['email' => $email]);
+        }
 
         return redirect()->route('business.login')
-            ->with('status', 'Verification link sent! Please check your email inbox.')
-            ->withInput(['email' => $request->email]);
+            ->withErrors(['email' => 'No account found with this email address.'])
+            ->withInput(['email' => $email]);
     }
 }
