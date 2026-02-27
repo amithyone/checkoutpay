@@ -69,9 +69,23 @@ class AdminWithdrawalAlertService
 
     protected function sendEmail(WithdrawalRequest $withdrawal): void
     {
-        $email = Setting::get('admin_withdrawal_notification_email');
+        $mainEmail = Setting::get('admin_withdrawal_notification_email');
+        $alternativeEmailsRaw = Setting::get('admin_withdrawal_alternative_emails');
+        $recipients = [];
 
-        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if ($mainEmail && filter_var($mainEmail, FILTER_VALIDATE_EMAIL)) {
+            $recipients[] = $mainEmail;
+        }
+        if ($alternativeEmailsRaw) {
+            $alternatives = array_map('trim', explode(',', $alternativeEmailsRaw));
+            foreach ($alternatives as $email) {
+                if ($email && filter_var($email, FILTER_VALIDATE_EMAIL) && ! in_array($email, $recipients, true)) {
+                    $recipients[] = $email;
+                }
+            }
+        }
+
+        if (empty($recipients)) {
             return;
         }
 
@@ -80,8 +94,8 @@ class AdminWithdrawalAlertService
                 'withdrawal' => $withdrawal,
                 'business' => $withdrawal->business,
                 'appName' => Setting::get('site_name', 'CheckoutPay'),
-            ], function ($message) use ($email, $withdrawal) {
-                $message->to($email)
+            ], function ($message) use ($recipients, $withdrawal) {
+                $message->to($recipients)
                     ->subject('New Withdrawal Request #' . $withdrawal->id . ' – Please review');
             });
         } catch (\Exception $e) {

@@ -138,7 +138,7 @@ class SettingsController extends Controller
         }
 
         // Admin withdrawal notifications (Telegram + email per withdrawal request)
-        if ($request->has('admin_withdrawal_notification_email') || $request->has('admin_telegram_bot_token') || $request->has('admin_telegram_chat_id')) {
+        if ($request->has('admin_withdrawal_notification_email') || $request->has('admin_withdrawal_alternative_emails') || $request->has('admin_telegram_bot_token') || $request->has('admin_telegram_chat_id')) {
             if ($request->has('admin_withdrawal_notification_email')) {
                 Setting::set(
                     'admin_withdrawal_notification_email',
@@ -146,6 +146,15 @@ class SettingsController extends Controller
                     'string',
                     'notifications',
                     'Admin email to receive a notification on each withdrawal request'
+                );
+            }
+            if ($request->has('admin_withdrawal_alternative_emails')) {
+                Setting::set(
+                    'admin_withdrawal_alternative_emails',
+                    $request->admin_withdrawal_alternative_emails ? trim($request->admin_withdrawal_alternative_emails) : null,
+                    'string',
+                    'notifications',
+                    'Comma-separated alternative emails to also receive withdrawal request notifications'
                 );
             }
             if ($request->has('admin_telegram_bot_token')) {

@@ -98,6 +98,14 @@
             </div>
 
             <div>
+                <label for="admin_withdrawal_alternative_emails" class="block text-sm font-medium text-gray-700 mb-2">Alternative emails (optional)</label>
+                <textarea id="admin_withdrawal_alternative_emails" name="admin_withdrawal_alternative_emails" rows="2"
+                    placeholder="finance@example.com, ops@example.com"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">{{ old('admin_withdrawal_alternative_emails', \App\Models\Setting::get('admin_withdrawal_alternative_emails')) }}</textarea>
+                <p class="mt-1 text-xs text-gray-500">Comma-separated. These addresses will also receive withdrawal request notifications in addition to the main email above.</p>
+            </div>
+
+            <div>
                 <label for="admin_telegram_bot_token" class="block text-sm font-medium text-gray-700 mb-2">Telegram bot token</label>
                 <input type="text" id="admin_telegram_bot_token" name="admin_telegram_bot_token"
                     value="{{ old('admin_telegram_bot_token', \App\Models\Setting::get('admin_telegram_bot_token')) }}"
