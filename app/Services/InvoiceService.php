@@ -203,7 +203,70 @@ class InvoiceService
     }
 
     /**
-     * Mark invoice as paid and send notifications
+     * Mark invoice as paid manually (business received money outside the system).
+     * Does NOT add to business balance. Supports partial payments.
+     */
+    public function markAsPaidManually(Invoice $invoice, float $amountPaid, ?string $notes = null): bool
+    {
+        try {
+            $invoice->load(['business', 'items']);
+
+            $currentPaid = (float) ($invoice->paid_amount ?? 0);
+            $newPaid = $currentPaid + $amountPaid;
+            $totalAmount = (float) $invoice->total_amount;
+
+            $updateData = [
+                'paid_amount' => min($newPaid, $totalAmount),
+            ];
+
+            if ($notes) {
+                $existingNotes = $invoice->paid_confirmation_notes ?? '';
+                $updateData['paid_confirmation_notes'] = trim($existingNotes . "\n" . now()->format('Y-m-d H:i') . ': ' . $notes);
+            }
+
+            if ($newPaid >= $totalAmount) {
+                $updateData['status'] = 'paid';
+                $updateData['paid_at'] = now();
+                if (!$invoice->payment_id) {
+                    $updateData['payment_id'] = null;
+                }
+            }
+
+            $invoice->update($updateData);
+
+            $remainingAfter = max(0, $totalAmount - $newPaid);
+            $nextAmount = null;
+            if ($remainingAfter >= 0.01 && $invoice->allow_split_payment && !empty($invoice->split_percentages)) {
+                $suggested = $invoice->getSuggestedSplitAmounts();
+                foreach ($suggested as $s) {
+                    $a = (float) $s['amount'];
+                    if ($a >= 0.01 && $a <= $remainingAfter) {
+                        $nextAmount = round($a, 2);
+                        break;
+                    }
+                }
+            }
+
+            // Send receipt to both client and business (partial or full)
+            $this->sendManualPaymentReceipt($invoice, $amountPaid, $remainingAfter, $nextAmount);
+
+            if ($newPaid >= $totalAmount) {
+                $this->sendPaymentConfirmation($invoice);
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to mark invoice as paid manually', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Mark invoice as paid and send notifications (used when payment is approved via email matching).
+     * Adds to business balance.
      */
     public function markAsPaid(Invoice $invoice, $paymentId = null, $paidAmount = null): bool
     {
@@ -246,12 +309,60 @@ class InvoiceService
                 $invoice->business->increment('balance', $paidAmount);
             }
 
-            // Send payment confirmation emails
+            // Send payment receipt to both client and business (for single payment)
+            $payment = $paymentId ? \App\Models\Payment::find($paymentId) : null;
+            if ($payment) {
+                $this->sendPaymentReceipt($invoice, $payment, (float) $paidAmount, 0, null);
+            }
+
+            // Send payment confirmation emails (Invoice paid)
             $this->sendPaymentConfirmation($invoice);
 
             return true;
         } catch (\Exception $e) {
             Log::error('Failed to mark invoice as paid', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Send payment receipt for manual payment (no Payment record). Sends to both client and business.
+     */
+    public function sendManualPaymentReceipt(
+        Invoice $invoice,
+        float $amount,
+        float $remaining = 0,
+        ?float $nextPaymentAmount = null
+    ): bool {
+        try {
+            $invoice->load(['business']);
+
+            Mail::to($invoice->client_email)->send(new InvoicePaymentReceipt(
+                $invoice,
+                null,
+                $amount,
+                false,
+                $remaining,
+                $nextPaymentAmount
+            ));
+
+            if ($invoice->business->email && $invoice->business->shouldReceivePaymentNotifications()) {
+                Mail::to($invoice->business->email)->send(new InvoicePaymentReceipt(
+                    $invoice,
+                    null,
+                    $amount,
+                    true,
+                    $remaining,
+                    $nextPaymentAmount
+                ));
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to send manual payment receipt emails', [
                 'invoice_id' => $invoice->id,
                 'error' => $e->getMessage(),
             ]);

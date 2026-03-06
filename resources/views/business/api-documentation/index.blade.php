@@ -126,6 +126,27 @@ X-API-Key: {{ $business->api_key }}</code></pre>
                 </div>
             </div>
 
+            <!-- Correct transaction amount (wrong amount sent) -->
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-3">2a. Correct transaction amount (optional)</h4>
+                <p class="text-sm text-gray-600 mb-2">If your site sent the wrong amount and the customer paid a different sum, you can update the pending payment to the actual amount. This triggers an immediate re-match so the system can find the bank alert with that amount and approve the payment.</p>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>PATCH {{ url('/api/v1/payment/{transactionId}/amount') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{
+  "new_amount": 7500.00
+}</code></pre>
+                </div>
+                <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p class="text-xs text-amber-800">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Only <strong>pending</strong>, non-expired payments can be updated. Then use <strong>GET /payment/{transactionId}</strong> to check status or wait for the webhook.
+                    </p>
+                </div>
+            </div>
+
             <!-- Webhook Notifications -->
             <div>
                 <h4 class="text-base font-semibold text-gray-900 mb-3">3. Receive Webhook Notifications</h4>
@@ -135,14 +156,22 @@ Content-Type: application/json
 
 {
   "event": "payment.approved",
-  "transaction_id": "txn_123456",
+  "transaction_id": "TXN-1234567890",
   "status": "approved",
   "amount": 5000.00,
   "received_amount": 5000.00,
   "payer_name": "John Doe",
-  "timestamp": "2024-01-15T10:30:00Z"
+  "bank": "GTBank",
+  "payer_account_number": "0123456789",
+  "account_number": "0987654321",
+  "is_mismatch": false,
+  "mismatch_reason": null,
+  "charges": { "percentage": 50, "fixed": 50, "total": 100, "business_receives": 4900 },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "email_data": {}
 }</code></pre>
                 </div>
+                <p class="text-xs text-gray-600 mt-2">Use <code>transaction_id</code> to identify the payment; use <code>received_amount</code> and <code>charges.business_receives</code> for reconciliation. Response structure is stable.</p>
                 <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p class="text-xs text-green-800">
                         <i class="fas fa-check-circle mr-1"></i>

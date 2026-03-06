@@ -3,7 +3,7 @@ Contributors: checkoutpay
 Tags: woocommerce, payment, payment-gateway, checkoutpay
 Requires at least: 5.0
 Tested up to: 6.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -50,6 +50,14 @@ Yes, enable test mode in the plugin settings to use test API credentials.
 
 == Changelog ==
 
+= 1.0.1 =
+* Fixed: Check payment status now uses transaction_id and GET /api/v1/payment/{transactionId} (was incorrectly using payment_id and /payments/).
+* Fixed: Webhook handler now accepts API payload (event, transaction_id, status) and no longer requires deprecated "reference" field.
+* Fixed: Account name and bank name taken from API response (account_name, bank_name) with fallback to account_details.
+* New: "Paid a different amount?" on the thank-you page: customer can enter the actual amount paid and click "Update amount & check status" to call the amount-correction API and re-check (so wrong-amount payments can still be matched).
+* Improved: Webhook stores received_amount and uses mismatch_reason when payment is rejected.
+* Docs: README updated with current API endpoints and webhook payload structure.
+
 = 1.0.0 =
 * Initial release
 * WooCommerce integration
@@ -58,6 +66,9 @@ Yes, enable test mode in the plugin settings to use test API credentials.
 * Payment status checking
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+Fixes payment status check and webhook handling to match current CheckoutPay API. Upgrade if you use the "Check Payment Status" button or webhooks.
 
 = 1.0.0 =
 Initial release of CheckoutPay Payment Gateway for WooCommerce.

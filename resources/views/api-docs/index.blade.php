@@ -49,6 +49,7 @@
         }
         .badge-get { background: #10b981; color: white; }
         .badge-post { background: #3b82f6; color: white; }
+        .badge-patch { background: #f59e0b; color: white; }
         .badge-put { background: #f59e0b; color: white; }
         .badge-delete { background: #ef4444; color: white; }
     </style>
@@ -83,6 +84,7 @@
                             <a href="#authentication" class="block text-sm text-gray-700 hover:text-primary py-2">Authentication</a>
                             <a href="#endpoints" class="block text-sm text-gray-700 hover:text-primary py-2">API Endpoints</a>
                             <a href="#payments" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Payments</a>
+                            <a href="#update-amount" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Update payment amount</a>
                             <a href="#webhooks" class="block text-sm text-gray-700 hover:text-primary py-2">Webhooks</a>
                             <a href="#code-examples" class="block text-sm text-gray-700 hover:text-primary py-2">Code Examples</a>
                             <a href="#error-handling" class="block text-sm text-gray-700 hover:text-primary py-2">Error Handling</a>
@@ -288,13 +290,61 @@
                                 </div>
                             </div>
 
+                            <!-- Update payment amount (correct wrong amount) -->
+                            <div id="update-amount" class="mb-6 border-l-4 border-amber-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-patch">PATCH</span>
+                                    <code class="text-lg font-mono text-gray-900">/payment/{transactionId}/amount</code>
+                                </div>
+                                <p class="text-gray-700 mb-4">Correct the expected amount for a <strong>pending</strong> payment. Use this when your site sent the wrong amount (e.g. customer paid a different sum). The system updates the transaction amount, recalculates charges, and immediately re-runs email matching so any bank alert with the actual amount paid can be matched and the payment approved.</p>
+                                <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <p class="text-sm text-amber-800"><strong>When to use:</strong> Only pending, non-expired payments can be updated.</p>
+                                    <p class="text-sm text-amber-800 mt-1"><strong>Recommended flow:</strong> Call <code class="bg-amber-100 px-1 rounded">PATCH /payment/{transactionId}/amount</code> with the correct amount, then poll <code class="bg-amber-100 px-1 rounded">GET /payment/{transactionId}</code> until status changes, or rely on your webhook for final confirmation. The webhook sent when a payment is approved is <strong>unchanged</strong> (same <code>payment.approved</code> payload) when the payment was matched after an amount correction.</p>
+                                </div>
+                                <div class="mb-4">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Request Body</h4>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "new_amount": 7500.00
+}</code></pre>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Response (200 OK)</h4>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "success": true,
+  "message": "Transaction amount successfully updated. Recalculated charges and matching initiated.",
+  "data": {
+    "transaction_id": "TXN-1234567890",
+    "amount": 7500.00,
+    "payer_name": "John Doe",
+    "bank": "GTBank",
+    "account_number": "0123456789",
+    "account_name": "Your Business Name",
+    "bank_name": "GTBank",
+    "status": "pending",
+    "webhook_url": "https://yourwebsite.com/webhook/payment-status",
+    "expires_at": "2024-01-15T12:00:00Z",
+    "matched_at": null,
+    "approved_at": null,
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-01-15T10:15:00Z",
+    "charges": { "percentage": 50.00, "fixed": 50.00, "total": 100.00, "paid_by_customer": false, "business_receives": 7400.00 },
+    "website": { "id": 1, "url": "https://yourwebsite.com" }
+  }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Get Payment -->
                             <div class="mb-6 border-l-4 border-green-500 pl-4">
                                 <div class="flex items-center gap-3 mb-2">
                                     <span class="endpoint-badge badge-get">GET</span>
                                     <code class="text-lg font-mono text-gray-900">/payment/{transactionId}</code>
                                 </div>
-                                <p class="text-gray-700 mb-4">Retrieve payment details by transaction ID.</p>
+                                <p class="text-gray-700 mb-4">Retrieve payment details by transaction ID. Use this to poll for status after creating a payment or after correcting the amount with PATCH. Response structure is stable; new fields may be added.</p>
 
                                 <div class="mb-4">
                                     <h4 class="font-semibold text-gray-900 mb-2">Response (200 OK)</h4>
@@ -420,7 +470,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
 
                             <div>
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3">Webhook Payload</h3>
-                                <p class="text-gray-700 mb-4">When a payment is approved, you'll receive a POST request to your webhook URL with the following payload:</p>
+                                <p class="text-gray-700 mb-4">When a payment is approved, you'll receive a POST request to your webhook URL with the following payload (structure is stable; new fields may be added in the future). This includes payments that were matched after an amount correction via <code>PATCH /payment/{transactionId}/amount</code>—the webhook payload is unchanged.</p>
                                 <div class="code-block">
                                     <pre><code>{
   "event": "payment.approved",
@@ -432,36 +482,19 @@ X-API-Key: pk_your_api_key_here</code></pre>
   "bank": "GTBank",
   "payer_account_number": "0123456789",
   "account_number": "0987654321",
-  "account_details": {
-    "account_name": "Your Business Name",
-    "bank_name": "GTBank"
-  },
   "is_mismatch": false,
   "mismatch_reason": null,
-  "name_mismatch": false,
-  "name_similarity_percent": 100,
-  "matched_at": "2024-01-15T10:30:00Z",
-  "approved_at": "2024-01-15T10:35:00Z",
-  "created_at": "2024-01-15T10:00:00Z",
-  "timestamp": "2024-01-15T10:35:00Z",
-  "website": {
-    "id": 1,
-    "url": "https://yourwebsite.com"
-  },
   "charges": {
     "percentage": 50.00,
     "fixed": 50.00,
     "total": 100.00,
-    "paid_by_customer": false,
     "business_receives": 4900.00
   },
-  "email": {
-    "subject": "Credit Alert",
-    "from": "noreply@gtbank.com",
-    "date": "2024-01-15T10:30:00Z"
-  }
+  "timestamp": "2024-01-15T10:35:00Z",
+  "email_data": {}
 }</code></pre>
                                 </div>
+                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>email_data</code> (optional raw email info).</p>
                             </div>
 
                             <div>

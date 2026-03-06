@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -187,5 +188,68 @@ class SettingsController extends Controller
 
         return redirect()->route('business.settings.index')
             ->with('success', 'Two-factor authentication disabled successfully');
+    }
+
+    /**
+     * Send a test webhook to the given URL so the user can verify it's working.
+     */
+    public function testWebhook(Request $request)
+    {
+        $validated = $request->validate([
+            'webhook_url' => 'required|url|max:500',
+        ]);
+        $webhookUrl = $validated['webhook_url'];
+
+        $payload = $this->buildTestWebhookPayload();
+
+        try {
+            $response = Http::timeout(10)->post($webhookUrl, $payload);
+
+            if ($response->successful()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Webhook delivered successfully. Your endpoint responded with HTTP ' . $response->status() . '.',
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Webhook URL responded with HTTP ' . $response->status() . '. ' . ($response->body() ? 'Response: ' . Str::limit($response->body(), 200) : ''),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not reach webhook URL: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Build a sample payload matching the real payment.approved webhook shape (with test flag).
+     */
+    protected function buildTestWebhookPayload(): array
+    {
+        return [
+            'event' => 'payment.approved',
+            'test' => true,
+            'transaction_id' => 'test_txn_' . Str::random(12),
+            'status' => 'approved',
+            'amount' => 100.00,
+            'received_amount' => 100.00,
+            'payer_name' => 'Test Payer',
+            'bank' => 'Test Bank',
+            'payer_account_number' => null,
+            'account_number' => null,
+            'is_mismatch' => false,
+            'mismatch_reason' => null,
+            'charges' => [
+                'percentage' => 1,
+                'fixed' => 0,
+                'total' => 1,
+                'business_receives' => 99,
+            ],
+            'timestamp' => now()->toISOString(),
+            'email_data' => [],
+        ];
     }
 }

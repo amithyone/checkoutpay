@@ -52,7 +52,7 @@
                 </div>
                 <div class="info-box">
                     <div class="label">Payment Date</div>
-                    <div class="value">{{ ($payment->matched_at ?? $payment->updated_at)?->format('F d, Y \a\t g:i A') ?? now()->format('F d, Y \a\t g:i A') }}</div>
+                    <div class="value">{{ $payment ? (($payment->matched_at ?? $payment->updated_at)?->format('F d, Y \a\t g:i A') ?? now()->format('F d, Y \a\t g:i A')) : now()->format('F d, Y \a\t g:i A') }}</div>
                 </div>
                 @if($invoice->due_date)
                 <div class="info-box">
@@ -62,7 +62,7 @@
                 @endif
                 <div class="info-box">
                     <div class="label">Transaction Reference</div>
-                    <div class="value">{{ $payment->transaction_id }}</div>
+                    <div class="value">{{ $payment ? $payment->transaction_id : 'Manual payment' }}</div>
                 </div>
                 @if($remaining > 0)
                 <div class="next-box">

@@ -235,7 +235,7 @@ class InvoiceController extends Controller
             abort(403, 'You do not have permission to view this invoice.');
         }
 
-        $invoice->load(['business', 'items', 'payment']);
+        $invoice->load(['business', 'items', 'payment', 'invoicePayments.payment']);
 
         return view('business.invoices.show', compact('invoice'));
     }
@@ -404,9 +404,10 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Mark invoice as paid (client paid business directly). Sends receipt to both parties.
+     * Mark invoice as paid manually (business received money outside the system).
+     * Does NOT add to business balance. Supports partial payments.
      */
-    public function markPaid(Invoice $invoice): RedirectResponse
+    public function markPaid(Request $request, Invoice $invoice): RedirectResponse
     {
         $this->authorizeInvoiceForBusiness($invoice, 'mark as paid');
 
@@ -420,14 +421,36 @@ class InvoiceController extends Controller
                 ->with('error', 'Only sent, viewed, or overdue invoices can be marked as paid.');
         }
 
-        $ok = $this->invoiceService->markAsPaid($invoice, null, (float) $invoice->total_amount);
+        $validated = $request->validate([
+            'amount_paid' => 'required|numeric|min:0.01',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $currentPaid = (float) ($invoice->paid_amount ?? 0);
+        $remaining = max(0, (float) $invoice->total_amount - $currentPaid);
+        $amountPaid = (float) $validated['amount_paid'];
+
+        if ($amountPaid > $remaining) {
+            return redirect()->route('business.invoices.show', $invoice)
+                ->with('error', 'Amount cannot exceed remaining balance (' . $invoice->currency . ' ' . number_format($remaining, 2) . ').');
+        }
+
+        $ok = $this->invoiceService->markAsPaidManually(
+            $invoice,
+            $amountPaid,
+            $validated['notes'] ?? null
+        );
 
         if (! $ok) {
             return redirect()->route('business.invoices.show', $invoice)
                 ->with('error', 'Failed to mark invoice as paid. Please try again.');
         }
 
+        $message = $amountPaid >= $remaining
+            ? 'Invoice marked as paid. Receipt sent to both parties. (Manual approval – balance not credited.)'
+            : 'Payment of ' . $invoice->currency . ' ' . number_format($amountPaid, 2) . ' recorded. Remaining: ' . $invoice->currency . ' ' . number_format(max(0, (float) $invoice->total_amount - ($currentPaid + $amountPaid)), 2) . '.';
+
         return redirect()->route('business.invoices.show', $invoice)
-            ->with('success', 'Invoice marked as paid. Receipt sent to both parties.');
+            ->with('success', $message);
     }
 }

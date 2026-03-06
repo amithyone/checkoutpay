@@ -17,15 +17,17 @@ class AccountNumberController extends Controller
     {
         $query = AccountNumber::with('business');
 
-        // Filter by type
+        // Filter by type (an account can be in multiple pools)
         if ($request->type === 'pool') {
-            $query->where('is_pool', true)->where('is_invoice_pool', false)->where('is_membership_pool', false);
+            $query->where('is_pool', true);
         } elseif ($request->type === 'invoice_pool') {
             $query->where('is_invoice_pool', true);
         } elseif ($request->type === 'membership_pool') {
             $query->where('is_membership_pool', true);
+        } elseif ($request->type === 'tickets_pool') {
+            $query->where('is_tickets_pool', true);
         } elseif ($request->type === 'business') {
-            $query->where('is_pool', false)->where('is_invoice_pool', false)->where('is_membership_pool', false);
+            $query->where('is_pool', false)->where('is_invoice_pool', false)->where('is_membership_pool', false)->where('is_tickets_pool', false);
         }
 
         // Filter by status
@@ -84,41 +86,26 @@ class AccountNumberController extends Controller
             'account_name' => 'required|string|max:255',
             'bank_name' => 'required|string|max:255',
             'bank_code' => 'nullable|string|max:10',
-            'account_type' => 'required|in:regular_pool,invoice_pool,membership_pool,business',
             'business_id' => 'nullable|exists:businesses,id',
             'is_active' => 'boolean',
         ]);
 
-        // Handle account type from radio button
-        $accountType = $validated['account_type'];
-        if ($accountType === 'invoice_pool') {
-            $validated['is_invoice_pool'] = true;
-            $validated['is_membership_pool'] = false;
-            $validated['is_pool'] = false;
-            $validated['business_id'] = null;
-        } elseif ($accountType === 'membership_pool') {
-            $validated['is_membership_pool'] = true;
-            $validated['is_invoice_pool'] = false;
-            $validated['is_pool'] = false;
-            $validated['business_id'] = null;
-        } elseif ($accountType === 'regular_pool') {
-            $validated['is_invoice_pool'] = false;
-            $validated['is_membership_pool'] = false;
-            $validated['is_pool'] = true;
+        // Pool flags from checkboxes (multiple can be checked)
+        $validated['is_pool'] = $request->boolean('is_pool');
+        $validated['is_invoice_pool'] = $request->boolean('is_invoice_pool');
+        $validated['is_membership_pool'] = $request->boolean('is_membership_pool');
+        $validated['is_tickets_pool'] = $request->boolean('is_tickets_pool');
+
+        if ($validated['is_pool'] || $validated['is_invoice_pool'] || $validated['is_membership_pool'] || $validated['is_tickets_pool']) {
             $validated['business_id'] = null;
         } else {
-            // Business-specific
-            $validated['is_invoice_pool'] = false;
-            $validated['is_membership_pool'] = false;
-            $validated['is_pool'] = false;
-            // business_id is required for business-specific accounts
             if (empty($validated['business_id'])) {
-                return back()->withInput()->with('error', 'Business is required for business-specific accounts.');
+                return back()->withInput()->with('error', 'Select at least one pool (Pool, Invoice, Membership, or Tickets) or assign to a Business.');
             }
         }
 
-        // Remove bank_code and account_type (not stored in DB)
-        unset($validated['bank_code'], $validated['account_type']);
+        // Remove bank_code (not stored in DB)
+        unset($validated['bank_code']);
 
         // Handle is_active checkbox
         $validated['is_active'] = $request->has('is_active') ? (bool)$request->input('is_active') : true;
@@ -158,8 +145,8 @@ class AccountNumberController extends Controller
             'business_id' => 'nullable|exists:businesses,id',
         ]);
 
-        // Set business_id to null for pool accounts (regular, invoice, or membership)
-        if ($accountNumber->is_pool || $accountNumber->is_invoice_pool || $accountNumber->is_membership_pool) {
+        // Set business_id to null for any pool account
+        if ($accountNumber->is_pool || $accountNumber->is_invoice_pool || $accountNumber->is_membership_pool || ($accountNumber->is_tickets_pool ?? false)) {
             $validated['business_id'] = null;
         }
 
@@ -167,9 +154,18 @@ class AccountNumberController extends Controller
         unset($validated['bank_code']);
 
         // Handle is_active checkbox - checkboxes only send value when checked
-        // If checkbox is checked, it sends 'is_active' = '1' (string)
-        // If checkbox is unchecked, it doesn't send anything, so we default to false
         $validated['is_active'] = $request->has('is_active') && ($request->input('is_active') == '1' || $request->input('is_active') === true || $request->input('is_active') === 'true');
+
+        // Pool / Invoice / Membership / Tickets flags (checkboxes; multiple can be checked)
+        $validated['is_pool'] = $request->has('is_pool') && ($request->input('is_pool') == '1' || $request->input('is_pool') === true);
+        $validated['is_invoice_pool'] = $request->has('is_invoice_pool') && ($request->input('is_invoice_pool') == '1' || $request->input('is_invoice_pool') === true);
+        $validated['is_membership_pool'] = $request->has('is_membership_pool') && ($request->input('is_membership_pool') == '1' || $request->input('is_membership_pool') === true);
+        $validated['is_tickets_pool'] = $request->has('is_tickets_pool') && ($request->input('is_tickets_pool') == '1' || $request->input('is_tickets_pool') === true);
+
+        // If any pool is checked, clear business_id
+        if ($validated['is_pool'] || $validated['is_invoice_pool'] || $validated['is_membership_pool'] || $validated['is_tickets_pool']) {
+            $validated['business_id'] = null;
+        }
 
         try {
             $accountNumber->update($validated);
@@ -188,6 +184,32 @@ class AccountNumberController extends Controller
             ]);
             return back()->withInput()->with('error', 'Failed to update account number: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Update only pool flags and active status (for inline edit on index)
+     */
+    public function updateFlags(Request $request, AccountNumber $accountNumber)
+    {
+        $accountNumber->update([
+            'is_pool' => $request->boolean('is_pool'),
+            'is_invoice_pool' => $request->boolean('is_invoice_pool'),
+            'is_membership_pool' => $request->boolean('is_membership_pool'),
+            'is_tickets_pool' => $request->boolean('is_tickets_pool'),
+            'is_active' => $request->boolean('is_active'),
+        ]);
+
+        // If any pool is checked, clear business_id
+        if ($accountNumber->is_pool || $accountNumber->is_invoice_pool || $accountNumber->is_membership_pool || $accountNumber->is_tickets_pool) {
+            $accountNumber->update(['business_id' => null]);
+        }
+
+        app(\App\Services\AccountNumberService::class)->invalidateAllCaches();
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
+        return back()->with('success', 'Account flags updated.');
     }
 
     /**

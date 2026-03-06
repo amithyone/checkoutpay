@@ -2,14 +2,6 @@
 
 namespace App\Providers;
 
-use App\Events\PaymentApproved;
-use App\Events\PaymentExpired;
-use App\Listeners\CreateMembershipSubscriptionOnPaymentApproved;
-use App\Listeners\MarkInvoicePaidOnPaymentApproved;
-use App\Listeners\MarkRentalPaidOnPaymentApproved;
-use App\Listeners\ProcessTicketOrderOnPayment;
-use App\Listeners\SendExpiredPaymentWebhook;
-use App\Listeners\SendPaymentWebhook;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -19,18 +11,7 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<class-string, array<int, class-string>>
      */
-    protected $listen = [
-        PaymentApproved::class => [
-            CreateMembershipSubscriptionOnPaymentApproved::class,
-            MarkInvoicePaidOnPaymentApproved::class,
-            MarkRentalPaidOnPaymentApproved::class,
-            ProcessTicketOrderOnPayment::class,
-            SendPaymentWebhook::class,
-        ],
-        PaymentExpired::class => [
-            SendExpiredPaymentWebhook::class,
-        ],
-    ];
+    protected $listen = [];
 
     /**
      * Register any events for your application.
@@ -38,5 +19,13 @@ class EventServiceProvider extends ServiceProvider
     public function boot(): void
     {
         //
+    }
+
+    /**
+     * Determine if events and listeners should be automatically discovered.
+     */
+    public function shouldDiscoverEvents(): bool
+    {
+        return false;
     }
 }

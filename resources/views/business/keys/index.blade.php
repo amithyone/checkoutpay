@@ -130,6 +130,19 @@ X-API-Key: {{ $business->api_key }}</code></pre>
                 </div>
             </div>
 
+            <!-- Correct payment amount -->
+            <div>
+                <h4 class="text-sm font-semibold text-gray-900 mb-2">Correct payment amount</h4>
+                <p class="text-xs text-gray-600 mb-2">If the wrong amount was sent, update a pending payment to the actual amount paid; matching is re-run automatically.</p>
+                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 overflow-x-auto">
+                    <pre class="text-xs text-gray-800"><code>PATCH {{ url('/api/v1/payment/{transaction_id}/amount') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{ "new_amount": 7500.00 }</code></pre>
+                </div>
+            </div>
+
             <!-- Webhook Configuration -->
             <div>
                 <h4 class="text-sm font-semibold text-gray-900 mb-2">Webhook Configuration</h4>

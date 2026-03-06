@@ -24,10 +24,16 @@
                 </div>
                 <div>
                     <label for="webhook_url" class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Webhook URL (Optional)</label>
-                    <input type="url" name="webhook_url" id="webhook_url" 
-                        value="{{ old('webhook_url') }}"
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="https://yourwebsite.com/webhook">
+                    <div class="flex gap-2">
+                        <input type="url" name="webhook_url" id="webhook_url" 
+                            value="{{ old('webhook_url') }}"
+                            class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                            placeholder="https://yourwebsite.com/webhook">
+                        <button type="button" class="test-webhook-btn px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 whitespace-nowrap" data-input-id="webhook_url" title="Send a test request to verify the URL">
+                            <i class="fas fa-paper-plane mr-1"></i> Test
+                        </button>
+                    </div>
+                    <p id="webhook_test_result" class="mt-1 text-xs hidden" aria-live="polite"></p>
                     @error('webhook_url')
                         <p class="mt-1 text-xs sm:text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -99,10 +105,16 @@
                                         @method('PUT')
                                         <div class="flex-1 min-w-0">
                                             <label for="webhook_url_{{ $website->id }}" class="block text-xs font-medium text-gray-700 mb-1">Webhook URL</label>
-                                            <input type="url" name="webhook_url" id="webhook_url_{{ $website->id }}" 
-                                                value="{{ old('webhook_url', $website->webhook_url) }}"
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                                                placeholder="https://yourwebsite.com/webhook">
+                                            <div class="flex gap-2">
+                                                <input type="url" name="webhook_url" id="webhook_url_{{ $website->id }}" 
+                                                    value="{{ old('webhook_url', $website->webhook_url) }}"
+                                                    class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                                                    placeholder="https://yourwebsite.com/webhook">
+                                                <button type="button" class="test-webhook-btn px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 whitespace-nowrap" data-input-id="webhook_url_{{ $website->id }}" title="Send a test request to verify the URL">
+                                                    <i class="fas fa-paper-plane mr-1"></i> Test
+                                                </button>
+                                            </div>
+                                            <p class="webhook_test_result mt-1 text-xs hidden" aria-live="polite" data-for="webhook_url_{{ $website->id }}"></p>
                                             @error('webhook_url')
                                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                             @enderror
@@ -137,4 +149,59 @@
         </p>
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.querySelectorAll('.test-webhook-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var inputId = this.getAttribute('data-input-id');
+        var input = document.getElementById(inputId);
+        var url = input && input.value ? input.value.trim() : '';
+        if (!url) {
+            alert('Please enter a webhook URL first.');
+            return;
+        }
+        var resultEl = document.getElementById('webhook_test_result') || document.querySelector('.webhook_test_result[data-for="' + inputId + '"]');
+        if (resultEl) {
+            resultEl.textContent = 'Sending test…';
+            resultEl.classList.remove('hidden', 'text-green-600', 'text-red-600');
+            resultEl.classList.add('text-gray-600');
+        }
+        this.disabled = true;
+        fetch('{{ route("business.webhook.test") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ webhook_url: url })
+        })
+        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+        .then(function(_ref) {
+            var ok = _ref.ok, data = _ref.data;
+            if (resultEl) {
+                resultEl.classList.remove('text-gray-600');
+                resultEl.classList.add(ok ? 'text-green-600' : 'text-red-600');
+                resultEl.textContent = data.message || (ok ? 'Webhook delivered successfully.' : 'Request failed.');
+                resultEl.classList.remove('hidden');
+            } else {
+                alert(ok ? (data.message || 'Webhook delivered successfully.') : (data.message || 'Request failed.'));
+            }
+        })
+        .catch(function(err) {
+            if (resultEl) {
+                resultEl.classList.remove('text-gray-600');
+                resultEl.classList.add('text-red-600');
+                resultEl.textContent = 'Request failed: ' + (err.message || 'Network error');
+                resultEl.classList.remove('hidden');
+            } else {
+                alert('Request failed: ' + (err.message || 'Network error'));
+            }
+        })
+        .finally(function() { btn.disabled = false; });
+    });
+});
+</script>
+@endpush
 @endsection

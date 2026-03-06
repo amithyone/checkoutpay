@@ -76,6 +76,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         // Settings
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::post('/webhook/test', [SettingsController::class, 'testWebhook'])->name('webhook.test');
 
         // Memberships
         Route::resource('memberships', \App\Http\Controllers\Business\MembershipController::class);

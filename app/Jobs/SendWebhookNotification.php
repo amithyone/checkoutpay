@@ -81,7 +81,7 @@ class SendWebhookNotification implements ShouldQueue
                         'error' => $response['error'],
                     ];
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::error('Exception sending webhook', [
                     'payment_id' => $this->payment->id,
                     'webhook_url' => $webhookUrl,
@@ -90,7 +90,7 @@ class SendWebhookNotification implements ShouldQueue
                 
                 $failedUrls[] = [
                     'url' => $webhookUrl,
-                    'error' => $e->getMessage(),
+                    'error' => $this->formatFullError($e),
                 ];
             }
         }
@@ -107,7 +107,7 @@ class SendWebhookNotification implements ShouldQueue
         ];
 
         if (!empty($failedUrls)) {
-            $updateData['webhook_last_error'] = json_encode($failedUrls);
+            $updateData['webhook_last_error'] = json_encode($failedUrls, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         }
 
         $this->payment->update($updateData);
@@ -118,6 +118,17 @@ class SendWebhookNotification implements ShouldQueue
             'success_count' => $successCount,
             'failed_count' => count($failedUrls),
             'total_urls' => count($webhookUrls),
+        ]);
+    }
+
+    /**
+     * Handle job failure - store full exception in webhook_last_error.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        $this->payment->update([
+            'webhook_last_error' => $this->formatFullError($exception),
+            'webhook_status' => 'failed',
         ]);
     }
 
@@ -164,18 +175,38 @@ class SendWebhookNotification implements ShouldQueue
                     'status' => $response->status(),
                 ];
             } else {
+                $body = $response->body();
+                $fullError = sprintf(
+                    "HTTP %d %s\nResponse body: %s",
+                    $response->status(),
+                    $response->reason() ?: '',
+                    $body !== '' ? $body : '(empty)'
+                );
                 return [
                     'success' => false,
-                    'error' => "HTTP {$response->status()}: {$response->body()}",
+                    'error' => trim($fullError),
                     'status' => $response->status(),
                 ];
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => $this->formatFullError($e),
             ];
         }
+    }
+
+    /**
+     * Format exception/throwable as full error string for storage in webhook_last_error.
+     */
+    protected function formatFullError(\Throwable $e): string
+    {
+        $parts = [
+            get_class($e) . ': ' . $e->getMessage(),
+            $e->getFile() . ':' . $e->getLine(),
+            $e->getTraceAsString(),
+        ];
+        return implode("\n", $parts);
     }
 
     /**

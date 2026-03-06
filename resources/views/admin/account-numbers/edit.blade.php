@@ -11,14 +11,33 @@
             @method('PUT')
             <div class="space-y-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
-                    <div class="text-sm text-gray-600">
-                        {{ $accountNumber->is_pool ? 'Pool Account' : 'Business-Specific' }}
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pools &amp; status</label>
+                    <p class="text-xs text-gray-500 mb-2">An account can be in multiple pools. Pool = regular transactions; Invoice = invoices; Membership = membership; Tickets = ticket payments. Active = enabled everywhere it is assigned.</p>
+                    <div class="flex flex-wrap gap-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="is_pool" value="1" {{ old('is_pool', $accountNumber->is_pool) ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox">
+                            <span class="ml-2 text-sm text-gray-700">Pool (regular)</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="is_invoice_pool" value="1" {{ old('is_invoice_pool', $accountNumber->is_invoice_pool) ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox">
+                            <span class="ml-2 text-sm text-gray-700">Invoice</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="is_membership_pool" value="1" {{ old('is_membership_pool', $accountNumber->is_membership_pool) ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox">
+                            <span class="ml-2 text-sm text-gray-700">Membership</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="is_tickets_pool" value="1" {{ old('is_tickets_pool', $accountNumber->is_tickets_pool ?? false) ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox">
+                            <span class="ml-2 text-sm text-gray-700">Tickets</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" name="is_active" value="1" {{ old('is_active', $accountNumber->is_active) ? 'checked' : '' }} class="rounded border-gray-300">
+                            <span class="ml-2 text-sm text-gray-700">Active</span>
+                        </label>
                     </div>
                 </div>
 
-                @if(!$accountNumber->is_pool)
-                <div>
+                <div id="business-select" class="{{ ($accountNumber->is_pool || $accountNumber->is_invoice_pool || $accountNumber->is_membership_pool || ($accountNumber->is_tickets_pool ?? false)) ? 'hidden' : '' }}">
                     <label for="business_id" class="block text-sm font-medium text-gray-700 mb-1">Business</label>
                     <select name="business_id" id="business_id" class="w-full border border-gray-300 rounded-lg px-3 py-2">
                         <option value="">Select Business</option>
@@ -29,7 +48,6 @@
                         @endforeach
                     </select>
                 </div>
-                @endif
 
                 <div>
                     <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
@@ -105,13 +123,6 @@
                     @error('bank_code')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
-                </div>
-
-                <div>
-                    <label class="flex items-center">
-                        <input type="checkbox" name="is_active" value="1" {{ old('is_active', $accountNumber->is_active) ? 'checked' : '' }} class="mr-2">
-                        <span class="text-sm text-gray-700">Active</span>
-                    </label>
                 </div>
 
                 <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
@@ -190,6 +201,18 @@
             bankSearchInput.value = '';
         }
     }
+
+    // Toggle business select when pool checkboxes change
+    document.querySelectorAll('.pool-checkbox').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var any = Array.prototype.slice.call(document.querySelectorAll('.pool-checkbox')).some(function(c) { return c.checked; });
+            var el = document.getElementById('business-select');
+            if (el) {
+                el.classList.toggle('hidden', any);
+                if (any) document.getElementById('business_id').value = '';
+            }
+        });
+    });
 
     // Close dropdown when clicking outside
     document.addEventListener('click', function(event) {

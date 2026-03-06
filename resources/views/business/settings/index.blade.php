@@ -515,9 +515,15 @@
 
             <div>
                 <label for="webhook_url" class="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
-                <input type="url" name="webhook_url" id="webhook_url" value="{{ old('webhook_url', $business->webhook_url) }}"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                    placeholder="https://your-domain.com/webhook">
+                <div class="flex gap-2">
+                    <input type="url" name="webhook_url" id="webhook_url" value="{{ old('webhook_url', $business->webhook_url) }}"
+                        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        placeholder="https://your-domain.com/webhook">
+                    <button type="button" id="test_webhook_btn" class="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 whitespace-nowrap" title="Send a test request to verify the URL">
+                        <i class="fas fa-paper-plane mr-2"></i> Test webhook
+                    </button>
+                </div>
+                <p id="webhook_test_result" class="mt-1 text-xs hidden" aria-live="polite"></p>
                 <p class="mt-1 text-xs text-gray-500">We'll send payment notifications to this URL</p>
                 @error('webhook_url')
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -600,6 +606,43 @@
 
 @push('scripts')
 <script>
+document.getElementById('test_webhook_btn').addEventListener('click', function() {
+    var input = document.getElementById('webhook_url');
+    var url = input && input.value ? input.value.trim() : '';
+    if (!url) {
+        alert('Please enter a webhook URL first.');
+        return;
+    }
+    var resultEl = document.getElementById('webhook_test_result');
+    resultEl.textContent = 'Sending test…';
+    resultEl.classList.remove('hidden', 'text-green-600', 'text-red-600');
+    resultEl.classList.add('text-gray-600');
+    this.disabled = true;
+    fetch('{{ route("business.webhook.test") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ webhook_url: url })
+    })
+    .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+    .then(function(_ref) {
+        var ok = _ref.ok, data = _ref.data;
+        resultEl.classList.remove('text-gray-600');
+        resultEl.classList.add(ok ? 'text-green-600' : 'text-red-600');
+        resultEl.textContent = data.message || (ok ? 'Webhook delivered successfully.' : 'Request failed.');
+        resultEl.classList.remove('hidden');
+    })
+    .catch(function(err) {
+        resultEl.classList.remove('text-gray-600');
+        resultEl.classList.add('text-red-600');
+        resultEl.textContent = 'Request failed: ' + (err.message || 'Network error');
+        resultEl.classList.remove('hidden');
+    })
+    .finally(function() { document.getElementById('test_webhook_btn').disabled = false; });
+});
 function copyApiKey() {
     const input = document.getElementById('api-key-input');
     input.select();

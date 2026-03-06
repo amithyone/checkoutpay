@@ -16,7 +16,7 @@ class InvoicePaymentReceipt extends Mailable
 
     public function __construct(
         public Invoice $invoice,
-        public Payment $payment,
+        public ?Payment $payment,
         public float $amount,
         public bool $isForSender,
         public float $remaining = 0,

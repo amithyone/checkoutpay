@@ -39,6 +39,7 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         // Actions
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         add_action('woocommerce_api_wc_checkoutpay_gateway', array($this, 'check_payment_status'));
+        add_action('woocommerce_api_wc_checkoutpay_update_amount', array($this, 'update_payment_amount'));
         add_action('woocommerce_api_wc_checkoutpay_webhook', array($this, 'handle_webhook'));
         
         // Payment listener/API hook
@@ -158,8 +159,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             // Store payment information in order meta
             $order->update_meta_data('_checkoutpay_transaction_id', $payment_data['transaction_id']);
             $order->update_meta_data('_checkoutpay_account_number', $payment_data['account_number']);
-            $order->update_meta_data('_checkoutpay_account_name', isset($payment_data['account_details']['account_name']) ? $payment_data['account_details']['account_name'] : '');
-            $order->update_meta_data('_checkoutpay_bank_name', isset($payment_data['account_details']['bank_name']) ? $payment_data['account_details']['bank_name'] : '');
+            $order->update_meta_data('_checkoutpay_account_name', isset($payment_data['account_name']) ? $payment_data['account_name'] : (isset($payment_data['account_details']['account_name']) ? $payment_data['account_details']['account_name'] : ''));
+            $order->update_meta_data('_checkoutpay_bank_name', isset($payment_data['bank_name']) ? $payment_data['bank_name'] : (isset($payment_data['account_details']['bank_name']) ? $payment_data['account_details']['bank_name'] : ''));
             $order->update_meta_data('_checkoutpay_status', 'pending');
             $order->update_meta_data('_checkoutpay_charges', $charges_data);
             $order->update_meta_data('_checkoutpay_original_amount', $original_amount);
@@ -222,32 +223,33 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
      */
     public function check_payment_status() {
         $order_id = isset($_GET['order_id']) ? absint($_GET['order_id']) : 0;
-        
+
         if (!$order_id) {
             wp_send_json_error(array('message' => 'Invalid order ID'));
             return;
         }
 
         $order = wc_get_order($order_id);
-        
+
         if (!$order) {
             wp_send_json_error(array('message' => 'Order not found'));
             return;
         }
 
-        $payment_id = $order->get_meta('_checkoutpay_payment_id');
-        
-        if (!$payment_id) {
-            wp_send_json_error(array('message' => 'Payment ID not found'));
+        $transaction_id = $order->get_meta('_checkoutpay_transaction_id');
+
+        if (!$transaction_id) {
+            wp_send_json_error(array('message' => 'Transaction ID not found'));
             return;
         }
 
-        // Check payment status via API
-        $api_url = trailingslashit($this->api_url) . 'payments/' . $payment_id;
-        
+        // Check payment status via API: GET /api/v1/payment/{transactionId}
+        $api_url = trailingslashit($this->api_url) . 'payment/' . $transaction_id;
+
         $response = wp_remote_get($api_url, array(
+            'timeout' => 15,
             'headers' => array(
-                'Authorization' => 'Bearer ' . $this->api_key,
+                'Content-Type' => 'application/json',
                 'X-API-Key' => $this->api_key,
             ),
         ));
@@ -259,39 +261,137 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
 
         $response_data = json_decode(wp_remote_retrieve_body($response), true);
 
-        if (isset($response_data['data']['status'])) {
+        if (isset($response_data['success']) && $response_data['success'] && isset($response_data['data']['status'])) {
             $status = $response_data['data']['status'];
-            
-            if ($status === 'approved' || $status === 'completed') {
+
+            if ($status === 'approved') {
                 $order->payment_complete();
                 $order->add_order_note(__('Payment confirmed via CheckoutPay', 'checkoutpay-gateway'));
+                $order->update_meta_data('_checkoutpay_status', 'approved');
+                $order->save();
                 wp_send_json_success(array('status' => 'completed'));
             } else {
                 wp_send_json_success(array('status' => $status));
             }
         } else {
-            wp_send_json_error(array('message' => 'Unable to retrieve payment status'));
+            wp_send_json_error(array('message' => isset($response_data['message']) ? $response_data['message'] : __('Unable to retrieve payment status', 'checkoutpay-gateway')));
         }
     }
 
     /**
+     * Update payment amount (correct wrong amount) then check status
+     * Called via AJAX when customer says they paid a different amount.
+     */
+    public function update_payment_amount() {
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        $new_amount = isset($_POST['amount']) ? floatval($_POST['amount']) : 0;
+
+        if (!$order_id || $new_amount <= 0) {
+            wp_send_json_error(array('message' => __('Invalid order or amount.', 'checkoutpay-gateway')));
+            return;
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found.', 'checkoutpay-gateway')));
+            return;
+        }
+
+        $transaction_id = $order->get_meta('_checkoutpay_transaction_id');
+        if (!$transaction_id) {
+            wp_send_json_error(array('message' => __('Transaction ID not found.', 'checkoutpay-gateway')));
+            return;
+        }
+
+        // PATCH /api/v1/payment/{transactionId}/amount
+        $api_url = trailingslashit($this->api_url) . 'payment/' . $transaction_id . '/amount';
+        $response = wp_remote_request($api_url, array(
+            'method' => 'PATCH',
+            'timeout' => 15,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $this->api_key,
+            ),
+            'body' => json_encode(array('new_amount' => $new_amount)),
+        ));
+
+        if (is_wp_error($response)) {
+            wp_send_json_error(array('message' => $response->get_error_message()));
+            return;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code !== 200 || empty($body['success'])) {
+            $msg = isset($body['message']) ? $body['message'] : __('Failed to update amount.', 'checkoutpay-gateway');
+            wp_send_json_error(array('message' => $msg));
+            return;
+        }
+
+        // Update order meta from response if present
+        if (!empty($body['data'])) {
+            $data = $body['data'];
+            if (isset($data['amount'])) {
+                $order->update_meta_data('_checkoutpay_original_amount', $data['amount']);
+            }
+            if (isset($data['charges']) && is_array($data['charges'])) {
+                $order->update_meta_data('_checkoutpay_charges', $data['charges']);
+            }
+            $order->save();
+        }
+
+        // Now check status (GET) and return same shape as check_payment_status
+        $get_url = trailingslashit($this->api_url) . 'payment/' . $transaction_id;
+        $get_response = wp_remote_get($get_url, array(
+            'timeout' => 15,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $this->api_key,
+            ),
+        ));
+
+        if (!is_wp_error($get_response)) {
+            $get_data = json_decode(wp_remote_retrieve_body($get_response), true);
+            if (isset($get_data['success']) && $get_data['success'] && isset($get_data['data']['status'])) {
+                $status = $get_data['data']['status'];
+                if ($status === 'approved') {
+                    $order->payment_complete();
+                    $order->add_order_note(__('Payment confirmed via CheckoutPay (after amount correction)', 'checkoutpay-gateway'));
+                    $order->update_meta_data('_checkoutpay_status', 'approved');
+                    $order->save();
+                    wp_send_json_success(array('status' => 'completed', 'message' => __('Amount updated and payment confirmed!', 'checkoutpay-gateway')));
+                }
+                wp_send_json_success(array('status' => $status, 'message' => __('Amount updated. Payment is still pending.', 'checkoutpay-gateway')));
+            }
+        }
+
+        wp_send_json_success(array('status' => 'pending', 'message' => __('Amount updated. You can check status again in a moment.', 'checkoutpay-gateway')));
+    }
+
+    /**
      * Handle webhook callback
+     * Expects POST body: event, transaction_id, status, amount, received_amount, charges, etc.
      */
     public function handle_webhook() {
         $payload = file_get_contents('php://input');
         $data = json_decode($payload, true);
 
-        if (!isset($data['reference']) || !isset($data['status'])) {
-            status_header(400);
-            exit;
-        }
-
-        // Find order by transaction_id
+        // Accept transaction_id and either status or event (API sends event + transaction_id + status)
         $transaction_id = isset($data['transaction_id']) ? sanitize_text_field($data['transaction_id']) : '';
-        
+        $status = isset($data['status']) ? sanitize_text_field($data['status']) : '';
+        $event = isset($data['event']) ? sanitize_text_field($data['event']) : '';
+
         if (empty($transaction_id)) {
             status_header(400);
             exit;
+        }
+        if (empty($status) && empty($event)) {
+            status_header(400);
+            exit;
+        }
+        if (empty($status) && $event === 'payment.approved') {
+            $status = 'approved';
         }
 
         $orders = wc_get_orders(array(
@@ -306,7 +406,9 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         }
 
         $order = $orders[0];
-        $status = sanitize_text_field($data['status']);
+        if (empty($status)) {
+            $status = 'pending';
+        }
 
         // Verify webhook signature if available
         if (isset($data['signature'])) {
@@ -314,35 +416,29 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         }
 
         // Update order status based on webhook event
-        $event = isset($data['event']) ? sanitize_text_field($data['event']) : '';
-        
         if ($status === 'approved' || $event === 'payment.approved') {
             $order->payment_complete();
             $order->add_order_note(__('Payment confirmed via CheckoutPay webhook', 'checkoutpay-gateway'));
             $order->update_meta_data('_checkoutpay_status', 'approved');
-            
-            // Update charges if provided
+            if (isset($data['received_amount'])) {
+                $order->update_meta_data('_checkoutpay_received_amount', $data['received_amount']);
+            }
             if (isset($data['charges']) && is_array($data['charges'])) {
                 $order->update_meta_data('_checkoutpay_charges', $data['charges']);
             }
-            
             $order->save();
-            
             status_header(200);
             echo json_encode(array('success' => true));
         } elseif ($status === 'rejected' || $status === 'failed' || $event === 'payment.rejected') {
-            $reason = isset($data['reason']) ? sanitize_text_field($data['reason']) : __('Payment rejected', 'checkoutpay-gateway');
+            $reason = isset($data['mismatch_reason']) ? sanitize_text_field($data['mismatch_reason']) : (isset($data['reason']) ? sanitize_text_field($data['reason']) : __('Payment rejected', 'checkoutpay-gateway'));
             $order->update_status('failed', __('Payment rejected via CheckoutPay: ', 'checkoutpay-gateway') . $reason);
             $order->update_meta_data('_checkoutpay_status', 'rejected');
             $order->save();
-            
             status_header(200);
             echo json_encode(array('success' => true));
         } else {
-            // Update status but don't change order status
             $order->update_meta_data('_checkoutpay_status', $status);
             $order->save();
-            
             status_header(200);
             echo json_encode(array('success' => true));
         }
@@ -429,6 +525,15 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             }
             
             echo '<p><button type="button" id="checkoutpay-check-status" class="button">' . __('Check Payment Status', 'checkoutpay-gateway') . '</button></p>';
+            
+            echo '<div class="checkoutpay-update-amount" style="margin-top: 15px; padding: 15px; background: #fff8e5; border: 1px solid #e5d48a; border-radius: 5px;">';
+            echo '<p><strong>' . __('Paid a different amount?', 'checkoutpay-gateway') . '</strong></p>';
+            echo '<p class="description">' . __('If you transferred a different sum than shown above, enter the actual amount you paid and we will update the transaction and re-check for your payment.', 'checkoutpay-gateway') . '</p>';
+            echo '<p style="margin-bottom: 8px;"><label for="checkoutpay-actual-amount">' . __('Amount paid:', 'checkoutpay-gateway') . ' </label>';
+            echo '<input type="number" id="checkoutpay-actual-amount" name="checkoutpay_actual_amount" min="0.01" step="0.01" placeholder="0.00" style="width: 120px; padding: 6px;"> ';
+            echo '<button type="button" id="checkoutpay-update-amount-btn" class="button">' . __('Update amount & check status', 'checkoutpay-gateway') . '</button></p>';
+            echo '</div>';
+            
             echo '</div>';
             ?>
             <script>
@@ -455,8 +560,45 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                             button.prop('disabled', false).text('<?php _e('Check Payment Status', 'checkoutpay-gateway'); ?>');
                             alert('<?php _e('Unable to check payment status. Please try again later.', 'checkoutpay-gateway'); ?>');
                         }
-                    });
                 });
+            });
+            
+            $('#checkoutpay-update-amount-btn').on('click', function() {
+                var button = $(this);
+                var amountInput = $('#checkoutpay-actual-amount');
+                var amount = parseFloat(amountInput.val());
+                if (!amount || amount <= 0) {
+                    alert('<?php echo esc_js(__('Please enter the amount you paid.', 'checkoutpay-gateway')); ?>');
+                    return;
+                }
+                button.prop('disabled', true).text('<?php echo esc_js(__('Updating...', 'checkoutpay-gateway')); ?>');
+                $.ajax({
+                    url: '<?php echo esc_url(add_query_arg('wc-api', 'wc_checkoutpay_update_amount', home_url('/'))); ?>',
+                    type: 'POST',
+                    data: {
+                        order_id: <?php echo $order_id; ?>,
+                        amount: amount
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            if (response.data && response.data.status === 'completed') {
+                                location.reload();
+                            } else {
+                                button.prop('disabled', false).text('<?php echo esc_js(__('Update amount & check status', 'checkoutpay-gateway')); ?>');
+                                alert(response.data && response.data.message ? response.data.message : '<?php echo esc_js(__('Amount updated. You can check status again.', 'checkoutpay-gateway')); ?>');
+                            }
+                        } else {
+                            button.prop('disabled', false).text('<?php echo esc_js(__('Update amount & check status', 'checkoutpay-gateway')); ?>');
+                            alert(response.data && response.data.message ? response.data.message : '<?php echo esc_js(__('Update failed. Please try again.', 'checkoutpay-gateway')); ?>');
+                        }
+                    },
+                    error: function(xhr) {
+                        button.prop('disabled', false).text('<?php echo esc_js(__('Update amount & check status', 'checkoutpay-gateway')); ?>');
+                        var msg = (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) ? xhr.responseJSON.data.message : '<?php echo esc_js(__('Unable to update. Please try again.', 'checkoutpay-gateway')); ?>';
+                        alert(msg);
+                    }
+                });
+            });
             });
             </script>
             <?php

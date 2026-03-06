@@ -18,6 +18,10 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
     // Payment routes (require API key)
     Route::post('/payment-request', [PaymentController::class, 'store']);
     Route::get('/payment/{transactionId}', [PaymentController::class, 'show']);
+    // Correct wrong amount: updates payment, recalculates charges, dispatches CheckPaymentEmails to re-scan
+    // emails with new amount; when an email matches, payment is approved and the same webhook is sent
+    // (payment.approved, unchanged payload). Only pending, non-expired payments can be updated.
+    Route::patch('/payment/{transactionId}/amount', [PaymentController::class, 'updateAmount']);
     Route::get('/payments', [PaymentController::class, 'index']);
     
     // Withdrawal routes (require API key)

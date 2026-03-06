@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\PaymentRequest;
 use App\Models\Payment;
+use App\Models\ProcessedEmail;
 use App\Services\PaymentService;
+use App\Services\ChargeService;
+use App\Jobs\CheckPaymentEmails;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -248,6 +251,126 @@ class PaymentController extends Controller
                 'total' => $payments->total(),
             ],
         ]);
+    }
+
+    /**
+     * Update a payment's amount and trigger a manual matcher
+     * When an email later matches the new amount, the payment is approved and the same
+     * webhook (payment.approved) is sent—payload is unchanged. Do not modify SendWebhookNotification.
+     */
+    public function updateAmount(Request $request, string $transactionId): JsonResponse
+    {
+        $request->validate([
+            'new_amount' => 'required|numeric|min:1',
+        ]);
+
+        $business = $request->user();
+
+        $payment = Payment::with(['website'])
+            ->where('transaction_id', $transactionId)
+            ->where('business_id', $business->id)
+            ->first();
+
+        // 1. Transaction must exist
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment not found or does not belong to you',
+            ], 404);
+        }
+
+        // 2. Transaction must be pending to be updated
+        if ($payment->status !== Payment::STATUS_PENDING) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending payments can have their amounts updated. Current status: ' . $payment->status,
+            ], 400);
+        }
+
+        // 3. Prevent expired payments from being updated
+        if ($payment->isExpired()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This payment has expired and cannot be updated.',
+            ], 400);
+        }
+
+        try {
+            $oldAmount = $payment->amount;
+            $newAmount = $request->input('new_amount');
+
+            // 4. Update the amount on the record
+            $payment->amount = $newAmount;
+            
+            // 5. Recalculate charges based on the new amount
+            $chargeService = app(ChargeService::class);
+            $website = $payment->website;
+            $charges = $chargeService->calculateCharges($payment->amount, $website, $business);
+
+            // Apply calculated charges to maintain payload structure
+            $payment->charge_percentage = $charges['charge_percentage'];
+            $payment->charge_fixed = $charges['charge_fixed'];
+            $payment->total_charges = $charges['total_charges'];
+            $payment->business_receives = $charges['business_receives'];
+            $payment->save();
+
+            Log::info('Merchant requested transaction amount update', [
+                'business_id' => $business->id,
+                'payment_id' => $payment->id,
+                'transaction_id' => $payment->transaction_id,
+                'old_amount' => $oldAmount,
+                'new_amount' => $newAmount,
+            ]);
+
+            // 6. Instantly push to the CheckPaymentEmails job so the engine scans for the new amount
+            CheckPaymentEmails::dispatch($payment);
+
+            // Return full payment resource (same shape as show()) so client gets updated status in one call
+            $payment->load(['accountNumberDetails', 'website']);
+            return response()->json([
+                'success' => true,
+                'message' => 'Transaction amount successfully updated. Recalculated charges and matching initiated.',
+                'data' => [
+                    'transaction_id' => $payment->transaction_id,
+                    'amount' => (float) $payment->amount,
+                    'payer_name' => $payment->payer_name,
+                    'bank' => $payment->bank,
+                    'account_number' => $payment->account_number,
+                    'account_name' => $payment->accountNumberDetails->account_name ?? null,
+                    'bank_name' => $payment->accountNumberDetails->bank_name ?? null,
+                    'status' => $payment->status,
+                    'webhook_url' => $payment->webhook_url,
+                    'expires_at' => $payment->expires_at?->toISOString(),
+                    'matched_at' => $payment->matched_at?->toISOString(),
+                    'approved_at' => $payment->approved_at?->toISOString(),
+                    'created_at' => $payment->created_at->toISOString(),
+                    'updated_at' => $payment->updated_at->toISOString(),
+                    'charges' => [
+                        'percentage' => (float) ($payment->charge_percentage ?? 0),
+                        'fixed' => (float) ($payment->charge_fixed ?? 0),
+                        'total' => (float) ($payment->total_charges ?? 0),
+                        'paid_by_customer' => (bool) ($payment->charges_paid_by_customer ?? false),
+                        'business_receives' => (float) ($payment->business_receives ?? $payment->amount),
+                    ],
+                    'website' => $payment->website ? [
+                        'id' => $payment->website->id,
+                        'url' => $payment->website->website_url,
+                    ] : null,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error updating transaction amount via API', [
+                'error' => $e->getMessage(),
+                'business_id' => $business->id,
+                'payment_id' => $payment->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while trying to update the amount. Please try again.',
+            ], 500);
+        }
     }
 
     /**

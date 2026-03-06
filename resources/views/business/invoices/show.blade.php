@@ -23,12 +23,9 @@
                     </button>
                 </form>
                 @if(in_array($invoice->status, ['sent', 'viewed', 'overdue']))
-                <form action="{{ route('business.invoices.mark-paid', $invoice) }}" method="POST" class="inline" onsubmit="return confirm('Mark this invoice as paid? A receipt will be sent to you and the client.');">
-                    @csrf
-                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
-                        <i class="fas fa-check-circle mr-1"></i> Mark as paid
-                    </button>
-                </form>
+                <button type="button" onclick="document.getElementById('mark-paid-modal').classList.remove('hidden')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                    <i class="fas fa-check-circle mr-1"></i> Mark as paid manually
+                </button>
                 @endif
             @endif
             <a href="{{ route('business.invoices.view-pdf', $invoice) }}" target="_blank" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">
@@ -173,7 +170,12 @@
                     @if($invoice->isPaid())
                     <div class="flex justify-between text-sm text-green-600 pt-2">
                         <span>Paid Amount:</span>
-                        <span class="font-medium">{{ $invoice->currency }} {{ number_format($invoice->paid_amount ?? $invoice->total_amount, 2) }}</span>
+                        <span class="font-medium">{{ $invoice->currency }} {{ number_format($invoice->paid_amount_total, 2) }}</span>
+                    </div>
+                    @elseif((float) $invoice->paid_amount_total > 0)
+                    <div class="flex justify-between text-sm text-amber-600 pt-2">
+                        <span>Paid so far:</span>
+                        <span class="font-medium">{{ $invoice->currency }} {{ number_format($invoice->paid_amount_total, 2) }} of {{ $invoice->currency }} {{ number_format($invoice->total_amount, 2) }}</span>
                     </div>
                     @endif
                 </div>
@@ -214,6 +216,51 @@
             </a>
         </div>
         <p class="text-xs text-gray-500 mt-2">Share this link with your client to collect payment</p>
+    </div>
+    @endif
+
+    <!-- Mark as paid manually modal -->
+    @if(!$invoice->isPaid() && in_array($invoice->status, ['sent', 'viewed', 'overdue']))
+    @php
+        $paidSoFar = (float) $invoice->paid_amount_total;
+        $remaining = max(0, (float) $invoice->total_amount - $paidSoFar);
+    @endphp
+    <div id="mark-paid-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="document.getElementById('mark-paid-modal').classList.add('hidden')"></div>
+            <div class="relative inline-block bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-lg sm:w-full">
+                <form action="{{ route('business.invoices.mark-paid', $invoice) }}" method="POST" onsubmit="return confirm('Record this payment? Money will NOT be added to your balance (you received it outside the system).');">
+                    @csrf
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4" id="modal-title">Mark as paid manually</h3>
+                        <p class="text-sm text-gray-600 mb-4">Record that you received payment outside the system (cash, bank transfer, etc.). This will NOT add to your CheckoutPay balance.</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="amount_paid" class="block text-sm font-medium text-gray-700 mb-1">Amount received</label>
+                                <input type="number" name="amount_paid" id="amount_paid" step="0.01" min="0.01" max="{{ $remaining }}"
+                                    value="{{ $remaining >= 0.01 ? number_format($remaining, 2, '.', '') : '' }}"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                                <p class="text-xs text-gray-500 mt-1">Remaining: {{ $invoice->currency }} {{ number_format($remaining, 2) }}</p>
+                            </div>
+                            <div>
+                                <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                                <input type="text" name="notes" id="notes" placeholder="e.g. Bank transfer, Cash"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                        <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                            Record payment
+                        </button>
+                        <button type="button" onclick="document.getElementById('mark-paid-modal').classList.add('hidden')"
+                            class="mt-3 sm:mt-0 w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
     @endif
 

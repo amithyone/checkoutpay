@@ -10,36 +10,30 @@
             @csrf
             <div class="space-y-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
-                    <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pools (select one or more)</label>
+                    <p class="text-xs text-gray-500 mb-2">An account can be in multiple pools. Or leave all unchecked and assign to a Business.</p>
+                    <div class="flex flex-wrap gap-6">
                         <label class="flex items-center">
-                            <input type="radio" name="account_type" value="regular_pool" checked class="mr-2" onchange="toggleAccountType()">
-                            <span>Regular Pool Account</span>
+                            <input type="checkbox" name="is_pool" value="1" {{ old('is_pool', true) ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox-create">
+                            <span class="ml-2 text-sm">Pool (regular transactions)</span>
                         </label>
                         <label class="flex items-center">
-                            <input type="radio" name="account_type" value="invoice_pool" class="mr-2" onchange="toggleAccountType()">
-                            <span>Invoice Pool Account</span>
+                            <input type="checkbox" name="is_invoice_pool" value="1" {{ old('is_invoice_pool') ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox-create">
+                            <span class="ml-2 text-sm">Invoice</span>
                         </label>
                         <label class="flex items-center">
-                            <input type="radio" name="account_type" value="membership_pool" class="mr-2" onchange="toggleAccountType()">
-                            <span>Membership Pool Account</span>
+                            <input type="checkbox" name="is_membership_pool" value="1" {{ old('is_membership_pool') ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox-create">
+                            <span class="ml-2 text-sm">Membership</span>
                         </label>
                         <label class="flex items-center">
-                            <input type="radio" name="account_type" value="business" class="mr-2" onchange="toggleAccountType()">
-                            <span>Business-Specific</span>
+                            <input type="checkbox" name="is_tickets_pool" value="1" {{ old('is_tickets_pool') ? 'checked' : '' }} class="rounded border-gray-300 pool-checkbox-create">
+                            <span class="ml-2 text-sm">Tickets</span>
                         </label>
                     </div>
-                    <input type="hidden" name="is_pool" id="is_pool" value="1">
-                    <input type="hidden" name="is_invoice_pool" id="is_invoice_pool" value="0">
-                    <input type="hidden" name="is_membership_pool" id="is_membership_pool" value="0">
-                    <p class="mt-2 text-xs text-gray-500">
-                        <strong>Invoice Pool:</strong> Dedicated for invoice payments only.<br>
-                        <strong>Membership Pool:</strong> Dedicated for membership payments only.
-                    </p>
                 </div>
 
-                <div id="business-select" style="display: none;">
-                    <label for="business_id" class="block text-sm font-medium text-gray-700 mb-1">Business</label>
+                <div id="business-select" class="{{ (old('is_pool') || old('is_invoice_pool') || old('is_membership_pool') || old('is_tickets_pool')) ? 'hidden' : '' }}">
+                    <label for="business_id" class="block text-sm font-medium text-gray-700 mb-1">Business (if no pool selected)</label>
                     <select name="business_id" id="business_id" class="w-full border border-gray-300 rounded-lg px-3 py-2">
                         <option value="">Select Business</option>
                         @foreach($businesses as $business)
@@ -126,41 +120,21 @@
 
 @push('scripts')
 <script>
-    function toggleAccountType() {
-        const accountType = document.querySelector('input[name="account_type"]:checked')?.value;
-        const isPoolInput = document.getElementById('is_pool');
-        const isInvoicePoolInput = document.getElementById('is_invoice_pool');
-        const isMembershipPoolInput = document.getElementById('is_membership_pool');
-        const businessSelect = document.getElementById('business-select');
-        
-        if (accountType === 'regular_pool') {
-            isPoolInput.value = '1';
-            isInvoicePoolInput.value = '0';
-            isMembershipPoolInput.value = '0';
-            businessSelect.style.display = 'none';
-            document.getElementById('business_id').value = '';
-        } else if (accountType === 'invoice_pool') {
-            isPoolInput.value = '0';
-            isInvoicePoolInput.value = '1';
-            isMembershipPoolInput.value = '0';
-            businessSelect.style.display = 'none';
-            document.getElementById('business_id').value = '';
-        } else if (accountType === 'membership_pool') {
-            isPoolInput.value = '0';
-            isInvoicePoolInput.value = '0';
-            isMembershipPoolInput.value = '1';
-            businessSelect.style.display = 'none';
-            document.getElementById('business_id').value = '';
-        } else if (accountType === 'business') {
-            isPoolInput.value = '0';
-            isInvoicePoolInput.value = '0';
-            isMembershipPoolInput.value = '0';
-            businessSelect.style.display = 'block';
+    function toggleBusinessSelect() {
+        var any = Array.prototype.slice.call(document.querySelectorAll('.pool-checkbox-create')).some(function(c) { return c.checked; });
+        var el = document.getElementById('business-select');
+        if (el) {
+            el.classList.toggle('hidden', any);
+            if (any) document.getElementById('business_id').value = '';
         }
     }
 
     // Initialize bank search on page load
     document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.pool-checkbox-create').forEach(function(cb) {
+            cb.addEventListener('change', toggleBusinessSelect);
+        });
+        toggleBusinessSelect();
         const bankCodeSelect = document.getElementById('bank_code');
         const bankSearchInput = document.getElementById('bank_search');
         

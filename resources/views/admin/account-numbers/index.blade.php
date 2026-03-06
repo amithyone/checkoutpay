@@ -24,6 +24,7 @@
                 <option value="pool" {{ request('type') === 'pool' ? 'selected' : '' }}>Regular Pool</option>
                 <option value="invoice_pool" {{ request('type') === 'invoice_pool' ? 'selected' : '' }}>Invoice Pool</option>
                 <option value="membership_pool" {{ request('type') === 'membership_pool' ? 'selected' : '' }}>Membership Pool</option>
+                <option value="tickets_pool" {{ request('type') === 'tickets_pool' ? 'selected' : '' }}>Tickets Pool</option>
                 <option value="business" {{ request('type') === 'business' ? 'selected' : '' }}>Business Accounts</option>
             </select>
             <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
@@ -46,29 +47,56 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Regular pool (all non-invoice/membership/ticket)">Pool</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Invoice payments">Invoice</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Membership payments">Membership</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Ticket payments">Tickets</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Active</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usage</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payments Received</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     @forelse($accountNumbers as $account)
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-gray-50" data-account-id="{{ $account->id }}" data-update-url="{{ route('admin.account-numbers.update-flags', $account) }}">
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $account->account_number }}</td>
                         <td class="px-6 py-4 text-sm text-gray-900">{{ $account->account_name }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $account->bank_name }}</td>
                         <td class="px-6 py-4">
-                            @if($account->is_invoice_pool)
-                                <span class="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">Invoice Pool</span>
-                            @elseif($account->is_membership_pool)
-                                <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">Membership Pool</span>
-                            @elseif($account->is_pool)
-                                <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Regular Pool</span>
-                            @else
-                                <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Business</span>
-                            @endif
+                            <div class="flex flex-wrap gap-1">
+                                @if($account->is_pool)
+                                    <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Pool</span>
+                                @endif
+                                @if($account->is_invoice_pool)
+                                    <span class="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">Invoice</span>
+                                @endif
+                                @if($account->is_membership_pool)
+                                    <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">Membership</span>
+                                @endif
+                                @if($account->is_tickets_pool ?? false)
+                                    <span class="px-2 py-1 text-xs font-medium bg-teal-100 text-teal-800 rounded-full">Tickets</span>
+                                @endif
+                                @if(!$account->is_pool && !$account->is_invoice_pool && !($account->is_membership_pool ?? false) && !($account->is_tickets_pool ?? false))
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Business</span>
+                                @endif
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <input type="checkbox" class="account-flag-checkbox rounded border-gray-300" data-flag="is_pool" {{ $account->is_pool ? 'checked' : '' }} title="Use for regular transactions">
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <input type="checkbox" class="account-flag-checkbox rounded border-gray-300" data-flag="is_invoice_pool" {{ $account->is_invoice_pool ? 'checked' : '' }} title="Use for invoices">
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <input type="checkbox" class="account-flag-checkbox rounded border-gray-300" data-flag="is_membership_pool" {{ $account->is_membership_pool ? 'checked' : '' }} title="Use for membership">
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <input type="checkbox" class="account-flag-checkbox rounded border-gray-300" data-flag="is_tickets_pool" {{ $account->is_tickets_pool ?? false ? 'checked' : '' }} title="Use for tickets">
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <input type="checkbox" class="account-flag-checkbox rounded border-gray-300" data-flag="is_active" {{ $account->is_active ? 'checked' : '' }} title="Active">
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
                             {{ $account->business ? $account->business->name : '-' }}
@@ -84,13 +112,6 @@
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
-                        <td class="px-6 py-4">
-                            @if($account->is_active)
-                                <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>
-                            @else
-                                <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Inactive</span>
-                            @endif
-                        </td>
                         <td class="px-6 py-4 text-sm">
                             <a href="{{ route('admin.account-numbers.edit', $account) }}" class="text-primary hover:underline mr-3">Edit</a>
                             <form action="{{ route('admin.account-numbers.destroy', $account) }}" method="POST" class="inline" onsubmit="return confirm('Are you sure?')">
@@ -102,7 +123,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">No account numbers found</td>
+                        <td colspan="13" class="px-6 py-4 text-center text-sm text-gray-500">No account numbers found</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -115,4 +136,37 @@
         @endif
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.querySelectorAll('.account-flag-checkbox').forEach(function(checkbox) {
+    checkbox.addEventListener('change', function() {
+        var self = this;
+        var row = this.closest('tr');
+        var url = row.dataset.updateUrl;
+        var formData = new FormData();
+        formData.append('_token', '{{ csrf_token() }}');
+        formData.append('_method', 'PATCH');
+        formData.append('is_pool', row.querySelector('[data-flag="is_pool"]').checked ? '1' : '0');
+        formData.append('is_invoice_pool', row.querySelector('[data-flag="is_invoice_pool"]').checked ? '1' : '0');
+        formData.append('is_membership_pool', row.querySelector('[data-flag="is_membership_pool"]').checked ? '1' : '0');
+        formData.append('is_tickets_pool', row.querySelector('[data-flag="is_tickets_pool"]').checked ? '1' : '0');
+        formData.append('is_active', row.querySelector('[data-flag="is_active"]').checked ? '1' : '0');
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        }).then(function(r) {
+            if (!r.ok) throw new Error('Update failed');
+            return r.json();
+        }).then(function() {
+            window.location.reload();
+        }).catch(function() {
+            alert('Failed to update. Please try again.');
+            self.checked = !self.checked;
+        });
+    });
+});
+</script>
+@endpush
 @endsection

@@ -52,6 +52,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Account Numbers
             Route::resource('account-numbers', AccountNumberController::class);
+            Route::patch('account-numbers/{accountNumber}/flags', [AccountNumberController::class, 'updateFlags'])->name('account-numbers.update-flags');
             Route::post('account-numbers/validate-account', [AccountNumberController::class, 'validateAccount'])
                 ->name('account-numbers.validate-account');
         });

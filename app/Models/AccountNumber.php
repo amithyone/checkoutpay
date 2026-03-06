@@ -18,6 +18,7 @@ class AccountNumber extends Model
         'is_pool',
         'is_invoice_pool',
         'is_membership_pool',
+        'is_tickets_pool',
         'is_active',
         'usage_count',
     ];
@@ -26,6 +27,7 @@ class AccountNumber extends Model
         'is_pool' => 'boolean',
         'is_invoice_pool' => 'boolean',
         'is_membership_pool' => 'boolean',
+        'is_tickets_pool' => 'boolean',
         'is_active' => 'boolean',
         'usage_count' => 'integer',
         'created_at' => 'datetime',
@@ -50,11 +52,12 @@ class AccountNumber extends Model
     }
 
     /**
-     * Scope for pool account numbers
+     * Scope for pool account numbers (available for regular payment requests).
+     * Pool is independent of invoice: an account can be in both pool and invoice pool.
      */
     public function scopePool($query)
     {
-        return $query->where('is_pool', true)->where('is_invoice_pool', false);
+        return $query->where('is_pool', true);
     }
 
     /**
@@ -71,6 +74,14 @@ class AccountNumber extends Model
     public function scopeMembershipPool($query)
     {
         return $query->where('is_membership_pool', true)->where('is_active', true);
+    }
+
+    /**
+     * Scope for tickets pool account numbers
+     */
+    public function scopeTicketsPool($query)
+    {
+        return $query->where('is_tickets_pool', true)->where('is_active', true);
     }
 
     /**
@@ -132,15 +143,19 @@ class AccountNumber extends Model
             if ($accountNumber->is_membership_pool) {
                 $service->invalidateMembershipPoolCache();
             }
+            if ($accountNumber->is_tickets_pool ?? false) {
+                $service->invalidateTicketsPoolCache();
+            }
         });
 
         static::updated(function ($accountNumber) {
             // Invalidate cache if pool status or active status changed
-            if ($accountNumber->isDirty(['is_pool', 'is_invoice_pool', 'is_membership_pool', 'is_active', 'business_id'])) {
+            if ($accountNumber->isDirty(['is_pool', 'is_invoice_pool', 'is_membership_pool', 'is_tickets_pool', 'is_active', 'business_id'])) {
                 $service = app(\App\Services\AccountNumberService::class);
                 $service->invalidatePendingAccountsCache();
                 $service->invalidateInvoicePoolCache();
                 $service->invalidateMembershipPoolCache();
+                $service->invalidateTicketsPoolCache();
             }
         });
     }

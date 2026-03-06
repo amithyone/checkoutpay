@@ -46,6 +46,11 @@ class AccountNumberService
     const CACHE_KEY_LAST_USED_MEMBERSHIP_ACCOUNT = 'account_number_service:last_used_membership_account';
     
     /**
+     * Cache key for tickets pool accounts list
+     */
+    const CACHE_KEY_TICKETS_POOL_ACCOUNTS = 'account_number_service:tickets_pool_accounts';
+    
+    /**
      * Cache TTL in seconds (300 seconds = 5 minutes)
      * Increased from 60s to 300s to prevent frequent cache expiration
      */
@@ -694,6 +699,14 @@ class AccountNumberService
     }
 
     /**
+     * Invalidate cache for tickets pool accounts
+     */
+    public function invalidateTicketsPoolCache(): void
+    {
+        Cache::forget(self::CACHE_KEY_TICKETS_POOL_ACCOUNTS);
+    }
+
+    /**
      * Invalidate all account number caches
      */
     public function invalidateAllCaches(): void
@@ -701,5 +714,6 @@ class AccountNumberService
         $this->invalidatePendingAccountsCache();
         $this->invalidateInvoicePoolCache();
         $this->invalidateMembershipPoolCache();
+        $this->invalidateTicketsPoolCache();
     }
 }

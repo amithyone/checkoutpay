@@ -345,19 +345,16 @@ class PaymentMatchingService
             }
         }
 
-        // STEP 0.4: Invoice payment – account number + amount only (name not required)
-        // When the payment is for an invoice and the account number is from the invoice pool,
-        // match only on account number and amount.
+        // STEP 0.4: Invoice payment – account number + amount only (name NOT checked)
+        // For invoice transactions, match only on account number and amount. Never require name.
         $isInvoicePayment = ($payment->email_data['service'] ?? null) === 'invoice'
             || InvoicePayment::where('payment_id', $payment->id)->exists();
-        $accountIsInvoicePool = $payment->account_number
-            && AccountNumber::invoicePool()->where('account_number', $payment->account_number)->exists();
 
-        if ($isInvoicePayment && $accountIsInvoicePool) {
+        if ($isInvoicePayment && $payment->account_number) {
             $receivedAmount = $extractedInfo['amount'] ?? 0;
             $requestedAmount = $payment->amount;
             $amountDiff = abs($requestedAmount - $receivedAmount);
-            $extractedAccountNumber = $extractedInfo['account_number'] ?? null;
+            $extractedAccountNumber = isset($extractedInfo['account_number']) ? trim((string) $extractedInfo['account_number']) : null;
 
             if ($extractedAccountNumber && $payment->account_number === $extractedAccountNumber && $amountDiff <= 1) {
                 if ($emailDate && $emailDate->lt($payment->created_at)) {
