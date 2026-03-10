@@ -49,8 +49,8 @@
                     <select name="bank_name" id="bank_name" required
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                         <option value="">Select Bank</option>
-                        @foreach(config('banks') as $bank)
-                            <option value="{{ $bank['bank_name'] }}">
+                        @foreach(collect(config('banks'))->sortBy('bank_name') as $bank)
+                            <option value="{{ $bank['bank_name'] }}" data-bank-code="{{ $bank['code'] ?? '' }}">
                                 {{ $bank['bank_name'] }}
                             </option>
                         @endforeach
@@ -72,9 +72,10 @@
 
                 <div>
                     <label for="account_name" class="block text-sm font-medium text-gray-700 mb-1">Account Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="account_name" id="account_name" required
+                    <input type="text" name="account_name" id="account_name" required readonly
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                         placeholder="Enter account name">
+                    <p id="account_name_status" class="mt-1 text-sm hidden"></p>
                     @error('account_name')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -110,6 +111,11 @@
         const balanceDisplay = document.getElementById('balance-display');
         const balanceAmount = document.getElementById('balance-amount');
         const amountInput = document.getElementById('amount');
+        const bankSelect = document.getElementById('bank_name');
+        const accountNumberInput = document.getElementById('account_number');
+        const accountNameInput = document.getElementById('account_name');
+        const accountNameStatus = document.getElementById('account_name_status');
+        let accountValidationTimeout = null;
 
         // Show balance when business is selected
         businessSelect.addEventListener('change', function() {
@@ -141,6 +147,109 @@
                 }
             }
         });
+
+        function resetAccountNameState() {
+            if (!accountNameInput || !accountNameStatus) return;
+            accountNameStatus.classList.add('hidden');
+            accountNameStatus.textContent = '';
+            accountNameStatus.className = 'mt-1 text-sm hidden';
+            accountNameInput.value = '';
+            accountNameInput.classList.remove('bg-green-50', 'border-green-300');
+            accountNameInput.classList.add('bg-gray-50');
+            accountNameInput.setAttribute('readonly', 'readonly');
+        }
+
+        function validateBankAccount() {
+            if (!accountNumberInput || !bankSelect || !accountNameInput || !accountNameStatus) return;
+
+            const accountNumber = (accountNumberInput.value || '').replace(/\D/g, '');
+            const selectedOption = bankSelect.options[bankSelect.selectedIndex];
+            const bankCode = selectedOption ? (selectedOption.getAttribute('data-bank-code') || '') : '';
+
+            if (accountNumber.length !== 10 || !selectedOption.value) {
+                return;
+            }
+
+            accountNameStatus.classList.remove('hidden');
+            accountNameStatus.textContent = 'Validating account details...';
+            accountNameStatus.className = 'mt-1 text-sm text-blue-600';
+
+            fetch('{{ route("admin.account-numbers.validate-account") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    account_number: accountNumber,
+                    bank_code: bankCode || null
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.valid && data.account_name) {
+                    accountNameInput.value = data.account_name;
+                    accountNameInput.classList.remove('bg-gray-50');
+                    accountNameInput.removeAttribute('readonly');
+                    accountNameInput.classList.add('bg-green-50', 'border-green-300');
+
+                    accountNameStatus.textContent = '✓ Account name retrieved from bank';
+                    accountNameStatus.className = 'mt-1 text-sm text-green-600';
+
+                    setTimeout(() => {
+                        accountNameInput.classList.remove('bg-green-50', 'border-green-300');
+                    }, 3000);
+                } else {
+                    accountNameStatus.textContent = data.message || 'Unable to verify account. Please check account number and bank.';
+                    accountNameStatus.className = 'mt-1 text-sm text-red-600';
+                    resetAccountNameState();
+                }
+            })
+            .catch(() => {
+                accountNameStatus.textContent = 'Error validating account. Please try again.';
+                accountNameStatus.className = 'mt-1 text-sm text-red-600';
+                resetAccountNameState();
+            });
+        }
+
+        if (accountNumberInput && bankSelect) {
+            accountNumberInput.addEventListener('input', function() {
+                const accountNumber = this.value.replace(/\D/g, '');
+                this.value = accountNumber;
+
+                if (accountValidationTimeout) {
+                    clearTimeout(accountValidationTimeout);
+                }
+
+                resetAccountNameState();
+
+                if (accountNumber.length === 10 && bankSelect.value) {
+                    accountValidationTimeout = setTimeout(validateBankAccount, 500);
+                } else if (accountNumber.length > 0 && accountNumber.length < 10) {
+                    accountNameStatus.classList.remove('hidden');
+                    accountNameStatus.textContent = 'Account number must be 10 digits';
+                    accountNameStatus.className = 'mt-1 text-sm text-yellow-600';
+                }
+            });
+
+            bankSelect.addEventListener('change', function() {
+                if (accountValidationTimeout) {
+                    clearTimeout(accountValidationTimeout);
+                }
+
+                resetAccountNameState();
+
+                const accountNumber = (accountNumberInput.value || '').replace(/\D/g, '');
+                if (accountNumber.length === 10 && this.value) {
+                    accountValidationTimeout = setTimeout(validateBankAccount, 500);
+                }
+            });
+        }
     })();
 </script>
 @endpush
