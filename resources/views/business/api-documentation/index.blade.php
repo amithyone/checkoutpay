@@ -110,12 +110,35 @@ X-API-Key: {{ $business->api_key }}
   "webhook_url": "https://yourwebsite.com/webhook/checkout"
 }</code></pre>
                 </div>
-                <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p class="text-xs text-blue-800">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        <strong>Response:</strong> You'll receive an account number and transaction ID to display to your customer.
-                    </p>
+                <p class="text-sm font-medium text-gray-700 mt-3 mb-1">Expected response (201 Created)</p>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>{
+  "success": true,
+  "message": "Payment request received and monitoring started",
+  "data": {
+    "transaction_id": "TXN-1234567890-abc123",
+    "amount": 5000.00,
+    "payer_name": "john doe",
+    "webhook_url": "https://yourwebsite.com/webhook/checkout",
+    "account_number": "1234567890",
+    "account_name": "Your Business Name",
+    "bank_name": "GTBank",
+    "status": "pending",
+    "expires_at": "2024-01-02T12:00:00.000000Z",
+    "created_at": "2024-01-01T12:00:00.000000Z",
+    "charges": {
+      "percentage": 50.00,
+      "fixed": 100.00,
+      "total": 150.00,
+      "paid_by_customer": false,
+      "amount_to_pay": 5000.00,
+      "business_receives": 4850.00
+    },
+    "website": { "id": 1, "url": "https://yourwebsite.com" }
+  }
+}</code></pre>
                 </div>
+                <p class="text-xs text-gray-600 mt-2">Display <code>account_number</code>, <code>account_name</code>, <code>bank_name</code> and <code>transaction_id</code> to your customer.</p>
             </div>
 
             <!-- Check Payment Status -->
@@ -130,7 +153,7 @@ X-API-Key: {{ $business->api_key }}</code></pre>
             <!-- Correct transaction amount (wrong amount sent) -->
             <div>
                 <h4 class="text-base font-semibold text-gray-900 mb-3">2a. Correct transaction amount (optional)</h4>
-                <p class="text-sm text-gray-600 mb-2">If your site sent the wrong amount and the customer paid a different sum, you can update the pending payment to the actual amount. This triggers an immediate re-match so the system can find the bank alert with that amount and approve the payment.</p>
+                <p class="text-sm text-gray-600 mb-2">If you sent the wrong amount, update the pending payment to the actual amount the customer paid. We'll find your transaction with the new amount and approve it instead of refunding.</p>
                 <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
                     <pre class="text-xs text-gray-100"><code>PATCH {{ url('/api/v1/payment/{transactionId}/amount') }}
 Content-Type: application/json
