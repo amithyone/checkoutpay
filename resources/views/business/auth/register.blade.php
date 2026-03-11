@@ -89,9 +89,10 @@
                             </div>
                             <input id="website" name="website" type="url" required 
                                 class="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" 
-                                placeholder="https://yourwebsite.com" value="{{ old('website') }}">
+                                placeholder="https://yourwebsite.com or https://instagram.com/yourhandle" value="{{ old('website') }}">
                         </div>
-                        <p class="mt-1 text-xs text-gray-500">Your website will be reviewed for approval</p>
+                        <p class="mt-1 text-xs text-gray-500">Your website will be reviewed for approval.</p>
+                        <p class="mt-0.5 text-xs text-gray-500">Don't have a website? You can use your Instagram profile link (e.g. https://instagram.com/yourhandle).</p>
                     </div>
 
                     <div>

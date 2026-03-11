@@ -16,9 +16,6 @@
                 <a href="{{ route('business.keys.index') }}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium">
                     <i class="fas fa-key mr-2"></i> View API Keys
                 </a>
-                <a href="https://github.com/amithyone/checkoutpay/blob/main/API_DOCUMENTATION.md" target="_blank" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium">
-                    <i class="fab fa-github mr-2"></i> View on GitHub
-                </a>
             </div>
         </div>
     </div>
@@ -38,7 +35,7 @@
         </div>
         <p class="text-sm text-primary-100 mt-3">
             <i class="fas fa-info-circle mr-1"></i>
-            Include this key in the <code class="bg-white/20 px-1 py-0.5 rounded">X-API-Key</code> header for all API requests
+            Store in <code class="bg-white/20 px-1 py-0.5 rounded">.env</code> as <code class="bg-white/20 px-1 py-0.5 rounded">CHECKOUT_API_KEY</code> (never commit real keys). Include in the <code class="bg-white/20 px-1 py-0.5 rounded">X-API-Key</code> header for all API requests.
         </p>
     </div>
 
@@ -85,6 +82,10 @@
                 </div>
             </div>
         </div>
+        <p class="text-xs text-gray-600 mt-3">
+            <i class="fas fa-info-circle mr-1"></i>
+            Use <code class="bg-gray-100 px-1 py-0.5 rounded">CHECKOUT_BASE_URL</code> in your config (e.g. in <code class="bg-gray-100 px-1 py-0.5 rounded">.env</code>) for the base URL.
+        </p>
     </div>
 
     <!-- Quick Start Guide -->
@@ -106,7 +107,7 @@ X-API-Key: {{ $business->api_key }}
   "name": "John Doe",
   "amount": 5000.00,
   "service": "PRODUCT-123",
-  "webhook_url": "https://yourwebsite.com/webhook/payment-status"
+  "webhook_url": "https://yourwebsite.com/webhook/checkout"
 }</code></pre>
                 </div>
                 <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -151,7 +152,7 @@ X-API-Key: {{ $business->api_key }}
             <div>
                 <h4 class="text-base font-semibold text-gray-900 mb-3">3. Receive Webhook Notifications</h4>
                 <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                    <pre class="text-xs text-gray-100"><code>POST https://yourwebsite.com/webhook/payment-status
+                    <pre class="text-xs text-gray-100"><code>POST https://yourwebsite.com/webhook/checkout
 Content-Type: application/json
 
 {
@@ -187,7 +188,9 @@ Content-Type: application/json
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
             <i class="fas fa-code mr-2 text-primary"></i> Code Examples
         </h3>
-        
+        <p class="text-sm text-gray-600 mb-4">
+            In production, use <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">CHECKOUT_API_KEY</code> and <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">CHECKOUT_BASE_URL</code> from your environment instead of hardcoding.
+        </p>
         <div class="space-y-6">
             <!-- PHP Example -->
             <div>
@@ -205,7 +208,7 @@ $data = [
     'name' => 'John Doe',
     'amount' => 5000.00,
     'service' => 'PRODUCT-123',
-    'webhook_url' => 'https://yourwebsite.com/webhook/payment-status'
+    'webhook_url' => 'https://yourwebsite.com/webhook/checkout'
 ];
 
 $ch = curl_init($apiUrl);
@@ -250,7 +253,7 @@ const response = await fetch(apiUrl, {
         name: 'John Doe',
         amount: 5000.00,
         service: 'PRODUCT-123',
-        webhook_url: 'https://yourwebsite.com/webhook/payment-status'
+        webhook_url: 'https://yourwebsite.com/webhook/checkout'
     })
 });
 
@@ -286,7 +289,7 @@ data = {
     'name': 'John Doe',
     'amount': 5000.00,
     'service': 'PRODUCT-123',
-    'webhook_url': 'https://yourwebsite.com/webhook/payment-status'
+    'webhook_url': 'https://yourwebsite.com/webhook/checkout'
 }
 
 response = requests.post(api_url, json=data, headers=headers)
@@ -313,9 +316,8 @@ if result['success']:
         </div>
         <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
             <p class="text-xs text-gray-600">
-                <i class="fas fa-external-link-alt mr-1"></i>
-                For better formatting and the latest updates, view the documentation on 
-                <a href="https://github.com/amithyone/checkoutpay/blob/main/API_DOCUMENTATION.md" target="_blank" class="text-primary hover:underline">GitHub</a>.
+                <i class="fas fa-book mr-1"></i>
+                The documentation above is the complete reference. Scroll up for Quick Start and code examples.
             </p>
         </div>
     </div>

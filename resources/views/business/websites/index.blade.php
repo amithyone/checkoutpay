@@ -17,7 +17,8 @@
                     <input type="url" name="website_url" id="website_url" 
                         value="{{ old('website_url') }}"
                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="https://yourwebsite.com" required>
+                        placeholder="https://yourwebsite.com or https://subdomain.website.com" required>
+                    <p class="mt-1 text-xs text-gray-500">Subdomains are allowed (e.g. https://shop.example.com or https://subdomain.website.com).</p>
                     @error('website_url')
                         <p class="mt-1 text-xs sm:text-sm text-red-600">{{ $message }}</p>
                     @enderror
