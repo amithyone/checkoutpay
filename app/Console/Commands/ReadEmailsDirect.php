@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\EmailAccount;
 use App\Models\ProcessedEmail;
+use App\Models\WhitelistedEmailAddress;
 use App\Services\EmailExtractionService;
 use App\Services\PaymentMatchingService;
 use App\Jobs\ProcessEmailPayment;
@@ -707,6 +708,17 @@ class ReadEmailsDirect extends Command
             $textBody = $parts['text_body'] ?? '';
             $htmlBody = $parts['html_body'] ?? '';
             $subject = $parts['subject'] ?? '';
+
+            // Global whitelist check - only process emails from approved senders
+            if (!empty($fromEmail) && !WhitelistedEmailAddress::isWhitelisted($fromEmail)) {
+                Log::info('Email skipped: sender not in global whitelist', [
+                    'from' => $fromEmail,
+                    'subject' => $subject,
+                    'email_account' => $emailAccount->email,
+                    'source' => 'direct_filesystem',
+                ]);
+                return null;
+            }
 
             // IMPROVED: Extract sender name from email body if not already in headers
             // This ensures we capture the name even if it's not in the From header
