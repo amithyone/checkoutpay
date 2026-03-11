@@ -63,9 +63,10 @@ class CheckPaymentEmails implements ShouldQueue
             'account_number' => $this->payment->account_number,
         ]);
 
-        // Get unmatched stored emails that could potentially match this payment
+        // Get unmatched stored emails that could potentially match this payment (only whitelisted-from)
         // CRITICAL: Only check emails received AFTER transaction creation (emails arrive after transactions)
-        $query = ProcessedEmail::where('matched_payment_id', null) // Not already matched
+        $query = ProcessedEmail::fromWhitelisted()
+            ->where('matched_payment_id', null) // Not already matched
             ->where('email_date', '>=', $this->payment->created_at) // Email must be AFTER transaction creation
             ->where(function ($q) {
                 // Match by amount (within 1 naira tolerance)

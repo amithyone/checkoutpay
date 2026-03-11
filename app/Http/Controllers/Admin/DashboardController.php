@@ -75,12 +75,12 @@ class DashboardController extends Controller
                     ->sum(DB::raw('COALESCE(received_amount, amount)')),
             ],
             'stored_emails' => [
-                'total' => ProcessedEmail::count(),
-                'matched' => ProcessedEmail::where('is_matched', true)->count(),
-                'unmatched' => ProcessedEmail::where('is_matched', false)->count(),
-                'imap' => ProcessedEmail::where('source', 'imap')->count(),
-                'gmail_api' => ProcessedEmail::where('source', 'gmail_api')->count(),
-                'direct_filesystem' => ProcessedEmail::where('source', 'direct_filesystem')->count(),
+                'total' => ProcessedEmail::fromWhitelisted()->count(),
+                'matched' => ProcessedEmail::fromWhitelisted()->where('is_matched', true)->count(),
+                'unmatched' => ProcessedEmail::fromWhitelisted()->where('is_matched', false)->count(),
+                'imap' => ProcessedEmail::fromWhitelisted()->where('source', 'imap')->count(),
+                'gmail_api' => ProcessedEmail::fromWhitelisted()->where('source', 'gmail_api')->count(),
+                'direct_filesystem' => ProcessedEmail::fromWhitelisted()->where('source', 'direct_filesystem')->count(),
             ],
             'match_similarity' => [
                 'total_score' => MatchAttempt::whereNotNull('name_similarity_percent')->sum('name_similarity_percent'),

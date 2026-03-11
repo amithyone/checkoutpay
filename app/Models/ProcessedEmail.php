@@ -93,4 +93,28 @@ class ProcessedEmail extends Model
     {
         return $query->where('amount', $amount);
     }
+
+    /**
+     * Scope to only include emails whose from_email is whitelisted.
+     * Non-whitelisted emails are excluded from inbox and from match/unmatched consideration.
+     */
+    public function scopeFromWhitelisted($query)
+    {
+        $entries = WhitelistedEmailAddress::where('is_active', true)->get();
+        if ($entries->isEmpty()) {
+            return $query->whereRaw('1 = 0');
+        }
+        return $query->where(function ($q) use ($entries) {
+            foreach ($entries as $entry) {
+                $email = strtolower(trim($entry->email));
+                if (str_starts_with($email, '@')) {
+                    $domain = substr($email, 1);
+                    $q->orWhereRaw('LOWER(TRIM(COALESCE(from_email, ""))) LIKE ?', ['%@' . $domain]);
+                } else {
+                    $q->orWhereRaw('LOWER(TRIM(COALESCE(from_email, ""))) = ?', [$email])
+                        ->orWhereRaw('LOWER(TRIM(COALESCE(from_email, ""))) LIKE ?', ['%' . $email . '%']);
+                }
+            }
+        });
+    }
 }

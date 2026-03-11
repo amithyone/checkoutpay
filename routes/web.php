@@ -761,8 +761,9 @@ Route::get('/cron/process-emails', function () {
                 ->with('business')
                 ->get();
 
-            // Get all unmatched processed emails
-            $unmatchedEmails = \App\Models\ProcessedEmail::where('is_matched', false)
+            // Get all unmatched processed emails (only whitelisted-from count for matching)
+            $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
+                ->where('is_matched', false)
                 ->latest()
                 ->get();
 
@@ -980,8 +981,9 @@ Route::get('/cron/global-match', function () {
             ->with('business')
             ->get();
 
-        // Get all unmatched processed emails that have amounts (required for matching)
-        $unmatchedEmails = \App\Models\ProcessedEmail::where('is_matched', false)
+        // Get all unmatched processed emails that have amounts (only whitelisted-from count for matching)
+        $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
+            ->where('is_matched', false)
             ->whereNotNull('amount')
             ->where('amount', '>', 0)
             ->latest()
@@ -1019,7 +1021,8 @@ Route::get('/cron/global-match', function () {
         if ($textBodyExtractedCount > 0) {
             \Illuminate\Support\Facades\Log::info("Extracted {$textBodyExtractedCount} missing fields from text_body before matching");
             // Reload emails once after all extractions (single query instead of N queries)
-            $unmatchedEmails = \App\Models\ProcessedEmail::whereIn('id', $emailIds)
+            $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
+                ->whereIn('id', $emailIds)
                 ->where('is_matched', false)
                 ->get();
         }

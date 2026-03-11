@@ -1293,9 +1293,10 @@ class PaymentMatchingService
     public function matchPaymentToStoredEmail(Payment $payment): ?ProcessedEmail
     {
         try {
-            // Get unmatched emails with matching amount
+            // Get unmatched emails with matching amount (only whitelisted-from count for matching)
             // CRITICAL: Only check emails received AFTER transaction creation
-            $query = ProcessedEmail::where('is_matched', false)
+            $query = ProcessedEmail::fromWhitelisted()
+                ->where('is_matched', false)
                 ->where('amount', $payment->amount)
                 ->where('email_date', '>=', $payment->created_at); // Email must be AFTER transaction
             
@@ -1356,9 +1357,10 @@ class PaymentMatchingService
                 return null;
             }
 
-            // Get unmatched emails with matching amount
+            // Get unmatched emails with matching amount (only whitelisted-from count for matching)
             // CRITICAL: Only check emails received AFTER transaction creation
-            $query = ProcessedEmail::where('is_matched', false)
+            $query = ProcessedEmail::fromWhitelisted()
+                ->where('is_matched', false)
                 ->whereBetween('amount', [
                     $payment->amount - 1,
                     $payment->amount + 1

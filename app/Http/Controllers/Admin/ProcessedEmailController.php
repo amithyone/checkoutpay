@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProcessedEmail;
+use App\Models\WhitelistedEmailAddress;
 use Illuminate\Http\Request;
 
 class ProcessedEmailController extends Controller
@@ -14,6 +15,7 @@ class ProcessedEmailController extends Controller
     public function index(Request $request)
     {
         $query = ProcessedEmail::with('emailAccount', 'matchedPayment')
+            ->fromWhitelisted()
             ->latest();
 
         // Filter by status
@@ -70,11 +72,11 @@ class ProcessedEmailController extends Controller
 
         $emails = $query->paginate(20)->withQueryString();
 
-        // Statistics
+        // Statistics (only whitelisted-from emails count as total / matched / unmatched)
         $stats = [
-            'total' => ProcessedEmail::count(),
-            'matched' => ProcessedEmail::where('is_matched', true)->count(),
-            'unmatched' => ProcessedEmail::where('is_matched', false)->count(),
+            'total' => ProcessedEmail::fromWhitelisted()->count(),
+            'matched' => ProcessedEmail::fromWhitelisted()->where('is_matched', true)->count(),
+            'unmatched' => ProcessedEmail::fromWhitelisted()->where('is_matched', false)->count(),
         ];
 
         // Get email accounts for filter
@@ -84,10 +86,13 @@ class ProcessedEmailController extends Controller
     }
 
     /**
-     * Show email details
+     * Show email details (only for whitelisted-from emails)
      */
     public function show(ProcessedEmail $processedEmail)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            abort(404, 'Email not found.');
+        }
         $processedEmail->load('emailAccount', 'matchedPayment.business');
         
         return view('admin.processed-emails.show', compact('processedEmail'));
@@ -98,6 +103,12 @@ class ProcessedEmailController extends Controller
      */
     public function checkMatch(ProcessedEmail $processedEmail)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email not found.',
+            ], 404);
+        }
         try {
             // Use same logic as PaymentController::checkMatch (which works!)
             $matchingService = new \App\Services\PaymentMatchingService(
@@ -114,7 +125,8 @@ class ProcessedEmailController extends Controller
             }
             
             // Get unmatched stored emails with matching amount (same as PaymentController::checkMatch)
-            $storedEmails = \App\Models\ProcessedEmail::where('is_matched', false)
+            $storedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
+                ->where('is_matched', false)
                 ->where('id', $processedEmail->id) // Only check this specific email
                 ->whereBetween('amount', [
                     $processedEmail->amount - 1,
@@ -310,6 +322,9 @@ class ProcessedEmailController extends Controller
      */
     public function updateName(Request $request, ProcessedEmail $processedEmail)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json(['success' => false, 'message' => 'Email not found.'], 404);
+        }
         $request->validate([
             'sender_name' => 'required|string|max:255',
         ]);
@@ -355,6 +370,9 @@ class ProcessedEmailController extends Controller
      */
     public function updateAndRematch(Request $request, ProcessedEmail $processedEmail)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json(['success' => false, 'message' => 'Email not found.'], 404);
+        }
         $request->validate([
             'sender_name' => 'nullable|string|max:255',
         ]);
@@ -501,6 +519,9 @@ class ProcessedEmailController extends Controller
      */
     public function updateAmount(Request $request, ProcessedEmail $processedEmail)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json(['success' => false, 'message' => 'Email not found.'], 404);
+        }
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
         ]);
@@ -546,6 +567,9 @@ class ProcessedEmailController extends Controller
      */
     public function updateAmountAndRematch(Request $request, ProcessedEmail $processedEmail)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json(['success' => false, 'message' => 'Email not found.'], 404);
+        }
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
         ]);
@@ -686,6 +710,9 @@ class ProcessedEmailController extends Controller
      */
     public function getPendingPayments(\Illuminate\Http\Request $request, ProcessedEmail $processedEmail): \Illuminate\Http\JsonResponse
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json(['message' => 'Email not found.'], 404);
+        }
         $search = trim((string) $request->query('search', ''));
         $emailAmount = $processedEmail->amount ? (float) $processedEmail->amount : null;
 
@@ -743,6 +770,9 @@ class ProcessedEmailController extends Controller
      */
     public function matchToPayment(\Illuminate\Http\Request $request, ProcessedEmail $processedEmail): \Illuminate\Http\RedirectResponse
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return redirect()->route('admin.processed-emails.index')->with('error', 'Email not found.');
+        }
         $request->validate([
             'payment_id' => 'required|exists:payments,id',
         ]);

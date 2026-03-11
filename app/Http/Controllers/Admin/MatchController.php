@@ -50,8 +50,9 @@ class MatchController extends Controller
                 ->with('business')
                 ->get();
 
-            // Get all unmatched processed emails
-            $unmatchedEmails = ProcessedEmail::where('is_matched', false)
+            // Get all unmatched processed emails (only whitelisted-from count for matching)
+            $unmatchedEmails = ProcessedEmail::fromWhitelisted()
+                ->where('is_matched', false)
                 ->latest()
                 ->get();
 
@@ -331,8 +332,9 @@ class MatchController extends Controller
 
                     $results['payments_checked']++;
 
-                    // Get unmatched stored emails with matching amount (same as PaymentController::checkMatch)
-                    $storedEmails = ProcessedEmail::where('is_matched', false)
+                    // Get unmatched stored emails with matching amount (only whitelisted-from count)
+                    $storedEmails = ProcessedEmail::fromWhitelisted()
+                        ->where('is_matched', false)
                         ->whereBetween('amount', [
                             $payment->amount - 1,
                             $payment->amount + 1

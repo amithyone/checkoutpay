@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
+use App\Models\WhitelistedEmailAddress;
 use App\Services\PaymentMatchingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -194,6 +195,9 @@ class MatchAttemptController extends Controller
      */
     public function reExtractAndMatch(ProcessedEmail $processedEmail, PaymentMatchingService $matchingService)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json(['success' => false, 'message' => 'Email not found.'], 404);
+        }
         try {
             // Rebuild email data from ProcessedEmail (will try text_body first, then html_body)
             $emailData = [
@@ -271,6 +275,9 @@ class MatchAttemptController extends Controller
      */
     public function retryEmail(ProcessedEmail $processedEmail, PaymentMatchingService $matchingService)
     {
+        if (!WhitelistedEmailAddress::isWhitelisted($processedEmail->from_email ?? '')) {
+            return response()->json(['success' => false, 'message' => 'Email not found.'], 404);
+        }
         try {
             // Rebuild email data
             $emailData = [
