@@ -37,9 +37,10 @@ class PaymentService
             } while (Payment::where('transaction_id', $transactionId)->exists());
         }
 
+        $payerName = isset($data['payer_name']) ? trim((string) $data['payer_name']) : null;
         $account = $useInvoicePool
             ? $this->accountNumberService->assignInvoiceAccountNumber($business)
-            : $this->accountNumberService->assignAccountNumber($business);
+            : $this->accountNumberService->assignAccountNumber($business, $payerName ?: null);
 
         if (!$account) {
             throw new \RuntimeException('No account number available. Please contact support.');

@@ -339,8 +339,8 @@ class Payment extends Model
         });
 
         static::updated(function ($payment) {
-            // Invalidate cache if status or account_number changed
-            if ($payment->isDirty(['status', 'account_number', 'expires_at'])) {
+            // Invalidate cache if status or account_number changed (e.g. payment approved → account released after window)
+            if ($payment->wasChanged(['status', 'account_number', 'expires_at'])) {
                 app(\App\Services\AccountNumberService::class)->invalidatePendingAccountsCache();
             }
         });

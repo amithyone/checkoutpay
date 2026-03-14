@@ -43,6 +43,8 @@ class SettingsController extends Controller
             $validated = $request->validate([
                 'payment_time_window_minutes' => 'required|integer|min:1|max:1440', // Max 24 hours
                 'transaction_pending_time_minutes' => 'required|integer|min:5|max:10080', // 5 minutes to 7 days
+                'account_release_after_success_minutes' => 'nullable|integer|min:1|max:1440',
+                'account_same_payer_similarity_percent' => 'nullable|integer|min:50|max:100',
             ]);
 
             // Update payment time window (for email matching)
@@ -62,6 +64,25 @@ class SettingsController extends Controller
                 'payment',
                 'Time (in minutes) before a pending transaction expires. After expiration, transaction will be automatically marked as expired and cannot be matched.'
             );
+
+            if (array_key_exists('account_release_after_success_minutes', $validated) && $validated['account_release_after_success_minutes'] !== null) {
+                Setting::set(
+                    'account_release_after_success_minutes',
+                    $validated['account_release_after_success_minutes'],
+                    'integer',
+                    'payment',
+                    'Minutes after a successful transaction before the account number is released for new use. Same payer can reuse within this window.'
+                );
+            }
+            if (array_key_exists('account_same_payer_similarity_percent', $validated) && $validated['account_same_payer_similarity_percent'] !== null) {
+                Setting::set(
+                    'account_same_payer_similarity_percent',
+                    $validated['account_same_payer_similarity_percent'],
+                    'integer',
+                    'payment',
+                    'Name similarity percentage to treat two payers as the same person for account reuse.'
+                );
+            }
         }
 
         // Update IMAP fetching setting

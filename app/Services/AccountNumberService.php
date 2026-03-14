@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AccountNumber;
 use App\Models\Business;
 use App\Models\Payment;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
@@ -57,18 +58,13 @@ class AccountNumberService
     const CACHE_TTL = 300;
 
     /**
-     * Assign account number to payment request
-     * Priority: Business-specific > Pool account
-     * Pool accounts are assigned sequentially by ID, excluding last used and accounts with pending payments
-     * 
-     * OPTIMIZED: Uses caching to avoid querying all pending payments on every request
+     * Assign account number to payment request.
+     * Priority: Business-specific > Same-payer reuse (by name similarity) > First available in pool (by id, first to last).
+     * An account is "released" for new use release_after_success_minutes after it sees a successful transaction.
      */
-    public function assignAccountNumber(?Business $business = null): ?AccountNumber
+    public function assignAccountNumber(?Business $business = null, ?string $payerName = null): ?AccountNumber
     {
         $startTime = microtime(true);
-        
-        // NOTE: moveOrphanedAccountsToPool() moved to cron job to avoid running on every request
-        // This improves performance significantly
 
         // Try to get business-specific account number
         if ($business && $business->hasAccountNumber()) {
@@ -82,7 +78,6 @@ class AccountNumberService
             return $accountNumber;
         }
 
-        // OPTIMIZED: Get pool accounts from cache to avoid loading all accounts every time
         $poolAccounts = Cache::remember(self::CACHE_KEY_POOL_ACCOUNTS, self::CACHE_TTL, function () {
             return AccountNumber::pool()
                 ->active()
@@ -95,111 +90,145 @@ class AccountNumberService
             return null;
         }
 
-        // OPTIMIZED: Use cached pending account numbers instead of querying every time
+        $releaseMinutes = $this->getReleaseAfterSuccessMinutes();
+        $poolNumbers = $poolAccounts->pluck('account_number')->toArray();
+        $poolAccountsByNumber = $poolAccounts->keyBy('account_number');
+
+        // Same-payer reuse: if payer name given, try to reuse same account for same person (within release window)
+        if ($payerName !== null && $payerName !== '') {
+            $reused = $this->trySamePayerReuse($payerName, $poolNumbers, $releaseMinutes);
+            if ($reused !== null && isset($poolAccountsByNumber[$reused])) {
+                $account = $poolAccountsByNumber[$reused];
+                $duration = (microtime(true) - $startTime) * 1000;
+                Log::info('Assigned pool account number (same-payer reuse)', [
+                    'business_id' => $business?->id,
+                    'account_number' => $account->account_number,
+                    'payer_name' => $payerName,
+                    'duration_ms' => round($duration, 2),
+                ]);
+                return $account;
+            }
+        }
+
+        // In-use = pending (non-expired) union recently approved (matched within release window)
         $pendingAccountNumbers = $this->getPendingAccountNumbers();
-        
-        // OPTIMIZED: Use cached last used account instead of querying every time
-        $lastUsedAccountNumber = $this->getLastUsedAccountNumber();
-        $lastUsedAccountId = null;
-        
-        // OPTIMIZED: Use array key mapping for O(1) lookups instead of O(n) firstWhere()
-        $poolAccountsById = [];
-        $poolAccountsByNumber = [];
-        foreach ($poolAccounts as $account) {
-            $poolAccountsById[$account->id] = $account;
-            $poolAccountsByNumber[$account->account_number] = $account;
-        }
-        
-        if ($lastUsedAccountNumber) {
-            // O(1) lookup instead of O(n) firstWhere()
-            $lastUsedAccount = $poolAccountsByNumber[$lastUsedAccountNumber] ?? null;
-            if ($lastUsedAccount) {
-                $lastUsedAccountId = $lastUsedAccount->id;
-            }
-        }
+        $recentlyApproved = $this->getRecentlyApprovedAccountNumbers($releaseMinutes);
+        $inUseSet = array_flip(array_merge($pendingAccountNumbers, $recentlyApproved));
 
-        // OPTIMIZED: Use array key mapping for O(1) index lookup instead of O(n) search()
-        $poolAccountsArray = $poolAccounts->values()->all();
-        $poolCount = count($poolAccountsArray);
-        
-        // Find starting point: next account after last used (by ID)
-        $startIndex = 0;
-        if ($lastUsedAccountId && isset($poolAccountsById[$lastUsedAccountId])) {
-            // Find index using array_search for O(n) but only once, then use array keys
-            $lastUsedIndex = array_search($lastUsedAccountId, array_column($poolAccountsArray, 'id'));
-            
-            if ($lastUsedIndex !== false) {
-                // Start from the next account after the last used one
-                $startIndex = $lastUsedIndex + 1;
-            }
-        }
-
-        // OPTIMIZED: Use array key lookup for pending check (O(1) instead of in_array O(n))
-        $pendingAccountNumbersSet = array_flip($pendingAccountNumbers);
-        
-        // Try to find the next available account starting from startIndex
-        // We will always assign an account - wrap around and reuse accounts with pending payments if needed
+        // Pool order: first to last by id. Pick first account (by id) that is not in use.
         $selectedAccount = null;
-        
-        // First pass: Try to find account without pending payments (excluding last used)
-        for ($i = 0; $i < $poolCount; $i++) {
-            $index = ($startIndex + $i) % $poolCount;
-            $account = $poolAccountsArray[$index];
-            
-            // Skip if this is the last used account
-            if ($lastUsedAccountNumber && $account->account_number === $lastUsedAccountNumber) {
-                continue;
+        foreach ($poolAccounts as $account) {
+            if (!isset($inUseSet[$account->account_number])) {
+                $selectedAccount = $account;
+                break;
             }
-            
-            // OPTIMIZED: O(1) lookup instead of O(n) in_array
-            if (isset($pendingAccountNumbersSet[$account->account_number])) {
-                continue;
-            }
-            
-            // Found an available account without pending payments
-            $selectedAccount = $account;
-            break;
         }
 
-        // Second pass: If no account found without pending, wrap around and use next one after last used
-        // This ensures we ALWAYS assign an account number when requested, even if all have pending payments
-        // When we reach the end of the pool, we start again from the beginning (wraps around)
+        // If all in use, wrap: use next after last used (by creation order of pending)
+        $lastUsedAccountNumber = $this->getLastUsedAccountNumber();
         if (!$selectedAccount) {
+            $poolAccountsArray = $poolAccounts->values()->all();
+            $poolCount = count($poolAccountsArray);
+            $lastUsedAccountId = $lastUsedAccountNumber && isset($poolAccountsByNumber[$lastUsedAccountNumber])
+                ? $poolAccountsByNumber[$lastUsedAccountNumber]->id
+                : null;
+            $startIndex = 0;
             if ($lastUsedAccountId) {
                 $lastUsedIndex = array_search($lastUsedAccountId, array_column($poolAccountsArray, 'id'));
-                
                 if ($lastUsedIndex !== false) {
-                    // Get next account after last used, wrapping around to beginning if at end
-                    // This ensures we always have an account to assign, even if it has pending payments
-                    $nextIndex = ($lastUsedIndex + 1) % $poolCount;
-                    $selectedAccount = $poolAccountsArray[$nextIndex];
-                } else {
-                    // Last used account not found in pool, start from beginning
-                    $selectedAccount = $poolAccountsArray[0];
+                    $startIndex = ($lastUsedIndex + 1) % $poolCount;
                 }
-            } else {
-                // No last used account, start from beginning
-                $selectedAccount = $poolAccountsArray[0];
             }
+            $selectedAccount = $poolAccountsArray[$startIndex];
         }
-        
-        // At this point, $selectedAccount is guaranteed to be set
-        // We always assign an account number, wrapping around if needed
 
         $duration = (microtime(true) - $startTime) * 1000;
-        Log::info('Assigned pool account number (sequentially)', [
+        Log::info('Assigned pool account number (first available by id)', [
             'business_id' => $business?->id,
             'account_number' => $selectedAccount->account_number,
             'account_id' => $selectedAccount->id,
             'pool_size' => $poolAccounts->count(),
-            'pending_accounts_count' => count($pendingAccountNumbers),
-            'last_used_account' => $lastUsedAccountNumber,
-            'last_used_account_id' => $lastUsedAccountId,
-            'start_index' => $startIndex,
+            'in_use_count' => count($inUseSet),
             'duration_ms' => round($duration, 2),
         ]);
 
         return $selectedAccount;
+    }
+
+    /**
+     * Try to reuse the same account for the same payer (by name similarity).
+     * Returns account_number string if reuse found, null otherwise.
+     */
+    protected function trySamePayerReuse(string $payerName, array $poolNumbers, int $releaseMinutes): ?string
+    {
+        $threshold = $this->getSamePayerSimilarityPercent();
+        $cutoff = now()->subMinutes($releaseMinutes);
+
+        $candidate = Payment::whereNotNull('account_number')
+            ->whereIn('account_number', $poolNumbers)
+            ->where(function ($q) use ($cutoff, $releaseMinutes) {
+                $q->where('status', Payment::STATUS_PENDING)
+                    ->orWhere(function ($q2) use ($cutoff) {
+                        $q2->where('status', Payment::STATUS_APPROVED)
+                            ->whereNotNull('matched_at')
+                            ->where('matched_at', '>=', $cutoff);
+                    });
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        foreach ($candidate as $payment) {
+            if ($payment->payer_name && $this->isSamePayer($payerName, $payment->payer_name, $threshold)) {
+                return $payment->account_number;
+            }
+        }
+
+        return null;
+    }
+
+    protected function getReleaseAfterSuccessMinutes(): int
+    {
+        return (int) Setting::get('account_release_after_success_minutes', 30);
+    }
+
+    protected function getSamePayerSimilarityPercent(): int
+    {
+        return (int) Setting::get('account_same_payer_similarity_percent', 70);
+    }
+
+    /**
+     * Name similarity check (same person). Uses similar_text; threshold is 50-100%.
+     */
+    protected function isSamePayer(string $name1, string $name2, int $thresholdPercent = 70): bool
+    {
+        $n1 = strtolower(trim(preg_replace('/\s+/', ' ', $name1)));
+        $n2 = strtolower(trim(preg_replace('/\s+/', ' ', $name2)));
+        if ($n1 === '' || $n2 === '') {
+            return false;
+        }
+        if ($n1 === $n2) {
+            return true;
+        }
+        $similarity = 0.0;
+        similar_text($n1, $n2, $similarity);
+        return $similarity >= $thresholdPercent;
+    }
+
+    /**
+     * Account numbers that have an approved payment with matched_at within the last $releaseMinutes.
+     * These are still "in use" and not released for another payer.
+     */
+    protected function getRecentlyApprovedAccountNumbers(int $releaseMinutes): array
+    {
+        $cutoff = now()->subMinutes($releaseMinutes);
+        return Payment::where('status', Payment::STATUS_APPROVED)
+            ->whereNotNull('account_number')
+            ->whereNotNull('matched_at')
+            ->where('matched_at', '>=', $cutoff)
+            ->pluck('account_number')
+            ->unique()
+            ->values()
+            ->toArray();
     }
     
     /**

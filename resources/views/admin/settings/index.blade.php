@@ -69,6 +69,48 @@
                 </p>
             </div>
 
+            <div class="border-t border-gray-200 pt-4 mt-4">
+                <h4 class="text-sm font-semibold text-gray-800 mb-3">Account pool allocation</h4>
+                <div class="space-y-4">
+                    <div>
+                        <label for="account_release_after_success_minutes" class="block text-sm font-medium text-gray-700 mb-2">
+                            Release account after success (minutes)
+                        </label>
+                        <input 
+                            type="number" 
+                            id="account_release_after_success_minutes" 
+                            name="account_release_after_success_minutes" 
+                            value="{{ $settings['payment']['account_release_after_success_minutes'] ?? 30 }}"
+                            min="1" 
+                            max="1440"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        >
+                        <p class="mt-2 text-sm text-gray-500">
+                            After an account number sees a successful transaction, it becomes available for new use after this many minutes. Same payer can reuse the same account within this window.
+                        </p>
+                        <p class="mt-1 text-xs text-gray-400">Default: 30 minutes. Range: 1–1440 (24 hours).</p>
+                    </div>
+                    <div>
+                        <label for="account_same_payer_similarity_percent" class="block text-sm font-medium text-gray-700 mb-2">
+                            Same-payer name similarity (%)
+                        </label>
+                        <input 
+                            type="number" 
+                            id="account_same_payer_similarity_percent" 
+                            name="account_same_payer_similarity_percent" 
+                            value="{{ $settings['payment']['account_same_payer_similarity_percent'] ?? 70 }}"
+                            min="50" 
+                            max="100"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        >
+                        <p class="mt-2 text-sm text-gray-500">
+                            Payer names with at least this similarity are treated as the same person for reusing the same account number.
+                        </p>
+                        <p class="mt-1 text-xs text-gray-400">Default: 70%. Range: 50–100.</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="flex justify-end">
                 <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
                     <i class="fas fa-save mr-2"></i> Save Payment Settings
