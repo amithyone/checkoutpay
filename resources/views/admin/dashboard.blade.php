@@ -295,6 +295,36 @@
             </div>
         </div>
 
+        <!-- Match Attempts Log (view + clear on dashboard) -->
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Match Attempts Log</p>
+                    <h3 class="text-2xl font-bold text-gray-900">{{ number_format($stats['match_log']['total']) }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-list-alt text-amber-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center text-sm">
+                <span class="text-green-600">Matched: {{ $stats['match_log']['matched'] }}</span>
+                <span class="mx-2">•</span>
+                <span class="text-yellow-600">Unmatched: {{ $stats['match_log']['unmatched'] }}</span>
+            </div>
+            <div class="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-center gap-2">
+                <a href="{{ route('admin.match-attempts.index') }}" class="text-xs text-primary hover:underline inline-flex items-center">
+                    <i class="fas fa-external-link-alt mr-1"></i> View log
+                </a>
+                <span class="text-gray-300">|</span>
+                <button type="button" id="dashboardClearMatchLogBtn"
+                    class="text-xs text-red-600 hover:text-red-800 font-medium inline-flex items-center"
+                    onclick="confirmClearMatchLog()"
+                >
+                    <i class="fas fa-trash-alt mr-1"></i> Clear match logs
+                </button>
+            </div>
+        </div>
+
         <!-- Average Matching Time -->
         <div class="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-sm p-6 border-2 border-teal-200">
             <div class="flex items-center justify-between">
@@ -1194,6 +1224,46 @@ function getCsrfToken() {
     }
     console.error('CSRF token meta tag not found');
     return null;
+}
+
+function confirmClearMatchLog() {
+    if (!confirm('Clear all match logs? This cannot be undone.')) {
+        return;
+    }
+    const btn = document.getElementById('dashboardClearMatchLogBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Clearing...';
+    }
+    const csrfToken = getCsrfToken();
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash-alt mr-1"></i> Clear match logs'; }
+        return;
+    }
+    fetch('{{ route("admin.match-attempts.clear") }}', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            window.location.reload();
+        } else {
+            alert('❌ ' + (data.message || 'Failed to clear'));
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash-alt mr-1"></i> Clear match logs'; }
+        }
+    })
+    .catch(err => {
+        alert('❌ Error: ' + (err.message || 'Request failed'));
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash-alt mr-1"></i> Clear match logs'; }
+    });
 }
 
 function resendWebhook(paymentId) {

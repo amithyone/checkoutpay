@@ -66,7 +66,7 @@ class MatchAttemptLogger
         try {
             // Create match attempt record
             $attempt = MatchAttempt::create($attemptData);
-            
+
             // Update ProcessedEmail with last match reason if unmatched
             if ($attempt->processed_email_id && $attempt->match_result !== MatchAttempt::RESULT_MATCHED) {
                 $processedEmail = ProcessedEmail::find($attempt->processed_email_id);
@@ -77,6 +77,13 @@ class MatchAttemptLogger
                         'extraction_method' => $attempt->extraction_method,
                     ]);
                 }
+            }
+
+            // When unmatched logs reach 100, clear all match logs and start over (keeps table small)
+            $unmatchedCount = MatchAttempt::where('match_result', MatchAttempt::RESULT_UNMATCHED)->count();
+            if ($unmatchedCount >= 100) {
+                $deleted = MatchAttempt::query()->delete();
+                Log::info('Match logs auto-cleared (unmatched reached 100)', ['deleted_count' => $deleted]);
             }
 
             return $attempt;

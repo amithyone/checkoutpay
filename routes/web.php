@@ -747,10 +747,17 @@ Route::get('/cron/process-emails', function () {
                 'matched_emails' => [],
             ];
 
-            // Get all unmatched pending payments (not expired)
+            // Memory cap: process in batches to avoid loading 10k+ emails/payments (see MEMORY_MANAGEMENT.md)
+            $matchBatchSizePayments = 200;
+            $matchBatchSizeEmails = 300;
+
+            // Get unmatched pending payments (not expired); exclude when payer_name contains "checkout"
             $pendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->where(function ($q) {
+                    $q->whereNull('payer_name')->orWhereRaw('LOWER(payer_name) NOT LIKE ?', ['%checkout%']);
                 })
                 ->whereNotExists(function ($query) {
                     $query->select(\Illuminate\Support\Facades\DB::raw(1))
@@ -759,12 +766,18 @@ Route::get('/cron/process-emails', function () {
                         ->where('processed_emails.is_matched', true);
                 })
                 ->with('business')
+                ->orderBy('id')
+                ->limit($matchBatchSizePayments)
                 ->get();
 
-            // Get all unmatched processed emails (only whitelisted-from count for matching)
+            // Only today's unmatched emails that have amount (whitelisted-from), limited for memory safety
             $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
                 ->where('is_matched', false)
+                ->whereNotNull('amount')
+                ->where('amount', '>', 0)
+                ->whereDate('email_date', now()->toDateString())
                 ->latest()
+                ->limit($matchBatchSizeEmails)
                 ->get();
 
             // STEP 3a: Extract missing sender_name and description_field from text_body (if still needed)
@@ -967,10 +980,17 @@ Route::get('/cron/global-match', function () {
             'matched_emails' => [],
         ];
 
-        // Get all unmatched pending payments (not expired)
+        // Memory cap: process in batches to avoid loading 10k+ emails/payments (see MEMORY_MANAGEMENT.md)
+        $matchBatchSizePayments = 200;
+        $matchBatchSizeEmails = 300;
+
+        // Get unmatched pending payments (not expired); exclude when payer_name contains "checkout"
         $pendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('payer_name')->orWhereRaw('LOWER(payer_name) NOT LIKE ?', ['%checkout%']);
             })
             ->whereNotExists(function ($query) {
                 $query->select(\Illuminate\Support\Facades\DB::raw(1))
@@ -979,14 +999,18 @@ Route::get('/cron/global-match', function () {
                     ->where('processed_emails.is_matched', true);
             })
             ->with('business')
+            ->orderBy('id')
+            ->limit($matchBatchSizePayments)
             ->get();
 
-        // Get all unmatched processed emails that have amounts (only whitelisted-from count for matching)
+        // Only today's unmatched emails that have amount (whitelisted-from), limited for memory safety
         $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
             ->where('is_matched', false)
             ->whereNotNull('amount')
             ->where('amount', '>', 0)
+            ->whereDate('email_date', now()->toDateString())
             ->latest()
+            ->limit($matchBatchSizeEmails)
             ->get();
 
         \Illuminate\Support\Facades\Log::info('Global match cron triggered', [
@@ -1063,10 +1087,13 @@ Route::get('/cron/global-match', function () {
             \Illuminate\Support\Facades\Log::info("Parsed {$parsedCount} description fields before matching");
         }
 
-        // OPTIMIZED: Pre-load all payments once (single query) instead of querying per email
+        // OPTIMIZED: Pre-load same batch of payments once (single query) for O(1) lookup; exclude payer_name containing "checkout"
         $allPendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('payer_name')->orWhereRaw('LOWER(payer_name) NOT LIKE ?', ['%checkout%']);
             })
             ->whereNotExists(function ($query) {
                 $query->select(\Illuminate\Support\Facades\DB::raw(1))
@@ -1075,8 +1102,10 @@ Route::get('/cron/global-match', function () {
                     ->where('processed_emails.is_matched', true);
             })
             ->with('business')
+            ->orderBy('id')
+            ->limit($matchBatchSizePayments)
             ->get()
-            ->keyBy('id'); // Key by ID for O(1) lookup
+            ->keyBy('id');
         
         // Strategy: For each unmatched email, try to match against all pending payments
         // FIXED: Use same approach as admin checkMatch - use matchPayment() directly instead of matchEmail()

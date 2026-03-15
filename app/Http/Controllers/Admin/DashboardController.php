@@ -87,6 +87,11 @@ class DashboardController extends Controller
                 'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
                 'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
             ],
+            'match_log' => [
+                'total' => MatchAttempt::count(),
+                'matched' => MatchAttempt::where('match_result', MatchAttempt::RESULT_MATCHED)->count(),
+                'unmatched' => MatchAttempt::where('match_result', MatchAttempt::RESULT_UNMATCHED)->count(),
+            ],
             'invoices' => [
                 'total' => Invoice::count(),
                 'draft' => Invoice::where('status', 'draft')->count(),
