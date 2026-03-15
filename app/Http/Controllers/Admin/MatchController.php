@@ -36,13 +36,10 @@ class MatchController extends Controller
                 'matched_emails' => [],
             ];
 
-            // Get unmatched pending payments (not expired); exclude when payer_name contains "checkout"
+            // Get all unmatched pending payments (not expired)
             $pendingPayments = Payment::where('status', Payment::STATUS_PENDING)
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                })
-                ->where(function ($q) {
-                    $q->whereNull('payer_name')->orWhereRaw('LOWER(payer_name) NOT LIKE ?', ['%checkout%']);
                 })
                 ->whereNotExists(function ($query) {
                     $query->select(DB::raw(1))
@@ -53,11 +50,9 @@ class MatchController extends Controller
                 ->with('business')
                 ->get();
 
-            // Unmatched emails that have amount (whitelisted-from), latest first
+            // Get all unmatched processed emails (only whitelisted-from count for matching)
             $unmatchedEmails = ProcessedEmail::fromWhitelisted()
                 ->where('is_matched', false)
-                ->whereNotNull('amount')
-                ->where('amount', '>', 0)
                 ->latest()
                 ->get();
 

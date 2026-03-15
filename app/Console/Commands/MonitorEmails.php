@@ -295,14 +295,22 @@ class MonitorEmails extends Command
                     ]);
                     
                     if (!$messageId) {
+                        Log::warning('Email skipped: No message ID', [
+                            'subject' => $subject,
+                            'from' => $fromEmail,
+                        ]);
                         $skippedCount++;
                         $this->warn("  ❌ Skipped email #{$index}: No message ID - Subject: {$subject}");
                         continue;
                     }
-
+                    
                     // FAST CHECK: Skip if already stored (check before fetching body)
                     // Use isset() for O(1) lookup instead of in_array() O(n)
                     if (isset($existingMessageIds[$messageId])) {
+                        Log::debug('Email skipped: Already stored', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                        ]);
                         $alreadyStoredCount++;
                         $this->line("  ⏭️  Email #{$index} already stored: {$subject}");
                         continue; // Skip immediately - don't fetch body
@@ -310,6 +318,10 @@ class MonitorEmails extends Command
                     
                     // FAST CHECK: Skip if we've already processed this message ID
                     if ($lastProcessedMessageId && $messageId === $lastProcessedMessageId) {
+                        Log::debug('Email skipped: Already processed (last processed message)', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                        ]);
                         $foundLastProcessed = true;
                         $this->line("  ⏭️  Email #{$index} is last processed message: {$subject}");
                         continue;
@@ -317,14 +329,24 @@ class MonitorEmails extends Command
                     
                     // If we found the last processed message, skip all previous ones
                     if ($foundLastProcessed) {
+                        Log::debug('Email skipped: Before last processed message', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                        ]);
                         $this->line("  ⏭️  Email #{$index} skipped (before last processed): {$subject}");
                         continue;
                     }
                     
                     // Only fetch email body if we need to process it
                     
-                    // Filter by allowed senders if configured (no log - too noisy)
+                    // Filter by allowed senders if configured
                     if ($emailAccount && !$emailAccount->isSenderAllowed($fromEmail)) {
+                        Log::warning('Email skipped: Sender not allowed', [
+                            'message_id' => $messageId,
+                            'subject' => $subject,
+                            'from' => $fromEmail,
+                            'allowed_senders' => $emailAccount->allowed_senders,
+                        ]);
                         $skippedCount++;
                         $this->warn("  ❌ Email #{$index} skipped: Sender not allowed - From: {$fromEmail}, Subject: {$subject}");
                         continue;

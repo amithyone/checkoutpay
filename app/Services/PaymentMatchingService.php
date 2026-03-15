@@ -195,9 +195,8 @@ class PaymentMatchingService
                 });
             }
             
-            $paymentLimit = config('payment.match_batch_size_payments', 200);
-            $potentialPayments = $query->orderBy('created_at', 'desc')->limit($paymentLimit)->get();
-
+            $potentialPayments = $query->orderBy('created_at', 'desc')->get();
+            
             if ($potentialPayments->isEmpty()) {
                 return null;
             }
@@ -1305,10 +1304,9 @@ class PaymentMatchingService
             if ($payment->business_id && $payment->business->email_account_id) {
                 $query->where('email_account_id', $payment->business->email_account_id);
             }
-
-            $emailLimit = config('payment.match_per_payment_email_limit', 100);
-            $potentialEmails = $query->orderBy('email_date', 'asc')->limit($emailLimit)->get();
-
+            
+            $potentialEmails = $query->orderBy('email_date', 'asc')->get();
+            
             foreach ($potentialEmails as $email) {
                 $emailData = [
                     'subject' => $email->subject,
@@ -1373,10 +1371,9 @@ class PaymentMatchingService
             if ($payment->business_id && $payment->business->email_account_id) {
                 $query->where('email_account_id', $payment->business->email_account_id);
             }
-
-            $emailLimit = config('payment.match_per_payment_email_limit', 100);
-            $potentialEmails = $query->orderBy('email_date', 'asc')->limit($emailLimit)->get();
-
+            
+            $potentialEmails = $query->orderBy('email_date', 'asc')->get();
+            
             // Normalize payer name for searching (uppercase, remove extra spaces)
             $payerNameNormalized = strtoupper(trim($payment->payer_name));
             $payerNameNormalized = preg_replace('/\s+/', ' ', $payerNameNormalized);

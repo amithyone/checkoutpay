@@ -35,12 +35,19 @@ class CheckPaymentEmails implements ShouldQueue
         // Refresh payment to get latest status
         $this->payment->refresh();
         
-        // Skip if payment is already matched or expired (no log - too noisy)
+        // Skip if payment is already matched or expired
         if ($this->payment->status !== Payment::STATUS_PENDING) {
+            Log::info('Payment already processed, skipping email check', [
+                'transaction_id' => $this->payment->transaction_id,
+                'status' => $this->payment->status,
+            ]);
             return;
         }
 
         if ($this->payment->isExpired()) {
+            Log::info('Payment expired, skipping email check', [
+                'transaction_id' => $this->payment->transaction_id,
+            ]);
             return;
         }
 
@@ -83,8 +90,7 @@ class CheckPaymentEmails implements ShouldQueue
             $query->where('email_account_id', $this->payment->business->email_account_id);
         }
 
-        $emailLimit = config('payment.match_per_payment_email_limit', 100);
-        $potentialEmails = $query->orderBy('email_date', 'desc')->limit($emailLimit)->get();
+        $potentialEmails = $query->orderBy('email_date', 'desc')->get();
 
         Log::info('Found potential matching emails', [
             'transaction_id' => $this->payment->transaction_id,

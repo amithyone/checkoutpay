@@ -16,10 +16,6 @@ class ProcessedEmailController extends Controller
     {
         $query = ProcessedEmail::with('emailAccount', 'matchedPayment')
             ->fromWhitelisted()
-            ->select([
-                'id', 'subject', 'from_email', 'from_name', 'sender_name', 'amount', 'is_matched',
-                'email_date', 'created_at', 'source', 'email_account_id', 'matched_payment_id',
-            ])
             ->latest();
 
         // Filter by status

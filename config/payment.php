@@ -32,16 +32,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Match batch sizes (memory management)
-    |--------------------------------------------------------------------------
-    | Limit rows per match run to avoid loading 10k+ emails/payments into RAM.
-    */
-    'match_batch_size_payments' => (int) env('MATCH_BATCH_SIZE_PAYMENTS', 200),
-    'match_batch_size_emails' => (int) env('MATCH_BATCH_SIZE_EMAILS', 300),
-    'match_per_payment_email_limit' => (int) env('MATCH_PER_PAYMENT_EMAIL_LIMIT', 100),
-
-    /*
-    |--------------------------------------------------------------------------
     | Webhook Configuration
     |--------------------------------------------------------------------------
     |
