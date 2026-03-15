@@ -53,12 +53,11 @@ class MatchController extends Controller
                 ->with('business')
                 ->get();
 
-            // Only today's unmatched emails that have amount (whitelisted-from)
+            // Unmatched emails that have amount (whitelisted-from), latest first
             $unmatchedEmails = ProcessedEmail::fromWhitelisted()
                 ->where('is_matched', false)
                 ->whereNotNull('amount')
                 ->where('amount', '>', 0)
-                ->whereDate('email_date', now()->toDateString())
                 ->latest()
                 ->get();
 

@@ -770,12 +770,11 @@ Route::get('/cron/process-emails', function () {
                 ->limit($matchBatchSizePayments)
                 ->get();
 
-            // Only today's unmatched emails that have amount (whitelisted-from), limited for memory safety
+            // Unmatched emails that have amount (whitelisted-from), latest first, limited for memory safety
             $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
                 ->where('is_matched', false)
                 ->whereNotNull('amount')
                 ->where('amount', '>', 0)
-                ->whereDate('email_date', now()->toDateString())
                 ->latest()
                 ->limit($matchBatchSizeEmails)
                 ->get();
@@ -894,6 +893,28 @@ Route::get('/cron/process-emails', function () {
                             'payment_id' => $payment->id,
                             'email_id' => $matchedEmail->id,
                         ];
+                        $extractedData = $matchedEmail->extracted_data ?? [];
+                        $matchedEmail->markAsMatched($payment);
+                        $payment->approve([
+                            'subject' => $matchedEmail->subject,
+                            'from' => $matchedEmail->from_email,
+                            'text' => $matchedEmail->text_body ?? '',
+                            'html' => $matchedEmail->html_body ?? '',
+                            'date' => $matchedEmail->email_date ? $matchedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                            'sender_name' => $matchedEmail->sender_name,
+                        ]);
+                        if (!empty($extractedData['payer_account_number'])) {
+                            $payment->update(['payer_account_number' => $extractedData['payer_account_number']]);
+                        }
+                        if ($payment->business_id) {
+                            $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
+                            $payment->business->refresh();
+                            $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                            $payment->business->triggerAutoWithdrawal();
+                        }
+                        $payment->refresh();
+                        $payment->load(['business.websites', 'website']);
+                        event(new \App\Events\PaymentApproved($payment));
                     }
                 } catch (\Exception $e) {
                     $matchResults['errors'][] = [
@@ -1006,12 +1027,11 @@ Route::get('/cron/global-match', function () {
             ->limit($matchBatchSizePayments)
             ->get();
 
-        // Only today's unmatched emails that have amount (whitelisted-from), limited for memory safety
+        // Unmatched emails that have amount (whitelisted-from), latest first, limited for memory safety
         $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
             ->where('is_matched', false)
             ->whereNotNull('amount')
             ->where('amount', '>', 0)
-            ->whereDate('email_date', now()->toDateString())
             ->latest()
             ->limit($matchBatchSizeEmails)
             ->get();

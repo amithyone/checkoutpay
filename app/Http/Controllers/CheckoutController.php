@@ -248,19 +248,47 @@ class CheckoutController extends Controller
             ->where('transaction_id', $transactionId)
             ->firstOrFail();
 
-        // If payment is pending, trigger global match in background to check for matching emails
-        if ($payment->status === Payment::STATUS_PENDING) {
+        // If payment is pending, try to match it against stored emails (so status check can return approved)
+        if ($payment->status === Payment::STATUS_PENDING && !$payment->isExpired()) {
             try {
-                // Use dispatch to run in background (non-blocking)
-                \Illuminate\Support\Facades\Http::timeout(1)->get(url('/cron/global-match'))->throw();
-            } catch (\Exception $e) {
-                // Silently fail - don't block the response if global match fails
-                \Illuminate\Support\Facades\Log::debug('Global match trigger failed (non-critical)', [
+                $matchingService = app(\App\Services\PaymentMatchingService::class);
+                $matchedEmail = $matchingService->matchPaymentToStoredEmail($payment);
+                if (!$matchedEmail) {
+                    $matchedEmail = $matchingService->reverseSearchPaymentInEmails($payment);
+                }
+                if ($matchedEmail) {
+                    $extractedData = $matchedEmail->extracted_data ?? [];
+                    $matchedEmail->markAsMatched($payment);
+                    $payment->approve([
+                        'subject' => $matchedEmail->subject,
+                        'from' => $matchedEmail->from_email,
+                        'text' => $matchedEmail->text_body ?? '',
+                        'html' => $matchedEmail->html_body ?? '',
+                        'date' => $matchedEmail->email_date ? $matchedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
+                        'sender_name' => $matchedEmail->sender_name,
+                    ]);
+                    if (!empty($extractedData['payer_account_number'])) {
+                        $payment->update(['payer_account_number' => $extractedData['payer_account_number']]);
+                    }
+                    if ($payment->business_id) {
+                        $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
+                        $payment->business->refresh();
+                        $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+                        $payment->business->triggerAutoWithdrawal();
+                    }
+                    $payment->refresh();
+                    $payment->load(['business.websites', 'website']);
+                    event(new \App\Events\PaymentApproved($payment));
+                }
+            } catch (\Throwable $e) {
+                Log::debug('Status check match attempt failed (non-critical)', [
                     'transaction_id' => $transactionId,
                     'error' => $e->getMessage(),
                 ]);
             }
         }
+
+        $payment->refresh();
 
         $shouldRedirect = false;
         $redirectUrl = null;
