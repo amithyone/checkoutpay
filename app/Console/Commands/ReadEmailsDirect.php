@@ -709,14 +709,8 @@ class ReadEmailsDirect extends Command
             $htmlBody = $parts['html_body'] ?? '';
             $subject = $parts['subject'] ?? '';
 
-            // Global whitelist check - only process emails from approved senders
+            // Global whitelist check - only process emails from approved senders (no log - too noisy)
             if (!empty($fromEmail) && !WhitelistedEmailAddress::isWhitelisted($fromEmail)) {
-                Log::info('Email skipped: sender not in global whitelist', [
-                    'from' => $fromEmail,
-                    'subject' => $subject,
-                    'email_account' => $emailAccount->email,
-                    'source' => 'direct_filesystem',
-                ]);
                 return null;
             }
 
@@ -752,13 +746,8 @@ class ReadEmailsDirect extends Command
                 }
             }
 
-            // Filter by allowed senders
+            // Filter by allowed senders (no log - too noisy)
             if (!$emailAccount->isSenderAllowed($fromEmail)) {
-                Log::info('Email skipped: sender not allowed', [
-                    'from' => $fromEmail,
-                    'subject' => $subject,
-                    'email_account' => $emailAccount->email,
-                ]);
                 return null;
             }
 

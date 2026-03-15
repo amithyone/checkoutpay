@@ -747,9 +747,9 @@ Route::get('/cron/process-emails', function () {
                 'matched_emails' => [],
             ];
 
-            // Memory cap: process in batches to avoid loading 10k+ emails/payments (see MEMORY_MANAGEMENT.md)
-            $matchBatchSizePayments = 200;
-            $matchBatchSizeEmails = 300;
+            // Memory cap: process in batches (see MEMORY_MANAGEMENT.md; config in config/payment.php)
+            $matchBatchSizePayments = config('payment.match_batch_size_payments', 200);
+            $matchBatchSizeEmails = config('payment.match_batch_size_emails', 300);
 
             // Get unmatched pending payments (not expired); exclude when payer_name contains "checkout"
             $pendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
@@ -872,6 +872,7 @@ Route::get('/cron/process-emails', function () {
                         'error' => $e->getMessage(),
                     ]);
                 }
+                unset($processedEmail);
             }
 
             // Also check pending payments
@@ -901,6 +902,7 @@ Route::get('/cron/process-emails', function () {
                         'error' => $e->getMessage(),
                     ];
                 }
+                unset($payment);
             }
 
             $matchResults['attempts_logged'] = \App\Models\MatchAttempt::where('created_at', '>=', now()->subMinutes(1))->count();
@@ -935,6 +937,7 @@ Route::get('/cron/process-emails', function () {
             'step1' => $results['step1_fetch']['success'],
             'step2' => $results['step2_fill_sender']['success'],
             'step3' => $results['step3_match']['success'],
+            'peak_memory_mb' => round(memory_get_peak_usage(true) / 1024 / 1024, 2),
         ]);
         
         return response()->json([
@@ -980,9 +983,9 @@ Route::get('/cron/global-match', function () {
             'matched_emails' => [],
         ];
 
-        // Memory cap: process in batches to avoid loading 10k+ emails/payments (see MEMORY_MANAGEMENT.md)
-        $matchBatchSizePayments = 200;
-        $matchBatchSizeEmails = 300;
+        // Memory cap: process in batches (see MEMORY_MANAGEMENT.md; config in config/payment.php)
+        $matchBatchSizePayments = config('payment.match_batch_size_payments', 200);
+        $matchBatchSizeEmails = config('payment.match_batch_size_emails', 300);
 
         // Get unmatched pending payments (not expired); exclude when payer_name contains "checkout"
         $pendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
@@ -1299,6 +1302,7 @@ Route::get('/cron/global-match', function () {
                     'trace' => $e->getTraceAsString(),
                 ]);
             }
+            unset($processedEmail);
         }
 
         // OPTIMIZED: Pre-load all unmatched emails once (already loaded above, but filter unmatched)
@@ -1494,6 +1498,7 @@ Route::get('/cron/global-match', function () {
                             'error' => $e->getMessage(),
                         ]);
                     }
+                    unset($processedEmail);
                 }
             } catch (\Exception $e) {
                 $results['errors'][] = [
@@ -1502,6 +1507,7 @@ Route::get('/cron/global-match', function () {
                     'error' => $e->getMessage(),
                 ];
             }
+            unset($payment);
         }
 
         $results['attempts_logged'] = \App\Models\MatchAttempt::where('created_at', '>=', now()->subMinutes(1))->count();
@@ -1517,6 +1523,15 @@ Route::get('/cron/global-match', function () {
             $results['attempts_logged'],
             $executionTime
         );
+
+        $results['peak_memory_mb'] = round(memory_get_peak_usage(true) / 1024 / 1024, 2);
+        \Illuminate\Support\Facades\Log::info('Global match cron completed', [
+            'execution_time_seconds' => $executionTime,
+            'peak_memory_mb' => $results['peak_memory_mb'],
+            'emails_checked' => $results['emails_checked'],
+            'payments_checked' => $results['payments_checked'],
+            'matches_found' => $results['matches_found'],
+        ]);
 
         return response()->json([
             'success' => true,
