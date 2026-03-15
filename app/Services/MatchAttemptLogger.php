@@ -8,6 +8,12 @@ use Illuminate\Support\Facades\Log;
 
 class MatchAttemptLogger
 {
+    /** Auto-clear when total match attempts reach this count */
+    public const AUTO_CLEAR_THRESHOLD = 1000;
+
+    /** When clearing, keep this many most recent records */
+    public const KEEP_RECENT_COUNT = 300;
+
     /**
      * Log a match attempt to database with full details
      */
@@ -78,6 +84,9 @@ class MatchAttemptLogger
                     ]);
                 }
             }
+
+            // Auto-clear old match logs when count reaches threshold (keep most recent)
+            $this->autoClearIfNeeded();
 
             return $attempt;
         } catch (\Exception $e) {
@@ -210,5 +219,39 @@ class MatchAttemptLogger
         }
         
         return $sanitized;
+    }
+
+    /**
+     * When total match attempts reach AUTO_CLEAR_THRESHOLD, delete oldest so only KEEP_RECENT_COUNT remain.
+     */
+    protected function autoClearIfNeeded(): void
+    {
+        try {
+            $total = MatchAttempt::count();
+            if ($total < self::AUTO_CLEAR_THRESHOLD) {
+                return;
+            }
+
+            $toDelete = $total - self::KEEP_RECENT_COUNT;
+            if ($toDelete <= 0) {
+                return;
+            }
+
+            $oldestIds = MatchAttempt::orderBy('id')->limit($toDelete)->pluck('id');
+            if ($oldestIds->isEmpty()) {
+                return;
+            }
+
+            MatchAttempt::whereIn('id', $oldestIds)->delete();
+            Log::info('Match attempts auto-cleared (threshold reached)', [
+                'deleted' => $oldestIds->count(),
+                'kept' => self::KEEP_RECENT_COUNT,
+                'threshold' => self::AUTO_CLEAR_THRESHOLD,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Match attempts auto-clear failed (non-fatal)', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
