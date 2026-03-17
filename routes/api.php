@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\PaymentController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,7 +50,60 @@ Route::prefix('v1')->group(function () {
     // Webhook processing cron endpoint (for external cron services)
     Route::get('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']);
     Route::post('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']); // Also support POST
+
+    /**
+     * Rentals public API (no auth required)
+     */
+    Route::prefix('rentals')->group(function () {
+        // Catalog
+        Route::get('items', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'index']);
+        Route::get('items/{slug}', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'show']);
+        Route::get('items/{id}/unavailable-dates', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'unavailableDates'])
+            ->whereNumber('id');
+
+        // KYC verification (public AJAX-style endpoint)
+        Route::post('kyc/verify', [\App\Http\Controllers\Api\Rentals\KycController::class, 'verify']);
+        // Dynamic possible banks for an account number (NUBAN-backed)
+        Route::post('kyc/banks', [\App\Http\Controllers\Api\Rentals\KycController::class, 'banksForAccount']);
+        // All known banks from Checkout DB (cached from NUBAN responses)
+        Route::get('banks', [\App\Http\Controllers\Api\Rentals\KycController::class, 'banksFromDatabase']);
+
+        // Renter auth (token-based)
+        Route::post('auth/register', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'register']);
+        Route::post('auth/login', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'login']);
+
+        // Forgot password – send reset link email
+        Route::post('password/email', [\App\Http\Controllers\Api\Rentals\PasswordResetController::class, 'sendResetLinkEmail']);
+    });
 });
+
+/**
+ * Rentals authenticated API (requires Sanctum token, authenticating Renter model)
+ */
+Route::prefix('v1/rentals')
+    ->middleware('auth:sanctum')
+    ->group(function () {
+        // Current renter
+        Route::get('me', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'me']);
+        Route::post('auth/logout', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'logout']);
+
+        // KYC update for renter
+        Route::post('me/kyc', [\App\Http\Controllers\Api\Rentals\KycController::class, 'update']);
+        Route::post('me/kyc-id', [\App\Http\Controllers\Api\Rentals\KycController::class, 'uploadId']);
+
+        // Checkout flow
+        Route::post('checkout/quote', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'quote']);
+        Route::post('checkout/submit', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'submit']);
+
+        // Account management
+        Route::post('password/change', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'changePassword']);
+        Route::get('wallet', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'wallet']);
+
+        // Renter rentals
+        Route::get('requests', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'listRentals']);
+        Route::get('requests/{rental}', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'showRental'])
+            ->whereNumber('rental');
+    });
 
 // Health check
 Route::get('/health', function () {

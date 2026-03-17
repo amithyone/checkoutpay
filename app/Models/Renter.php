@@ -9,10 +9,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Laravel\Sanctum\HasApiTokens;
 
 class Renter extends Authenticatable implements MustVerifyEmail
 {
-    use HasFactory, SoftDeletes, Notifiable, MustVerifyEmailTrait;
+    use HasApiTokens, HasFactory, SoftDeletes, Notifiable, MustVerifyEmailTrait;
 
     /**
      * Send the email verification notification.
@@ -34,6 +35,9 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'verified_bank_code',
         'kyc_verified_at',
         'kyc_id_card_path',
+        'kyc_id_type',
+        'kyc_id_front_path',
+        'kyc_id_back_path',
         'is_active',
         'email_verified_at',
     ];

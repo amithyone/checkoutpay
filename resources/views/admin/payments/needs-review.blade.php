@@ -70,7 +70,25 @@
                         </div>
                         <div class="min-w-0">
                             <span class="text-gray-600 block sm:inline">Amount:</span>
-                            <span class="font-bold text-gray-900 sm:ml-2 break-words leading-tight">₦{{ number_format($payment->amount, 2) }}</span>
+                            @php
+                                $hasReceivedAmount = $payment->received_amount !== null && abs((float) $payment->received_amount - (float) $payment->amount) > 0.01;
+                                $apiAmountUpdate = is_array($payment->email_data ?? null) ? ($payment->email_data['api_amount_update'] ?? null) : null;
+                            @endphp
+                            @if($hasReceivedAmount)
+                                <span class="sm:ml-2 inline-block align-top">
+                                    <div class="text-xs text-gray-500 line-through leading-tight">₦{{ number_format($payment->amount, 2) }}</div>
+                                    <div class="font-bold text-orange-600 break-words leading-tight">₦{{ number_format($payment->received_amount, 2) }}</div>
+                                    <span class="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">Updated</span>
+                                </span>
+                            @elseif(is_array($apiAmountUpdate) && isset($apiAmountUpdate['old_amount'], $apiAmountUpdate['new_amount']) && abs((float) $apiAmountUpdate['old_amount'] - (float) $apiAmountUpdate['new_amount']) > 0.01)
+                                <span class="sm:ml-2 inline-block align-top">
+                                    <div class="text-xs text-gray-500 line-through leading-tight">₦{{ number_format((float) $apiAmountUpdate['old_amount'], 2) }}</div>
+                                    <div class="font-bold text-gray-900 break-words leading-tight">₦{{ number_format((float) $apiAmountUpdate['new_amount'], 2) }}</div>
+                                    <span class="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">API Updated</span>
+                                </span>
+                            @else
+                                <span class="font-bold text-gray-900 sm:ml-2 break-words leading-tight">₦{{ number_format($payment->amount, 2) }}</span>
+                            @endif
                         </div>
                         <div class="min-w-0">
                             <span class="text-gray-600 block sm:inline">Payer:</span>

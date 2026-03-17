@@ -81,6 +81,21 @@
             <div>
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">Expected Amount</label>
                 <p class="text-base sm:text-lg font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
+                @php
+                    $apiAmountUpdate = is_array($payment->email_data ?? null) ? ($payment->email_data['api_amount_update'] ?? null) : null;
+                @endphp
+                @if(is_array($apiAmountUpdate) && isset($apiAmountUpdate['old_amount'], $apiAmountUpdate['new_amount']) && abs((float) $apiAmountUpdate['old_amount'] - (float) $apiAmountUpdate['new_amount']) > 0.01)
+                    <p class="text-xs text-gray-500 mt-1">
+                        <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                            API Updated
+                        </span>
+                        <span class="ml-2 line-through">₦{{ number_format((float) $apiAmountUpdate['old_amount'], 2) }}</span>
+                        <span class="ml-2 font-semibold text-gray-900">→ ₦{{ number_format((float) $apiAmountUpdate['new_amount'], 2) }}</span>
+                        @if(!empty($apiAmountUpdate['updated_at']))
+                            <span class="ml-2">({{ \Carbon\Carbon::parse($apiAmountUpdate['updated_at'])->format('M d, Y H:i') }})</span>
+                        @endif
+                    </p>
+                @endif
                 @if($payment->received_amount && abs($payment->received_amount - $payment->amount) > 0.01)
                     <p class="text-xs text-gray-500 mt-1">
                         <span class="font-medium text-orange-600">Received: ₦{{ number_format($payment->received_amount, 2) }}</span>

@@ -301,6 +301,16 @@ class PaymentController extends Controller
 
             // 4. Update the amount on the record
             $payment->amount = $newAmount;
+
+            // Track that this amount was changed via API (so admin UI can display it)
+            $emailData = is_array($payment->email_data) ? $payment->email_data : [];
+            $emailData['api_amount_update'] = [
+                'old_amount' => (float) $oldAmount,
+                'new_amount' => (float) $newAmount,
+                'updated_at' => now()->toISOString(),
+                'updated_by_business_id' => $business->id,
+            ];
+            $payment->email_data = $emailData;
             
             // 5. Recalculate charges based on the new amount
             $chargeService = app(ChargeService::class);

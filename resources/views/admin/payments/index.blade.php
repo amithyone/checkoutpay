@@ -189,7 +189,31 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <span class="text-gray-400">N/A</span>
                             @endif
                         </td>
-                        <td class="px-6 py-4 text-sm font-medium text-gray-900">₦{{ number_format($payment->amount, 2) }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                            @php
+                                $hasReceivedAmount = $payment->received_amount !== null && abs((float) $payment->received_amount - (float) $payment->amount) > 0.01;
+                                $apiAmountUpdate = is_array($payment->email_data ?? null) ? ($payment->email_data['api_amount_update'] ?? null) : null;
+                            @endphp
+                            @if($hasReceivedAmount)
+                                <div class="leading-tight">
+                                    <div class="text-gray-500 line-through">₦{{ number_format($payment->amount, 2) }}</div>
+                                    <div class="text-orange-600 font-semibold">₦{{ number_format($payment->received_amount, 2) }}</div>
+                                    <div class="mt-1">
+                                        <span class="px-2 py-0.5 bg-orange-100 text-orange-800 rounded text-xs font-medium">Updated</span>
+                                    </div>
+                                </div>
+                            @elseif(is_array($apiAmountUpdate) && isset($apiAmountUpdate['old_amount'], $apiAmountUpdate['new_amount']) && abs((float) $apiAmountUpdate['old_amount'] - (float) $apiAmountUpdate['new_amount']) > 0.01)
+                                <div class="leading-tight">
+                                    <div class="text-gray-500 line-through">₦{{ number_format((float) $apiAmountUpdate['old_amount'], 2) }}</div>
+                                    <div class="text-gray-900 font-semibold">₦{{ number_format((float) $apiAmountUpdate['new_amount'], 2) }}</div>
+                                    <div class="mt-1">
+                                        <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">API Updated</span>
+                                    </div>
+                                </div>
+                            @else
+                                ₦{{ number_format($payment->amount, 2) }}
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $payment->account_number ?? 'N/A' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $payment->payer_name ?? 'N/A' }}</td>
                         <td class="px-6 py-4">
@@ -394,7 +418,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="grid grid-cols-2 gap-3 mb-3">
                     <div>
                         <p class="text-xs text-gray-600">Amount</p>
-                        <p class="text-base font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
+                        @php
+                            $hasReceivedAmount = $payment->received_amount !== null && abs((float) $payment->received_amount - (float) $payment->amount) > 0.01;
+                            $apiAmountUpdate = is_array($payment->email_data ?? null) ? ($payment->email_data['api_amount_update'] ?? null) : null;
+                        @endphp
+                        @if($hasReceivedAmount)
+                            <p class="text-xs text-gray-500 line-through leading-tight">₦{{ number_format($payment->amount, 2) }}</p>
+                            <p class="text-base font-bold text-orange-600 leading-tight">₦{{ number_format($payment->received_amount, 2) }}</p>
+                            <span class="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">Updated</span>
+                        @elseif(is_array($apiAmountUpdate) && isset($apiAmountUpdate['old_amount'], $apiAmountUpdate['new_amount']) && abs((float) $apiAmountUpdate['old_amount'] - (float) $apiAmountUpdate['new_amount']) > 0.01)
+                            <p class="text-xs text-gray-500 line-through leading-tight">₦{{ number_format((float) $apiAmountUpdate['old_amount'], 2) }}</p>
+                            <p class="text-base font-bold text-gray-900 leading-tight">₦{{ number_format((float) $apiAmountUpdate['new_amount'], 2) }}</p>
+                            <span class="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">API Updated</span>
+                        @else
+                            <p class="text-base font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
+                        @endif
                     </div>
                     @if($payment->payer_name)
                     <div>

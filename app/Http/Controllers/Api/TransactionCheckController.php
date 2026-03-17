@@ -34,12 +34,17 @@ class TransactionCheckController extends Controller
                 $payment = \App\Models\Payment::where('transaction_id', $transactionId)->first();
                 
                 if ($payment) {
+                    $hasReceivedAmount = $payment->received_amount !== null && (float) $payment->received_amount !== (float) $payment->amount;
                     $response['transaction'] = [
                         'transaction_id' => $payment->transaction_id,
                         'status' => $payment->status,
+                        // Expected/original amount requested when creating the payment
                         'amount' => (float) $payment->amount,
+                        // Actual amount received on the bank/email side (may differ when there is a mismatch or manual/manual approval)
+                        'received_amount' => $payment->received_amount !== null ? (float) $payment->received_amount : null,
+                        // Convenience flag so integrators can quickly see if amount was updated
+                        'is_amount_updated' => $hasReceivedAmount,
                         'matched_at' => $payment->matched_at?->toISOString(),
-                        'approved_at' => $payment->approved_at?->toISOString(),
                     ];
                 } else {
                     $response['transaction'] = null;

@@ -38,3 +38,17 @@ resources/views/components/beta-badge.blade.php
 # Database backups (too large for git)
 database/backups/*.sql
 database/backups/*.zip
+
+# Local exports/dumps (never commit)
+database/*.sql
+database/*.sql.zip
+database/__MACOSX/
+**/__MACOSX/
+
+# App runtime/generated files (never commit)
+storage/app/public/invoices/
+storage/app/public/rental-items/
+storage/app/public/settings/
+storage/app/rentals/
+error_log
+app.zip
