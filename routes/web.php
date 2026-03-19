@@ -948,6 +948,7 @@ Route::get('/cron/process-emails', function () {
 
 // Global Match Cron (matches all unmatched pending payments with unmatched emails)
 Route::get('/cron/global-match', function () {
+    $matchLogger = null;
     try {
         $startTime = microtime(true);
         
@@ -966,6 +967,9 @@ Route::get('/cron/global-match', function () {
             'matched_payments' => [],
             'matched_emails' => [],
         ];
+
+        $matchLogger = (new \App\Services\MatchAttemptLogger())->setDeferAutoClear(true);
+        $emailExtractionCache = []; // reused in second pass to avoid re-parsing email bodies
 
         // Get all unmatched pending payments (not expired)
         $pendingPayments = \App\Models\Payment::where('status', \App\Models\Payment::STATUS_PENDING)
@@ -1080,8 +1084,18 @@ Route::get('/cron/global-match', function () {
             ->with('business')
             ->get()
             ->keyBy('id'); // Key by ID for O(1) lookup
+
+        // Index pending payments by rounded amount so each email checks only ~3 buckets (not all N payments)
+        $paymentsByRoundedAmount = [];
+        foreach ($allPendingPayments as $payment) {
+            $bucket = (int) round((float) $payment->amount);
+            if (! isset($paymentsByRoundedAmount[$bucket])) {
+                $paymentsByRoundedAmount[$bucket] = collect();
+            }
+            $paymentsByRoundedAmount[$bucket]->push($payment);
+        }
         
-        // Strategy: For each unmatched email, try to match against all pending payments
+        // Strategy: For each unmatched email, try to match against candidate pending payments (same amount ±1)
         // FIXED: Use same approach as admin checkMatch - use matchPayment() directly instead of matchEmail()
         foreach ($unmatchedEmails as $processedEmail) {
             try {
@@ -1138,33 +1152,46 @@ Route::get('/cron/global-match', function () {
                     }
                 }
 
-                // OPTIMIZED: Filter pre-loaded payments instead of querying database
                 $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
                 $extractedAccountNumber = isset($extractedInfo['account_number']) ? trim((string) $extractedInfo['account_number']) : null;
 
-                // CRITICAL: Only check payments created BEFORE email was received
-                // When email has Account Number, only consider payments with that same account (must match our pool)
-                $potentialPayments = $allPendingPayments->filter(function ($payment) use ($extractedInfo, $emailDate, $extractedAccountNumber) {
-                    // Amount match (within 1 naira tolerance)
-                    $amountMatch = abs($payment->amount - $extractedInfo['amount']) <= 1;
-
-                    // Account number: when email has "Account Number", only consider payments that showed that same account (our pool)
-                    $accountOk = true;
+                $amountForMatch = (float) ($extractedInfo['amount'] ?? 0);
+                $candidateKeys = array_unique([
+                    (int) round($amountForMatch - 1),
+                    (int) round($amountForMatch),
+                    (int) round($amountForMatch + 1),
+                ]);
+                $potentialPayments = collect();
+                foreach ($candidateKeys as $bucketKey) {
+                    if (isset($paymentsByRoundedAmount[$bucketKey])) {
+                        $potentialPayments = $potentialPayments->merge($paymentsByRoundedAmount[$bucketKey]);
+                    }
+                }
+                $potentialPayments = $potentialPayments->unique('id')->filter(function ($payment) use ($amountForMatch, $emailDate, $extractedAccountNumber) {
+                    if (abs((float) $payment->amount - $amountForMatch) > 1) {
+                        return false;
+                    }
                     if ($extractedAccountNumber !== null && $extractedAccountNumber !== '') {
-                        $accountOk = $payment->account_number === $extractedAccountNumber;
+                        if ($payment->account_number !== $extractedAccountNumber) {
+                            return false;
+                        }
+                    }
+                    if ($emailDate && $payment->created_at > $emailDate) {
+                        return false;
+                    }
+                    if ($payment->expires_at && $payment->expires_at <= now()) {
+                        return false;
                     }
 
-                    // Time constraint: Payment must be created BEFORE email
-                    $timeMatch = !$emailDate || $payment->created_at <= $emailDate;
+                    return true;
+                })->sortByDesc('created_at')->values();
 
-                    // Not expired
-                    $notExpired = !$payment->expires_at || $payment->expires_at > now();
+                $emailExtractionCache[$processedEmail->id] = [
+                    'extractedInfo' => $extractedInfo,
+                    'extractionMethod' => is_array($extractionResult) ? ($extractionResult['method'] ?? null) : null,
+                    'extractionResult' => $extractionResult,
+                ];
 
-                    return $amountMatch && $accountOk && $timeMatch && $notExpired;
-                })->sortByDesc('created_at')->values(); // Sort by newest first
-                
-                // Use same logic as PaymentController::checkMatch (which works!)
-                $matchLogger = new \App\Services\MatchAttemptLogger();
                 $matchedPayment = null;
                 
                 foreach ($potentialPayments as $potentialPayment) {
@@ -1279,9 +1306,26 @@ Route::get('/cron/global-match', function () {
         $unmatchedEmailsByAmount = $unmatchedEmails->groupBy(function ($email) {
             return round($email->amount);
         });
+
+        // Second pass: only payments whose amount could match one of this batch's emails (±1), not all pending
+        $emailRoundedKeys = $unmatchedEmails->map(fn ($e) => (int) round((float) $e->amount))->unique()->values();
+        $candidatePaymentIds = collect();
+        foreach ($emailRoundedKeys as $erk) {
+            foreach ([$erk - 1, $erk, $erk + 1] as $bk) {
+                if (isset($paymentsByRoundedAmount[$bk])) {
+                    $candidatePaymentIds = $candidatePaymentIds->merge($paymentsByRoundedAmount[$bk]->pluck('id'));
+                }
+            }
+        }
+        $candidatePaymentIdSet = $candidatePaymentIds->unique()->flip()->all();
+        $pendingPaymentsSecondPass = $pendingPayments->filter(function ($p) use ($candidatePaymentIdSet) {
+            return isset($candidatePaymentIdSet[$p->id]);
+        });
+        $results['payments_second_pass_total_pending'] = $pendingPayments->count();
+        $results['payments_second_pass_considered'] = $pendingPaymentsSecondPass->count();
         
         // Also check pending payments that weren't matched in the first pass
-        foreach ($pendingPayments as $payment) {
+        foreach ($pendingPaymentsSecondPass as $payment) {
             try {
                 // OPTIMIZED: No refresh needed - check status from loaded data
                 if ($payment->status !== \App\Models\Payment::STATUS_PENDING || $payment->isExpired()) {
@@ -1323,58 +1367,58 @@ Route::get('/cron/global-match', function () {
                             continue;
                         }
 
-                        // Extract payment info from email
-                        $emailData = [
-                            'subject' => $processedEmail->subject,
-                            'from' => $processedEmail->from_email,
-                            'text' => $processedEmail->text_body ?? '',
-                            'html' => $processedEmail->html_body ?? '',
-                            'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
-                            'email_account_id' => $processedEmail->email_account_id,
-                            'processed_email_id' => $processedEmail->id,
-                        ];
-
-                        // Extract payment info from email (same as PaymentController::checkMatch)
-                        $extractionResult = $matchingService->extractPaymentInfo($emailData);
-                        
-                        // Handle new format: ['data' => [...], 'method' => '...']
-                        $extractedInfo = null;
-                        $extractionMethod = null;
-                        if (is_array($extractionResult) && isset($extractionResult['data'])) {
-                            $extractedInfo = $extractionResult['data'];
-                            $extractionMethod = $extractionResult['method'] ?? null;
+                        $cached = $emailExtractionCache[$processedEmail->id] ?? null;
+                        if ($cached) {
+                            $extractedInfo = $cached['extractedInfo'];
+                            $extractionMethod = $cached['extractionMethod'] ?? null;
+                            $extractionResult = $cached['extractionResult'] ?? null;
                         } else {
-                            $extractedInfo = $extractionResult; // Old format fallback
-                            $extractionMethod = 'unknown';
-                        }
-
-                        // Use stored values as fallback if extraction fails (same as PaymentController::checkMatch)
-                        if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
-                            $extractedInfo = [
-                                'amount' => $processedEmail->amount,
-                                'sender_name' => $processedEmail->sender_name,
-                                'account_number' => $processedEmail->account_number,
+                            $emailData = [
+                                'subject' => $processedEmail->subject,
+                                'from' => $processedEmail->from_email,
+                                'text' => $processedEmail->text_body ?? '',
+                                'html' => $processedEmail->html_body ?? '',
+                                'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : null,
+                                'email_account_id' => $processedEmail->email_account_id,
+                                'processed_email_id' => $processedEmail->id,
                             ];
-                        } else {
-                            // Merge stored values if extraction didn't provide them
-                            if (!isset($extractedInfo['amount']) && $processedEmail->amount) {
-                                $extractedInfo['amount'] = $processedEmail->amount;
+
+                            $extractionResult = $matchingService->extractPaymentInfo($emailData);
+
+                            $extractedInfo = null;
+                            $extractionMethod = null;
+                            if (is_array($extractionResult) && isset($extractionResult['data'])) {
+                                $extractedInfo = $extractionResult['data'];
+                                $extractionMethod = $extractionResult['method'] ?? null;
+                            } else {
+                                $extractedInfo = $extractionResult;
+                                $extractionMethod = 'unknown';
                             }
-                            if (!isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
-                                $extractedInfo['sender_name'] = $processedEmail->sender_name;
-                            }
-                            if (!isset($extractedInfo['account_number']) && $processedEmail->account_number) {
-                                $extractedInfo['account_number'] = $processedEmail->account_number;
+
+                            if (! $extractedInfo || ! isset($extractedInfo['amount']) || ! $extractedInfo['amount']) {
+                                $extractedInfo = [
+                                    'amount' => $processedEmail->amount,
+                                    'sender_name' => $processedEmail->sender_name,
+                                    'account_number' => $processedEmail->account_number,
+                                ];
+                            } else {
+                                if (! isset($extractedInfo['amount']) && $processedEmail->amount) {
+                                    $extractedInfo['amount'] = $processedEmail->amount;
+                                }
+                                if (! isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
+                                    $extractedInfo['sender_name'] = $processedEmail->sender_name;
+                                }
+                                if (! isset($extractedInfo['account_number']) && $processedEmail->account_number) {
+                                    $extractedInfo['account_number'] = $processedEmail->account_number;
+                                }
                             }
                         }
-                        
-                        // Use matchPayment() directly (same as PaymentController::checkMatch)
+
                         $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
                         $match = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
                         
                         // Log match attempt (same as PaymentController::checkMatch)
                         try {
-                            $matchLogger = new \App\Services\MatchAttemptLogger();
                             $matchLogger->logAttempt([
                                 'payment_id' => $payment->id,
                                 'processed_email_id' => $processedEmail->id,
@@ -1511,6 +1555,11 @@ Route::get('/cron/global-match', function () {
             'message' => 'Error: ' . $e->getMessage(),
             'timestamp' => now()->toDateTimeString(),
         ], 500);
+    } finally {
+        if ($matchLogger instanceof \App\Services\MatchAttemptLogger) {
+            $matchLogger->setDeferAutoClear(false);
+            $matchLogger->flushAutoClearIfNeeded();
+        }
     }
     
     // Helper function removed - now using DescriptionFieldExtractor service instead

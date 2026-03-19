@@ -8,11 +8,32 @@ use Illuminate\Support\Facades\Log;
 
 class MatchAttemptLogger
 {
+    /**
+     * When true, skip autoClearIfNeeded() after each insert (use for bulk cron runs).
+     * Call flushAutoClearIfNeeded() once at the end to avoid a full table COUNT per row.
+     */
+    protected bool $deferAutoClear = false;
+
     /** Auto-clear when total match attempts reach this count */
     public const AUTO_CLEAR_THRESHOLD = 1000;
 
     /** When clearing, keep this many most recent records */
     public const KEEP_RECENT_COUNT = 300;
+
+    public function setDeferAutoClear(bool $defer): self
+    {
+        $this->deferAutoClear = $defer;
+
+        return $this;
+    }
+
+    /**
+     * Run deferred auto-clear once (safe to call multiple times).
+     */
+    public function flushAutoClearIfNeeded(): void
+    {
+        $this->autoClearIfNeeded();
+    }
 
     /**
      * Log a match attempt to database with full details
@@ -86,7 +107,9 @@ class MatchAttemptLogger
             }
 
             // Auto-clear old match logs when count reaches threshold (keep most recent)
-            $this->autoClearIfNeeded();
+            if (! $this->deferAutoClear) {
+                $this->autoClearIfNeeded();
+            }
 
             return $attempt;
         } catch (\Exception $e) {
