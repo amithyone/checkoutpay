@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Api\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\Bank;
 use App\Models\Renter;
+use App\Services\MevonPayBankService;
 use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class KycController extends Controller
 {
     public function __construct(
         protected NubanValidationService $nubanService,
+        protected MevonPayBankService $mevonBankService,
     ) {
     }
 
@@ -26,13 +29,14 @@ class KycController extends Controller
             'account_number' => 'required|string|size:10',
         ]);
 
+        // Prefer NUBAN possible banks for this specific account (faster), MevonPay is not used here to avoid latency.
         $banks = $this->nubanService->getPossibleBanks($validated['account_number']);
 
         // Cache/update banks in our own DB so they are instantly available to frontends
         if (is_array($banks)) {
             foreach ($banks as $bank) {
-                $code = $bank['bank_code'] ?? $bank['code'] ?? null;
-                $name = $bank['name'] ?? $bank['bank_name'] ?? null;
+                $code = $bank['bankCode'] ?? $bank['bank_code'] ?? $bank['code'] ?? null;
+                $name = $bank['bankName'] ?? $bank['name'] ?? $bank['bank_name'] ?? null;
                 if (! $code || ! $name) {
                     continue;
                 }
@@ -54,9 +58,12 @@ class KycController extends Controller
      */
     public function banksFromDatabase()
     {
-        $banks = Bank::query()
-            ->orderBy('name')
-            ->get(['code', 'name']);
+        $banks = Cache::remember('rentals:banks:list:v1', now()->addHours(6), function () {
+            return Bank::query()
+                ->orderBy('name')
+                ->get(['code', 'name'])
+                ->toArray();
+        });
 
         return response()->json([
             'banks' => $banks,
@@ -74,7 +81,11 @@ class KycController extends Controller
             'bank_code' => 'required|string',
         ]);
 
+        // Prefer NUBAN validation (faster and already integrated), fallback to MevonPay name enquiry only if NUBAN fails.
         $result = $this->nubanService->validate($validated['account_number'], $validated['bank_code']);
+        if (! $result || ! isset($result['account_name'])) {
+            $result = $this->mevonBankService->nameEnquiry($validated['bank_code'], $validated['account_number']);
+        }
 
         if (! $result || ! isset($result['account_name'])) {
             return response()->json([
@@ -119,6 +130,10 @@ class KycController extends Controller
             'kyc_id_type' => $validated['id_type'],
             'kyc_id_front_path' => $frontPath,
             'kyc_id_back_path' => $backPath,
+            'kyc_id_status' => \App\Models\Renter::KYC_ID_STATUS_PENDING,
+            'kyc_id_reviewed_at' => null,
+            'kyc_id_reviewed_by' => null,
+            'kyc_id_rejection_reason' => null,
         ]);
 
         return response()->json([
@@ -147,7 +162,11 @@ class KycController extends Controller
             'bank_code' => 'required|string',
         ]);
 
+        // Prefer NUBAN validation for renter KYC as well, fallback to MevonPay only if NUBAN fails.
         $result = $this->nubanService->validate($validated['account_number'], $validated['bank_code']);
+        if (! $result || ! isset($result['account_name'])) {
+            $result = $this->mevonBankService->nameEnquiry($validated['bank_code'], $validated['account_number']);
+        }
 
         if (! $result || ! isset($result['account_name'])) {
             return response()->json([

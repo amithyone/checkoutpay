@@ -26,7 +26,8 @@ class ProfileController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:businesses,email,' . $business->id,
             'phone' => 'nullable|string|max:255',
-            'address' => 'nullable|string|max:1000',
+            // Pickup hub address for rentals
+            'address' => 'required|string|max:1000',
         ]);
 
         $business->update($validated);

@@ -50,15 +50,20 @@ class MatchController extends Controller
                 ->with('business')
                 ->get();
 
-            // Get all unmatched processed emails (only whitelisted-from count for matching)
+            // Newest unmatched emails only (same cap as cron; keeps runs fast)
+            $globalMatchMaxEmails = (int) config('checkout.global_match_max_emails', 200);
             $unmatchedEmails = ProcessedEmail::fromWhitelisted()
                 ->where('is_matched', false)
+                ->whereNotNull('amount')
+                ->where('amount', '>', 0)
                 ->latest()
+                ->limit($globalMatchMaxEmails)
                 ->get();
 
             Log::info('Global match check triggered', [
                 'pending_payments_count' => $pendingPayments->count(),
-                'unmatched_emails_count' => $unmatchedEmails->count(),
+                'unmatched_emails_in_batch' => $unmatchedEmails->count(),
+                'global_match_max_emails' => $globalMatchMaxEmails,
             ]);
 
             // STEP 1: Extract missing sender_name and description_field from text_body
@@ -483,6 +488,7 @@ class MatchController extends Controller
 
             // Count logged attempts (approximate from emails checked + payments checked)
             $results['attempts_logged'] = \App\Models\MatchAttempt::where('created_at', '>=', now()->subMinutes(1))->count();
+            $results['global_match_max_emails'] = $globalMatchMaxEmails;
 
             $message = sprintf(
                 'Global match check completed! Checked %d emails and %d payments. Found %d matches. Logged %d attempts.',

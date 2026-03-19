@@ -23,10 +23,11 @@ class RentalPaymentService
 
         $business = $rental->business;
         $amount = (float) $rental->total_amount;
+        $payerName = $rental->verified_account_name ?: $rental->renter_name;
 
         $payment = $this->paymentService->createPayment([
             'amount' => $amount,
-            'payer_name' => $rental->renter_name,
+            'payer_name' => $payerName,
             'webhook_url' => $business->webhook_url ?? '',
             'service' => 'rental',
             'business_website_id' => null,

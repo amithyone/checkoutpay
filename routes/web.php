@@ -198,7 +198,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/my-account/login', [\App\Http\Controllers\Account\Auth\LoginController::class, 'login'])->name('account.login.post');
     Route::post('/my-account/login/send-otp', [\App\Http\Controllers\Account\Auth\LoginController::class, 'sendOtp'])->name('account.login.send-otp');
     Route::get('/my-account/login/verify-otp', [\App\Http\Controllers\Account\Auth\LoginController::class, 'showVerifyOtp'])->name('account.login.verify-otp');
-    Route::post('/my-account/login/verify-otp', [\App\Http\Controllers\Account\Auth\LoginController::class, 'verifyOtp'])->name('account.login.verify-otp');
+    Route::post('/my-account/login/verify-otp', [\App\Http\Controllers\Account\Auth\LoginController::class, 'verifyOtp'])->name('account.login.verify-otp.post');
 });
 
 // Web (user) logout for my-account
@@ -981,17 +981,20 @@ Route::get('/cron/global-match', function () {
             ->with('business')
             ->get();
 
-        // Get all unmatched processed emails that have amounts (only whitelisted-from count for matching)
+        // Newest unmatched emails only (cap keeps cron fast; backlog clears over successive runs)
+        $globalMatchMaxEmails = (int) config('checkout.global_match_max_emails', 200);
         $unmatchedEmails = \App\Models\ProcessedEmail::fromWhitelisted()
             ->where('is_matched', false)
             ->whereNotNull('amount')
             ->where('amount', '>', 0)
             ->latest()
+            ->limit($globalMatchMaxEmails)
             ->get();
 
         \Illuminate\Support\Facades\Log::info('Global match cron triggered', [
             'pending_payments_count' => $pendingPayments->count(),
-            'unmatched_emails_count' => $unmatchedEmails->count(),
+            'unmatched_emails_in_batch' => $unmatchedEmails->count(),
+            'global_match_max_emails' => $globalMatchMaxEmails,
         ]);
 
         // OPTIMIZED: Batch load all data upfront to avoid N+1 queries
@@ -1476,7 +1479,8 @@ Route::get('/cron/global-match', function () {
         }
 
         $results['attempts_logged'] = \App\Models\MatchAttempt::where('created_at', '>=', now()->subMinutes(1))->count();
-        
+        $results['global_match_max_emails'] = $globalMatchMaxEmails;
+
         $executionTime = round(microtime(true) - $startTime, 2);
         $results['execution_time_seconds'] = $executionTime;
 

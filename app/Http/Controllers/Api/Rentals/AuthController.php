@@ -8,8 +8,10 @@ use App\Models\User;
 use App\Models\Business;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Auth\Events\Verified;
 
 class AuthController extends Controller
 {
@@ -22,7 +24,7 @@ class AuthController extends Controller
             'name' => 'nullable|string|max:255',
             'email' => 'required|email|max:255|unique:renters,email',
             'password' => 'required|string|min:8|confirmed',
-            'phone' => 'nullable|string|max:20',
+            'phone' => 'required|string|max:20',
             'address' => 'nullable|string|max:500',
         ]);
 
@@ -39,7 +41,7 @@ class AuthController extends Controller
             'name' => $validated['name'] ?? $validated['email'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'phone' => $validated['phone'] ?? null,
+            'phone' => $validated['phone'],
             'address' => $validated['address'] ?? null,
             'is_active' => true,
         ]);
@@ -128,8 +130,17 @@ class AuthController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
+        $business = Business::where('email', $renter->email)->first();
+
         return response()->json([
             'renter' => $this->renterResource($renter),
+            'is_business' => (bool) $business,
+            'business' => $business ? [
+                'id' => $business->id,
+                'business_id' => $business->business_id ?? null,
+                'name' => $business->name ?? null,
+                'address' => $business->address ?? null,
+            ] : null,
         ]);
     }
 
@@ -150,6 +161,72 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/v1/rentals/me/email/resend-verification
+     */
+    public function resendEmailVerification(Request $request)
+    {
+        /** @var Renter $renter */
+        $renter = $request->user();
+
+        if ($renter->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Your email is already verified.',
+            ]);
+        }
+
+        $renter->sendEmailVerificationNotification();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Verification email sent. Please check your inbox (and spam).',
+        ]);
+    }
+
+    /**
+     * POST /api/v1/rentals/me/email/verify-pin
+     */
+    public function verifyEmailPin(Request $request)
+    {
+        /** @var Renter $renter */
+        $renter = $request->user();
+
+        $validated = $request->validate([
+            'pin' => 'required|digits:6',
+        ]);
+
+        if ($renter->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Your email is already verified.',
+                'renter' => $this->renterResource($renter),
+            ]);
+        }
+
+        $cacheKey = 'renter_email_verification_pin_' . $renter->getKey();
+        $cachedPin = Cache::get($cacheKey);
+
+        if (! $cachedPin || (string) $cachedPin !== (string) $validated['pin']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
+        }
+
+        if ($renter->markEmailAsVerified()) {
+            event(new Verified($renter));
+        }
+
+        Cache::forget($cacheKey);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email verified successfully.',
+            'renter' => $this->renterResource($renter->fresh()),
+        ]);
+    }
+
     protected function renterResource(Renter $renter): array
     {
         return [
@@ -160,6 +237,14 @@ class AuthController extends Controller
             'address' => $renter->address,
             'email_verified' => (bool) $renter->email_verified_at,
             'kyc_verified' => $renter->isKycVerified(),
+            'bank_kyc_verified' => (bool) ($renter->kyc_verified_at && $renter->verified_account_number && $renter->verified_account_name),
+            'verified_account_number' => $renter->verified_account_number,
+            'verified_account_name' => $renter->verified_account_name,
+            'verified_bank_name' => $renter->verified_bank_name,
+            'verified_bank_code' => $renter->verified_bank_code,
+            'wallet_balance' => (float) ($renter->wallet_balance ?? 0.0),
+            'kyc_id_uploaded' => (bool) ($renter->kyc_id_front_path && $renter->kyc_id_back_path),
+            'kyc_id_status' => $renter->kyc_id_status,
         ];
     }
 }

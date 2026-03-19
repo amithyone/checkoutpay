@@ -15,6 +15,10 @@ class Renter extends Authenticatable implements MustVerifyEmail
 {
     use HasApiTokens, HasFactory, SoftDeletes, Notifiable, MustVerifyEmailTrait;
 
+    const KYC_ID_STATUS_PENDING = 'pending';
+    const KYC_ID_STATUS_APPROVED = 'approved';
+    const KYC_ID_STATUS_REJECTED = 'rejected';
+
     /**
      * Send the email verification notification.
      */
@@ -29,6 +33,7 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'password',
         'phone',
         'address',
+        'wallet_balance',
         'verified_account_number',
         'verified_account_name',
         'verified_bank_name',
@@ -38,6 +43,10 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'kyc_id_type',
         'kyc_id_front_path',
         'kyc_id_back_path',
+        'kyc_id_status',
+        'kyc_id_reviewed_at',
+        'kyc_id_reviewed_by',
+        'kyc_id_rejection_reason',
         'is_active',
         'email_verified_at',
     ];
@@ -50,6 +59,8 @@ class Renter extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'kyc_verified_at' => 'datetime',
+        'wallet_balance' => 'decimal:2',
+        'kyc_id_reviewed_at' => 'datetime',
         'is_active' => 'boolean',
         'password' => 'hashed',
     ];
@@ -67,9 +78,13 @@ class Renter extends Authenticatable implements MustVerifyEmail
      */
     public function isKycVerified(): bool
     {
-        return !is_null($this->kyc_verified_at) && 
-               !is_null($this->verified_account_number) && 
-               !is_null($this->verified_account_name);
+        $bankOk = !is_null($this->kyc_verified_at)
+            && !is_null($this->verified_account_number)
+            && !is_null($this->verified_account_name);
+
+        $idOk = $this->kyc_id_status === self::KYC_ID_STATUS_APPROVED;
+
+        return $bankOk && $idOk;
     }
 
     /**

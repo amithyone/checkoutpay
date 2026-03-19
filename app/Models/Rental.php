@@ -39,6 +39,9 @@ class Rental extends Model
         'renter_phone',
         'renter_address',
         'business_phone',
+        'fulfillment_method',
+        'delivery_address',
+        'return_method',
         'renter_notes',
         'business_notes',
         'payment_link_code',
@@ -47,6 +50,8 @@ class Rental extends Model
         'started_at',
         'completed_at',
         'returned_at',
+        'renter_return_requested_at',
+        'business_return_confirmed_at',
         'penalty_amount',
         'cancelled_at',
     ];
@@ -63,6 +68,8 @@ class Rental extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'returned_at' => 'datetime',
+        'renter_return_requested_at' => 'datetime',
+        'business_return_confirmed_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];
 
@@ -163,14 +170,17 @@ class Rental extends Model
     }
 
     /**
-     * Return deadline (end of end_date).
+     * Return deadline.
+     *
+     * Rule: item must be returned by 8:30am, with a 30-minute grace period.
+     * We interpret this as next-day morning after end_date: 09:00 (8:30 + 30min).
      */
     public function returnDeadline(): \Carbon\Carbon
     {
         $date = $this->end_date instanceof \Carbon\Carbon
             ? $this->end_date
             : \Carbon\Carbon::parse($this->end_date);
-        return $date->endOfDay();
+        return $date->copy()->addDay()->setTime(9, 0, 0);
     }
 
     /**

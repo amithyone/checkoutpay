@@ -60,6 +60,12 @@
                 <p><strong>Start Date:</strong> {{ $rental->start_date->format('F d, Y') }}</p>
                 <p><strong>End Date:</strong> {{ $rental->end_date->format('F d, Y') }}</p>
                 <p><strong>Duration:</strong> {{ $rental->days }} days</p>
+                <div class="mt-3 border-t pt-3 text-sm text-gray-700 space-y-1">
+                    <p><strong>Pickup time (started_at):</strong> {{ $rental->started_at ? $rental->started_at->format('F d, Y g:i A') : 'Not picked up yet' }}</p>
+                    <p><strong>Renter return requested:</strong> {{ $rental->renter_return_requested_at ? $rental->renter_return_requested_at->format('F d, Y g:i A') : 'Not requested yet' }}</p>
+                    <p><strong>Business return confirmed:</strong> {{ $rental->business_return_confirmed_at ? $rental->business_return_confirmed_at->format('F d, Y g:i A') : 'Not confirmed yet' }}</p>
+                    <p><strong>Returned time (returned_at):</strong> {{ $rental->returned_at ? $rental->returned_at->format('F d, Y g:i A') : 'Not returned yet' }}</p>
+                </div>
             </div>
         </div>
 
@@ -103,6 +109,22 @@
         <!-- Actions -->
         <div class="border-t pt-6">
             <h3 class="font-semibold mb-4">Update Status</h3>
+            <div class="flex flex-col md:flex-row gap-3 mb-5">
+                <form action="{{ route('business.rentals.mark-picked-up', $rental) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                        {{ in_array($rental->status, ['approved','active']) ? '' : 'disabled' }}>
+                        Mark picked up
+                    </button>
+                </form>
+                <form action="{{ route('business.rentals.confirm-return', $rental) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900"
+                        {{ in_array($rental->status, ['approved','active','completed']) ? '' : 'disabled' }}>
+                        Confirm return
+                    </button>
+                </form>
+            </div>
             <form action="{{ route('business.rentals.update-status', $rental) }}" method="POST" class="space-y-4">
                 @csrf
                 <div>

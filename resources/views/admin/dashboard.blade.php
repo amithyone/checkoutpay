@@ -102,7 +102,7 @@
                     <h3 class="text-lg font-semibold text-gray-900 mb-1">
                         <i class="fas fa-search-dollar text-green-600 mr-2"></i>Global Match
                     </h3>
-                    <p class="text-xs text-gray-600">Trigger matching for all unmatched items</p>
+                    <p class="text-xs text-gray-600">Match pending payments to the newest {{ config('checkout.global_match_max_emails', 200) }} unmatched emails per run</p>
                 </div>
             </div>
             <button onclick="triggerGlobalMatch()" 
@@ -500,7 +500,7 @@
                 </div>
                 <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/global-match') }}</code>
                 <p class="text-xs text-gray-600 mt-2">
-                    <strong>Matches unmatched payments with unmatched emails.</strong> Runs the global matching process using the new matching logic with full logging.
+                    <strong>Matches unmatched payments with the newest {{ config('checkout.global_match_max_emails', 200) }} unmatched emails</strong> (per run). Uses the matching logic with full logging; run again or schedule often to clear backlog.
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
                     <strong>Frequency:</strong> Every 10-30 minutes (can be less frequent than email reading)
@@ -1111,7 +1111,7 @@ function triggerGlobalMatch() {
     
     const originalHTML = btn.innerHTML;
     
-    if (!confirm('This will check all unmatched pending payments against all unmatched emails using the new matching logic with full logging. This may take a while. Continue?')) {
+    if (!confirm(`This will check unmatched pending payments against the newest {{ (int) config('checkout.global_match_max_emails', 200) }} unmatched emails (per run). Continue?`)) {
         return;
     }
     

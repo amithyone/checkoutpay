@@ -96,6 +96,8 @@ Route::prefix('dashboard')->name('business.')->group(function () {
             Route::post('/{rental}/approve', [\App\Http\Controllers\Business\RentalController::class, 'approve'])->name('approve');
             Route::post('/{rental}/reject', [\App\Http\Controllers\Business\RentalController::class, 'reject'])->name('reject');
             Route::post('/{rental}/update-status', [\App\Http\Controllers\Business\RentalController::class, 'updateStatus'])->name('update-status');
+            Route::post('/{rental}/mark-picked-up', [\App\Http\Controllers\Business\RentalController::class, 'markPickedUp'])->name('mark-picked-up');
+            Route::post('/{rental}/confirm-return', [\App\Http\Controllers\Business\RentalController::class, 'confirmReturn'])->name('confirm-return');
         });
         Route::post('/settings/regenerate-api-key', [SettingsController::class, 'regenerateApiKey'])->name('settings.regenerate-api-key');
         Route::delete('/settings/profile-picture', [SettingsController::class, 'removeProfilePicture'])->name('settings.remove-profile-picture');

@@ -36,4 +36,13 @@ return [
         'score_threshold' => (float) env('RECAPTCHA_SCORE_THRESHOLD', 0.5), // v3 only: 0.0-1.0, allow if score >= this
     ],
 
+    'mevonpay' => [
+        'base_url' => env('MEVONPAY_BASE_URL', ''),
+        'secret_key' => env('MEVONPAY_SECRET_KEY', ''),
+        'debit_account_name' => env('MEVONPAY_DEBIT_ACCOUNT_NAME', ''),
+        'debit_account_number' => env('MEVONPAY_DEBIT_ACCOUNT_NUMBER', ''),
+        'current_password' => env('MEVONPAY_CURRENT_PASSWORD', ''),
+        'timeout_seconds' => (int) env('MEVONPAY_TIMEOUT_SECONDS', 20),
+    ],
+
 ];

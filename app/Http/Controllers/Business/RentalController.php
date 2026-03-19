@@ -16,6 +16,22 @@ use Illuminate\Http\RedirectResponse;
 
 class RentalController extends Controller
 {
+    protected function maybeFinalizeReturn(Rental $rental): void
+    {
+        $rental->refresh();
+        if ($rental->returned_at) {
+            return;
+        }
+        if (! $rental->renter_return_requested_at || ! $rental->business_return_confirmed_at) {
+            return;
+        }
+        $rental->update([
+            'returned_at' => now(),
+            'completed_at' => $rental->completed_at ?? now(),
+            'status' => Rental::STATUS_COMPLETED,
+        ]);
+    }
+
 
     /**
      * Display a listing of rental requests
@@ -83,6 +99,8 @@ class RentalController extends Controller
             'daily_rate' => 'required|numeric|min:0',
             'weekly_rate' => 'nullable|numeric|min:0',
             'monthly_rate' => 'nullable|numeric|min:0',
+            'caution_fee_enabled' => 'sometimes|boolean',
+            'caution_fee_percent' => 'nullable|numeric|min:0|max:100',
             'quantity_available' => 'required|integer|min:1',
             'images' => 'nullable|array',
             'images.*' => 'image|max:2048',
@@ -93,6 +111,10 @@ class RentalController extends Controller
         $validated['business_id'] = $business->id;
         $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['is_available'] = $validated['is_available'] ?? true;
+        $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
+        $validated['caution_fee_percent'] = $validated['caution_fee_enabled']
+            ? (float) ($validated['caution_fee_percent'] ?? 0)
+            : 0;
 
         // Handle image uploads
         if ($request->hasFile('images')) {
@@ -178,6 +200,8 @@ class RentalController extends Controller
             'daily_rate' => 'required|numeric|min:0',
             'weekly_rate' => 'nullable|numeric|min:0',
             'monthly_rate' => 'nullable|numeric|min:0',
+            'caution_fee_enabled' => 'sometimes|boolean',
+            'caution_fee_percent' => 'nullable|numeric|min:0|max:100',
             'quantity_available' => 'required|integer|min:1',
             'images' => 'nullable|array',
             'images.*' => 'image|max:2048',
@@ -187,6 +211,10 @@ class RentalController extends Controller
             'is_available' => 'boolean',
             'remove_images' => 'nullable|array',
         ]);
+        $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
+        $validated['caution_fee_percent'] = $validated['caution_fee_enabled']
+            ? (float) ($validated['caution_fee_percent'] ?? 0)
+            : 0;
 
         // Handle image removal
         if ($request->filled('remove_images')) {
@@ -339,6 +367,51 @@ class RentalController extends Controller
         $rental->load(['renter', 'items', 'business']);
 
         return view('business.rentals.show', compact('rental'));
+    }
+
+    public function markPickedUp(Request $request, Rental $rental): RedirectResponse
+    {
+        $business = $request->user('business');
+        if ($rental->business_id !== $business->id) {
+            abort(403);
+        }
+
+        if (! in_array($rental->status, [Rental::STATUS_APPROVED, Rental::STATUS_ACTIVE], true)) {
+            return redirect()->route('business.rentals.show', $rental)
+                ->with('error', 'Rental must be approved before it can be marked as picked up.');
+        }
+
+        if (! $rental->started_at || $rental->status !== Rental::STATUS_ACTIVE) {
+            $rental->update([
+                'status' => Rental::STATUS_ACTIVE,
+                'started_at' => $rental->started_at ?? now(),
+            ]);
+        }
+
+        return redirect()->route('business.rentals.show', $rental)
+            ->with('success', 'Pickup confirmed. Rental is now active.');
+    }
+
+    public function confirmReturn(Request $request, Rental $rental): RedirectResponse
+    {
+        $business = $request->user('business');
+        if ($rental->business_id !== $business->id) {
+            abort(403);
+        }
+
+        if (! in_array($rental->status, [Rental::STATUS_ACTIVE, Rental::STATUS_APPROVED, Rental::STATUS_COMPLETED], true)) {
+            return redirect()->route('business.rentals.show', $rental)
+                ->with('error', 'Rental must be active (or approved) to confirm return.');
+        }
+
+        if (! $rental->business_return_confirmed_at) {
+            $rental->update(['business_return_confirmed_at' => now()]);
+        }
+
+        $this->maybeFinalizeReturn($rental);
+
+        return redirect()->route('business.rentals.show', $rental)
+            ->with('success', $rental->fresh()->returned_at ? 'Return completed.' : 'Return confirmed by business. Awaiting renter confirmation.');
     }
 
     /**

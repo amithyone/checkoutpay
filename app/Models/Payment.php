@@ -25,6 +25,7 @@ class Payment extends Model
         'payer_account_number',
         'business_id',
         'user_id',
+        'renter_id',
         'business_website_id',
         'rental_id',
         'status',
@@ -225,6 +226,9 @@ class Payment extends Model
         if ($updated && $this->user_id) {
             $this->creditUserWallet($receivedAmount ?? (float) $this->amount);
         }
+        if ($updated && $this->renter_id) {
+            $this->creditRenterWallet($receivedAmount ?? (float) $this->amount);
+        }
         return $updated;
     }
 
@@ -246,6 +250,19 @@ class Payment extends Model
             'reference_type' => self::class,
             'reference_id' => $this->id,
         ]);
+    }
+
+    /**
+     * Credit renter wallet for rentals wallet top-up payment.
+     */
+    public function creditRenterWallet(float $amount): void
+    {
+        $renter = \App\Models\Renter::find($this->renter_id);
+        if (! $renter) {
+            return;
+        }
+
+        $renter->increment('wallet_balance', $amount);
     }
 
     /**
@@ -274,6 +291,11 @@ class Payment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function renter()
+    {
+        return $this->belongsTo(\App\Models\Renter::class);
     }
 
     /**

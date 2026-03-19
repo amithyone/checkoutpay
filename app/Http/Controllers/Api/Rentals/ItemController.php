@@ -10,6 +10,23 @@ use Illuminate\Http\Request;
 class ItemController extends Controller
 {
     /**
+     * GET /api/v1/rentals/categories
+     * Public categories list.
+     */
+    public function categories()
+    {
+        $cats = RentalCategory::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'icon']);
+
+        return response()->json([
+            'data' => $cats,
+        ]);
+    }
+
+    /**
      * GET /api/v1/rentals/items
      * Public catalog list with filters + pagination.
      */

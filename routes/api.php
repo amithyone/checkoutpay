@@ -56,6 +56,7 @@ Route::prefix('v1')->group(function () {
      */
     Route::prefix('rentals')->group(function () {
         // Catalog
+        Route::get('categories', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'categories']);
         Route::get('items', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'index']);
         Route::get('items/{slug}', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'show']);
         Route::get('items/{id}/unavailable-dates', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'unavailableDates'])
@@ -86,6 +87,8 @@ Route::prefix('v1/rentals')
         // Current renter
         Route::get('me', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'me']);
         Route::post('auth/logout', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'logout']);
+        Route::post('me/email/resend-verification', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'resendEmailVerification']);
+        Route::post('me/email/verify-pin', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'verifyEmailPin']);
 
         // KYC update for renter
         Route::post('me/kyc', [\App\Http\Controllers\Api\Rentals\KycController::class, 'update']);
@@ -98,11 +101,46 @@ Route::prefix('v1/rentals')
         // Account management
         Route::post('password/change', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'changePassword']);
         Route::get('wallet', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'wallet']);
+        Route::post('wallet/fund', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'fundWallet']);
+        Route::post('wallet/fund/check', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'checkWalletFunding']);
+        Route::post('me/profile', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'updateProfile']);
 
         // Renter rentals
         Route::get('requests', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'listRentals']);
         Route::get('requests/{rental}', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'showRental'])
             ->whereNumber('rental');
+        Route::post('requests/{rental}/check-payment', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'checkPayment'])
+            ->whereNumber('rental');
+        Route::post('requests/{rental}/request-return', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'requestReturn'])
+            ->whereNumber('rental');
+        Route::post('requests/{rental}/fulfillment', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'setFulfillment'])
+            ->whereNumber('rental');
+        Route::post('requests/{rental}/return-method', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'setReturnMethod'])
+            ->whereNumber('rental');
+
+        /**
+         * Business management (authenticated via rentals token + email→Business)
+         */
+        Route::get('business/summary', \App\Http\Controllers\Api\Rentals\Business\SummaryController::class);
+        Route::get('business/rentals', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'index']);
+        Route::get('business/rentals/{rental}', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'show'])
+            ->whereNumber('rental');
+        Route::post('business/rentals/{rental}/mark-picked-up', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'markPickedUp'])
+            ->whereNumber('rental');
+        Route::post('business/rentals/{rental}/confirm-return', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'confirmReturn'])
+            ->whereNumber('rental');
+        Route::get('business/items', [\App\Http\Controllers\Api\Rentals\Business\ItemsController::class, 'index']);
+        Route::post('business/items', [\App\Http\Controllers\Api\Rentals\Business\ItemsController::class, 'store']);
+        Route::patch('business/items/{item}', [\App\Http\Controllers\Api\Rentals\Business\ItemsController::class, 'update'])
+            ->whereNumber('item');
+        Route::get('business/withdrawals', [\App\Http\Controllers\Api\Rentals\Business\WithdrawalsController::class, 'index']);
+        Route::post('business/withdrawals', [\App\Http\Controllers\Api\Rentals\Business\WithdrawalsController::class, 'store']);
+        Route::get('business/withdrawal-accounts', [\App\Http\Controllers\Api\Rentals\Business\WithdrawalAccountsController::class, 'index']);
+        Route::post('business/withdrawal-accounts', [\App\Http\Controllers\Api\Rentals\Business\WithdrawalAccountsController::class, 'store']);
+        Route::get('business/settings', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'show']);
+        Route::patch('business/settings', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'update']);
+        Route::post('business/settings/withdrawal-pin', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'setWithdrawalPin']);
+        Route::post('business/settings/withdrawal-pin/verify', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'verifyWithdrawalPin']);
     });
 
 // Health check

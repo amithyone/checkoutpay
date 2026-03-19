@@ -24,6 +24,8 @@ class RentalItem extends Model
         'weekly_rate',
         'monthly_rate',
         'currency',
+        'caution_fee_enabled',
+        'caution_fee_percent',
         'quantity_available',
         'is_available',
         'images',
@@ -37,6 +39,8 @@ class RentalItem extends Model
         'daily_rate' => 'decimal:2',
         'weekly_rate' => 'decimal:2',
         'monthly_rate' => 'decimal:2',
+        'caution_fee_enabled' => 'boolean',
+        'caution_fee_percent' => 'decimal:2',
         'quantity_available' => 'integer',
         'is_available' => 'boolean',
         'is_active' => 'boolean',
@@ -108,7 +112,9 @@ class RentalItem extends Model
         $conflictingRentals = Rental::whereHas('items', function ($q) {
             $q->where('rental_items.id', $this->id);
         })
-        ->where('status', '!=', 'cancelled')
+        // Only block dates for rentals that still occupy inventory.
+        // Once returned/completed, the item should be available again.
+        ->whereIn('status', [Rental::STATUS_PENDING, Rental::STATUS_APPROVED, Rental::STATUS_ACTIVE])
         ->where(function ($q) use ($startDate, $endDate) {
             $q->whereBetween('start_date', [$startDate, $endDate])
               ->orWhereBetween('end_date', [$startDate, $endDate])

@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
+use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
@@ -143,6 +144,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('withdrawals/{withdrawal}/approve', [WithdrawalController::class, 'approve'])->name('withdrawals.approve');
         Route::post('withdrawals/{withdrawal}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject');
         Route::post('withdrawals/{withdrawal}/mark-processed', [WithdrawalController::class, 'markProcessed'])->name('withdrawals.mark-processed');
+
+        // Renters KYC (ID review)
+        Route::get('renters-kyc', [RenterKycController::class, 'index'])->name('renters-kyc.index');
+        Route::post('renters-kyc/{renter}/approve', [RenterKycController::class, 'approve'])->name('renters-kyc.approve');
+        Route::post('renters-kyc/{renter}/reject', [RenterKycController::class, 'reject'])->name('renters-kyc.reject');
 
         // Transaction Logs
         Route::get('transaction-logs', [\App\Http\Controllers\Admin\TransactionLogController::class, 'index'])->name('transaction-logs.index');

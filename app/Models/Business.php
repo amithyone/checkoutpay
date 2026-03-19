@@ -48,6 +48,8 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'auto_withdraw_end_of_day',
         'two_factor_enabled',
         'two_factor_secret',
+        'withdrawal_pin_hash',
+        'withdrawal_pin_set_at',
         'charges_paid_by_customer',
         'charge_percentage',
         'charge_fixed',
@@ -69,11 +71,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'last_daily_revenue_update',
         'last_monthly_revenue_update',
         'last_yearly_revenue_update',
+        'rental_global_caution_fee_enabled',
+        'rental_global_caution_fee_percent',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'withdrawal_pin_hash',
     ];
 
     protected $casts = [
@@ -106,7 +111,10 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'last_daily_revenue_update' => 'datetime',
         'last_monthly_revenue_update' => 'datetime',
         'last_yearly_revenue_update' => 'datetime',
+        'rental_global_caution_fee_enabled' => 'boolean',
+        'rental_global_caution_fee_percent' => 'decimal:2',
         'two_factor_enabled' => 'boolean',
+        'withdrawal_pin_set_at' => 'datetime',
         'auto_withdraw_threshold' => 'decimal:2',
         'auto_withdraw_end_of_day' => 'boolean',
         'charges_paid_by_customer' => 'boolean',

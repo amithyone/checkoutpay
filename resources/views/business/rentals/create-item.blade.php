@@ -70,6 +70,25 @@
                 </div>
             </div>
 
+            <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="font-semibold">Caution fee</div>
+                        <div class="text-xs text-gray-500">Optional deposit charged as a percentage of the rental total.</div>
+                    </div>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="caution_fee_enabled" value="1" class="mr-2">
+                        <span class="text-sm">Enable</span>
+                    </label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Caution fee (%)</label>
+                        <input type="number" name="caution_fee_percent" step="0.01" min="0" max="100" value="0" class="w-full border-gray-300 rounded-md">
+                    </div>
+                </div>
+            </div>
+
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-1">Images</label>
                 <input type="file" name="images[]" multiple accept="image/*" class="w-full border-gray-300 rounded-md">
