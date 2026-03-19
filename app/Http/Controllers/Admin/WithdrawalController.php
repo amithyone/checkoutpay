@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\WithdrawalRequest;
 use App\Services\TransactionLogService;
+use App\Services\WithdrawalMavonPayPayoutService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -50,6 +51,7 @@ class WithdrawalController extends Controller
             'account_number' => 'required|string|max:20',
             'account_name' => 'required|string|max:255',
             'bank_name' => 'required|string|max:255',
+            'bank_code' => 'nullable|string|max:20',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -59,6 +61,14 @@ class WithdrawalController extends Controller
         if ($business->balance < $validated['amount']) {
             return back()
                 ->withErrors(['amount' => 'Insufficient balance. Available: ₦' . number_format($business->balance, 2)])
+                ->withInput();
+        }
+
+        /** @var WithdrawalMavonPayPayoutService $payout */
+        $payout = app(WithdrawalMavonPayPayoutService::class);
+        if ($payout->isMavonConfigured() && ! $payout->resolveBankCode($request->input('bank_code'), $validated['bank_name'])) {
+            return back()
+                ->withErrors(['bank_name' => 'Could not resolve bank code for the selected bank. Pick a bank from the list or ensure it exists in the Banks table.'])
                 ->withInput();
         }
 
@@ -72,6 +82,9 @@ class WithdrawalController extends Controller
             'status' => WithdrawalRequest::STATUS_PENDING,
         ]);
 
+        $payout->processWithdrawal($withdrawal, $business, $request->input('bank_code'));
+        $withdrawal->refresh();
+
         // Log withdrawal request
         $this->logService->logWithdrawalRequest($withdrawal, $request);
 
@@ -81,8 +94,10 @@ class WithdrawalController extends Controller
         // Notify admin (Telegram + email) so they can treat withdrawal ASAP
         app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
 
+        $success = 'Withdrawal request created. '.$payout->summaryMessage($withdrawal);
+
         return redirect()->route('admin.withdrawals.show', $withdrawal)
-            ->with('success', 'Withdrawal request created successfully');
+            ->with('success', $success);
     }
 
     public function show(WithdrawalRequest $withdrawal): View

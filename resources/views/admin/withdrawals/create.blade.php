@@ -46,15 +46,18 @@
 
                 <div>
                     <label for="bank_name" class="block text-sm font-medium text-gray-700 mb-1">Bank Name <span class="text-red-500">*</span></label>
+                    <input type="hidden" name="bank_code" id="bank_code" value="{{ old('bank_code') }}">
                     <select name="bank_name" id="bank_name" required
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
                         <option value="">Select Bank</option>
                         @foreach(collect(config('banks'))->sortBy('bank_name') as $bank)
-                            <option value="{{ $bank['bank_name'] }}" data-bank-code="{{ $bank['code'] ?? '' }}">
+                            <option value="{{ $bank['bank_name'] }}" data-bank-code="{{ $bank['code'] ?? '' }}"
+                                @selected(old('bank_name') === $bank['bank_name'])>
                                 {{ $bank['bank_name'] }}
                             </option>
                         @endforeach
                     </select>
+                    <p class="mt-1 text-xs text-gray-500">Bank code is sent for instant transfer (MavonPay) when configured.</p>
                     @error('bank_name')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -112,10 +115,18 @@
         const balanceAmount = document.getElementById('balance-amount');
         const amountInput = document.getElementById('amount');
         const bankSelect = document.getElementById('bank_name');
+        const bankCodeInput = document.getElementById('bank_code');
         const accountNumberInput = document.getElementById('account_number');
         const accountNameInput = document.getElementById('account_name');
         const accountNameStatus = document.getElementById('account_name_status');
         let accountValidationTimeout = null;
+
+        function syncBankCodeFromSelect() {
+            if (!bankSelect || !bankCodeInput) return;
+            const opt = bankSelect.options[bankSelect.selectedIndex];
+            bankCodeInput.value = opt ? (opt.getAttribute('data-bank-code') || '') : '';
+        }
+        syncBankCodeFromSelect();
 
         // Show balance when business is selected
         businessSelect.addEventListener('change', function() {
@@ -238,6 +249,7 @@
             });
 
             bankSelect.addEventListener('change', function() {
+                syncBankCodeFromSelect();
                 if (accountValidationTimeout) {
                     clearTimeout(accountValidationTimeout);
                 }

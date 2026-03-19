@@ -7,9 +7,26 @@ use Illuminate\Support\Facades\Log;
 
 class NubanValidationService
 {
-    private const API_KEY = 'NUBAN-RCWHXKRD3766';
-    private const BASE_URL = 'https://app.nuban.com.ng/api';
-    private const POSSIBLE_BANKS_URL = 'https://app.nuban.com.ng/possible-banks';
+    protected string $apiKey;
+
+    protected string $baseUrl;
+
+    protected string $possibleBanksUrl;
+
+    protected int $timeoutSeconds;
+
+    public function __construct()
+    {
+        $this->apiKey = (string) config('services.nuban.api_key', '');
+        $this->baseUrl = (string) config('services.nuban.base_url', 'https://app.nuban.com.ng/api');
+        $this->possibleBanksUrl = (string) config('services.nuban.possible_banks_url', 'https://app.nuban.com.ng/possible-banks');
+        $this->timeoutSeconds = (int) config('services.nuban.timeout_seconds', 10);
+    }
+
+    public function isConfigured(): bool
+    {
+        return $this->apiKey !== '';
+    }
 
     /**
      * Validate account number using only account number
@@ -20,8 +37,14 @@ class NubanValidationService
      */
     public function validateAccountNumber(string $accountNumber): ?array
     {
+        if (! $this->isConfigured()) {
+            Log::warning('NUBAN validation skipped: NUBAN_API_KEY is not set');
+
+            return null;
+        }
+
         try {
-            $response = Http::timeout(10)->get(self::BASE_URL . '/' . self::API_KEY, [
+            $response = Http::timeout($this->timeoutSeconds)->get($this->baseUrl.'/'.$this->apiKey, [
                 'acc_no' => $accountNumber,
             ]);
 
@@ -94,8 +117,14 @@ class NubanValidationService
      */
     public function validateAccountNumberWithBankCode(string $accountNumber, string $bankCode): ?array
     {
+        if (! $this->isConfigured()) {
+            Log::warning('NUBAN validation skipped: NUBAN_API_KEY is not set');
+
+            return null;
+        }
+
         try {
-            $response = Http::timeout(10)->get(self::BASE_URL . '/' . self::API_KEY, [
+            $response = Http::timeout($this->timeoutSeconds)->get($this->baseUrl.'/'.$this->apiKey, [
                 'bank_code' => $bankCode,
                 'acc_no' => $accountNumber,
             ]);
@@ -172,8 +201,12 @@ class NubanValidationService
      */
     public function getPossibleBanks(string $accountNumber): array
     {
+        if (! $this->isConfigured()) {
+            return [];
+        }
+
         try {
-            $response = Http::timeout(10)->get(self::POSSIBLE_BANKS_URL . '/' . self::API_KEY, [
+            $response = Http::timeout($this->timeoutSeconds)->get($this->possibleBanksUrl.'/'.$this->apiKey, [
                 'acc_no' => $accountNumber,
             ]);
 

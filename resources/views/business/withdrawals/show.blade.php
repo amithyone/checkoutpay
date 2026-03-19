@@ -60,6 +60,19 @@
                 <p class="text-xs sm:text-sm text-gray-900 break-words">{{ $withdrawal->notes }}</p>
             </div>
             @endif
+            @if($withdrawal->payout_provider || $withdrawal->payout_status)
+            <div class="sm:col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <label class="block text-xs sm:text-sm font-medium text-slate-800 mb-1">Bank transfer status</label>
+                <p class="text-xs sm:text-sm text-slate-700"><span class="font-medium capitalize">{{ str_replace('_', ' ', $withdrawal->payout_status ?? '—') }}</span>
+                    @if($withdrawal->payout_response_message)
+                        — {{ $withdrawal->payout_response_message }}
+                    @endif
+                </p>
+                @if($withdrawal->payout_reference)
+                    <p class="text-xs text-slate-500 mt-1 font-mono">Ref: {{ $withdrawal->payout_reference }}</p>
+                @endif
+            </div>
+            @endif
         </div>
 
         <div class="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">

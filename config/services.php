@@ -45,4 +45,14 @@ return [
         'timeout_seconds' => (int) env('MEVONPAY_TIMEOUT_SECONDS', 20),
     ],
 
+    /*
+    | NUBAN (app.nuban.com.ng) – account validation / possible banks
+    */
+    'nuban' => [
+        'api_key' => env('NUBAN_API_KEY', ''),
+        'base_url' => rtrim(env('NUBAN_BASE_URL', 'https://app.nuban.com.ng/api'), '/'),
+        'possible_banks_url' => rtrim(env('NUBAN_POSSIBLE_BANKS_URL', 'https://app.nuban.com.ng/possible-banks'), '/'),
+        'timeout_seconds' => (int) env('NUBAN_TIMEOUT_SECONDS', 10),
+    ],
+
 ];

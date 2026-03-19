@@ -65,6 +65,24 @@
         </div>
         @endif
 
+        @if($withdrawal->payout_provider || $withdrawal->payout_status)
+        <div class="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-slate-800 mb-2">Instant transfer (MavonPay)</h4>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div><span class="text-slate-600">Payout status:</span> <span class="font-medium">{{ $withdrawal->payout_status ?? '—' }}</span></div>
+                @if($withdrawal->payout_reference)
+                <div><span class="text-slate-600">Reference:</span> <span class="font-mono text-xs">{{ $withdrawal->payout_reference }}</span></div>
+                @endif
+                @if($withdrawal->payout_response_code)
+                <div><span class="text-slate-600">Response code:</span> {{ $withdrawal->payout_response_code }}</div>
+                @endif
+                @if($withdrawal->payout_response_message)
+                <div class="sm:col-span-2"><span class="text-slate-600">Message:</span> {{ $withdrawal->payout_response_message }}</div>
+                @endif
+            </dl>
+        </div>
+        @endif
+
         @if($withdrawal->status === 'pending')
         <div class="flex items-center space-x-3 pt-6 border-t border-gray-200">
             <form action="{{ route('admin.withdrawals.approve', $withdrawal) }}" method="POST" class="inline">

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\WithdrawalRequest;
 use App\Services\NubanValidationService;
+use App\Services\WithdrawalMavonPayPayoutService;
 
 class WithdrawalController extends Controller
 {
@@ -241,6 +242,8 @@ class WithdrawalController extends Controller
             'is_default' => 'boolean',
         ];
 
+        $bankCode = null;
+
         // Account from step 2 session (step-by-step flow)
         $sessionAccount = $request->session()->get('withdrawal_account');
         if ($sessionAccount) {
@@ -272,10 +275,12 @@ class WithdrawalController extends Controller
                 $bankName = $savedAccount->bank_name;
                 $accountNumber = $savedAccount->account_number;
                 $accountName = $savedAccount->account_name;
+                $bankCode = $savedAccount->bank_code ?? null;
             } elseif ($hasAccountNumber) {
                 $bankName = $accountDetails->bank_name;
                 $accountNumber = $accountDetails->account_number;
                 $accountName = $accountDetails->account_name;
+                $bankCode = null;
             } else {
                 $bankName = $validated['bank_name'];
                 $accountNumber = $validated['account_number'];
@@ -348,14 +353,19 @@ class WithdrawalController extends Controller
             'account_number' => $accountNumber,
             'account_name' => $accountName,
             'notes' => $validated['notes'] ?? null,
-            'status' => 'pending',
+            'status' => WithdrawalRequest::STATUS_PENDING,
         ]);
+
+        /** @var WithdrawalMavonPayPayoutService $payout */
+        $payout = app(WithdrawalMavonPayPayoutService::class);
+        $payout->processWithdrawal($withdrawal, $business, $bankCode);
+        $withdrawal->refresh();
 
         $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
         app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
 
         return redirect()->route('business.withdrawals.show', $withdrawal)
-            ->with('success', 'Withdrawal request submitted successfully');
+            ->with('success', 'Withdrawal request submitted. '.$payout->summaryMessage($withdrawal));
     }
 
     /**
