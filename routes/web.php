@@ -4,10 +4,23 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\TestEmailController;
 
-// Rental domains: camrentals.ng and abjrentals.ng — root shows rentals page directly (no redirect)
-$rentalDomains = ['camrentals.ng', 'abjrentals.ng', 'www.camrentals.ng', 'www.abjrentals.ng'];
-foreach ($rentalDomains as $domain) {
-    Route::domain($domain)->group(function () {
+// Canonical rental domain: redirect camrentals.* -> abjrentals.ng (preserve path + query)
+foreach (['camrentals.ng', 'www.camrentals.ng'] as $legacyRentalDomain) {
+    Route::domain($legacyRentalDomain)->any('/{any?}', function (?string $any = null) {
+        $path = trim((string) $any, '/');
+        $query = request()->getQueryString();
+        $target = 'https://abjrentals.ng' . ($path !== '' ? '/' . $path : '');
+        if ($query) {
+            $target .= '?' . $query;
+        }
+
+        return redirect()->away($target, 301);
+    })->where('any', '.*');
+}
+
+// Canonical rental domains serve rentals directly
+foreach (['abjrentals.ng', 'www.abjrentals.ng'] as $rentalDomain) {
+    Route::domain($rentalDomain)->group(function () {
         Route::get('/', [\App\Http\Controllers\Public\RentalController::class, 'index']);
     });
 }

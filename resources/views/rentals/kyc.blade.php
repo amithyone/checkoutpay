@@ -71,8 +71,14 @@
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-1">Account Number</label>
-                    <input type="text" name="account_number" maxlength="10" pattern="[0-9]{10}" required
-                           class="w-full border-gray-300 rounded-md" placeholder="10-digit account number">
+                    <div class="flex gap-2">
+                        <input type="text" id="account_number" name="account_number" maxlength="10" pattern="[0-9]{10}" required
+                               class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="10-digit account number">
+                        <button type="button" id="verify_account_btn"
+                                class="whitespace-nowrap bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                            Verify Account Number
+                        </button>
+                    </div>
                     @error('account_number')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -83,6 +89,7 @@
                         <p class="text-sm"><strong>Account Name:</strong> <span id="account_name_display"></span></p>
                     </div>
                 </div>
+                <input type="hidden" name="verified_account_name" id="verified_account_name" value="">
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-1">ID card (photo or scan) *</label>
@@ -94,8 +101,8 @@
                     @enderror
                 </div>
 
-                <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">
-                    Verify & Continue
+                <button type="submit" id="submit_kyc_btn" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-medium">
+                    Submit KYC
                 </button>
             </form>
         </div>
@@ -131,6 +138,67 @@
                 document.getElementById('bank_search').value = selectedOption.dataset.bankName;
             }
         }
+
+        async function verifyAccountNumber() {
+            const accountNumberInput = document.getElementById('account_number');
+            const bankCode = document.getElementById('bank_code').value;
+            const accountNumber = (accountNumberInput.value || '').replace(/\D/g, '');
+            const statusBox = document.getElementById('account_validation');
+            const accountNameDisplay = document.getElementById('account_name_display');
+            const verifiedAccountName = document.getElementById('verified_account_name');
+            const verifyBtn = document.getElementById('verify_account_btn');
+
+            if (!bankCode) {
+                alert('Please select a bank first.');
+                return;
+            }
+            if (accountNumber.length !== 10) {
+                alert('Account number must be 10 digits.');
+                return;
+            }
+
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = 'Verifying...';
+            statusBox.classList.remove('hidden');
+            accountNameDisplay.textContent = 'Checking account details...';
+
+            try {
+                const response = await fetch('{{ route("rentals.kyc.verify") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        account_number: accountNumber,
+                        bank_code: bankCode
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Unable to verify account.');
+                }
+
+                accountNameDisplay.textContent = data.account_name || 'Verified';
+                verifiedAccountName.value = data.account_name || '';
+                statusBox.querySelector('div').className = 'bg-green-50 border border-green-200 rounded p-3';
+            } catch (error) {
+                accountNameDisplay.textContent = error.message || 'Account verification failed.';
+                verifiedAccountName.value = '';
+                statusBox.querySelector('div').className = 'bg-red-50 border border-red-200 rounded p-3';
+            } finally {
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = 'Verify Account Number';
+            }
+        }
+
+        document.getElementById('verify_account_btn').addEventListener('click', verifyAccountNumber);
+        document.getElementById('account_number').addEventListener('input', function () {
+            this.value = this.value.replace(/\D/g, '').slice(0, 10);
+            document.getElementById('verified_account_name').value = '';
+        });
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
