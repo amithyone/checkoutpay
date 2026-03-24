@@ -2,21 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
 use Laravel\Sanctum\HasApiTokens;
 
 class Renter extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, SoftDeletes, Notifiable, MustVerifyEmailTrait;
+    use HasApiTokens, HasFactory, MustVerifyEmailTrait, Notifiable, SoftDeletes;
 
     const KYC_ID_STATUS_PENDING = 'pending';
+
     const KYC_ID_STATUS_APPROVED = 'approved';
+
     const KYC_ID_STATUS_REJECTED = 'rejected';
 
     /**
@@ -24,7 +25,7 @@ class Renter extends Authenticatable implements MustVerifyEmail
      */
     public function sendEmailVerificationNotification()
     {
-        $this->notify(new \App\Notifications\RenterEmailVerificationNotification());
+        $this->notify(new \App\Notifications\RenterEmailVerificationNotification);
     }
 
     protected $fillable = [
@@ -38,6 +39,9 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'verified_account_name',
         'verified_bank_name',
         'verified_bank_code',
+        'bvn',
+        'age',
+        'instagram_url',
         'kyc_verified_at',
         'kyc_id_card_path',
         'kyc_id_type',
@@ -60,6 +64,7 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
         'kyc_verified_at' => 'datetime',
         'wallet_balance' => 'decimal:2',
+        'age' => 'integer',
         'kyc_id_reviewed_at' => 'datetime',
         'is_active' => 'boolean',
         'password' => 'hashed',
@@ -78,9 +83,9 @@ class Renter extends Authenticatable implements MustVerifyEmail
      */
     public function isKycVerified(): bool
     {
-        $bankOk = !is_null($this->kyc_verified_at)
-            && !is_null($this->verified_account_number)
-            && !is_null($this->verified_account_name);
+        $bankOk = ! is_null($this->kyc_verified_at)
+            && ! is_null($this->verified_account_number)
+            && ! is_null($this->verified_account_name);
 
         $idOk = $this->kyc_id_status === self::KYC_ID_STATUS_APPROVED;
 

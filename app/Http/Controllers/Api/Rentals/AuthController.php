@@ -3,15 +3,15 @@
 namespace App\Http\Controllers\Api\Rentals;
 
 use App\Http\Controllers\Controller;
+use App\Models\Business;
 use App\Models\Renter;
 use App\Models\User;
-use App\Models\Business;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Auth\Events\Verified;
 
 class AuthController extends Controller
 {
@@ -111,8 +111,11 @@ class AuthController extends Controller
             }
         }
 
-        // Previously we blocked inactive renters here.
-        // For rentals login we now allow all valid accounts to sign in.
+        if (! (bool) $renter->is_active) {
+            return response()->json([
+                'message' => 'Your renter account is disabled. Please contact support.',
+            ], 403);
+        }
 
         $token = $renter->createToken('rentals-spa')->plainTextToken;
 
@@ -204,7 +207,7 @@ class AuthController extends Controller
             ]);
         }
 
-        $cacheKey = 'renter_email_verification_pin_' . $renter->getKey();
+        $cacheKey = 'renter_email_verification_pin_'.$renter->getKey();
         $cachedPin = Cache::get($cacheKey);
 
         if (! $cachedPin || (string) $cachedPin !== (string) $validated['pin']) {
@@ -229,10 +232,30 @@ class AuthController extends Controller
 
     protected function renterResource(Renter $renter): array
     {
+        $rentCount = \App\Models\Rental::query()
+            ->where('renter_id', $renter->id)
+            ->where('status', \App\Models\Rental::STATUS_COMPLETED)
+            ->count();
+
+        $linkedBusinessId = \App\Models\Business::query()
+            ->whereRaw('LOWER(email) = LOWER(?)', [$renter->email])
+            ->value('id');
+
+        $salesCount = $linkedBusinessId
+            ? \App\Models\Rental::query()
+                ->where('business_id', $linkedBusinessId)
+                ->where('status', \App\Models\Rental::STATUS_COMPLETED)
+                ->count()
+            : 0;
+
+        $rentScore = min(100, $rentCount * 5);
+        $salesScore = min(100, $salesCount * 5);
+
         return [
             'id' => $renter->id,
             'name' => $renter->name,
             'email' => $renter->email,
+            'is_active' => (bool) $renter->is_active,
             'phone' => $renter->phone,
             'address' => $renter->address,
             'email_verified' => (bool) $renter->email_verified_at,
@@ -242,10 +265,18 @@ class AuthController extends Controller
             'verified_account_name' => $renter->verified_account_name,
             'verified_bank_name' => $renter->verified_bank_name,
             'verified_bank_code' => $renter->verified_bank_code,
+            'bvn' => $renter->bvn,
+            'age' => $renter->age,
+            'instagram_url' => $renter->instagram_url,
             'wallet_balance' => (float) ($renter->wallet_balance ?? 0.0),
             'kyc_id_uploaded' => (bool) ($renter->kyc_id_front_path && $renter->kyc_id_back_path),
             'kyc_id_status' => $renter->kyc_id_status,
+            'trust' => [
+                'rent_count' => (int) $rentCount,
+                'sales_count' => (int) $salesCount,
+                'rent_score' => (int) $rentScore,
+                'sales_score' => (int) $salesScore,
+            ],
         ];
     }
 }
-

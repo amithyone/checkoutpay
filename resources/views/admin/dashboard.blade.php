@@ -187,6 +187,32 @@
             </div>
         </div>
 
+        <!-- Renters KYC -->
+        <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            @php
+                $pendingRenterKycCount = \App\Models\Renter::query()
+                    ->whereNotNull('kyc_id_card_path')
+                    ->where(function ($q) {
+                        $q->whereNull('kyc_id_status')->orWhere('kyc_id_status', 'pending');
+                    })
+                    ->count();
+            @endphp
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Renters KYC</p>
+                    <h3 class="text-2xl font-bold text-gray-900">{{ number_format($pendingRenterKycCount) }}</h3>
+                </div>
+                <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-id-card text-indigo-600 text-xl"></i>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a href="{{ route('admin.renters-kyc.index') }}" class="text-sm text-primary hover:underline inline-flex items-center">
+                    Manage KYC <i class="fas fa-arrow-right ml-1"></i>
+                </a>
+            </div>
+        </div>
+
         <!-- Account Numbers -->
         <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div class="flex items-center justify-between">

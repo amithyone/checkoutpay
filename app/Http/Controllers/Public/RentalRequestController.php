@@ -3,25 +3,24 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Mail\RentalApprovedPayNow;
+use App\Mail\RentalReceipt;
+use App\Mail\RentalRequestReceived;
 use App\Models\Rental;
 use App\Models\RentalItem;
 use App\Models\Renter;
 use App\Services\NubanValidationService;
 use App\Services\RecaptchaService;
-use App\Mail\RentalRequestReceived;
-use App\Mail\RentalReceipt;
-use App\Mail\RentalApprovedPayNow;
 use App\Services\RentalPaymentService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
 
 class RentalRequestController extends Controller
 {
@@ -36,7 +35,7 @@ class RentalRequestController extends Controller
     public function checkout(Request $request): View|RedirectResponse
     {
         $cart = session('rental_cart', []);
-        
+
         if (empty($cart)) {
             return redirect()->route('rentals.index')
                 ->with('error', 'Your cart is empty.');
@@ -51,11 +50,12 @@ class RentalRequestController extends Controller
                 'rental_cart' => $cart,
                 'rental_dates_conflict_ids' => [],
             ]);
+
             return redirect()->route('rentals.checkout');
         }
         // Normalize legacy cart: if start/end but no selected_dates, set selected_dates from range
         foreach ($cart as $itemId => $data) {
-            if (empty($data['selected_dates']) && !empty($data['start_date']) && !empty($data['end_date'])) {
+            if (empty($data['selected_dates']) && ! empty($data['start_date']) && ! empty($data['end_date'])) {
                 $s = \Carbon\Carbon::parse($data['start_date']);
                 $e = \Carbon\Carbon::parse($data['end_date']);
                 $cart[$itemId]['selected_dates'] = [];
@@ -75,15 +75,17 @@ class RentalRequestController extends Controller
                 $item->cart_selected_dates = $cart[$item->id]['selected_dates'] ?? null;
                 $item->cart_start_date = $cart[$item->id]['start_date'] ?? null;
                 $item->cart_end_date = $cart[$item->id]['end_date'] ?? null;
+
                 return $item;
             });
 
         $datesConflictItemIds = session('rental_dates_conflict_ids', []);
         $hasDates = $items->every(function ($item) {
             $dates = $item->cart_selected_dates ?? [];
-            if (!empty($dates)) {
+            if (! empty($dates)) {
                 return true;
             }
+
             return $item->cart_start_date && $item->cart_end_date;
         }) && empty($datesConflictItemIds);
 
@@ -91,7 +93,7 @@ class RentalRequestController extends Controller
         $isRenter = Auth::guard('renter')->check();
         $renter = $isRenter ? Auth::guard('renter')->user() : null;
 
-        if (!$renter && Auth::guard('web')->check()) {
+        if (! $renter && Auth::guard('web')->check()) {
             $user = Auth::guard('web')->user();
             $renter = Renter::firstOrCreate(
                 ['email' => strtolower($user->email)],
@@ -104,7 +106,7 @@ class RentalRequestController extends Controller
             $isRenter = true;
         }
 
-        $needsKyc = $renter && !$renter->isKycVerified();
+        $needsKyc = $renter && ! $renter->isKycVerified();
 
         $cartItemIds = $items->pluck('id')->all();
 
@@ -127,14 +129,14 @@ class RentalRequestController extends Controller
         $itemId = $request->get('item_id');
         if ($itemId !== null) {
             $itemId = (int) $itemId;
-            if (!isset($cart[$itemId])) {
+            if (! isset($cart[$itemId])) {
                 return response()->json(['unavailable' => []]);
             }
             $itemIds = [$itemId];
         }
 
         $month = $request->get('month', now()->format('Y-m'));
-        $start = \Carbon\Carbon::parse($month . '-01')->startOfDay();
+        $start = \Carbon\Carbon::parse($month.'-01')->startOfDay();
         $end = $start->copy()->endOfMonth();
 
         $items = RentalItem::whereIn('id', $itemIds)->get();
@@ -162,7 +164,7 @@ class RentalRequestController extends Controller
 
         $result = $this->nubanService->validate($validated['account_number'], $validated['bank_code']);
 
-        if (!$result || !isset($result['account_name'])) {
+        if (! $result || ! isset($result['account_name'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to verify account. Please check your account number and bank.',
@@ -188,7 +190,7 @@ class RentalRequestController extends Controller
                 'g-recaptcha-response.required' => 'Please complete the reCAPTCHA verification.',
             ]);
 
-            if (!$this->recaptcha->verify($request->input('g-recaptcha-response'), $request->ip())) {
+            if (! $this->recaptcha->verify($request->input('g-recaptcha-response'), $request->ip())) {
                 return back()->withErrors([
                     'g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.',
                 ])->withInput($request->except('password', 'password_confirmation'));
@@ -207,8 +209,8 @@ class RentalRequestController extends Controller
 
         // Verify account number and get account name
         $kycResult = $this->nubanService->validate($validated['account_number'], $validated['bank_code']);
-        
-        if (!$kycResult || !isset($kycResult['account_name'])) {
+
+        if (! $kycResult || ! isset($kycResult['account_name'])) {
             return back()->withErrors([
                 'account_number' => 'Unable to verify account. Please check your account number and bank.',
             ])->withInput($request->except('password', 'password_confirmation'));
@@ -252,7 +254,7 @@ class RentalRequestController extends Controller
     {
         $renter = Auth::guard('renter')->user();
 
-        if (!$renter && Auth::guard('web')->check()) {
+        if (! $renter && Auth::guard('web')->check()) {
             $user = Auth::guard('web')->user();
             $renter = Renter::firstOrCreate(
                 ['email' => strtolower($user->email)],
@@ -265,7 +267,7 @@ class RentalRequestController extends Controller
             Auth::guard('renter')->login($renter);
         }
 
-        if (!$renter) {
+        if (! $renter) {
             return redirect()->route('rentals.checkout');
         }
 
@@ -287,7 +289,7 @@ class RentalRequestController extends Controller
             'address' => $validated['address'] ?? $renter->address,
         ]);
 
-        if (!$renter->isKycVerified() && !empty($validated['account_number'])) {
+        if (! $renter->isKycVerified() && ! empty($validated['account_number'])) {
             $result = $this->nubanService->validate($validated['account_number'], $validated['bank_code']);
             if ($result && isset($result['account_name'])) {
                 $updateData = [
@@ -306,12 +308,13 @@ class RentalRequestController extends Controller
             }
         }
 
-        if (!$renter->hasVerifiedEmail()) {
+        if (! $renter->hasVerifiedEmail()) {
             return redirect()->route('rentals.verify-email');
         }
-        if (!$renter->isKycVerified()) {
+        if (! $renter->isKycVerified()) {
             return redirect()->route('rentals.kyc');
         }
+
         return redirect()->route('rentals.review');
     }
 
@@ -322,13 +325,14 @@ class RentalRequestController extends Controller
     {
         $renter = \App\Models\Renter::findOrFail($request->route('id'));
 
-        if (!hash_equals((string) $request->route('hash'), sha1($renter->getEmailForVerification()))) {
+        if (! hash_equals((string) $request->route('hash'), sha1($renter->getEmailForVerification()))) {
             return redirect()->route('rentals.verify-email')
                 ->withErrors(['email' => 'Invalid verification link.']);
         }
 
         if ($renter->hasVerifiedEmail()) {
             Auth::guard('renter')->login($renter);
+
             return redirect()->route('rentals.kyc')
                 ->with('success', 'Your email has already been verified.');
         }
@@ -350,7 +354,7 @@ class RentalRequestController extends Controller
     {
         $renter = Auth::guard('renter')->user() ?? \App\Models\Renter::where('email', $request->email)->first();
 
-        if (!$renter) {
+        if (! $renter) {
             return back()->withErrors(['email' => 'Email address not found.']);
         }
 
@@ -376,20 +380,21 @@ class RentalRequestController extends Controller
 
         $renter = \App\Models\Renter::where('email', $request->email)->first();
 
-        if (!$renter) {
+        if (! $renter) {
             return back()->withErrors(['email' => 'Email address not found.']);
         }
 
         if ($renter->hasVerifiedEmail()) {
             Auth::guard('renter')->login($renter);
+
             return redirect()->route('rentals.kyc')
                 ->with('success', 'Your email has already been verified.');
         }
 
         // Verify PIN from cache
-        $cachedPin = \Illuminate\Support\Facades\Cache::get('renter_email_verification_pin_' . $renter->id);
+        $cachedPin = \Illuminate\Support\Facades\Cache::get('renter_email_verification_pin_'.$renter->id);
 
-        if (!$cachedPin || $cachedPin !== $request->pin) {
+        if (! $cachedPin || $cachedPin !== $request->pin) {
             return back()->withErrors(['pin' => 'Invalid or expired verification PIN.']);
         }
 
@@ -399,7 +404,7 @@ class RentalRequestController extends Controller
         }
 
         // Clear PIN from cache
-        \Illuminate\Support\Facades\Cache::forget('renter_email_verification_pin_' . $renter->id);
+        \Illuminate\Support\Facades\Cache::forget('renter_email_verification_pin_'.$renter->id);
 
         // Auto-login
         Auth::guard('renter')->login($renter);
@@ -414,7 +419,7 @@ class RentalRequestController extends Controller
     public function verifyEmail(): View
     {
         $renter = Auth::guard('renter')->user();
-        
+
         if ($renter->hasVerifiedEmail()) {
             return redirect()->route('rentals.kyc');
         }
@@ -429,7 +434,7 @@ class RentalRequestController extends Controller
     {
         $renter = Auth::guard('renter')->user();
 
-        if (!$renter->hasVerifiedEmail()) {
+        if (! $renter->hasVerifiedEmail()) {
             return redirect()->route('rentals.verify-email')
                 ->with('error', 'Please verify your email first.');
         }
@@ -449,7 +454,7 @@ class RentalRequestController extends Controller
             // Validate account number
             $result = $this->nubanService->validate($validated['account_number'], $validated['bank_code']);
 
-            if (!$result || !isset($result['account_name'])) {
+            if (! $result || ! isset($result['account_name'])) {
                 return back()->withInput()->with('error', 'Invalid account number. Please verify and try again.');
             }
 
@@ -480,16 +485,16 @@ class RentalRequestController extends Controller
     {
         $renter = Auth::guard('renter')->user();
 
-        if (!$renter->hasVerifiedEmail()) {
+        if (! $renter->hasVerifiedEmail()) {
             return redirect()->route('rentals.verify-email');
         }
 
-        if (!$renter->isKycVerified()) {
+        if (! $renter->isKycVerified()) {
             return redirect()->route('rentals.kyc');
         }
 
         $cart = session('rental_cart', []);
-        
+
         if (empty($cart)) {
             return redirect()->route('rentals.index')
                 ->with('error', 'Your cart is empty.');
@@ -503,11 +508,11 @@ class RentalRequestController extends Controller
         // Calculate totals
         $totalAmount = 0;
         $businesses = [];
-        
+
         foreach ($items as $item) {
             $cartData = $cart[$item->id];
             $selectedDates = $cartData['selected_dates'] ?? null;
-            if (!empty($selectedDates)) {
+            if (! empty($selectedDates)) {
                 $days = count($selectedDates);
                 $startDate = \Carbon\Carbon::parse($selectedDates[0]);
                 $endDate = \Carbon\Carbon::parse($selectedDates[array_key_last($selectedDates)]);
@@ -516,19 +521,19 @@ class RentalRequestController extends Controller
                 $endDate = \Carbon\Carbon::parse($cartData['end_date']);
                 $days = $startDate->diffInDays($endDate) + 1;
             }
-            
+
             $rate = $item->getRateForPeriod($days);
             $itemTotal = $rate * ($cartData['quantity'] ?? 1);
             $totalAmount += $itemTotal;
-            
-            if (!isset($businesses[$item->business_id])) {
+
+            if (! isset($businesses[$item->business_id])) {
                 $businesses[$item->business_id] = [
                     'business' => $item->business,
                     'items' => [],
                     'total' => 0,
                 ];
             }
-            
+
             $businesses[$item->business_id]['items'][] = [
                 'item' => $item,
                 'quantity' => $cartData['quantity'] ?? 1,
@@ -562,7 +567,7 @@ class RentalRequestController extends Controller
             foreach ($businesses as $businessData) {
                 $business = $businessData['business'];
                 $businessItems = $businessData['items'];
-                
+
                 // Calculate business total
                 $businessTotal = 0;
                 $totalDays = 0;
@@ -647,7 +652,7 @@ class RentalRequestController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return back()->withInput()->with('error', 'Failed to submit rental request: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Failed to submit rental request: '.$e->getMessage());
         }
     }
 
@@ -717,15 +722,15 @@ class RentalRequestController extends Controller
         }
 
         $cart = session('rental_cart', []);
-        if (empty($cart) || !isset($cart[$itemId])) {
+        if (empty($cart) || ! isset($cart[$itemId])) {
             return redirect()->route('rentals.checkout')->with('error', 'Item not in cart.');
         }
 
         $item = RentalItem::find($itemId);
         foreach ($selected as $dateStr) {
-            if (!$item->isAvailableForDates($dateStr, $dateStr)) {
+            if (! $item->isAvailableForDates($dateStr, $dateStr)) {
                 return redirect()->route('rentals.checkout')
-                    ->with('error', $dateStr . ' is not available for ' . $item->name . '. Please update your selection.');
+                    ->with('error', $dateStr.' is not available for '.$item->name.'. Please update your selection.');
             }
         }
 
@@ -742,7 +747,7 @@ class RentalRequestController extends Controller
         $conflictIds = array_values(array_diff(session('rental_dates_conflict_ids', []), [$itemId]));
         session(['rental_dates_conflict_ids' => $conflictIds]);
 
-        return redirect()->route('rentals.checkout')->with('success', 'Dates saved for ' . $item->name . ' (' . count($selected) . ' day(s)).');
+        return redirect()->route('rentals.checkout')->with('success', 'Dates saved for '.$item->name.' ('.count($selected).' day(s)).');
     }
 
     /**
@@ -773,7 +778,7 @@ class RentalRequestController extends Controller
         foreach ($items as $item) {
             $allAvailable = true;
             foreach ($selected as $dateStr) {
-                if (!$item->isAvailableForDates($dateStr, $dateStr)) {
+                if (! $item->isAvailableForDates($dateStr, $dateStr)) {
                     $allAvailable = false;
                     break;
                 }
@@ -795,13 +800,14 @@ class RentalRequestController extends Controller
             'rental_dates_conflict_ids' => $conflictIds,
         ]);
 
-        if (!empty($conflictIds)) {
+        if (! empty($conflictIds)) {
             $count = count($conflictIds);
+
             return redirect()->route('rentals.checkout')
-                ->with('warning', 'Dates applied to some items. ' . $count . ' item(s) are not available for those dates – click each red item to set different dates.');
+                ->with('warning', 'Dates applied to some items. '.$count.' item(s) are not available for those dates – click each red item to set different dates.');
         }
 
-        return redirect()->route('rentals.checkout')->with('success', 'Same dates applied to all items (' . count($selected) . ' day(s)).');
+        return redirect()->route('rentals.checkout')->with('success', 'Same dates applied to all items ('.count($selected).' day(s)).');
     }
 
     /**
@@ -825,7 +831,8 @@ class RentalRequestController extends Controller
     protected function storeKycIdCard(\Illuminate\Http\UploadedFile $file, ?int $renterId = null): string
     {
         $prefix = $renterId ? "renters/{$renterId}" : 'renters';
-        $path = $file->store("rentals/kyc/{$prefix}", 'local');
+        $path = $file->store("rentals/kyc/{$prefix}", 'public');
+
         return $path;
     }
 }

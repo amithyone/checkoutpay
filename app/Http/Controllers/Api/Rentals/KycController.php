@@ -15,8 +15,7 @@ class KycController extends Controller
     public function __construct(
         protected NubanValidationService $nubanService,
         protected MevonPayBankService $mevonBankService,
-    ) {
-    }
+    ) {}
 
     /**
      * POST /api/v1/rentals/kyc/banks
@@ -79,6 +78,9 @@ class KycController extends Controller
         $validated = $request->validate([
             'account_number' => 'required|string|size:10',
             'bank_code' => 'required|string',
+            'bvn' => 'nullable|digits:11',
+            'age' => 'nullable|integer|min:18|max:120',
+            'instagram_url' => 'nullable|url|max:255',
         ]);
 
         // Prefer NUBAN validation (faster and already integrated), fallback to MevonPay name enquiry only if NUBAN fails.
@@ -123,8 +125,8 @@ class KycController extends Controller
 
         $prefix = $renter->id ? "renters/{$renter->id}" : 'renters';
 
-        $frontPath = $request->file('id_front')->store("rentals/kyc/{$prefix}", 'local');
-        $backPath = $request->file('id_back')->store("rentals/kyc/{$prefix}", 'local');
+        $frontPath = $request->file('id_front')->store("rentals/kyc/{$prefix}", 'public');
+        $backPath = $request->file('id_back')->store("rentals/kyc/{$prefix}", 'public');
 
         $renter->update([
             'kyc_id_type' => $validated['id_type'],
@@ -180,6 +182,9 @@ class KycController extends Controller
             'verified_account_name' => $result['account_name'],
             'verified_bank_name' => $result['bank_name'] ?? null,
             'verified_bank_code' => $result['bank_code'] ?? $validated['bank_code'],
+            'bvn' => $validated['bvn'] ?? $renter->bvn,
+            'age' => $validated['age'] ?? $renter->age,
+            'instagram_url' => $validated['instagram_url'] ?? $renter->instagram_url,
             'kyc_verified_at' => now(),
             'name' => $result['account_name'],
         ]);
@@ -195,4 +200,3 @@ class KycController extends Controller
         ]);
     }
 }
-

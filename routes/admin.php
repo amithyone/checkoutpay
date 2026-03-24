@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
+use App\Http\Controllers\Admin\RenterController;
 use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\WithdrawalController;
@@ -24,7 +25,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('/extract-missing-names', [DashboardController::class, 'extractMissingNames'])->name('extract-missing-names');
         Route::post('/test-sender-extraction', [DashboardController::class, 'testSenderExtraction'])->name('test-sender-extraction');
-        
+
         // Statistics
         Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 
@@ -44,7 +45,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::resource('email-accounts', EmailAccountController::class);
             Route::post('email-accounts/{emailAccount}/test-connection', [EmailAccountController::class, 'testConnection'])
                 ->name('email-accounts.test-connection');
-            
+
             // Gmail API Authorization
             Route::get('email-accounts/{emailAccount}/gmail/authorize', [GmailAuthController::class, 'authorize'])
                 ->name('email-accounts.gmail.authorize');
@@ -103,7 +104,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('businesses.login-as');
         Route::post('businesses/exit-impersonation', [BusinessController::class, 'exitImpersonation'])
             ->name('businesses.exit-impersonation');
-        
+
         // Business KYC Management
         Route::post('businesses/{business}/verifications/{verification}/approve', [BusinessController::class, 'approveVerification'])
             ->name('businesses.verification.approve');
@@ -145,10 +146,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('withdrawals/{withdrawal}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject');
         Route::post('withdrawals/{withdrawal}/mark-processed', [WithdrawalController::class, 'markProcessed'])->name('withdrawals.mark-processed');
 
+        // Rental users (renters)
+        Route::get('renters', [RenterController::class, 'index'])->name('renters.index');
+
         // Renters KYC (ID review)
         Route::get('renters-kyc', [RenterKycController::class, 'index'])->name('renters-kyc.index');
+        Route::get('renters-kyc/{renter}/document/{type}', [RenterKycController::class, 'document'])->name('renters-kyc.document');
         Route::post('renters-kyc/{renter}/approve', [RenterKycController::class, 'approve'])->name('renters-kyc.approve');
         Route::post('renters-kyc/{renter}/reject', [RenterKycController::class, 'reject'])->name('renters-kyc.reject');
+        Route::post('renters-kyc/{renter}/toggle-active', [RenterKycController::class, 'toggleActive'])->name('renters-kyc.toggle-active');
 
         // Transaction Logs
         Route::get('transaction-logs', [\App\Http\Controllers\Admin\TransactionLogController::class, 'index'])->name('transaction-logs.index');
@@ -167,7 +173,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('settings/general', [\App\Http\Controllers\Admin\SettingsController::class, 'updateGeneral'])->name('settings.update-general');
             Route::post('settings/whitelisted-emails', [\App\Http\Controllers\Admin\SettingsController::class, 'addWhitelistedEmail'])->name('settings.add-whitelisted-email');
             Route::delete('settings/whitelisted-emails/{whitelistedEmail}', [\App\Http\Controllers\Admin\SettingsController::class, 'removeWhitelistedEmail'])->name('settings.remove-whitelisted-email');
-            
+
             // Email Templates
             Route::get('email-templates', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'index'])->name('email-templates.index');
             Route::get('email-templates/{template}/edit', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'edit'])->name('email-templates.edit');
@@ -203,7 +209,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::delete('match-attempts/clear', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'clear'])->name('match-attempts.clear');
         Route::post('processed-emails/{processedEmail}/retry-match', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'retryEmail'])->name('processed-emails.retry-match');
         Route::post('processed-emails/{processedEmail}/re-extract-match', [\App\Http\Controllers\Admin\MatchAttemptController::class, 'reExtractAndMatch'])->name('processed-emails.re-extract-match');
-        
+
         // Global Match Trigger
         Route::post('match/trigger-global', [\App\Http\Controllers\Admin\MatchController::class, 'triggerGlobalMatch'])->name('match.trigger-global');
 
@@ -228,7 +234,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('orders/{order}', [\App\Http\Controllers\Admin\TicketController::class, 'showOrder'])->name('orders.show');
             Route::post('orders/{order}/refund', [\App\Http\Controllers\Admin\TicketController::class, 'refund'])->name('orders.refund');
             Route::put('events/{event}/max-tickets', [\App\Http\Controllers\Admin\TicketController::class, 'updateMaxTickets'])->name('events.update-max-tickets');
-            
+
             // QR Scanner
             Route::get('scanner', [\App\Http\Controllers\Admin\TicketScannerController::class, 'index'])->name('scanner');
             Route::post('scanner/verify', [\App\Http\Controllers\Admin\TicketScannerController::class, 'verify'])->name('scanner.verify');

@@ -152,6 +152,27 @@
                     <span>Withdrawals</span>
                 </a>
 
+                <a href="{{ route('admin.renters.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.renters.index') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-users w-5 mr-3"></i>
+                    <span>Rental users</span>
+                </a>
+
+                <a href="{{ route('admin.renters-kyc.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.renters-kyc.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-id-card w-5 mr-3"></i>
+                    <span>Renters KYC</span>
+                    @php
+                        $pendingRenterKycCount = \App\Models\Renter::query()
+                            ->whereNotNull('kyc_id_card_path')
+                            ->where(function ($q) {
+                                $q->whereNull('kyc_id_status')->orWhere('kyc_id_status', 'pending');
+                            })
+                            ->count();
+                    @endphp
+                    @if($pendingRenterKycCount > 0)
+                        <span class="ml-auto bg-yellow-500 text-white text-xs rounded-full px-2 py-0.5">{{ $pendingRenterKycCount }}</span>
+                    @endif
+                </a>
+
                 <a href="{{ route('admin.transaction-logs.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.transaction-logs.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-history w-5 mr-3"></i>
                     <span>Transaction Logs</span>

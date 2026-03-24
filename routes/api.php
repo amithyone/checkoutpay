@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\PaymentController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -24,7 +23,7 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
     // (payment.approved, unchanged payload). Only pending, non-expired payments can be updated.
     Route::patch('/payment/{transactionId}/amount', [PaymentController::class, 'updateAmount']);
     Route::get('/payments', [PaymentController::class, 'index']);
-    
+
     // Withdrawal routes (require API key)
     Route::post('/withdrawal', [\App\Http\Controllers\Api\WithdrawalController::class, 'store']);
     Route::get('/withdrawals', [\App\Http\Controllers\Api\WithdrawalController::class, 'index']);
@@ -35,18 +34,18 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
 Route::prefix('v1')->group(function () {
     // Statistics routes
     Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index']);
-    
+
     // Email webhook (for email forwarding services like Zapier)
     Route::post('/email/webhook', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']);
     Route::get('/email/webhook', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck']); // GET for health checks and testing
     Route::post('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']); // Legacy route for backward compatibility
     Route::get('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck']); // GET for legacy route too
     Route::get('/email/webhook/health', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck'])->name('email.webhook.health');
-    
+
     // Transaction check endpoint (for external sites to trigger email checking)
     Route::post('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']);
     Route::get('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']); // Also support GET
-    
+
     // Webhook processing cron endpoint (for external cron services)
     Route::get('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']);
     Route::post('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']); // Also support POST
@@ -82,7 +81,7 @@ Route::prefix('v1')->group(function () {
  * Rentals authenticated API (requires Sanctum token, authenticating Renter model)
  */
 Route::prefix('v1/rentals')
-    ->middleware('auth:sanctum')
+    ->middleware(['auth:sanctum', 'renter_active'])
     ->group(function () {
         // Current renter
         Route::get('me', [\App\Http\Controllers\Api\Rentals\AuthController::class, 'me']);
