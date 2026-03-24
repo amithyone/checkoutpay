@@ -52,7 +52,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600 mb-1">Pending</p>
-                    <h3 class="text-2xl font-bold text-yellow-600">{{ number_format($stats['sent'] + $stats['viewed']) }}</h3>
+                    <h3 class="text-2xl font-bold text-yellow-600">{{ number_format($stats['sent'] + $stats['viewed'] + ($stats['partial'] ?? 0)) }}</h3>
                 </div>
                 <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
                     <i class="fas fa-clock text-yellow-600 text-xl"></i>
@@ -81,7 +81,7 @@
     </div>
 
     <!-- Status Breakdown -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div class="text-center">
                 <p class="text-xs text-gray-600 mb-1">Draft</p>
@@ -98,6 +98,12 @@
             <div class="text-center">
                 <p class="text-xs text-gray-600 mb-1">Viewed</p>
                 <p class="text-lg font-semibold text-purple-600">{{ number_format($stats['viewed']) }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="text-center">
+                <p class="text-xs text-gray-600 mb-1">Partial</p>
+                <p class="text-lg font-semibold text-amber-600">{{ number_format($stats['partial'] ?? 0) }}</p>
             </div>
         </div>
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -136,6 +142,7 @@
                     <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>Draft</option>
                     <option value="sent" {{ request('status') === 'sent' ? 'selected' : '' }}>Sent</option>
                     <option value="viewed" {{ request('status') === 'viewed' ? 'selected' : '' }}>Viewed</option>
+                    <option value="partial" {{ request('status') === 'partial' ? 'selected' : '' }}>Partial</option>
                     <option value="paid" {{ request('status') === 'paid' ? 'selected' : '' }}>Paid</option>
                     <option value="overdue" {{ request('status') === 'overdue' ? 'selected' : '' }}>Overdue</option>
                     <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
@@ -211,6 +218,8 @@
                                 <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Sent</span>
                             @elseif($invoice->status === 'viewed')
                                 <span class="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">Viewed</span>
+                            @elseif($invoice->status === 'partial')
+                                <span class="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">Partial</span>
                             @elseif($invoice->status === 'overdue')
                                 <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Overdue</span>
                             @elseif($invoice->status === 'cancelled')
@@ -231,7 +240,7 @@
                                 <a href="{{ route('admin.invoices.edit', $invoice) }}" class="text-sm text-gray-600 hover:text-primary">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                @if(!$invoice->isPaid() && in_array($invoice->status, ['sent', 'viewed', 'overdue']))
+                                @if(!$invoice->isPaid() && in_array($invoice->status, ['sent', 'viewed', 'partial', 'overdue']))
                                 <button type="button" onclick="showMarkPaidModal({{ $invoice->id }}, '{{ addslashes($invoice->invoice_number) }}', {{ $invoice->total_amount }}, '{{ addslashes($invoice->currency) }}')"
                                     class="text-sm text-green-600 hover:text-green-700 font-medium">
                                     <i class="fas fa-check-circle mr-1"></i> Mark as paid

@@ -78,6 +78,7 @@ class InvoiceController extends Controller
             'draft' => Invoice::where('business_id', $business->id)->where('status', 'draft')->count(),
             'sent' => Invoice::where('business_id', $business->id)->where('status', 'sent')->count(),
             'viewed' => Invoice::where('business_id', $business->id)->where('status', 'viewed')->count(),
+            'partial' => Invoice::where('business_id', $business->id)->where('status', 'partial')->count(),
             'paid' => Invoice::where('business_id', $business->id)->where('status', 'paid')->count(),
             'overdue' => Invoice::where('business_id', $business->id)->where('status', 'overdue')->count(),
             'cancelled' => Invoice::where('business_id', $business->id)->where('status', 'cancelled')->count(),
@@ -416,9 +417,9 @@ class InvoiceController extends Controller
                 ->with('info', 'This invoice is already marked as paid.');
         }
 
-        if (! in_array($invoice->status, ['sent', 'viewed', 'overdue'], true)) {
+        if (! in_array($invoice->status, ['sent', 'viewed', 'partial', 'overdue'], true)) {
             return redirect()->route('business.invoices.show', $invoice)
-                ->with('error', 'Only sent, viewed, or overdue invoices can be marked as paid.');
+                ->with('error', 'Only sent, viewed, partial, or overdue invoices can be marked as paid.');
         }
 
         $validated = $request->validate([

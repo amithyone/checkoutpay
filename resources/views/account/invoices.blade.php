@@ -24,7 +24,7 @@
                                     @if($invoice->business)
                                         <p class="text-sm text-gray-500 mt-0.5">{{ $invoice->business->name }}</p>
                                     @endif
-                                    <p class="text-xs text-gray-500 mt-0.5">Due {{ $invoice->due_date?->format('M j, Y') }} · {{ $invoice->status }}</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">Due {{ $invoice->due_date?->format('M j, Y') }} · {{ ucfirst($invoice->status) }}</p>
                                 </div>
                                 <div class="flex items-center gap-2 flex-shrink-0">
                                     <span class="font-semibold text-gray-800">₦{{ number_format($invoice->total_amount, 2) }}</span>

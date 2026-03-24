@@ -210,6 +210,10 @@
             background-color: #fee2e2;
             color: #991b1b;
         }
+        .status-partial {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
         .qr-code-section {
             text-align: center;
             margin: 30px 0;

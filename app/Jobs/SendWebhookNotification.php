@@ -154,7 +154,38 @@ class SendWebhookNotification implements ShouldQueue
             $urls[] = $this->payment->webhook_url;
         }
 
-        return array_unique($urls);
+        $urls = array_values(array_filter(array_unique($urls), function (string $url): bool {
+            return ! $this->isInternalProcessingWebhookUrl($url);
+        }));
+
+        return $urls;
+    }
+
+    /**
+     * Internal processing callback URLs are handled by app listeners/services
+     * and should not be treated as merchant webhook destinations.
+     */
+    protected function isInternalProcessingWebhookUrl(string $url): bool
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if ($path === '') {
+            return false;
+        }
+
+        // Handle relative URLs like "/invoices/pay/ABC/webhook"
+        if (str_starts_with($path, '/')) {
+            if (preg_match('#^/invoices/pay/[^/]+/webhook$#', $path)) {
+                return true;
+            }
+            if (preg_match('#^/tickets/payment/webhook/[^/]+$#', $path)) {
+                return true;
+            }
+            if (preg_match('#^/memberships/[^/]+/payment/webhook$#', $path)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

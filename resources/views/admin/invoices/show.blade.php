@@ -39,6 +39,8 @@
                 <span class="px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">Sent</span>
             @elseif($invoice->status === 'viewed')
                 <span class="px-3 py-1 text-sm font-medium bg-purple-100 text-purple-800 rounded-full">Viewed</span>
+            @elseif($invoice->status === 'partial')
+                <span class="px-3 py-1 text-sm font-medium bg-amber-100 text-amber-800 rounded-full">Partial</span>
             @elseif($invoice->status === 'overdue')
                 <span class="px-3 py-1 text-sm font-medium bg-red-100 text-red-800 rounded-full">Overdue</span>
             @elseif($invoice->status === 'cancelled')

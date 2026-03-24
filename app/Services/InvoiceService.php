@@ -171,9 +171,17 @@ class InvoiceService
             ->whereHas('payment', fn ($q) => $q->where('status', \App\Models\Payment::STATUS_APPROVED))
             ->sum('amount');
 
+        $newStatus = $invoice->status;
+        if ($totalPaid >= (float) $invoice->total_amount) {
+            $newStatus = 'paid';
+        } elseif ($totalPaid > 0) {
+            $newStatus = 'partial';
+        }
+
         $invoice->update([
             'paid_amount' => $totalPaid,
             'payment_id' => $invoice->payment_id ?? $payment->id,
+            'status' => $newStatus,
         ]);
 
         // Send receipt to both parties for this payment (amount, due date, next payment reminder)
@@ -230,6 +238,8 @@ class InvoiceService
                 if (!$invoice->payment_id) {
                     $updateData['payment_id'] = null;
                 }
+            } elseif ($newPaid > 0) {
+                $updateData['status'] = 'partial';
             }
 
             $invoice->update($updateData);
@@ -349,7 +359,7 @@ class InvoiceService
                 $nextPaymentAmount
             ));
 
-            if ($invoice->business->email && $invoice->business->shouldReceivePaymentNotifications()) {
+            if ($invoice->business->email) {
                 Mail::to($invoice->business->email)->send(new InvoicePaymentReceipt(
                     $invoice,
                     null,
@@ -392,7 +402,7 @@ class InvoiceService
                 $nextPaymentAmount
             ));
 
-            if ($invoice->business->email && $invoice->business->shouldReceivePaymentNotifications()) {
+            if ($invoice->business->email) {
                 Mail::to($invoice->business->email)->send(new InvoicePaymentReceipt(
                     $invoice,
                     $payment,

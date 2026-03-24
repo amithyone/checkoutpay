@@ -22,7 +22,7 @@
                         <i class="fas fa-paper-plane mr-1"></i> Send Email
                     </button>
                 </form>
-                @if(in_array($invoice->status, ['sent', 'viewed', 'overdue']))
+                @if(in_array($invoice->status, ['sent', 'viewed', 'partial', 'overdue']))
                 <button type="button" onclick="document.getElementById('mark-paid-modal').classList.remove('hidden')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
                     <i class="fas fa-check-circle mr-1"></i> Mark as paid manually
                 </button>
@@ -91,6 +91,7 @@
                             @if($invoice->status === 'paid') bg-green-100 text-green-800
                             @elseif($invoice->status === 'sent') bg-blue-100 text-blue-800
                             @elseif($invoice->status === 'viewed') bg-purple-100 text-purple-800
+                            @elseif($invoice->status === 'partial') bg-amber-100 text-amber-800
                             @elseif($invoice->status === 'overdue') bg-red-100 text-red-800
                             @elseif($invoice->status === 'cancelled') bg-gray-100 text-gray-800
                             @else bg-yellow-100 text-yellow-800
@@ -220,7 +221,7 @@
     @endif
 
     <!-- Mark as paid manually modal -->
-    @if(!$invoice->isPaid() && in_array($invoice->status, ['sent', 'viewed', 'overdue']))
+    @if(!$invoice->isPaid() && in_array($invoice->status, ['sent', 'viewed', 'partial', 'overdue']))
     @php
         $paidSoFar = (float) $invoice->paid_amount_total;
         $remaining = max(0, (float) $invoice->total_amount - $paidSoFar);
