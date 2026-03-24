@@ -280,6 +280,9 @@
         .status-ribbon.paid {
             background-color: #10b981;
         }
+        .status-ribbon.partial {
+            background-color: #f59e0b;
+        }
         .status-ribbon.unpaid {
             background-color: #ef4444;
         }
@@ -326,10 +329,20 @@
     </style>
 </head>
 <body>
+    @php
+        $paidSoFar = (float) ($invoice->paid_amount_total ?? $invoice->paid_amount ?? 0);
+        $remainingBalance = max(0, (float) $invoice->total_amount - $paidSoFar);
+        $isPartial = !(isset($isPaid) && $isPaid) && $paidSoFar > 0;
+        $approvedPayments = ($invoice->invoicePayments ?? collect())->filter(function ($ip) {
+            return $ip->payment && $ip->payment->status === 'approved';
+        })->values();
+    @endphp
     <div class="invoice-container status-ribbon-container" style="position: relative;">
         <!-- Status Ribbon Badge -->
         @if(isset($isPaid) && $isPaid)
         <div class="status-ribbon paid">PAID</div>
+        @elseif($isPartial)
+        <div class="status-ribbon partial">PARTIAL</div>
         @else
         <div class="status-ribbon unpaid">UNPAID</div>
         @endif
@@ -418,6 +431,8 @@
                 <p>
                     @if(isset($isPaid) && $isPaid)
                         <span class="paid-badge-large">PAID</span>
+                    @elseif($isPartial)
+                        <span class="status-badge status-partial">PARTIAL</span>
                     @else
                         <span class="status-badge status-{{ $invoice->status }}">
                             {{ ucfirst($invoice->status) }}
@@ -484,13 +499,49 @@
                 <span>Total Amount:</span>
                 <span>{{ $invoice->currency }} {{ number_format($invoice->total_amount, 2) }}</span>
             </div>
-            @if($invoice->isPaid())
+            @if($paidSoFar > 0)
             <div class="total-row" style="margin-top: 10px;">
                 <span class="label" style="color: #10b981;">Paid Amount:</span>
-                <span class="value" style="color: #10b981;">{{ $invoice->currency }} {{ number_format($invoice->paid_amount ?? $invoice->total_amount, 2) }}</span>
+                <span class="value" style="color: #10b981;">{{ $invoice->currency }} {{ number_format($paidSoFar, 2) }}</span>
+            </div>
+            @endif
+            @if($remainingBalance > 0)
+            <div class="total-row">
+                <span class="label" style="color: #92400e;">Remaining Balance:</span>
+                <span class="value" style="color: #92400e;">{{ $invoice->currency }} {{ number_format($remainingBalance, 2) }}</span>
             </div>
             @endif
         </div>
+
+        @if($paidSoFar > 0)
+        <div style="margin-top: 28px;">
+            <h3 style="font-size: 13px; color: #3C50E0; margin-bottom: 10px; text-transform: uppercase;">Invoice Payments</h3>
+            <table class="items-table" style="margin-bottom: 0;">
+                <thead>
+                    <tr>
+                        <th style="width: 35%;">Date</th>
+                        <th style="width: 35%;">Reference</th>
+                        <th class="text-right" style="width: 30%;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($approvedPayments as $ip)
+                    <tr>
+                        <td>{{ optional($ip->payment->matched_at ?? $ip->payment->updated_at)->format('F d, Y g:i A') ?? '-' }}</td>
+                        <td>{{ $ip->payment->transaction_id ?? 'Approved payment' }}</td>
+                        <td class="text-right">{{ $invoice->currency }} {{ number_format((float) $ip->amount, 2) }}</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td>{{ now()->format('F d, Y g:i A') }}</td>
+                        <td>Recorded payment</td>
+                        <td class="text-right">{{ $invoice->currency }} {{ number_format($paidSoFar, 2) }}</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @endif
 
         <!-- QR Code Section (only show if not paid) -->
         @if(!isset($isPaid) || !$isPaid)

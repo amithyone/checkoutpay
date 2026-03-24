@@ -20,7 +20,7 @@ class InvoicePdfService
     public function generatePdf(Invoice $invoice, ?string $qrCodeBase64 = null, bool $isPaid = false): ?string
     {
         try {
-            $invoice->load(['business', 'items']);
+            $invoice->load(['business', 'items', 'invoicePayments.payment']);
 
             // Generate PDF using DomPDF
             $pdf = PdfFacade::loadView('invoices.pdf', [
@@ -87,7 +87,7 @@ class InvoicePdfService
      */
     public function streamPdf(Invoice $invoice)
     {
-        $invoice->load(['business', 'items']);
+        $invoice->load(['business', 'items', 'invoicePayments.payment']);
 
         // Generate QR code if not paid
         $qrCodeBase64 = null;
