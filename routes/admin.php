@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
+use App\Http\Controllers\Admin\BusinessKycController;
 use App\Http\Controllers\Admin\RenterController;
 use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
@@ -155,6 +156,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('renters-kyc/{renter}/approve', [RenterKycController::class, 'approve'])->name('renters-kyc.approve');
         Route::post('renters-kyc/{renter}/reject', [RenterKycController::class, 'reject'])->name('renters-kyc.reject');
         Route::post('renters-kyc/{renter}/toggle-active', [RenterKycController::class, 'toggleActive'])->name('renters-kyc.toggle-active');
+
+        // Business KYC queue (document review)
+        Route::get('businesses-kyc', [BusinessKycController::class, 'index'])->name('businesses-kyc.index');
 
         // Transaction Logs
         Route::get('transaction-logs', [\App\Http\Controllers\Admin\TransactionLogController::class, 'index'])->name('transaction-logs.index');
