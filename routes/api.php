@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\MevonPayWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,6 +50,19 @@ Route::prefix('v1')->group(function () {
     // Webhook processing cron endpoint (for external cron services)
     Route::get('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']);
     Route::post('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']); // Also support POST
+
+    // MEVONPAY external funding webhook (account_number is source of truth)
+    Route::post('/webhook/mevonpay', [MevonPayWebhookController::class, 'receive']);
+    Route::post('/webhook/sla', [MevonPayWebhookController::class, 'receive']); // backward compatibility
+    Route::post('/webhook/mavonpay', [MevonPayWebhookController::class, 'receive']); // backward compatibility
+
+    /**
+     * Tax Calculator open API
+     */
+    Route::prefix('tax')->group(function () {
+        Route::post('business', [\App\Http\Controllers\Api\TaxController::class, 'saveBusiness']);
+        Route::post('personal', [\App\Http\Controllers\Api\TaxController::class, 'savePersonal']);
+    });
 
     /**
      * Rentals public API (no auth required)

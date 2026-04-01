@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -14,6 +15,10 @@ class NubanValidationService
     protected string $possibleBanksUrl;
 
     protected int $timeoutSeconds;
+    protected int $connectTimeoutSeconds;
+
+    /** When true, further NUBAN calls would likely hit the same DNS/connect failure. */
+    protected bool $abortNubanCascade = false;
 
     public function __construct()
     {
@@ -21,6 +26,7 @@ class NubanValidationService
         $this->baseUrl = (string) config('services.nuban.base_url', 'https://app.nuban.com.ng/api');
         $this->possibleBanksUrl = (string) config('services.nuban.possible_banks_url', 'https://app.nuban.com.ng/possible-banks');
         $this->timeoutSeconds = (int) config('services.nuban.timeout_seconds', 10);
+        $this->connectTimeoutSeconds = (int) config('services.nuban.connect_timeout_seconds', 3);
     }
 
     public function isConfigured(): bool
@@ -44,7 +50,9 @@ class NubanValidationService
         }
 
         try {
-            $response = Http::timeout($this->timeoutSeconds)->get($this->baseUrl.'/'.$this->apiKey, [
+            $response = Http::connectTimeout($this->connectTimeoutSeconds)
+                ->timeout($this->timeoutSeconds)
+                ->get($this->baseUrl.'/'.$this->apiKey, [
                 'acc_no' => $accountNumber,
             ]);
 
@@ -98,7 +106,8 @@ class NubanValidationService
             ]);
 
             return null;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            $this->markTransportFailureIfConnectionError($e);
             Log::error('NUBAN validation error', [
                 'account_number' => $accountNumber,
                 'error' => $e->getMessage(),
@@ -124,7 +133,9 @@ class NubanValidationService
         }
 
         try {
-            $response = Http::timeout($this->timeoutSeconds)->get($this->baseUrl.'/'.$this->apiKey, [
+            $response = Http::connectTimeout($this->connectTimeoutSeconds)
+                ->timeout($this->timeoutSeconds)
+                ->get($this->baseUrl.'/'.$this->apiKey, [
                 'bank_code' => $bankCode,
                 'acc_no' => $accountNumber,
             ]);
@@ -182,7 +193,8 @@ class NubanValidationService
             ]);
 
             return null;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            $this->markTransportFailureIfConnectionError($e);
             Log::error('NUBAN validation error with bank code', [
                 'account_number' => $accountNumber,
                 'bank_code' => $bankCode,
@@ -191,6 +203,56 @@ class NubanValidationService
             ]);
             return null;
         }
+    }
+
+    /**
+     * Build possible bank-code variants across providers.
+     * Some providers send bank codes with different zero-padding.
+     *
+     * @return array<int, string>
+     */
+    protected function bankCodeCandidates(string $bankCode): array
+    {
+        $raw = trim($bankCode);
+        if ($raw === '') {
+            return [];
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw) ?? '';
+        $variants = array_values(array_filter([
+            $raw,
+            $digits !== '' ? $digits : null,
+        ]));
+
+        // Keep only likely NUBAN-compatible widths to avoid extra slow calls.
+        if ($digits !== '') {
+            $variants[] = str_pad($digits, 6, '0', STR_PAD_LEFT);
+        }
+
+        $unique = array_values(array_unique($variants));
+
+        return array_slice($unique, 0, 2);
+    }
+
+    protected function markTransportFailureIfConnectionError(\Throwable $e): void
+    {
+        if ($e instanceof ConnectionException) {
+            $this->abortNubanCascade = true;
+
+            return;
+        }
+
+        $msg = $e->getMessage();
+        if (str_contains($msg, 'cURL error 28')
+            || str_contains($msg, 'Could not resolve host')
+            || str_contains($msg, 'Connection timed out')) {
+            $this->abortNubanCascade = true;
+        }
+    }
+
+    protected function shouldAbortNubanCascade(): bool
+    {
+        return $this->abortNubanCascade;
     }
 
     /**
@@ -206,7 +268,9 @@ class NubanValidationService
         }
 
         try {
-            $response = Http::timeout($this->timeoutSeconds)->get($this->possibleBanksUrl.'/'.$this->apiKey, [
+            $response = Http::connectTimeout($this->connectTimeoutSeconds)
+                ->timeout($this->timeoutSeconds)
+                ->get($this->possibleBanksUrl.'/'.$this->apiKey, [
                 'acc_no' => $accountNumber,
             ]);
 
@@ -216,7 +280,8 @@ class NubanValidationService
             }
 
             return [];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            $this->markTransportFailureIfConnectionError($e);
             Log::error('NUBAN possible banks error', [
                 'account_number' => $accountNumber,
                 'error' => $e->getMessage(),
@@ -235,6 +300,8 @@ class NubanValidationService
      */
     public function validate(string $accountNumber, ?string $bankCode = null): ?array
     {
+        $this->abortNubanCascade = false;
+
         // Remove any spaces or dashes from account number
         $accountNumber = preg_replace('/[^0-9]/', '', $accountNumber);
 
@@ -243,41 +310,56 @@ class NubanValidationService
             return null;
         }
 
-        // If bank code is provided, try with that bank first
+        // If bank code is provided, only try a couple of code variants. Do not chain
+        // possible-banks + account-only (many sequential HTTP calls); callers can use MevonPay name enquiry.
         if ($bankCode) {
-            $result = $this->validateAccountNumberWithBankCode($accountNumber, $bankCode);
-            if ($result && $result['valid']) {
-                return $result;
+            foreach ($this->bankCodeCandidates($bankCode) as $candidateCode) {
+                if ($this->shouldAbortNubanCascade()) {
+                    break;
+                }
+                $result = $this->validateAccountNumberWithBankCode($accountNumber, $candidateCode);
+                if ($result && $result['valid']) {
+                    return $result;
+                }
             }
 
-            // If validation failed with provided bank code, try possible banks
-            Log::info('Validation failed with provided bank code, trying possible banks', [
-                'account_number' => $accountNumber,
-                'bank_code' => $bankCode,
-            ]);
+            return null;
         }
 
-        // Try without bank code first
+        // No bank code provided: try account-only first.
         $result = $this->validateAccountNumber($accountNumber);
+        if ($this->shouldAbortNubanCascade()) {
+            return null;
+        }
         if ($result && $result['valid']) {
             return $result;
         }
 
-        // If that fails, try possible banks endpoint
+        // Then try possible banks endpoint.
         $possibleBanks = $this->getPossibleBanks($accountNumber);
-        if (!empty($possibleBanks)) {
-            // Try validating with each possible bank
+        if ($this->shouldAbortNubanCascade()) {
+            return null;
+        }
+        if (! empty($possibleBanks)) {
             foreach ($possibleBanks as $bank) {
+                if ($this->shouldAbortNubanCascade()) {
+                    break;
+                }
                 $bankCodeToTry = $bank['bank_code'] ?? $bank['destbankcode'] ?? null;
                 if ($bankCodeToTry) {
-                    $result = $this->validateAccountNumberWithBankCode($accountNumber, $bankCodeToTry);
-                    if ($result && $result['valid']) {
-                        Log::info('Validation succeeded with possible bank', [
-                            'account_number' => $accountNumber,
-                            'bank_code' => $bankCodeToTry,
-                            'bank_name' => $bank['name'] ?? null,
-                        ]);
-                        return $result;
+                    foreach ($this->bankCodeCandidates((string) $bankCodeToTry) as $candidateCode) {
+                        if ($this->shouldAbortNubanCascade()) {
+                            break 2;
+                        }
+                        $result = $this->validateAccountNumberWithBankCode($accountNumber, $candidateCode);
+                        if ($result && $result['valid']) {
+                            Log::info('Validation succeeded with possible bank', [
+                                'account_number' => $accountNumber,
+                                'bank_code' => $candidateCode,
+                                'bank_name' => $bank['name'] ?? null,
+                            ]);
+                            return $result;
+                        }
                     }
                 }
             }

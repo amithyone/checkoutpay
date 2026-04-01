@@ -62,9 +62,47 @@ class AccountNumberService
      * Priority: Business-specific > Same-payer reuse (by name similarity) > First available in pool (by id, first to last).
      * An account is "released" for new use release_after_success_minutes after it sees a successful transaction.
      */
-    public function assignAccountNumber(?Business $business = null, ?string $payerName = null): ?AccountNumber
+    public function assignAccountNumber(?Business $business = null, ?string $payerName = null, ?int $businessWebsiteId = null, array $options = []): ?AccountNumber
     {
         $startTime = microtime(true);
+
+        $forceExternal = (bool) ($options['force_external'] ?? false);
+        $preferExternal = (bool) ($options['prefer_external'] ?? false);
+        $shouldTryExternal = $forceExternal || $preferExternal;
+
+        if ($business && $shouldTryExternal) {
+            if ($businessWebsiteId) {
+                $websiteExternalAccount = AccountNumber::where('business_id', $business->id)
+                    ->where('business_website_id', $businessWebsiteId)
+                    ->where('is_external', true)
+                    ->where('is_active', true)
+                    ->orderBy('id')
+                    ->first();
+
+                if ($websiteExternalAccount) {
+                    return $websiteExternalAccount;
+                }
+            }
+
+            $externalAccount = AccountNumber::where('business_id', $business->id)
+                ->whereNull('business_website_id')
+                ->where('is_external', true)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->first();
+
+            if ($externalAccount) {
+                return $externalAccount;
+            }
+
+            if ($forceExternal) {
+                Log::warning('External-only mode has no external account number available', [
+                    'business_id' => $business->id,
+                    'business_website_id' => $businessWebsiteId,
+                ]);
+                return null;
+            }
+        }
 
         // Try to get business-specific account number
         if ($business && $business->hasAccountNumber()) {

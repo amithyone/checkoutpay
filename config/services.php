@@ -43,6 +43,15 @@ return [
         'debit_account_number' => env('MEVONPAY_DEBIT_ACCOUNT_NUMBER', ''),
         'current_password' => env('MEVONPAY_CURRENT_PASSWORD', ''),
         'timeout_seconds' => (int) env('MEVONPAY_TIMEOUT_SECONDS', 20),
+        'connect_timeout_seconds' => (int) env('MEVONPAY_CONNECT_TIMEOUT_SECONDS', 3),
+        'temp_va_registration_number' => env('MEVONPAY_TEMP_VA_REGISTRATION_NUMBER', ''),
+    ],
+
+    'mevonrubies' => [
+        // If you don't set these, the integration falls back to the MevonPay config.
+        'base_url' => env('MEVONRUBIES_BASE_URL', ''),
+        'secret_key' => env('MEVONRUBIES_SECRET_KEY', ''),
+        'timeout_seconds' => (int) env('MEVONRUBIES_TIMEOUT_SECONDS', 20),
     ],
 
     /*
@@ -53,6 +62,7 @@ return [
         'base_url' => rtrim(env('NUBAN_BASE_URL', 'https://app.nuban.com.ng/api'), '/'),
         'possible_banks_url' => rtrim(env('NUBAN_POSSIBLE_BANKS_URL', 'https://app.nuban.com.ng/possible-banks'), '/'),
         'timeout_seconds' => (int) env('NUBAN_TIMEOUT_SECONDS', 10),
+        'connect_timeout_seconds' => (int) env('NUBAN_CONNECT_TIMEOUT_SECONDS', 3),
     ],
 
 ];

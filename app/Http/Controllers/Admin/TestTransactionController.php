@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\Business;
 use App\Models\EmailAccount;
 use App\Services\PaymentService;
+use App\Services\MevonPayVirtualAccountService;
 use App\Services\TransactionLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -79,6 +80,78 @@ class TestTransactionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create payment: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Test MevonPay temp virtual account creation (createtempva).
+     * Returns the temp account details so you can verify provider connectivity.
+     */
+    public function createMevonpayTempVa(Request $request)
+    {
+        $validated = $request->validate([
+            'fname' => 'required|string|max:100',
+            'lname' => 'required|string|max:100',
+            'bvn' => 'required|string|max:30',
+        ]);
+
+        try {
+            $svc = app(MevonPayVirtualAccountService::class);
+            $result = $svc->createTempVa(
+                $validated['fname'],
+                $validated['lname'],
+                $validated['bvn']
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Temp virtual account created successfully',
+                'data' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('MevonPay createtempva test failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create temp VA: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Test MEVONPAY createdynamic (dynamic VA).
+     * Returns an accountNumber without requiring BVN.
+     */
+    public function createMevonpayDynamicVa(Request $request)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:1',
+            'currency' => 'nullable|string|max:10',
+        ]);
+
+        try {
+            $svc = app(MevonPayVirtualAccountService::class);
+            $result = $svc->createDynamicVa(
+                (float) $validated['amount'],
+                (string) ($validated['currency'] ?? 'NGN')
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Dynamic virtual account created successfully',
+                'data' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('MevonPay createdynamic test failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create dynamic VA: ' . $e->getMessage(),
             ], 500);
         }
     }

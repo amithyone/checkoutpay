@@ -49,9 +49,31 @@
                     </select>
                 </div>
 
+                <div id="website-select" class="{{ ($accountNumber->is_pool || $accountNumber->is_invoice_pool || $accountNumber->is_membership_pool || ($accountNumber->is_tickets_pool ?? false)) ? 'hidden' : '' }}">
+                    <label for="business_website_id" class="block text-sm font-medium text-gray-700 mb-1">Website (optional for external account)</label>
+                    <select name="business_website_id" id="business_website_id" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        <option value="">All websites for selected business</option>
+                        @foreach($websites as $website)
+                            <option value="{{ $website->id }}" data-business-id="{{ $website->business_id }}" {{ old('business_website_id', $accountNumber->business_website_id) == $website->id ? 'selected' : '' }}>
+                                {{ $website->website_url }} ({{ $website->business->name ?? 'Business' }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">When set, this external account number will be used first for this website.</p>
+                </div>
+
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="is_external" id="is_external" value="1" {{ old('is_external', $accountNumber->is_external) ? 'checked' : '' }} class="rounded border-gray-300 mr-2">
+                        <span class="text-sm text-gray-700">External account number</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Use this for MEVONPAY account numbers.</p>
+                    <input type="hidden" name="external_provider" value="mevonpay">
+                </div>
+
                 <div>
                     <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1">Account Number *</label>
-                    <input type="text" name="account_number" id="account_number" required maxlength="10"
+                    <input type="text" name="account_number" id="account_number" maxlength="10"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
                         value="{{ old('account_number', $accountNumber->account_number) }}"
                         placeholder="Enter 10-digit account number">
@@ -207,12 +229,66 @@
         cb.addEventListener('change', function() {
             var any = Array.prototype.slice.call(document.querySelectorAll('.pool-checkbox')).some(function(c) { return c.checked; });
             var el = document.getElementById('business-select');
+            var websiteEl = document.getElementById('website-select');
             if (el) {
                 el.classList.toggle('hidden', any);
                 if (any) document.getElementById('business_id').value = '';
             }
+            if (websiteEl) {
+                websiteEl.classList.toggle('hidden', any);
+                if (any) document.getElementById('business_website_id').value = '';
+            }
         });
     });
+
+    function filterWebsitesByBusiness() {
+        const businessSelect = document.getElementById('business_id');
+        const websiteSelect = document.getElementById('business_website_id');
+        if (!businessSelect || !websiteSelect) return;
+
+        const businessId = businessSelect.value;
+        Array.from(websiteSelect.options).forEach((option, idx) => {
+            if (idx === 0) {
+                option.hidden = false;
+                return;
+            }
+            const optionBusinessId = option.getAttribute('data-business-id');
+            option.hidden = !!businessId && optionBusinessId !== businessId;
+        });
+
+        const selected = websiteSelect.options[websiteSelect.selectedIndex];
+        if (selected && selected.hidden) {
+            websiteSelect.value = '';
+        }
+    }
+
+    function toggleExternalAccountNumberRequirement() {
+        const externalCheckbox = document.getElementById('is_external');
+        const accountNumberInput = document.getElementById('account_number');
+        const accountNumberLabel = document.querySelector('label[for="account_number"]');
+        if (!externalCheckbox || !accountNumberInput || !accountNumberLabel) return;
+
+        if (externalCheckbox.checked) {
+            accountNumberInput.removeAttribute('required');
+            accountNumberInput.placeholder = 'Optional for external accounts (comes from payload)';
+            accountNumberLabel.textContent = 'Account Number (optional for external)';
+        } else {
+            accountNumberInput.setAttribute('required', 'required');
+            accountNumberInput.placeholder = 'Enter 10-digit account number';
+            accountNumberLabel.textContent = 'Account Number *';
+        }
+    }
+
+    const businessSelectForWebsite = document.getElementById('business_id');
+    if (businessSelectForWebsite) {
+        businessSelectForWebsite.addEventListener('change', filterWebsitesByBusiness);
+    }
+    filterWebsitesByBusiness();
+    const externalCheckbox = document.getElementById('is_external');
+    if (externalCheckbox) {
+        externalCheckbox.addEventListener('change', toggleExternalAccountNumberRequirement);
+    }
+    toggleExternalAccountNumberRequirement();
 
     // Close dropdown when clicking outside
     document.addEventListener('click', function(event) {

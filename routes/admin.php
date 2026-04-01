@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
 use App\Http\Controllers\Admin\BusinessKycController;
+use App\Http\Controllers\Admin\ExternalApiController;
 use App\Http\Controllers\Admin\RenterController;
 use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
@@ -58,6 +59,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::patch('account-numbers/{accountNumber}/flags', [AccountNumberController::class, 'updateFlags'])->name('account-numbers.update-flags');
             Route::post('account-numbers/validate-account', [AccountNumberController::class, 'validateAccount'])
                 ->name('account-numbers.validate-account');
+
+            // External APIs
+            Route::get('external-apis', [ExternalApiController::class, 'index'])->name('external-apis.index');
+            Route::post('external-apis', [ExternalApiController::class, 'store'])->name('external-apis.store');
+            Route::put('external-apis/{externalApi}/businesses', [ExternalApiController::class, 'updateBusinesses'])->name('external-apis.update-businesses');
         });
 
         // Businesses
@@ -169,6 +175,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('test-transaction/create', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createPayment'])->name('test-transaction.create');
         Route::get('test-transaction/status/{transactionId}', [\App\Http\Controllers\Admin\TestTransactionController::class, 'getStatus'])->name('test-transaction.status');
         Route::post('test-transaction/check-email', [\App\Http\Controllers\Admin\TestTransactionController::class, 'checkEmail'])->name('test-transaction.check-email');
+        Route::post('test-transaction/mevonpay-temp-va', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createMevonpayTempVa'])
+            ->name('test-transaction.mevonpay-temp-va');
+        Route::post('test-transaction/mevonpay-dynamic-va', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createMevonpayDynamicVa'])
+            ->name('test-transaction.mevonpay-dynamic-va');
 
         // Settings (Admin/Super Admin only)
         Route::middleware('admin_or_super')->group(function () {

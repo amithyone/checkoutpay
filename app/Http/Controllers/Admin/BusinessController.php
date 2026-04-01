@@ -87,7 +87,9 @@ class BusinessController extends Controller
             'email_account_id' => 'nullable|exists:email_accounts,id',
             'is_active' => 'boolean',
             'website_approved' => 'boolean',
+            'uses_external_account_numbers' => 'boolean',
         ]);
+        $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
 
         Business::create($validated);
 
@@ -128,7 +130,9 @@ class BusinessController extends Controller
             'is_active' => 'boolean',
             'website_approved' => 'boolean',
             'balance' => 'nullable|numeric|min:0',
+            'uses_external_account_numbers' => 'boolean',
         ]);
+        $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
 
         $business->update($validated);
 

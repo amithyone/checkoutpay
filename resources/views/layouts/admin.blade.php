@@ -99,6 +99,10 @@
                     <i class="fas fa-credit-card w-5 mr-3"></i>
                     <span>Account Numbers</span>
                 </a>
+                <a href="{{ route('admin.external-apis.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.external-apis.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-plug w-5 mr-3"></i>
+                    <span>External APIs</span>
+                </a>
                 @endif
 
                 <a href="{{ route('admin.businesses.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.businesses.*') ? 'bg-primary/10 text-primary' : '' }}">

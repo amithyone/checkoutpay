@@ -26,7 +26,11 @@ class PaymentRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0.01'],
             'name' => ['nullable', 'string', 'max:255'], // Accept 'name' from API (will be mapped to payer_name)
             'payer_name' => ['nullable', 'string', 'max:255'], // Accept 'payer_name' directly
+            'fname' => ['nullable', 'string', 'max:100'],
+            'lname' => ['nullable', 'string', 'max:100'],
             'bank' => ['nullable', 'string', 'max:255'],
+            'bvn' => ['nullable', 'string', 'max:30'],
+            'registration_number' => ['nullable', 'string', 'max:60'],
             'webhook_url' => ['required', 'url', 'max:500'],
             'service' => ['nullable', 'string', 'max:255'], // Accept service field
             'transaction_id' => ['nullable', 'string', 'max:255', 'unique:payments,transaction_id'],
@@ -85,6 +89,30 @@ class PaymentRequest extends FormRequest
         if ($this->has('payer_name') && $this->payer_name) {
             $this->merge([
                 'payer_name' => trim($this->payer_name),
+            ]);
+        }
+
+        if ($this->has('fname') && $this->fname) {
+            $this->merge([
+                'fname' => trim($this->fname),
+            ]);
+        }
+
+        if ($this->has('lname') && $this->lname) {
+            $this->merge([
+                'lname' => trim($this->lname),
+            ]);
+        }
+
+        if ($this->has('bvn') && $this->bvn) {
+            $this->merge([
+                'bvn' => trim($this->bvn),
+            ]);
+        }
+
+        if ($this->has('registration_number') && $this->registration_number) {
+            $this->merge([
+                'registration_number' => trim($this->registration_number),
             ]);
         }
         

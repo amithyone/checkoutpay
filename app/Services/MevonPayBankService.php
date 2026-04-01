@@ -11,12 +11,14 @@ class MevonPayBankService
     protected string $baseUrl;
     protected string $secretKey;
     protected int $timeoutSeconds;
+    protected int $connectTimeoutSeconds;
 
     public function __construct()
     {
         $this->baseUrl = (string) config('services.mevonpay.base_url', '');
         $this->secretKey = (string) config('services.mevonpay.secret_key', '');
         $this->timeoutSeconds = (int) config('services.mevonpay.timeout_seconds', 20);
+        $this->connectTimeoutSeconds = (int) config('services.mevonpay.connect_timeout_seconds', 3);
     }
 
     public function isConfigured(): bool
@@ -38,7 +40,9 @@ class MevonPayBankService
                 ])
                 ->acceptJson()
                 ->asJson()
+                ->connectTimeout($this->connectTimeoutSeconds)
                 ->timeout($this->timeoutSeconds)
+                ->retry(1, 0, throw: false)
                 ->post($url, ['action' => 'getBankList']);
 
             $json = $resp->json();
@@ -78,7 +82,9 @@ class MevonPayBankService
                 ])
                 ->acceptJson()
                 ->asJson()
+                ->connectTimeout($this->connectTimeoutSeconds)
                 ->timeout($this->timeoutSeconds)
+                ->retry(1, 0, throw: false)
                 ->post($url, [
                     'action' => 'nameEnquiry',
                     'bankCode' => $bankCode,

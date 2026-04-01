@@ -16,26 +16,37 @@ class RentalPaymentController extends Controller
     public function show(Request $request, string $code): View|RedirectResponse
     {
         $rental = Rental::where('payment_link_code', $code)
-            ->with(['business', 'items', 'payment.accountNumberDetails'])
+            ->with(['business', 'items', 'payment.accountNumberDetails', 'secondaryPayment.accountNumberDetails'])
             ->firstOrFail();
 
         if ($rental->status === 'cancelled' || $rental->status === 'rejected') {
             return redirect()->route('rentals.index')->with('error', 'This rental is no longer valid.');
         }
 
-        if ($rental->payment && $rental->payment->status === 'approved') {
+        $primaryPayment = $rental->payment;
+        $secondaryPayment = $rental->secondaryPayment;
+
+        if (
+            ($primaryPayment && $primaryPayment->status === \App\Models\Payment::STATUS_APPROVED)
+            || ($secondaryPayment && $secondaryPayment->status === \App\Models\Payment::STATUS_APPROVED)
+        ) {
             return view('rentals.paid', compact('rental'));
         }
 
-        $payment = $rental->payment;
-        if (!$payment || !$payment->account_number) {
+        if (
+            (!$primaryPayment && !$secondaryPayment)
+            || (($primaryPayment && ! $primaryPayment->account_number) && ($secondaryPayment && ! $secondaryPayment->account_number))
+        ) {
             return redirect()->route('rentals.index')->with('error', 'Payment details are not available. Please contact the business.');
         }
 
-        if ($payment->isExpired()) {
+        $primaryExpired = $primaryPayment?->isExpired() ?? true;
+        $secondaryExpired = $secondaryPayment?->isExpired() ?? true;
+
+        if ($primaryExpired && $secondaryExpired) {
             return view('rentals.pay-expired', compact('rental'));
         }
 
-        return view('rentals.pay', compact('rental', 'payment'));
+        return view('rentals.pay', compact('rental', 'primaryPayment', 'secondaryPayment'));
     }
 }

@@ -162,6 +162,11 @@ class PaymentMatchingService
             // Get pending payments sorted by creation time (oldest first)
             // CRITICAL: Only check payments created BEFORE email was received
             $query = Payment::where('status', Payment::STATUS_PENDING)
+                ->whereNotIn('payment_source', [
+                    Payment::SOURCE_EXTERNAL_MEVONPAY,
+                    Payment::SOURCE_EXTERNAL_SLA,
+                    Payment::SOURCE_EXTERNAL_MAVONPAY,
+                ])
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 });
@@ -1299,6 +1304,10 @@ class PaymentMatchingService
                 ->where('is_matched', false)
                 ->where('amount', $payment->amount)
                 ->where('email_date', '>=', $payment->created_at); // Email must be AFTER transaction
+
+            if ($payment->isExternalGatewayPayment()) {
+                return null;
+            }
             
             // Filter by email account if business has one
             if ($payment->business_id && $payment->business->email_account_id) {
@@ -1366,6 +1375,10 @@ class PaymentMatchingService
                     $payment->amount + 1
                 ])
                 ->where('email_date', '>=', $payment->created_at); // Email must be AFTER transaction
+
+            if ($payment->isExternalGatewayPayment()) {
+                return null;
+            }
             
             // Filter by email account if business has one
             if ($payment->business_id && $payment->business->email_account_id) {

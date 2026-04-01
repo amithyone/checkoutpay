@@ -26,6 +26,7 @@
                 <option value="membership_pool" {{ request('type') === 'membership_pool' ? 'selected' : '' }}>Membership Pool</option>
                 <option value="tickets_pool" {{ request('type') === 'tickets_pool' ? 'selected' : '' }}>Tickets Pool</option>
                 <option value="business" {{ request('type') === 'business' ? 'selected' : '' }}>Business Accounts</option>
+                <option value="external" {{ request('type') === 'external' ? 'selected' : '' }}>External Accounts</option>
             </select>
             <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All Status</option>
@@ -53,6 +54,7 @@
                         <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Ticket payments">Tickets</th>
                         <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Active</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usage</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payments Received</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -81,6 +83,9 @@
                                 @if(!$account->is_pool && !$account->is_invoice_pool && !($account->is_membership_pool ?? false) && !($account->is_tickets_pool ?? false))
                                     <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Business</span>
                                 @endif
+                                @if($account->is_external)
+                                    <span class="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">External</span>
+                                @endif
                             </div>
                         </td>
                         <td class="px-6 py-4 text-center">
@@ -100,6 +105,9 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
                             {{ $account->business ? $account->business->name : '-' }}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            {{ $account->website?->website_url ?? '-' }}
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $account->usage_count }}</td>
                         <td class="px-6 py-4 text-sm text-gray-900">
@@ -123,7 +131,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="13" class="px-6 py-4 text-center text-sm text-gray-500">No account numbers found</td>
+                        <td colspan="14" class="px-6 py-4 text-center text-sm text-gray-500">No account numbers found</td>
                     </tr>
                     @endforelse
                 </tbody>

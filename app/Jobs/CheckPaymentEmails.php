@@ -44,6 +44,14 @@ class CheckPaymentEmails implements ShouldQueue
             return;
         }
 
+        if ($this->payment->isExternalGatewayPayment() || (($this->payment->email_data['skip_auto_match'] ?? false) === true)) {
+            Log::info('Skipping email auto-match for external payment source', [
+                'transaction_id' => $this->payment->transaction_id,
+                'payment_source' => $this->payment->payment_source,
+            ]);
+            return;
+        }
+
         if ($this->payment->isExpired()) {
             Log::info('Payment expired, skipping email check', [
                 'transaction_id' => $this->payment->transaction_id,

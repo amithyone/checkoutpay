@@ -73,6 +73,13 @@
                     </label>
                 </div>
 
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="uses_external_account_numbers" value="1" {{ old('uses_external_account_numbers', $business->uses_external_account_numbers) ? 'checked' : '' }} class="mr-2">
+                        <span class="text-sm text-gray-700">Use external account numbers (MEVONPAY)</span>
+                    </label>
+                </div>
+
                 <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
                     <a href="{{ route('admin.businesses.show', $business) }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                         Cancel

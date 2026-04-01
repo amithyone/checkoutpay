@@ -121,7 +121,7 @@ class WithdrawalMavonPayPayoutService
 
         $status = $withdrawal->payout_status;
         if ($status === MavonPayTransferService::BUCKET_SUCCESSFUL) {
-            return 'Transfer completed successfully via MavonPay.';
+            return 'Transfer completed successfully via AutoPay.';
         }
         if ($status === MavonPayTransferService::BUCKET_PENDING) {
             return 'Transfer submitted; bank status is pending. Check this withdrawal for updates.';

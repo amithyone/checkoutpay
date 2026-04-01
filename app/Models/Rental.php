@@ -46,6 +46,7 @@ class Rental extends Model
         'business_notes',
         'payment_link_code',
         'payment_id',
+        'secondary_payment_id',
         'approved_at',
         'started_at',
         'completed_at',
@@ -118,6 +119,14 @@ class Rental extends Model
     public function payment()
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    /**
+     * Optional second payment option (e.g. external + internal).
+     */
+    public function secondaryPayment()
+    {
+        return $this->belongsTo(Payment::class, 'secondary_payment_id');
     }
 
     /**

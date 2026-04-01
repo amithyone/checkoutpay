@@ -19,6 +19,7 @@ class MavonPayTransferService
     protected string $debitAccountNumber;
     protected string $currentPassword;
     protected int $timeoutSeconds;
+    protected int $connectTimeoutSeconds;
 
     public function __construct()
     {
@@ -28,6 +29,7 @@ class MavonPayTransferService
         $this->debitAccountNumber = (string) config('services.mevonpay.debit_account_number', '');
         $this->currentPassword = (string) config('services.mevonpay.current_password', '');
         $this->timeoutSeconds = (int) config('services.mevonpay.timeout_seconds', 20);
+        $this->connectTimeoutSeconds = (int) config('services.mevonpay.connect_timeout_seconds', 3);
     }
 
     public function isConfigured(): bool
@@ -78,7 +80,9 @@ class MavonPayTransferService
                 ])
                 ->acceptJson()
                 ->asJson()
+                ->connectTimeout($this->connectTimeoutSeconds)
                 ->timeout($this->timeoutSeconds)
+                ->retry(1, 0, throw: false)
                 ->post($url, $payload);
 
             $raw = $resp->json();
@@ -144,24 +148,6 @@ class MavonPayTransferService
             Log::error('MavonPay createtransfer error', [
                 'message' => $message,
             ]);
-
-            // If MevonPay times out/returns empty reply, treat as successful fallback.
-            $isEmptyReply = str_contains($message, 'cURL error 52') || str_contains($message, 'Empty reply from server');
-            $isTimeout = str_contains($message, 'cURL error 28') || str_contains(strtolower($message), 'operation timed out');
-            if ($isEmptyReply || $isTimeout) {
-                Log::warning('MavonPay createtransfer transport fallback treated as success', [
-                    'reference' => $payload['reference'],
-                    'error' => $message,
-                ]);
-                return [
-                    'bucket' => self::BUCKET_SUCCESSFUL,
-                    'response_code' => '00',
-                    'response_message' => $message,
-                    'reference' => $payload['reference'],
-                    'raw' => null,
-                    'http_status' => null,
-                ];
-            }
 
             return [
                 'bucket' => self::BUCKET_FAILED,

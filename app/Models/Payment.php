@@ -29,6 +29,8 @@ class Payment extends Model
         'business_website_id',
         'rental_id',
         'status',
+        'payment_source',
+        'external_reference',
         'email_data',
         'matched_at',
         'expires_at',
@@ -77,6 +79,10 @@ class Payment extends Model
     const STATUS_PENDING = 'pending';
     const STATUS_APPROVED = 'approved';
     const STATUS_REJECTED = 'rejected';
+    const SOURCE_INTERNAL = 'internal';
+    const SOURCE_EXTERNAL_MEVONPAY = 'external_mevonpay';
+    const SOURCE_EXTERNAL_SLA = 'external_sla';
+    const SOURCE_EXTERNAL_MAVONPAY = 'external_mavonpay'; // legacy
 
     /**
      * Get pending payments
@@ -129,6 +135,15 @@ class Payment extends Model
     public function isRejected(): bool
     {
         return $this->status === self::STATUS_REJECTED;
+    }
+
+    public function isExternalGatewayPayment(): bool
+    {
+        return in_array($this->payment_source, [
+            self::SOURCE_EXTERNAL_MEVONPAY,
+            self::SOURCE_EXTERNAL_SLA,
+            self::SOURCE_EXTERNAL_MAVONPAY,
+        ], true);
     }
 
     /**

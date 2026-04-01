@@ -32,45 +32,105 @@
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Payment Instructions</h2>
-        <p class="text-gray-600 mb-6">Transfer the exact amount below to complete your rental payment:</p>
+        <p class="text-gray-600 mb-6">Transfer the exact amount below to complete your rental payment.</p>
 
-        <div class="bg-gray-50 rounded-lg p-6 mb-4 space-y-4">
-            <div class="flex justify-between items-center pb-3 border-b border-gray-200">
-                <span class="text-sm font-medium text-gray-600">Bank</span>
-                <span class="font-medium text-gray-900">{{ $payment->accountNumberDetails->bank_name ?? 'N/A' }}</span>
-            </div>
-            <div class="flex justify-between items-center pb-3 border-b border-gray-200">
-                <span class="text-sm font-medium text-gray-600">Account Name</span>
-                <span class="font-medium text-gray-900">{{ $payment->accountNumberDetails->account_name ?? 'N/A' }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-                <span class="text-sm font-medium text-gray-600">Account Number</span>
-                <div class="flex items-center gap-2">
-                    <span id="accountNumber" class="font-mono font-semibold text-gray-900">{{ $payment->account_number }}</span>
-                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('accountNumber').textContent); this.querySelector('i').classList.replace('fa-copy','fa-check'); setTimeout(() => this.querySelector('i').classList.replace('fa-check','fa-copy'), 2000)" class="text-primary hover:opacity-80" title="Copy"><i class="fas fa-copy"></i></button>
+        @php
+            $primaryExpired = $primaryPayment?->isExpired() ?? false;
+            $secondaryExpired = $secondaryPayment?->isExpired() ?? false;
+        @endphp
+
+        <div class="space-y-4">
+            @if($primaryPayment)
+                <div class="bg-gray-50 rounded-lg p-6 space-y-4 @if($primaryExpired) opacity-70 @endif">
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-200">
+                        <span class="text-sm font-medium text-gray-600">
+                            {{ $primaryPayment && $primaryPayment->isExternalGatewayPayment() ? 'External (MEVONRUBIES)' : 'Internal account' }}
+                        </span>
+                        <span class="text-xs {{ $primaryExpired ? 'text-amber-700' : 'text-gray-500' }}">
+                            {{ $primaryExpired ? 'Expired' : 'Available' }}
+                        </span>
+                    </div>
+
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-200">
+                        <span class="text-sm font-medium text-gray-600">Bank</span>
+                        <span class="font-medium text-gray-900">{{ $primaryPayment->accountNumberDetails->bank_name ?? 'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-200">
+                        <span class="text-sm font-medium text-gray-600">Account Name</span>
+                        <span class="font-medium text-gray-900">{{ $primaryPayment->accountNumberDetails->account_name ?? 'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-600">Account Number</span>
+                        <div class="flex items-center gap-2">
+                            <span id="primaryAccountNumber" class="font-mono font-semibold text-gray-900">{{ $primaryPayment->account_number }}</span>
+                            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('primaryAccountNumber').textContent)" class="text-primary hover:opacity-80" title="Copy"><i class="fas fa-copy"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-600">Transaction ID</span>
+                        <span class="font-mono text-sm text-gray-900">{{ $primaryPayment->transaction_id }}</span>
+                    </div>
+                </div>
+            @endif
+
+            @if($secondaryPayment)
+                <div class="bg-gray-50 rounded-lg p-6 space-y-4 @if($secondaryExpired) opacity-70 @endif">
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-200">
+                        <span class="text-sm font-medium text-gray-600">
+                            {{ $secondaryPayment && $secondaryPayment->isExternalGatewayPayment() ? 'External (MEVONRUBIES)' : 'Internal account' }}
+                        </span>
+                        <span class="text-xs {{ $secondaryExpired ? 'text-amber-700' : 'text-gray-500' }}">
+                            {{ $secondaryExpired ? 'Expired' : 'Available' }}
+                        </span>
+                    </div>
+
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-200">
+                        <span class="text-sm font-medium text-gray-600">Bank</span>
+                        <span class="font-medium text-gray-900">{{ $secondaryPayment->accountNumberDetails->bank_name ?? 'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-3 border-b border-gray-200">
+                        <span class="text-sm font-medium text-gray-600">Account Name</span>
+                        <span class="font-medium text-gray-900">{{ $secondaryPayment->accountNumberDetails->account_name ?? 'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-600">Account Number</span>
+                        <div class="flex items-center gap-2">
+                            <span id="secondaryAccountNumber" class="font-mono font-semibold text-gray-900">{{ $secondaryPayment->account_number }}</span>
+                            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('secondaryAccountNumber').textContent)" class="text-primary hover:opacity-80" title="Copy"><i class="fas fa-copy"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-600">Transaction ID</span>
+                        <span class="font-mono text-sm text-gray-900">{{ $secondaryPayment->transaction_id }}</span>
+                    </div>
+                </div>
+            @endif
+
+            <div class="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                <div class="flex justify-between items-center">
+                    <span class="font-medium text-gray-700">Amount to pay</span>
+                    <span class="text-xl font-bold text-gray-900">₦{{ number_format($rental->total_amount, 2) }}</span>
                 </div>
             </div>
-        </div>
 
-        <div class="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-4">
-            <div class="flex justify-between items-center">
-                <span class="font-medium text-gray-700">Amount to pay</span>
-                <span class="text-xl font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</span>
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p class="text-sm text-amber-800">
+                    <strong>Important:</strong> Transfer the exact amount to one of the account numbers above.
+                    Payment will be verified automatically and your rental will be confirmed once received.
+                </p>
             </div>
-        </div>
-
-        <div class="bg-gray-50 rounded-lg p-4 mb-4">
-            <p class="text-xs text-gray-600 mb-1">Transaction ID (use as reference if required)</p>
-            <p class="font-mono text-sm text-gray-900">{{ $payment->transaction_id }}</p>
-        </div>
-
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p class="text-sm text-amber-800"><strong>Important:</strong> Transfer the exact amount. Payment will be verified automatically and your rental will be confirmed once received.</p>
         </div>
     </div>
 
-    @if($payment->expires_at)
-    <p class="text-center text-sm text-gray-500">This payment link expires {{ $payment->expires_at->format('M d, Y H:i') }}.</p>
+    @php
+        $primaryExpiresAt = $primaryPayment?->expires_at;
+        $secondaryExpiresAt = $secondaryPayment?->expires_at;
+        $displayExpiry = $primaryExpiresAt ?? $secondaryExpiresAt;
+    @endphp
+    @if($displayExpiry)
+        <p class="text-center text-sm text-gray-500">This payment link expires {{ $displayExpiry->format('M d, Y H:i') }}.</p>
     @endif
 </div>
 </body>

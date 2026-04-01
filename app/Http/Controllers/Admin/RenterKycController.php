@@ -4,12 +4,18 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Renter;
+use App\Services\MevonRubiesVirtualAccountService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class RenterKycController extends Controller
 {
+    public function __construct(
+        protected MevonRubiesVirtualAccountService $mevonRubiesVirtualAccountService
+    ) {}
+
     protected function kycPathExists(?string $path): bool
     {
         if (! $path) {
@@ -75,7 +81,33 @@ class RenterKycController extends Controller
             'kyc_id_rejection_reason' => null,
         ]);
 
-        return redirect()->back()->with('success', 'Renter ID approved.');
+        // Provision a persistent Rubies VA once KYC is approved.
+        // This keeps rentals users from creating VA on the frontend.
+        if (! $renter->rubies_account_number) {
+            try {
+                $va = $this->mevonRubiesVirtualAccountService->createRenterAccount($renter);
+                $renter->update([
+                    'rubies_account_number' => $va['account_number'] ?? null,
+                    'rubies_account_name' => $va['account_name'] ?? null,
+                    'rubies_bank_name' => $va['bank_name'] ?? null,
+                    'rubies_bank_code' => $va['bank_code'] ?? null,
+                    'rubies_reference' => $va['reference'] ?? null,
+                    'rubies_account_created_at' => now(),
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Rubies account auto-creation failed on renter KYC approval', [
+                    'renter_id' => $renter->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return redirect()->back()->with(
+                    'success',
+                    'Renter ID approved, but Rubies account was not created automatically yet.'
+                );
+            }
+        }
+
+        return redirect()->back()->with('success', 'Renter ID approved and Rubies account created.');
     }
 
     public function reject(Request $request, Renter $renter)

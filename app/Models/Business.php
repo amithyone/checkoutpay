@@ -24,6 +24,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'website_approved',
         'api_key',
         'webhook_url',
+        'uses_external_account_numbers',
         'email_account_id',
         'is_active',
         'rental_auto_approve',
@@ -121,6 +122,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_percentage' => 'decimal:2',
         'charge_fixed' => 'decimal:2',
         'charge_exempt' => 'boolean',
+        'uses_external_account_numbers' => 'boolean',
     ];
 
     /**
@@ -229,6 +231,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         return $this->accountNumbers()
             ->where('is_active', true)
             ->where('is_pool', false)
+            ->where('is_external', false)
             ->first();
     }
 
@@ -240,6 +243,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         return $this->accountNumbers()
             ->where('is_active', true)
             ->where('is_pool', false)
+            ->where('is_external', false)
             ->exists();
     }
 
@@ -357,6 +361,75 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function websites()
     {
         return $this->hasMany(BusinessWebsite::class);
+    }
+
+    public function externalApis()
+    {
+        return $this->belongsToMany(ExternalApi::class, 'business_external_api')
+            ->withPivot(['assignment_mode', 'services'])
+            ->withTimestamps();
+    }
+
+    public function usesExternalProvider(string $providerKey): bool
+    {
+        if (!$this->relationLoaded('externalApis')) {
+            $this->load('externalApis');
+        }
+
+        return $this->externalApis
+            ->where('provider_key', $providerKey)
+            ->where('is_active', true)
+            ->isNotEmpty();
+    }
+
+    public function getExternalProviderAssignment(string $providerKey): ?ExternalApi
+    {
+        if (!$this->relationLoaded('externalApis')) {
+            $this->load('externalApis');
+        }
+
+        return $this->externalApis
+            ->first(function ($api) use ($providerKey) {
+                return $api->provider_key === $providerKey && $api->is_active;
+            });
+    }
+
+    public function externalProviderModeForService(string $providerKey, ?string $service = null): string
+    {
+        $assignment = $this->getExternalProviderAssignment($providerKey);
+        if (!$assignment) {
+            return 'internal_only';
+        }
+
+        $mode = $assignment->pivot->assignment_mode ?? 'hybrid';
+        $services = $assignment->pivot->services;
+        $services = is_array($services) ? $services : (is_string($services) ? json_decode($services, true) : null);
+        $services = is_array($services) ? array_values(array_filter($services)) : [];
+
+        if (!empty($services) && $service !== null && !in_array($service, $services, true)) {
+            return 'internal_only';
+        }
+
+        return in_array($mode, ['external_only', 'hybrid', 'internal_only'], true) ? $mode : 'hybrid';
+    }
+
+    /**
+     * Get external VA generation mode for a given provider.
+     * Used for providers like MEVONPAY to decide between createdynamic vs createtempva.
+     */
+    public function externalProviderVaGenerationMode(string $providerKey): string
+    {
+        $assignment = $this->getExternalProviderAssignment($providerKey);
+        if (!$assignment) {
+            return 'dynamic';
+        }
+
+        $mode = strtolower(trim((string) ($assignment->pivot->va_generation_mode ?? 'dynamic')));
+        if (!in_array($mode, ['dynamic', 'temp'], true)) {
+            return 'dynamic';
+        }
+
+        return $mode;
     }
 
     /**

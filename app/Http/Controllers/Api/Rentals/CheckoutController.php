@@ -330,13 +330,32 @@ class CheckoutController extends Controller
                 }
 
                 $rentalData = $rental->fresh('items', 'business')->toArray();
-                if (isset($assignedPayment) && $assignedPayment) {
-                    $acc = \App\Models\AccountNumber::where('account_number', $assignedPayment->account_number)->first();
+
+                // Provide both payment options (external + internal) when available.
+                $rental->loadMissing(['payment.accountNumberDetails', 'secondaryPayment.accountNumberDetails']);
+
+                $primaryPayment = $rental->payment;
+                $secondaryPayment = $rental->secondaryPayment;
+
+                if ($primaryPayment) {
                     $rentalData['payment_instructions'] = [
-                        'account_number' => $assignedPayment->account_number,
-                        'bank' => $acc ? $acc->bank_name : null,
-                        'account_name' => $acc ? $acc->account_name : null,
-                        'amount' => $assignedPayment->amount,
+                        'account_number' => $primaryPayment->account_number,
+                        'bank' => $primaryPayment->accountNumberDetails->bank_name ?? null,
+                        'account_name' => $primaryPayment->accountNumberDetails->account_name ?? null,
+                        'amount' => (float) $primaryPayment->amount,
+                        'transaction_id' => $primaryPayment->transaction_id,
+                        'payment_source' => $primaryPayment->payment_source,
+                    ];
+                }
+
+                if ($secondaryPayment) {
+                    $rentalData['payment_instructions_secondary'] = [
+                        'account_number' => $secondaryPayment->account_number,
+                        'bank' => $secondaryPayment->accountNumberDetails->bank_name ?? null,
+                        'account_name' => $secondaryPayment->accountNumberDetails->account_name ?? null,
+                        'amount' => (float) $secondaryPayment->amount,
+                        'transaction_id' => $secondaryPayment->transaction_id,
+                        'payment_source' => $secondaryPayment->payment_source,
                     ];
                 }
                 $created[] = $rentalData;
@@ -423,7 +442,7 @@ class CheckoutController extends Controller
             ], 404);
         }
 
-        if (! $rental->payment_id) {
+        if (! $rental->payment_id && ! $rental->secondary_payment_id) {
             return response()->json([
                 'message' => 'No payment attached to this rental.',
             ], 422);
@@ -432,10 +451,17 @@ class CheckoutController extends Controller
         // Run email monitoring to fetch and process new emails (may approve payment).
         Artisan::call('payment:monitor-emails');
 
-        $rental->load('payment');
+        $rental->load(['payment', 'secondaryPayment']);
         $payment = $rental->payment;
+        $secondaryPayment = $rental->secondaryPayment;
 
-        if ($payment && $payment->status === \App\Models\Payment::STATUS_APPROVED && $rental->status === Rental::STATUS_PENDING) {
+        if (
+            $rental->status === Rental::STATUS_PENDING
+            && (
+                ($payment && $payment->status === \App\Models\Payment::STATUS_APPROVED)
+                || ($secondaryPayment && $secondaryPayment->status === \App\Models\Payment::STATUS_APPROVED)
+            )
+        ) {
             $rental->approve('Auto-approved after payment was confirmed.');
             $rental->refresh();
         }
@@ -453,6 +479,14 @@ class CheckoutController extends Controller
                 'amount' => (float) $payment->amount,
                 'received_amount' => $payment->received_amount !== null ? (float) $payment->received_amount : null,
                 'matched_at' => $payment->matched_at?->toISOString(),
+            ] : null,
+            'secondary_payment' => $secondaryPayment ? [
+                'id' => $secondaryPayment->id,
+                'transaction_id' => $secondaryPayment->transaction_id,
+                'status' => $secondaryPayment->status,
+                'amount' => (float) $secondaryPayment->amount,
+                'received_amount' => $secondaryPayment->received_amount !== null ? (float) $secondaryPayment->received_amount : null,
+                'matched_at' => $secondaryPayment->matched_at?->toISOString(),
             ] : null,
         ]);
     }

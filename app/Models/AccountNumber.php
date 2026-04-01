@@ -15,10 +15,13 @@ class AccountNumber extends Model
         'account_name',
         'bank_name',
         'business_id',
+        'business_website_id',
         'is_pool',
         'is_invoice_pool',
         'is_membership_pool',
         'is_tickets_pool',
+        'is_external',
+        'external_provider',
         'is_active',
         'usage_count',
     ];
@@ -28,6 +31,7 @@ class AccountNumber extends Model
         'is_invoice_pool' => 'boolean',
         'is_membership_pool' => 'boolean',
         'is_tickets_pool' => 'boolean',
+        'is_external' => 'boolean',
         'is_active' => 'boolean',
         'usage_count' => 'integer',
         'created_at' => 'datetime',
@@ -41,6 +45,11 @@ class AccountNumber extends Model
     public function business()
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function website()
+    {
+        return $this->belongsTo(BusinessWebsite::class, 'business_website_id');
     }
 
     /**
