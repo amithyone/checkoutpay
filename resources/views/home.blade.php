@@ -406,6 +406,18 @@
     </section>
     @endif
 
+    <!-- Partnership Section -->
+    <section id="partnership" class="py-12 sm:py-16 md:py-20 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Partnership</h2>
+                <p class="text-base sm:text-lg md:text-xl text-gray-700 leading-relaxed max-w-3xl mx-auto px-2">
+                    Powered by <span class="font-semibold text-primary">METRAVON INNOVATION LTD</span>
+                </p>
+            </div>
+        </div>
+    </section>
+
     <!-- CTA Section -->
     @if(isset($cta['title']))
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">

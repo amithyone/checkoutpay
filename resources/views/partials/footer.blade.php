@@ -76,6 +76,9 @@
                     <h3 class="text-white font-bold text-base sm:text-lg">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h3>
                 </div>
                 <p class="text-xs sm:text-sm text-gray-400 mb-4">Intelligent Payment Gateway</p>
+                <p class="text-xs sm:text-sm text-gray-500 mb-4">
+                    Powered by <span class="text-gray-300 font-semibold">METRAVON INNOVATION LTD</span>
+                </p>
                 <div class="flex space-x-4">
                     <a href="{{ route('business.login') }}" class="text-gray-400 hover:text-white transition-colors text-sm">Login</a>
                     <a href="{{ route('business.register') }}" class="text-gray-400 hover:text-white transition-colors text-sm">Sign Up</a>
