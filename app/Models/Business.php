@@ -366,7 +366,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function externalApis()
     {
         return $this->belongsToMany(ExternalApi::class, 'business_external_api')
-            ->withPivot(['assignment_mode', 'services'])
+            ->withPivot(['assignment_mode', 'services', 'va_generation_mode'])
             ->withTimestamps();
     }
 

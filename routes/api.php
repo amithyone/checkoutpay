@@ -53,8 +53,11 @@ Route::prefix('v1')->group(function () {
 
     // MEVONPAY external funding webhook (account_number is source of truth)
     Route::post('/webhook/mevonpay', [MevonPayWebhookController::class, 'receive']);
+    Route::post('/webhooks/mevonpay', [MevonPayWebhookController::class, 'receive']); // plural alias
     Route::post('/webhook/sla', [MevonPayWebhookController::class, 'receive']); // backward compatibility
+    Route::post('/webhooks/sla', [MevonPayWebhookController::class, 'receive']); // plural alias
     Route::post('/webhook/mavonpay', [MevonPayWebhookController::class, 'receive']); // backward compatibility
+    Route::post('/webhooks/mavonpay', [MevonPayWebhookController::class, 'receive']); // plural alias
 
     /**
      * Tax Calculator open API

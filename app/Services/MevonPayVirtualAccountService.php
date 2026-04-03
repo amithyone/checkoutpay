@@ -23,6 +23,11 @@ class MevonPayVirtualAccountService
         return $this->baseUrl !== '' && $this->secretKey !== '';
     }
 
+    protected function shouldLogAccountRequests(): bool
+    {
+        return (bool) config('services.mevonpay.account_logs_enabled', false);
+    }
+
     protected function authorizationHeaderValue(): string
     {
         $key = trim($this->secretKey);
@@ -71,16 +76,25 @@ class MevonPayVirtualAccountService
 
         $authorization = $this->rawAuthorizationHeaderValue();
 
+        $effectiveRegistrationNumber = trim((string) ($registrationNumber ?: config('services.mevonpay.temp_va_registration_number', '')));
+
         $payload = [
             'type' => 'rubies',
             'fname' => $fname,
             'lname' => $lname,
         ];
-        if (! empty($registrationNumber)) {
-            $payload['registration_number'] = $registrationNumber;
+        if ($effectiveRegistrationNumber !== '') {
+            $payload['registration_number'] = $effectiveRegistrationNumber;
         } elseif (! empty($bvn)) {
             // Backward compatibility fallback when registration number is unavailable.
             $payload['bvn'] = $bvn;
+        }
+
+        if ($this->shouldLogAccountRequests()) {
+            Log::info('MevonPay createtempva request payload', [
+                'url' => $url,
+                'payload' => $payload,
+            ]);
         }
 
         $resp = Http::withHeaders([
@@ -92,6 +106,13 @@ class MevonPayVirtualAccountService
             ->post($url, $payload);
 
         $json = $resp->json();
+
+        if ($this->shouldLogAccountRequests()) {
+            Log::info('MevonPay createtempva response payload', [
+                'http_status' => $resp->status(),
+                'response' => $json,
+            ]);
+        }
 
         if (! $resp->successful()) {
             Log::warning('MevonPay createtempva non-2xx response', [
@@ -152,6 +173,13 @@ class MevonPayVirtualAccountService
             'currency' => $currency,
         ];
 
+        if ($this->shouldLogAccountRequests()) {
+            Log::info('MevonPay createdynamic request payload', [
+                'url' => $url,
+                'payload' => $payload,
+            ]);
+        }
+
         $resp = Http::withHeaders([
             'Authorization' => $authorization,
         ])
@@ -161,6 +189,13 @@ class MevonPayVirtualAccountService
             ->post($url, $payload);
 
         $json = $resp->json();
+
+        if ($this->shouldLogAccountRequests()) {
+            Log::info('MevonPay createdynamic response payload', [
+                'http_status' => $resp->status(),
+                'response' => $json,
+            ]);
+        }
 
         if (! $resp->successful()) {
             Log::warning('MevonPay createdynamic non-2xx response', [

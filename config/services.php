@@ -45,6 +45,7 @@ return [
         'timeout_seconds' => (int) env('MEVONPAY_TIMEOUT_SECONDS', 20),
         'connect_timeout_seconds' => (int) env('MEVONPAY_CONNECT_TIMEOUT_SECONDS', 3),
         'temp_va_registration_number' => env('MEVONPAY_TEMP_VA_REGISTRATION_NUMBER', ''),
+        'account_logs_enabled' => (bool) env('MEVONPAY_ACCOUNT_LOGS_ENABLED', false),
     ],
 
     'mevonrubies' => [

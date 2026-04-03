@@ -80,8 +80,11 @@ class PaymentService
                         }
                     }
 
-                    if (empty($fname) || empty($lname)) {
-                        throw new \RuntimeException('fname/lname are required for Temporary VA (createtempva).');
+                    if (empty($fname)) {
+                        $fname = 'Checkout';
+                    }
+                    if (empty($lname)) {
+                        $lname = 'Pay';
                     }
 
                     $va = $this->mevonPayVirtualAccountService->createTempVa(
