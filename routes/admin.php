@@ -22,8 +22,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('/login', [\App\Http\Controllers\Admin\Auth\LoginController::class, 'login']);
     Route::post('/logout', [\App\Http\Controllers\Admin\Auth\LoginController::class, 'logout'])->name('logout');
 
-    // Protected admin routes
-    Route::middleware('auth:admin')->group(function () {
+    // Protected admin routes (tax-role admins use NigTax /admin only)
+    Route::middleware(['auth:admin', 'tax_admin_redirect'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('/extract-missing-names', [DashboardController::class, 'extractMissingNames'])->name('extract-missing-names');
         Route::post('/test-sender-extraction', [DashboardController::class, 'testSenderExtraction'])->name('test-sender-extraction');

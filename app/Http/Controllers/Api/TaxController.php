@@ -28,6 +28,8 @@ class TaxController extends Controller
         
         $rc_number = $data['rc_number'] ?? '';
         $tin_number = $data['tin_number'] ?? '';
+        $email = isset($data['email']) ? filter_var($data['email'], FILTER_VALIDATE_EMAIL) : null;
+        $email = $email ? (string) $email : '';
         $address = $data['address'] ?? '';
         $statement_filename = $data['statement_filename'] ?? '';
         $total_inflows = (float)($data['total_inflows'] ?? 0);
@@ -39,23 +41,9 @@ class TaxController extends Controller
         $total_tax_due = (float)($data['total_tax_due'] ?? 0);
         $is_small_company = (int)($data['is_small_company'] ?? 0);
 
-        // Deduplication check
-        if (!empty($rc_number) && !empty($phone_number)) {
-            $existing = DB::table('nigtax_business_records')
-                ->where('rc_number', $rc_number)
-                ->where('phone_number', $phone_number)
-                ->first();
+        // Each PDF download submits a new row (admin submissions / analytics). Do not dedupe by RC+phone.
 
-            if ($existing) {
-                return response()->json([
-                    'success' => true,
-                    'id' => $existing->id,
-                    'message' => 'Duplicate prevented. Using existing record.'
-                ]);
-            }
-        }
-
-        $id = DB::table('nigtax_business_records')->insertGetId([
+        $insert = [
             'business_name' => $business_name,
             'phone_number' => $phone_number,
             'rc_number' => $rc_number,
@@ -69,8 +57,13 @@ class TaxController extends Controller
             'cit_amount' => $cit_amount,
             'dev_levy_amount' => $dev_levy_amount,
             'total_tax_due' => $total_tax_due,
-            'is_small_company' => $is_small_company
-        ]);
+            'is_small_company' => $is_small_company,
+        ];
+        if ($email !== '') {
+            $insert['email'] = $email;
+        }
+
+        $id = DB::table('nigtax_business_records')->insertGetId($insert);
 
         return response()->json(['success' => true, 'id' => $id]);
     }
@@ -83,6 +76,8 @@ class TaxController extends Controller
         $data = $request->json()->all();
 
         $individual_name = $data['individual_name'] ?? 'Unknown';
+        $emailRaw = isset($data['email']) ? filter_var($data['email'], FILTER_VALIDATE_EMAIL) : null;
+        $email = $emailRaw ? (string) $emailRaw : '';
         $annual_income = (float)($data['annual_income'] ?? 0);
         $pension = (float)($data['pension'] ?? 0);
         $nhf = (float)($data['nhf'] ?? 0);
@@ -91,7 +86,7 @@ class TaxController extends Controller
         $rent_relief = (float)($data['rent_relief'] ?? 0);
         $total_tax_due = (float)($data['total_tax_due'] ?? 0);
 
-        $id = DB::table('nigtax_personal_records')->insertGetId([
+        $insertPit = [
             'individual_name' => $individual_name,
             'annual_income' => $annual_income,
             'pension' => $pension,
@@ -99,8 +94,13 @@ class TaxController extends Controller
             'nhis' => $nhis,
             'life_assurance' => $life_assurance,
             'rent_relief' => $rent_relief,
-            'total_tax_due' => $total_tax_due
-        ]);
+            'total_tax_due' => $total_tax_due,
+        ];
+        if ($email !== '') {
+            $insertPit['email'] = $email;
+        }
+
+        $id = DB::table('nigtax_personal_records')->insertGetId($insertPit);
 
         return response()->json(['success' => true, 'id' => $id]);
     }

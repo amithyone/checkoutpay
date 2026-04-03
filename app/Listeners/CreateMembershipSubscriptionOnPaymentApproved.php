@@ -5,8 +5,11 @@ namespace App\Listeners;
 use App\Events\PaymentApproved;
 use App\Models\Membership;
 use App\Models\MembershipSubscription;
+use App\Models\NigtaxProPendingRegistration;
+use App\Services\NigtaxProSubscriptionService;
 use App\Services\MembershipCardPdfService;
 use App\Mail\MembershipActivated;
+use App\Mail\MembershipPaymentReceiptMail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
@@ -30,6 +33,20 @@ class CreateMembershipSubscriptionOnPaymentApproved
         // Check if this payment is linked to a membership
         $emailData = $payment->email_data ?? [];
         $membershipId = $emailData['membership_id'] ?? null;
+
+        // NigTax PRO modal: email_data could lack membership_id if approved before Payment::approve() fix
+        if (! $membershipId) {
+            $pending = NigtaxProPendingRegistration::query()->where('payment_id', $payment->id)->first();
+            if ($pending) {
+                $proMembership = app(NigtaxProSubscriptionService::class)->findMembership();
+                if ($proMembership) {
+                    $membershipId = $proMembership->id;
+                    $emailData['membership_id'] = $membershipId;
+                    $emailData['member_name'] = $emailData['member_name'] ?? $pending->member_name;
+                    $emailData['member_email'] = $emailData['member_email'] ?? $pending->email;
+                }
+            }
+        }
 
         if (!$membershipId) {
             return; // Not a membership payment
@@ -95,9 +112,19 @@ class CreateMembershipSubscriptionOnPaymentApproved
             
             // Refresh subscription to get updated card_pdf_path
             $subscription->refresh();
+            $subscription->load('membership');
 
             // Send activation email to member
             if ($subscription->member_email) {
+                try {
+                    Mail::to($subscription->member_email)->send(new MembershipPaymentReceiptMail($subscription, $payment));
+                } catch (\Exception $e) {
+                    Log::error('Failed to send membership payment receipt email', [
+                        'subscription_id' => $subscription->id,
+                        'member_email' => $subscription->member_email,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
                 try {
                     Mail::to($subscription->member_email)->send(new MembershipActivated($subscription));
                     Log::info('Membership activation email sent', [

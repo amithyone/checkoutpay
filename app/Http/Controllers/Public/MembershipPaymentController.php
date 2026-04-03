@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Mail\MembershipPaymentInstructionsMail;
 use App\Models\Membership;
 use App\Models\MembershipSubscription;
 use App\Services\PaymentService;
 use App\Services\ChargeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Carbon\Carbon;
@@ -83,6 +85,24 @@ class MembershipPaymentController extends Controller
             $emailData['member_email'] = $validated['member_email'];
             $emailData['member_phone'] = $validated['member_phone'] ?? null;
             $payment->update(['email_data' => $emailData]);
+
+            $payment->load('accountNumberDetails');
+            try {
+                Mail::to($validated['member_email'])->send(new MembershipPaymentInstructionsMail(
+                    $payment->fresh(['accountNumberDetails']),
+                    $membership,
+                    [
+                        'member_name' => $validated['member_name'],
+                        'member_email' => $validated['member_email'],
+                        'member_phone' => $validated['member_phone'],
+                    ]
+                ));
+            } catch (\Throwable $e) {
+                Log::warning('Membership payment instructions email failed', [
+                    'payment_id' => $payment->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // Redirect to payment page
             return redirect()->route('checkout.payment', $payment->transaction_id)

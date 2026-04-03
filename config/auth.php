@@ -42,6 +42,10 @@ return [
             'driver' => 'eloquent',
             'model' => App\Models\Renter::class,
         ],
+        'nigtax_pro_users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\NigtaxProUser::class,
+        ],
     ],
 
     'passwords' => [
@@ -59,6 +63,12 @@ return [
         ],
         'renters' => [
             'provider' => 'renters',
+            'table' => 'password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+        'nigtax_pro' => [
+            'provider' => 'nigtax_pro_users',
             'table' => 'password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,

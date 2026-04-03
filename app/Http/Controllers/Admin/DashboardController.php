@@ -11,6 +11,7 @@ use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
 use App\Models\WithdrawalRequest;
+use App\Services\NigtaxRevenueStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -109,6 +110,8 @@ class DashboardController extends Controller
                 'websites_with_charges_enabled' => BusinessWebsite::where('charges_enabled', true)->count(),
                 'websites_with_charges_disabled' => BusinessWebsite::where('charges_enabled', false)->count(),
             ],
+            'nigtax_pro' => app(NigtaxRevenueStatsService::class)->proPlanStats($today),
+            'nigtax_certified' => app(NigtaxRevenueStatsService::class)->certifiedRevenueStats($today),
             'unmatched_pending' => [
                 // Get pending payments that haven't been matched and are not expired
                 // A payment is considered unmatched if status is pending and no processed_email has matched_payment_id = payment.id

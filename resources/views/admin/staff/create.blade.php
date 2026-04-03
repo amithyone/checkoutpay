@@ -41,11 +41,13 @@
                     <option value="staff" {{ old('role') === 'staff' ? 'selected' : '' }}>Staff - Review transactions, manage tickets, test transactions</option>
                     <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin - Full access except balance updates</option>
                     <option value="support" {{ old('role') === 'support' ? 'selected' : '' }}>Support - Manage support tickets only</option>
+                    <option value="tax" {{ old('role') === 'tax' ? 'selected' : '' }}>Tax - NigTax admin only (submitted tax records; signs in at nigtax.com/admin)</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500">
                     <strong>Staff:</strong> Can review transactions, manage businesses, handle tickets, test transactions. Cannot update balances or manage settings.<br>
                     <strong>Admin:</strong> Full access except updating business balances (super admin only).<br>
-                    <strong>Support:</strong> Can only manage support tickets.
+                    <strong>Support:</strong> Can only manage support tickets.<br>
+                    <strong>Tax:</strong> Only the NigTax submissions dashboard (no payment gateway admin access).
                 </p>
             </div>
 

@@ -33,6 +33,13 @@ class RouteServiceProvider extends ServiceProvider
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
+            // NigTax admin: alternate paths when nginx strips /api before PHP (see routes/tax_admin_fallback.php)
+            Route::middleware('api')
+                ->group(base_path('routes/tax_admin_fallback.php'));
+
+            Route::middleware('api')
+                ->group(base_path('routes/nigtax_public_fallback.php'));
+
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
 

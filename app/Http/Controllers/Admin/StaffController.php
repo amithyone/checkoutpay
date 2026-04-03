@@ -51,7 +51,7 @@ class StaffController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:admins,email',
             'password' => 'required|string|min:8|confirmed',
-            'role' => ['required', Rule::in([Admin::ROLE_STAFF, Admin::ROLE_ADMIN, Admin::ROLE_SUPPORT])],
+            'role' => ['required', Rule::in([Admin::ROLE_STAFF, Admin::ROLE_ADMIN, Admin::ROLE_SUPPORT, Admin::ROLE_TAX])],
             'is_active' => 'boolean',
         ]);
 
@@ -88,7 +88,7 @@ class StaffController extends Controller
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('admins', 'email')->ignore($staff->id)],
             'password' => 'nullable|string|min:8|confirmed',
-            'role' => ['required', Rule::in([Admin::ROLE_STAFF, Admin::ROLE_ADMIN, Admin::ROLE_SUPPORT])],
+            'role' => ['required', Rule::in([Admin::ROLE_STAFF, Admin::ROLE_ADMIN, Admin::ROLE_SUPPORT, Admin::ROLE_TAX])],
             'is_active' => 'boolean',
         ]);
 

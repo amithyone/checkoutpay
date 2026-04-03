@@ -93,6 +93,67 @@
         </div>
     </div>
 
+    <!-- NigTax: PRO plan vs certified consultant revenue -->
+    <div class="bg-gradient-to-r from-emerald-50 via-white to-violet-50 rounded-lg shadow-sm border-2 border-gray-200 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-coins text-amber-500 mr-2"></i>
+            NigTax revenue
+        </h2>
+        <p class="text-sm text-gray-600 mb-4">Totals from approved PRO membership payments and paid certified consultant report orders.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-emerald-200 border-l-4 border-l-emerald-500">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">NigTax PRO plan</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Membership slug: {{ config('services.nigtax.pro_membership_slug', 'nigtax-pro') }}</p>
+                    </div>
+                    <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-id-card text-emerald-600 text-xl"></i>
+                    </div>
+                </div>
+                @if(!($stats['nigtax_pro']['membership_configured'] ?? true))
+                    <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">No active PRO membership product found for this slug. Create or enable it under Memberships.</p>
+                @else
+                    <p class="text-3xl font-bold text-gray-900">₦{{ number_format($stats['nigtax_pro']['total_revenue'], 2) }}</p>
+                    <p class="text-xs text-gray-500 mt-1">All time (approved payments linked to PRO subscriptions)</p>
+                    <div class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <p class="text-gray-500 text-xs">Today</p>
+                            <p class="font-semibold text-gray-900">₦{{ number_format($stats['nigtax_pro']['today_revenue'], 2) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-xs">Payments</p>
+                            <p class="font-semibold text-gray-900">{{ number_format($stats['nigtax_pro']['payment_count']) }} <span class="text-gray-400 font-normal">({{ number_format($stats['nigtax_pro']['today_payment_count']) }} today)</span></p>
+                        </div>
+                    </div>
+                @endif
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-6 border border-violet-200 border-l-4 border-l-violet-500">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">Certified consultant reports</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Paid signature / stamp orders from the tax calculator</p>
+                    </div>
+                    <div class="w-12 h-12 bg-violet-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-stamp text-violet-600 text-xl"></i>
+                    </div>
+                </div>
+                <p class="text-3xl font-bold text-gray-900">₦{{ number_format($stats['nigtax_certified']['total_revenue'], 2) }}</p>
+                <p class="text-xs text-gray-500 mt-1">All time (paid, signed, or delivered orders)</p>
+                <div class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p class="text-gray-500 text-xs">Today (by paid date)</p>
+                        <p class="font-semibold text-gray-900">₦{{ number_format($stats['nigtax_certified']['today_revenue'], 2) }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-xs">Orders</p>
+                        <p class="font-semibold text-gray-900">{{ number_format($stats['nigtax_certified']['order_count']) }} <span class="text-gray-400 font-normal">({{ number_format($stats['nigtax_certified']['today_order_count']) }} today)</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
         <!-- Global Match Trigger Button -->

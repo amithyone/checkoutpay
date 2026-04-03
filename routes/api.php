@@ -67,6 +67,39 @@ Route::prefix('v1')->group(function () {
         Route::post('personal', [\App\Http\Controllers\Api\TaxController::class, 'savePersonal']);
     });
 
+    Route::post('nigtax/visit', [\App\Http\Controllers\Api\NigtaxVisitController::class, 'store'])
+        ->middleware('throttle:120,1');
+
+    Route::prefix('nigtax/certified')->middleware('throttle:60,1')->group(function () {
+        Route::get('settings', [\App\Http\Controllers\Api\NigtaxCertifiedPublicController::class, 'settings']);
+        Route::post('orders', [\App\Http\Controllers\Api\NigtaxCertifiedPublicController::class, 'store']);
+        Route::get('orders/{transaction_id}', [\App\Http\Controllers\Api\NigtaxCertifiedPublicController::class, 'show']);
+    });
+
+    Route::prefix('nigtax/pro')->middleware('throttle:60,1')->group(function () {
+        Route::get('config', [\App\Http\Controllers\Api\NigtaxProAuthController::class, 'config']);
+        Route::post('password/email', [\App\Http\Controllers\Api\NigtaxProPasswordResetController::class, 'sendResetLinkEmail'])
+            ->middleware('throttle:6,1');
+        Route::post('membership/checkout', [\App\Http\Controllers\Api\NigtaxProAuthController::class, 'startMembershipCheckout'])
+            ->middleware('throttle:10,1');
+        Route::get('membership/payment/{transaction_id}', [\App\Http\Controllers\Api\NigtaxProAuthController::class, 'membershipPaymentStatus']);
+        Route::post('register', [\App\Http\Controllers\Api\NigtaxProAuthController::class, 'register'])
+            ->middleware('throttle:10,1');
+        Route::post('login', [\App\Http\Controllers\Api\NigtaxProAuthController::class, 'login'])
+            ->middleware('throttle:20,1');
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('me', [\App\Http\Controllers\Api\NigtaxProAuthController::class, 'me']);
+            Route::post('logout', [\App\Http\Controllers\Api\NigtaxProAuthController::class, 'logout']);
+            Route::get('queries', [\App\Http\Controllers\Api\NigtaxProQueryController::class, 'index']);
+            Route::post('queries', [\App\Http\Controllers\Api\NigtaxProQueryController::class, 'store'])
+                ->middleware('throttle:30,1');
+            Route::get('queries/{id}', [\App\Http\Controllers\Api\NigtaxProQueryController::class, 'show'])->whereNumber('id');
+            Route::get('queries/{id}/statement', [\App\Http\Controllers\Api\NigtaxProQueryController::class, 'downloadStatement'])->whereNumber('id');
+            Route::delete('queries/{id}/statement', [\App\Http\Controllers\Api\NigtaxProQueryController::class, 'destroyStatement'])->whereNumber('id');
+            Route::delete('queries/{id}', [\App\Http\Controllers\Api\NigtaxProQueryController::class, 'destroy'])->whereNumber('id');
+        });
+    });
+
     /**
      * Rentals public API (no auth required)
      */
@@ -117,6 +150,8 @@ Route::prefix('v1/rentals')
         // Account management
         Route::post('password/change', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'changePassword']);
         Route::get('wallet', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'wallet']);
+        Route::post('devices/register', [\App\Http\Controllers\Api\Rentals\DeviceController::class, 'register']);
+        Route::get('support/messages', [\App\Http\Controllers\Api\Rentals\SupportController::class, 'messages']);
         Route::post('wallet/fund', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'fundWallet']);
         Route::post('wallet/fund/check', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'checkWalletFunding']);
         Route::post('me/profile', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'updateProfile']);
@@ -158,6 +193,50 @@ Route::prefix('v1/rentals')
         Route::post('business/settings/withdrawal-pin', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'setWithdrawalPin']);
         Route::post('business/settings/withdrawal-pin/verify', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'verifyWithdrawalPin']);
     });
+
+/**
+ * NigTax admin API (Sanctum token; same Admin accounts as checkout, roles: tax, super_admin)
+ */
+Route::prefix('v1/tax-admin')->group(function () {
+    Route::get('/login', function () {
+        return response()->json([
+            'message' => 'Use POST with JSON body: {"email":"...","password":"..."}. Roles allowed: tax, super_admin.',
+        ]);
+    });
+    Route::post('/login', [\App\Http\Controllers\Api\TaxAdminAuthController::class, 'login'])
+        ->middleware('throttle:10,1');
+    Route::middleware(['auth:sanctum', 'tax_admin_api'])->group(function () {
+        Route::post('/logout', [\App\Http\Controllers\Api\TaxAdminAuthController::class, 'logout']);
+        Route::get('/user', [\App\Http\Controllers\Api\TaxAdminAuthController::class, 'user']);
+        Route::get('/stats', [\App\Http\Controllers\Api\TaxAdminStatsController::class, 'index']);
+        Route::put('/password', [\App\Http\Controllers\Api\TaxAdminAuthController::class, 'changePassword']);
+        Route::get('/business-records', [\App\Http\Controllers\Api\TaxAdminRecordController::class, 'businessRecords']);
+        Route::get('/personal-records', [\App\Http\Controllers\Api\TaxAdminRecordController::class, 'personalRecords']);
+        Route::get('/pro-users', [\App\Http\Controllers\Api\TaxAdminRecordController::class, 'proUsers']);
+
+        Route::get('/certified/settings', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'certifiedSettings']);
+        Route::put('/certified/settings', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'certifiedSettingsUpdate']);
+        Route::get('/certified/consultants', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'consultantsIndex']);
+        Route::post('/certified/consultants', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'consultantsStore']);
+        Route::put('/certified/consultants/{id}', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'consultantsUpdate'])
+            ->whereNumber('id');
+        Route::delete('/certified/consultants/{id}', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'consultantsDestroy'])
+            ->whereNumber('id');
+        Route::post('/certified/consultants/{id}/signature', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'uploadConsultantSignature'])
+            ->whereNumber('id');
+        Route::post('/certified/consultants/{id}/stamp', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'uploadConsultantStamp'])
+            ->whereNumber('id');
+        Route::get('/certified/consultant', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'consultantShow']);
+        Route::put('/certified/consultant', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'consultantUpdate']);
+        Route::post('/certified/consultant/signature', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'uploadSignature']);
+        Route::post('/certified/consultant/stamp', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'uploadStamp']);
+        Route::get('/certified/orders', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'ordersIndex']);
+        Route::get('/certified/orders/{id}', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'orderShow'])
+            ->whereNumber('id');
+        Route::patch('/certified/orders/{id}', [\App\Http\Controllers\Api\TaxAdminCertifiedController::class, 'orderUpdate'])
+            ->whereNumber('id');
+    });
+});
 
 // Health check
 Route::get('/health', function () {

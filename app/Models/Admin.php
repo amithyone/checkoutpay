@@ -36,6 +36,7 @@ class Admin extends Authenticatable
     const ROLE_ADMIN = 'admin';
     const ROLE_SUPPORT = 'support';
     const ROLE_STAFF = 'staff';
+    const ROLE_TAX = 'tax';
 
     /**
      * Get withdrawal requests processed by this admin
@@ -59,6 +60,14 @@ class Admin extends Authenticatable
     public function isStaff(): bool
     {
         return $this->role === self::ROLE_STAFF;
+    }
+
+    /**
+     * NigTax-only admin (no access to payment gateway admin UI).
+     */
+    public function isTaxAdmin(): bool
+    {
+        return $this->role === self::ROLE_TAX;
     }
 
     /**

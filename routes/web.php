@@ -157,6 +157,12 @@ Route::prefix('memberships')->name('memberships.')->group(function () {
     Route::post('find', [\App\Http\Controllers\Public\MembershipController::class, 'findMembership'])->name('find');
 });
 
+// NigTax PRO password reset (link from email; same broker pattern as rentals)
+Route::prefix('nigtax-pro')->name('nigtax-pro.')->group(function () {
+    Route::get('/password/reset/{token}', [\App\Http\Controllers\Public\NigtaxProPasswordWebController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/password/reset', [\App\Http\Controllers\Public\NigtaxProPasswordWebController::class, 'reset'])->name('password.update');
+});
+
 // Public purchase verification (scan QR → open this page)
 Route::prefix('verify')->name('verify.')->group(function () {
     Route::get('rental/{rental}', [\App\Http\Controllers\Public\PurchaseVerificationController::class, 'showRental'])->name('rental')->middleware('signed');

@@ -3,6 +3,8 @@
 /public/hot
 /public/storage
 /storage/*.key
+# Firebase service account (never commit; use path in FCM_SERVICE_ACCOUNT_JSON)
+storage/app/fcm-service-account.json
 /storage/logs/*.log
 /storage/framework/cache/*
 /storage/framework/sessions/*

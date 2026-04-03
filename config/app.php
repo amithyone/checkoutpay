@@ -8,6 +8,11 @@ return [
     'env' => env('APP_ENV', 'production'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => rtrim(env('APP_URL', 'http://localhost'), '/'),
+
+    /**
+     * NigTax admin SPA URL (tax-role admins are redirected here from the gateway admin).
+     */
+    'tax_admin_url' => rtrim(env('TAX_ADMIN_URL', 'https://nigtax.com/admin'), '/'),
     'asset_url' => env('ASSET_URL') ? rtrim(env('ASSET_URL'), '/') : null,
     'timezone' => env('APP_TIMEZONE', 'Africa/Lagos'),
     'locale' => env('APP_LOCALE', 'en'),

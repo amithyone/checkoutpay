@@ -1,17 +1,15 @@
 <?php
 
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    /*
+     * Match all paths so OPTIONS preflight and responses always get CORS headers.
+     * (Scoped patterns like api/* miss some setups, e.g. subpaths or proxies.)
+     */
+    'paths' => ['*'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'https://abjrentals.ng',
-        'https://www.abjrentals.ng',
-        'https://camrentals.ng',
-        'https://www.camrentals.ng',
-        '*', // keep flexible during initial development; tighten later if needed
-    ],
+    'allowed_origins' => ['*'],
 
     'allowed_origins_patterns' => [],
 
@@ -23,4 +21,3 @@ return [
 
     'supports_credentials' => false,
 ];
-

@@ -37,6 +37,24 @@ class SendRentalReturnReminders extends Command
             foreach ($rentals as $rental) {
                 try {
                     Mail::to($rental->renter_email)->send(new RentalReturnReminderMail($rental, $reminderType));
+                    try {
+                        app(\App\Services\PushNotificationService::class)->notifyRenter(
+                            (int) $rental->renter_id,
+                            'Return reminder',
+                            'Your rental return time is due soon.',
+                            [
+                                'type' => 'return_reminder',
+                                'rental_id' => (string) $rental->id,
+                                'reminder_type' => (string) $reminderType,
+                            ]
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('Rental return reminder push failed', [
+                            'rental_id' => $rental->id,
+                            'reminder_type' => $reminderType,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                     RentalReturnReminder::create([
                         'rental_id' => $rental->id,
                         'reminder_type' => $reminderType,

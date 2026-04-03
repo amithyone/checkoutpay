@@ -64,5 +64,7 @@ class Kernel extends HttpKernel
         'super_admin' => \App\Http\Middleware\RequireSuperAdmin::class,
         'admin_or_super' => \App\Http\Middleware\RequireAdminOrSuperAdmin::class,
         'renter_active' => \App\Http\Middleware\EnsureRenterIsActive::class,
+        'tax_admin_redirect' => \App\Http\Middleware\RedirectTaxAdminFromCheckoutPanel::class,
+        'tax_admin_api' => \App\Http\Middleware\EnsureTaxAdminApi::class,
     ];
 }

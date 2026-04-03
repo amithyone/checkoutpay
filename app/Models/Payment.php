@@ -199,6 +199,30 @@ class Payment extends Model
     }
 
     /**
+     * Metadata keys kept when approving a payment. Webhooks and bank emails only pass transfer
+     * fields into approve(); without this, membership checkout (NigTax PRO, etc.) loses
+     * membership_id / member_email and subscriptions or accounts are never created.
+     *
+     * @return list<string>
+     */
+    public static function preservedEmailDataKeysOnApprove(): array
+    {
+        return [
+            'membership_id',
+            'member_name',
+            'member_email',
+            'member_phone',
+            'service',
+            'return_url',
+            'website_url',
+            'skip_auto_match',
+            'nigtax_certified_order_id',
+            'manual_verification',
+            'api_amount_update',
+        ];
+    }
+
+    /**
      * Approve payment
      */
     public function approve(array $emailData = [], bool $isMismatch = false, ?float $receivedAmount = null, ?string $mismatchReason = null): bool
@@ -207,13 +231,22 @@ class Payment extends Model
         if (!isset($emailData['amount']) && !isset($emailData['received_amount'])) {
             $emailData['amount'] = $this->amount;
         }
-        
+
+        $existingEmailData = is_array($this->email_data) ? $this->email_data : [];
+        $preserved = array_intersect_key(
+            $existingEmailData,
+            array_flip(self::preservedEmailDataKeysOnApprove())
+        );
+
         // Sanitize email_data to remove large text/html bodies
         $sanitizedEmailData = self::sanitizeEmailData($emailData);
-        
+
+        // Restore checkout / membership metadata not present in webhook or email payloads
+        $mergedEmailData = array_merge($sanitizedEmailData, $preserved);
+
         $updateData = [
             'status' => self::STATUS_APPROVED,
-            'email_data' => $sanitizedEmailData,
+            'email_data' => $mergedEmailData,
             'matched_at' => now(),
             'is_mismatch' => $isMismatch,
             'received_amount' => $receivedAmount,
@@ -278,6 +311,24 @@ class Payment extends Model
         }
 
         $renter->increment('wallet_balance', $amount);
+        try {
+            app(\App\Services\PushNotificationService::class)->notifyRenter(
+                (int) $renter->id,
+                'Wallet credited',
+                'Your wallet has been credited.',
+                [
+                    'type' => 'wallet_credit',
+                    'amount' => (string) $amount,
+                    'payment_id' => (string) $this->id,
+                ]
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Push notify failed for wallet credit', [
+                'payment_id' => $this->id,
+                'renter_id' => $renter->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

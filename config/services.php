@@ -66,4 +66,27 @@ return [
         'connect_timeout_seconds' => (int) env('NUBAN_CONNECT_TIMEOUT_SECONDS', 3),
     ],
 
+    'firebase' => [
+        'project_id' => env('FCM_PROJECT_ID', ''),
+        /*
+         * Service account: single-line minified JSON, OR path to a .json file.
+         * Do not put multi-line JSON in .env — it invalidates the entire .env for Laravel/dotenv.
+         * Relative paths are resolved from the project base path (see PushNotificationService).
+         */
+        'service_account_json' => env('FCM_SERVICE_ACCOUNT_JSON', ''),
+    ],
+
+    /*
+    | NigTax certified reports: virtual-account payments are created under this Business.
+    | Must have at least one website (webhook domain). Optional override for webhook_url.
+    */
+    'nigtax' => [
+        'payment_business_id' => (int) env('NIGTAX_PAYMENT_BUSINESS_ID', 0),
+        'payment_webhook_url' => env('NIGTAX_PAYMENT_WEBHOOK_URL', ''),
+        // Membership slug for ₦2,000/mo PRO (Taxcalculate: multi-statement + per-file PDF passwords)
+        'pro_membership_slug' => env('NIGTAX_PRO_MEMBERSHIP_SLUG', 'nigtax-pro'),
+        // After PRO password reset, redirect users here (e.g. https://yournigtax.com). Falls back to APP_URL.
+        'calculator_url' => env('NIGTAX_CALCULATOR_URL', ''),
+    ],
+
 ];
