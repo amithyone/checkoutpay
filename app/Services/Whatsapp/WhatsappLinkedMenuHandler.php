@@ -40,7 +40,7 @@ class WhatsappLinkedMenuHandler
         }
 
         $text = trim($rawText);
-        $cmd = strtoupper($text);
+        $cmd = WhatsappMenuInputNormalizer::commandToken($rawText);
 
         if ($cmd === 'CHECK' && preg_match('/^CHECK\s+(\S+)/i', $text, $m)) {
             $this->runFundCheck($renter, $session, $instance, $phone, $m[1]);
@@ -104,11 +104,12 @@ class WhatsappLinkedMenuHandler
         $rentals = $this->portalRentals();
 
         return "*Main categories*\n\n".
-            "*RENTALS* — browse gear; pay with your *rentals* wallet\n".
-            "*WALLET* — *WhatsApp wallet* (separate from rentals wallet)\n\n".
-            "*BALANCE* — rentals wallet\n".
-            "*FUND* — add money to *rentals* wallet\n".
-            "*WITHDRAW* — business payouts info\n".
+            "*1* — *RENTALS* — browse gear; pay with your *rentals* wallet\n".
+            "*2* — *WALLET* — *WhatsApp wallet* (separate from rentals wallet)\n".
+            "*3* — *BALANCE* — rentals wallet\n".
+            "*4* — *FUND* — add money to *rentals* wallet\n".
+            "*5* — *WITHDRAW* — business payouts info\n\n".
+            "Reply with a *number* or the *keyword*.\n\n".
             "*MENU* — this screen\n".
             "*RESTART* — back to main categories\n\n".
             "Full rentals site: {$rentals}\n\n".
@@ -158,6 +159,15 @@ class WhatsappLinkedMenuHandler
         string $cmd
     ): void {
         $wallet = $this->formatMoney((float) ($renter->fresh()->wallet_balance ?? 0));
+
+        $cmd = match ($cmd) {
+            '1' => 'RENTALS',
+            '2' => 'WALLET',
+            '3' => 'BALANCE',
+            '4' => 'FUND',
+            '5' => 'WITHDRAW',
+            default => $cmd,
+        };
 
         if ($cmd === 'BALANCE') {
             $this->client->sendText($instance, $phone, "*Wallet balance:* {$wallet}");

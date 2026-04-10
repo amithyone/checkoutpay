@@ -24,10 +24,10 @@ class WhatsappGuestRentalBrowseHandler
         $session->save();
 
         $text = trim($rawText);
-        $cmd = strtoupper($text);
+        $cmd = WhatsappMenuInputNormalizer::commandToken($rawText);
 
         if ($session->chat_flow !== self::FLOW) {
-            if ($this->isGuestBrowseCommand($cmd)) {
+            if ($this->isGuestBrowseCommand($cmd) || $cmd === '1') {
                 $this->start($session->fresh(), $instance, $phone);
             }
 
@@ -133,7 +133,7 @@ class WhatsappGuestRentalBrowseHandler
         $rentals = $this->portalRentals();
 
         return "*CheckoutNow (guest)*\n\n".
-            "*RENTALS* — browse categories & prices (no account needed)\n\n".
+            "*1* or *RENTALS* — browse categories & prices (no account needed)\n\n".
             "To link this WhatsApp and pay from your wallet, send the *email* you use on {$rentals}.";
     }
 

@@ -52,7 +52,7 @@ class WhatsappInboundHandler
         $phone = $msg['phone_e164'];
         $text = trim($msg['text']);
         $remoteJid = $msg['remote_jid'];
-        $cmd = strtoupper(trim($text));
+        $cmd = WhatsappMenuInputNormalizer::commandToken($text);
 
         $session = WhatsappSession::query()->firstOrNew(['phone_e164' => $phone]);
         $session->remote_jid = $remoteJid;
@@ -85,6 +85,7 @@ class WhatsappInboundHandler
                 'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
                 'INVOICE', 'INVOICES', 'PAY', 'PAYMENT',
                 'TOPUP', 'TOP UP', 'UPGRADE', 'TIER2', 'TIER 2',
+                '1', '2', '3', '4', '5',
             ];
             if (! in_array($cmd, $resume, true)) {
                 $session->save();
@@ -197,20 +198,21 @@ class WhatsappInboundHandler
 
     private function isGuestRentalBrowseCommand(string $text): bool
     {
-        $cmd = strtoupper(trim($text));
+        $cmd = WhatsappMenuInputNormalizer::commandToken($text);
 
-        return in_array($cmd, ['RENTALS', 'BROWSE', 'SHOP', 'CATALOG'], true);
+        return in_array($cmd, ['RENTALS', 'BROWSE', 'SHOP', 'CATALOG', '1'], true);
     }
 
     private function isCheckoutServicesCommand(string $text): bool
     {
-        $cmd = strtoupper(trim($text));
+        $cmd = WhatsappMenuInputNormalizer::commandToken($text);
 
         return in_array($cmd, [
             'MENU', 'START', 'SERVICES', '0', 'HI', 'HELLO', 'HELP', 'HOME',
             'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
             'INVOICE', 'INVOICES', 'PAY', 'PAYMENT',
             'TOPUP', 'TOP UP',
+            '2', '3', '4',
         ], true);
     }
 
