@@ -91,8 +91,13 @@ class MevonPayBankService
                     'accountNumber' => $accountNumber,
                 ]);
 
-            $json = $resp->json();
-            if (! $resp->successful() || ($json['status'] ?? false) !== true) {
+            $json = $resp->json() ?? [];
+            $statusOk = ($json['status'] ?? false) === true
+                || ($json['status'] ?? '') === 'true'
+                || ($json['status'] ?? '') === 'success'
+                || ($json['success'] ?? false) === true;
+
+            if (! $resp->successful() || ! $statusOk) {
                 Log::warning('MevonPay nameEnquiry failed', [
                     'http_status' => $resp->status(),
                     'response' => $json,
@@ -105,15 +110,18 @@ class MevonPayBankService
                 return null;
             }
 
-            $accountName = $data['account_name'] ?? null;
-            if (! is_string($accountName) || trim($accountName) === '') {
+            $accountName = $data['account_name'] ?? $data['accountName'] ?? $data['AccountName'] ?? null;
+            if ($accountName !== null && ! is_string($accountName)) {
+                $accountName = is_scalar($accountName) ? (string) $accountName : null;
+            }
+            if ($accountName === null || trim((string) $accountName) === '') {
                 return null;
             }
 
             return [
-                'account_name' => (string) $data['account_name'],
-                'account_number' => (string) ($data['account_number'] ?? $accountNumber),
-                'bank_code' => (string) ($data['bank_code'] ?? $bankCode),
+                'account_name' => trim((string) $accountName),
+                'account_number' => (string) ($data['account_number'] ?? $data['accountNumber'] ?? $accountNumber),
+                'bank_code' => (string) ($data['bank_code'] ?? $data['bankCode'] ?? $bankCode),
             ];
         } catch (\Throwable $e) {
             $message = $e->getMessage();

@@ -432,14 +432,9 @@ class WhatsappWaWalletMenuHandler
 
         $ctx['step'] = 'transfer_bank';
         $ctx['dest_acct'] = $digits;
+        $ctx['bank_quick_page'] = 0;
         $session->update(['chat_context' => $ctx]);
-        $this->client->sendText(
-            $instance,
-            $phone,
-            "*Bank transfer — bank*\n\n".
-            "Send *bank name* (e.g. *GTBank*) or a *3-digit bank code* (e.g. *058*).\n\n".
-            '*BACK* — cancel'
-        );
+        $this->client->sendText($instance, $phone, $this->bankPayout->transferBankPickerMessage(0));
     }
 
     /**
@@ -453,12 +448,50 @@ class WhatsappWaWalletMenuHandler
         array $ctx,
         WhatsappWallet $wallet
     ): void {
-        $resolved = $this->bankPayout->resolveBankFromUserInput($text);
+        $trim = trim($text);
+        $page = isset($ctx['bank_quick_page']) ? (int) $ctx['bank_quick_page'] : 0;
+        $cmd = strtoupper($trim);
+
+        if (in_array($cmd, ['MORE', 'NEXT'], true)) {
+            $last = $this->bankPayout->quickBankLastPageIndex();
+            $ctx['bank_quick_page'] = min($last, $page + 1);
+            $session->update(['chat_context' => $ctx]);
+            $this->client->sendText($instance, $phone, $this->bankPayout->transferBankPickerMessage($ctx['bank_quick_page']));
+
+            return;
+        }
+
+        if (in_array($cmd, ['PREV', 'PREVIOUS'], true)) {
+            $ctx['bank_quick_page'] = max(0, $page - 1);
+            $session->update(['chat_context' => $ctx]);
+            $this->client->sendText($instance, $phone, $this->bankPayout->transferBankPickerMessage($ctx['bank_quick_page']));
+
+            return;
+        }
+
+        $resolved = null;
+        if (preg_match('/^\d+$/', $trim)) {
+            if (strlen($trim) >= 3) {
+                $resolved = $this->bankPayout->resolveBankFromUserInput($trim);
+            } else {
+                $g = (int) $trim;
+                $total = count($this->bankPayout->quickBanks());
+                if ($g >= 1 && $g <= $total) {
+                    $resolved = $this->bankPayout->resolveQuickBankGlobalNumber($g);
+                } else {
+                    $resolved = $this->bankPayout->resolveBankFromUserInput($trim);
+                }
+            }
+        } else {
+            $resolved = $this->bankPayout->resolveBankFromUserInput($trim);
+        }
+
         if (! $resolved) {
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Could not match a bank. Try the full name (e.g. *Access Bank*) or a *3-digit code* from your bank app.'
+                "Could not match that bank.\n\n".
+                'Pick a number from the list, try a clearer name (e.g. *Access Bank*, *First Bank*), *MORE* to see other banks, or send the *bank code* (3+ digits).'
             );
 
             return;

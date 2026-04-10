@@ -18,6 +18,7 @@ class WhatsappWalletTier1TopupVaService
 {
     public function __construct(
         private MevonPayVirtualAccountService $mevonPayVa,
+        private WhatsappWalletTopupNotifier $topupNotifier,
     ) {}
 
     public function isAvailable(): bool
@@ -193,8 +194,9 @@ class WhatsappWalletTier1TopupVaService
         }
 
         $handled = false;
+        $notify = null;
 
-        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, &$handled) {
+        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, &$handled, &$notify) {
             $pending = WhatsappWalletPendingTopup::query()
                 ->where('account_number', $accountNumber)
                 ->whereNull('fulfilled_at')
@@ -231,6 +233,12 @@ class WhatsappWalletTier1TopupVaService
                         'pending_topup_id' => $pending->id,
                     ],
                 ]);
+
+                $notify = [
+                    'wallet_id' => (int) $wallet->id,
+                    'credited' => $credited,
+                    'balance_after' => $newBal,
+                ];
             }
 
             $pending->update([
@@ -254,6 +262,13 @@ class WhatsappWalletTier1TopupVaService
             $handled = true;
         });
 
+        if (is_array($notify)) {
+            $w = WhatsappWallet::query()->find($notify['wallet_id']);
+            if ($w) {
+                $this->topupNotifier->notifyCredited($w, (float) $notify['credited'], (float) $notify['balance_after']);
+            }
+        }
+
         return $handled;
     }
 
@@ -274,8 +289,9 @@ class WhatsappWalletTier1TopupVaService
         }
 
         $handled = false;
+        $notify = null;
 
-        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, &$handled) {
+        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, &$handled, &$notify) {
             $wallet = WhatsappWallet::query()
                 ->where('mevon_virtual_account_number', $accountNumber)
                 ->where('tier', WhatsappWallet::TIER_RUBIES_VA)
@@ -318,6 +334,12 @@ class WhatsappWalletTier1TopupVaService
                         'permanent_va' => true,
                     ],
                 ]);
+
+                $notify = [
+                    'wallet_id' => (int) $wallet->id,
+                    'credited' => $credited,
+                    'balance_after' => $newBal,
+                ];
             }
 
             if ($credited < $amount) {
@@ -332,6 +354,13 @@ class WhatsappWalletTier1TopupVaService
 
             $handled = true;
         });
+
+        if (is_array($notify)) {
+            $w = WhatsappWallet::query()->find($notify['wallet_id']);
+            if ($w) {
+                $this->topupNotifier->notifyCredited($w, (float) $notify['credited'], (float) $notify['balance_after']);
+            }
+        }
 
         return $handled;
     }

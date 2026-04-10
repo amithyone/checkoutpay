@@ -51,6 +51,8 @@ return [
         'tier1_temp_va_lname' => (string) env('WHATSAPP_WALLET_TIER1_TEMP_VA_LNAME', 'User'),
         /** Hours until an unused Tier 1 top-up VA stops accepting webhook matches. */
         'tier1_temp_va_ttl_hours' => (int) env('WHATSAPP_WALLET_TIER1_TEMP_VA_TTL_HOURS', 48),
+        /** Banks per page in *Transfer → bank* numbered picker (reply 1–N, MORE/PREV). */
+        'bank_picker_page_size' => max(4, min(12, (int) env('WHATSAPP_WALLET_BANK_PICKER_PAGE_SIZE', 8))),
     ],
 
     'evolution' => [
