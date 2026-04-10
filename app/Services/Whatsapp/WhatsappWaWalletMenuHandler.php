@@ -2,6 +2,7 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Models\Bank;
 use App\Models\Renter;
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
@@ -32,6 +33,7 @@ class WhatsappWaWalletMenuHandler
         private WhatsappCheckoutServicesMenuHandler $checkoutServicesMenu,
         private WhatsappWalletBankPayoutService $bankPayout,
         private WhatsappWalletTier1TopupVaService $tier1TopupVa,
+        private WhatsappWalletTopupNotifier $walletNotifier,
     ) {}
 
     public function openMenu(WhatsappSession $session, string $instance, string $phone, ?Renter $renter): void
@@ -55,6 +57,8 @@ class WhatsappWaWalletMenuHandler
         string $cmd,
         ?Renter $linkedRenter
     ): void {
+        $cmd = $this->normalizeWalletCommand($text);
+
         $ctx = $session->chat_context;
         if (! is_array($ctx)) {
             $ctx = [];
@@ -115,6 +119,25 @@ class WhatsappWaWalletMenuHandler
             'p2p_pin' => $this->handleP2pPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
             default => $this->recoverSubmenu($session, $instance, $phone, $wallet),
         };
+    }
+
+    /**
+     * WhatsApp users often send *1* or _1_; normalize so submenu and shortcuts match.
+     */
+    private function normalizeWalletCommand(string $text): string
+    {
+        $t = trim($text);
+        $t = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $t) ?? $t;
+        $t = preg_replace('/^[\*_~\s]+|[\*_~\s]+$/u', '', $t) ?? $t;
+        $t = trim($t);
+        for ($i = 0; $i <= 9; $i++) {
+            $fw = mb_chr(0xFF10 + $i, 'UTF-8');
+            if ($fw !== '' && $fw !== false) {
+                $t = str_replace($fw, (string) $i, $t);
+            }
+        }
+
+        return strtoupper($t);
     }
 
     private function findOrCreateWallet(string $phone, ?Renter $renter): WhatsappWallet
@@ -210,7 +233,20 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($cmd === '1' || in_array($cmd, ['RECEIVE', 'TOPUP', 'TOP UP'], true)) {
-            $this->sendReceiveTopupHelp($instance, $phone, $wallet);
+            try {
+                $this->sendReceiveTopupHelp($instance, $phone, $wallet);
+            } catch (\Throwable $e) {
+                Log::error('whatsapp.wallet.receive_topup_help_failed', [
+                    'error' => $e->getMessage(),
+                    'phone' => $phone,
+                ]);
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    "We couldn't load top-up details just now. Try again in a moment.\n\n".
+                    'Tier 2 users: your bank details are unchanged. Tier 1: try *UPGRADE* or *MENU*.'
+                );
+            }
 
             return;
         }
@@ -233,11 +269,7 @@ class WhatsappWaWalletMenuHandler
             $session->update([
                 'chat_context' => ['step' => 'transfer_acct'],
             ]);
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "*Bank transfer*\n\nSend the *10-digit* account number.\n\n*BACK* — cancel"
-            );
+            $this->sendTransferAccountStep($instance, $phone, $wallet);
 
             return;
         }
@@ -423,9 +455,33 @@ class WhatsappWaWalletMenuHandler
         array $ctx,
         WhatsappWallet $wallet
     ): void {
+        $trim = trim($text);
+        $pick = $this->normalizeWalletCommand($text);
+        if (preg_match('/^[1-3]$/', $pick)) {
+            $recent = $this->recentBankTransferTargets($wallet->fresh(), 3);
+            $idx = (int) $pick - 1;
+            if (! isset($recent[$idx])) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    "There is no recent recipient *{$pick}*.\n\n".$this->buildTransferAccountPrompt($wallet)
+                );
+
+                return;
+            }
+            $row = $recent[$idx];
+            $this->applyRecentBankRecipientToContext($session, $instance, $phone, $ctx, $wallet, $row);
+
+            return;
+        }
+
         $digits = preg_replace('/\D/', '', $text) ?? '';
         if (strlen($digits) !== 10) {
-            $this->client->sendText($instance, $phone, 'Send a valid *10-digit* account number.');
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "Send a valid *10-digit* account number, or *1* / *2* / *3* for a recent recipient.\n\n".$this->buildTransferAccountPrompt($wallet)
+            );
 
             return;
         }
@@ -435,6 +491,145 @@ class WhatsappWaWalletMenuHandler
         $ctx['bank_quick_page'] = 0;
         $session->update(['chat_context' => $ctx]);
         $this->client->sendText($instance, $phone, $this->bankPayout->transferBankPickerMessage(0));
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     * @param  array{acct: string, bank_code: string, bank_name: string, account_name: string}  $row
+     */
+    private function applyRecentBankRecipientToContext(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        array $ctx,
+        WhatsappWallet $wallet,
+        array $row,
+    ): void {
+        $acct = $row['acct'];
+        $bankCode = $row['bank_code'];
+        $bankName = $row['bank_name'];
+        $accountName = trim($row['account_name']);
+
+        if ($accountName === '' && $this->bankPayout->isNameEnquiryAvailable()) {
+            $ne = $this->bankPayout->nameEnquiry($bankCode, $acct);
+            if ($ne && ($ne['account_name'] ?? '') !== '') {
+                $accountName = trim((string) $ne['account_name']);
+            }
+        }
+
+        $ctx['dest_acct'] = $acct;
+        $ctx['dest_bank_code'] = $bankCode;
+        $ctx['dest_bank'] = $bankName;
+        unset($ctx['bank_quick_page']);
+
+        if ($accountName !== '') {
+            $ctx['dest_acct_name'] = $accountName;
+            $ctx['step'] = 'transfer_amount';
+            $session->update(['chat_context' => $ctx]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*{$bankName}* · ****".substr($acct, -4)." · {$accountName}\n\n".
+                "Send the *amount* in Naira (numbers only), minimum ₦1.\n\n".
+                '*BACK* — cancel'
+            );
+
+            return;
+        }
+
+        $ctx['step'] = 'transfer_beneficiary';
+        $session->update(['chat_context' => $ctx]);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*{$bankName}* · ****".substr($acct, -4)."\n\n".
+            'Send the *account holder name* exactly as registered with the bank.'."\n\n".
+            '*BACK* — cancel'
+        );
+    }
+
+    /**
+     * Last unique bank-transfer destinations for this wallet (most recent first).
+     *
+     * @return list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>
+     */
+    private function recentBankTransferTargets(WhatsappWallet $wallet, int $limit = 3): array
+    {
+        $rows = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('type', WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT)
+            ->whereNotNull('counterparty_account_number')
+            ->where('counterparty_account_number', '!=', '')
+            ->whereNotNull('counterparty_bank_code')
+            ->where('counterparty_bank_code', '!=', '')
+            ->orderByDesc('id')
+            ->limit(80)
+            ->get();
+
+        $out = [];
+        $seen = [];
+        foreach ($rows as $txn) {
+            $acct = (string) $txn->counterparty_account_number;
+            $code = (string) $txn->counterparty_bank_code;
+            $key = $acct.'|'.$code;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $meta = is_array($txn->meta) ? $txn->meta : [];
+            $bankName = trim((string) ($meta['bank_name'] ?? ''));
+            if ($bankName === '') {
+                $bankName = (string) (Bank::query()->where('code', $code)->value('name') ?? '');
+            }
+            if ($bankName === '') {
+                $bankName = 'Bank '.$code;
+            }
+
+            $out[] = [
+                'acct' => $acct,
+                'bank_code' => $code,
+                'bank_name' => $bankName,
+                'account_name' => trim((string) ($txn->counterparty_account_name ?? '')),
+            ];
+
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    private function buildTransferAccountPrompt(WhatsappWallet $wallet): string
+    {
+        $lines = [
+            '*Bank transfer*',
+            '',
+            'Send the *10-digit* account number.',
+        ];
+
+        $recent = $this->recentBankTransferTargets($wallet, 3);
+        if ($recent !== []) {
+            $lines[] = '';
+            $lines[] = 'Last transfers — *1*, *2*, or *3* reuses that account (skips bank search):';
+            foreach ($recent as $i => $r) {
+                $n = $i + 1;
+                $tail = strlen($r['acct']) >= 4 ? '****'.substr($r['acct'], -4) : '****';
+                $who = $r['account_name'] !== '' ? $r['account_name'] : 'Saved account';
+                $lines[] = "*{$n}* — {$r['bank_name']} · {$who} · {$tail}";
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = '*BACK* — cancel';
+
+        return implode("\n", $lines);
+    }
+
+    private function sendTransferAccountStep(string $instance, string $phone, WhatsappWallet $wallet): void
+    {
+        $this->client->sendText($instance, $phone, $this->buildTransferAccountPrompt($wallet));
     }
 
     /**
@@ -1121,6 +1316,17 @@ class WhatsappWaWalletMenuHandler
             );
 
             return;
+        }
+
+        $recvNotify = WhatsappWallet::query()->where('phone_e164', $recipient)->first();
+        if ($recvNotify) {
+            $this->walletNotifier->notifyP2pReceived(
+                $instance,
+                $recvNotify->fresh(),
+                $amount,
+                (float) $recvNotify->balance,
+                $phone
+            );
         }
 
         $session->update(['chat_context' => ['step' => 'submenu']]);
