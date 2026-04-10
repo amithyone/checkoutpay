@@ -8,9 +8,13 @@ use App\Models\WithdrawalRequest as WithdrawalRequestModel;
 use App\Services\TransactionLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class WithdrawalController extends Controller
 {
+    private const WITHDRAWAL_COOLDOWN_MINUTES = 2;
+    private const WITHDRAWAL_BLOCKED_MESSAGE = 'Withdrawal could not be processed. Please try again shortly.';
+
     public function __construct(
         protected TransactionLogService $logService
     ) {}
@@ -21,6 +25,15 @@ class WithdrawalController extends Controller
     public function store(WithdrawalRequest $request): JsonResponse
     {
         $business = $request->user();
+        $cooldownKey = "withdrawal:cooldown:business:{$business->id}";
+        $lockKey = "withdrawal:submit-lock:business:{$business->id}";
+
+        if (Cache::has($cooldownKey)) {
+            return response()->json([
+                'success' => false,
+                'message' => self::WITHDRAWAL_BLOCKED_MESSAGE,
+            ], 429);
+        }
 
         // Check if business has sufficient balance
         if ($business->balance < $request->amount) {
@@ -29,6 +42,13 @@ class WithdrawalController extends Controller
                 'message' => 'Insufficient balance',
                 'available_balance' => (float) $business->balance,
             ], 400);
+        }
+
+        if (!Cache::add($lockKey, true, now()->addSeconds(30))) {
+            return response()->json([
+                'success' => false,
+                'message' => self::WITHDRAWAL_BLOCKED_MESSAGE,
+            ], 429);
         }
 
         $withdrawal = WithdrawalRequestModel::create([
@@ -48,6 +68,8 @@ class WithdrawalController extends Controller
 
         // Notify admin (Telegram + email)
         app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
+        Cache::put($cooldownKey, true, now()->addMinutes(self::WITHDRAWAL_COOLDOWN_MINUTES));
+        Cache::forget($lockKey);
 
         return response()->json([
             'success' => true,

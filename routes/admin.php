@@ -64,6 +64,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('external-apis', [ExternalApiController::class, 'index'])->name('external-apis.index');
             Route::post('external-apis', [ExternalApiController::class, 'store'])->name('external-apis.store');
             Route::put('external-apis/{externalApi}/businesses', [ExternalApiController::class, 'updateBusinesses'])->name('external-apis.update-businesses');
+            Route::get('external-apis/mevonpay/webhook-sources', [ExternalApiController::class, 'mevonpayWebhookSources'])
+                ->middleware('super_admin')
+                ->name('external-apis.mevonpay-webhook-sources');
         });
 
         // Businesses

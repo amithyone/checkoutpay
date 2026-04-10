@@ -4,28 +4,25 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\TestEmailController;
 
-// Canonical rental domain: redirect camrentals.* -> abjrentals.ng (preserve path + query)
-foreach (['camrentals.ng', 'www.camrentals.ng'] as $legacyRentalDomain) {
-    Route::domain($legacyRentalDomain)->any('/{any?}', function (?string $any = null) {
-        $path = trim((string) $any, '/');
-        $query = request()->getQueryString();
-        $target = 'https://abjrentals.ng' . ($path !== '' ? '/' . $path : '');
-        if ($query) {
-            $target .= '?' . $query;
-        }
-
-        return redirect()->away($target, 301);
-    })->where('any', '.*');
-}
-
-// Canonical rental domains serve rentals directly
-foreach (['abjrentals.ng', 'www.abjrentals.ng'] as $rentalDomain) {
+// Rental storefront hostnames: same app, no redirect — browser stays on the host the user typed
+foreach (
+    [
+        'abjrentals.ng',
+        'www.abjrentals.ng',
+        'camrentals.ng',
+        'www.camrentals.ng',
+    ] as $rentalDomain
+) {
     Route::domain($rentalDomain)->group(function () {
         Route::get('/', [\App\Http\Controllers\Public\RentalController::class, 'index']);
     });
 }
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
+
+Route::get('/whatsapp/link', [\App\Http\Controllers\WhatsappMagicLinkController::class, 'confirm'])
+    ->middleware('throttle:30,1')
+    ->name('whatsapp.magic-link');
 
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
 

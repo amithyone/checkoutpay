@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\MevonPayWebhookController;
+use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -69,6 +70,14 @@ Route::prefix('v1')->group(function () {
 
     Route::post('nigtax/visit', [\App\Http\Controllers\Api\NigtaxVisitController::class, 'store'])
         ->middleware('throttle:120,1');
+
+    /**
+     * Evolution API → Checkout (OTP link for renters). Configure webhook to POST here.
+     * Header X-Checkout-WhatsApp-Secret or ?secret= when WHATSAPP_WEBHOOK_SECRET is set.
+     */
+    Route::post('whatsapp/webhook', [WhatsappWebhookController::class, 'receive'])
+        ->middleware('throttle:120,1');
+    Route::get('whatsapp/webhook', [WhatsappWebhookController::class, 'health']);
 
     Route::prefix('nigtax/certified')->middleware('throttle:60,1')->group(function () {
         Route::get('settings', [\App\Http\Controllers\Api\NigtaxCertifiedPublicController::class, 'settings']);

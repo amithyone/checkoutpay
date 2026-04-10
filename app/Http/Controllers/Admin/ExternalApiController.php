@@ -6,11 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\ExternalApi;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class ExternalApiController extends Controller
 {
+    private const WEBHOOK_SOURCE_CACHE_KEY = 'mevonpay:webhook:recent_sources';
+
     protected array $serviceOptions = [
         'invoice',
         'membership',
@@ -99,5 +103,23 @@ class ExternalApiController extends Controller
         }
 
         return redirect()->route('admin.external-apis.index')->with('success', 'External API business list updated.');
+    }
+
+    public function mevonpayWebhookSources(Request $request): JsonResponse
+    {
+        $limit = max(1, min((int) $request->query('limit', 50), 200));
+        $entries = Cache::get(self::WEBHOOK_SOURCE_CACHE_KEY, []);
+        if (!is_array($entries)) {
+            $entries = [];
+        }
+
+        $entries = array_reverse($entries);
+        $entries = array_slice($entries, 0, $limit);
+
+        return response()->json([
+            'success' => true,
+            'count' => count($entries),
+            'data' => $entries,
+        ]);
     }
 }

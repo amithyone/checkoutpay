@@ -59,6 +59,8 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'kyc_id_rejection_reason',
         'is_active',
         'email_verified_at',
+        'whatsapp_phone_e164',
+        'whatsapp_verified_at',
     ];
 
     protected $hidden = [
@@ -75,6 +77,7 @@ class Renter extends Authenticatable implements MustVerifyEmail
         'rubies_account_created_at' => 'datetime',
         'is_active' => 'boolean',
         'password' => 'hashed',
+        'whatsapp_verified_at' => 'datetime',
     ];
 
     /**

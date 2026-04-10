@@ -7,10 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Models\WithdrawalRequest;
 use App\Services\WithdrawalMavonPayPayoutService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class WithdrawalsController extends Controller
 {
     use ResolvesBusiness;
+    private const WITHDRAWAL_COOLDOWN_MINUTES = 2;
+    private const WITHDRAWAL_BLOCKED_MESSAGE = 'Withdrawal could not be processed. Please try again shortly.';
 
     /**
      * GET /api/v1/rentals/business/withdrawals
@@ -40,6 +43,14 @@ class WithdrawalsController extends Controller
     public function store(Request $request)
     {
         $business = $this->resolveBusinessOr403($request);
+        $cooldownKey = "withdrawal:cooldown:business:{$business->id}";
+        $lockKey = "withdrawal:submit-lock:business:{$business->id}";
+
+        if (Cache::has($cooldownKey)) {
+            return response()->json([
+                'message' => self::WITHDRAWAL_BLOCKED_MESSAGE,
+            ], 429);
+        }
 
         /** @var WithdrawalMavonPayPayoutService $payout */
         $payout = app(WithdrawalMavonPayPayoutService::class);
@@ -67,6 +78,12 @@ class WithdrawalsController extends Controller
             ], 422);
         }
 
+        if (!Cache::add($lockKey, true, now()->addSeconds(30))) {
+            return response()->json([
+                'message' => self::WITHDRAWAL_BLOCKED_MESSAGE,
+            ], 429);
+        }
+
         $withdrawal = WithdrawalRequest::create([
             'business_id' => $business->id,
             'amount' => $validated['amount'],
@@ -78,6 +95,8 @@ class WithdrawalsController extends Controller
         ]);
 
         $payout->processWithdrawal($withdrawal, $business, $bankCode);
+        Cache::put($cooldownKey, true, now()->addMinutes(self::WITHDRAWAL_COOLDOWN_MINUTES));
+        Cache::forget($lockKey);
 
         return response()->json([
             'data' => $withdrawal->fresh(),

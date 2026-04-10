@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use App\Models\WithdrawalRequest;
 use App\Services\NubanValidationService;
@@ -12,6 +13,9 @@ use App\Services\WithdrawalMavonPayPayoutService;
 
 class WithdrawalController extends Controller
 {
+    private const WITHDRAWAL_COOLDOWN_MINUTES = 2;
+    private const WITHDRAWAL_BLOCKED_MESSAGE = 'Withdrawal could not be processed. Please try again shortly.';
+
     public function index(Request $request)
     {
         $business = Auth::guard('business')->user();
@@ -219,6 +223,12 @@ class WithdrawalController extends Controller
     public function store(Request $request)
     {
         $business = Auth::guard('business')->user();
+        $cooldownKey = "withdrawal:cooldown:business:{$business->id}";
+        $lockKey = "withdrawal:submit-lock:business:{$business->id}";
+
+        if (Cache::has($cooldownKey)) {
+            return back()->with('error', self::WITHDRAWAL_BLOCKED_MESSAGE)->withInput();
+        }
 
         // Check if business has account number set (legacy KYC account)
         $hasAccountNumber = $business->hasAccountNumber();
@@ -347,6 +357,10 @@ class WithdrawalController extends Controller
             $savedAccount->markAsUsed();
         }
 
+        if (!Cache::add($lockKey, true, now()->addSeconds(30))) {
+            return back()->with('error', self::WITHDRAWAL_BLOCKED_MESSAGE)->withInput();
+        }
+
         $withdrawal = $business->withdrawalRequests()->create([
             'amount' => $validated['amount'],
             'bank_name' => $bankName,
@@ -360,6 +374,8 @@ class WithdrawalController extends Controller
         $payout = app(WithdrawalMavonPayPayoutService::class);
         $payout->processWithdrawal($withdrawal, $business, $bankCode);
         $withdrawal->refresh();
+        Cache::put($cooldownKey, true, now()->addMinutes(self::WITHDRAWAL_COOLDOWN_MINUTES));
+        Cache::forget($lockKey);
 
         $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));
         app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);

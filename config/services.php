@@ -39,6 +39,9 @@ return [
     'mevonpay' => [
         'base_url' => env('MEVONPAY_BASE_URL', ''),
         'secret_key' => env('MEVONPAY_SECRET_KEY', ''),
+        'webhook_secret' => env('MEVONPAY_WEBHOOK_SECRET', env('SLA_WEBHOOK_SECRET', env('MAVONPAY_WEBHOOK_SECRET', ''))),
+        'webhook_allowed_ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('MEVONPAY_WEBHOOK_ALLOWED_IPS', ''))))),
+        'webhook_allowed_domains' => array_values(array_filter(array_map('trim', explode(',', (string) env('MEVONPAY_WEBHOOK_ALLOWED_DOMAINS', ''))))),
         'debit_account_name' => env('MEVONPAY_DEBIT_ACCOUNT_NAME', ''),
         'debit_account_number' => env('MEVONPAY_DEBIT_ACCOUNT_NUMBER', ''),
         'current_password' => env('MEVONPAY_CURRENT_PASSWORD', ''),
