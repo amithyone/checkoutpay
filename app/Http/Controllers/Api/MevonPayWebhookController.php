@@ -52,10 +52,28 @@ class MevonPayWebhookController extends Controller
         $amount = (float) data_get($payload, 'data.amount', 0);
         $reference = (string) data_get($payload, 'data.reference', '');
 
-        if ($accountNumber === '' || $amount <= 0) {
+        if ($accountNumber === '') {
             $this->recordWebhookSource($request, 'invalid_payload');
             return response()->json(['success' => false, 'message' => 'Invalid payload'], 422);
         }
+
+        $waTopup = app(WhatsappWalletTier1TopupVaService::class);
+
+        if ($amount <= 0) {
+            if ($waTopup->tryLogZeroAmountWebhook($accountNumber, $reference, $payload)) {
+                $this->recordWebhookSource($request, 'whatsapp_wallet_topup_no_amount');
+
+                return response()->json(['success' => true, 'message' => 'WhatsApp wallet webhook logged (no amount)']);
+            }
+
+            $this->recordWebhookSource($request, 'invalid_payload');
+            return response()->json(['success' => false, 'message' => 'Invalid payload'], 422);
+        }
+
+        $webhookMeta = [
+            'sender' => (string) data_get($payload, 'data.sender', ''),
+            'bank_name' => (string) data_get($payload, 'data.bank_name', ''),
+        ];
 
         $payment = Payment::where('status', Payment::STATUS_PENDING)
             ->whereIn('payment_source', [
@@ -71,10 +89,16 @@ class MevonPayWebhookController extends Controller
             ->first();
 
         if (! $payment) {
-            if (app(WhatsappWalletTier1TopupVaService::class)->tryFulfillFromWebhook($accountNumber, $amount, $reference)) {
+            if ($waTopup->tryFulfillFromWebhook($accountNumber, $amount, $reference, $webhookMeta)) {
                 $this->recordWebhookSource($request, 'whatsapp_wallet_topup');
 
                 return response()->json(['success' => true, 'message' => 'WhatsApp wallet top-up applied']);
+            }
+
+            if ($waTopup->tryFulfillPermanentVaFromWebhook($accountNumber, $amount, $reference, $webhookMeta)) {
+                $this->recordWebhookSource($request, 'whatsapp_wallet_permanent_va_topup');
+
+                return response()->json(['success' => true, 'message' => 'WhatsApp wallet top-up applied (permanent VA)']);
             }
 
             $this->recordWebhookSource($request, 'no_payment');

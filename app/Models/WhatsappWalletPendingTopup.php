@@ -9,6 +9,7 @@ class WhatsappWalletPendingTopup extends Model
 {
     protected $fillable = [
         'whatsapp_wallet_id',
+        'payment_id',
         'account_number',
         'account_name',
         'bank_name',
@@ -30,5 +31,10 @@ class WhatsappWalletPendingTopup extends Model
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(WhatsappWallet::class, 'whatsapp_wallet_id');
+    }
+
+    public function payment(): BelongsTo
+    {
+        return $this->belongsTo(Payment::class);
     }
 }

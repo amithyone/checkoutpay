@@ -166,6 +166,7 @@ class PaymentMatchingService
                     Payment::SOURCE_EXTERNAL_MEVONPAY,
                     Payment::SOURCE_EXTERNAL_SLA,
                     Payment::SOURCE_EXTERNAL_MAVONPAY,
+                    Payment::SOURCE_WHATSAPP_WALLET,
                 ])
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());

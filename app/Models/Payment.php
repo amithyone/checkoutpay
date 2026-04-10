@@ -83,6 +83,8 @@ class Payment extends Model
     const SOURCE_EXTERNAL_MEVONPAY = 'external_mevonpay';
     const SOURCE_EXTERNAL_SLA = 'external_sla';
     const SOURCE_EXTERNAL_MAVONPAY = 'external_mavonpay'; // legacy
+    /** Tier 1 WhatsApp wallet temp VA top-up (admin payments visibility; not a merchant checkout). */
+    const SOURCE_WHATSAPP_WALLET = 'whatsapp_wallet';
 
     /**
      * Get pending payments
@@ -219,6 +221,10 @@ class Payment extends Model
             'nigtax_certified_order_id',
             'manual_verification',
             'api_amount_update',
+            'wa_topup',
+            'whatsapp_wallet_id',
+            'whatsapp_pending_topup_id',
+            'wa_permanent_va',
         ];
     }
 

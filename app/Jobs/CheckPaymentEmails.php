@@ -37,25 +37,14 @@ class CheckPaymentEmails implements ShouldQueue
         
         // Skip if payment is already matched or expired
         if ($this->payment->status !== Payment::STATUS_PENDING) {
-            Log::info('Payment already processed, skipping email check', [
-                'transaction_id' => $this->payment->transaction_id,
-                'status' => $this->payment->status,
-            ]);
             return;
         }
 
         if ($this->payment->isExternalGatewayPayment() || (($this->payment->email_data['skip_auto_match'] ?? false) === true)) {
-            Log::info('Skipping email auto-match for external payment source', [
-                'transaction_id' => $this->payment->transaction_id,
-                'payment_source' => $this->payment->payment_source,
-            ]);
             return;
         }
 
         if ($this->payment->isExpired()) {
-            Log::info('Payment expired, skipping email check', [
-                'transaction_id' => $this->payment->transaction_id,
-            ]);
             return;
         }
 

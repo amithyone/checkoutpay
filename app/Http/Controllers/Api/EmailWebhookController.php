@@ -166,12 +166,6 @@ class EmailWebhookController extends Controller
                     'error_details' => 'Email content preview: ' . substr($emailContent, 0, 500),
                 ]);
                 
-                Log::warning('Webhook request rejected - could not extract sender email', [
-                    'ip' => $request->ip(),
-                    'email_content_preview' => substr($emailContent, 0, 200),
-                    'zapier_log_id' => $zapierLog->id,
-                ]);
-                
                 return response()->json([
                     'success' => false,
                     'message' => 'Could not extract sender email address from email content',
@@ -188,12 +182,6 @@ class EmailWebhookController extends Controller
                     'status' => 'rejected',
                     'status_message' => 'Email address not whitelisted: ' . $fromEmail,
                     'error_details' => 'Add this email address to the whitelist in admin panel: Settings > Whitelisted Emails',
-                ]);
-                
-                Log::warning('Webhook request rejected - email not whitelisted', [
-                    'from_email' => $fromEmail,
-                    'ip' => $request->ip(),
-                    'zapier_log_id' => $zapierLog->id,
                 ]);
                 
                 return response()->json([
@@ -603,13 +591,6 @@ class EmailWebhookController extends Controller
         $extractedInfo = $extractionResult['data'] ?? null;
         
         if (!$extractedInfo || !isset($extractedInfo['amount']) || empty($extractedInfo['amount'])) {
-            // Log the email but don't process if we can't extract payment info
-            \Illuminate\Support\Facades\Log::warning('Email webhook: Could not extract payment information from raw email', [
-                'subject' => $subject,
-                'from' => $fromEmail,
-                'ip_address' => $request->ip(),
-            ]);
-            
             return response()->json([
                 'success' => false,
                 'message' => 'Could not extract payment information from email',

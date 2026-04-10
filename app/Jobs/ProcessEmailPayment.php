@@ -114,12 +114,6 @@ class ProcessEmailPayment implements ShouldQueue
                     'processing_time_ms' => $processingTime,
                     'attempt' => $this->attempts(),
                 ]);
-            } else {
-                $processingTime = round((microtime(true) - $startTime) * 1000, 2);
-                Log::info('Email payment processed but no match found', [
-                    'processing_time_ms' => $processingTime,
-                    'attempt' => $this->attempts(),
-                ]);
             }
         } catch (\Exception $e) {
             $processingTime = round((microtime(true) - $startTime) * 1000, 2);

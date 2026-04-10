@@ -295,10 +295,6 @@ class MonitorEmails extends Command
                     ]);
                     
                     if (!$messageId) {
-                        Log::warning('Email skipped: No message ID', [
-                            'subject' => $subject,
-                            'from' => $fromEmail,
-                        ]);
                         $skippedCount++;
                         $this->warn("  ❌ Skipped email #{$index}: No message ID - Subject: {$subject}");
                         continue;
@@ -307,10 +303,6 @@ class MonitorEmails extends Command
                     // FAST CHECK: Skip if already stored (check before fetching body)
                     // Use isset() for O(1) lookup instead of in_array() O(n)
                     if (isset($existingMessageIds[$messageId])) {
-                        Log::debug('Email skipped: Already stored', [
-                            'message_id' => $messageId,
-                            'subject' => $subject,
-                        ]);
                         $alreadyStoredCount++;
                         $this->line("  ⏭️  Email #{$index} already stored: {$subject}");
                         continue; // Skip immediately - don't fetch body
@@ -318,10 +310,6 @@ class MonitorEmails extends Command
                     
                     // FAST CHECK: Skip if we've already processed this message ID
                     if ($lastProcessedMessageId && $messageId === $lastProcessedMessageId) {
-                        Log::debug('Email skipped: Already processed (last processed message)', [
-                            'message_id' => $messageId,
-                            'subject' => $subject,
-                        ]);
                         $foundLastProcessed = true;
                         $this->line("  ⏭️  Email #{$index} is last processed message: {$subject}");
                         continue;
@@ -329,10 +317,6 @@ class MonitorEmails extends Command
                     
                     // If we found the last processed message, skip all previous ones
                     if ($foundLastProcessed) {
-                        Log::debug('Email skipped: Before last processed message', [
-                            'message_id' => $messageId,
-                            'subject' => $subject,
-                        ]);
                         $this->line("  ⏭️  Email #{$index} skipped (before last processed): {$subject}");
                         continue;
                     }
@@ -341,12 +325,6 @@ class MonitorEmails extends Command
                     
                     // Filter by allowed senders if configured
                     if ($emailAccount && !$emailAccount->isSenderAllowed($fromEmail)) {
-                        Log::warning('Email skipped: Sender not allowed', [
-                            'message_id' => $messageId,
-                            'subject' => $subject,
-                            'from' => $fromEmail,
-                            'allowed_senders' => $emailAccount->allowed_senders,
-                        ]);
                         $skippedCount++;
                         $this->warn("  ❌ Email #{$index} skipped: Sender not allowed - From: {$fromEmail}, Subject: {$subject}");
                         continue;
@@ -381,11 +359,6 @@ class MonitorEmails extends Command
                         ]);
                         $this->info("  ✅ Stored email #{$index} in database (ID: {$storedEmail->id}) [{$emailProcessingTime}ms]");
                     } else {
-                        Log::warning('Email NOT stored (storeEmail returned null)', [
-                            'message_id' => $messageId,
-                            'subject' => $subject,
-                            'from' => $fromEmail,
-                        ]);
                         $this->warn("  ⚠️  Email #{$index} NOT stored (storeEmail returned null): {$subject}");
                         $skippedCount++;
                         continue;
@@ -509,7 +482,7 @@ class MonitorEmails extends Command
             
             if ($totalEmailsFound > 0 && $storedCount === 0 && $alreadyStoredCount === 0) {
                 $this->warn("⚠️  WARNING: Found {$totalEmailsFound} emails but NONE were stored!");
-                $this->warn("   Check logs for details on why emails were skipped.");
+                $this->warn('   Review skipped count, sender allowlists, and messages above.');
             }
 
             $client->disconnect();

@@ -711,12 +711,6 @@ class ReadEmailsDirect extends Command
 
             // Global whitelist check - only process emails from approved senders
             if (!empty($fromEmail) && !WhitelistedEmailAddress::isWhitelisted($fromEmail)) {
-                Log::info('Email skipped: sender not in global whitelist', [
-                    'from' => $fromEmail,
-                    'subject' => $subject,
-                    'email_account' => $emailAccount->email,
-                    'source' => 'direct_filesystem',
-                ]);
                 return null;
             }
 
@@ -754,11 +748,6 @@ class ReadEmailsDirect extends Command
 
             // Filter by allowed senders
             if (!$emailAccount->isSenderAllowed($fromEmail)) {
-                Log::info('Email skipped: sender not allowed', [
-                    'from' => $fromEmail,
-                    'subject' => $subject,
-                    'email_account' => $emailAccount->email,
-                ]);
                 return null;
             }
 
