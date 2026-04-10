@@ -83,6 +83,24 @@ class WhatsappWallet extends Model
         return $n !== '' ? $n : null;
     }
 
+    /**
+     * Email used for transfer confirmation OTP (linked renter account, else Tier 2 KYC email).
+     */
+    public function resolveOtpEmail(): ?string
+    {
+        $this->loadMissing('renter');
+        $e = $this->renter?->email;
+        if (is_string($e) && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+            return strtolower(trim($e));
+        }
+        $k = trim((string) $this->kyc_email);
+        if ($k !== '' && filter_var($k, FILTER_VALIDATE_EMAIL)) {
+            return strtolower($k);
+        }
+
+        return null;
+    }
+
     public function isPinLocked(): bool
     {
         return $this->pin_locked_until !== null && $this->pin_locked_until->isFuture();

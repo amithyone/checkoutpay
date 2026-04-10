@@ -17,6 +17,12 @@ class WhatsappWalletTransaction extends Model
 
     public const TYPE_ADJUSTMENT = 'adjustment';
 
+    public const TYPE_VTU_AIRTIME = 'vtu_airtime';
+
+    public const TYPE_VTU_DATA = 'vtu_data';
+
+    public const TYPE_VTU_ELECTRICITY = 'vtu_electricity';
+
     protected $fillable = [
         'whatsapp_wallet_id',
         'sender_name',

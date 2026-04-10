@@ -21,6 +21,7 @@ class WhatsappInboundHandler
         private WhatsappCheckoutServicesMenuHandler $checkoutServicesMenu,
         private WhatsappWalletUpgradeFlowHandler $walletUpgradeFlow,
         private WhatsappWaWalletMenuHandler $waWalletMenu,
+        private WhatsappWalletVtuFlowHandler $walletVtuFlow,
     ) {}
 
     public function handleRequest(Request $request): void
@@ -125,6 +126,12 @@ class WhatsappInboundHandler
 
         if ($session && $session->chat_flow === WhatsappWalletUpgradeFlowHandler::FLOW) {
             $this->walletUpgradeFlow->handle($session, $instance, $phone, $text, $cmd);
+
+            return;
+        }
+
+        if ($session && $session->chat_flow === WhatsappWalletVtuFlowHandler::FLOW) {
+            $this->walletVtuFlow->handle($session, $instance, $phone, $text, $cmd, $linkedRenter);
 
             return;
         }

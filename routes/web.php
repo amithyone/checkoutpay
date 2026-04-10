@@ -24,6 +24,13 @@ Route::get('/whatsapp/link', [\App\Http\Controllers\WhatsappMagicLinkController:
     ->middleware('throttle:30,1')
     ->name('whatsapp.magic-link');
 
+Route::get('/wallet/whatsapp/confirm/{token}', [\App\Http\Controllers\WhatsappWalletTransferConfirmController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('wallet.whatsapp.transfer-confirm.show');
+Route::post('/wallet/whatsapp/confirm/{token}', [\App\Http\Controllers\WhatsappWalletTransferConfirmController::class, 'submit'])
+    ->middleware('throttle:30,1')
+    ->name('wallet.whatsapp.transfer-confirm.submit');
+
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
