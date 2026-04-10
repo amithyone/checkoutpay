@@ -19,6 +19,11 @@ return [
     'webhook_secret' => env('WHATSAPP_WEBHOOK_SECRET', ''),
 
     /*
+    | Customer-facing name in WhatsApp bot copy (not internal payment gateway names).
+    */
+    'bot_brand_name' => (string) env('WHATSAPP_BOT_BRAND_NAME', 'CheckoutNow'),
+
+    /*
     | Public HTTPS base for WhatsApp (magic links in email, default webhook URL).
     | When APP_URL is http://localhost, set WHATSAPP_APP_URL to your live site.
     */

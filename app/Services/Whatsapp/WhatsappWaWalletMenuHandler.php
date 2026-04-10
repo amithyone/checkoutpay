@@ -27,6 +27,10 @@ class WhatsappWaWalletMenuHandler
 
     private const PIN_LOCK_MINUTES = 15;
 
+    private const SENDER_NAME_MIN_LEN = 2;
+
+    private const SENDER_NAME_MAX_LEN = 120;
+
     public function __construct(
         private EvolutionWhatsAppClient $client,
         private WhatsappWalletUpgradeFlowHandler $upgradeFlow,
@@ -91,12 +95,18 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
+            if ($step === 'p2p_verify_recipient') {
+                $session->update(['chat_context' => ['step' => 'p2p_phone']]);
+                $this->sendP2pPhoneStepPrompt($instance, $phone);
+
+                return;
+            }
             if (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_')) {
                 $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
                 return;
             }
-            if (in_array($step, ['pin_new', 'pin_confirm'], true)) {
+            if (in_array($step, ['pin_new', 'pin_confirm', 'pin_sender_name'], true)) {
                 $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
                 return;
@@ -109,12 +119,14 @@ class WhatsappWaWalletMenuHandler
             'submenu' => $this->handleSubmenu($session, $instance, $phone, $text, $cmd, $wallet),
             'pin_new' => $this->handlePinNew($session, $instance, $phone, $text, $wallet),
             'pin_confirm' => $this->handlePinConfirm($session, $instance, $phone, $text, $ctx, $wallet),
+            'pin_sender_name' => $this->handlePinSenderName($session, $instance, $phone, $text, $wallet, $linkedRenter),
             'transfer_acct' => $this->handleTransferAcct($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_bank' => $this->handleTransferBank($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_beneficiary' => $this->handleTransferBeneficiary($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_amount' => $this->handleTransferAmount($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_pin' => $this->handleTransferPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
             'p2p_phone' => $this->handleP2pPhone($session, $instance, $phone, $text, $ctx, $wallet),
+            'p2p_verify_recipient' => $this->handleP2pVerifyRecipient($session, $instance, $phone, $text, $cmd, $ctx, $wallet),
             'p2p_amount' => $this->handleP2pAmount($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_pin' => $this->handleP2pPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
             default => $this->recoverSubmenu($session, $instance, $phone, $wallet),
@@ -138,6 +150,17 @@ class WhatsappWaWalletMenuHandler
         }
 
         return strtoupper($t);
+    }
+
+    private function waBrand(): string
+    {
+        return (string) config('whatsapp.bot_brand_name', 'CheckoutNow');
+    }
+
+    /** Shown after the user sends their wallet PIN for a transfer (bank or P2P). */
+    private function waPinDeleteReminderSuffix(): string
+    {
+        return "\n\n*Security:* Long-press your PIN message and tap *Delete* so it is not left in this chat.";
     }
 
     private function findOrCreateWallet(string $phone, ?Renter $renter): WhatsappWallet
@@ -179,9 +202,10 @@ class WhatsappWaWalletMenuHandler
             $tier1VaNote = "\nTier 1: *1* gives a *new temporary* pay-in account each time.\n";
         }
 
+        $brand = $this->waBrand();
         $bankNote = $this->bankPayout->isConfigured()
-            ? 'Bank sends use *MavonPay*: we only keep the debit when the transfer is *confirmed successful* — failed or *pending* responses refund your wallet.'
-            : 'Bank sends are recorded on your balance; connect MavonPay for live payouts.';
+            ? "Bank sends use *{$brand}*: we only keep the debit when the transfer is *confirmed successful* — failed or *pending* responses refund your wallet."
+            : "Bank sends are recorded on your balance; connect *{$brand}* for live payouts.";
 
         $this->client->sendText(
             $instance,
@@ -266,6 +290,11 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
+            if ($wallet->normalizedSenderName() === null) {
+                $this->startSenderNameStep($session, $instance, $phone);
+
+                return;
+            }
             $session->update([
                 'chat_context' => ['step' => 'transfer_acct'],
             ]);
@@ -285,15 +314,13 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
+            if ($wallet->normalizedSenderName() === null) {
+                $this->startSenderNameStep($session, $instance, $phone);
+
+                return;
+            }
             $session->update(['chat_context' => ['step' => 'p2p_phone']]);
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "*Send to WhatsApp (P2P)*\n\n".
-                "Send the recipient's Nigerian mobile number (e.g. *080…* or *234…*).\n".
-                "They must have sent *WALLET* here once so their wallet exists.\n\n".
-                '*BACK* — cancel'
-            );
+            $this->sendP2pPhoneStepPrompt($instance, $phone);
 
             return;
         }
@@ -358,7 +385,7 @@ class WhatsappWaWalletMenuHandler
                 "*Bank:* {$bname}\n".
                 "*Account:* *{$acct}*\n".
                 "*Name:* {$aname}\n\n".
-                "Transfer from your bank app. We credit this wallet when MevonPay confirms (*funding.success* webhook).\n".
+                "Transfer from your bank app. We credit this wallet when *{$this->waBrand()}* confirms your payment.\n".
                 $expLine.
                 "Max wallet balance Tier 1: ₦{$t1max}.\n\n".
                 'Others can also send via *WALLET* → *4* (P2P). Permanent VA: *3* *UPGRADE*.'
@@ -439,9 +466,57 @@ class WhatsappWaWalletMenuHandler
         $wallet->pin_locked_until = null;
         $wallet->save();
 
+        $session->update(['chat_context' => ['step' => 'pin_sender_name']]);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*PIN saved*\n\n".
+            "*Your send name*\n\n".
+            'Send the name you want shown on your transfers (e.g. your full name). '.
+            'Between *'.self::SENDER_NAME_MIN_LEN.'* and *'.self::SENDER_NAME_MAX_LEN."* characters.\n\n".
+            '*BACK* — skip for now (you will be asked before you can send money).'
+        );
+    }
+
+    private function handlePinSenderName(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        WhatsappWallet $wallet,
+        ?Renter $linkedRenter
+    ): void {
+        $raw = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+        $len = function_exists('mb_strlen') ? mb_strlen($raw, 'UTF-8') : strlen($raw);
+        if ($len < self::SENDER_NAME_MIN_LEN || $len > self::SENDER_NAME_MAX_LEN) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Send a name between *'.self::SENDER_NAME_MIN_LEN.'* and *'.self::SENDER_NAME_MAX_LEN.'* characters, or *BACK* to cancel.'
+            );
+
+            return;
+        }
+
+        $wallet->sender_name = $raw;
+        $wallet->save();
+
         $session->update(['chat_context' => ['step' => 'submenu']]);
-        $this->client->sendText($instance, $phone, "PIN saved.\n\n");
+        $this->client->sendText($instance, $phone, "Send name saved.\n\n{$raw}\n\n");
         $this->sendSubmenu($instance, $phone, $wallet->fresh());
+    }
+
+    private function startSenderNameStep(WhatsappSession $session, string $instance, string $phone): void
+    {
+        $session->update(['chat_context' => ['step' => 'pin_sender_name']]);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Your send name*\n\n".
+            'Before you can send money, send the name you want shown on your transfers (e.g. your full name). '.
+            'Between *'.self::SENDER_NAME_MIN_LEN.'* and *'.self::SENDER_NAME_MAX_LEN."* characters.\n\n".
+            '*BACK* — cancel'
+        );
     }
 
     /**
@@ -905,6 +980,7 @@ class WhatsappWaWalletMenuHandler
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $w->id,
+                    'sender_name' => $w->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
                     'amount' => $amount,
                     'balance_after' => $newBal,
@@ -920,7 +996,11 @@ class WhatsappWaWalletMenuHandler
             });
         } catch (\Throwable $e) {
             Log::warning('whatsapp.wallet.transfer_failed', ['error' => $e->getMessage(), 'phone' => $phone]);
-            $this->client->sendText($instance, $phone, 'Transfer could not be completed. Check balance and limits, then try again.');
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Transfer could not be completed. Check balance and limits, then try again.'.$this->waPinDeleteReminderSuffix()
+            );
 
             return;
         }
@@ -932,8 +1012,9 @@ class WhatsappWaWalletMenuHandler
             $phone,
             "*Transfer recorded*\n\n".
             '₦'.number_format($amount, 2)." → {$bankName} / {$acct} ({$beneficiary}).\n".
-            "MavonPay is not configured — this is ledger-only until payouts are enabled.\n\n".
-            'New balance: *₦'.number_format((float) $wallet->balance, 2).'*'
+            '*'.$this->waBrand().'* bank payouts are not enabled — this is ledger-only until support turns them on.'."\n\n".
+            'New balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+            $this->waPinDeleteReminderSuffix()
         );
         $this->sendSubmenu($instance, $phone, $wallet);
     }
@@ -971,6 +1052,7 @@ class WhatsappWaWalletMenuHandler
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $w->id,
+                    'sender_name' => $w->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
                     'amount' => $amount,
                     'balance_after' => $newBal,
@@ -987,7 +1069,11 @@ class WhatsappWaWalletMenuHandler
             });
         } catch (\Throwable $e) {
             Log::warning('whatsapp.wallet.transfer_debit_failed', ['error' => $e->getMessage(), 'phone' => $phone]);
-            $this->client->sendText($instance, $phone, 'Transfer could not be completed. Check balance and limits, then try again.');
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Transfer could not be completed. Check balance and limits, then try again.'.$this->waPinDeleteReminderSuffix()
+            );
 
             return;
         }
@@ -1046,11 +1132,12 @@ class WhatsappWaWalletMenuHandler
                 "*Bank transfer sent*\n\n".
                 '₦'.number_format($amount, 2)." → {$bankName} / {$acct}\n".
                 'Ref: *'.($result['reference'] ?? $reference)."*\n\n".
-                'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'
+                'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+                $this->waPinDeleteReminderSuffix()
             );
         } else {
             $detail = $bucket === MavonPayTransferService::BUCKET_PENDING
-                ? 'MavonPay returned *pending* (not a final success). WhatsApp transfers only complete when the bank confirms — your wallet has been *refunded*.'
+                ? '*'.$this->waBrand().'* returned *pending* (not a final success). Transfers only complete when the bank confirms — your wallet has been *refunded*.'
                 : ($result['response_message'] ?? 'The bank could not accept this transfer.');
             $this->client->sendText(
                 $instance,
@@ -1058,7 +1145,8 @@ class WhatsappWaWalletMenuHandler
                 "*Bank transfer not completed*\n\n".
                 $detail."\n\n".
                 "Your wallet was *refunded*.\n\n".
-                'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'
+                'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+                $this->waPinDeleteReminderSuffix()
             );
         }
 
@@ -1106,12 +1194,78 @@ class WhatsappWaWalletMenuHandler
         }
 
         $ctx['p2p_recipient_e164'] = $recipient;
-        $ctx['step'] = 'p2p_amount';
+        $ctx['step'] = 'p2p_verify_recipient';
         $session->update(['chat_context' => $ctx]);
+
+        $recvName = $recvWallet->normalizedSenderName();
+        $mask = $this->maskPhoneForDisplay($recipient);
+        $nameBlock = $recvName !== null
+            ? "Registered send name (their wallet):\n{$recvName}"
+            : 'Registered send name: not on file yet — rely on the number and your contact.';
+
         $this->client->sendText(
             $instance,
             $phone,
-            "Send *amount* in Naira (numbers only), minimum ₦1.\n\n*BACK* — cancel"
+            "*Confirm recipient*\n\n".
+            "Wallet: {$mask}\n".
+            "{$nameBlock}\n\n".
+            "Reply *YES* if this is the right person.\n\n".
+            '*BACK* — enter a different number'
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    private function handleP2pVerifyRecipient(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        string $cmd,
+        array $ctx,
+        WhatsappWallet $wallet
+    ): void {
+        $recipient = isset($ctx['p2p_recipient_e164']) && is_string($ctx['p2p_recipient_e164'])
+            ? $ctx['p2p_recipient_e164']
+            : '';
+        if ($recipient === '') {
+            $this->recoverSubmenu($session, $instance, $phone, $wallet);
+
+            return;
+        }
+
+        $recvWallet = WhatsappWallet::query()
+            ->where('phone_e164', $recipient)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
+
+        if (! $recvWallet) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'That wallet is no longer available. *BACK* to try another number.'
+            );
+
+            return;
+        }
+
+        if (in_array($cmd, ['YES', 'Y', 'OK', 'CONFIRM'], true) || $cmd === '1') {
+            $ctx['step'] = 'p2p_amount';
+            $session->update(['chat_context' => $ctx]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "Send *amount* in Naira (numbers only), minimum ₦1.\n\n*BACK* — cancel"
+            );
+
+            return;
+        }
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            'Reply *YES* when the wallet and name match who you intend to pay, or *BACK* to change the number.'
         );
     }
 
@@ -1291,6 +1445,7 @@ class WhatsappWaWalletMenuHandler
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $sender->id,
+                    'sender_name' => $sender->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_P2P_DEBIT,
                     'amount' => $amount,
                     'balance_after' => $newSenderBal,
@@ -1300,6 +1455,7 @@ class WhatsappWaWalletMenuHandler
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $recv->id,
+                    'sender_name' => $sender->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_P2P_CREDIT,
                     'amount' => $amount,
                     'balance_after' => $newRecvBal,
@@ -1312,7 +1468,7 @@ class WhatsappWaWalletMenuHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Send failed (limits or availability). Check balance and try again.'
+                'Send failed (limits or availability). Check balance and try again.'.$this->waPinDeleteReminderSuffix()
             );
 
             return;
@@ -1336,9 +1492,32 @@ class WhatsappWaWalletMenuHandler
             $phone,
             "*Sent*\n\n".
             '₦'.number_format($amount, 2).' → WhatsApp *'.$recipient."*\n\n".
-            'Your new balance: *₦'.number_format((float) $wallet->balance, 2).'*'
+            'Your new balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+            $this->waPinDeleteReminderSuffix()
         );
         $this->sendSubmenu($instance, $phone, $wallet);
+    }
+
+    private function sendP2pPhoneStepPrompt(string $instance, string $phone): void
+    {
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Send to WhatsApp (P2P)*\n\n".
+            "Send the recipient's Nigerian mobile number (e.g. *080…* or *234…*).\n".
+            "They must have sent *WALLET* here once so their wallet exists.\n\n".
+            '*BACK* — cancel'
+        );
+    }
+
+    private function maskPhoneForDisplay(string $e164): string
+    {
+        $d = preg_replace('/\D/', '', $e164) ?? '';
+        if (strlen($d) < 9) {
+            return $e164;
+        }
+
+        return substr($d, 0, 5).' •••• '.substr($d, -4);
     }
 
     private function recoverSubmenu(WhatsappSession $session, string $instance, string $phone, WhatsappWallet $wallet): void

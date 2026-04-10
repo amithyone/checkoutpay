@@ -42,7 +42,7 @@ class WhatsappWalletTier1TopupVaService
         if (! $this->isAvailable()) {
             return [
                 'ok' => false,
-                'message' => 'Temporary top-up accounts are not configured. Set *MEVONPAY_TEMP_VA_REGISTRATION_NUMBER* (and MevonPay keys), or *UPGRADE* to Tier 2 for a fixed account.',
+                'message' => 'Temporary top-up is not available on *'.(string) config('whatsapp.bot_brand_name', 'CheckoutNow').'* right now. Try again later or *UPGRADE* to Tier 2 for a fixed account.',
             ];
         }
 

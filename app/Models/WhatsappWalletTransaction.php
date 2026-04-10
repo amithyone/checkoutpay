@@ -19,6 +19,7 @@ class WhatsappWalletTransaction extends Model
 
     protected $fillable = [
         'whatsapp_wallet_id',
+        'sender_name',
         'type',
         'amount',
         'balance_after',

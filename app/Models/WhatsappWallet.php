@@ -28,6 +28,7 @@ class WhatsappWallet extends Model
         'pin_set_at',
         'pin_failed_attempts',
         'pin_locked_until',
+        'sender_name',
         'kyc_verified_at',
         'mevon_virtual_account_number',
         'mevon_bank_name',
@@ -73,6 +74,13 @@ class WhatsappWallet extends Model
     public function hasPin(): bool
     {
         return $this->pin_hash !== null && $this->pin_hash !== '';
+    }
+
+    public function normalizedSenderName(): ?string
+    {
+        $n = trim((string) $this->sender_name);
+
+        return $n !== '' ? $n : null;
     }
 
     public function isPinLocked(): bool

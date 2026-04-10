@@ -93,7 +93,7 @@ class WhatsappCheckoutServicesMenuHandler
         return "*WhatsApp Wallet*\n\n".
             "Open the wallet menu with *WALLET* (balance, receive, transfer, PIN).\n\n".
             "*Tier 1:* WhatsApp number = your wallet ID. Cap ₦{$t1max} balance & ₦{$t1day} sent per day.\n\n".
-            "*Tier 2:* *UPGRADE* in the wallet menu — KYC; permanent Rubies VA (Mevon).\n\n".
+            '*Tier 2:* *UPGRADE* in the wallet menu — KYC; permanent bank account via *'.(string) config('whatsapp.bot_brand_name', 'CheckoutNow')."*.\n\n".
             "Web app:\n{$url}\n\n".
             '*MENU* — main categories';
     }

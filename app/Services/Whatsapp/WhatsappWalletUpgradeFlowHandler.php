@@ -46,7 +46,7 @@ class WhatsappWalletUpgradeFlowHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Tier 2 (permanent bank account) is not available yet — Mevon Rubies is not configured. Try again later or use the web wallet link from *MENU*.'
+                'Tier 2 (permanent bank account) is not available yet on *'.$this->waBrand().'*. Try again later or use the web wallet link from *MENU*.'
             );
 
             return;
@@ -61,7 +61,7 @@ class WhatsappWalletUpgradeFlowHandler
             $instance,
             $phone,
             "*Tier 2 — full KYC*\n\n".
-            "You will get a *permanent* Rubies account for top-ups (Mevon Pay).\n".
+            'You will get a *permanent* bank account for top-ups via *'.$this->waBrand()."*.\n".
             "Your *WhatsApp number* must match the number we send to the bank.\n\n".
             "Send your *first name* (as on BVN).\n\n".
             '*CANCEL* — exit'
@@ -195,7 +195,7 @@ class WhatsappWalletUpgradeFlowHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "We will register this Rubies account for *this WhatsApp only*.\n\n".
+            'We will register this *'.$this->waBrand()."* bank account for *this WhatsApp only*.\n\n".
             "Detected number: *{$local}*\n\n".
             "Reply *YES* if this is correct and matches the SIM on this chat.\n".
             'If not, send *CANCEL* — you must use WhatsApp on the same phone you register.'
@@ -280,10 +280,15 @@ class WhatsappWalletUpgradeFlowHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'We could not create your bank account right now: '.$e->getMessage()."\n\nTry *UPGRADE* again later or use the web app."
+                'We could not create your bank account right now. Try *UPGRADE* again later or use the web app from *MENU*.'
             );
             $session->update(['chat_flow' => null, 'chat_context' => null]);
         }
+    }
+
+    private function waBrand(): string
+    {
+        return (string) config('whatsapp.bot_brand_name', 'CheckoutNow');
     }
 
     private function recover(WhatsappSession $session, string $instance, string $phone): void
