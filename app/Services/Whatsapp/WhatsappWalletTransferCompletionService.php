@@ -8,6 +8,7 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\MavonPayTransferService;
 use App\Services\VtuNg\VtuNgApiClient;
 use App\Services\WhatsappWalletBankPayoutService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -36,6 +37,24 @@ class WhatsappWalletTransferCompletionService
         }
 
         return "\n\n*Security:* Long-press your PIN message and tap *Delete* so it is not left in this chat.";
+    }
+
+    private function transferNoticeTimeLine(?Carbon $at = null): string
+    {
+        $at ??= now();
+
+        return $at->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
+            ' ('.(string) config('app.timezone').')';
+    }
+
+    private function maskPhoneTail(string $e164Digits): string
+    {
+        $d = preg_replace('/\D/', '', $e164Digits) ?? '';
+        if (strlen($d) < 9) {
+            return $e164Digits;
+        }
+
+        return substr($d, 0, 5).' •••• '.substr($d, -4);
     }
 
     /**
@@ -82,6 +101,7 @@ class WhatsappWalletTransferCompletionService
             "*3* — Tier 2 (*UPGRADE*): permanent bank account (KYC)\n".
             "*4* — Send to another *WhatsApp* number (P2P; they must open *WALLET* once)\n".
             $vtuLine.
+            "*6* — Transaction history (*6* per page; *MORE* / *PREV*)\n".
             "\n".
             "{$pinLine}\n\n".
             "Tier 1 cap: ₦{$t1max} balance & same daily send limit until upgraded.\n".
@@ -180,11 +200,16 @@ class WhatsappWalletTransferCompletionService
 
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $wallet = $wallet->fresh();
+        $when = $this->transferNoticeTimeLine();
         $this->client->sendText(
             $instance,
             $phone,
             "*Transfer recorded*\n\n".
-            '₦'.number_format($amount, 2)." → {$bankName} / {$acct} ({$beneficiary}).\n".
+            "*To:* {$beneficiary}\n".
+            "*Bank:* {$bankName}\n".
+            "*Account:* {$acct}\n".
+            '*Amount:* ₦'.number_format($amount, 2)."\n".
+            "*Time:* {$when}\n\n".
             '*'.$this->waBrand().'* bank payouts are not enabled — this is ledger-only until support turns them on.'."\n\n".
             'New balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
             $this->pinDeleteReminderSuffix($userTypedPinInChat)
@@ -300,12 +325,18 @@ class WhatsappWalletTransferCompletionService
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $wallet = $wallet->fresh();
 
+        $when = $this->transferNoticeTimeLine();
+
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
             $this->client->sendText(
                 $instance,
                 $phone,
                 "*Bank transfer sent*\n\n".
-                '₦'.number_format($amount, 2)." → {$bankName} / {$acct}\n".
+                "*To:* {$beneficiary}\n".
+                "*Bank:* {$bankName}\n".
+                "*Account:* {$acct}\n".
+                '*Amount:* ₦'.number_format($amount, 2)."\n".
+                "*Time:* {$when}\n".
                 'Ref: *'.($result['reference'] ?? $reference)."*\n\n".
                 'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
@@ -318,6 +349,9 @@ class WhatsappWalletTransferCompletionService
                 $instance,
                 $phone,
                 "*Bank transfer not completed*\n\n".
+                "Attempted to: *{$beneficiary}*\n".
+                "{$bankName} / {$acct} · ₦".number_format($amount, 2)."\n".
+                "*Time:* {$when}\n\n".
                 $detail."\n\n".
                 "Your wallet was *refunded*.\n\n".
                 'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
@@ -432,24 +466,38 @@ class WhatsappWalletTransferCompletionService
             return;
         }
 
+        $sentAt = now();
+        $when = $this->transferNoticeTimeLine($sentAt);
+        $senderDisplayName = $wallet->normalizedSenderName();
+
         $recvNotify = WhatsappWallet::query()->where('phone_e164', $recipient)->first();
-        if ($recvNotify) {
+        $recvFresh = $recvNotify?->fresh();
+        $recipientDisplayName = $recvFresh?->normalizedSenderName();
+
+        if ($recvFresh) {
             $this->walletNotifier->notifyP2pReceived(
                 $instance,
-                $recvNotify->fresh(),
+                $recvFresh,
                 $amount,
-                (float) $recvNotify->balance,
-                $phone
+                (float) $recvFresh->balance,
+                $phone,
+                $senderDisplayName,
+                $sentAt
             );
         }
 
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $wallet = $wallet->fresh();
+        $toLine = $recipientDisplayName !== null
+            ? "*To:* {$recipientDisplayName}\n*Number:* ".$this->maskPhoneTail($recipient)
+            : '*To:* '.$this->maskPhoneTail($recipient);
         $this->client->sendText(
             $instance,
             $phone,
             "*Sent*\n\n".
-            '₦'.number_format($amount, 2).' → WhatsApp *'.$recipient."*\n\n".
+            $toLine."\n".
+            '*Amount:* ₦'.number_format($amount, 2)."\n".
+            "*Time:* {$when}\n\n".
             'Your new balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
             $this->pinDeleteReminderSuffix($userTypedPinInChat)
         );

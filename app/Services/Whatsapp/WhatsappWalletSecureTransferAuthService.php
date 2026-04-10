@@ -53,6 +53,15 @@ class WhatsappWalletSecureTransferAuthService
     }
 
     /**
+     * Send the URL alone in a follow-up message so WhatsApp parses tappable links reliably
+     * (domains with hyphens often break when the URL sits inside a formatted block).
+     */
+    private function sendStandaloneConfirmLink(string $instance, string $phone, string $linkUrl): void
+    {
+        $this->client->sendText($instance, $phone, $linkUrl);
+    }
+
+    /**
      * @param  array<string, mixed>  $ctx
      * @return array<string, mixed>
      */
@@ -131,8 +140,11 @@ class WhatsappWalletSecureTransferAuthService
             $this->client->sendText(
                 $instance,
                 $phone,
-                '*No email on file* for a login code. You can enter your *4-digit wallet PIN* here, *or* use this link to type your PIN privately (safer):\n'.$linkUrl."\n\n*BACK* — cancel"
+                "*No email on file* for a login code.\n\n".
+                "You can enter your *4-digit wallet PIN* here, *or* tap the link in the *next message* to type your PIN on a secure page (safer).\n\n".
+                '*BACK* — cancel'
             );
+            $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
 
             return;
         }
@@ -157,8 +169,11 @@ class WhatsappWalletSecureTransferAuthService
             $this->client->sendText(
                 $instance,
                 $phone,
-                'We could not send email right now. Enter your *4-digit wallet PIN* here, or open this link to type your PIN privately:\n'.$linkUrl."\n\n*BACK* — cancel"
+                "We could not send email right now.\n\n".
+                "Enter your *4-digit wallet PIN* here, *or* tap the link in the *next message* to type your PIN on a secure page.\n\n".
+                '*BACK* — cancel'
             );
+            $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
 
             return;
         }

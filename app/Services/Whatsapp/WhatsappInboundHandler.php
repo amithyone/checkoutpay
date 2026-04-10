@@ -86,7 +86,7 @@ class WhatsappInboundHandler
                 'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
                 'INVOICE', 'INVOICES', 'PAY', 'PAYMENT',
                 'TOPUP', 'TOP UP', 'UPGRADE', 'TIER2', 'TIER 2',
-                '1', '2', '3', '4', '5',
+                '1', '2', '3', '4', '5', '6',
             ];
             if (! in_array($cmd, $resume, true)) {
                 $session->save();

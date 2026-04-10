@@ -4,6 +4,7 @@ namespace App\Services\Whatsapp;
 
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -24,6 +25,8 @@ class WhatsappWalletTopupNotifier
         float $amount,
         float $balanceAfter,
         string $senderPhoneE164,
+        ?string $senderWalletDisplayName = null,
+        ?Carbon $transferredAt = null,
     ): void {
         if ($amount <= 0) {
             return;
@@ -49,14 +52,33 @@ class WhatsappWalletTopupNotifier
 
         $amountStr = '₦'.number_format($amount, 2);
         $balStr = '₦'.number_format($balanceAfter, 2);
-        $tail = strlen($senderPhoneE164) >= 4 ? substr($senderPhoneE164, -4) : $senderPhoneE164;
+        $at = $transferredAt ?? now();
+        $when = $at->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
+            ' ('.(string) config('app.timezone').')';
+
+        $name = trim((string) $senderWalletDisplayName);
+        $fromWho = $name !== '' ? $name : 'Wallet sender';
+        $masked = $this->maskPhoneForNotify($senderPhoneE164);
 
         $text = "*Money received*\n\n".
-            "You got {$amountStr} in your WhatsApp wallet from a number ending *{$tail}*.\n".
+            "*From:* {$fromWho}\n".
+            "*Number:* {$masked}\n".
+            "*Amount:* {$amountStr}\n".
+            "*Time:* {$when}\n\n".
             "New balance: {$balStr}.\n\n".
             'Send *WALLET* to open your wallet or *MENU* for options.';
 
         $this->client->sendText($instance, $recipientWallet->phone_e164, $text);
+    }
+
+    private function maskPhoneForNotify(string $e164Digits): string
+    {
+        $d = preg_replace('/\D/', '', $e164Digits) ?? '';
+        if (strlen($d) < 9) {
+            return '••••';
+        }
+
+        return substr($d, 0, 5).' •••• '.substr($d, -4);
     }
 
     /**

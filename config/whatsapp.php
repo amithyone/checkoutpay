@@ -60,6 +60,8 @@ return [
         'bank_picker_page_size' => max(4, min(12, (int) env('WHATSAPP_WALLET_BANK_PICKER_PAGE_SIZE', 8))),
         /** Secure web link + cache TTL for confirming transfers (PIN on web or OTP in chat). */
         'transfer_confirm_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_TRANSFER_CONFIRM_TTL_MINUTES', 15))),
+        /** One-time web link TTL for *REGISTER* wallet PIN setup (defaults to transfer_confirm TTL if unset). */
+        'pin_setup_web_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_PIN_SETUP_WEB_TTL_MINUTES', 15))),
     ],
 
     'evolution' => [

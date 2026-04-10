@@ -31,6 +31,9 @@ class WhatsappWaWalletMenuHandler
 
     private const TRANSFER_OTP_LEN = 6;
 
+    /** WhatsApp history list: 6 lines per message; paginate with MORE/PREV. */
+    private const TX_HISTORY_PAGE_SIZE = 6;
+
     public function __construct(
         private EvolutionWhatsAppClient $client,
         private WhatsappWalletUpgradeFlowHandler $upgradeFlow,
@@ -41,6 +44,7 @@ class WhatsappWaWalletMenuHandler
         private WhatsappWalletTransferCompletionService $transferCompletion,
         private WhatsappWalletSecureTransferAuthService $secureTransferAuth,
         private WhatsappWalletVtuFlowHandler $vtuFlow,
+        private WhatsappWalletPinSetupWebService $pinSetupWeb,
     ) {}
 
     public function openMenu(WhatsappSession $session, string $instance, string $phone, ?Renter $renter): void
@@ -80,13 +84,14 @@ class WhatsappWaWalletMenuHandler
         }
 
         if (in_array($cmd, ['UPGRADE', 'TIER2', 'TIER 2'], true)) {
+            $this->forgetPinSetupWebTokenFromSession($session);
             $session->update(['chat_flow' => null, 'chat_context' => null]);
             $this->upgradeFlow->start($session->fresh(), $instance, $phone);
 
             return;
         }
 
-        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_'))) {
+        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history')) {
             $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
             return;
@@ -95,6 +100,11 @@ class WhatsappWaWalletMenuHandler
         if ($cmd === 'BACK') {
             if ($step === 'submenu') {
                 $this->exitToMain($session, $instance, $phone, $linkedRenter);
+
+                return;
+            }
+            if ($step === 'wallet_tx_history') {
+                $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
                 return;
             }
@@ -134,6 +144,7 @@ class WhatsappWaWalletMenuHandler
             'p2p_amount' => $this->handleP2pAmount($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_otp' => $this->handleP2pOtp($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_pin' => $this->handleP2pPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
+            'wallet_tx_history' => $this->handleWalletTransactionHistory($session, $instance, $phone, $cmd, $wallet),
             default => $this->recoverSubmenu($session, $instance, $phone, $wallet),
         };
     }
@@ -222,6 +233,7 @@ class WhatsappWaWalletMenuHandler
             "*3* — Tier 2 (*UPGRADE*): permanent bank account (KYC)\n".
             "*4* — Send to another *WhatsApp* number (P2P; they must open *WALLET* once)\n".
             $vtuLine.
+            "*6* — Transaction history (*6* per page; *MORE* / *PREV*)\n".
             "\n".
             "{$pinLine}\n\n".
             "Tier 1 cap: ₦{$t1max} balance & same daily send limit until upgraded.\n".
@@ -250,14 +262,27 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
+            $created = $this->pinSetupWeb->createAndStoreToken($session->fresh(), $instance, $phone, $wallet);
+            if (! ($created['ok'] ?? false) || ! isset($created['token']) || ! is_string($created['token'])) {
+                $this->client->sendText($instance, $phone, 'Could not start PIN setup. Try again or contact support.');
+
+                return;
+            }
+            $token = $created['token'];
             $session->update([
-                'chat_context' => ['step' => 'pin_new'],
+                'chat_context' => [
+                    'step' => 'pin_new',
+                    'pin_setup_web_token' => $token,
+                ],
             ]);
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Set wallet PIN*\n\nSend a *4-digit* PIN (numbers only).\n\n*BACK* — cancel"
+                "*Set wallet PIN*\n\n".
+                "Send a *4-digit* PIN here (numbers only), then confirm — *or* open the page in the *next message* to set your PIN privately.\n\n".
+                '*BACK* — cancel'
             );
+            $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
 
             return;
         }
@@ -358,8 +383,21 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($cmd === '3') {
+            $this->forgetPinSetupWebTokenFromSession($session);
             $session->update(['chat_flow' => null, 'chat_context' => null]);
             $this->upgradeFlow->start($session->fresh(), $instance, $phone);
+
+            return;
+        }
+
+        if ($cmd === '6' || $cmd === 'HISTORY' || $cmd === 'STATEMENT' || $cmd === 'TRANSACTIONS') {
+            $session->update([
+                'chat_context' => [
+                    'step' => 'wallet_tx_history',
+                    'wallet_tx_page' => 0,
+                ],
+            ]);
+            $this->sendWalletTransactionHistoryPage($session, $instance, $phone, $wallet->fresh(), 0);
 
             return;
         }
@@ -370,7 +408,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $range = $this->vtuFlow->isAvailable() ? '*1*–*5*' : '*1*–*4*';
+        $range = $this->vtuFlow->isAvailable() ? '*1*–*6*' : '*1*–*4*, *6*';
         $this->client->sendText(
             $instance,
             $phone,
@@ -454,12 +492,15 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $session->update([
-            'chat_context' => [
-                'step' => 'pin_confirm',
-                'pin_temp' => Hash::make($digits),
-            ],
-        ]);
+        $prev = $session->chat_context;
+        $nextCtx = [
+            'step' => 'pin_confirm',
+            'pin_temp' => Hash::make($digits),
+        ];
+        if (is_array($prev) && isset($prev['pin_setup_web_token']) && is_string($prev['pin_setup_web_token'])) {
+            $nextCtx['pin_setup_web_token'] = $prev['pin_setup_web_token'];
+        }
+        $session->update(['chat_context' => $nextCtx]);
         $this->client->sendText(
             $instance,
             $phone,
@@ -487,7 +528,11 @@ class WhatsappWaWalletMenuHandler
 
         $digits = preg_replace('/\D/', '', $text) ?? '';
         if (strlen($digits) !== self::PIN_LEN || ! Hash::check($digits, $hash)) {
-            $session->update(['chat_context' => ['step' => 'pin_new']]);
+            $retryCtx = ['step' => 'pin_new'];
+            if (isset($ctx['pin_setup_web_token']) && is_string($ctx['pin_setup_web_token'])) {
+                $retryCtx['pin_setup_web_token'] = $ctx['pin_setup_web_token'];
+            }
+            $session->update(['chat_context' => $retryCtx]);
             $this->client->sendText($instance, $phone, 'PINs did not match. Send a new *4-digit* PIN.');
 
             return;
@@ -498,6 +543,10 @@ class WhatsappWaWalletMenuHandler
         $wallet->pin_failed_attempts = 0;
         $wallet->pin_locked_until = null;
         $wallet->save();
+
+        if (isset($ctx['pin_setup_web_token']) && is_string($ctx['pin_setup_web_token'])) {
+            $this->pinSetupWeb->forgetToken($ctx['pin_setup_web_token']);
+        }
 
         $session->update(['chat_context' => ['step' => 'pin_sender_name']]);
         $this->client->sendText(
@@ -1313,12 +1362,144 @@ class WhatsappWaWalletMenuHandler
         return substr($d, 0, 5).' •••• '.substr($d, -4);
     }
 
+    private function handleWalletTransactionHistory(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $cmd,
+        WhatsappWallet $wallet,
+    ): void {
+        $ctx = $session->chat_context;
+        if (! is_array($ctx)) {
+            $ctx = [];
+        }
+        $page = (int) ($ctx['wallet_tx_page'] ?? 0);
+        $perPage = self::TX_HISTORY_PAGE_SIZE;
+        $total = WhatsappWalletTransaction::query()->where('whatsapp_wallet_id', $wallet->id)->count();
+        $lastPage = $total > 0 ? (int) max(0, (int) ceil($total / $perPage) - 1) : 0;
+
+        if (in_array($cmd, ['MORE', 'NEXT'], true)) {
+            $page = min($lastPage, $page + 1);
+        } elseif (in_array($cmd, ['PREV', 'PREVIOUS'], true)) {
+            $page = max(0, $page - 1);
+        } elseif ($cmd === '6' || $cmd === 'HISTORY' || $cmd === 'STATEMENT' || $cmd === 'TRANSACTIONS') {
+            $page = 0;
+        }
+
+        $session->update([
+            'chat_context' => [
+                'step' => 'wallet_tx_history',
+                'wallet_tx_page' => $page,
+            ],
+        ]);
+        $this->sendWalletTransactionHistoryPage($instance, $phone, $wallet->fresh(), $page);
+    }
+
+    private function sendWalletTransactionHistoryPage(
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        int $page,
+    ): void {
+        $perPage = self::TX_HISTORY_PAGE_SIZE;
+        $total = WhatsappWalletTransaction::query()->where('whatsapp_wallet_id', $wallet->id)->count();
+        $lastPage = $total > 0 ? (int) max(0, (int) ceil($total / $perPage) - 1) : 0;
+        $page = max(0, min($lastPage, $page));
+
+        $rows = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->orderByDesc('id')
+            ->skip($page * $perPage)
+            ->take($perPage)
+            ->get();
+
+        $lines = ["*Transaction history* (newest first)\n"];
+        $lines[] = 'Page '.($page + 1).' / '.($lastPage + 1).' · '.$total." total\n";
+
+        if ($rows->isEmpty()) {
+            $lines[] = "\nNo transactions yet.";
+        } else {
+            foreach ($rows as $t) {
+                $lines[] = $this->formatWalletTxHistoryLine($t);
+            }
+        }
+
+        $lines[] = '';
+        if ($page < $lastPage) {
+            $lines[] = '*MORE* — next page';
+        }
+        if ($page > 0) {
+            $lines[] = '*PREV* — previous page';
+        }
+        $lines[] = '*BACK* or *CANCEL* — wallet menu';
+
+        $this->client->sendText($instance, $phone, implode("\n", $lines));
+    }
+
+    private function formatWalletTxHistoryLine(WhatsappWalletTransaction $t): string
+    {
+        $amt = number_format((float) $t->amount, 2);
+        $balAfter = $t->balance_after !== null ? number_format((float) $t->balance_after, 2) : '—';
+        $when = $t->created_at instanceof Carbon
+            ? $t->created_at->timezone(config('app.timezone'))->format('M j, g:i A')
+            : '';
+
+        return match ($t->type) {
+            WhatsappWalletTransaction::TYPE_TOPUP => "• Top-up *+₦{$amt}* · bal ₦{$balAfter} · {$when}",
+            WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT => $this->formatBankOutHistoryLine($t, $amt, $when),
+            WhatsappWalletTransaction::TYPE_P2P_DEBIT => '• WhatsApp send → '.$this->maskPhoneForDisplay((string) $t->counterparty_phone_e164)." · *₦{$amt}* · {$when}",
+            WhatsappWalletTransaction::TYPE_P2P_CREDIT => '• WhatsApp receive ← '.$this->maskPhoneForDisplay((string) $t->counterparty_phone_e164)." · *+₦{$amt}* · {$when}",
+            WhatsappWalletTransaction::TYPE_VTU_AIRTIME => $this->formatVtuHistoryLine('Airtime', $t, $amt, $when),
+            WhatsappWalletTransaction::TYPE_VTU_DATA => $this->formatVtuHistoryLine('Data', $t, $amt, $when),
+            WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY => $this->formatVtuHistoryLine('Electricity', $t, $amt, $when),
+            WhatsappWalletTransaction::TYPE_ADJUSTMENT => "• Adjustment *₦{$amt}* · bal ₦{$balAfter} · {$when}",
+            default => "• {$t->type} · *₦{$amt}* · {$when}",
+        };
+    }
+
+    private function formatBankOutHistoryLine(WhatsappWalletTransaction $t, string $amt, string $when): string
+    {
+        $name = trim((string) $t->counterparty_account_name);
+        if ($name === '') {
+            $name = 'Beneficiary';
+        }
+        $acct = (string) $t->counterparty_account_number;
+        $tail = strlen($acct) >= 4 ? '****'.substr($acct, -4) : $acct;
+        $meta = is_array($t->meta) ? $t->meta : [];
+        $bn = trim((string) ($meta['bank_name'] ?? ''));
+        if ($bn === '' && $t->counterparty_bank_code) {
+            $bn = (string) (Bank::query()->where('code', $t->counterparty_bank_code)->value('name') ?? '');
+        }
+        $bankBit = $bn !== '' ? $bn.' · ' : '';
+
+        return "• Bank → *{$name}* · {$bankBit}{$tail} · *₦{$amt}* · {$when}";
+    }
+
+    private function formatVtuHistoryLine(string $label, WhatsappWalletTransaction $t, string $amt, string $when): string
+    {
+        $meta = is_array($t->meta) ? $t->meta : [];
+        $extra = trim((string) ($meta['network_id'] ?? $meta['service_id'] ?? ''));
+
+        return $extra !== ''
+            ? "• {$label} ({$extra}) · *₦{$amt}* · {$when}"
+            : "• {$label} · *₦{$amt}* · {$when}";
+    }
+
+    private function forgetPinSetupWebTokenFromSession(WhatsappSession $session): void
+    {
+        $ctx = $session->chat_context;
+        if (is_array($ctx) && isset($ctx['pin_setup_web_token']) && is_string($ctx['pin_setup_web_token'])) {
+            $this->pinSetupWeb->forgetToken($ctx['pin_setup_web_token']);
+        }
+    }
+
     private function recoverSubmenu(WhatsappSession $session, string $instance, string $phone, WhatsappWallet $wallet): void
     {
         $ctx = $session->chat_context;
         if (is_array($ctx) && isset($ctx['wallet_transfer_confirm_token']) && is_string($ctx['wallet_transfer_confirm_token'])) {
             $this->secureTransferAuth->forgetConfirmTokenIfPresent($ctx['wallet_transfer_confirm_token']);
         }
+        $this->forgetPinSetupWebTokenFromSession($session);
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $this->sendSubmenu($instance, $phone, $wallet->fresh());
     }
@@ -1333,6 +1514,7 @@ class WhatsappWaWalletMenuHandler
         if (is_array($ctx) && isset($ctx['wallet_transfer_confirm_token']) && is_string($ctx['wallet_transfer_confirm_token'])) {
             $this->secureTransferAuth->forgetConfirmTokenIfPresent($ctx['wallet_transfer_confirm_token']);
         }
+        $this->forgetPinSetupWebTokenFromSession($session);
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
         $this->sendSubmenu($instance, $phone, $wallet);
@@ -1344,6 +1526,7 @@ class WhatsappWaWalletMenuHandler
         string $phone,
         ?Renter $linkedRenter
     ): void {
+        $this->forgetPinSetupWebTokenFromSession($session);
         $session->update(['chat_flow' => null, 'chat_context' => null]);
         if ($linkedRenter !== null && $linkedRenter->is_active) {
             app(WhatsappLinkedMenuHandler::class)->sendRootForRenter($linkedRenter->fresh(), $instance, $phone);

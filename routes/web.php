@@ -31,6 +31,13 @@ Route::post('/wallet/whatsapp/confirm/{token}', [\App\Http\Controllers\WhatsappW
     ->middleware('throttle:30,1')
     ->name('wallet.whatsapp.transfer-confirm.submit');
 
+Route::get('/wallet/whatsapp/set-pin/{token}', [\App\Http\Controllers\WhatsappWalletPinSetupController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('wallet.whatsapp.pin-setup.show');
+Route::post('/wallet/whatsapp/set-pin/{token}', [\App\Http\Controllers\WhatsappWalletPinSetupController::class, 'submit'])
+    ->middleware('throttle:20,1')
+    ->name('wallet.whatsapp.pin-setup.submit');
+
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
