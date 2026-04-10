@@ -110,8 +110,7 @@ class WhatsappLinkedMenuHandler
             "*4* — *FUND* — add money to *rentals* wallet\n".
             "*5* — *WITHDRAW* — business payouts info\n\n".
             "Reply with a *number* or the *keyword*.\n\n".
-            "*MENU* — this screen\n".
-            "*RESTART* — back to main categories\n\n".
+            WhatsappMenuInputNormalizer::navigationHelpFooter()."\n\n".
             "Full rentals site: {$rentals}\n\n".
             '*STOP* — pause bot  *START* / *MENU* — resume';
     }
@@ -175,7 +174,7 @@ class WhatsappLinkedMenuHandler
             return;
         }
 
-        if (in_array($cmd, ['MENU', 'HELP', 'HI', 'HELLO', 'START', '0'], true)) {
+        if (in_array($cmd, ['MENU', 'HELP', 'HI', 'HELLO', 'START', 'BACK'], true)) {
             $this->client->sendText(
                 $instance,
                 $phone,

@@ -9,7 +9,7 @@ use App\Services\VtuNg\VtuNgApiClient;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * WhatsApp wallet → VTU.ng (airtime, data, electricity). Debits wallet; refunds on API failure.
+ * WhatsApp wallet airtime, data, and electricity. Debits wallet; refunds on provider failure.
  */
 class WhatsappWalletVtuFlowHandler
 {
@@ -38,7 +38,7 @@ class WhatsappWalletVtuFlowHandler
     public function start(WhatsappSession $session, string $instance, string $phone, ?Renter $linkedRenter): void
     {
         if (! $this->isAvailable()) {
-            $this->client->sendText($instance, $phone, 'VTU (airtime / data / electricity) is not available right now.');
+            $this->client->sendText($instance, $phone, 'Airtime, data, and electricity payments are not available right now.');
 
             return;
         }
@@ -191,11 +191,12 @@ class WhatsappWalletVtuFlowHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "*VTU (airtime, data, electricity)*\n\n".
+            "*Airtime, data & electricity*\n\n".
             "*1* — Airtime\n".
             "*2* — Data bundle\n".
             "*3* — Electricity bill\n\n".
-            '*BACK* — return to wallet  *CANCEL* — wallet  *MENU* — main services'
+            WhatsappMenuInputNormalizer::navigationHelpFooter()."\n".
+            '*CANCEL* — wallet (abandon this bill payment)'
         );
     }
 
@@ -234,7 +235,7 @@ class WhatsappWalletVtuFlowHandler
     ): void {
         $net = $this->resolveNetworkFromCmd($cmd);
         if ($net === null) {
-            $this->client->sendText($instance, $phone, 'Pick *1*–*4* for the network. *BACK* — VTU menu.');
+            $this->client->sendText($instance, $phone, 'Pick *1*–*4* for the network. *BACK* — previous menu.');
 
             return;
         }
@@ -374,7 +375,7 @@ class WhatsappWalletVtuFlowHandler
     ): void {
         $net = $this->resolveNetworkFromCmd($cmd);
         if ($net === null) {
-            $this->client->sendText($instance, $phone, 'Pick *1*–*4* for the network. *BACK* — VTU menu.');
+            $this->client->sendText($instance, $phone, 'Pick *1*–*4* for the network. *BACK* — previous menu.');
 
             return;
         }
@@ -384,7 +385,7 @@ class WhatsappWalletVtuFlowHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Could not load data plans: '.($plansRes['message'] ?? 'Error')."\n\n*BACK* — VTU menu."
+                'Could not load data plans: '.($plansRes['message'] ?? 'Error')."\n\n*BACK* — previous menu."
             );
             $session->update(['chat_context' => ['step' => 'vtu_menu']]);
 
@@ -393,7 +394,7 @@ class WhatsappWalletVtuFlowHandler
         $plans = $plansRes['plans'] ?? [];
         $available = array_values(array_filter($plans, fn ($p) => ($p['available'] ?? false) === true));
         if ($available === []) {
-            $this->client->sendText($instance, $phone, 'No available data plans for that network right now. *BACK* — VTU menu.');
+            $this->client->sendText($instance, $phone, 'No available data plans for that network right now. *BACK* — previous menu.');
             $session->update(['chat_context' => ['step' => 'vtu_menu']]);
 
             return;
@@ -418,7 +419,7 @@ class WhatsappWalletVtuFlowHandler
     ): void {
         $plans = $ctx['vtu_plans'] ?? [];
         if (! is_array($plans) || $plans === []) {
-            $this->client->sendText($instance, $phone, 'No plans loaded. *BACK* — VTU menu.');
+            $this->client->sendText($instance, $phone, 'No plans loaded. *BACK* — previous menu.');
 
             return;
         }
@@ -616,7 +617,7 @@ class WhatsappWalletVtuFlowHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Pick a disco number from the list (*1*–*'.count($discos).'*.). *BACK* — VTU menu.'
+                'Pick a disco number from the list (*1*–*'.count($discos).'*.). *BACK* — previous menu.'
             );
 
             return;
@@ -900,7 +901,7 @@ class WhatsappWalletVtuFlowHandler
                 $i++;
             }
         }
-        $lines[] = "\n*BACK* — VTU menu";
+        $lines[] = "\n*BACK* — previous menu";
         $this->client->sendText($instance, $phone, implode("\n", $lines));
     }
 
@@ -918,7 +919,7 @@ class WhatsappWalletVtuFlowHandler
                 $i++;
             }
         }
-        $lines[] = "\n*BACK* — VTU menu";
+        $lines[] = "\n*BACK* — previous menu";
         $this->client->sendText($instance, $phone, implode("\n", $lines));
     }
 

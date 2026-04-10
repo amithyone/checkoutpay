@@ -57,7 +57,7 @@ class WhatsappCheckoutServicesMenuHandler
 
     private function isRootMenuCommand(string $cmd): bool
     {
-        return in_array($cmd, ['MENU', 'START', 'SERVICES', '0', 'HI', 'HELLO', 'HELP', 'HOME'], true);
+        return in_array($cmd, ['MENU', 'START', 'SERVICES', 'HI', 'HELLO', 'HELP', 'HOME', 'BACK'], true);
     }
 
     public function rootMenuBody(): string
@@ -73,8 +73,9 @@ class WhatsappCheckoutServicesMenuHandler
             "*4* — *INVOICE* — pay / view invoices (login)\n\n".
             "You can reply with the *number* or the *keyword*.\n\n".
             "Link your *rentals* account: send your *email* here.\n\n".
-            "*RESTART* — back to this menu anytime\n".
-            "*STOP* — pause auto-replies  *START* / *MENU* — resume\n\n".
+            WhatsappMenuInputNormalizer::navigationHelpFooter()."\n".
+            "*RESTART* / *000* — back to this menu anytime\n".
+            "*STOP* — pause auto-replies  *START* / *MENU* / *00* — resume\n\n".
             "Rentals site: {$rentals}\n".
             "Business portal: {$biz}";
     }

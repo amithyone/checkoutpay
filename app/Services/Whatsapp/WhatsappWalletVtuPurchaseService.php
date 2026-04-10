@@ -41,7 +41,7 @@ class WhatsappWalletVtuPurchaseService
 
         $api = $this->vtu->purchaseAirtime($networkId, $phone11, $amount);
         if (! $api['ok']) {
-            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'VTU.ng error'));
+            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 
             return ['ok' => false, 'message' => (string) ($api['message'] ?? 'Purchase failed.')];
         }
@@ -93,7 +93,7 @@ class WhatsappWalletVtuPurchaseService
 
         $api = $this->vtu->purchaseData($networkId, $phone11, $variationId);
         if (! $api['ok']) {
-            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'VTU.ng error'));
+            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 
             return ['ok' => false, 'message' => (string) ($api['message'] ?? 'Purchase failed.')];
         }
@@ -144,7 +144,7 @@ class WhatsappWalletVtuPurchaseService
 
         $api = $this->vtu->purchaseElectricity($serviceId, $meterNumber, $phone11, $amount, $variationId);
         if (! $api['ok']) {
-            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'VTU.ng error'));
+            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 
             return ['ok' => false, 'message' => (string) ($api['message'] ?? 'Purchase failed.')];
         }

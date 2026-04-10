@@ -67,7 +67,7 @@ class WhatsappWalletTransferCompletionService
             : "Bank sends are recorded on your balance; connect *{$brand}* for live payouts.";
 
         $vtuLine = $this->vtuApi->isConfigured()
-            ? "*5* — Airtime / Data / Electricity (VTU.ng)\n"
+            ? "*5* — Airtime / Data / Electricity\n"
             : '';
 
         $this->client->sendText(
@@ -87,7 +87,7 @@ class WhatsappWalletTransferCompletionService
             "Tier 1 cap: ₦{$t1max} balance & same daily send limit until upgraded.\n".
             $tier1VaNote.
             "{$bankNote}\n\n".
-            '*BACK* or *MENU* — leave wallet  *STOP* — pause bot'
+            WhatsappMenuInputNormalizer::navigationHelpFooter().'  *STOP* — pause bot'
         );
     }
 

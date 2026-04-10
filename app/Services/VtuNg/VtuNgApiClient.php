@@ -24,7 +24,7 @@ class VtuNgApiClient
     public function getBalance(): array
     {
         if (! $this->isConfigured()) {
-            return ['ok' => false, 'message' => 'VTU.ng is not configured.'];
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
         }
 
         $response = Http::timeout((int) config('vtu.timeout', 60))
@@ -40,7 +40,7 @@ class VtuNgApiClient
     public function purchaseAirtime(string $networkId, string $phone11, float $amount): array
     {
         if (! $this->isConfigured()) {
-            return ['ok' => false, 'message' => 'VTU.ng is not configured.'];
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
         }
 
         $response = Http::timeout((int) config('vtu.timeout', 60))
@@ -109,7 +109,7 @@ class VtuNgApiClient
     public function purchaseData(string $networkId, string $phone11, int $variationId): array
     {
         if (! $this->isConfigured()) {
-            return ['ok' => false, 'message' => 'VTU.ng is not configured.'];
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
         }
 
         $response = Http::timeout((int) config('vtu.timeout', 60))
@@ -130,7 +130,7 @@ class VtuNgApiClient
     public function verifyElectricityCustomer(string $serviceId, string $meterNumber, string $variationId): array
     {
         if (! $this->isConfigured()) {
-            return ['ok' => false, 'message' => 'VTU.ng is not configured.'];
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
         }
 
         $response = Http::timeout((int) config('vtu.timeout', 60))
@@ -156,7 +156,7 @@ class VtuNgApiClient
         string $variationId
     ): array {
         if (! $this->isConfigured()) {
-            return ['ok' => false, 'message' => 'VTU.ng is not configured.'];
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
         }
 
         $response = Http::timeout((int) config('vtu.timeout', 60))
@@ -211,7 +211,7 @@ class VtuNgApiClient
         if (! is_array($json)) {
             Log::warning('vtu.ng.non_json', ['status' => $response->status(), 'body' => substr($body, 0, 500)]);
 
-            return ['ok' => false, 'message' => 'Invalid response from VTU.ng.', 'raw' => $body];
+            return ['ok' => false, 'message' => 'Invalid response from bill provider.', 'raw' => $body];
         }
 
         $code = strtolower((string) ($json['code'] ?? ''));

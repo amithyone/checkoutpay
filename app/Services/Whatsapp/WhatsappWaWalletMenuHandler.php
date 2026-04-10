@@ -119,7 +119,7 @@ class WhatsappWaWalletMenuHandler
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
 
         match ($step) {
-            'submenu' => $this->handleSubmenu($session, $instance, $phone, $text, $cmd, $wallet),
+            'submenu' => $this->handleSubmenu($session, $instance, $phone, $text, $cmd, $wallet, $linkedRenter),
             'pin_new' => $this->handlePinNew($session, $instance, $phone, $text, $wallet),
             'pin_confirm' => $this->handlePinConfirm($session, $instance, $phone, $text, $ctx, $wallet),
             'pin_sender_name' => $this->handlePinSenderName($session, $instance, $phone, $text, $wallet, $linkedRenter),
@@ -154,7 +154,7 @@ class WhatsappWaWalletMenuHandler
             }
         }
 
-        return strtoupper($t);
+        return WhatsappMenuInputNormalizer::mapNavigationShortcuts(strtoupper($t));
     }
 
     private function waBrand(): string
@@ -207,7 +207,7 @@ class WhatsappWaWalletMenuHandler
             : "Bank sends are recorded on your balance; connect *{$brand}* for live payouts.";
 
         $vtuLine = $this->vtuFlow->isAvailable()
-            ? "*5* — Airtime / Data / Electricity (VTU.ng)\n"
+            ? "*5* — Airtime / Data / Electricity\n"
             : '';
 
         $this->client->sendText(
@@ -227,7 +227,7 @@ class WhatsappWaWalletMenuHandler
             "Tier 1 cap: ₦{$t1max} balance & same daily send limit until upgraded.\n".
             $tier1VaNote.
             "{$bankNote}\n\n".
-            '*BACK* or *MENU* — leave wallet  *STOP* — pause bot'
+            WhatsappMenuInputNormalizer::navigationHelpFooter()."  *STOP* — pause bot"
         );
     }
 
@@ -237,7 +237,8 @@ class WhatsappWaWalletMenuHandler
         string $phone,
         string $text,
         string $cmd,
-        WhatsappWallet $wallet
+        WhatsappWallet $wallet,
+        ?Renter $linkedRenter
     ): void {
         if (in_array($cmd, ['REGISTER', 'PIN'], true)) {
             if ($wallet->hasPin()) {
@@ -310,7 +311,7 @@ class WhatsappWaWalletMenuHandler
 
         if ($cmd === '5' || $cmd === 'VTU') {
             if (! $this->vtuFlow->isAvailable()) {
-                $this->client->sendText($instance, $phone, 'VTU purchases are not available (not configured).');
+                $this->client->sendText($instance, $phone, 'Airtime, data, and electricity payments are not available right now.');
 
                 return;
             }

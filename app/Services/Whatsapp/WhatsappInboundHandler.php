@@ -72,7 +72,7 @@ class WhatsappInboundHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Paused*\n\nAutomated replies are off.\nSend *START* or *MENU* when you want them again.\nAfter you resume, *RESTART* takes you back to the main categories."
+                "*Paused*\n\nAutomated replies are off.\nSend *START*, *MENU*, or *00* when you want them again.\nAfter you resume, *RESTART* or *000* takes you back to the main categories."
             );
 
             return;
@@ -80,8 +80,8 @@ class WhatsappInboundHandler
 
         if ((bool) ($session->bot_paused ?? false)) {
             $resume = [
-                'START', 'MENU', 'SERVICES', '0', 'HI', 'HELLO', 'HELP', 'HOME',
-                'RESTART', 'MAIN',
+                'START', 'MENU', 'SERVICES', 'HI', 'HELLO', 'HELP', 'HOME',
+                'BACK', 'RESTART', 'MAIN',
                 'RENTALS', 'BROWSE', 'SHOP', 'CATALOG',
                 'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
                 'INVOICE', 'INVOICES', 'PAY', 'PAYMENT',
@@ -215,8 +215,8 @@ class WhatsappInboundHandler
         $cmd = WhatsappMenuInputNormalizer::commandToken($text);
 
         return in_array($cmd, [
-            'MENU', 'START', 'SERVICES', '0', 'HI', 'HELLO', 'HELP', 'HOME',
-            'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
+            'MENU', 'START', 'SERVICES', 'HI', 'HELLO', 'HELP', 'HOME',
+            'BACK', 'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
             'INVOICE', 'INVOICES', 'PAY', 'PAYMENT',
             'TOPUP', 'TOP UP',
             '2', '3', '4',
