@@ -397,7 +397,7 @@ class WhatsappWaWalletMenuHandler
                     'wallet_tx_page' => 0,
                 ],
             ]);
-            $this->sendWalletTransactionHistoryPage($session, $instance, $phone, $wallet->fresh(), 0);
+            $this->sendWalletTransactionHistoryPage($instance, $phone, $wallet->fresh(), 0);
 
             return;
         }
