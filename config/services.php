@@ -56,6 +56,10 @@ return [
         'base_url' => env('MEVONRUBIES_BASE_URL', ''),
         'secret_key' => env('MEVONRUBIES_SECRET_KEY', ''),
         'timeout_seconds' => (int) env('MEVONRUBIES_TIMEOUT_SECONDS', 20),
+        /** POST path for initiate / complete / resendOtp (Tier 2 permanent VA). */
+        'create_path' => env('MEVONRUBIES_CREATE_PATH', '/V1/createrubies'),
+        /** Used only for server-side createRenterAccount when gender is not stored on the renter. */
+        'default_gender' => env('MEVONRUBIES_DEFAULT_GENDER', 'male'),
     ],
 
     /*

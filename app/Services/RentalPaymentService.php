@@ -19,7 +19,7 @@ class RentalPaymentService
      *
      * Renter pays via the payment page. When external rentals are enabled for the business,
      * we generate:
-     * - external: via /V1/mevonrubies (unique VA per payment request)
+     * - external: via Mevon Rubies /V1/createrubies (renter VA; may require OTP on WhatsApp Tier 2)
      * - internal: via the existing internal matching flow (account pool)
      *
      * Rental is considered paid when either payment is approved.

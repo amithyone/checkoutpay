@@ -8,7 +8,8 @@ use App\Services\MevonRubiesVirtualAccountService;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Tier 2: collect KYC (fname, lname, dob, bvn, email), confirm WhatsApp number, call Mevon Rubies create.
+ * Tier 2: collect KYC (fname, lname, dob, gender, bvn, email), confirm WhatsApp number,
+ * then Mevon Rubies POST /V1/createrubies: initiate → OTP (if required) → complete.
  */
 class WhatsappWalletUpgradeFlowHandler
 {
@@ -63,7 +64,7 @@ class WhatsappWalletUpgradeFlowHandler
             "*Tier 2 — full KYC*\n\n".
             'You will get a *permanent* bank account for top-ups via *'.$this->waBrand()."*.\n".
             "Your *WhatsApp number* must match the number we send to the bank.\n\n".
-            "Send your *first name* (as on BVN).\n\n".
+            "Send your *first name* (as on your BVN).\n\n".
             '*CANCEL* — exit'
         );
     }
@@ -88,9 +89,11 @@ class WhatsappWalletUpgradeFlowHandler
             'fname' => $this->stepFname($session, $instance, $phone, $text, $ctx),
             'lname' => $this->stepLname($session, $instance, $phone, $text, $ctx),
             'dob' => $this->stepDob($session, $instance, $phone, $text, $ctx),
+            'gender' => $this->stepGender($session, $instance, $phone, $text, $ctx),
             'bvn' => $this->stepBvn($session, $instance, $phone, $text, $ctx),
             'email' => $this->stepEmail($session, $instance, $phone, $text, $ctx),
             'confirm_phone' => $this->stepConfirmPhone($session, $instance, $phone, $text, $ctx, $cmd),
+            'rubies_otp' => $this->stepRubiesOtp($session, $instance, $phone, $text, $ctx, $cmd),
             default => $this->recover($session, $instance, $phone),
         };
     }
@@ -152,6 +155,40 @@ class WhatsappWalletUpgradeFlowHandler
         }
 
         $ctx['dob'] = $d->format('Y-m-d');
+        $ctx['step'] = 'gender';
+        $session->update(['chat_context' => $ctx]);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            'Send *M* for *male* or *F* for *female* (as on your BVN).'
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    private function stepGender(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        array $ctx
+    ): void {
+        $t = strtoupper(trim($text));
+        $gender = null;
+        if (in_array($t, ['M', 'MALE'], true)) {
+            $gender = 'male';
+        }
+        if (in_array($t, ['F', 'FEMALE'], true)) {
+            $gender = 'female';
+        }
+        if ($gender === null) {
+            $this->client->sendText($instance, $phone, 'Reply *M* for male or *F* for female.');
+
+            return;
+        }
+
+        $ctx['gender'] = $gender;
         $ctx['step'] = 'bvn';
         $session->update(['chat_context' => $ctx]);
         $this->client->sendText($instance, $phone, 'Send your *11-digit BVN* (numbers only).');
@@ -236,41 +273,46 @@ class WhatsappWalletUpgradeFlowHandler
         );
 
         try {
-            $result = $this->mevonRubies->createRubiesAccount([
-                'action' => 'create',
-                'fname' => (string) ($ctx['fname'] ?? ''),
-                'lname' => (string) ($ctx['lname'] ?? ''),
-                'phone' => $apiPhone,
-                'dob' => (string) ($ctx['dob'] ?? ''),
-                'bvn' => (string) ($ctx['bvn'] ?? ''),
-                'email' => (string) ($ctx['email'] ?? ''),
-            ]);
+            $init = $this->mevonRubies->initiateRubiesAccount(
+                (string) ($ctx['fname'] ?? ''),
+                (string) ($ctx['lname'] ?? ''),
+                (string) ($ctx['gender'] ?? 'male'),
+                $apiPhone,
+                (string) ($ctx['bvn'] ?? ''),
+            );
 
-            $wallet->update([
-                'tier' => WhatsappWallet::TIER_RUBIES_VA,
-                'kyc_fname' => (string) ($ctx['fname'] ?? ''),
-                'kyc_lname' => (string) ($ctx['lname'] ?? ''),
-                'kyc_dob' => (string) ($ctx['dob'] ?? ''),
-                'kyc_bvn' => (string) ($ctx['bvn'] ?? ''),
-                'kyc_email' => (string) ($ctx['email'] ?? ''),
-                'kyc_verified_at' => now(),
-                'mevon_virtual_account_number' => $result['account_number'],
-                'mevon_bank_name' => $result['bank_name'],
-                'mevon_bank_code' => $result['bank_code'],
-                'mevon_reference' => $result['reference'] ?? null,
-                'tier2_provisioned_at' => now(),
-            ]);
+            if ($init['account_number'] !== '') {
+                $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $init);
 
-            $session->update(['chat_flow' => null, 'chat_context' => null]);
+                return;
+            }
+
+            if ($init['reference'] === '') {
+                Log::warning('WhatsApp wallet Tier 2 Rubies initiate missing reference', [
+                    'phone' => $phone,
+                    'raw' => $init['raw'] ?? [],
+                ]);
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'We could not start bank verification. Try *UPGRADE* again later or contact support.'
+                );
+                $session->update(['chat_flow' => null, 'chat_context' => null]);
+
+                return;
+            }
+
+            $ctx['rubies_pending_reference'] = $init['reference'];
+            $ctx['step'] = 'rubies_otp';
+            $session->update(['chat_context' => $ctx]);
 
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Tier 2 active*\n\n".
-                'Account: *'.$result['account_number']."*\n".
-                'Bank: *'.($result['bank_name'] ?: 'RUBIES MFB')."*\n".
-                'Name: *'.($result['account_name'] ?: '')."* \n\n".
-                'Use this account to top up your WhatsApp wallet. *MENU* for more.'
+                "*OTP sent*\n\n".
+                "Check the phone number linked to your *BVN* for a code from the bank.\n\n".
+                'Send the *OTP* here (usually *6 digits*).\n\n'.
+                '*RESEND* — request another code if it expired.'
             );
         } catch (\Throwable $e) {
             Log::warning('WhatsApp wallet Tier 2 Mevon Rubies failed', [
@@ -284,6 +326,129 @@ class WhatsappWalletUpgradeFlowHandler
             );
             $session->update(['chat_flow' => null, 'chat_context' => null]);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     * @param  array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array}  $va
+     */
+    private function stepRubiesOtp(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        array $ctx,
+        string $cmd
+    ): void {
+        $ref = isset($ctx['rubies_pending_reference']) && is_string($ctx['rubies_pending_reference'])
+            ? trim($ctx['rubies_pending_reference'])
+            : '';
+        if ($ref === '') {
+            $this->recover($session, $instance, $phone);
+
+            return;
+        }
+
+        if (str_starts_with($cmd, 'RESEND')) {
+            try {
+                $this->mevonRubies->resendRubiesOtp($ref);
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'If your number matches your BVN, a new OTP should arrive shortly. Send the code here when you receive it.'
+                );
+            } catch (\Throwable $e) {
+                Log::warning('WhatsApp wallet Tier 2 Rubies resendOtp failed', [
+                    'phone' => $phone,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Could not resend the OTP right now. Try *RESEND* again in a minute or *CANCEL* and start *UPGRADE* over.'
+                );
+            }
+
+            return;
+        }
+
+        $digits = preg_replace('/\D+/', '', $text) ?? '';
+        if (strlen($digits) < 4 || strlen($digits) > 8) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Send the *OTP* from the bank (numbers only), or *RESEND* for a new code.'
+            );
+
+            return;
+        }
+
+        $wallet = WhatsappWallet::query()->firstOrCreate(
+            ['phone_e164' => $phone],
+            [
+                'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+                'balance' => 0,
+                'status' => WhatsappWallet::STATUS_ACTIVE,
+            ]
+        );
+
+        try {
+            $result = $this->mevonRubies->completeRubiesAccount($ref, $digits);
+            $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $result);
+        } catch (\Throwable $e) {
+            Log::warning('WhatsApp wallet Tier 2 Rubies complete failed', [
+                'phone' => $phone,
+                'error' => $e->getMessage(),
+            ]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'That code did not work. Check the OTP and try again, or send *RESEND* for a new one.'
+            );
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     * @param  array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array}  $va
+     */
+    private function finalizeTier2Success(
+        WhatsappSession $session,
+        WhatsappWallet $wallet,
+        string $instance,
+        string $phone,
+        array $ctx,
+        array $va
+    ): void {
+        $wallet->update([
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'kyc_fname' => (string) ($ctx['fname'] ?? ''),
+            'kyc_lname' => (string) ($ctx['lname'] ?? ''),
+            'kyc_gender' => (string) ($ctx['gender'] ?? ''),
+            'kyc_dob' => (string) ($ctx['dob'] ?? ''),
+            'kyc_bvn' => (string) ($ctx['bvn'] ?? ''),
+            'kyc_email' => (string) ($ctx['email'] ?? ''),
+            'kyc_verified_at' => now(),
+            'mevon_virtual_account_number' => $va['account_number'],
+            'mevon_bank_name' => $va['bank_name'],
+            'mevon_bank_code' => $va['bank_code'],
+            'mevon_reference' => $va['reference'] !== ''
+                ? $va['reference']
+                : (is_string($ctx['rubies_pending_reference'] ?? null) ? $ctx['rubies_pending_reference'] : $wallet->mevon_reference),
+            'tier2_provisioned_at' => now(),
+        ]);
+
+        $session->update(['chat_flow' => null, 'chat_context' => null]);
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Tier 2 active*\n\n".
+            'Account: *'.$va['account_number']."*\n".
+            'Bank: *'.($va['bank_name'] ?: 'RUBIES MFB')."*\n".
+            'Name: *'.($va['account_name'] ?: '')."* \n\n".
+            'Use this account to top up your WhatsApp wallet. *MENU* for more.'
+        );
     }
 
     private function waBrand(): string

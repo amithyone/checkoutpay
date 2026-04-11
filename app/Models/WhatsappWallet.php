@@ -37,6 +37,7 @@ class WhatsappWallet extends Model
         'tier2_provisioned_at',
         'kyc_fname',
         'kyc_lname',
+        'kyc_gender',
         'kyc_dob',
         'kyc_bvn',
         'kyc_email',

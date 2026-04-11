@@ -102,7 +102,7 @@ class RenterKycController extends Controller
 
                 return redirect()->back()->with(
                     'success',
-                    'Renter ID approved, but Rubies account was not created automatically yet.'
+                    'Renter ID approved. Rubies VA was not created automatically (invalid details, or an OTP is required on the renter’s phone — they can complete Tier 2 on WhatsApp from that number).'
                 );
             }
         }
