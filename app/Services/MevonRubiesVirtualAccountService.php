@@ -30,18 +30,15 @@ class MevonRubiesVirtualAccountService
         return $this->baseUrl !== '' && $this->secretKey !== '';
     }
 
+    /**
+     * Same style as {@see MavonPayTransferService}: send the configured secret as the raw
+     * Authorization header value (no automatic "Bearer " prefix). Mevon createrubies appears
+     * to accept the same token format as createtransfer. If your key must include a prefix,
+     * put the full value in MEVONRUBIES_SECRET_KEY or MEVONPAY_SECRET_KEY.
+     */
     protected function authorizationHeaderValue(): string
     {
-        $key = trim($this->secretKey);
-        if ($key === '') {
-            return '';
-        }
-
-        if (stripos($key, 'bearer ') === 0) {
-            return $key;
-        }
-
-        return 'Bearer '.$key;
+        return trim($this->secretKey);
     }
 
     protected function createrubiesUrl(): string
