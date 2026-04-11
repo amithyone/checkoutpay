@@ -83,7 +83,7 @@ class WhatsappWalletBankPayoutService
         }
         $row = $all[$globalIndex1based - 1];
 
-        return ['code' => (string) $row['code'], 'name' => (string) $row['label']];
+        return $this->resolvedBankPair((string) $row['code'], (string) $row['label']);
     }
 
     public function transferBankPickerMessage(int $page): string
@@ -154,7 +154,14 @@ class WhatsappWalletBankPayoutService
             foreach ($candidates as $code) {
                 $bank = Bank::query()->where('code', $code)->first();
                 if ($bank) {
-                    return ['code' => (string) $bank->code, 'name' => (string) $bank->name];
+                    return $this->resolvedBankPair((string) $bank->code, (string) $bank->name);
+                }
+            }
+            $nipTry = NigerianBankCodeNormalizer::toNipTransferCode($digits);
+            if ($nipTry !== '') {
+                $bank = Bank::query()->where('code', $nipTry)->first();
+                if ($bank) {
+                    return $this->resolvedBankPair((string) $bank->code, (string) $bank->name);
                 }
             }
         }
@@ -176,13 +183,13 @@ class WhatsappWalletBankPayoutService
                 }
             }
             if ($bestRow !== null && $bestScore >= self::QUICK_BANK_MIN_SCORE) {
-                return ['code' => (string) $bestRow['code'], 'name' => (string) $bestRow['label']];
+                return $this->resolvedBankPair((string) $bestRow['code'], (string) $bestRow['label']);
             }
         }
 
         $bank = Bank::query()->whereRaw('LOWER(name) = LOWER(?)', [$t])->first();
         if ($bank) {
-            return ['code' => (string) $bank->code, 'name' => (string) $bank->name];
+            return $this->resolvedBankPair((string) $bank->code, (string) $bank->name);
         }
 
         $tokens = array_values(array_filter(
@@ -207,13 +214,24 @@ class WhatsappWalletBankPayoutService
                 }
             }
             if ($best !== null && $bestScore >= self::QUICK_BANK_MIN_SCORE) {
-                return ['code' => (string) $best->code, 'name' => (string) $best->name];
+                return $this->resolvedBankPair((string) $best->code, (string) $best->name);
             }
         }
 
         $like = Bank::query()->where('name', 'like', '%'.$t.'%')->orderByRaw('LENGTH(name) asc')->first();
 
-        return $like ? ['code' => (string) $like->code, 'name' => (string) $like->name] : null;
+        return $like ? $this->resolvedBankPair((string) $like->code, (string) $like->name) : null;
+    }
+
+    /**
+     * @return array{code: string, name: string}
+     */
+    private function resolvedBankPair(string $code, string $name): array
+    {
+        return [
+            'code' => NigerianBankCodeNormalizer::toNipTransferCode($code),
+            'name' => $name,
+        ];
     }
 
     private function normalizeBankSearchText(string $text): string
@@ -257,6 +275,8 @@ class WhatsappWalletBankPayoutService
      */
     public function nameEnquiry(string $bankCode, string $accountNumber): ?array
     {
+        $bankCode = NigerianBankCodeNormalizer::toNipTransferCode($bankCode);
+
         $acct = preg_replace('/\D/', '', $accountNumber) ?? '';
         if (strlen($acct) !== 10) {
             return null;
@@ -344,6 +364,8 @@ class WhatsappWalletBankPayoutService
         string $accountName,
         string $reference
     ): array {
+        $bankCode = NigerianBankCodeNormalizer::toNipTransferCode($bankCode);
+
         $sessionId = 'WAW'.now()->format('YmdHis').Str::upper(Str::random(4));
 
         return $this->mavon->createTransfer([

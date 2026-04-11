@@ -60,6 +60,9 @@ class WithdrawalMavonPayPayoutService
         }
 
         $resolvedCode = $this->resolveBankCode($bankCode, $withdrawal->bank_name);
+        if ($resolvedCode !== null && trim($resolvedCode) !== '') {
+            $resolvedCode = NigerianBankCodeNormalizer::toNipTransferCode($resolvedCode);
+        }
         if (! $resolvedCode) {
             $withdrawal->update([
                 'payout_status' => 'failed',
