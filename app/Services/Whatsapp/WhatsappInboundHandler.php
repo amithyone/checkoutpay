@@ -158,6 +158,16 @@ class WhatsappInboundHandler
             return;
         }
 
+        if (
+            $session->chat_flow !== WhatsappGuestRentalBrowseHandler::FLOW
+            && $session->state !== WhatsappSession::STATE_AWAIT_EMAIL
+            && PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) !== null
+        ) {
+            $this->waWalletMenu->enterP2pFlowFromPhoneShortcut($session->fresh(), $instance, $phone, $text, $linkedRenter);
+
+            return;
+        }
+
         $renter = $linkedRenter;
 
         if ($renter) {

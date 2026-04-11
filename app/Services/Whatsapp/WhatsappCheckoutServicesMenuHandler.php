@@ -2,6 +2,7 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Models\Renter;
 use App\Models\WhatsappSession;
 
 /**
@@ -30,6 +31,16 @@ class WhatsappCheckoutServicesMenuHandler
 
         if ($this->isRootMenuCommand($cmd)) {
             $this->sendRootMenu($instance, $phone);
+
+            return;
+        }
+
+        if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($rawText) !== null) {
+            $linked = Renter::query()
+                ->where('whatsapp_phone_e164', $phone)
+                ->where('is_active', true)
+                ->first();
+            app(WhatsappWaWalletMenuHandler::class)->enterP2pFlowFromPhoneShortcut($session->fresh(), $instance, $phone, $rawText, $linked);
 
             return;
         }
@@ -73,6 +84,7 @@ class WhatsappCheckoutServicesMenuHandler
             "*4* — *INVOICE* — pay / view invoices (login)\n\n".
             "You can reply with the *number* or the *keyword*.\n\n".
             "Link your *rentals* account: send your *email* here.\n\n".
+            "P2P: send a Nigerian mobile (*080…*, *80…* without the leading 0, or *+234…*) to start *send to WhatsApp* (PIN required).\n\n".
             WhatsappMenuInputNormalizer::navigationHelpFooter()."\n".
             "*RESTART* / *000* — back to this menu anytime\n".
             "*STOP* — pause auto-replies  *START* / *MENU* / *00* — resume\n\n".

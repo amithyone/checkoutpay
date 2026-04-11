@@ -60,6 +60,55 @@ class WhatsappWaWalletMenuHandler
     }
 
     /**
+     * Start P2P when the user sends only an NG mobile (080…, 80…, +234…) from the main menu or similar.
+     * Same readiness rules as *4* (PIN, send name, not locked).
+     */
+    public function enterP2pFlowFromPhoneShortcut(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        ?Renter $linkedRenter
+    ): void {
+        if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) === null) {
+            return;
+        }
+
+        $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
+        $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
+
+        if (! $wallet->hasPin()) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Set a wallet PIN first. Open *WALLET* (*2* from main menu) and reply *REGISTER*.'
+            );
+
+            return;
+        }
+        if ($wallet->isPinLocked()) {
+            $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked. Try again later or contact support.');
+
+            return;
+        }
+        if ($wallet->normalizedSenderName() === null) {
+            $session->update([
+                'chat_flow' => self::FLOW,
+                'chat_context' => ['step' => 'submenu'],
+            ]);
+            $this->startSenderNameStep($session->fresh(), $instance, $phone);
+
+            return;
+        }
+
+        $session->update([
+            'chat_flow' => self::FLOW,
+            'chat_context' => ['step' => 'p2p_phone'],
+        ]);
+        $this->handleP2pPhone($session->fresh(), $instance, $phone, $text, [], $wallet);
+    }
+
+    /**
      * @param  array<string, mixed>  $ctx
      */
     public function handle(
@@ -131,6 +180,27 @@ class WhatsappWaWalletMenuHandler
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
         if ($step === 'submenu') {
             $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
+            if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) !== null) {
+                if (! $wallet->hasPin()) {
+                    $this->client->sendText($instance, $phone, 'Set a wallet PIN first. Reply *REGISTER*.');
+
+                    return;
+                }
+                if ($wallet->isPinLocked()) {
+                    $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked. Try again later or contact support.');
+
+                    return;
+                }
+                if ($wallet->normalizedSenderName() === null) {
+                    $this->startSenderNameStep($session, $instance, $phone);
+
+                    return;
+                }
+                $session->update(['chat_context' => ['step' => 'p2p_phone']]);
+                $this->handleP2pPhone($session->fresh(), $instance, $phone, $text, [], $wallet);
+
+                return;
+            }
         }
 
         match ($step) {
@@ -237,6 +307,7 @@ class WhatsappWaWalletMenuHandler
             "*2* — Transfer to bank (… amount → email code or secure link / PIN)\n".
             "*3* — Tier 2 (*UPGRADE*): permanent bank account (KYC)\n".
             '*4* — Send to another *WhatsApp* number (P2P; new users have *'.WhatsappWalletPendingP2pService::claimMinutes()." min* to open *WALLET* and claim)\n".
+            "Tip: paste *080…*, *80…*, or *+234…* here to start *P2P* without *4*.\n".
             $vtuLine.
             "*6* — Transaction history (*6* per page; *MORE* / *PREV*)\n".
             "\n".
