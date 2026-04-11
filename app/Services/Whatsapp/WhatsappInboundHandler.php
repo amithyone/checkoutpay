@@ -22,6 +22,7 @@ class WhatsappInboundHandler
         private WhatsappWalletUpgradeFlowHandler $walletUpgradeFlow,
         private WhatsappWaWalletMenuHandler $waWalletMenu,
         private WhatsappWalletVtuFlowHandler $walletVtuFlow,
+        private WhatsappWalletPendingP2pService $pendingP2p,
     ) {}
 
     public function handleRequest(Request $request): void
@@ -140,6 +141,15 @@ class WhatsappInboundHandler
             $this->waWalletMenu->handle($session, $instance, $phone, $text, $cmd, $linkedRenter);
 
             return;
+        }
+
+        if (in_array($cmd, ['CANCEL', 'DECLINE'], true)) {
+            $refunded = $this->pendingP2p->refundIncomingPendingAsRecipient($phone, $instance);
+            if ($refunded > 0) {
+                $session->save();
+
+                return;
+            }
         }
 
         if (in_array($cmd, ['UPGRADE', 'TIER2', 'TIER 2'], true)) {

@@ -226,8 +226,11 @@ class WhatsappWalletSecureTransferAuthService
     {
         $amount = isset($execCtx['p2p_amount']) && is_numeric($execCtx['p2p_amount']) ? (float) $execCtx['p2p_amount'] : 0.0;
         $to = isset($execCtx['p2p_recipient_e164']) && is_string($execCtx['p2p_recipient_e164']) ? $execCtx['p2p_recipient_e164'] : '';
+        $suffix = ! empty($execCtx['p2p_recipient_unregistered'])
+            ? ' (recipient must open WALLET to claim; auto-refund if not)'
+            : '';
 
-        return 'WhatsApp send: ₦'.number_format($amount, 2).' → '.$to;
+        return 'WhatsApp send: ₦'.number_format($amount, 2).' → '.$to.$suffix;
     }
 
     /**

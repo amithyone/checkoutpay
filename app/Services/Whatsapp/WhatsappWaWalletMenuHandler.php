@@ -45,11 +45,13 @@ class WhatsappWaWalletMenuHandler
         private WhatsappWalletSecureTransferAuthService $secureTransferAuth,
         private WhatsappWalletVtuFlowHandler $vtuFlow,
         private WhatsappWalletPinSetupWebService $pinSetupWeb,
+        private WhatsappWalletPendingP2pService $pendingP2p,
     ) {}
 
     public function openMenu(WhatsappSession $session, string $instance, string $phone, ?Renter $renter): void
     {
         $wallet = $this->findOrCreateWallet($phone, $renter);
+        $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
         $session->update([
             'chat_flow' => self::FLOW,
             'chat_context' => ['step' => 'submenu'],
@@ -127,6 +129,9 @@ class WhatsappWaWalletMenuHandler
         }
 
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
+        if ($step === 'submenu') {
+            $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
+        }
 
         match ($step) {
             'submenu' => $this->handleSubmenu($session, $instance, $phone, $text, $cmd, $wallet, $linkedRenter),
@@ -231,7 +236,7 @@ class WhatsappWaWalletMenuHandler
             "*1* — Receive / Top up\n".
             "*2* — Transfer to bank (… amount → email code or secure link / PIN)\n".
             "*3* — Tier 2 (*UPGRADE*): permanent bank account (KYC)\n".
-            "*4* — Send to another *WhatsApp* number (P2P; they must open *WALLET* once)\n".
+            '*4* — Send to another *WhatsApp* number (P2P; new users have *'.WhatsappWalletPendingP2pService::claimMinutes()." min* to open *WALLET* and claim)\n".
             $vtuLine.
             "*6* — Transaction history (*6* per page; *MORE* / *PREV*)\n".
             "\n".
@@ -1092,22 +1097,33 @@ class WhatsappWaWalletMenuHandler
             ->where('status', WhatsappWallet::STATUS_ACTIVE)
             ->first();
 
+        $ctx['p2p_recipient_e164'] = $recipient;
+        $ctx['step'] = 'p2p_verify_recipient';
+
+        $mask = $this->maskPhoneForDisplay($recipient);
+        $mins = WhatsappWalletPendingP2pService::claimMinutes();
+
         if (! $recvWallet) {
+            $ctx['p2p_recipient_unregistered'] = true;
+            $session->update(['chat_context' => $ctx]);
             $this->client->sendText(
                 $instance,
                 $phone,
-                'That number does not have a WhatsApp wallet yet. Ask them to send *WALLET* here first, then try again.'
+                "*Confirm recipient*\n\n".
+                "Number: {$mask}\n".
+                "They have *not* opened *WALLET* here yet.\n\n".
+                "After you send, they'll get a message: *REGISTER* / *WALLET* to claim, or *CANCEL* to refund you. They have *{$mins} minutes*.\n\n".
+                "Reply *YES* if this is the right person.\n\n".
+                '*BACK* — enter a different number'
             );
 
             return;
         }
 
-        $ctx['p2p_recipient_e164'] = $recipient;
-        $ctx['step'] = 'p2p_verify_recipient';
+        unset($ctx['p2p_recipient_unregistered']);
         $session->update(['chat_context' => $ctx]);
 
         $recvName = $recvWallet->normalizedSenderName();
-        $mask = $this->maskPhoneForDisplay($recipient);
         $nameBlock = $recvName !== null
             ? "Registered send name (their wallet):\n{$recvName}"
             : 'Registered send name: not on file yet — rely on the number and your contact.';
@@ -1144,19 +1160,23 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $recvWallet = WhatsappWallet::query()
-            ->where('phone_e164', $recipient)
-            ->where('status', WhatsappWallet::STATUS_ACTIVE)
-            ->first();
+        $unreg = ! empty($ctx['p2p_recipient_unregistered']);
 
-        if (! $recvWallet) {
-            $this->client->sendText(
-                $instance,
-                $phone,
-                'That wallet is no longer available. *BACK* to try another number.'
-            );
+        if (! $unreg) {
+            $recvWallet = WhatsappWallet::query()
+                ->where('phone_e164', $recipient)
+                ->where('status', WhatsappWallet::STATUS_ACTIVE)
+                ->first();
 
-            return;
+            if (! $recvWallet) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'That wallet is no longer available. *BACK* to try another number.'
+                );
+
+                return;
+            }
         }
 
         if (in_array($cmd, ['YES', 'Y', 'OK', 'CONFIRM'], true) || $cmd === '1') {
@@ -1219,22 +1239,26 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $recv = WhatsappWallet::query()->where('phone_e164', $recipient)->first();
-        if (! $recv || ! $recv->isActive()) {
-            $this->client->sendText($instance, $phone, 'Recipient wallet is not available. Try again later.');
+        $recv = WhatsappWallet::query()
+            ->where('phone_e164', $recipient)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
 
-            return;
+        if (! empty($ctx['p2p_recipient_unregistered']) && $recv) {
+            unset($ctx['p2p_recipient_unregistered']);
         }
 
-        $creditCheck = $recv->canCredit($amount);
-        if (! $creditCheck['ok']) {
-            $this->client->sendText(
-                $instance,
-                $phone,
-                ($creditCheck['message'] ?? 'Recipient cannot receive this amount.').' Ask them to spend or *UPGRADE*.'
-            );
+        if ($recv) {
+            $creditCheck = $recv->canCredit($amount);
+            if (! $creditCheck['ok']) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    ($creditCheck['message'] ?? 'Recipient cannot receive this amount.').' Ask them to spend or *UPGRADE*.'
+                );
 
-            return;
+                return;
+            }
         }
 
         $ctx['p2p_amount'] = $amount;
@@ -1447,7 +1471,7 @@ class WhatsappWaWalletMenuHandler
         return match ($t->type) {
             WhatsappWalletTransaction::TYPE_TOPUP => "• Top-up *+₦{$amt}* · bal ₦{$balAfter} · {$when}",
             WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT => $this->formatBankOutHistoryLine($t, $amt, $when),
-            WhatsappWalletTransaction::TYPE_P2P_DEBIT => '• WhatsApp send → '.$this->maskPhoneForDisplay((string) $t->counterparty_phone_e164)." · *₦{$amt}* · {$when}",
+            WhatsappWalletTransaction::TYPE_P2P_DEBIT => $this->formatP2pDebitHistoryLine($t, $amt, $when),
             WhatsappWalletTransaction::TYPE_P2P_CREDIT => '• WhatsApp receive ← '.$this->maskPhoneForDisplay((string) $t->counterparty_phone_e164)." · *+₦{$amt}* · {$when}",
             WhatsappWalletTransaction::TYPE_VTU_AIRTIME => $this->formatVtuHistoryLine('Airtime', $t, $amt, $when),
             WhatsappWalletTransaction::TYPE_VTU_DATA => $this->formatVtuHistoryLine('Data', $t, $amt, $when),
@@ -1483,6 +1507,20 @@ class WhatsappWaWalletMenuHandler
         return $extra !== ''
             ? "• {$label} ({$extra}) · *₦{$amt}* · {$when}"
             : "• {$label} · *₦{$amt}* · {$when}";
+    }
+
+    private function formatP2pDebitHistoryLine(WhatsappWalletTransaction $t, string $amt, string $when): string
+    {
+        $line = '• WhatsApp send → '.$this->maskPhoneForDisplay((string) $t->counterparty_phone_e164)." · *₦{$amt}* · {$when}";
+        $meta = is_array($t->meta) ? $t->meta : [];
+        if (! empty($meta['refunded_unclaimed'])) {
+            return $line.' · *refunded (unclaimed)*';
+        }
+        if (! empty($meta['awaiting_recipient_wallet'])) {
+            return $line.' · *awaiting claim*';
+        }
+
+        return $line;
     }
 
     private function forgetPinSetupWebTokenFromSession(WhatsappSession $session): void

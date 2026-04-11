@@ -22,6 +22,7 @@ class WhatsappWalletTransferCompletionService
         private WhatsappWalletBankPayoutService $bankPayout,
         private WhatsappWalletTier1TopupVaService $tier1TopupVa,
         private WhatsappWalletTopupNotifier $walletNotifier,
+        private WhatsappWalletPendingP2pService $pendingP2p,
         private VtuNgApiClient $vtuApi,
     ) {}
 
@@ -99,7 +100,7 @@ class WhatsappWalletTransferCompletionService
             "*1* — Receive / Top up\n".
             "*2* — Transfer to bank (… amount → email code or secure link / PIN)\n".
             "*3* — Tier 2 (*UPGRADE*): permanent bank account (KYC)\n".
-            "*4* — Send to another *WhatsApp* number (P2P; they must open *WALLET* once)\n".
+            "*4* — Send to another *WhatsApp* number (P2P; if they have no wallet yet, they have *".WhatsappWalletPendingP2pService::claimMinutes()."* min* to open *WALLET* and claim)\n".
             $vtuLine.
             "*6* — Transaction history (*6* per page; *MORE* / *PREV*)\n".
             "\n".
@@ -381,6 +382,49 @@ class WhatsappWalletTransferCompletionService
         if ($recipient === '' || $amount < 1) {
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        $recvRow = WhatsappWallet::query()
+            ->where('phone_e164', $recipient)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
+
+        if (! $recvRow) {
+            $hold = $this->pendingP2p->createHold($wallet->fresh(), $recipient, $amount, $instance);
+            if (! ($hold['ok'] ?? false)) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    ($hold['message'] ?? 'Send failed. Try again.').
+                    $this->pinDeleteReminderSuffix($userTypedPinInChat)
+                );
+
+                return;
+            }
+
+            /** @var \Carbon\Carbon $expAt */
+            $expAt = $hold['expires_at'];
+            $deadline = $expAt->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
+                ' ('.(string) config('app.timezone').')';
+            $mins = WhatsappWalletPendingP2pService::claimMinutes();
+
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $wallet = $wallet->fresh();
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*Sent (waiting for recipient)*\n\n".
+                '*To:* '.$this->maskPhoneTail($recipient)."\n".
+                '*Amount:* ₦'.number_format($amount, 2)."\n\n".
+                "They have *{$mins} minutes* to send *WALLET* *on that WhatsApp number* to claim.\n\n".
+                "If they don't, your wallet will be *refunded automatically*.\n\n".
+                "*Claim by:* {$deadline}\n\n".
+                'Your new balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+                $this->pinDeleteReminderSuffix($userTypedPinInChat)
+            );
+            $this->sendWalletSubmenu($instance, $phone, $wallet);
 
             return;
         }

@@ -1,0 +1,40 @@
+---
+description: Never destroy databases without explicit user approval and a fresh backup file
+alwaysApply: true
+---
+
+# Database safety (non-negotiable)
+
+## Forbidden unless the user explicitly orders it in writing **and** a backup file was just created
+
+- `php artisan db:wipe`
+- `php artisan migrate:fresh` / `migrate:fresh --seed`
+- `php artisan schema:dump` when used to replace a live schema destructively
+- `DROP DATABASE`, `DROP SCHEMA`
+- `mysql`/`psql` commands that drop or truncate **all** tables or the whole database
+- Any Docker/CI step equivalent to the above
+
+## If a migration fails (e.g. index name too long)
+
+- Fix the migration and run `php artisan migrate` again.
+- If a **single** table is stuck in a bad state, `DROP TABLE that_table` **only** after the user agrees — never wipe the whole DB.
+
+## Before *any* destructive SQL the user requests
+
+1. Run a backup first, e.g. `./scripts/mysql-backup.sh` (project root), or `mysqldump` to a dated file the user names.
+2. Show the exact command you will run and wait for explicit confirmation if there is any doubt.
+
+## Restoring from production / live
+
+The agent **cannot** reach the user’s live DB. The user must dump from live, copy the file here, then import:
+
+```bash
+# Where you can reach LIVE MySQL:
+mysqldump -h LIVE_HOST -u USER -p --single-transaction LIVE_DB > checkout-restore-$(date +%F).sql
+
+# On this app server (local DB from .env):
+mysql -h "$DB_HOST" -u "$DB_USERNAME" -p "$DB_DATABASE" < checkout-restore-YYYY-MM-DD.sql
+php artisan migrate --force
+```
+
+Use `.env` values for local `DB_*` after import.

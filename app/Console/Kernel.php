@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('banks:sync')->weekly();
+        $schedule->command('whatsapp-wallet:expire-pending-p2p')->everyFiveMinutes();
     }
 
     /**
