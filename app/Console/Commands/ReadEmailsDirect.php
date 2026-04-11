@@ -498,14 +498,6 @@ class ReadEmailsDirect extends Command
                             // Don't log each skipped email - only show summary at end
                         } else {
                             $failed++;
-                            $hasHeaders = preg_match('/^(From|Subject|Date|To|Message-ID|Content-Type):/mi', $emailContent);
-                            // Only log failed emails if there are any (for debugging)
-                            Log::debug('Email parsing failed', [
-                                'file' => $file,
-                                'content_length' => strlen($emailContent),
-                                'has_headers' => $hasHeaders,
-                                'content_preview' => substr($emailContent, 0, 200),
-                            ]);
                         }
                     } catch (\Exception $e) {
                         Log::error('Error reading mail file', [
@@ -932,32 +924,13 @@ class ReadEmailsDirect extends Command
                     $body = substr($content, 2000);
                 }
             } else {
-                // No recognizable headers - log for debugging
-                Log::debug('Email parsing failed: no recognizable headers', [
-                    'content_preview' => substr($content, 0, 500),
-                    'content_length' => strlen($content),
-                ]);
                 return null;
             }
         }
         
         // Validate that we have headers
         if (empty(trim($headers))) {
-            Log::debug('Email parsing failed: empty headers', [
-                'content_preview' => substr($content, 0, 500),
-                'content_length' => strlen($content),
-            ]);
             return null;
-        }
-        
-        // Validate that we have body
-        if (empty(trim($body))) {
-            Log::debug('Email parsing failed: empty body after header split', [
-                'headers_length' => strlen($headers),
-                'headers_preview' => substr($headers, 0, 500),
-                'content_length' => strlen($content),
-            ]);
-            // Don't return null - some emails might have empty bodies, but we should still try to parse headers
         }
 
         // Parse headers

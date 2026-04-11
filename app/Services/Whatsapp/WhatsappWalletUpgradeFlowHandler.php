@@ -32,6 +32,12 @@ class WhatsappWalletUpgradeFlowHandler
         );
 
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
+            $this->kycLog('info', 'whatsapp.wallet.kyc.upgrade_requested', [
+                'outcome' => 'already_tier2',
+                'whatsapp_wallet_id' => $wallet->id,
+                'phone' => $phone,
+                'instance' => $instance,
+            ]);
             $this->client->sendText(
                 $instance,
                 $phone,
@@ -44,6 +50,12 @@ class WhatsappWalletUpgradeFlowHandler
         }
 
         if (! $this->mevonRubies->isConfigured()) {
+            $this->kycLog('info', 'whatsapp.wallet.kyc.upgrade_requested', [
+                'outcome' => 'tier2_unavailable',
+                'whatsapp_wallet_id' => $wallet->id,
+                'phone' => $phone,
+                'instance' => $instance,
+            ]);
             $this->client->sendText(
                 $instance,
                 $phone,
@@ -52,6 +64,14 @@ class WhatsappWalletUpgradeFlowHandler
 
             return;
         }
+
+        $this->kycLog('info', 'whatsapp.wallet.kyc.upgrade_requested', [
+            'outcome' => 'kyc_flow_started',
+            'whatsapp_wallet_id' => $wallet->id,
+            'phone' => $phone,
+            'instance' => $instance,
+            'tier_before' => (int) $wallet->tier,
+        ]);
 
         $session->update([
             'chat_flow' => self::FLOW,
@@ -76,14 +96,29 @@ class WhatsappWalletUpgradeFlowHandler
             $ctx = [];
         }
 
+        $walletId = WhatsappWallet::query()->where('phone_e164', $phone)->value('id');
+        $step = (string) ($ctx['step'] ?? 'fname');
+
+        $this->kycLog('info', 'whatsapp.wallet.kyc.inbound', array_merge([
+            'whatsapp_wallet_id' => $walletId,
+            'phone' => $phone,
+            'instance' => $instance,
+            'step' => $step,
+            'cmd' => $cmd,
+        ], $this->describeUserInputForLog($step, $text, $cmd)));
+
         if (in_array($cmd, ['CANCEL', 'EXIT', 'BACK'], true)) {
+            $this->kycLog('info', 'whatsapp.wallet.kyc.flow_cancelled', [
+                'whatsapp_wallet_id' => $walletId,
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => $step,
+            ]);
             $session->update(['chat_flow' => null, 'chat_context' => null]);
             $this->client->sendText($instance, $phone, 'Tier 2 signup cancelled. *MENU* for services.');
 
             return;
         }
-
-        $step = (string) ($ctx['step'] ?? 'fname');
 
         match ($step) {
             'fname' => $this->stepFname($session, $instance, $phone, $text, $ctx),
@@ -105,6 +140,13 @@ class WhatsappWalletUpgradeFlowHandler
     {
         $name = trim($text);
         if (strlen($name) < 2) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'fname',
+                'reason' => 'too_short',
+                'length' => strlen($name),
+            ]);
             $this->client->sendText($instance, $phone, 'Send your first name (at least 2 characters).');
 
             return;
@@ -123,6 +165,13 @@ class WhatsappWalletUpgradeFlowHandler
     {
         $name = trim($text);
         if (strlen($name) < 2) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'lname',
+                'reason' => 'too_short',
+                'length' => strlen($name),
+            ]);
             $this->client->sendText($instance, $phone, 'Send your last name (at least 2 characters).');
 
             return;
@@ -141,6 +190,13 @@ class WhatsappWalletUpgradeFlowHandler
     {
         $raw = trim($text);
         if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'dob',
+                'reason' => 'bad_format',
+                'value' => $raw,
+            ]);
             $this->client->sendText($instance, $phone, 'Use format *YYYY-MM-DD*.');
 
             return;
@@ -149,6 +205,14 @@ class WhatsappWalletUpgradeFlowHandler
         try {
             $d = new \DateTimeImmutable($raw);
         } catch (\Throwable $e) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'dob',
+                'reason' => 'invalid_date',
+                'value' => $raw,
+                'error' => $e->getMessage(),
+            ]);
             $this->client->sendText($instance, $phone, 'That date is not valid. Try again.');
 
             return;
@@ -183,6 +247,13 @@ class WhatsappWalletUpgradeFlowHandler
             $gender = 'female';
         }
         if ($gender === null) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'gender',
+                'reason' => 'not_m_or_f',
+                'value' => substr($t, 0, 16),
+            ]);
             $this->client->sendText($instance, $phone, 'Reply *M* for male or *F* for female.');
 
             return;
@@ -201,6 +272,13 @@ class WhatsappWalletUpgradeFlowHandler
     {
         $digits = preg_replace('/\D+/', '', $text) ?? '';
         if (strlen($digits) !== 11) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'bvn',
+                'reason' => 'bad_digit_count',
+                'digit_count' => strlen($digits),
+            ]);
             $this->client->sendText($instance, $phone, 'BVN must be exactly 11 digits.');
 
             return;
@@ -219,6 +297,13 @@ class WhatsappWalletUpgradeFlowHandler
     {
         $email = strtolower(trim($text));
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'email',
+                'reason' => 'invalid_email',
+                'value' => $email,
+            ]);
             $this->client->sendText($instance, $phone, 'Send a valid email address.');
 
             return;
@@ -251,6 +336,13 @@ class WhatsappWalletUpgradeFlowHandler
         string $cmd
     ): void {
         if (! in_array($cmd, ['YES', 'Y', 'OK'], true)) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'confirm_phone',
+                'reason' => 'not_yes',
+                'cmd' => $cmd,
+            ]);
             $this->client->sendText($instance, $phone, 'Reply *YES* to confirm this WhatsApp number, or *CANCEL*.');
 
             return;
@@ -258,6 +350,11 @@ class WhatsappWalletUpgradeFlowHandler
 
         $apiPhone = PhoneNormalizer::e164DigitsToNgLocal11($phone);
         if ($apiPhone === null) {
+            $this->kycLog('error', 'whatsapp.wallet.kyc.phone_normalization_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'confirm_phone',
+            ]);
             $this->client->sendText($instance, $phone, 'Could not read your WhatsApp number. Contact support.');
 
             return;
@@ -281,6 +378,22 @@ class WhatsappWalletUpgradeFlowHandler
                 (string) ($ctx['bvn'] ?? ''),
             );
 
+            $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_initiate_response', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'whatsapp_wallet_id' => $wallet->id,
+                'has_account_number' => ($init['account_number'] ?? '') !== '',
+                'has_reference' => ($init['reference'] ?? '') !== '',
+                'reference_suffix' => ($init['reference'] ?? '') !== ''
+                    ? substr((string) $init['reference'], -8)
+                    : null,
+                'account_suffix' => ($init['account_number'] ?? '') !== ''
+                    ? substr((string) $init['account_number'], -4)
+                    : null,
+                'bank_name' => $init['bank_name'] ?? null,
+                'raw_summary' => $this->summarizeRubiesRaw($init['raw'] ?? []),
+            ]);
+
             if ($init['account_number'] !== '') {
                 $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $init);
 
@@ -288,9 +401,12 @@ class WhatsappWalletUpgradeFlowHandler
             }
 
             if ($init['reference'] === '') {
-                Log::warning('WhatsApp wallet Tier 2 Rubies initiate missing reference', [
+                $this->kycLog('warning', 'whatsapp.wallet.kyc.rubies_initiate_failed', [
                     'phone' => $phone,
-                    'raw' => $init['raw'] ?? [],
+                    'instance' => $instance,
+                    'whatsapp_wallet_id' => $wallet->id,
+                    'reason' => 'missing_reference',
+                    'raw_summary' => $this->summarizeRubiesRaw($init['raw'] ?? []),
                 ]);
                 $this->client->sendText(
                     $instance,
@@ -315,8 +431,11 @@ class WhatsappWalletUpgradeFlowHandler
                 '*RESEND* — request another code if it expired.'
             );
         } catch (\Throwable $e) {
-            Log::warning('WhatsApp wallet Tier 2 Mevon Rubies failed', [
+            $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_initiate_exception', [
                 'phone' => $phone,
+                'instance' => $instance,
+                'whatsapp_wallet_id' => $wallet->id,
+                'exception_class' => $e::class,
                 'error' => $e->getMessage(),
             ]);
             $this->client->sendText(
@@ -344,6 +463,10 @@ class WhatsappWalletUpgradeFlowHandler
             ? trim($ctx['rubies_pending_reference'])
             : '';
         if ($ref === '') {
+            $this->kycLog('warning', 'whatsapp.wallet.kyc.rubies_otp_missing_reference', [
+                'phone' => $phone,
+                'instance' => $instance,
+            ]);
             $this->recover($session, $instance, $phone);
 
             return;
@@ -352,14 +475,22 @@ class WhatsappWalletUpgradeFlowHandler
         if (str_starts_with($cmd, 'RESEND')) {
             try {
                 $this->mevonRubies->resendRubiesOtp($ref);
+                $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_otp_resent', [
+                    'phone' => $phone,
+                    'instance' => $instance,
+                    'reference_suffix' => substr($ref, -8),
+                ]);
                 $this->client->sendText(
                     $instance,
                     $phone,
                     'If your number matches your BVN, a new OTP should arrive shortly. Send the code here when you receive it.'
                 );
             } catch (\Throwable $e) {
-                Log::warning('WhatsApp wallet Tier 2 Rubies resendOtp failed', [
+                $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_resend_otp_failed', [
                     'phone' => $phone,
+                    'instance' => $instance,
+                    'reference_suffix' => substr($ref, -8),
+                    'exception_class' => $e::class,
                     'error' => $e->getMessage(),
                 ]);
                 $this->client->sendText(
@@ -374,6 +505,13 @@ class WhatsappWalletUpgradeFlowHandler
 
         $digits = preg_replace('/\D+/', '', $text) ?? '';
         if (strlen($digits) < 4 || strlen($digits) > 8) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'rubies_otp',
+                'reason' => 'otp_bad_length',
+                'digit_count' => strlen($digits),
+            ]);
             $this->client->sendText(
                 $instance,
                 $phone,
@@ -394,10 +532,25 @@ class WhatsappWalletUpgradeFlowHandler
 
         try {
             $result = $this->mevonRubies->completeRubiesAccount($ref, $digits);
+            $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_complete_response', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'whatsapp_wallet_id' => $wallet->id,
+                'has_account_number' => ($result['account_number'] ?? '') !== '',
+                'account_suffix' => ($result['account_number'] ?? '') !== ''
+                    ? substr((string) $result['account_number'], -4)
+                    : null,
+                'reference_suffix' => substr($ref, -8),
+                'raw_summary' => $this->summarizeRubiesRaw($result['raw'] ?? []),
+            ]);
             $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $result);
         } catch (\Throwable $e) {
-            Log::warning('WhatsApp wallet Tier 2 Rubies complete failed', [
+            $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_complete_failed', [
                 'phone' => $phone,
+                'instance' => $instance,
+                'whatsapp_wallet_id' => $wallet->id,
+                'reference_suffix' => substr($ref, -8),
+                'exception_class' => $e::class,
                 'error' => $e->getMessage(),
             ]);
             $this->client->sendText(
@@ -440,6 +593,17 @@ class WhatsappWalletUpgradeFlowHandler
 
         $session->update(['chat_flow' => null, 'chat_context' => null]);
 
+        $this->kycLog('info', 'whatsapp.wallet.kyc.tier2_completed', [
+            'phone' => $phone,
+            'instance' => $instance,
+            'whatsapp_wallet_id' => $wallet->id,
+            'account_suffix' => substr((string) $va['account_number'], -4),
+            'bank_name' => $va['bank_name'] ?? null,
+            'mevon_reference_suffix' => ($va['reference'] ?? '') !== ''
+                ? substr((string) $va['reference'], -8)
+                : null,
+        ]);
+
         $this->client->sendText(
             $instance,
             $phone,
@@ -458,7 +622,79 @@ class WhatsappWalletUpgradeFlowHandler
 
     private function recover(WhatsappSession $session, string $instance, string $phone): void
     {
+        $this->kycLog('warning', 'whatsapp.wallet.kyc.session_recovered', [
+            'phone' => $phone,
+            'instance' => $instance,
+        ]);
         $session->update(['chat_flow' => null, 'chat_context' => null]);
         $this->client->sendText($instance, $phone, 'Session reset. Send *UPGRADE* to try Tier 2 again.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function kycLog(string $level, string $message, array $context = []): void
+    {
+        Log::channel('whatsapp_wallet_kyc')->log($level, $message, $context);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function describeUserInputForLog(string $step, string $text, string $cmd): array
+    {
+        $trim = trim($text);
+        $cmdU = strtoupper($cmd);
+
+        if ($step === 'rubies_otp' && str_starts_with($cmdU, 'RESEND')) {
+            return [
+                'input_type' => 'resend_otp',
+                'cmd' => $cmdU,
+            ];
+        }
+
+        return match ($step) {
+            'bvn' => [
+                'input_type' => 'bvn',
+                'digit_count' => strlen(preg_replace('/\D+/', '', $trim) ?? ''),
+            ],
+            'rubies_otp' => [
+                'input_type' => 'otp',
+                'digit_count' => strlen(preg_replace('/\D+/', '', $trim) ?? ''),
+            ],
+            'email' => ['input_type' => 'email', 'value' => $trim],
+            'dob' => ['input_type' => 'dob', 'value' => $trim],
+            'gender' => ['input_type' => 'gender', 'value' => strtoupper(substr($trim, 0, 16))],
+            'fname', 'lname' => ['input_type' => $step, 'value' => $trim],
+            'confirm_phone' => [
+                'input_type' => 'confirm_phone',
+                'cmd' => $cmdU,
+                'unexpected_text' => $trim !== '' && ! in_array($cmdU, ['YES', 'Y', 'OK'], true)
+                    ? substr($trim, 0, 80)
+                    : null,
+            ],
+            default => ['input_type' => $step, 'text_preview' => substr($trim, 0, 160)],
+        };
+    }
+
+    /**
+     * @param  array<mixed>  $raw
+     * @return array<string, mixed>
+     */
+    private function summarizeRubiesRaw(array $raw): array
+    {
+        if ($raw === []) {
+            return [];
+        }
+
+        $json = json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false) {
+            return ['encode_error' => true];
+        }
+
+        return [
+            'length' => strlen($json),
+            'preview' => substr($json, 0, 2000),
+        ];
     }
 }

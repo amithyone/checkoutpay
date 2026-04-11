@@ -30,6 +30,13 @@ return [
             'days' => 14,
             'replace_placeholders' => true,
         ],
+        'whatsapp_wallet_kyc' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/whatsapp_wallet_kyc.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,
