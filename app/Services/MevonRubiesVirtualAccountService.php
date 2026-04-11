@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Renter;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -71,18 +72,79 @@ class MevonRubiesVirtualAccountService
         }
 
         if (! $resp->successful()) {
-            Log::warning('MevonRubies createrubies non-2xx response', [
-                'http_status' => $resp->status(),
-                'response' => $json,
-            ]);
-            throw new \RuntimeException('MevonRubies failed: non-2xx response.');
+            $errorCtx = $this->formatCreaterubiesHttpError($resp, $json);
+            Log::warning('MevonRubies createrubies non-2xx response', $errorCtx);
+            Log::channel('whatsapp_wallet_kyc')->warning('MevonRubies createrubies non-2xx response', $errorCtx);
+            throw new \RuntimeException('MevonRubies failed: '.$errorCtx['summary_for_exception']);
         }
 
         if (($json['status'] ?? null) === false) {
-            throw new \RuntimeException('MevonRubies: '.($json['message'] ?? 'Unknown error'));
+            $parts = [];
+            if (array_key_exists('code', $json) && $json['code'] !== null && $json['code'] !== '') {
+                $c = $json['code'];
+                $parts[] = 'code='.(is_scalar($c) ? (string) $c : json_encode($c, JSON_UNESCAPED_UNICODE));
+            }
+            $parts[] = (string) ($json['message'] ?? $json['error'] ?? 'Unknown error');
+            $msg = implode(' — ', array_filter($parts));
+            Log::channel('whatsapp_wallet_kyc')->warning('MevonRubies createrubies status=false (HTTP 2xx)', [
+                'response' => $json,
+            ]);
+            throw new \RuntimeException('MevonRubies: '.$msg);
         }
 
         return $json;
+    }
+
+    /**
+     * @param  array<string, mixed>  $json
+     * @return array{http_status: int, response: array<string, mixed>, raw_body_preview: ?string, summary_for_exception: string}
+     */
+    protected function formatCreaterubiesHttpError(Response $resp, array $json): array
+    {
+        $status = $resp->status();
+        $parts = ["HTTP {$status}"];
+
+        if (array_key_exists('code', $json) && $json['code'] !== null && $json['code'] !== '') {
+            $code = $json['code'];
+            $parts[] = 'code='.(is_scalar($code) ? (string) $code : json_encode($code, JSON_UNESCAPED_UNICODE));
+        }
+
+        $apiMessage = null;
+        foreach (['message', 'error', 'msg', 'description'] as $key) {
+            if (isset($json[$key]) && is_string($json[$key]) && $json[$key] !== '') {
+                $apiMessage = $json[$key];
+                break;
+            }
+        }
+        if ($apiMessage === null && isset($json['errors']) && is_array($json['errors']) && $json['errors'] !== []) {
+            $enc = json_encode($json['errors'], JSON_UNESCAPED_UNICODE);
+            $apiMessage = $enc !== false ? $enc : null;
+        }
+        if ($apiMessage !== null) {
+            $parts[] = $apiMessage;
+        }
+
+        $raw = $resp->body();
+        $rawPreview = null;
+        if ($raw !== '') {
+            $rawPreview = substr($raw, 0, 2000);
+        }
+        if ($apiMessage === null && $rawPreview !== null && trim($rawPreview) !== '') {
+            $oneLine = preg_replace('/\s+/', ' ', $rawPreview) ?? $rawPreview;
+            $parts[] = 'raw='.substr($oneLine, 0, 400);
+        }
+
+        $summary = implode(' — ', $parts);
+        if (strlen($summary) > 600) {
+            $summary = substr($summary, 0, 597).'...';
+        }
+
+        return [
+            'http_status' => $status,
+            'response' => $json,
+            'raw_body_preview' => $rawPreview,
+            'summary_for_exception' => $summary,
+        ];
     }
 
     /**
