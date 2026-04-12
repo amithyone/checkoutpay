@@ -553,11 +553,11 @@ class WhatsappWalletUpgradeFlowHandler
                 'exception_class' => $e::class,
                 'error' => $e->getMessage(),
             ]);
-            $this->client->sendText(
-                $instance,
-                $phone,
-                'That code did not work. Check the OTP and try again, or send *RESEND* for a new one.'
-            );
+            $err = $e->getMessage();
+            $userHint = str_contains($err, 'missing account_number')
+                ? 'The bank replied but we could not read your new account details. Try *RESEND* for a new code, or contact support (this is usually fixed on our side).'
+                : 'That code did not work. Check the OTP and try again, or send *RESEND* for a new one.';
+            $this->client->sendText($instance, $phone, $userHint);
         }
     }
 

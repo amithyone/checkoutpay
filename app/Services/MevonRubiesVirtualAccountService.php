@@ -178,6 +178,11 @@ class MevonRubiesVirtualAccountService
 
         $out = $this->parseVaPayload($json);
         if (trim($out['account_number']) === '') {
+            Log::channel('whatsapp_wallet_kyc')->error('MevonRubies complete: unparseable VA payload', [
+                'top_level_keys' => array_keys($json),
+                'data_is_array' => isset($json['data']) && is_array($json['data']),
+                'data_keys' => isset($json['data']) && is_array($json['data']) ? array_keys($json['data']) : [],
+            ]);
             throw new \RuntimeException('MevonRubies complete: missing account_number in response.');
         }
 
@@ -196,25 +201,58 @@ class MevonRubiesVirtualAccountService
     }
 
     /**
+     * Read a VA field from Mevon JSON. Fields may live under `data` or at the root.
+     * Important: `data: []` is a valid key in PHP — it must not replace the whole response
+     * or we miss root-level `account_number` after OTP complete.
+     *
+     * @param  array<string, mixed>  $json
+     * @param  list<string>  $keys
+     */
+    protected function rubiesVaField(array $json, string ...$keys): string
+    {
+        $nested = $json['data'] ?? null;
+        $nestedUsable = is_array($nested) && $nested !== [];
+
+        foreach ($keys as $key) {
+            if ($nestedUsable && array_key_exists($key, $nested)) {
+                $v = trim((string) $nested[$key]);
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $json)) {
+                $v = trim((string) $json[$key]);
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * @param  array<string, mixed>  $json
      * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
      */
     protected function parseVaPayload(array $json): array
     {
-        $data = $json['data'] ?? $json;
-        if (! is_array($data)) {
-            $data = [];
+        $accountNumber = $this->rubiesVaField($json, 'account_number', 'accountNumber', 'nuban');
+        if ($accountNumber === '') {
+            // Initiate/complete sometimes expose the dedicated VA as account_parent only.
+            $accountNumber = $this->rubiesVaField($json, 'account_parent', 'accountParent');
         }
 
-        $accountNumber = (string) ($data['account_number'] ?? $data['accountNumber'] ?? '');
-        $reference = (string) ($data['reference'] ?? $json['reference'] ?? '');
+        $reference = $this->rubiesVaField($json, 'reference');
 
         return [
-            'account_number' => trim($accountNumber),
-            'account_name' => (string) ($data['account_name'] ?? $data['accountName'] ?? ''),
-            'bank_name' => (string) ($data['bank_name'] ?? $data['bankName'] ?? ''),
-            'bank_code' => (string) ($data['bank_code'] ?? $data['bankCode'] ?? ''),
-            'reference' => trim($reference),
+            'account_number' => $accountNumber,
+            'account_name' => $this->rubiesVaField($json, 'account_name', 'accountName'),
+            'bank_name' => $this->rubiesVaField($json, 'bank_name', 'bankName'),
+            'bank_code' => $this->rubiesVaField($json, 'bank_code', 'bankCode'),
+            'reference' => $reference,
             'raw' => $json,
         ];
     }
