@@ -3,9 +3,15 @@
 return [
     'enabled' => (bool) env('VTU_NG_ENABLED', false),
     'base_url' => rtrim((string) env('VTU_NG_API_BASE', 'https://vtu.ng/wp-json/api/v2'), '/'),
+    /** Override JWT login URL if VTU.ng changes it; empty = derived from `base_url` (…/wp-json/jwt-auth/v1/token). */
+    'jwt_token_url' => ($jwt = (string) env('VTU_NG_JWT_URL', '')) !== '' ? rtrim($jwt, '/') : null,
     'username' => (string) env('VTU_NG_USERNAME', ''),
     'password' => (string) env('VTU_NG_PASSWORD', ''),
+    /** Optional API / transaction PIN if VTU.ng expects it alongside username & password (see their docs). */
+    'pin' => (string) env('VTU_NG_PIN', ''),
     'timeout' => max(10, min(120, (int) env('VTU_NG_TIMEOUT', 60))),
+    /** Max characters of raw HTTP body to include in `vtu.ng.response` logs (0 = omit body). */
+    'log_response_body_max_chars' => max(0, (int) env('VTU_NG_LOG_RESPONSE_MAX_CHARS', 12000)),
     'airtime_min' => (float) env('VTU_NG_AIRTIME_MIN', 50),
     'airtime_max' => (float) env('VTU_NG_AIRTIME_MAX', 50000),
     'electricity_min' => (float) env('VTU_NG_ELECTRICITY_MIN', 500),
