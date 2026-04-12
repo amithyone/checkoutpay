@@ -142,7 +142,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history')) {
+        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history' || $step === 'casual_bank_pick')) {
             $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
             return;
@@ -165,7 +165,7 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
-            if (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_')) {
+            if (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'casual_bank_pick') {
                 $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
                 return;
@@ -205,6 +205,7 @@ class WhatsappWaWalletMenuHandler
 
         match ($step) {
             'submenu' => $this->handleSubmenu($session, $instance, $phone, $text, $cmd, $wallet, $linkedRenter),
+            'casual_bank_pick' => $this->handleCasualBankPick($session, $instance, $phone, $text, $ctx, $wallet),
             'pin_new' => $this->handlePinNew($session, $instance, $phone, $text, $wallet),
             'pin_confirm' => $this->handlePinConfirm($session, $instance, $phone, $text, $ctx, $wallet),
             'pin_sender_name' => $this->handlePinSenderName($session, $instance, $phone, $text, $wallet, $linkedRenter),
@@ -316,7 +317,7 @@ class WhatsappWaWalletMenuHandler
             $tier1VaNote.
             "{$bankNote}\n\n".
             "If you've sent to someone before, you can type e.g. *send 5k to Tunde Opay* in plain English.\n\n".
-            WhatsappMenuInputNormalizer::navigationHelpFooter()." · *STOP* — pause replies"
+            WhatsappMenuInputNormalizer::navigationHelpFooter().' · *STOP* — pause replies'
         );
     }
 
@@ -485,6 +486,11 @@ class WhatsappWaWalletMenuHandler
                 $recent = $this->recentBankTransferTargets($wallet, 10);
                 $casual = WhatsappWalletCasualSendParser::tryParse($norm, $wallet, $this->bankPayout, $recent);
                 if ($casual !== null) {
+                    if (($casual['flow'] ?? '') === 'bank_disambiguate') {
+                        $this->beginCasualBankDisambiguation($session, $instance, $phone, $casual);
+
+                        return;
+                    }
                     $this->handleCasualSendFromSubmenu($session, $instance, $phone, $wallet, $casual);
 
                     return;
@@ -518,6 +524,104 @@ class WhatsappWaWalletMenuHandler
             $phone,
             "Hey — tap a number ({$range}), or say something like *send 5k to Tunde Opay* if you've paid them before.\n\n*00* or *MENU* = all services · *WALLET* = this screen again."
         );
+    }
+
+    /**
+     * @param  array{flow: 'bank_disambiguate', amount: float, candidates: list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>}  $casual
+     */
+    private function beginCasualBankDisambiguation(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        array $casual,
+    ): void {
+        $candidates = $casual['candidates'] ?? [];
+        if ($candidates === []) {
+            return;
+        }
+        $amt = number_format((float) $casual['amount'], 2);
+        $session->update([
+            'chat_context' => [
+                'step' => 'casual_bank_pick',
+                'casual_pick_amount' => (float) $casual['amount'],
+                'casual_pick_candidates' => $candidates,
+            ],
+        ]);
+        $lines = [
+            "I found *more than one* saved payee that could match — *₦{$amt}*.",
+            '',
+            'Reply with a number:',
+            '',
+        ];
+        foreach ($candidates as $i => $r) {
+            $n = $i + 1;
+            $who = $r['account_name'] !== '' ? $r['account_name'] : 'Saved account';
+            $tail = strlen($r['acct']) >= 4 ? '****'.substr($r['acct'], -4) : '****';
+            $lines[] = "*{$n}* — {$who} · {$r['bank_name']} · {$tail}";
+        }
+        $lines[] = '';
+        $lines[] = '*BACK* or *CANCEL* — wallet menu · '.WhatsappMenuInputNormalizer::navigationHelpFooter();
+        $this->client->sendText($instance, $phone, implode("\n", $lines));
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    private function handleCasualBankPick(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        array $ctx,
+        WhatsappWallet $wallet,
+    ): void {
+        $raw = trim($text);
+        $raw = preg_replace('/^[\*_~\s]+|[\*_~\s]+$/u', '', $raw) ?? $raw;
+        $raw = trim((string) $raw);
+        if ($raw === '' || ! preg_match('/^(\d+)$/D', $raw, $m)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "Reply with *1*, *2*, … to pick who gets the money — or *BACK* to cancel.\n\n".
+                    WhatsappMenuInputNormalizer::navigationHelpFooter()
+            );
+
+            return;
+        }
+        $idx = (int) $m[1] - 1;
+        $candidates = $ctx['casual_pick_candidates'] ?? [];
+        if (! is_array($candidates) || ! isset($candidates[$idx]) || ! is_array($candidates[$idx])) {
+            $max = is_array($candidates) ? count($candidates) : 0;
+            $range = $max > 0 ? "*1*–*{$max}*" : '*1*';
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "That number is not on the list. Pick {$range} or *BACK*.\n\n".
+                    WhatsappMenuInputNormalizer::navigationHelpFooter()
+            );
+
+            return;
+        }
+        $hit = $candidates[$idx];
+        $amount = (float) ($ctx['casual_pick_amount'] ?? 0);
+        if ($amount < 1) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+        $casual = [
+            'flow' => 'bank',
+            'amount' => $amount,
+            'ctx' => [
+                'dest_acct' => $hit['acct'],
+                'dest_bank_code' => $hit['bank_code'],
+                'dest_bank' => $hit['bank_name'],
+                'dest_acct_name' => $hit['account_name'],
+                'amount' => $amount,
+            ],
+        ];
+        $this->handleCasualSendFromSubmenu($session, $instance, $phone, $wallet, $casual);
     }
 
     /**

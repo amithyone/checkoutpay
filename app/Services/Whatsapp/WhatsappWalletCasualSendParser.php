@@ -58,9 +58,13 @@ final class WhatsappWalletCasualSendParser
         return self::pickLargestAmount($text);
     }
 
+    private const BANK_MATCH_MIN_SCORE = 50;
+
+    private const BANK_DISAMBIG_MAX_OPTIONS = 5;
+
     /**
      * @param  list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>  $recentBank
-     * @return array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'p2p', amount: float, recipient_e164: string}|null
+     * @return array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_disambiguate', amount: float, candidates: list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>}|array{flow: 'p2p', amount: float, recipient_e164: string}|null
      */
     public static function tryParse(
         string $text,
@@ -89,8 +93,10 @@ final class WhatsappWalletCasualSendParser
         $bankMatch = self::extractBankAndNameClause($normalized, $bankPayout);
         if ($bankMatch === null) {
             if (count($recentBank) === 1) {
-                $hit = self::matchRecentBankTarget($recentBank, '', null);
-                if ($hit !== null) {
+                $res = self::resolveRecentBankTarget($recentBank, '', null);
+                if ($res !== null && $res['type'] === 'one') {
+                    $hit = $res['row'];
+
                     return [
                         'flow' => 'bank',
                         'amount' => $amount,
@@ -111,11 +117,20 @@ final class WhatsappWalletCasualSendParser
         [$nameNeedle, $resolvedBank] = $bankMatch;
         $nameNeedle = trim($nameNeedle);
 
-        $hit = self::matchRecentBankTarget($recentBank, $nameNeedle, $resolvedBank);
-        if ($hit === null) {
+        $resolution = self::resolveRecentBankTarget($recentBank, $nameNeedle, $resolvedBank);
+        if ($resolution === null) {
             return null;
         }
 
+        if ($resolution['type'] === 'disambiguate') {
+            return [
+                'flow' => 'bank_disambiguate',
+                'amount' => $amount,
+                'candidates' => $resolution['candidates'],
+            ];
+        }
+
+        $hit = $resolution['row'];
         $ctx = [
             'dest_acct' => $hit['acct'],
             'dest_bank_code' => $hit['bank_code'],
@@ -213,7 +228,7 @@ final class WhatsappWalletCasualSendParser
     }
 
     /**
-     * @return array{0: string, 1: array{code: string, name: string}|null}|null  [nameNeedle, resolvedBank|null]
+     * @return array{0: string, 1: array{code: string, name: string}|null}|null [nameNeedle, resolvedBank|null]
      */
     private static function extractBankAndNameClause(string $text, WhatsappWalletBankPayoutService $bankPayout): ?array
     {
@@ -301,8 +316,9 @@ final class WhatsappWalletCasualSendParser
     /**
      * @param  list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>  $recent
      * @param  array{code: string, name: string}|null  $bankFilter
+     * @return array{type: 'one', row: array{acct: string, bank_code: string, bank_name: string, account_name: string}}|array{type: 'disambiguate', candidates: list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>}|null
      */
-    private static function matchRecentBankTarget(array $recent, string $nameNeedle, ?array $bankFilter): ?array
+    private static function resolveRecentBankTarget(array $recent, string $nameNeedle, ?array $bankFilter): ?array
     {
         if ($recent === []) {
             return null;
@@ -311,37 +327,121 @@ final class WhatsappWalletCasualSendParser
         $needle = strtolower(trim($nameNeedle));
 
         if ($needle === '') {
-            return self::matchWhenNoNameTokens($recent, $bankFilter);
+            $only = self::matchWhenNoNameTokens($recent, $bankFilter);
+
+            return $only !== null ? ['type' => 'one', 'row' => $only] : null;
         }
 
-        $hits = [];
+        $scored = [];
         foreach ($recent as $r) {
-            $nm = strtolower(trim($r['account_name']));
-            $matchedName = $nm !== '' && str_contains($nm, $needle);
-            if (! $matchedName && $nm !== '') {
-                $toks = preg_split('/\s+/u', $needle, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                foreach ($toks as $tok) {
-                    if (strlen($tok) >= 2 && str_contains($nm, strtolower($tok))) {
-                        $matchedName = true;
-
-                        break;
-                    }
-                }
-            }
-            if (! $matchedName) {
-                continue;
-            }
             if (! self::rowMatchesBankFilter($r, $bankFilter)) {
                 continue;
             }
-            $hits[] = $r;
+            $nm = strtolower(trim($r['account_name']));
+            $score = self::scoreNameAgainstAccountName($needle, $nm);
+            if ($score < self::BANK_MATCH_MIN_SCORE) {
+                continue;
+            }
+            $scored[] = ['row' => $r, 'score' => $score];
         }
 
-        if (count($hits) === 1) {
-            return $hits[0];
+        if ($scored === []) {
+            return null;
         }
 
-        return null;
+        usort($scored, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
+
+        $top = $scored[0]['score'];
+        $close = array_values(array_filter($scored, static fn (array $x): bool => $x['score'] >= $top - 8));
+
+        if (count($close) === 1) {
+            return ['type' => 'one', 'row' => $close[0]['row']];
+        }
+
+        $candidates = [];
+        foreach (array_slice($close, 0, self::BANK_DISAMBIG_MAX_OPTIONS) as $x) {
+            $candidates[] = $x['row'];
+        }
+
+        return ['type' => 'disambiguate', 'candidates' => $candidates];
+    }
+
+    /** @internal */
+    public static function scoreNameAgainstAccountName(string $needleNorm, string $accountNameNorm): int
+    {
+        $needleNorm = trim($needleNorm);
+        $accountNameNorm = trim($accountNameNorm);
+        if ($needleNorm === '' || $accountNameNorm === '') {
+            return 0;
+        }
+
+        if ($accountNameNorm === $needleNorm) {
+            return 100;
+        }
+        if (str_contains($accountNameNorm, $needleNorm)) {
+            return 88;
+        }
+
+        $nameWords = preg_split('/\s+/u', $accountNameNorm, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach ($nameWords as $w) {
+            if (strlen($needleNorm) >= 3 && str_starts_with($w, $needleNorm)) {
+                return 78;
+            }
+        }
+
+        $needleTokens = preg_split('/\s+/u', $needleNorm, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $matchedTokens = 0;
+        $requiredTokens = 0;
+        foreach ($needleTokens as $tok) {
+            $tok = strtolower($tok);
+            if (strlen($tok) < 2) {
+                continue;
+            }
+            $requiredTokens++;
+            if (str_contains($accountNameNorm, $tok)) {
+                $matchedTokens++;
+            }
+        }
+        if ($requiredTokens > 0 && $matchedTokens === $requiredTokens) {
+            return 68;
+        }
+
+        if (preg_match('/^[a-z]{2,6}$/u', $needleNorm) === 1) {
+            $initials = self::initialsFromNormalizedName($accountNameNorm);
+            if ($initials !== '' && $initials === $needleNorm) {
+                return 72;
+            }
+        }
+
+        if (preg_match('/^[a-z]{3,6}$/u', $needleNorm) === 1) {
+            foreach ($nameWords as $w) {
+                if (strlen($w) < 3) {
+                    continue;
+                }
+                if (strlen($needleNorm) <= 255 && strlen($w) <= 255 && levenshtein($needleNorm, $w) <= 1) {
+                    return 58;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    private static function initialsFromNormalizedName(string $accountNameNorm): string
+    {
+        $parts = preg_split('/\s+/u', trim($accountNameNorm), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $buf = '';
+        foreach ($parts as $p) {
+            if ($p === '') {
+                continue;
+            }
+            $first = mb_substr($p, 0, 1);
+            if (preg_match('/^[a-z]$/iu', $first) === 1) {
+                $buf .= strtolower($first);
+            }
+        }
+
+        return $buf;
     }
 
     /**
