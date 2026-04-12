@@ -62,7 +62,7 @@ class WhatsappWalletTopupNotifier
         if ($recipientWallet->needsQuickWalletSetup()) {
             $pinLine = $recipientWallet->hasPin()
                 ? ''
-                : "• *REGISTER* — 4-digit PIN\n";
+                : "• *REGISTER* — PIN (secure link)\n";
             $nameLine = $recipientWallet->hasPin()
                 ? '• Send *your name* (what people see when you send)'
                 : '• Then *your name* (what people see when you send)';
@@ -127,7 +127,7 @@ class WhatsappWalletTopupNotifier
         if ($wallet->needsQuickWalletSetup()) {
             $pinLine = $wallet->hasPin()
                 ? ''
-                : "• *REGISTER* — PIN\n";
+                : "• *REGISTER* — PIN (link)\n";
             $text = "✅ *{$amountStr}* received\n".
                 "Balance: *{$balStr}*\n\n".
                 "Quick setup:\n".

@@ -158,7 +158,7 @@ class WhatsappWalletTransferCompletionService
         $isTier2 = $wallet->isTier2();
         $pinSection = $wallet->hasPin()
             ? ''
-            : "*REGISTER* — set a 4-digit wallet PIN (required before *2* Transfer).\n\n";
+            : "*REGISTER* — set wallet PIN via secure link (required before *2* Transfer).\n\n";
 
         $vaBlock = '';
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
@@ -199,7 +199,7 @@ class WhatsappWalletTransferCompletionService
             "*1* — Add money / receive\n".
             "*2* — Send to someone's *bank* account\n".
             $upgradeLine.
-            '*4* — Send to another *WhatsApp* number (new users get *'.WhatsappWalletPendingP2pService::claimMinutes()."* min* to open *WALLET*)\n".
+            "*4* — Send money to another *WhatsApp* user\n".
             "Tip: paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
             "*6* — Recent activity (*MORE* / *PREV*)\n".
@@ -533,24 +533,17 @@ class WhatsappWalletTransferCompletionService
                 return;
             }
 
-            /** @var \Carbon\Carbon $expAt */
-            $expAt = $hold['expires_at'];
-            $deadline = $expAt->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
-                ' ('.(string) config('app.timezone').')';
-            $mins = WhatsappWalletPendingP2pService::claimMinutes();
-
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $wallet = $wallet->fresh();
             $masked = $this->maskPhoneTail($recipient);
             $this->client->sendText(
                 $instance,
                 $phone,
-                "⏳ *Sent — waiting for them to claim*\n\n".
+                "⏳ *Sent — waiting for them*\n\n".
                 '*To:* '.$masked."\n".
                 '*Amount:* ₦'.number_format($amount, 2)."\n\n".
-                "They have *{$mins} minutes* to send *WALLET* *on that WhatsApp number* to claim.\n\n".
-                "If they don't, your wallet will be *refunded automatically*.\n\n".
-                "*Claim by:* {$deadline}\n\n".
+                "They need to open *WALLET* on that *WhatsApp* number to receive.\n\n".
+                "The funds are for them here until they do. They can send *CANCEL* to return it to you.\n\n".
                 '💡 Open *WALLET* anytime here to see your balance.'.
                 $this->forwardableReceiptFooter().
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)

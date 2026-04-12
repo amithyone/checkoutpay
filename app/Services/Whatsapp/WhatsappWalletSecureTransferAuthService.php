@@ -52,6 +52,11 @@ class WhatsappWalletSecureTransferAuthService
         return $b;
     }
 
+    public function transferConfirmUrl(string $token): string
+    {
+        return $this->secureConfirmBaseUrl().'/wallet/whatsapp/confirm/'.$token;
+    }
+
     /**
      * Send the URL alone in a follow-up message so WhatsApp parses tappable links reliably
      * (domains with hyphens often break when the URL sits inside a formatted block).
@@ -141,7 +146,8 @@ class WhatsappWalletSecureTransferAuthService
                 $instance,
                 $phone,
                 "*No email on file* for a login code.\n\n".
-                "You can enter your *4-digit wallet PIN* here, *or* tap the link in the *next message* to type your PIN on a secure page (safer).\n\n".
+                "Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.\n\n".
+                "*Do not* send your wallet PIN in this chat.\n\n".
                 '*BACK* — cancel'
             );
             $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
@@ -170,7 +176,8 @@ class WhatsappWalletSecureTransferAuthService
                 $instance,
                 $phone,
                 "We could not send email right now.\n\n".
-                "Enter your *4-digit wallet PIN* here, *or* tap the link in the *next message* to type your PIN on a secure page.\n\n".
+                "Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.\n\n".
+                "*Do not* send your wallet PIN in this chat.\n\n".
                 '*BACK* — cancel'
             );
             $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
@@ -191,7 +198,7 @@ class WhatsappWalletSecureTransferAuthService
             $phone,
             "*Check your email* ({$masked})\n\n".
             "We sent a *6-digit code*. Send that code *here* in WhatsApp — *do not* send your wallet PIN in this chat.\n\n".
-            "Or open the link in the email to enter your PIN on a secure page.\n\n".
+            "Or open the link in the email to enter your wallet PIN on the secure page (never type your wallet PIN here).\n\n".
             '*BACK* — cancel'
         );
     }
@@ -227,7 +234,7 @@ class WhatsappWalletSecureTransferAuthService
         $amount = isset($execCtx['p2p_amount']) && is_numeric($execCtx['p2p_amount']) ? (float) $execCtx['p2p_amount'] : 0.0;
         $to = isset($execCtx['p2p_recipient_e164']) && is_string($execCtx['p2p_recipient_e164']) ? $execCtx['p2p_recipient_e164'] : '';
         $suffix = ! empty($execCtx['p2p_recipient_unregistered'])
-            ? ' (recipient must open WALLET to claim; auto-refund if not)'
+            ? ' (recipient opens WALLET to receive; CANCEL returns to sender)'
             : '';
 
         return 'WhatsApp send: ₦'.number_format($amount, 2).' → '.$to.$suffix;
@@ -363,8 +370,22 @@ class WhatsappWalletSecureTransferAuthService
         }
 
         if (! $wallet->pin_hash || ! Hash::check($pinDigits, (string) $wallet->pin_hash)) {
+            $wallet->increment('pin_failed_attempts');
+            $wallet->refresh();
+            if ((int) $wallet->pin_failed_attempts >= 5) {
+                $wallet->pin_locked_until = now()->addMinutes(15);
+                $wallet->save();
+                Cache::forget($this->cacheKey($token));
+
+                return ['ok' => false, 'error' => 'Too many wrong PIN attempts. Wallet PIN locked for 15 minutes. Open WhatsApp when ready.'];
+            }
+
             return ['ok' => false, 'error' => 'Incorrect wallet PIN.'];
         }
+
+        $wallet->pin_failed_attempts = 0;
+        $wallet->pin_locked_until = null;
+        $wallet->save();
 
         Cache::forget($this->cacheKey($token));
         $session->update(['chat_context' => ['step' => 'submenu']]);

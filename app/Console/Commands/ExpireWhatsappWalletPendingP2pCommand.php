@@ -9,7 +9,7 @@ class ExpireWhatsappWalletPendingP2pCommand extends Command
 {
     protected $signature = 'whatsapp-wallet:expire-pending-p2p';
 
-    protected $description = 'Refund WhatsApp P2P holds when the recipient did not open WALLET in time';
+    protected $description = 'Refund legacy WhatsApp P2P holds that still have an expires_at deadline in the past';
 
     public function handle(WhatsappWalletPendingP2pService $service): int
     {

@@ -16,7 +16,7 @@
 <body>
     <h1>Confirm transfer</h1>
     <p>{{ $summary }}</p>
-    <p class="muted">Enter your 4-digit WhatsApp wallet PIN. This page is for this transfer only.</p>
+    <p class="muted">Enter your 4-digit wallet PIN here only — do not send it in WhatsApp. This page is for this transfer.</p>
 
     <form method="post" action="{{ url('/wallet/whatsapp/confirm/'.$token) }}">
         @csrf

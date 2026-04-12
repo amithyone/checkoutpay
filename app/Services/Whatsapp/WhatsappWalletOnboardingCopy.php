@@ -18,7 +18,7 @@ final class WhatsappWalletOnboardingCopy
             return "*Wallet*\n".
                 "Balance: *{$bal}*\n\n".
                 "Finish setup so you can use your money:\n".
-                "1️⃣ *REGISTER* — set a *4-digit PIN*\n".
+                "1️⃣ *REGISTER* — open the *link* to set your PIN (not in chat)\n".
                 "2️⃣ Then send *your name* (what people see when you pay them)\n\n".
                 "*1* — Add / receive money\n".
                 "*MENU* — all services\n\n".

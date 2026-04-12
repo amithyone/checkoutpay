@@ -15,7 +15,7 @@
 </head>
 <body>
     <h1>Set WhatsApp wallet PIN</h1>
-    <p class="muted">Choose a new 4-digit PIN and confirm it. This page is one-time and safer than typing a PIN in the chat.</p>
+    <p class="muted">Choose a new 4-digit PIN and confirm it. Wallet PIN is only entered on this page — do not send it in WhatsApp.</p>
 
     <form method="post" action="{{ url('/wallet/whatsapp/set-pin/'.$token) }}">
         @csrf

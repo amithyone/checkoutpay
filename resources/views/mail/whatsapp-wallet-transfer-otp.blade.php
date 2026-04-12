@@ -12,8 +12,8 @@
     <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">{{ $code }}</p>
     <p>This code expires in <strong>{{ $otpTtlMinutes }} minutes</strong>.</p>
 
-    <p><strong>Option 2 — Enter PIN on the web</strong><br>
-    Open this link on your phone to confirm with your 4-digit wallet PIN:</p>
+    <p><strong>Option 2 — Confirm with wallet PIN (web only)</strong><br>
+    Open this link on your phone and enter your 4-digit wallet PIN there. Do not type your wallet PIN in WhatsApp.</p>
     <p><a href="{{ $securePinUrl }}" style="word-break: break-all;">Confirm transfer securely</a></p>
     <p>The link expires in <strong>{{ $linkTtlMinutes }} minutes</strong>.</p>
 

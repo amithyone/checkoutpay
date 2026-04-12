@@ -58,11 +58,11 @@ return [
         'tier1_temp_va_ttl_hours' => (int) env('WHATSAPP_WALLET_TIER1_TEMP_VA_TTL_HOURS', 48),
         /** Banks per page in *Transfer → bank* numbered picker (reply 1–N, MORE/PREV). */
         'bank_picker_page_size' => max(4, min(12, (int) env('WHATSAPP_WALLET_BANK_PICKER_PAGE_SIZE', 8))),
-        /** Secure web link + cache TTL for confirming transfers (PIN on web or OTP in chat). */
+        /** Secure web link + cache TTL for confirming transfers (wallet PIN on web only; email OTP may be sent in chat). */
         'transfer_confirm_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_TRANSFER_CONFIRM_TTL_MINUTES', 15))),
         /** One-time web link TTL for *REGISTER* wallet PIN setup (defaults to transfer_confirm TTL if unset). */
         'pin_setup_web_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_PIN_SETUP_WEB_TTL_MINUTES', 15))),
-        /** P2P to a number with no wallet: minutes to send *WALLET* and claim before auto-refund to sender. */
+        /** Legacy: only rows created before no-expiry P2P used this TTL. New pending P2P credits use no auto-expiry. */
         'p2p_pending_claim_minutes' => max(5, min(120, (int) env('WHATSAPP_WALLET_P2P_PENDING_CLAIM_MINUTES', 30))),
         /** After bank / instant P2P success, send a small PNG receipt (requires GD). Safe to forward — no balance. */
         'send_transfer_receipt_image' => filter_var(env('WHATSAPP_SEND_TRANSFER_RECEIPT_IMAGE', true), FILTER_VALIDATE_BOOL),

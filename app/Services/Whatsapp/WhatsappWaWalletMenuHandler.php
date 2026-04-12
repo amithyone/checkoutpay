@@ -142,7 +142,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history' || $step === 'casual_bank_pick')) {
+        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history' || $step === 'casual_bank_pick' || $step === 'pin_setup_web')) {
             $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
             return;
@@ -170,7 +170,12 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
-            if (in_array($step, ['pin_new', 'pin_confirm', 'pin_sender_name'], true)) {
+            if (in_array($step, ['pin_setup_web', 'pin_sender_name'], true)) {
+                $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
+
+                return;
+            }
+            if (in_array($step, ['pin_new', 'pin_confirm'], true)) {
                 $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
                 return;
@@ -206,20 +211,19 @@ class WhatsappWaWalletMenuHandler
         match ($step) {
             'submenu' => $this->handleSubmenu($session, $instance, $phone, $text, $cmd, $wallet, $linkedRenter),
             'casual_bank_pick' => $this->handleCasualBankPick($session, $instance, $phone, $text, $ctx, $wallet),
-            'pin_new' => $this->handlePinNew($session, $instance, $phone, $text, $wallet),
-            'pin_confirm' => $this->handlePinConfirm($session, $instance, $phone, $text, $ctx, $wallet),
+            'pin_setup_web', 'pin_new', 'pin_confirm' => $this->handlePinSetupWebWait($session, $instance, $phone, $text, $ctx, $wallet),
             'pin_sender_name' => $this->handlePinSenderName($session, $instance, $phone, $text, $wallet, $linkedRenter),
             'transfer_acct' => $this->handleTransferAcct($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_bank' => $this->handleTransferBank($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_beneficiary' => $this->handleTransferBeneficiary($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_amount' => $this->handleTransferAmount($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_otp' => $this->handleTransferOtp($session, $instance, $phone, $text, $ctx, $wallet),
-            'transfer_pin' => $this->handleTransferPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
+            'transfer_pin' => $this->handleTransferPinWebOnly($instance, $phone, $text, $ctx, $wallet),
             'p2p_phone' => $this->handleP2pPhone($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_verify_recipient' => $this->handleP2pVerifyRecipient($session, $instance, $phone, $text, $cmd, $ctx, $wallet),
             'p2p_amount' => $this->handleP2pAmount($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_otp' => $this->handleP2pOtp($session, $instance, $phone, $text, $ctx, $wallet),
-            'p2p_pin' => $this->handleP2pPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
+            'p2p_pin' => $this->handleTransferPinWebOnly($instance, $phone, $text, $ctx, $wallet),
             'wallet_tx_history' => $this->handleWalletTransactionHistory($session, $instance, $phone, $cmd, $wallet),
             default => $this->recoverSubmenu($session, $instance, $phone, $wallet),
         };
@@ -286,7 +290,7 @@ class WhatsappWaWalletMenuHandler
         $isTier2 = $wallet->isTier2();
         $pinSection = $wallet->hasPin()
             ? ''
-            : "*REGISTER* — set a 4-digit wallet PIN (required before *2* Transfer).\n\n";
+            : "*REGISTER* — set wallet PIN (secure link; do not send PIN in chat).\n\n";
 
         $vaBlock = '';
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
@@ -327,7 +331,7 @@ class WhatsappWaWalletMenuHandler
             "*1* — Add money / receive\n".
             "*2* — Send to someone's *bank* account\n".
             $upgradeLine.
-            '*4* — Send to another *WhatsApp* number (they get *'.WhatsappWalletPendingP2pService::claimMinutes()." min* to open *WALLET* if they're new)\n".
+            "*4* — Send money to another *WhatsApp* user\n".
             "Tip: you can paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
             "*6* — See recent activity (*MORE* / *PREV* to flip pages)\n".
@@ -374,7 +378,7 @@ class WhatsappWaWalletMenuHandler
             $token = $created['token'];
             $session->update([
                 'chat_context' => [
-                    'step' => 'pin_new',
+                    'step' => 'pin_setup_web',
                     'pin_setup_web_token' => $token,
                 ],
             ]);
@@ -382,7 +386,8 @@ class WhatsappWaWalletMenuHandler
                 $instance,
                 $phone,
                 "*Set wallet PIN*\n\n".
-                "Send *4 digits* here (twice to confirm), or use the *link* in the next message.\n\n".
+                "Open the link in the *next message* to choose your *4-digit PIN* on a secure page.\n\n".
+                "*Do not* send your PIN in this chat.\n\n".
                 '*BACK* — cancel'
             );
             $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
@@ -566,7 +571,7 @@ class WhatsappWaWalletMenuHandler
         if ($wallet->needsQuickWalletSetup()) {
             $hint = $wallet->hasPin()
                 ? 'Send *your name*, or *1* to add money. *MENU* — all services.'
-                : 'Reply *REGISTER* (PIN), send *your name*, or *1* to add money. *MENU* — all services.';
+                : 'Reply *REGISTER* (PIN link), send *your name*, or *1* to add money. *MENU* — all services.';
             $this->client->sendText($instance, $phone, $hint);
 
             return;
@@ -758,14 +763,13 @@ class WhatsappWaWalletMenuHandler
 
         $mask = $this->maskPhoneForDisplay($recipient);
         $amt = number_format((float) $casual['amount'], 2);
-        $mins = WhatsappWalletPendingP2pService::claimMinutes();
 
         if (! $recvWallet) {
             $this->client->sendText(
                 $instance,
                 $phone,
                 "Got it — *₦{$amt}* to *{$mask}* (they haven't opened a wallet here yet).\n\n".
-                "If you continue, they get *{$mins} minutes* to open *WALLET* or you get refunded.\n\n".
+                "If you continue, they open *WALLET* on that number to receive it (no time limit). They can send *CANCEL* to return it to you.\n\n".
                 "Reply *YES* to go ahead — then we'll do your usual security check (PIN or email).\n\n".
                 WhatsappMenuInputNormalizer::navigationHelpFooter()
             );
@@ -849,84 +853,62 @@ class WhatsappWaWalletMenuHandler
         );
     }
 
-    private function handlePinNew(
-        WhatsappSession $session,
-        string $instance,
-        string $phone,
-        string $text,
-        WhatsappWallet $wallet
-    ): void {
-        $digits = preg_replace('/\D/', '', $text) ?? '';
-        if (strlen($digits) !== self::PIN_LEN) {
-            $this->client->sendText($instance, $phone, 'Send exactly *4 digits* for your PIN.');
-
-            return;
-        }
-
-        $prev = $session->chat_context;
-        $nextCtx = [
-            'step' => 'pin_confirm',
-            'pin_temp' => Hash::make($digits),
-        ];
-        if (is_array($prev) && isset($prev['pin_setup_web_token']) && is_string($prev['pin_setup_web_token'])) {
-            $nextCtx['pin_setup_web_token'] = $prev['pin_setup_web_token'];
-        }
-        $session->update(['chat_context' => $nextCtx]);
-        $this->client->sendText(
-            $instance,
-            $phone,
-            '*Confirm PIN*\n\nSend the *same 4 digits* again.'
-        );
-    }
-
     /**
+     * Awaiting wallet PIN setup via secure web link only (no PIN in chat).
+     *
      * @param  array<string, mixed>  $ctx
      */
-    private function handlePinConfirm(
+    private function handlePinSetupWebWait(
         WhatsappSession $session,
         string $instance,
         string $phone,
         string $text,
         array $ctx,
-        WhatsappWallet $wallet
+        WhatsappWallet $wallet,
     ): void {
-        $hash = $ctx['pin_temp'] ?? null;
-        if (! is_string($hash) || $hash === '') {
+        $wallet->refresh();
+        if ($wallet->hasPin()) {
+            $this->forgetPinSetupWebTokenFromSession($session);
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        $token = isset($ctx['pin_setup_web_token']) && is_string($ctx['pin_setup_web_token'])
+            ? $ctx['pin_setup_web_token']
+            : '';
+        if ($token === '') {
             $this->recoverSubmenu($session, $instance, $phone, $wallet);
 
             return;
         }
 
+        $session->update([
+            'chat_context' => [
+                'step' => 'pin_setup_web',
+                'pin_setup_web_token' => $token,
+            ],
+        ]);
+
         $digits = preg_replace('/\D/', '', $text) ?? '';
-        if (strlen($digits) !== self::PIN_LEN || ! Hash::check($digits, $hash)) {
-            $retryCtx = ['step' => 'pin_new'];
-            if (isset($ctx['pin_setup_web_token']) && is_string($ctx['pin_setup_web_token'])) {
-                $retryCtx['pin_setup_web_token'] = $ctx['pin_setup_web_token'];
-            }
-            $session->update(['chat_context' => $retryCtx]);
-            $this->client->sendText($instance, $phone, 'PINs did not match. Send a new *4-digit* PIN.');
+        if (strlen($digits) === self::PIN_LEN) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Do *not* send your wallet PIN in this chat. Use the secure link only:'
+            );
+            $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
 
             return;
         }
 
-        $wallet->pin_hash = $hash;
-        $wallet->pin_set_at = now();
-        $wallet->pin_failed_attempts = 0;
-        $wallet->pin_locked_until = null;
-        $wallet->save();
-
-        if (isset($ctx['pin_setup_web_token']) && is_string($ctx['pin_setup_web_token'])) {
-            $this->pinSetupWeb->forgetToken($ctx['pin_setup_web_token']);
-        }
-
-        $session->update(['chat_context' => ['step' => 'pin_sender_name']]);
         $this->client->sendText(
             $instance,
             $phone,
-            "*PIN saved*\n\n".
-            'Send *your name* for transfers (*'.self::SENDER_NAME_MIN_LEN.'*–*'.self::SENDER_NAME_MAX_LEN.'* characters, e.g. *Ade Johnson*).'."\n\n".
-            '*BACK* — skip (we will ask again before you send money).'
+            "Open the link below to set your *4-digit PIN* on a secure page. *Do not* type your PIN here.\n\n*BACK* — cancel"
         );
+        $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
     }
 
     private function handlePinSenderName(
@@ -1332,16 +1314,16 @@ class WhatsappWaWalletMenuHandler
     }
 
     /**
+     * Transfer confirmation: wallet PIN only on the secure web page (never in chat).
+     *
      * @param  array<string, mixed>  $ctx
      */
-    private function handleTransferPin(
-        WhatsappSession $session,
+    private function handleTransferPinWebOnly(
         string $instance,
         string $phone,
         string $text,
         array $ctx,
         WhatsappWallet $wallet,
-        ?Renter $linkedRenter
     ): void {
         if ($wallet->isPinLocked()) {
             $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked.');
@@ -1349,51 +1331,33 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $digits = preg_replace('/\D/', '', $text) ?? '';
-        if (strlen($digits) !== self::PIN_LEN) {
-            $this->client->sendText($instance, $phone, 'Send your *4-digit* PIN.');
-
-            return;
-        }
-
-        if (! $wallet->pin_hash || ! Hash::check($digits, (string) $wallet->pin_hash)) {
-            $wallet->increment('pin_failed_attempts');
-            $wallet->refresh();
-            if ((int) $wallet->pin_failed_attempts >= self::MAX_PIN_FAILS) {
-                $wallet->pin_locked_until = now()->addMinutes(self::PIN_LOCK_MINUTES);
-                $wallet->save();
-                $this->secureTransferAuth->forgetConfirmTokenIfPresent(
-                    isset($ctx['wallet_transfer_confirm_token']) && is_string($ctx['wallet_transfer_confirm_token'])
-                        ? $ctx['wallet_transfer_confirm_token']
-                        : null
-                );
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    'Too many wrong PIN attempts. Wallet PIN locked for '.self::PIN_LOCK_MINUTES.' minutes.'
-                );
-                $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
-
-                return;
-            }
-            $this->client->sendText($instance, $phone, 'Wrong PIN. Try again or *BACK* to cancel.');
-
-            return;
-        }
-
         $token = isset($ctx['wallet_transfer_confirm_token']) && is_string($ctx['wallet_transfer_confirm_token'])
             ? $ctx['wallet_transfer_confirm_token']
-            : null;
-        $this->secureTransferAuth->forgetConfirmTokenIfPresent($token);
+            : '';
+        if ($token === '') {
+            $this->recoverSubmenu($session, $instance, $phone, $wallet);
 
-        $this->transferCompletion->completeBankTransfer(
-            $session,
+            return;
+        }
+
+        $digits = preg_replace('/\D/', '', $text) ?? '';
+        if (strlen($digits) === self::PIN_LEN) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Do *not* send your wallet PIN in this chat. Open the secure link and enter your PIN there:'
+            );
+            $this->client->sendText($instance, $phone, $this->secureTransferAuth->transferConfirmUrl($token));
+
+            return;
+        }
+
+        $this->client->sendText(
             $instance,
             $phone,
-            $wallet->fresh(),
-            $ctx,
-            true
+            "Open the link below and enter your *4-digit wallet PIN* to confirm. *Do not* type your PIN in WhatsApp.\n\n*BACK* — cancel"
         );
+        $this->client->sendText($instance, $phone, $this->secureTransferAuth->transferConfirmUrl($token));
     }
 
     /**
@@ -1464,7 +1428,6 @@ class WhatsappWaWalletMenuHandler
         $ctx['step'] = 'p2p_verify_recipient';
 
         $mask = $this->maskPhoneForDisplay($recipient);
-        $mins = WhatsappWalletPendingP2pService::claimMinutes();
 
         if (! $recvWallet) {
             $ctx['p2p_recipient_unregistered'] = true;
@@ -1475,7 +1438,7 @@ class WhatsappWaWalletMenuHandler
                 "*Confirm recipient*\n\n".
                 "Number: {$mask}\n".
                 "They have *not* opened *WALLET* here yet.\n\n".
-                "After you send, they'll get a message: *REGISTER* / *WALLET* to claim, or *CANCEL* to refund you. They have *{$mins} minutes*.\n\n".
+                "After you send, they'll get a message to open *WALLET* / *REGISTER*, or *CANCEL* to return the money to you.\n\n".
                 "Reply *YES* if this is the right person.\n\n".
                 '*BACK* — enter a different number'
             );
@@ -1665,71 +1628,6 @@ class WhatsappWaWalletMenuHandler
 
         $ctx['p2p_amount'] = $amount;
         $this->secureTransferAuth->beginP2pTransferConfirmation($session, $instance, $phone, $wallet, $ctx);
-    }
-
-    /**
-     * @param  array<string, mixed>  $ctx
-     */
-    private function handleP2pPin(
-        WhatsappSession $session,
-        string $instance,
-        string $phone,
-        string $text,
-        array $ctx,
-        WhatsappWallet $wallet,
-        ?Renter $linkedRenter
-    ): void {
-        if ($wallet->isPinLocked()) {
-            $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked.');
-
-            return;
-        }
-
-        $digits = preg_replace('/\D/', '', $text) ?? '';
-        if (strlen($digits) !== self::PIN_LEN) {
-            $this->client->sendText($instance, $phone, 'Send your *4-digit* PIN.');
-
-            return;
-        }
-
-        if (! $wallet->pin_hash || ! Hash::check($digits, (string) $wallet->pin_hash)) {
-            $wallet->increment('pin_failed_attempts');
-            $wallet->refresh();
-            if ((int) $wallet->pin_failed_attempts >= self::MAX_PIN_FAILS) {
-                $wallet->pin_locked_until = now()->addMinutes(self::PIN_LOCK_MINUTES);
-                $wallet->save();
-                $this->secureTransferAuth->forgetConfirmTokenIfPresent(
-                    isset($ctx['wallet_transfer_confirm_token']) && is_string($ctx['wallet_transfer_confirm_token'])
-                        ? $ctx['wallet_transfer_confirm_token']
-                        : null
-                );
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    'Too many wrong PIN attempts. Wallet PIN locked for '.self::PIN_LOCK_MINUTES.' minutes.'
-                );
-                $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
-
-                return;
-            }
-            $this->client->sendText($instance, $phone, 'Wrong PIN. Try again or *BACK* to cancel.');
-
-            return;
-        }
-
-        $token = isset($ctx['wallet_transfer_confirm_token']) && is_string($ctx['wallet_transfer_confirm_token'])
-            ? $ctx['wallet_transfer_confirm_token']
-            : null;
-        $this->secureTransferAuth->forgetConfirmTokenIfPresent($token);
-
-        $this->transferCompletion->completeP2pTransfer(
-            $session,
-            $instance,
-            $phone,
-            $wallet->fresh(),
-            $ctx,
-            true
-        );
     }
 
     /**

@@ -5,12 +5,12 @@ namespace App\Services\Whatsapp;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingP2pCredit;
 use App\Models\WhatsappWalletTransaction;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * P2P to a number without a wallet yet: sender debited immediately; recipient claims by opening WALLET; else refund after TTL.
+ * P2P to a number without a wallet yet: sender debited immediately; recipient receives by opening WALLET (no time limit).
+ * Recipient can *CANCEL* to refund the sender. Legacy rows with expires_at set may still be auto-refunded by the scheduler.
  */
 class WhatsappWalletPendingP2pService
 {
@@ -22,7 +22,7 @@ class WhatsappWalletPendingP2pService
     /**
      * Debit sender and record a pending credit for a recipient who has no wallet yet.
      *
-     * @return array{ok: true, expires_at: \Carbon\Carbon}|array{ok: false, message: string}
+     * @return array{ok: true, expires_at: null}|array{ok: false, message: string}
      */
     public function createHold(
         WhatsappWallet $senderWallet,
@@ -34,10 +34,8 @@ class WhatsappWalletPendingP2pService
             return ['ok' => false, 'message' => 'Invalid amount.'];
         }
 
-        $expiresAt = now()->addMinutes(self::claimMinutes());
-
         try {
-            $result = DB::transaction(function () use ($senderWallet, $recipientPhoneE164, $amount, $expiresAt) {
+            $result = DB::transaction(function () use ($senderWallet, $recipientPhoneE164, $amount) {
                 $ids = array_values(array_unique(array_filter([$senderWallet->id])));
                 sort($ids, SORT_NUMERIC);
                 $locked = [];
@@ -70,7 +68,7 @@ class WhatsappWalletPendingP2pService
                     'recipient_phone_e164' => $recipientPhoneE164,
                     'amount' => $amount,
                     'status' => WhatsappWalletPendingP2pCredit::STATUS_PENDING,
-                    'expires_at' => $expiresAt,
+                    'expires_at' => null,
                     'meta' => ['channel' => 'whatsapp_menu'],
                 ]);
 
@@ -85,25 +83,22 @@ class WhatsappWalletPendingP2pService
                         'channel' => 'whatsapp_menu',
                         'awaiting_recipient_wallet' => true,
                         'pending_p2p_id' => $pending->id,
-                        'claim_deadline' => $expiresAt->toIso8601String(),
                     ],
                 ]);
 
                 $pending->sender_debit_transaction_id = $debitTxn->id;
                 $pending->save();
 
-                return ['expires_at' => $expiresAt, 'sender' => $sender->fresh()];
+                return ['sender' => $sender->fresh()];
             });
 
             $senderFresh = $result['sender'];
-            $expiresAtOut = $result['expires_at'];
 
             DB::afterCommit(function () use (
                 $evolutionInstance,
                 $recipientPhoneE164,
                 $amount,
                 $senderFresh,
-                $expiresAtOut
             ) {
                 $this->notifyRecipientToClaim(
                     $evolutionInstance,
@@ -111,11 +106,10 @@ class WhatsappWalletPendingP2pService
                     $amount,
                     (string) $senderFresh->phone_e164,
                     $senderFresh->normalizedSenderName(),
-                    $expiresAtOut
                 );
             });
 
-            return ['ok' => true, 'expires_at' => $expiresAtOut];
+            return ['ok' => true, 'expires_at' => null];
         } catch (\RuntimeException $e) {
             $code = $e->getMessage();
             Log::warning('whatsapp.wallet.p2p_pending_hold_failed', ['error' => $code, 'wallet_id' => $senderWallet->id]);
@@ -131,11 +125,6 @@ class WhatsappWalletPendingP2pService
         }
     }
 
-    public static function claimMinutes(): int
-    {
-        return max(5, min(120, (int) config('whatsapp.wallet.p2p_pending_claim_minutes', 30)));
-    }
-
     /**
      * Claim any pending credits for this wallet's phone (call after wallet exists / on submenu).
      */
@@ -149,7 +138,9 @@ class WhatsappWalletPendingP2pService
         $ids = WhatsappWalletPendingP2pCredit::query()
             ->where('recipient_phone_e164', $phone)
             ->where('status', WhatsappWalletPendingP2pCredit::STATUS_PENDING)
-            ->where('expires_at', '>', now())
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
             ->orderBy('id')
             ->pluck('id')
             ->all();
@@ -169,7 +160,7 @@ class WhatsappWalletPendingP2pService
                 if (! $pending || $pending->status !== WhatsappWalletPendingP2pCredit::STATUS_PENDING) {
                     return;
                 }
-                if ($pending->expires_at->isPast()) {
+                if ($pending->expires_at !== null && $pending->expires_at->isPast()) {
                     return;
                 }
 
@@ -244,12 +235,13 @@ class WhatsappWalletPendingP2pService
     }
 
     /**
-     * Refund all pending rows past expiry. Returns count refunded.
+     * Refund pending rows whose expires_at is set and in the past (legacy TTL holds only).
      */
     public function expireAndRefundDue(): int
     {
         $ids = WhatsappWalletPendingP2pCredit::query()
             ->where('status', WhatsappWalletPendingP2pCredit::STATUS_PENDING)
+            ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now())
             ->orderBy('id')
             ->pluck('id')
@@ -266,14 +258,13 @@ class WhatsappWalletPendingP2pService
     }
 
     /**
-     * Recipient sent *CANCEL* / *DECLINE*: refund all unexpired pending incoming for this number.
+     * Recipient sent *CANCEL* / *DECLINE*: refund all pending incoming for this number.
      */
     public function refundIncomingPendingAsRecipient(string $recipientPhoneE164, string $evolutionInstance): int
     {
         $ids = WhatsappWalletPendingP2pCredit::query()
             ->where('recipient_phone_e164', $recipientPhoneE164)
             ->where('status', WhatsappWalletPendingP2pCredit::STATUS_PENDING)
-            ->where('expires_at', '>', now())
             ->orderBy('id')
             ->pluck('id')
             ->all();
@@ -410,7 +401,6 @@ class WhatsappWalletPendingP2pService
         float $amount,
         string $senderPhoneE164,
         ?string $senderDisplayName,
-        Carbon $expiresAt
     ): void {
         if ($evolutionInstance === '') {
             $evolutionInstance = (string) config('whatsapp.evolution.instance', '');
@@ -420,12 +410,9 @@ class WhatsappWalletPendingP2pService
         }
 
         $amountStr = '₦'.number_format($amount, 2);
-        $deadline = $expiresAt->copy()->timezone(config('app.timezone'))->format('M j, g:i A').
-            ' ('.(string) config('app.timezone').')';
         $fromWho = trim((string) $senderDisplayName);
         $senderLabel = $fromWho !== '' ? $fromWho : 'A wallet user';
         $maskedSender = $this->maskPhoneTail($senderPhoneE164);
-        $mins = self::claimMinutes();
         $brand = (string) config('whatsapp.bot_brand_name', 'CheckoutNow');
 
         $this->client->sendText(
@@ -434,9 +421,8 @@ class WhatsappWalletPendingP2pService
             "💸 *{$amountStr}* from *{$senderLabel}*\n".
             "*Number:* {$maskedSender}\n\n".
             "No {$brand} wallet on this chat yet.\n".
-            "Send *WALLET* → *REGISTER* (PIN) → *your name*\n\n".
-            "*CANCEL* — money returns to sender\n\n".
-            "*Claim by {$deadline}* ({$mins} min)"
+            "Send *WALLET* → *REGISTER* (PIN link) → *your name*\n\n".
+            "*CANCEL* — money returns to sender"
         );
     }
 
