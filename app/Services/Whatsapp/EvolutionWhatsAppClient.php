@@ -47,4 +47,70 @@ class EvolutionWhatsAppClient
             return false;
         }
     }
+
+    /**
+     * Send image, video, or document via Evolution API (base64 body).
+     *
+     * @param  string  $mediatype  image|video|document|audio (Evolution expects lowercase)
+     */
+    public function sendMedia(
+        string $instanceName,
+        string $numberDigits,
+        string $mediatype,
+        string $mimetype,
+        string $base64Media,
+        ?string $caption = null,
+        ?string $fileName = null,
+    ): bool {
+        $base = config('whatsapp.evolution.base_url');
+        $key = config('whatsapp.evolution.api_key');
+
+        if ($base === '' || $key === '' || $instanceName === '') {
+            Log::warning('whatsapp.evolution: missing base_url, api_key, or instance');
+
+            return false;
+        }
+
+        $media = preg_replace('#^data:[^;]+;base64,#i', '', $base64Media) ?? $base64Media;
+        $media = trim($media);
+        if ($media === '') {
+            Log::warning('whatsapp.evolution: sendMedia empty media payload');
+
+            return false;
+        }
+
+        $url = $base.'/message/sendMedia/'.rawurlencode($instanceName);
+        $payload = [
+            'number' => $numberDigits,
+            'mediatype' => strtolower($mediatype),
+            'mimetype' => $mimetype,
+            'caption' => $caption ?? '',
+            'media' => $media,
+            'fileName' => $fileName ?? 'media.bin',
+        ];
+
+        try {
+            $response = Http::withHeaders([
+                'apikey' => $key,
+                'Content-Type' => 'application/json',
+            ])
+                ->timeout(60)
+                ->post($url, $payload);
+
+            if (! $response->successful()) {
+                Log::warning('whatsapp.evolution: sendMedia failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('whatsapp.evolution: sendMedia exception', ['error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
 }

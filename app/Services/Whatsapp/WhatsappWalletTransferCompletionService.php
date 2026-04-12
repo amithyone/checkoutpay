@@ -58,6 +58,85 @@ class WhatsappWalletTransferCompletionService
         return substr($d, 0, 5).' •••• '.substr($d, -4);
     }
 
+    private function accountLast4(string $acct): string
+    {
+        $digits = preg_replace('/\D/', '', $acct) ?? '';
+
+        return strlen($digits) >= 4 ? substr($digits, -4) : $digits;
+    }
+
+    private function forwardableReceiptFooter(): string
+    {
+        return "\n\n_You can forward this as proof — it does *not* show your wallet balance._";
+    }
+
+    /**
+     * Optional PNG receipt (no balance). Failure is logged only.
+     */
+    private function maybeSendBankTransferReceiptImage(
+        string $instance,
+        string $phone,
+        string $brand,
+        string $beneficiary,
+        string $bankName,
+        string $acct,
+        float $amount,
+        string $reference,
+        string $whenLine,
+    ): void {
+        if (! config('whatsapp.wallet.send_transfer_receipt_image', true)) {
+            return;
+        }
+        $png = WhatsappTransferReceiptImage::bankTransferPngBytes(
+            $brand,
+            $beneficiary,
+            $bankName,
+            $this->accountLast4($acct),
+            $amount,
+            $reference,
+            $whenLine,
+        );
+        if ($png === null) {
+            return;
+        }
+        $this->client->sendMedia(
+            $instance,
+            $phone,
+            'image',
+            'image/png',
+            base64_encode($png),
+            '📎 Receipt — ok to forward (no balance).',
+            'transfer-receipt.png'
+        );
+    }
+
+    private function maybeSendP2pReceiptImage(
+        string $instance,
+        string $phone,
+        string $brand,
+        string $toMasked,
+        float $amount,
+        string $whenLine,
+        string $receiptId,
+    ): void {
+        if (! config('whatsapp.wallet.send_transfer_receipt_image', true)) {
+            return;
+        }
+        $png = WhatsappTransferReceiptImage::p2pSentPngBytes($brand, $toMasked, $amount, $whenLine, $receiptId);
+        if ($png === null) {
+            return;
+        }
+        $this->client->sendMedia(
+            $instance,
+            $phone,
+            'image',
+            'image/png',
+            base64_encode($png),
+            '📎 Receipt — ok to forward (no balance).',
+            'p2p-receipt.png'
+        );
+    }
+
     /**
      * @param  array<string, mixed>  $ctx
      */
@@ -94,7 +173,7 @@ class WhatsappWalletTransferCompletionService
             $instance,
             $phone,
             "Here's your wallet 👋\n".
-            "Balance: *{$bal}*\n".
+            "💰 Balance: *{$bal}*\n".
             $vaBlock.
             "\nWhat would you like to do?\n".
             "*1* — Add money / receive\n".
@@ -194,7 +273,7 @@ class WhatsappWalletTransferCompletionService
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Transfer could not be completed. Check balance and limits, then try again.'.
+                '❌ Transfer could not be completed. Check balance and limits, then try again.'.
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
 
@@ -204,18 +283,31 @@ class WhatsappWalletTransferCompletionService
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $wallet = $wallet->fresh();
         $when = $this->transferNoticeTimeLine();
+        $tail = $this->accountLast4($acct);
+        $brand = $this->waBrand();
         $this->client->sendText(
             $instance,
             $phone,
-            "*Transfer recorded*\n\n".
+            "✅ *Transfer recorded*\n\n".
             "*To:* {$beneficiary}\n".
             "*Bank:* {$bankName}\n".
-            "*Account:* {$acct}\n".
+            "*Account:* ****{$tail}\n".
             '*Amount:* ₦'.number_format($amount, 2)."\n".
             "*Time:* {$when}\n\n".
-            '*'.$this->waBrand().'* bank payouts are not enabled — this is ledger-only until support turns them on.'."\n\n".
-            'New balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+            "🏦 *{$brand}* bank payouts are not on yet — this is *ledger-only* until support enables live sends.".
+            $this->forwardableReceiptFooter().
             $this->pinDeleteReminderSuffix($userTypedPinInChat)
+        );
+        $this->maybeSendBankTransferReceiptImage(
+            $instance,
+            $phone,
+            $brand,
+            $beneficiary,
+            $bankName,
+            $acct,
+            $amount,
+            'ledger-'.now()->format('Ymd-His'),
+            $when
         );
         $this->sendWalletSubmenu($instance, $phone, $wallet);
     }
@@ -274,7 +366,7 @@ class WhatsappWalletTransferCompletionService
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Transfer could not be completed. Check balance and limits, then try again.'.
+                '❌ Transfer could not be completed. Check balance and limits, then try again.'.
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
 
@@ -330,19 +422,34 @@ class WhatsappWalletTransferCompletionService
 
         $when = $this->transferNoticeTimeLine();
 
+        $brand = $this->waBrand();
+        $refShown = (string) ($result['reference'] ?? $reference);
+        $acctTail = $this->accountLast4($acct);
+
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Bank transfer sent*\n\n".
+                "✅ *Bank transfer sent!*\n\n".
                 "*To:* {$beneficiary}\n".
                 "*Bank:* {$bankName}\n".
-                "*Account:* {$acct}\n".
+                "*Account:* ****{$acctTail}\n".
                 '*Amount:* ₦'.number_format($amount, 2)."\n".
                 "*Time:* {$when}\n".
-                'Ref: *'.($result['reference'] ?? $reference)."*\n\n".
-                'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+                'Ref: *'.$refShown.'*'.
+                $this->forwardableReceiptFooter().
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
+            );
+            $this->maybeSendBankTransferReceiptImage(
+                $instance,
+                $phone,
+                $brand,
+                $beneficiary,
+                $bankName,
+                $acct,
+                $amount,
+                $refShown,
+                $when
             );
         } else {
             $detail = $bucket === MavonPayTransferService::BUCKET_PENDING
@@ -351,13 +458,13 @@ class WhatsappWalletTransferCompletionService
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Bank transfer not completed*\n\n".
+                "⚠️ *Bank transfer not completed*\n\n".
                 "Attempted to: *{$beneficiary}*\n".
-                "{$bankName} / {$acct} · ₦".number_format($amount, 2)."\n".
+                "{$bankName} / ****{$acctTail} · ₦".number_format($amount, 2)."\n".
                 "*Time:* {$when}\n\n".
                 $detail."\n\n".
                 "Your wallet was *refunded*.\n\n".
-                'Balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+                '💰 Balance now: *₦'.number_format((float) $wallet->balance, 2).'*'.
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
         }
@@ -414,16 +521,18 @@ class WhatsappWalletTransferCompletionService
 
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $wallet = $wallet->fresh();
+            $masked = $this->maskPhoneTail($recipient);
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Sent (waiting for recipient)*\n\n".
-                '*To:* '.$this->maskPhoneTail($recipient)."\n".
+                "⏳ *Sent — waiting for them to claim*\n\n".
+                '*To:* '.$masked."\n".
                 '*Amount:* ₦'.number_format($amount, 2)."\n\n".
                 "They have *{$mins} minutes* to send *WALLET* *on that WhatsApp number* to claim.\n\n".
                 "If they don't, your wallet will be *refunded automatically*.\n\n".
                 "*Claim by:* {$deadline}\n\n".
-                'Your new balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+                '💡 Open *WALLET* anytime here to see your balance.'.
+                $this->forwardableReceiptFooter().
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
             $this->sendWalletSubmenu($instance, $phone, $wallet);
@@ -525,7 +634,6 @@ class WhatsappWalletTransferCompletionService
                 $instance,
                 $recvFresh,
                 $amount,
-                (float) $recvFresh->balance,
                 $phone,
                 $senderDisplayName,
                 $sentAt
@@ -537,15 +645,28 @@ class WhatsappWalletTransferCompletionService
         $toLine = $recipientDisplayName !== null
             ? "*To:* {$recipientDisplayName}\n*Number:* ".$this->maskPhoneTail($recipient)
             : '*To:* '.$this->maskPhoneTail($recipient);
+        $brand = $this->waBrand();
+        $maskedTo = $this->maskPhoneTail($recipient);
+        $receiptId = 'P2P-'.$sentAt->timezone(config('app.timezone'))->format('Ymd-His');
         $this->client->sendText(
             $instance,
             $phone,
-            "*Sent*\n\n".
+            "✅ *Sent!*\n\n".
             $toLine."\n".
             '*Amount:* ₦'.number_format($amount, 2)."\n".
-            "*Time:* {$when}\n\n".
-            'Your new balance: *₦'.number_format((float) $wallet->balance, 2).'*'.
+            "*Time:* {$when}\n".
+            'Receipt: *'.$receiptId.'*'.
+            $this->forwardableReceiptFooter().
             $this->pinDeleteReminderSuffix($userTypedPinInChat)
+        );
+        $this->maybeSendP2pReceiptImage(
+            $instance,
+            $phone,
+            $brand,
+            $maskedTo,
+            $amount,
+            $when,
+            $receiptId
         );
         $this->sendWalletSubmenu($instance, $phone, $wallet);
     }

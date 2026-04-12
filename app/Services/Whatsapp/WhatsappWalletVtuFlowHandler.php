@@ -428,7 +428,7 @@ class WhatsappWalletVtuFlowHandler
         $lastPage = (int) max(0, (int) ceil($total / $pageSize) - 1);
         $page = max(0, min($lastPage, $page));
         $slice = array_slice($plans, $page * $pageSize, $pageSize);
-        $lines = ["*Data — pick a plan* (page ".($page + 1).' / '.($lastPage + 1).")\n"];
+        $lines = ['*Data — pick a plan* (page '.($page + 1).' / '.($lastPage + 1).")\n"];
         $i = 1;
         foreach ($slice as $p) {
             if (! is_array($p)) {
@@ -832,9 +832,9 @@ class WhatsappWalletVtuFlowHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Done*\n\n".
+                "*Done* ✅\n\n".
                 ($result['message'] ?? 'Success')."\n\n".
-                'New balance: *₦'.number_format($bal, 2).'*'
+                '💰 New balance: *₦'.number_format($bal, 2).'*'
             );
         } else {
             $this->client->sendText($instance, $phone, ($result['message'] ?? 'Purchase failed.')."\n\nTry again or *CANCEL*.");

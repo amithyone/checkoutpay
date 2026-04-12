@@ -18,12 +18,12 @@ class WhatsappWalletTopupNotifier
 
     /**
      * Notify the recipient after another wallet sends them money (P2P). Runs after DB commit.
+     * Message is forward-friendly and does not include their wallet balance.
      */
     public function notifyP2pReceived(
         string $senderChatInstance,
         WhatsappWallet $recipientWallet,
         float $amount,
-        float $balanceAfter,
         string $senderPhoneE164,
         ?string $senderWalletDisplayName = null,
         ?Carbon $transferredAt = null,
@@ -51,7 +51,6 @@ class WhatsappWalletTopupNotifier
         }
 
         $amountStr = '₦'.number_format($amount, 2);
-        $balStr = '₦'.number_format($balanceAfter, 2);
         $at = $transferredAt ?? now();
         $when = $at->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
             ' ('.(string) config('app.timezone').')';
@@ -60,13 +59,13 @@ class WhatsappWalletTopupNotifier
         $fromWho = $name !== '' ? $name : 'Wallet sender';
         $masked = $this->maskPhoneForNotify($senderPhoneE164);
 
-        $text = "*Money received*\n\n".
+        $text = "💸 *You received money* ✨\n\n".
             "*From:* {$fromWho}\n".
             "*Number:* {$masked}\n".
             "*Amount:* {$amountStr}\n".
             "*Time:* {$when}\n\n".
-            "New balance: {$balStr}.\n\n".
-            'Send *WALLET* to open your wallet or *MENU* for options.';
+            "💡 Open *WALLET* here to see your balance.\n\n".
+            'Send *WALLET* for the hub or *MENU* for all options.';
 
         $this->client->sendText($instance, $recipientWallet->phone_e164, $text);
     }
@@ -109,8 +108,9 @@ class WhatsappWalletTopupNotifier
         $amountStr = '₦'.number_format($credited, 2);
         $balStr = '₦'.number_format($balanceAfter, 2);
 
-        $text = "*Wallet funded*\n\n".
-            "We received {$amountStr}. Your new balance is {$balStr}.\n\n".
+        $text = "✅ *Wallet funded*\n\n".
+            "We received *{$amountStr}*.\n".
+            "💰 New balance: *{$balStr}*\n\n".
             'Send *WALLET* to open your wallet or *MENU* for all options.';
 
         $this->client->sendText($instance, $wallet->phone_e164, $text);

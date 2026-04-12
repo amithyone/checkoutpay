@@ -221,14 +221,13 @@ class WhatsappWalletPendingP2pService
                 $pending->save();
 
                 $senderId = (int) $pending->sender_wallet_id;
-                DB::afterCommit(function () use ($recv, $amount, $newBal, $senderId, $evolutionInstance) {
+                DB::afterCommit(function () use ($recv, $amount, $senderId, $evolutionInstance) {
                     $sender = WhatsappWallet::query()->find($senderId);
                     if ($sender) {
                         $this->walletNotifier->notifyP2pReceived(
                             $evolutionInstance,
                             $recv->fresh(),
                             $amount,
-                            $newBal,
                             (string) $sender->phone_e164,
                             $sender->normalizedSenderName(),
                             now()
