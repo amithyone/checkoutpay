@@ -41,6 +41,7 @@ class WhatsappWallet extends Model
         'kyc_dob',
         'kyc_bvn',
         'kyc_email',
+        'transfer_email_otp_enabled',
         'status',
     ];
 
@@ -55,6 +56,7 @@ class WhatsappWallet extends Model
         'tier2_provisioned_at' => 'datetime',
         'kyc_dob' => 'date',
         'tier' => 'integer',
+        'transfer_email_otp_enabled' => 'boolean',
     ];
 
     public function renter(): BelongsTo
@@ -113,6 +115,16 @@ class WhatsappWallet extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Tier 2 only: when true, we email a 6-digit code for transfer confirmation (default false = secure link only).
+     */
+    public function wantsTransferEmailOtp(): bool
+    {
+        return $this->isTier2()
+            && $this->transfer_email_otp_enabled
+            && $this->resolveOtpEmail() !== null;
     }
 
     public function isPinLocked(): bool

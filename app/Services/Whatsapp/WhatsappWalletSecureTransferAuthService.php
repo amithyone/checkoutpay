@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Email OTP + secure web PIN link for WhatsApp wallet transfers (bank / P2P).
+ * WhatsApp wallet transfer confirmation: secure PIN link always; optional email OTP for Tier 2 when enabled (default off).
  */
 class WhatsappWalletSecureTransferAuthService
 {
@@ -64,6 +64,47 @@ class WhatsappWalletSecureTransferAuthService
     private function sendStandaloneConfirmLink(string $instance, string $phone, string $linkUrl): void
     {
         $this->client->sendText($instance, $phone, $linkUrl);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     * @param  'tier1'|'no_email'|'otp_disabled'|'mail_failed'  $reason
+     */
+    private function beginLinkOnlyTransferConfirmation(
+        WhatsappSession $session,
+        array $ctx,
+        string $instance,
+        string $phone,
+        string $kind,
+        string $token,
+        string $linkUrl,
+        string $reason,
+    ): void {
+        $ctx['step'] = $kind === 'bank' ? 'transfer_pin' : 'p2p_pin';
+        $ctx['wallet_transfer_confirm_token'] = $token;
+        $session->update(['chat_context' => $ctx]);
+
+        $preamble = match ($reason) {
+            'tier1' => "*Tier 1* — Confirm this send on a *secure page* only.\n\n".
+                'Open the link in the *next message* and enter your *4-digit wallet PIN* there.',
+            'no_email' => "*No email on file* we can use for transfer codes.\n\n".
+                'Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.',
+            'otp_disabled' => "Email *transfer codes* are *OFF* in your settings (default — secure link only).\n\n".
+                'Open the link in the *next message* and enter your *4-digit wallet PIN* there.'."\n\n".
+                'Turn codes *ON* anytime: *WALLET* → *7* *SETTINGS*.',
+            'mail_failed' => "We could not send email right now.\n\n".
+                'Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.',
+            default => 'Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.',
+        };
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "{$preamble}\n\n".
+            "*Do not* send your wallet PIN in this chat.\n\n".
+            '*BACK* — cancel'
+        );
+        $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
     }
 
     /**
@@ -131,6 +172,7 @@ class WhatsappWalletSecureTransferAuthService
             'ctx' => $execCtx,
         ], now()->addSeconds($this->linkTtlSeconds()));
 
+        $wallet->refresh();
         $email = $wallet->resolveOtpEmail();
         $linkUrl = $this->secureConfirmBaseUrl().'/wallet/whatsapp/confirm/'.$token;
         $brand = (string) config('whatsapp.bot_brand_name', 'CheckoutNow');
@@ -138,19 +180,11 @@ class WhatsappWalletSecureTransferAuthService
             ? $this->summarizeBank($execCtx)
             : $this->summarizeP2p($execCtx);
 
-        if (! $email) {
-            $ctx['step'] = $kind === 'bank' ? 'transfer_pin' : 'p2p_pin';
-            $ctx['wallet_transfer_confirm_token'] = $token;
-            $session->update(['chat_context' => $ctx]);
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "*No email on file* for a login code.\n\n".
-                "Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.\n\n".
-                "*Do not* send your wallet PIN in this chat.\n\n".
-                '*BACK* — cancel'
-            );
-            $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
+        if (! $wallet->wantsTransferEmailOtp()) {
+            $reason = ! $wallet->isTier2()
+                ? 'tier1'
+                : ($email === null ? 'no_email' : 'otp_disabled');
+            $this->beginLinkOnlyTransferConfirmation($session, $ctx, $instance, $phone, $kind, $token, $linkUrl, $reason);
 
             return;
         }
@@ -169,18 +203,7 @@ class WhatsappWalletSecureTransferAuthService
             ));
         } catch (\Throwable $e) {
             Log::error('whatsapp.wallet.transfer_otp_mail_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
-            $ctx['step'] = $kind === 'bank' ? 'transfer_pin' : 'p2p_pin';
-            $ctx['wallet_transfer_confirm_token'] = $token;
-            $session->update(['chat_context' => $ctx]);
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "We could not send email right now.\n\n".
-                "Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.\n\n".
-                "*Do not* send your wallet PIN in this chat.\n\n".
-                '*BACK* — cancel'
-            );
-            $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
+            $this->beginLinkOnlyTransferConfirmation($session, $ctx, $instance, $phone, $kind, $token, $linkUrl, 'mail_failed');
 
             return;
         }

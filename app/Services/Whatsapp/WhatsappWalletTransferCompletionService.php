@@ -189,6 +189,10 @@ class WhatsappWalletTransferCompletionService
             ? "*5* — Airtime / Data / Electricity\n"
             : '';
 
+        $settingsLine = $isTier2
+            ? "*7* — *SETTINGS* — email code for transfers *ON* / *OFF*\n"
+            : '';
+
         $this->client->sendText(
             $instance,
             $phone,
@@ -203,6 +207,7 @@ class WhatsappWalletTransferCompletionService
             "Tip: paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
             "*6* — Recent activity (*MORE* / *PREV*)\n".
+            $settingsLine.
             "\n".
             $pinSection.
             $tier1HeadsUp.

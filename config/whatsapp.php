@@ -58,7 +58,7 @@ return [
         'tier1_temp_va_ttl_hours' => (int) env('WHATSAPP_WALLET_TIER1_TEMP_VA_TTL_HOURS', 48),
         /** Banks per page in *Transfer → bank* numbered picker (reply 1–N, MORE/PREV). */
         'bank_picker_page_size' => max(4, min(12, (int) env('WHATSAPP_WALLET_BANK_PICKER_PAGE_SIZE', 8))),
-        /** Secure web link + cache TTL for confirming transfers (wallet PIN on web only; email OTP may be sent in chat). */
+        /** Secure web link + cache TTL for confirming transfers (wallet PIN on web only). Tier 2 may enable email OTP via *7* SETTINGS (default off). */
         'transfer_confirm_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_TRANSFER_CONFIRM_TTL_MINUTES', 15))),
         /** One-time web link TTL for *REGISTER* wallet PIN setup (defaults to transfer_confirm TTL if unset). */
         'pin_setup_web_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_PIN_SETUP_WEB_TTL_MINUTES', 15))),

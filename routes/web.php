@@ -38,6 +38,13 @@ Route::post('/wallet/whatsapp/set-pin/{token}', [\App\Http\Controllers\WhatsappW
     ->middleware('throttle:20,1')
     ->name('wallet.whatsapp.pin-setup.submit');
 
+Route::get('/wallet/whatsapp/vtu-confirm/{token}', [\App\Http\Controllers\WhatsappWalletVtuConfirmController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('wallet.whatsapp.vtu-confirm.show');
+Route::post('/wallet/whatsapp/vtu-confirm/{token}', [\App\Http\Controllers\WhatsappWalletVtuConfirmController::class, 'submit'])
+    ->middleware('throttle:30,1')
+    ->name('wallet.whatsapp.vtu-confirm.submit');
+
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');

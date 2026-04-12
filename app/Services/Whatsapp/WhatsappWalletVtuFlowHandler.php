@@ -6,7 +6,6 @@ use App\Models\Renter;
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
 use App\Services\VtuNg\VtuNgApiClient;
-use Illuminate\Support\Facades\Hash;
 
 /**
  * WhatsApp wallet airtime, data, and electricity. Debits wallet; refunds on provider failure.
@@ -17,14 +16,11 @@ class WhatsappWalletVtuFlowHandler
 
     private const PIN_LEN = 4;
 
-    private const MAX_PIN_FAILS = 5;
-
-    private const PIN_LOCK_MINUTES = 15;
-
     public function __construct(
         private EvolutionWhatsAppClient $client,
         private VtuNgApiClient $vtuApi,
         private WhatsappWalletVtuPurchaseService $purchase,
+        private WhatsappWalletVtuWebPinService $vtuWebPin,
         private WhatsappWalletTransferCompletionService $transferCompletion,
         private WhatsappCheckoutServicesMenuHandler $checkoutServicesMenu,
         private WhatsappLinkedMenuHandler $linkedMenu,
@@ -95,6 +91,10 @@ class WhatsappWalletVtuFlowHandler
         }
 
         if ($cmd === 'CANCEL') {
+            if (str_ends_with($step, '_pin_web')) {
+                $t = $ctx['vtu_wallet_confirm_token'] ?? null;
+                $this->vtuWebPin->forgetToken(is_string($t) ? $t : null);
+            }
             $this->backToWalletSubmenu($session, $instance, $phone, $linkedRenter);
 
             return;
@@ -159,6 +159,56 @@ class WhatsappWalletVtuFlowHandler
 
                 return;
             }
+            if ($step === 'vtu_air_pin_web') {
+                $t = $ctx['vtu_wallet_confirm_token'] ?? null;
+                $this->vtuWebPin->forgetToken(is_string($t) ? $t : null);
+                $next = $ctx;
+                unset($next['vtu_wallet_confirm_token']);
+                $next['step'] = 'vtu_air_amount';
+                $session->update(['chat_context' => $next]);
+                $min = number_format((float) config('vtu.airtime_min', 50), 0);
+                $max = number_format((float) config('vtu.airtime_max', 50000), 0);
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    "Send the *amount* in Naira (₦{$min}–₦{$max}).\n\n*BACK* — cancel"
+                );
+
+                return;
+            }
+            if ($step === 'vtu_dat_pin_web') {
+                $t = $ctx['vtu_wallet_confirm_token'] ?? null;
+                $this->vtuWebPin->forgetToken(is_string($t) ? $t : null);
+                $next = $ctx;
+                unset($next['vtu_wallet_confirm_token']);
+                $next['step'] = 'vtu_dat_phone';
+                $session->update(['chat_context' => $next]);
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    '*Data — phone*\n\n'.
+                    "Send the *11-digit* number to receive data, or *1* for *this WhatsApp number*.\n\n".
+                    '*BACK* — plans list'
+                );
+
+                return;
+            }
+            if ($step === 'vtu_el_pin_web') {
+                $t = $ctx['vtu_wallet_confirm_token'] ?? null;
+                $this->vtuWebPin->forgetToken(is_string($t) ? $t : null);
+                $next = $ctx;
+                unset($next['vtu_wallet_confirm_token']);
+                $next['step'] = 'vtu_el_amount';
+                $session->update(['chat_context' => $next]);
+                $min = number_format((float) config('vtu.electricity_min', 500), 0);
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    "Send *amount* in Naira (minimum ₦{$min}).\n\n*BACK* — change meter"
+                );
+
+                return;
+            }
             $session->update(['chat_context' => ['step' => 'vtu_menu']]);
             $this->sendVtuRootMenu($instance, $phone);
 
@@ -171,17 +221,17 @@ class WhatsappWalletVtuFlowHandler
             'vtu_menu' => $this->handleVtuMenu($session, $instance, $phone, $cmd),
             'vtu_air_network' => $this->handleAirNetwork($session, $instance, $phone, $cmd, $ctx),
             'vtu_air_phone' => $this->handleAirPhone($session, $instance, $phone, $text, $cmd, $ctx, $phone),
-            'vtu_air_amount' => $this->handleAirAmount($session, $instance, $phone, $text, $ctx),
-            'vtu_air_pin' => $this->handleAirPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
+            'vtu_air_amount' => $this->handleAirAmount($session, $instance, $phone, $text, $ctx, $wallet),
+            'vtu_air_pin_web' => $this->handleVtuPinWeb($session, $instance, $phone, $text, $ctx),
             'vtu_dat_network' => $this->handleDatNetwork($session, $instance, $phone, $cmd, $ctx),
             'vtu_dat_pick_plan' => $this->handleDatPickPlan($session, $instance, $phone, $text, $cmd, $ctx, $linkedRenter),
-            'vtu_dat_phone' => $this->handleDatPhone($session, $instance, $phone, $text, $cmd, $ctx, $phone),
-            'vtu_dat_pin' => $this->handleDatPin($session, $instance, $phone, $text, $ctx, $wallet, $linkedRenter),
+            'vtu_dat_phone' => $this->handleDatPhone($session, $instance, $phone, $text, $cmd, $ctx, $phone, $wallet),
+            'vtu_dat_pin_web' => $this->handleVtuPinWeb($session, $instance, $phone, $text, $ctx),
             'vtu_el_disco' => $this->handleElDisco($session, $instance, $phone, $cmd, $ctx, $linkedRenter),
             'vtu_el_type' => $this->handleElType($session, $instance, $phone, $cmd, $ctx),
             'vtu_el_meter' => $this->handleElMeter($session, $instance, $phone, $text, $ctx, $linkedRenter),
-            'vtu_el_amount' => $this->handleElAmount($session, $instance, $phone, $text, $ctx),
-            'vtu_el_pin' => $this->handleElPin($session, $instance, $phone, $text, $ctx, $wallet, $phone, $linkedRenter),
+            'vtu_el_amount' => $this->handleElAmount($session, $instance, $phone, $text, $ctx, $wallet),
+            'vtu_el_pin_web' => $this->handleVtuPinWeb($session, $instance, $phone, $text, $ctx),
             default => $this->recover($session, $instance, $phone, $linkedRenter),
         };
     }
@@ -301,7 +351,8 @@ class WhatsappWalletVtuFlowHandler
         string $instance,
         string $phone,
         string $text,
-        array $ctx
+        array $ctx,
+        WhatsappWallet $wallet,
     ): void {
         $t = preg_replace('/[^\d.]/', '', $text) ?? '';
         if ($t === '' || ! is_numeric($t)) {
@@ -321,46 +372,17 @@ class WhatsappWalletVtuFlowHandler
 
             return;
         }
-        $ctx['step'] = 'vtu_air_pin';
         $ctx['vtu_amount'] = $amount;
         $session->update(['chat_context' => $ctx]);
-        $this->client->sendText(
+        $this->vtuWebPin->beginWebPinConfirmation(
+            $session->fresh(),
             $instance,
             $phone,
-            '*Confirm with wallet PIN*\n\n'.
-            'Send your *4-digit* wallet PIN to buy airtime.'."\n\n".
-            '*BACK* — change amount  *CANCEL* — wallet'
+            $wallet,
+            $ctx,
+            'airtime',
+            'vtu_air_pin_web'
         );
-    }
-
-    /**
-     * @param  array<string, mixed>  $ctx
-     */
-    private function handleAirPin(
-        WhatsappSession $session,
-        string $instance,
-        string $phone,
-        string $text,
-        array $ctx,
-        WhatsappWallet $wallet,
-        ?Renter $linkedRenter
-    ): void {
-        if (! $this->verifyPinStep($session, $instance, $phone, $text, $wallet, $linkedRenter)) {
-            return;
-        }
-
-        $net = (string) ($ctx['vtu_network'] ?? '');
-        $recipient = (string) ($ctx['vtu_recipient_e164'] ?? '');
-        $amount = isset($ctx['vtu_amount']) ? (float) $ctx['vtu_amount'] : 0.0;
-        if ($net === '' || $recipient === '' || $amount < 1) {
-            $this->recover($session, $instance, $phone, $linkedRenter);
-
-            return;
-        }
-
-        $w = $wallet->fresh();
-        $result = $this->purchase->purchaseAirtime($w, $net, $recipient, $amount);
-        $this->afterPurchase($session, $instance, $phone, $w, $result, $linkedRenter);
     }
 
     /**
@@ -535,7 +557,8 @@ class WhatsappWalletVtuFlowHandler
         string $text,
         string $cmd,
         array $ctx,
-        string $senderE164
+        string $senderE164,
+        WhatsappWallet $wallet,
     ): void {
         $recipient = null;
         if ($cmd === '1' || $cmd === 'ME' || $cmd === 'SELF') {
@@ -548,51 +571,17 @@ class WhatsappWalletVtuFlowHandler
 
             return;
         }
-        $ctx['step'] = 'vtu_dat_pin';
         $ctx['vtu_recipient_e164'] = $recipient;
         $session->update(['chat_context' => $ctx]);
-        $label = (string) ($ctx['vtu_sel_label'] ?? '');
-        $price = number_format((float) ($ctx['vtu_sel_price'] ?? 0), 2);
-        $this->client->sendText(
+        $this->vtuWebPin->beginWebPinConfirmation(
+            $session->fresh(),
             $instance,
             $phone,
-            "*Confirm data purchase*\n\n".
-            "{$label}\n".
-            "Price: *₦{$price}*\n\n".
-            'Send your *4-digit* wallet PIN to pay.'."\n\n".
-            '*BACK* — change number  *CANCEL* — wallet'
+            $wallet,
+            array_merge($ctx, ['vtu_recipient_e164' => $recipient]),
+            'data',
+            'vtu_dat_pin_web'
         );
-    }
-
-    /**
-     * @param  array<string, mixed>  $ctx
-     */
-    private function handleDatPin(
-        WhatsappSession $session,
-        string $instance,
-        string $phone,
-        string $text,
-        array $ctx,
-        WhatsappWallet $wallet,
-        ?Renter $linkedRenter
-    ): void {
-        if (! $this->verifyPinStep($session, $instance, $phone, $text, $wallet, $linkedRenter)) {
-            return;
-        }
-
-        $net = (string) ($ctx['vtu_network'] ?? '');
-        $recipient = (string) ($ctx['vtu_recipient_e164'] ?? '');
-        $vid = (int) ($ctx['vtu_sel_variation_id'] ?? 0);
-        $price = (float) ($ctx['vtu_sel_price'] ?? 0);
-        if ($net === '' || $recipient === '' || $vid < 1 || $price < 1) {
-            $this->recover($session, $instance, $phone, $linkedRenter);
-
-            return;
-        }
-
-        $w = $wallet->fresh();
-        $result = $this->purchase->purchaseData($w, $net, $recipient, $vid, $price);
-        $this->afterPurchase($session, $instance, $phone, $w, $result, $linkedRenter);
     }
 
     /**
@@ -745,7 +734,8 @@ class WhatsappWalletVtuFlowHandler
         string $instance,
         string $phone,
         string $text,
-        array $ctx
+        array $ctx,
+        WhatsappWallet $wallet,
     ): void {
         $t = preg_replace('/[^\d.]/', '', $text) ?? '';
         if ($t === '' || ! is_numeric($t)) {
@@ -760,57 +750,67 @@ class WhatsappWalletVtuFlowHandler
 
             return;
         }
-        $ctx['step'] = 'vtu_el_pin';
         $ctx['vtu_amount'] = $amount;
         $session->update(['chat_context' => $ctx]);
-        $this->client->sendText(
+        $this->vtuWebPin->beginWebPinConfirmation(
+            $session->fresh(),
             $instance,
             $phone,
-            '*Confirm with wallet PIN*\n\n'.
-            'Send your *4-digit* wallet PIN to pay electricity.'."\n\n".
-            '*BACK* — change amount  *CANCEL* — wallet'
+            $wallet,
+            $ctx,
+            'electricity',
+            'vtu_el_pin_web'
         );
     }
 
     /**
      * @param  array<string, mixed>  $ctx
      */
-    private function handleElPin(
+    private function handleVtuPinWeb(
         WhatsappSession $session,
         string $instance,
         string $phone,
         string $text,
         array $ctx,
-        WhatsappWallet $wallet,
-        string $payerE164,
-        ?Renter $linkedRenter
     ): void {
-        if (! $this->verifyPinStep($session, $instance, $phone, $text, $wallet, $linkedRenter)) {
-            return;
-        }
-
-        $service = (string) ($ctx['vtu_el_service'] ?? '');
-        $meter = (string) ($ctx['vtu_el_meter'] ?? '');
-        $variation = (string) ($ctx['vtu_el_variation'] ?? '');
-        $amount = isset($ctx['vtu_amount']) ? (float) $ctx['vtu_amount'] : 0.0;
-        $cust = (string) ($ctx['vtu_el_customer_name'] ?? '');
-        if ($service === '' || $meter === '' || $variation === '' || $amount < 1) {
-            $this->recover($session, $instance, $phone, $linkedRenter);
+        $cmd = WhatsappMenuInputNormalizer::commandToken($text);
+        $token = isset($ctx['vtu_wallet_confirm_token']) && is_string($ctx['vtu_wallet_confirm_token'])
+            ? $ctx['vtu_wallet_confirm_token']
+            : '';
+        if ($token === '') {
+            $this->recover($session, $instance, $phone, null);
 
             return;
         }
 
-        $w = $wallet->fresh();
-        $result = $this->purchase->purchaseElectricity(
-            $w,
-            $service,
-            $meter,
-            $variation,
-            $payerE164,
-            $amount,
-            $cust !== '' ? $cust : null
+        if (in_array($cmd, ['LINK', 'RESEND', 'URL'], true)) {
+            $url = $this->vtuWebPin->confirmUrl($token);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*VTU payment* — open this link to enter your wallet PIN:\n{$url}\n\n*Do not* send your PIN in this chat."
+            );
+
+            return;
+        }
+
+        $digits = preg_replace('/\D/', '', $text) ?? '';
+        if (strlen($digits) === self::PIN_LEN) {
+            $url = $this->vtuWebPin->confirmUrl($token);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "Do *not* send your wallet PIN in this chat. Use the secure link only:\n{$url}"
+            );
+
+            return;
+        }
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "Open the *VTU* link we sent. Lost it? Reply *LINK*.\n\n*BACK* · *CANCEL*"
         );
-        $this->afterPurchase($session, $instance, $phone, $w, $result, $linkedRenter);
     }
 
     /**
@@ -840,49 +840,6 @@ class WhatsappWalletVtuFlowHandler
             $this->client->sendText($instance, $phone, ($result['message'] ?? 'Purchase failed.')."\n\nTry again or *CANCEL*.");
         }
         $this->backToWalletSubmenu($session, $instance, $phone, $linkedRenter);
-    }
-
-    private function verifyPinStep(
-        WhatsappSession $session,
-        string $instance,
-        string $phone,
-        string $text,
-        WhatsappWallet $wallet,
-        ?Renter $linkedRenter
-    ): bool {
-        if ($wallet->isPinLocked()) {
-            $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked.');
-            $this->backToWalletSubmenu($session, $instance, $phone, $linkedRenter);
-
-            return false;
-        }
-        $digits = preg_replace('/\D/', '', $text) ?? '';
-        if (strlen($digits) !== self::PIN_LEN) {
-            $this->client->sendText($instance, $phone, 'Send your *4-digit* wallet PIN.');
-
-            return false;
-        }
-        if (! $wallet->pin_hash || ! Hash::check($digits, (string) $wallet->pin_hash)) {
-            $wallet->increment('pin_failed_attempts');
-            $wallet->refresh();
-            if ((int) $wallet->pin_failed_attempts >= self::MAX_PIN_FAILS) {
-                $wallet->pin_locked_until = now()->addMinutes(self::PIN_LOCK_MINUTES);
-                $wallet->save();
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    'Too many wrong PIN attempts. Locked for '.self::PIN_LOCK_MINUTES.' minutes.'
-                );
-                $this->backToWalletSubmenu($session, $instance, $phone, $linkedRenter);
-
-                return false;
-            }
-            $this->client->sendText($instance, $phone, 'Wrong PIN. Try again or *CANCEL*.');
-
-            return false;
-        }
-
-        return true;
     }
 
     private function sendNetworkPicker(string $instance, string $phone, string $forKind): void

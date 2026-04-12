@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * One-time web link to set a new WhatsApp wallet PIN (private page; link sent standalone in chat).
+ * One-time web link to set a new WhatsApp wallet PIN (private page). After PIN is saved, pending P2P credits are claimed.
  */
 class WhatsappWalletPinSetupWebService
 {
@@ -16,6 +16,7 @@ class WhatsappWalletPinSetupWebService
 
     public function __construct(
         private EvolutionWhatsAppClient $client,
+        private WhatsappWalletPendingP2pService $pendingP2p,
     ) {}
 
     private function cacheKey(string $token): string
@@ -143,6 +144,11 @@ class WhatsappWalletPinSetupWebService
         $wallet->save();
 
         Cache::forget($this->cacheKey($token));
+
+        $claimInstance = $instance !== '' ? $instance : (string) config('whatsapp.evolution.instance', '');
+        if ($claimInstance !== '') {
+            $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $claimInstance);
+        }
 
         $session->update([
             'chat_context' => [

@@ -142,7 +142,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history' || $step === 'casual_bank_pick' || $step === 'pin_setup_web')) {
+        if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history' || $step === 'casual_bank_pick' || $step === 'pin_setup_web' || $step === 'wallet_settings')) {
             $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
             return;
@@ -170,6 +170,12 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
+            if ($step === 'wallet_settings') {
+                $session->update(['chat_context' => ['step' => 'submenu']]);
+                $this->sendSubmenu($instance, $phone, $this->findOrCreateWallet($phone, $linkedRenter)->fresh());
+
+                return;
+            }
             if (in_array($step, ['pin_setup_web', 'pin_sender_name'], true)) {
                 $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
@@ -183,8 +189,11 @@ class WhatsappWaWalletMenuHandler
         }
 
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
-        if ($step === 'submenu') {
+        if (! in_array($step, ['pin_setup_web', 'pin_new', 'pin_confirm'], true)) {
             $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
+        }
+
+        if ($step === 'submenu') {
             if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) !== null) {
                 if (! $wallet->hasPin()) {
                     $this->client->sendText($instance, $phone, 'Set a wallet PIN first. Reply *REGISTER*.');
@@ -210,6 +219,7 @@ class WhatsappWaWalletMenuHandler
 
         match ($step) {
             'submenu' => $this->handleSubmenu($session, $instance, $phone, $text, $cmd, $wallet, $linkedRenter),
+            'wallet_settings' => $this->handleWalletSettings($session, $instance, $phone, $cmd, $wallet, $linkedRenter),
             'casual_bank_pick' => $this->handleCasualBankPick($session, $instance, $phone, $text, $ctx, $wallet),
             'pin_setup_web', 'pin_new', 'pin_confirm' => $this->handlePinSetupWebWait($session, $instance, $phone, $text, $ctx, $wallet),
             'pin_sender_name' => $this->handlePinSenderName($session, $instance, $phone, $text, $wallet, $linkedRenter),
@@ -321,6 +331,10 @@ class WhatsappWaWalletMenuHandler
             ? "*5* — Airtime / Data / Electricity\n"
             : '';
 
+        $settingsLine = $isTier2
+            ? "*7* — *SETTINGS* — email code for transfers *ON* / *OFF*\n"
+            : '';
+
         $this->client->sendText(
             $instance,
             $phone,
@@ -335,6 +349,7 @@ class WhatsappWaWalletMenuHandler
             "Tip: you can paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
             "*6* — See recent activity (*MORE* / *PREV* to flip pages)\n".
+            $settingsLine.
             "\n".
             $pinSection.
             $tier1HeadsUp.
@@ -342,6 +357,98 @@ class WhatsappWaWalletMenuHandler
             "{$bankNote}\n\n".
             "If you've sent to someone before, you can type e.g. *send 5k to Tunde Opay* in plain English.\n\n".
             WhatsappMenuInputNormalizer::navigationHelpFooter().' · *STOP* — pause replies'
+        );
+    }
+
+    private function sendWalletSettingsScreen(string $instance, string $phone, WhatsappWallet $wallet): void
+    {
+        $wallet->refresh();
+        $on = (bool) $wallet->transfer_email_otp_enabled;
+        $hasEmail = $wallet->resolveOtpEmail() !== null;
+        $statusLine = $on
+            ? '*ON* — We email a *6-digit code*; you can still confirm with the secure PIN link.'
+            : '*OFF* — *Default.* Confirm with the secure PIN link only (recommended).';
+        $emailWarn = $hasEmail
+            ? ''
+            : "\n\n_No email on file — complete Tier 2 / link an account with email before you can turn this *ON*._";
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Wallet settings* (Tier 2)\n\n".
+            "*Email code* after starting a bank or WhatsApp send:\n{$statusLine}{$emailWarn}\n\n".
+            "Reply *OFF* or *ON*. Shortcuts: *1* = OFF, *2* = ON.\n".
+            "Wallet PIN is always entered on the *secure page* — never in this chat.\n\n".
+            '*BACK* — wallet menu'
+        );
+    }
+
+    /**
+     * Tier 2: toggle transfer email OTP (default off = link only).
+     */
+    private function handleWalletSettings(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $cmd,
+        WhatsappWallet $wallet,
+        ?Renter $linkedRenter,
+    ): void {
+        if ($cmd === 'WALLET' || $cmd === '') {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->sendSubmenu($instance, $phone, $this->findOrCreateWallet($phone, $linkedRenter)->fresh());
+
+            return;
+        }
+
+        if (! $wallet->isTier2()) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        if (in_array($cmd, ['OFF', '1'], true)) {
+            $wallet->transfer_email_otp_enabled = false;
+            $wallet->save();
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Saved: email transfer codes are *OFF*. Confirm sends with the *secure link* only.'
+            );
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        if (in_array($cmd, ['ON', '2'], true)) {
+            if ($wallet->resolveOtpEmail() === null) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'We need an *email* on your profile to send codes. Complete *Tier 2* / link an account with email, then try *ON* again.'
+                );
+
+                return;
+            }
+            $wallet->transfer_email_otp_enabled = true;
+            $wallet->save();
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Saved: email transfer codes are *ON*. We will email a *6-digit code*; you can still use the PIN link.'
+            );
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "Reply *ON* or *OFF* (or *2* / *1*). *BACK* — wallet menu.\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
@@ -354,6 +461,22 @@ class WhatsappWaWalletMenuHandler
         WhatsappWallet $wallet,
         ?Renter $linkedRenter
     ): void {
+        if ($cmd === '7' || $cmd === 'SETTINGS') {
+            if (! $wallet->isTier2()) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Wallet *SETTINGS* (email codes for transfers) are for *Tier 2*. Tier 1 confirms sends with a *secure link* only. Upgrade with *3* *UPGRADE*.'
+                );
+
+                return;
+            }
+            $session->update(['chat_context' => ['step' => 'wallet_settings']]);
+            $this->sendWalletSettingsScreen($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
         if (in_array($cmd, ['REGISTER', 'PIN'], true)) {
             if ($wallet->hasPin()) {
                 if ($wallet->normalizedSenderName() === null) {
@@ -382,15 +505,15 @@ class WhatsappWaWalletMenuHandler
                     'pin_setup_web_token' => $token,
                 ],
             ]);
+            $url = $this->pinSetupWeb->setupUrl($token);
             $this->client->sendText(
                 $instance,
                 $phone,
                 "*Set wallet PIN*\n\n".
-                "Open the link in the *next message* to choose your *4-digit PIN* on a secure page.\n\n".
+                "Open this link to choose your *4-digit PIN* on a secure page:\n{$url}\n\n".
                 "*Do not* send your PIN in this chat.\n\n".
-                '*BACK* — cancel'
+                'Lost the link? Reply *LINK* anytime. *BACK* — cancel'
             );
-            $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
 
             return;
         }
@@ -578,7 +701,7 @@ class WhatsappWaWalletMenuHandler
         }
 
         $range = $wallet->isTier2()
-            ? ($this->vtuFlow->isAvailable() ? '*1*, *2*, *4*, *5*, *6*' : '*1*, *2*, *4*, *6*')
+            ? ($this->vtuFlow->isAvailable() ? '*1*, *2*, *4*, *5*, *6*, *7*' : '*1*, *2*, *4*, *6*, *7*')
             : ($this->vtuFlow->isAvailable() ? '*1*–*6*' : '*1*–*4*, *6*');
         $this->client->sendText(
             $instance,
@@ -891,14 +1014,36 @@ class WhatsappWaWalletMenuHandler
             ],
         ]);
 
-        $digits = preg_replace('/\D/', '', $text) ?? '';
-        if (strlen($digits) === self::PIN_LEN) {
+        $cmd = $this->normalizeWalletCommand($text);
+        if (in_array($cmd, ['LINK', 'RESEND', 'URL'], true)) {
+            $url = $this->pinSetupWeb->setupUrl($token);
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Do *not* send your wallet PIN in this chat. Use the secure link only:'
+                "*Set wallet PIN* — open this link:\n{$url}\n\n*Do not* send your PIN in this chat."
             );
-            $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
+
+            return;
+        }
+
+        if (in_array($cmd, ['REGISTER', 'PIN'], true)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'We already sent your PIN setup link. Scroll up and tap it, or reply *LINK* to see it again.'
+            );
+
+            return;
+        }
+
+        $digits = preg_replace('/\D/', '', $text) ?? '';
+        if (strlen($digits) === self::PIN_LEN) {
+            $url = $this->pinSetupWeb->setupUrl($token);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "Do *not* send your wallet PIN in this chat. Open the secure link only:\n{$url}"
+            );
 
             return;
         }
@@ -906,9 +1051,8 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "Open the link below to set your *4-digit PIN* on a secure page. *Do not* type your PIN here.\n\n*BACK* — cancel"
+            "Use the *PIN setup link* we sent when you tapped *REGISTER*. Lost it? Reply *LINK*.\n\n*BACK* — cancel"
         );
-        $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
     }
 
     private function handlePinSenderName(
