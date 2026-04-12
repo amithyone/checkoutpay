@@ -182,6 +182,8 @@ class MevonRubiesVirtualAccountService
                 'top_level_keys' => array_keys($json),
                 'data_is_array' => isset($json['data']) && is_array($json['data']),
                 'data_keys' => isset($json['data']) && is_array($json['data']) ? array_keys($json['data']) : [],
+                'raw_response' => $json,
+                'va_field_debug' => $this->rubiesVaFieldDebugSnapshot($json),
             ]);
             throw new \RuntimeException('MevonRubies complete: missing account_number in response.');
         }
@@ -208,6 +210,44 @@ class MevonRubiesVirtualAccountService
      * @param  array<string, mixed>  $json
      * @param  list<string>  $keys
      */
+    /**
+     * Log-friendly snapshot of VA-related keys (type + raw value) when parsing fails.
+     *
+     * @param  array<string, mixed>  $json
+     * @return array<string, array{type: string, value: mixed}>
+     */
+    protected function rubiesVaFieldDebugSnapshot(array $json): array
+    {
+        $watch = [
+            'status', 'message', 'account_number', 'accountNumber', 'account_name', 'accountName',
+            'bank_name', 'bankName', 'bank_code', 'bankCode', 'reference',
+            'account_parent', 'accountParent', 'nuban',
+        ];
+        $out = [];
+        foreach ($watch as $key) {
+            if (! array_key_exists($key, $json)) {
+                continue;
+            }
+            $v = $json[$key];
+            $out[$key] = [
+                'type' => get_debug_type($v),
+                'value' => $v,
+            ];
+        }
+
+        if (isset($json['data']) && is_array($json['data'])) {
+            foreach ($json['data'] as $k => $v) {
+                $sk = is_string($k) ? $k : 'idx_'.$k;
+                $out['data.'.$sk] = [
+                    'type' => get_debug_type($v),
+                    'value' => $v,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
     protected function rubiesVaField(array $json, string ...$keys): string
     {
         $nested = $json['data'] ?? null;
