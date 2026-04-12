@@ -56,10 +56,12 @@ return [
         'base_url' => env('MEVONRUBIES_BASE_URL', ''),
         'secret_key' => env('MEVONRUBIES_SECRET_KEY', ''),
         'timeout_seconds' => (int) env('MEVONRUBIES_TIMEOUT_SECONDS', 20),
-        /** POST path for initiate / complete / resendOtp (Tier 2 permanent VA). */
+        /** POST path: createrubies (action=create personal VA, no OTP). */
         'create_path' => env('MEVONRUBIES_CREATE_PATH', '/V1/createrubies'),
         /** Used only for server-side createRenterAccount when gender is not stored on the renter. */
         'default_gender' => env('MEVONRUBIES_DEFAULT_GENDER', 'male'),
+        /** DOB (Y-m-d) when Renter has no date of birth on file (API requires dob). */
+        'renter_placeholder_dob' => env('MEVONRUBIES_RENTER_PLACEHOLDER_DOB', '1990-01-01'),
     ],
 
     /*

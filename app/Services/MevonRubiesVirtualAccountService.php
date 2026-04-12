@@ -145,7 +145,72 @@ class MevonRubiesVirtualAccountService
     }
 
     /**
-     * Step 1: initiate — may return account details immediately or a reference for OTP completion.
+     * Create a personal Rubies VA in one call (no OTP). Mevon createrubies: action=create, account_type=personal.
+     * Supply either bvn11 or nin (not both required by caller; API accepts bvn or nin per provider docs).
+     *
+     * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
+     */
+    public function createRubiesPersonalAccount(
+        string $fname,
+        string $lname,
+        string $phoneLocal11,
+        string $dobYmd,
+        string $email,
+        ?string $bvn11 = null,
+        ?string $nin = null,
+    ): array {
+        $fname = trim($fname);
+        $lname = trim($lname);
+        $email = strtolower(trim($email));
+        if ($fname === '' || $lname === '') {
+            throw new \RuntimeException('First and last name are required.');
+        }
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dobYmd)) {
+            throw new \RuntimeException('Date of birth must be YYYY-MM-DD.');
+        }
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('Valid email is required.');
+        }
+        $bvn = $bvn11 !== null ? (preg_replace('/\D+/', '', $bvn11) ?? '') : '';
+        $ninDigits = $nin !== null ? (preg_replace('/\D+/', '', $nin) ?? '') : '';
+
+        $phoneLocal11 = $this->normalizeToLocal11($phoneLocal11);
+
+        $body = [
+            'action' => 'create',
+            'account_type' => 'personal',
+            'fname' => $fname,
+            'lname' => $lname,
+            'phone' => $phoneLocal11,
+            'dob' => $dobYmd,
+            'email' => $email,
+        ];
+        if (strlen($bvn) === 11) {
+            $body['bvn'] = $bvn;
+        } elseif (strlen($ninDigits) === 11) {
+            $body['nin'] = $ninDigits;
+        } else {
+            throw new \RuntimeException('BVN or NIN (11 digits each) is required.');
+        }
+
+        $json = $this->postCreaterubies($body);
+        $out = $this->parseVaPayload($json);
+        if (trim($out['account_number']) === '') {
+            Log::channel('whatsapp_wallet_kyc')->error('MevonRubies create: unparseable VA payload', [
+                'top_level_keys' => array_keys($json),
+                'data_is_array' => isset($json['data']) && is_array($json['data']),
+                'data_keys' => isset($json['data']) && is_array($json['data']) ? array_keys($json['data']) : [],
+                'raw_response' => $json,
+                'va_field_debug' => $this->rubiesVaFieldDebugSnapshot($json),
+            ]);
+            throw new \RuntimeException('MevonRubies create: missing account_number in response.');
+        }
+
+        return $out;
+    }
+
+    /**
+     * @deprecated Legacy initiate + OTP flow; prefer {@see createRubiesPersonalAccount}.
      *
      * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
      */
@@ -164,7 +229,7 @@ class MevonRubiesVirtualAccountService
     }
 
     /**
-     * Step 2: submit OTP to complete account creation.
+     * @deprecated Legacy OTP completion; prefer {@see createRubiesPersonalAccount}.
      *
      * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
      */
@@ -192,7 +257,7 @@ class MevonRubiesVirtualAccountService
     }
 
     /**
-     * Step 3: resend OTP for a pending reference.
+     * @deprecated Legacy OTP flow.
      */
     public function resendRubiesOtp(string $reference): void
     {
@@ -298,9 +363,8 @@ class MevonRubiesVirtualAccountService
     }
 
     /**
-     * Create renter-specific reusable Rubies account (server-side only).
-     * If the provider requires OTP, initiate returns a reference without an account — this method throws
-     * because OTP must be completed on a channel tied to the BVN phone (e.g. WhatsApp Tier 2).
+     * Create renter-specific reusable Rubies account (server-side only). Uses createrubies action=create (no OTP).
+     * DOB comes from config {@see config('services.mevonrubies.renter_placeholder_dob')} when not on the renter model.
      */
     public function createRenterAccount(Renter $renter): array
     {
@@ -328,32 +392,29 @@ class MevonRubiesVirtualAccountService
             throw new \RuntimeException('Renter BVN must be 11 digits.');
         }
 
-        $gender = strtolower(trim((string) config('services.mevonrubies.default_gender', 'male')));
-        if (! in_array($gender, ['male', 'female'], true)) {
-            $gender = 'male';
+        $dob = (string) config('services.mevonrubies.renter_placeholder_dob', '1990-01-01');
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+            $dob = '1990-01-01';
         }
 
-        $parsed = $this->initiateRubiesAccount($fname, $lname, $gender, $phoneLocal, $bvn);
+        $parsed = $this->createRubiesPersonalAccount(
+            $fname,
+            $lname,
+            $phoneLocal,
+            $dob,
+            strtolower(trim((string) $renter->email)),
+            $bvn,
+            null
+        );
 
-        if ($parsed['account_number'] !== '') {
-            return [
-                'account_number' => $parsed['account_number'],
-                'account_name' => $parsed['account_name'],
-                'bank_name' => $parsed['bank_name'],
-                'bank_code' => $parsed['bank_code'],
-                'reference' => $parsed['reference'],
-                'raw' => $parsed['raw'],
-            ];
-        }
-
-        if ($parsed['reference'] !== '') {
-            throw new \RuntimeException(
-                'Rubies requires an OTP sent to the phone linked to this BVN. '.
-                'Complete Tier 2 on WhatsApp from that same mobile number, or contact support.'
-            );
-        }
-
-        throw new \RuntimeException('MevonRubies initiate returned no account number and no reference.');
+        return [
+            'account_number' => $parsed['account_number'],
+            'account_name' => $parsed['account_name'],
+            'bank_name' => $parsed['bank_name'],
+            'bank_code' => $parsed['bank_code'],
+            'reference' => $parsed['reference'],
+            'raw' => $parsed['raw'],
+        ];
     }
 
     protected function normalizeToLocal11(string $phone): string

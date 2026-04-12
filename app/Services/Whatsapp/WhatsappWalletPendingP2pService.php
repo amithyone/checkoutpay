@@ -431,13 +431,12 @@ class WhatsappWalletPendingP2pService
         $this->client->sendText(
             $evolutionInstance,
             $recipientPhoneE164,
-            "*You have a transfer*\n\n".
-            "*From:* {$senderLabel}\n".
-            "*Number:* {$maskedSender}\n".
-            "*Amount:* {$amountStr}\n\n".
-            "Send *REGISTER* or *WALLET* *here* to open your {$brand} wallet and *access the money*.\n\n".
-            "Or send *CANCEL* to *decline* — the money goes *back* to the sender.\n\n".
-            "*You have {$mins} minutes* (by {$deadline})."
+            "💸 *{$amountStr}* from *{$senderLabel}*\n".
+            "*Number:* {$maskedSender}\n\n".
+            "No {$brand} wallet on this chat yet.\n".
+            "Send *WALLET* → *REGISTER* (PIN) → *your name*\n\n".
+            "*CANCEL* — money returns to sender\n\n".
+            "*Claim by {$deadline}* ({$mins} min)"
         );
     }
 

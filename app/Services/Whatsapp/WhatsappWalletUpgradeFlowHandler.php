@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Tier 2: collect KYC (fname, lname, dob, gender, bvn, email), confirm WhatsApp number,
- * then Mevon Rubies POST /V1/createrubies: initiate → OTP (if required) → complete.
+ * then Mevon Rubies POST /V1/createrubies: action=create, account_type=personal (no OTP).
  */
 class WhatsappWalletUpgradeFlowHandler
 {
@@ -83,6 +83,7 @@ class WhatsappWalletUpgradeFlowHandler
             $phone,
             "Nice — let's set up your Tier 2 account 🏦\n\n".
             "You'll get a *permanent* bank number for topping up via *".$this->waBrand()."*.\n".
+            "No separate bank *OTP* step — we create the account once your details are confirmed.\n".
             "The number on this WhatsApp chat should match what the bank has on file.\n\n".
             "First, what's your *first name* exactly as on your BVN?\n\n".
             '*CANCEL* to stop · *0* back · *00* menu · *000* main'
@@ -128,7 +129,7 @@ class WhatsappWalletUpgradeFlowHandler
             'bvn' => $this->stepBvn($session, $instance, $phone, $text, $ctx),
             'email' => $this->stepEmail($session, $instance, $phone, $text, $ctx),
             'confirm_phone' => $this->stepConfirmPhone($session, $instance, $phone, $text, $ctx, $cmd),
-            'rubies_otp' => $this->stepRubiesOtp($session, $instance, $phone, $text, $ctx, $cmd),
+            'rubies_otp' => $this->recover($session, $instance, $phone),
             default => $this->recover($session, $instance, $phone),
         };
     }
@@ -370,68 +371,35 @@ class WhatsappWalletUpgradeFlowHandler
         );
 
         try {
-            $init = $this->mevonRubies->initiateRubiesAccount(
+            $created = $this->mevonRubies->createRubiesPersonalAccount(
                 (string) ($ctx['fname'] ?? ''),
                 (string) ($ctx['lname'] ?? ''),
-                (string) ($ctx['gender'] ?? 'male'),
                 $apiPhone,
+                (string) ($ctx['dob'] ?? ''),
+                (string) ($ctx['email'] ?? ''),
                 (string) ($ctx['bvn'] ?? ''),
+                null,
             );
 
-            $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_initiate_response', [
+            $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_create_response', [
                 'phone' => $phone,
                 'instance' => $instance,
                 'whatsapp_wallet_id' => $wallet->id,
-                'has_account_number' => ($init['account_number'] ?? '') !== '',
-                'has_reference' => ($init['reference'] ?? '') !== '',
-                'reference_suffix' => ($init['reference'] ?? '') !== ''
-                    ? substr((string) $init['reference'], -8)
+                'has_account_number' => ($created['account_number'] ?? '') !== '',
+                'has_reference' => ($created['reference'] ?? '') !== '',
+                'reference_suffix' => ($created['reference'] ?? '') !== ''
+                    ? substr((string) $created['reference'], -8)
                     : null,
-                'account_suffix' => ($init['account_number'] ?? '') !== ''
-                    ? substr((string) $init['account_number'], -4)
+                'account_suffix' => ($created['account_number'] ?? '') !== ''
+                    ? substr((string) $created['account_number'], -4)
                     : null,
-                'bank_name' => $init['bank_name'] ?? null,
-                'raw_summary' => $this->summarizeRubiesRaw($init['raw'] ?? []),
+                'bank_name' => $created['bank_name'] ?? null,
+                'raw_summary' => $this->summarizeRubiesRaw($created['raw'] ?? []),
             ]);
 
-            if ($init['account_number'] !== '') {
-                $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $init);
-
-                return;
-            }
-
-            if ($init['reference'] === '') {
-                $this->kycLog('warning', 'whatsapp.wallet.kyc.rubies_initiate_failed', [
-                    'phone' => $phone,
-                    'instance' => $instance,
-                    'whatsapp_wallet_id' => $wallet->id,
-                    'reason' => 'missing_reference',
-                    'raw_summary' => $this->summarizeRubiesRaw($init['raw'] ?? []),
-                ]);
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    'We could not start bank verification. Try *UPGRADE* again later or contact support.'
-                );
-                $session->update(['chat_flow' => null, 'chat_context' => null]);
-
-                return;
-            }
-
-            $ctx['rubies_pending_reference'] = $init['reference'];
-            $ctx['step'] = 'rubies_otp';
-            $session->update(['chat_context' => $ctx]);
-
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "*OTP sent*\n\n".
-                "Check the phone number linked to your *BVN* for a code from the bank.\n\n".
-                'Send the *OTP* here (usually *6 digits*).\n\n'.
-                '*RESEND* — request another code if it expired.'
-            );
+            $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $created);
         } catch (\Throwable $e) {
-            $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_initiate_exception', [
+            $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_create_exception', [
                 'phone' => $phone,
                 'instance' => $instance,
                 'whatsapp_wallet_id' => $wallet->id,
@@ -441,123 +409,9 @@ class WhatsappWalletUpgradeFlowHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'We could not create your bank account right now. Try *UPGRADE* again later or use the web app from *MENU*.'
+                'We could not create your bank account right now. Check your details and try *UPGRADE* again, or use the web app from *MENU*.'
             );
             $session->update(['chat_flow' => null, 'chat_context' => null]);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $ctx
-     * @param  array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array}  $va
-     */
-    private function stepRubiesOtp(
-        WhatsappSession $session,
-        string $instance,
-        string $phone,
-        string $text,
-        array $ctx,
-        string $cmd
-    ): void {
-        $ref = isset($ctx['rubies_pending_reference']) && is_string($ctx['rubies_pending_reference'])
-            ? trim($ctx['rubies_pending_reference'])
-            : '';
-        if ($ref === '') {
-            $this->kycLog('warning', 'whatsapp.wallet.kyc.rubies_otp_missing_reference', [
-                'phone' => $phone,
-                'instance' => $instance,
-            ]);
-            $this->recover($session, $instance, $phone);
-
-            return;
-        }
-
-        if (str_starts_with($cmd, 'RESEND')) {
-            try {
-                $this->mevonRubies->resendRubiesOtp($ref);
-                $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_otp_resent', [
-                    'phone' => $phone,
-                    'instance' => $instance,
-                    'reference_suffix' => substr($ref, -8),
-                ]);
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    'If your number matches your BVN, a new OTP should arrive shortly. Send the code here when you receive it.'
-                );
-            } catch (\Throwable $e) {
-                $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_resend_otp_failed', [
-                    'phone' => $phone,
-                    'instance' => $instance,
-                    'reference_suffix' => substr($ref, -8),
-                    'exception_class' => $e::class,
-                    'error' => $e->getMessage(),
-                ]);
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    'Could not resend the OTP right now. Try *RESEND* again in a minute or *CANCEL* and start *UPGRADE* over.'
-                );
-            }
-
-            return;
-        }
-
-        $digits = preg_replace('/\D+/', '', $text) ?? '';
-        if (strlen($digits) < 4 || strlen($digits) > 8) {
-            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
-                'phone' => $phone,
-                'instance' => $instance,
-                'step' => 'rubies_otp',
-                'reason' => 'otp_bad_length',
-                'digit_count' => strlen($digits),
-            ]);
-            $this->client->sendText(
-                $instance,
-                $phone,
-                'Send the *OTP* from the bank (numbers only), or *RESEND* for a new code.'
-            );
-
-            return;
-        }
-
-        $wallet = WhatsappWallet::query()->firstOrCreate(
-            ['phone_e164' => $phone],
-            [
-                'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
-                'balance' => 0,
-                'status' => WhatsappWallet::STATUS_ACTIVE,
-            ]
-        );
-
-        try {
-            $result = $this->mevonRubies->completeRubiesAccount($ref, $digits);
-            $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_complete_response', [
-                'phone' => $phone,
-                'instance' => $instance,
-                'whatsapp_wallet_id' => $wallet->id,
-                'has_account_number' => ($result['account_number'] ?? '') !== '',
-                'account_suffix' => ($result['account_number'] ?? '') !== ''
-                    ? substr((string) $result['account_number'], -4)
-                    : null,
-                'reference_suffix' => substr($ref, -8),
-                'raw_summary' => $this->summarizeRubiesRaw($result['raw'] ?? []),
-            ]);
-            $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $result);
-        } catch (\Throwable $e) {
-            $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_complete_failed', [
-                'phone' => $phone,
-                'instance' => $instance,
-                'whatsapp_wallet_id' => $wallet->id,
-                'reference_suffix' => substr($ref, -8),
-                'exception_class' => $e::class,
-                'error' => $e->getMessage(),
-            ]);
-            $err = $e->getMessage();
-            $userHint = str_contains($err, 'missing account_number')
-                ? 'The bank replied but we could not read your new account details. Try *RESEND* for a new code, or contact support (this is usually fixed on our side).'
-                : 'That code did not work. Check the OTP and try again, or send *RESEND* for a new one.';
-            $this->client->sendText($instance, $phone, $userHint);
         }
     }
 
@@ -585,9 +439,7 @@ class WhatsappWalletUpgradeFlowHandler
             'mevon_virtual_account_number' => $va['account_number'],
             'mevon_bank_name' => $va['bank_name'],
             'mevon_bank_code' => $va['bank_code'],
-            'mevon_reference' => $va['reference'] !== ''
-                ? $va['reference']
-                : (is_string($ctx['rubies_pending_reference'] ?? null) ? $ctx['rubies_pending_reference'] : $wallet->mevon_reference),
+            'mevon_reference' => $va['reference'] !== '' ? $va['reference'] : $wallet->mevon_reference,
             'tier2_provisioned_at' => now(),
         ]);
 
@@ -646,20 +498,9 @@ class WhatsappWalletUpgradeFlowHandler
         $trim = trim($text);
         $cmdU = strtoupper($cmd);
 
-        if ($step === 'rubies_otp' && str_starts_with($cmdU, 'RESEND')) {
-            return [
-                'input_type' => 'resend_otp',
-                'cmd' => $cmdU,
-            ];
-        }
-
         return match ($step) {
             'bvn' => [
                 'input_type' => 'bvn',
-                'digit_count' => strlen(preg_replace('/\D+/', '', $trim) ?? ''),
-            ],
-            'rubies_otp' => [
-                'input_type' => 'otp',
                 'digit_count' => strlen(preg_replace('/\D+/', '', $trim) ?? ''),
             ],
             'email' => ['input_type' => 'email', 'value' => $trim],

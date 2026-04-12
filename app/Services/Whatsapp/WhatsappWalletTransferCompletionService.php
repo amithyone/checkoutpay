@@ -142,6 +142,17 @@ class WhatsappWalletTransferCompletionService
      */
     public function sendWalletSubmenu(string $instance, string $phone, WhatsappWallet $wallet): void
     {
+        $wallet = $wallet->fresh();
+        if ($wallet->needsQuickWalletSetup()) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                WhatsappWalletOnboardingCopy::compactWalletSubmenuBody($wallet)
+            );
+
+            return;
+        }
+
         $bal = '₦'.number_format((float) $wallet->balance, 2);
         $t1max = number_format((float) config('whatsapp.wallet.tier1_max_balance', 50000), 0);
         $pinLine = $wallet->hasPin()

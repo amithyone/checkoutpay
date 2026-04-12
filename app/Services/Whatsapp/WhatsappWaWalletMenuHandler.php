@@ -81,7 +81,7 @@ class WhatsappWaWalletMenuHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Set a wallet PIN first. Open *WALLET* (*2* from main menu) and reply *REGISTER*.'
+                'Set a wallet PIN first: send *WALLET* then *REGISTER*.'
             );
 
             return;
@@ -270,6 +270,17 @@ class WhatsappWaWalletMenuHandler
 
     private function sendSubmenu(string $instance, string $phone, WhatsappWallet $wallet): void
     {
+        $wallet = $wallet->fresh();
+        if ($wallet->needsQuickWalletSetup()) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                WhatsappWalletOnboardingCopy::compactWalletSubmenuBody($wallet)
+            );
+
+            return;
+        }
+
         $bal = '₦'.number_format((float) $wallet->balance, 2);
         $t1max = number_format((float) config('whatsapp.wallet.tier1_max_balance', 50000), 0);
         $pinLine = $wallet->hasPin()
@@ -332,6 +343,11 @@ class WhatsappWaWalletMenuHandler
     ): void {
         if (in_array($cmd, ['REGISTER', 'PIN'], true)) {
             if ($wallet->hasPin()) {
+                if ($wallet->normalizedSenderName() === null) {
+                    $this->startSenderNameStep($session, $instance, $phone);
+
+                    return;
+                }
                 $this->client->sendText(
                     $instance,
                     $phone,
@@ -357,7 +373,7 @@ class WhatsappWaWalletMenuHandler
                 $instance,
                 $phone,
                 "*Set wallet PIN*\n\n".
-                "Send a *4-digit* PIN here (numbers only), then confirm — *or* open the page in the *next message* to set your PIN privately.\n\n".
+                "Send *4 digits* here (twice to confirm), or use the *link* in the next message.\n\n".
                 '*BACK* — cancel'
             );
             $this->client->sendText($instance, $phone, $this->pinSetupWeb->setupUrl($token));
@@ -514,6 +530,16 @@ class WhatsappWaWalletMenuHandler
 
         if ($cmd === 'WALLET' || $cmd === '') {
             $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        if ($wallet->needsQuickWalletSetup()) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Reply *REGISTER* (PIN), send *your name*, or *1* to add money. *MENU* — all services.'
+            );
 
             return;
         }
@@ -868,10 +894,8 @@ class WhatsappWaWalletMenuHandler
             $instance,
             $phone,
             "*PIN saved*\n\n".
-            "*Your send name*\n\n".
-            'Send the name you want shown on your transfers (e.g. your full name). '.
-            'Between *'.self::SENDER_NAME_MIN_LEN.'* and *'.self::SENDER_NAME_MAX_LEN."* characters.\n\n".
-            '*BACK* — skip for now (you will be asked before you can send money).'
+            'Send *your name* for transfers (*'.self::SENDER_NAME_MIN_LEN.'*–*'.self::SENDER_NAME_MAX_LEN.'* characters, e.g. *Ade Johnson*).'."\n\n".
+            '*BACK* — skip (we will ask again before you send money).'
         );
     }
 
@@ -909,9 +933,8 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "*Your send name*\n\n".
-            'Before you can send money, send the name you want shown on your transfers (e.g. your full name). '.
-            'Between *'.self::SENDER_NAME_MIN_LEN.'* and *'.self::SENDER_NAME_MAX_LEN."* characters.\n\n".
+            "*Your name*\n\n".
+            'Send the name shown on your transfers (*'.self::SENDER_NAME_MIN_LEN.'*–*'.self::SENDER_NAME_MAX_LEN.'* characters).'."\n\n".
             '*BACK* — cancel'
         );
     }

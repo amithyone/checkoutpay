@@ -77,19 +77,15 @@ class WhatsappCheckoutServicesMenuHandler
         $rentals = $this->portalRentals();
 
         return "*Checkout*\n\n".
-            "*Main categories*\n\n".
-            "*1* — *RENTALS* — browse gear & prices (no login)\n".
-            "*2* — *WALLET* — WhatsApp wallet: balance, top-up, bank transfer\n".
-            "*3* — *TICKETS* — help (dashboard login)\n".
-            "*4* — *INVOICE* — pay / view invoices (login)\n\n".
-            "You can reply with the *number* or the *keyword*.\n\n".
-            "Link your *rentals* account: send your *email* here.\n\n".
-            "P2P: send a Nigerian mobile (*080…*, *80…* without the leading 0, or *+234…*) to start *send to WhatsApp* (PIN required).\n\n".
+            "*1* — Rentals (browse)\n".
+            "*2* — *WALLET* — balance, receive money, PIN & name\n".
+            "*3* — Support\n".
+            "*4* — Invoices\n\n".
+            "Reply with the *number* or *keyword*.\n".
+            "Rentals: link with your *email* here.\n\n".
             WhatsappMenuInputNormalizer::navigationHelpFooter()."\n".
-            "*RESTART* / *000* — back to this menu anytime\n".
-            "*STOP* — pause auto-replies  *START* / *MENU* / *00* — resume\n\n".
-            "Rentals site: {$rentals}\n".
-            "Business portal: {$biz}";
+            "*RESTART* / *000* · *STOP* / *START* / *MENU*\n\n".
+            "{$rentals}\n{$biz}";
     }
 
     public function sendWalletIntro(string $instance, string $phone): void

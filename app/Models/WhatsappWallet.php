@@ -85,6 +85,14 @@ class WhatsappWallet extends Model
     }
 
     /**
+     * True until PIN and display name are set — show a short wallet menu and onboarding-style alerts.
+     */
+    public function needsQuickWalletSetup(): bool
+    {
+        return ! $this->hasPin() || $this->normalizedSenderName() === null;
+    }
+
+    /**
      * Email used for transfer confirmation OTP (linked renter account, else Tier 2 KYC email).
      */
     public function resolveOtpEmail(): ?string

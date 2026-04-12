@@ -56,16 +56,26 @@ class WhatsappWalletTopupNotifier
             ' ('.(string) config('app.timezone').')';
 
         $name = trim((string) $senderWalletDisplayName);
-        $fromWho = $name !== '' ? $name : 'Wallet sender';
+        $fromWho = $name !== '' ? $name : 'Someone';
         $masked = $this->maskPhoneForNotify($senderPhoneE164);
 
-        $text = "💸 *You received money* ✨\n\n".
-            "*From:* {$fromWho}\n".
-            "*Number:* {$masked}\n".
-            "*Amount:* {$amountStr}\n".
-            "*Time:* {$when}\n\n".
-            "💡 Open *WALLET* here to see your balance.\n\n".
-            'Send *WALLET* for the hub or *MENU* for all options.';
+        if ($recipientWallet->needsQuickWalletSetup()) {
+            $text = "💸 *You received {$amountStr}*\n\n".
+                "*From:* {$fromWho}\n".
+                "*Number:* {$masked}\n".
+                "*Time:* {$when}\n\n".
+                "Finish on WhatsApp (takes a minute):\n".
+                "• Send *WALLET*\n".
+                "• *REGISTER* — 4-digit PIN\n".
+                "• Then *your name* (what people see when you send)\n\n".
+                '*MENU* — other services';
+        } else {
+            $text = "💸 *You received {$amountStr}*\n\n".
+                "*From:* {$fromWho}\n".
+                "*Number:* {$masked}\n".
+                "*Time:* {$when}\n\n".
+                'Send *WALLET* for balance & options · *MENU* for all services.';
+        }
 
         $this->client->sendText($instance, $recipientWallet->phone_e164, $text);
     }
@@ -108,10 +118,19 @@ class WhatsappWalletTopupNotifier
         $amountStr = '₦'.number_format($credited, 2);
         $balStr = '₦'.number_format($balanceAfter, 2);
 
-        $text = "✅ *Wallet funded*\n\n".
-            "We received *{$amountStr}*.\n".
-            "💰 New balance: *{$balStr}*\n\n".
-            'Send *WALLET* to open your wallet or *MENU* for all options.';
+        if ($wallet->needsQuickWalletSetup()) {
+            $text = "✅ *{$amountStr}* received\n".
+                "Balance: *{$balStr}*\n\n".
+                "Quick setup:\n".
+                "• Send *WALLET*\n".
+                "• *REGISTER* — PIN\n".
+                "• Your *display name*\n\n".
+                '*MENU* — other services';
+        } else {
+            $text = "✅ *{$amountStr}* received\n".
+                "Balance: *{$balStr}*\n\n".
+                'Send *WALLET* for your wallet · *MENU* for all services.';
+        }
 
         $this->client->sendText($instance, $wallet->phone_e164, $text);
     }

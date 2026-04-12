@@ -7,18 +7,20 @@ use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Console\Command;
 
 /**
- * Exercise Mevon Rubies POST createrubies (action=initiate) with the same payload shape as WhatsApp Tier 2 KYC.
+ * Exercise Mevon Rubies POST createrubies (action=create, account_type=personal) — same shape as WhatsApp Tier 2 KYC.
  */
 class TestMevonRubiesInitiateCommand extends Command
 {
     protected $signature = 'mevon:rubies-test-initiate
-        {--fname=Innocent : First name}
-        {--lname=Solomon : Last name}
-        {--gender=male : male or female}
-        {--phone=2348148790554 : Nigerian phone as 234… E.164 digits or local 081…}
-        {--bvn=22377512104 : 11-digit BVN}';
+        {--fname=John : First name}
+        {--lname=Doe : Last name}
+        {--phone=08012345678 : Nigerian phone local 081… or 234…}
+        {--dob=1990-01-01 : Date of birth YYYY-MM-DD}
+        {--email=test@example.com : Email}
+        {--bvn= : 11-digit BVN (required unless --nin)}
+        {--nin= : 11-digit NIN (required unless --bvn)}';
 
-    protected $description = 'Call Mevon Rubies createrubies initiate (Tier 2); prints parsed result or HTTP/API error from the provider.';
+    protected $description = 'Call Mevon Rubies createrubies create (Tier 2, no OTP); prints parsed result or HTTP/API error.';
 
     public function handle(MevonRubiesVirtualAccountService $rubies): int
     {
@@ -42,29 +44,36 @@ class TestMevonRubiesInitiateCommand extends Command
             return self::FAILURE;
         }
 
-        $bvn = preg_replace('/\D+/', '', (string) $this->option('bvn')) ?? '';
-        if (strlen($bvn) !== 11) {
-            $this->error('BVN must be exactly 11 digits.');
+        $bvnOpt = (string) $this->option('bvn');
+        $ninOpt = (string) $this->option('nin');
+        $bvn = preg_replace('/\D+/', '', $bvnOpt) ?? '';
+        $nin = preg_replace('/\D+/', '', $ninOpt) ?? '';
+        if (strlen($bvn) !== 11 && strlen($nin) !== 11) {
+            $this->error('Provide exactly one of --bvn= (11 digits) or --nin= (11 digits).');
 
             return self::FAILURE;
         }
 
         $fname = (string) $this->option('fname');
         $lname = (string) $this->option('lname');
-        $gender = strtolower((string) $this->option('gender'));
-        if (! in_array($gender, ['male', 'female'], true)) {
-            $this->error('--gender must be male or female.');
-
-            return self::FAILURE;
-        }
+        $dob = trim((string) $this->option('dob'));
+        $email = strtolower(trim((string) $this->option('email')));
 
         $url = rtrim((string) (config('services.mevonrubies.base_url') ?: config('services.mevonpay.base_url', '')), '/')
             .'/'.ltrim((string) config('services.mevonrubies.create_path', '/V1/createrubies'), '/');
         $this->info("Endpoint: {$url}");
-        $this->info("Payload: fname={$fname}, lname={$lname}, gender={$gender}, phone_local={$local11}, bvn=***********");
+        $this->info("Payload: action=create, account_type=personal, fname={$fname}, lname={$lname}, phone_local={$local11}, dob={$dob}, email={$email}, bvn/nin=***");
 
         try {
-            $out = $rubies->initiateRubiesAccount($fname, $lname, $gender, $local11, $bvn);
+            $out = $rubies->createRubiesPersonalAccount(
+                $fname,
+                $lname,
+                $local11,
+                $dob,
+                $email,
+                strlen($bvn) === 11 ? $bvn : null,
+                strlen($nin) === 11 ? $nin : null,
+            );
             $this->info('Provider accepted the request. Parsed payload:');
             $this->line(json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
