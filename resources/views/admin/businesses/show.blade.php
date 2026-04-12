@@ -1245,44 +1245,47 @@ document.addEventListener('change', function(e) {
     }
 });
 
-document.getElementById('transferTransactionsForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    if (selectedPaymentIds.length === 0) {
-        alert('Please select at least one transaction to transfer.');
-        return;
-    }
-    
-    const route = currentWebsiteId 
-        ? '{{ route("admin.businesses.websites.transfer-transactions", [$business, ":website"]) }}'.replace(':website', currentWebsiteId)
-        : '{{ route("admin.businesses.transfer-transactions", $business) }}';
-    
-    const formData = new FormData();
-    formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
-    formData.append('payment_ids', JSON.stringify(selectedPaymentIds));
-    
-    fetch(route, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
+const transferTransactionsForm = document.getElementById('transferTransactionsForm');
+if (transferTransactionsForm) {
+    transferTransactionsForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        if (selectedPaymentIds.length === 0) {
+            alert('Please select at least one transaction to transfer.');
+            return;
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message || 'Transactions transferred successfully!');
-            location.reload();
-        } else {
-            alert(data.message || 'Error transferring transactions.');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error transferring transactions.');
+
+        const route = currentWebsiteId
+            ? '{{ route("admin.businesses.websites.transfer-transactions", [$business, ":website"]) }}'.replace(':website', currentWebsiteId)
+            : '{{ route("admin.businesses.transfer-transactions", $business) }}';
+
+        const formData = new FormData();
+        formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+        formData.append('payment_ids', JSON.stringify(selectedPaymentIds));
+
+        fetch(route, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Transactions transferred successfully!');
+                location.reload();
+            } else {
+                alert(data.message || 'Error transferring transactions.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error transferring transactions.');
+        });
     });
-});
+}
 
 // Close modals when clicking outside
 document.addEventListener('click', function(event) {
