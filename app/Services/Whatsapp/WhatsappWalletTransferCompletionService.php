@@ -93,22 +93,24 @@ class WhatsappWalletTransferCompletionService
         $this->client->sendText(
             $instance,
             $phone,
-            "*WhatsApp wallet*\n".
+            "Here's your wallet 👋\n".
             "Balance: *{$bal}*\n".
             $vaBlock.
-            "\n".
-            "*1* — Receive / Top up\n".
-            "*2* — Transfer to bank (… amount → email code or secure link / PIN)\n".
-            "*3* — Tier 2 (*UPGRADE*): permanent bank account (KYC)\n".
-            "*4* — Send to another *WhatsApp* number (P2P; if they have no wallet yet, they have *".WhatsappWalletPendingP2pService::claimMinutes()."* min* to open *WALLET* and claim)\n".
+            "\nWhat would you like to do?\n".
+            "*1* — Add money / receive\n".
+            "*2* — Send to someone's *bank* account\n".
+            "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n".
+            '*4* — Send to another *WhatsApp* number (new users get *'.WhatsappWalletPendingP2pService::claimMinutes()."* min* to open *WALLET*)\n".
+            "Tip: paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
-            "*6* — Transaction history (*6* per page; *MORE* / *PREV*)\n".
+            "*6* — Recent activity (*MORE* / *PREV*)\n".
             "\n".
             "{$pinLine}\n\n".
-            "Tier 1 cap: ₦{$t1max} balance & same daily send limit until upgraded.\n".
+            "Tier 1 max balance: ₦{$t1max} until you upgrade.\n".
             $tier1VaNote.
             "{$bankNote}\n\n".
-            WhatsappMenuInputNormalizer::navigationHelpFooter().'  *STOP* — pause bot'
+            "If you've sent to someone before, try *send 5k to Tunde Opay* in plain English.\n\n".
+            WhatsappMenuInputNormalizer::navigationHelpFooter().' · *STOP* — pause replies'
         );
     }
 

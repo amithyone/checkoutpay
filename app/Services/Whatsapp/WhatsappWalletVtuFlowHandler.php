@@ -88,7 +88,7 @@ class WhatsappWalletVtuFlowHandler
         }
         $step = (string) ($ctx['step'] ?? 'vtu_menu');
 
-        if (in_array($cmd, ['MENU', 'MAIN', 'START', 'HOME'], true)) {
+        if (in_array($cmd, ['MENU', 'MAIN', 'START', 'HOME', 'RESTART'], true)) {
             $this->exitToMain($session, $instance, $phone, $linkedRenter);
 
             return;
@@ -191,12 +191,12 @@ class WhatsappWalletVtuFlowHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "*Airtime, data & electricity*\n\n".
+            "Let's sort a bill 📱\n\n".
             "*1* — Airtime\n".
-            "*2* — Data bundle\n".
-            "*3* — Electricity bill\n\n".
+            "*2* — Data\n".
+            "*3* — Electricity\n\n".
             WhatsappMenuInputNormalizer::navigationHelpFooter()."\n".
-            '*CANCEL* — wallet (abandon this bill payment)'
+            '*CANCEL* — leave this and go back to your wallet'
         );
     }
 
@@ -220,7 +220,7 @@ class WhatsappWalletVtuFlowHandler
 
             return;
         }
-        $this->client->sendText($instance, $phone, 'Reply *1*, *2*, or *3*. *BACK* returns to the wallet.');
+        $this->client->sendText($instance, $phone, 'Choose *1*, *2*, or *3* — or *0* to step back.');
     }
 
     /**

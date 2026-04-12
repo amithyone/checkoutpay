@@ -128,7 +128,7 @@ class WhatsappWaWalletMenuHandler
 
         $step = (string) ($ctx['step'] ?? 'submenu');
 
-        if (in_array($cmd, ['MENU', 'MAIN', 'START', 'HOME'], true)) {
+        if (in_array($cmd, ['MENU', 'MAIN', 'START', 'HOME', 'RESTART'], true)) {
             $this->exitToMain($session, $instance, $phone, $linkedRenter);
 
             return;
@@ -299,23 +299,24 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "*WhatsApp wallet*\n".
+            "Here's your wallet 👋\n".
             "Balance: *{$bal}*\n".
             $vaBlock.
-            "\n".
-            "*1* — Receive / Top up\n".
-            "*2* — Transfer to bank (… amount → email code or secure link / PIN)\n".
-            "*3* — Tier 2 (*UPGRADE*): permanent bank account (KYC)\n".
-            '*4* — Send to another *WhatsApp* number (P2P; new users have *'.WhatsappWalletPendingP2pService::claimMinutes()." min* to open *WALLET* and claim)\n".
-            "Tip: paste *080…*, *80…*, or *+234…* here to start *P2P* without *4*.\n".
+            "\nWhat would you like to do?\n".
+            "*1* — Add money / receive\n".
+            "*2* — Send to someone's *bank* account\n".
+            "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n".
+            '*4* — Send to another *WhatsApp* number (they get *'.WhatsappWalletPendingP2pService::claimMinutes()." min* to open *WALLET* if they're new)\n".
+            "Tip: you can paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
-            "*6* — Transaction history (*6* per page; *MORE* / *PREV*)\n".
+            "*6* — See recent activity (*MORE* / *PREV* to flip pages)\n".
             "\n".
             "{$pinLine}\n\n".
-            "Tier 1 cap: ₦{$t1max} balance & same daily send limit until upgraded.\n".
+            "Heads-up — Tier 1 max balance is ₦{$t1max} until you upgrade.\n".
             $tier1VaNote.
             "{$bankNote}\n\n".
-            WhatsappMenuInputNormalizer::navigationHelpFooter()."  *STOP* — pause bot"
+            "If you've sent to someone before, you can type e.g. *send 5k to Tunde Opay* in plain English.\n\n".
+            WhatsappMenuInputNormalizer::navigationHelpFooter()." · *STOP* — pause replies"
         );
     }
 
@@ -478,6 +479,20 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
+        if ($wallet->hasPin() && ! $wallet->isPinLocked() && $wallet->normalizedSenderName() !== null) {
+            $casual = WhatsappWalletCasualSendParser::tryParse(
+                $text,
+                $wallet,
+                $this->bankPayout,
+                $this->recentBankTransferTargets($wallet, 5),
+            );
+            if ($casual !== null) {
+                $this->handleCasualSendFromSubmenu($session, $instance, $phone, $wallet, $casual);
+
+                return;
+            }
+        }
+
         if ($cmd === 'WALLET' || $cmd === '') {
             $this->sendSubmenu($instance, $phone, $wallet->fresh());
 
@@ -488,7 +503,114 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "Reply {$range}, or *REGISTER* / *UPGRADE*. *MENU* — main categories."
+            "Hey — tap a number ({$range}), or say something like *send 5k to Tunde Opay* if you've paid them before.\n\n*00* or *MENU* = all services · *WALLET* = this screen again."
+        );
+    }
+
+    /**
+     * Natural-language shortcut from submenu: bank repeat-pay or P2P with amount + phone in one line.
+     *
+     * @param  array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'p2p', amount: float, recipient_e164: string}  $casual
+     */
+    private function handleCasualSendFromSubmenu(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $casual,
+    ): void {
+        if ($casual['flow'] === 'bank') {
+            $wallet->refresh();
+            $check = $wallet->canDebit($casual['amount']);
+            if (! $check['ok']) {
+                $this->client->sendText($instance, $phone, ($check['message'] ?? 'Cannot send that amount.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
+
+                return;
+            }
+            $ctx = array_merge($casual['ctx'], ['step' => 'transfer_amount']);
+            $session->update(['chat_context' => $ctx]);
+            $this->secureTransferAuth->beginBankTransferConfirmation(
+                $session->fresh(),
+                $instance,
+                $phone,
+                $wallet->fresh(),
+                $ctx
+            );
+
+            return;
+        }
+
+        $recipient = $casual['recipient_e164'];
+        if ($recipient === PhoneNormalizer::canonicalNgE164Digits($phone)) {
+            $this->client->sendText($instance, $phone, "You can't send to your own number — pick someone else.\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
+
+            return;
+        }
+
+        $wallet->refresh();
+        $debitCheck = $wallet->canDebit($casual['amount']);
+        if (! $debitCheck['ok']) {
+            $this->client->sendText($instance, $phone, ($debitCheck['message'] ?? 'Cannot send that amount.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
+
+            return;
+        }
+
+        $recvWallet = WhatsappWallet::query()
+            ->where('phone_e164', $recipient)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
+
+        if ($recvWallet) {
+            $creditCheck = $recvWallet->canCredit($casual['amount']);
+            if (! $creditCheck['ok']) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    ($creditCheck['message'] ?? 'Their wallet cannot receive this amount.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+                );
+
+                return;
+            }
+        }
+
+        $ctx = [
+            'step' => 'p2p_verify_recipient',
+            'p2p_recipient_e164' => $recipient,
+            'p2p_amount' => round((float) $casual['amount'], 2),
+        ];
+        if (! $recvWallet) {
+            $ctx['p2p_recipient_unregistered'] = true;
+        }
+        $session->update(['chat_context' => $ctx]);
+
+        $mask = $this->maskPhoneForDisplay($recipient);
+        $amt = number_format((float) $casual['amount'], 2);
+        $mins = WhatsappWalletPendingP2pService::claimMinutes();
+
+        if (! $recvWallet) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "Got it — *₦{$amt}* to *{$mask}* (they haven't opened a wallet here yet).\n\n".
+                "If you continue, they get *{$mins} minutes* to open *WALLET* or you get refunded.\n\n".
+                "Reply *YES* to go ahead — then we'll do your usual security check (PIN or email).\n\n".
+                WhatsappMenuInputNormalizer::navigationHelpFooter()
+            );
+
+            return;
+        }
+
+        $recvName = $recvWallet->normalizedSenderName();
+        $nameLine = $recvName !== null
+            ? "Their saved send name: *{$recvName}*"
+            : 'They have a wallet on this number.';
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "Got it — *₦{$amt}* to *{$mask}*.\n{$nameLine}\n\n".
+            "Reply *YES* if that's the right person — then we'll ask for your PIN or email code like always.\n\n".
+            WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
@@ -1251,12 +1373,51 @@ class WhatsappWaWalletMenuHandler
         }
 
         if (in_array($cmd, ['YES', 'Y', 'OK', 'CONFIRM'], true) || $cmd === '1') {
+            if (isset($ctx['p2p_amount']) && is_numeric($ctx['p2p_amount'])) {
+                $preset = round((float) $ctx['p2p_amount'], 2);
+                if ($preset < 1) {
+                    $this->client->sendText($instance, $phone, 'That amount looks off. Start again from *4* or type a new send.');
+
+                    return;
+                }
+                $wallet->refresh();
+                $debitCheck = $wallet->canDebit($preset);
+                if (! $debitCheck['ok']) {
+                    $this->client->sendText($instance, $phone, $debitCheck['message'] ?? 'Cannot send that amount.');
+
+                    return;
+                }
+                if (! $unreg) {
+                    $recvWallet = WhatsappWallet::query()
+                        ->where('phone_e164', $recipient)
+                        ->where('status', WhatsappWallet::STATUS_ACTIVE)
+                        ->first();
+                    if (! $recvWallet) {
+                        $this->recoverSubmenu($session, $instance, $phone, $wallet);
+
+                        return;
+                    }
+                    $creditCheck = $recvWallet->canCredit($preset);
+                    if (! $creditCheck['ok']) {
+                        $this->client->sendText(
+                            $instance,
+                            $phone,
+                            ($creditCheck['message'] ?? 'Recipient cannot receive this amount.').' Ask them to spend or *UPGRADE*.'
+                        );
+
+                        return;
+                    }
+                }
+                $this->secureTransferAuth->beginP2pTransferConfirmation($session, $instance, $phone, $wallet, $ctx);
+
+                return;
+            }
             $ctx['step'] = 'p2p_amount';
             $session->update(['chat_context' => $ctx]);
             $this->client->sendText(
                 $instance,
                 $phone,
-                "Send *amount* in Naira (numbers only), minimum ₦1.\n\n*BACK* — cancel"
+                "How much in Naira? (numbers only, min ₦1)\n\n*0* back · *00* wallet menu"
             );
 
             return;
@@ -1265,7 +1426,7 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            'Reply *YES* when the wallet and name match who you intend to pay, or *BACK* to change the number.'
+            "If that’s the right person, reply *YES*. Otherwise *0* to change the number.\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 

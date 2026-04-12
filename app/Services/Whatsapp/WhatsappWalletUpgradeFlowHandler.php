@@ -81,11 +81,11 @@ class WhatsappWalletUpgradeFlowHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "*Tier 2 — full KYC*\n\n".
-            'You will get a *permanent* bank account for top-ups via *'.$this->waBrand()."*.\n".
-            "Your *WhatsApp number* must match the number we send to the bank.\n\n".
-            "Send your *first name* (as on your BVN).\n\n".
-            '*CANCEL* — exit'
+            "Nice — let's set up your Tier 2 account 🏦\n\n".
+            "You'll get a *permanent* bank number for topping up via *".$this->waBrand()."*.\n".
+            "The number on this WhatsApp chat should match what the bank has on file.\n\n".
+            "First, what's your *first name* exactly as on your BVN?\n\n".
+            '*CANCEL* to stop · *0* back · *00* menu · *000* main'
         );
     }
 
