@@ -283,21 +283,30 @@ class WhatsappWaWalletMenuHandler
 
         $bal = '₦'.number_format((float) $wallet->balance, 2);
         $t1max = number_format((float) config('whatsapp.wallet.tier1_max_balance', 50000), 0);
-        $pinLine = $wallet->hasPin()
-            ? 'Your wallet PIN is set (needed for transfers).'
-            : '*REGISTER* — set a 4-digit wallet PIN (required before *2* Transfer).';
+        $isTier2 = $wallet->isTier2();
+        $pinSection = $wallet->hasPin()
+            ? ''
+            : "*REGISTER* — set a 4-digit wallet PIN (required before *2* Transfer).\n\n";
 
         $vaBlock = '';
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
-            $vaBlock = "\n*Tier 2 account*\n".
+            $vaBlock = "\n*Your bank account*\n".
                 'Bank: *'.($wallet->mevon_bank_name ?? 'Rubies MFB')."*\n".
                 'Account: *'.$wallet->mevon_virtual_account_number."*\n";
         }
 
         $tier1VaNote = '';
-        if ((int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
+        if (! $isTier2 && (int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
             $tier1VaNote = "\nTier 1: *1* gives a *new temporary* pay-in account each time.\n";
         }
+
+        $upgradeLine = $isTier2
+            ? ''
+            : "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n";
+
+        $tier1HeadsUp = $isTier2
+            ? ''
+            : "Heads-up — Tier 1 max balance is ₦{$t1max} until you upgrade.\n";
 
         $brand = $this->waBrand();
         $bankNote = $this->bankPayout->isConfigured()
@@ -317,14 +326,14 @@ class WhatsappWaWalletMenuHandler
             "\nWhat would you like to do?\n".
             "*1* — Add money / receive\n".
             "*2* — Send to someone's *bank* account\n".
-            "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n".
+            $upgradeLine.
             '*4* — Send to another *WhatsApp* number (they get *'.WhatsappWalletPendingP2pService::claimMinutes()." min* to open *WALLET* if they're new)\n".
             "Tip: you can paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
             "*6* — See recent activity (*MORE* / *PREV* to flip pages)\n".
             "\n".
-            "{$pinLine}\n\n".
-            "Heads-up — Tier 1 max balance is ₦{$t1max} until you upgrade.\n".
+            $pinSection.
+            $tier1HeadsUp.
             $tier1VaNote.
             "{$bankNote}\n\n".
             "If you've sent to someone before, you can type e.g. *send 5k to Tunde Opay* in plain English.\n\n".
@@ -389,12 +398,11 @@ class WhatsappWaWalletMenuHandler
                     'error' => $e->getMessage(),
                     'phone' => $phone,
                 ]);
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    "We couldn't load top-up details just now. Try again in a moment.\n\n".
-                    'Tier 2 users: your bank details are unchanged. Tier 1: try *UPGRADE* or *MENU*.'
-                );
+                $topupErr = $wallet->isTier2()
+                    ? "We couldn't load receive details just now. Your dedicated account is unchanged — try again shortly or *MENU*."
+                    : "We couldn't load top-up details just now. Try again in a moment.\n\n".
+                        'Tier 2 users: your bank details are unchanged. Tier 1: try *UPGRADE* or *MENU*.';
+                $this->client->sendText($instance, $phone, $topupErr);
             }
 
             return;
@@ -477,6 +485,27 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($cmd === '3') {
+            if ($wallet->isTier2()) {
+                $acct = trim((string) $wallet->mevon_virtual_account_number);
+                if ($acct !== '') {
+                    $this->client->sendText(
+                        $instance,
+                        $phone,
+                        "You're already on *Tier 2* with a fixed account.\n\n".
+                        '*Bank:* '.($wallet->mevon_bank_name ?? 'Rubies MFB')."\n".
+                        '*Account:* *'.$acct."*\n\n".
+                        'Send *1* anytime for receive / top-up details.'
+                    );
+                } else {
+                    $this->client->sendText(
+                        $instance,
+                        $phone,
+                        'Your *Tier 2* account is still being set up. Try *WALLET* again soon or contact support.'
+                    );
+                }
+
+                return;
+            }
             $this->forgetPinSetupWebTokenFromSession($session);
             $session->update(['chat_flow' => null, 'chat_context' => null]);
             $this->upgradeFlow->start($session->fresh(), $instance, $phone);
@@ -535,16 +564,17 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($wallet->needsQuickWalletSetup()) {
-            $this->client->sendText(
-                $instance,
-                $phone,
-                'Reply *REGISTER* (PIN), send *your name*, or *1* to add money. *MENU* — all services.'
-            );
+            $hint = $wallet->hasPin()
+                ? 'Send *your name*, or *1* to add money. *MENU* — all services.'
+                : 'Reply *REGISTER* (PIN), send *your name*, or *1* to add money. *MENU* — all services.';
+            $this->client->sendText($instance, $phone, $hint);
 
             return;
         }
 
-        $range = $this->vtuFlow->isAvailable() ? '*1*–*6*' : '*1*–*4*, *6*';
+        $range = $wallet->isTier2()
+            ? ($this->vtuFlow->isAvailable() ? '*1*, *2*, *4*, *5*, *6*' : '*1*, *2*, *4*, *6*')
+            : ($this->vtuFlow->isAvailable() ? '*1*–*6*' : '*1*–*4*, *6*');
         $this->client->sendText(
             $instance,
             $phone,
@@ -764,7 +794,7 @@ class WhatsappWaWalletMenuHandler
                 $instance,
                 $phone,
                 "*Receive / Top up*\n\n".
-                'Transfer to your dedicated account (Tier 2):'."\n".
+                'Transfer to your dedicated account:'."\n".
                 '*Bank:* '.($wallet->mevon_bank_name ?? 'Rubies MFB')."\n".
                 '*Account:* *'.$wallet->mevon_virtual_account_number."*\n\n".
                 'Use your own bank app; funds will reflect when our bank confirms.'

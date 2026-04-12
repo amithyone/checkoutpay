@@ -60,14 +60,20 @@ class WhatsappWalletTopupNotifier
         $masked = $this->maskPhoneForNotify($senderPhoneE164);
 
         if ($recipientWallet->needsQuickWalletSetup()) {
+            $pinLine = $recipientWallet->hasPin()
+                ? ''
+                : "• *REGISTER* — 4-digit PIN\n";
+            $nameLine = $recipientWallet->hasPin()
+                ? '• Send *your name* (what people see when you send)'
+                : '• Then *your name* (what people see when you send)';
             $text = "💸 *You received {$amountStr}*\n\n".
                 "*From:* {$fromWho}\n".
                 "*Number:* {$masked}\n".
                 "*Time:* {$when}\n\n".
                 "Finish on WhatsApp (takes a minute):\n".
                 "• Send *WALLET*\n".
-                "• *REGISTER* — 4-digit PIN\n".
-                "• Then *your name* (what people see when you send)\n\n".
+                $pinLine.
+                $nameLine."\n\n".
                 '*MENU* — other services';
         } else {
             $text = "💸 *You received {$amountStr}*\n\n".
@@ -119,11 +125,14 @@ class WhatsappWalletTopupNotifier
         $balStr = '₦'.number_format($balanceAfter, 2);
 
         if ($wallet->needsQuickWalletSetup()) {
+            $pinLine = $wallet->hasPin()
+                ? ''
+                : "• *REGISTER* — PIN\n";
             $text = "✅ *{$amountStr}* received\n".
                 "Balance: *{$balStr}*\n\n".
                 "Quick setup:\n".
                 "• Send *WALLET*\n".
-                "• *REGISTER* — PIN\n".
+                $pinLine.
                 "• Your *display name*\n\n".
                 '*MENU* — other services';
         } else {

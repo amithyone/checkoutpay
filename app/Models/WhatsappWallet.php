@@ -92,6 +92,11 @@ class WhatsappWallet extends Model
         return ! $this->hasPin() || $this->normalizedSenderName() === null;
     }
 
+    public function isTier2(): bool
+    {
+        return (int) $this->tier >= self::TIER_RUBIES_VA;
+    }
+
     /**
      * Email used for transfer confirmation OTP (linked renter account, else Tier 2 KYC email).
      */

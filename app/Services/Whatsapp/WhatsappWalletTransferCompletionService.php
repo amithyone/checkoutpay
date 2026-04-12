@@ -155,21 +155,30 @@ class WhatsappWalletTransferCompletionService
 
         $bal = '₦'.number_format((float) $wallet->balance, 2);
         $t1max = number_format((float) config('whatsapp.wallet.tier1_max_balance', 50000), 0);
-        $pinLine = $wallet->hasPin()
-            ? 'Your wallet PIN is set (needed for transfers).'
-            : '*REGISTER* — set a 4-digit wallet PIN (required before *2* Transfer).';
+        $isTier2 = $wallet->isTier2();
+        $pinSection = $wallet->hasPin()
+            ? ''
+            : "*REGISTER* — set a 4-digit wallet PIN (required before *2* Transfer).\n\n";
 
         $vaBlock = '';
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
-            $vaBlock = "\n*Tier 2 account*\n".
+            $vaBlock = "\n*Your bank account*\n".
                 'Bank: *'.($wallet->mevon_bank_name ?? 'Rubies MFB')."*\n".
                 'Account: *'.$wallet->mevon_virtual_account_number."*\n";
         }
 
         $tier1VaNote = '';
-        if ((int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
+        if (! $isTier2 && (int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
             $tier1VaNote = "\nTier 1: *1* gives a *new temporary* pay-in account each time.\n";
         }
+
+        $upgradeLine = $isTier2
+            ? ''
+            : "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n";
+
+        $tier1HeadsUp = $isTier2
+            ? ''
+            : "Tier 1 max balance: ₦{$t1max} until you upgrade.\n";
 
         $brand = $this->waBrand();
         $bankNote = $this->bankPayout->isConfigured()
@@ -189,14 +198,14 @@ class WhatsappWalletTransferCompletionService
             "\nWhat would you like to do?\n".
             "*1* — Add money / receive\n".
             "*2* — Send to someone's *bank* account\n".
-            "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n".
+            $upgradeLine.
             '*4* — Send to another *WhatsApp* number (new users get *'.WhatsappWalletPendingP2pService::claimMinutes()."* min* to open *WALLET*)\n".
             "Tip: paste *080…* / *234…* anytime to start a WhatsApp send.\n".
             $vtuLine.
             "*6* — Recent activity (*MORE* / *PREV*)\n".
             "\n".
-            "{$pinLine}\n\n".
-            "Tier 1 max balance: ₦{$t1max} until you upgrade.\n".
+            $pinSection.
+            $tier1HeadsUp.
             $tier1VaNote.
             "{$bankNote}\n\n".
             "If you've sent to someone before, try *send 5k to Tunde Opay* in plain English.\n\n".
