@@ -60,6 +60,23 @@ class WhatsappInboundHandler
         $session->remote_jid = $remoteJid;
         $session->evolution_instance = $instance;
 
+        if (in_array($cmd, ['RESTART', 'MAIN'], true)) {
+            $this->applyGlobalConversationRestart($session);
+            $session->save();
+            $session = $session->fresh();
+            $lr = Renter::query()
+                ->where('whatsapp_phone_e164', $phone)
+                ->where('is_active', true)
+                ->first();
+            if ($lr) {
+                $this->linkedMenu->sendRootForRenter($lr->fresh(), $instance, $phone);
+            } else {
+                $this->checkoutServicesMenu->sendRootMenu($instance, $phone);
+            }
+
+            return;
+        }
+
         if ($session->exists && $session->state === WhatsappSession::STATE_AWAIT_OTP) {
             $session->save();
             $this->stepVerifyOtp($session->fresh(), $instance, $phone, $text);
@@ -109,21 +126,6 @@ class WhatsappInboundHandler
             ->where('whatsapp_phone_e164', $phone)
             ->where('is_active', true)
             ->first();
-
-        if (in_array($cmd, ['RESTART', 'MAIN'], true)) {
-            $session->update([
-                'chat_flow' => null,
-                'chat_context' => null,
-            ]);
-            $session = $session->fresh();
-            if ($linkedRenter) {
-                $this->linkedMenu->sendRootForRenter($linkedRenter->fresh(), $instance, $phone);
-            } else {
-                $this->checkoutServicesMenu->sendRootMenu($instance, $phone);
-            }
-
-            return;
-        }
 
         if ($session && $session->chat_flow === WhatsappWalletUpgradeFlowHandler::FLOW) {
             $this->walletUpgradeFlow->handle($session, $instance, $phone, $text, $cmd);
@@ -221,6 +223,27 @@ class WhatsappInboundHandler
         }
 
         $this->stepWelcomeOrEmail($session, $instance, $phone, $text);
+    }
+
+    /**
+     * *000* / *RESTART* / *MAIN*: drop any in-chat flow, cancel email OTP if mid-link, unpause bot.
+     */
+    private function applyGlobalConversationRestart(WhatsappSession $session): void
+    {
+        $session->chat_flow = null;
+        $session->chat_context = null;
+        $session->bot_paused = false;
+
+        $session->otp_code_hash = null;
+        $session->otp_expires_at = null;
+        $session->pending_email = null;
+        $session->otp_attempts = 0;
+        $session->magic_link_token_hash = null;
+        $session->magic_link_expires_at = null;
+
+        if (in_array($session->state, [WhatsappSession::STATE_AWAIT_OTP, WhatsappSession::STATE_AWAIT_EMAIL], true)) {
+            $session->state = WhatsappSession::STATE_WELCOME;
+        }
     }
 
     private function isGuestRentalBrowseCommand(string $text): bool

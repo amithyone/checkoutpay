@@ -480,16 +480,29 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($wallet->hasPin() && ! $wallet->isPinLocked() && $wallet->normalizedSenderName() !== null) {
-            $casual = WhatsappWalletCasualSendParser::tryParse(
-                $text,
-                $wallet,
-                $this->bankPayout,
-                $this->recentBankTransferTargets($wallet, 5),
-            );
-            if ($casual !== null) {
-                $this->handleCasualSendFromSubmenu($session, $instance, $phone, $wallet, $casual);
+            $norm = WhatsappWalletCasualSendParser::normalizeForCasualParse($text);
+            if (WhatsappWalletCasualSendParser::looksLikeCasualSend($norm)) {
+                $recent = $this->recentBankTransferTargets($wallet, 10);
+                $casual = WhatsappWalletCasualSendParser::tryParse($norm, $wallet, $this->bankPayout, $recent);
+                if ($casual !== null) {
+                    $this->handleCasualSendFromSubmenu($session, $instance, $phone, $wallet, $casual);
 
-                return;
+                    return;
+                }
+                if (WhatsappWalletCasualSendParser::largestNairaAmount($norm) !== null) {
+                    $this->client->sendText(
+                        $instance,
+                        $phone,
+                        "I see you're trying to *send money* in plain English, but I couldn't match a saved bank payee.\n\n".
+                        "• Use *2* once to send to their account (we save it for next time).\n".
+                        "• Then try e.g. *send 5k to Tunde Opay* or *pay 2000 for mama GTB*.\n".
+                        "• WhatsApp sends: *send 5k to 080…* with their number.\n".
+                        "• If you only have *one* saved payee, *send 5k* alone can work.\n\n".
+                        WhatsappMenuInputNormalizer::navigationHelpFooter()
+                    );
+
+                    return;
+                }
             }
         }
 
