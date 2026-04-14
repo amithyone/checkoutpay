@@ -18,6 +18,7 @@ class WhatsappWalletUpgradeFlowHandler
     public function __construct(
         private EvolutionWhatsAppClient $client,
         private MevonRubiesVirtualAccountService $mevonRubies,
+        private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
     public function start(WhatsappSession $session, string $instance, string $phone): void
@@ -30,6 +31,16 @@ class WhatsappWalletUpgradeFlowHandler
                 'status' => WhatsappWallet::STATUS_ACTIVE,
             ]
         );
+
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                '*UPGRADE* (Tier 2 bank pay-in) is only available for *Nigeria* numbers right now. Use *4* for WhatsApp wallet sends.'
+            );
+
+            return;
+        }
 
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
             $this->kycLog('info', 'whatsapp.wallet.kyc.upgrade_requested', [

@@ -24,6 +24,7 @@ class WhatsappWalletVtuFlowHandler
         private WhatsappWalletTransferCompletionService $transferCompletion,
         private WhatsappCheckoutServicesMenuHandler $checkoutServicesMenu,
         private WhatsappLinkedMenuHandler $linkedMenu,
+        private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
     public function isAvailable(): bool
@@ -40,6 +41,15 @@ class WhatsappWalletVtuFlowHandler
         }
 
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Airtime, data, and electricity (*VTU*) are only for *Nigeria* wallet numbers right now.'
+            );
+
+            return;
+        }
         if (! $wallet->hasPin()) {
             $this->client->sendText($instance, $phone, 'Set a wallet PIN first. Open *WALLET* and reply *REGISTER*.');
 

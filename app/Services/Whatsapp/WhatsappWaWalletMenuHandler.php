@@ -46,6 +46,8 @@ class WhatsappWaWalletMenuHandler
         private WhatsappWalletVtuFlowHandler $vtuFlow,
         private WhatsappWalletPinSetupWebService $pinSetupWeb,
         private WhatsappWalletPendingP2pService $pendingP2p,
+        private WhatsappCrossBorderP2pFxService $crossBorderFx,
+        private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
     public function openMenu(WhatsappSession $session, string $instance, string $phone, ?Renter $renter): void
@@ -134,14 +136,6 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        if (in_array($cmd, ['UPGRADE', 'TIER2', 'TIER 2'], true)) {
-            $this->forgetPinSetupWebTokenFromSession($session);
-            $session->update(['chat_flow' => null, 'chat_context' => null]);
-            $this->upgradeFlow->start($session->fresh(), $instance, $phone);
-
-            return;
-        }
-
         if (in_array($cmd, ['CANCEL'], true) && (str_starts_with($step, 'transfer_') || str_starts_with($step, 'p2p_') || $step === 'wallet_tx_history' || $step === 'casual_bank_pick' || $step === 'pin_setup_web' || $step === 'wallet_settings')) {
             $this->returnToSubmenu($session, $instance, $phone, $linkedRenter);
 
@@ -189,6 +183,24 @@ class WhatsappWaWalletMenuHandler
         }
 
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
+
+        if (in_array($cmd, ['UPGRADE', 'TIER2', 'TIER 2'], true)) {
+            if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Bank pay-in and *UPGRADE* are only available for *Nigeria* numbers right now. You can still use *4* to send or receive on WhatsApp.'
+                );
+
+                return;
+            }
+            $this->forgetPinSetupWebTokenFromSession($session);
+            $session->update(['chat_flow' => null, 'chat_context' => null]);
+            $this->upgradeFlow->start($session->fresh(), $instance, $phone);
+
+            return;
+        }
+
         if (! in_array($step, ['pin_setup_web', 'pin_new', 'pin_confirm'], true)) {
             $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
         }
@@ -295,68 +307,83 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $bal = '₦'.number_format((float) $wallet->balance, 2);
+        $ngRails = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
+        $cur = $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);
+        $bal = WhatsappWalletMoneyFormatter::format((float) $wallet->balance, $cur);
         $t1max = number_format((float) config('whatsapp.wallet.tier1_max_balance', 50000), 0);
         $isTier2 = $wallet->isTier2();
         $pinSection = $wallet->hasPin()
             ? ''
-            : "*REGISTER* — set wallet PIN (secure link; do not send PIN in chat).\n\n";
+            : "*REGISTER* — PIN link first.\n\n";
 
         $vaBlock = '';
-        if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
-            $vaBlock = "\n*Your bank account*\n".
-                'Bank: *'.($wallet->mevon_bank_name ?? 'Rubies MFB')."*\n".
-                'Account: *'.$wallet->mevon_virtual_account_number."*\n";
+        if ($ngRails && $wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
+            $vaBlock = "\n*Pay-in:* ".($wallet->mevon_bank_name ?? 'Rubies MFB').' *'.$wallet->mevon_virtual_account_number."*\n";
         }
 
         $tier1VaNote = '';
-        if (! $isTier2 && (int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
-            $tier1VaNote = "\nTier 1: *1* gives a *new temporary* pay-in account each time.\n";
+        if ($ngRails && ! $isTier2 && (int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
+            $tier1VaNote = "Tier 1: *1* = new temp account each time.\n";
         }
 
-        $upgradeLine = $isTier2
-            ? ''
-            : "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n";
+        $upgradeLine = ($ngRails && ! $isTier2)
+            ? "*3* Upgrade (permanent VA)\n"
+            : '';
 
-        $tier1HeadsUp = $isTier2
-            ? ''
-            : "Heads-up — Tier 1 max balance is ₦{$t1max} until you upgrade.\n";
+        $tier1HeadsUp = '';
+        if (! $isTier2) {
+            $tier1HeadsUp = $ngRails
+                ? "Max ₦{$t1max} until *3* upgrade.\n"
+                : "NG pay-in only · use *4* to receive.\n";
+        }
 
         $brand = $this->waBrand();
-        $bankNote = $this->bankPayout->isConfigured()
-            ? "Bank sends use *{$brand}*: we only keep the debit when the transfer is *confirmed successful* — failed or *pending* responses refund your wallet."
-            : "Bank sends are recorded on your balance; connect *{$brand}* for live payouts.";
+        $bankNote = '';
+        if ($ngRails) {
+            $bankNote = $this->bankPayout->isConfigured()
+                ? "*2* bank: {$brand} — debit only when payout succeeds."
+                : "*2* bank: ledger until {$brand} live.";
+        }
 
-        $vtuLine = $this->vtuFlow->isAvailable()
-            ? "*5* — Airtime / Data / Electricity\n"
+        $vtuLine = ($ngRails && $this->vtuFlow->isAvailable())
+            ? "*5* Bills (airtime / data / power)\n"
             : '';
 
         $settingsLine = $isTier2
-            ? "*7* — *SETTINGS* — email code for transfers *ON* / *OFF*\n"
+            ? "*7* Settings (email code on/off)\n"
+            : '';
+
+        $line1 = $ngRails ? "*1* Add / receive\n" : '';
+        $line2 = $ngRails ? "*2* Bank send\n" : '';
+        $p2pTip = $ngRails
+            ? "Paste *080…* / *234…* anytime for *4*.\n"
+            : "*4* WhatsApp send (intl OK).\n";
+
+        $casualLine = $ngRails
+            ? "Or: *send 5k to Name Opay*\n\n"
             : '';
 
         $this->client->sendText(
             $instance,
             $phone,
-            "Here's your wallet 👋\n".
-            "Balance: *{$bal}*\n".
+            "*Wallet* *{$bal}*\n".
             $vaBlock.
-            "\nWhat would you like to do?\n".
-            "*1* — Add money / receive\n".
-            "*2* — Send to someone's *bank* account\n".
+            "\n".
+            $line1.
+            $line2.
             $upgradeLine.
-            "*4* — Send money to another *WhatsApp* user\n".
-            "Tip: you can paste *080…* / *234…* anytime to start a WhatsApp send.\n".
+            "*4* WhatsApp send\n".
+            $p2pTip.
             $vtuLine.
-            "*6* — See recent activity (*MORE* / *PREV* to flip pages)\n".
+            "*6* History (*MORE* / *PREV*)\n".
             $settingsLine.
             "\n".
             $pinSection.
             $tier1HeadsUp.
-            $tier1VaNote.
-            "{$bankNote}\n\n".
-            "If you've sent to someone before, you can type e.g. *send 5k to Tunde Opay* in plain English.\n\n".
-            WhatsappMenuInputNormalizer::navigationHelpFooter().' · *STOP* — pause replies'
+            ($tier1VaNote !== '' ? $tier1VaNote."\n" : '').
+            ($bankNote !== '' ? $bankNote."\n\n" : '').
+            $casualLine.
+            WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
@@ -366,20 +393,18 @@ class WhatsappWaWalletMenuHandler
         $on = (bool) $wallet->transfer_email_otp_enabled;
         $hasEmail = $wallet->resolveOtpEmail() !== null;
         $statusLine = $on
-            ? '*ON* — We email a *6-digit code*; you can still confirm with the secure PIN link.'
-            : '*OFF* — *Default.* Confirm with the secure PIN link only (recommended).';
+            ? 'ON — email *6-digit* code (PIN link still works).'
+            : 'OFF — PIN link only (default).';
         $emailWarn = $hasEmail
             ? ''
-            : "\n\n_No email on file — complete Tier 2 / link an account with email before you can turn this *ON*._";
+            : "\n_No email — Tier 2 + email before *2* ON._";
 
         $this->client->sendText(
             $instance,
             $phone,
-            "*Wallet settings* (Tier 2)\n\n".
-            "*Email code* after starting a bank or WhatsApp send:\n{$statusLine}{$emailWarn}\n\n".
-            "Reply *OFF* or *ON*. Shortcuts: *1* = OFF, *2* = ON.\n".
-            "Wallet PIN is always entered on the *secure page* — never in this chat.\n\n".
-            '*BACK* — wallet menu'
+            "*Settings*\n{$statusLine}{$emailWarn}\n\n".
+            "*1* OFF · *2* ON · *0* back\n".
+            'PIN only on secure page.'
         );
     }
 
@@ -448,7 +473,7 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "Reply *ON* or *OFF* (or *2* / *1*). *BACK* — wallet menu.\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+            "*1* OFF · *2* ON · *0* back\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
@@ -463,11 +488,10 @@ class WhatsappWaWalletMenuHandler
     ): void {
         if ($cmd === '7' || $cmd === 'SETTINGS') {
             if (! $wallet->isTier2()) {
-                $this->client->sendText(
-                    $instance,
-                    $phone,
-                    'Wallet *SETTINGS* (email codes for transfers) are for *Tier 2*. Tier 1 confirms sends with a *secure link* only. Upgrade with *3* *UPGRADE*.'
-                );
+                $tier1Msg = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)
+                    ? '*7* = Tier 2 only · *3* upgrade (NG).'
+                    : '*7* = Tier 2 · upgrade NG-only for now.';
+                $this->client->sendText($instance, $phone, $tier1Msg);
 
                 return;
             }
@@ -519,6 +543,15 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($cmd === '1' || in_array($cmd, ['RECEIVE', 'TOPUP', 'TOP UP'], true)) {
+            if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Adding money via bank is only set up for *Nigeria* numbers right now. You can still receive from others with *4* (WhatsApp wallet send). We will add pay-in options for other regions later.'
+                );
+
+                return;
+            }
             try {
                 $this->sendReceiveTopupHelp($instance, $phone, $wallet);
             } catch (\Throwable $e) {
@@ -537,6 +570,15 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($cmd === '2' || $cmd === 'TRANSFER') {
+            if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Sending to Nigerian *bank accounts* is only available for *Nigeria* wallet numbers. Use *4* for WhatsApp wallet sends (including cross-border where enabled).'
+                );
+
+                return;
+            }
             if (! $wallet->hasPin()) {
                 $this->client->sendText(
                     $instance,
@@ -565,6 +607,15 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($cmd === '5' || $cmd === 'VTU') {
+            if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Airtime, data, and electricity (*VTU*) are only available for *Nigeria* wallet numbers right now.'
+                );
+
+                return;
+            }
             if (! $this->vtuFlow->isAvailable()) {
                 $this->client->sendText($instance, $phone, 'Airtime, data, and electricity payments are not available right now.');
 
@@ -613,6 +664,15 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($cmd === '3') {
+            if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    '*UPGRADE* (permanent bank pay-in) is only available for *Nigeria* numbers right now. Use *4* to move money on WhatsApp where supported.'
+                );
+
+                return;
+            }
             if ($wallet->isTier2()) {
                 $acct = trim((string) $wallet->mevon_virtual_account_number);
                 if ($acct !== '') {
@@ -660,6 +720,15 @@ class WhatsappWaWalletMenuHandler
                 $casual = WhatsappWalletCasualSendParser::tryParse($norm, $wallet, $this->bankPayout, $recent);
                 if ($casual !== null) {
                     if (($casual['flow'] ?? '') === 'bank_disambiguate') {
+                        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+                            $this->client->sendText(
+                                $instance,
+                                $phone,
+                                'Plain-English *bank* sends are only for *Nigeria* wallet numbers. Use *4* for WhatsApp sends.'."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+                            );
+
+                            return;
+                        }
                         $this->beginCasualBankDisambiguation($session, $instance, $phone, $casual);
 
                         return;
@@ -669,13 +738,16 @@ class WhatsappWaWalletMenuHandler
                     return;
                 }
                 if (WhatsappWalletCasualSendParser::largestNairaAmount($norm) !== null) {
+                    $bankTips = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)
+                        ? "• Use *2* once to send to their account (we save it for next time).\n".
+                            "• Then try e.g. *send 5k to Tunde Opay* or *pay 2000 for mama GTB*.\n"
+                        : '';
                     $this->client->sendText(
                         $instance,
                         $phone,
                         "I see you're trying to *send money* in plain English, but I couldn't match a saved bank payee.\n\n".
-                        "• Use *2* once to send to their account (we save it for next time).\n".
-                        "• Then try e.g. *send 5k to Tunde Opay* or *pay 2000 for mama GTB*.\n".
-                        "• WhatsApp sends: *send 5k to 080…* with their number.\n".
+                        $bankTips.
+                        "• WhatsApp sends: *send 5k to 080…* or an international number.\n".
                         "• If you only have *one* saved payee, *send 5k* alone can work.\n\n".
                         WhatsappMenuInputNormalizer::navigationHelpFooter()
                     );
@@ -692,21 +764,36 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($wallet->needsQuickWalletSetup()) {
+            $ng = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
             $hint = $wallet->hasPin()
-                ? 'Send *your name*, or *1* to add money. *MENU* — all services.'
-                : 'Reply *REGISTER* (PIN link), send *your name*, or *1* to add money. *MENU* — all services.';
+                ? ($ng ? 'Send *your name*, or *1* to add money. *MENU* — all services.' : 'Send *your name*. *MENU* — all services.')
+                : ($ng
+                    ? 'Reply *REGISTER* (PIN link), send *your name*, or *1* to add money. *MENU* — all services.'
+                    : 'Reply *REGISTER* (PIN link) or send *your name*. *MENU* — all services.');
             $this->client->sendText($instance, $phone, $hint);
 
             return;
         }
 
-        $range = $wallet->isTier2()
-            ? ($this->vtuFlow->isAvailable() ? '*1*, *2*, *4*, *5*, *6*, *7*' : '*1*, *2*, *4*, *6*, *7*')
-            : ($this->vtuFlow->isAvailable() ? '*1*–*6*' : '*1*–*4*, *6*');
+        $ng = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
+        $vtu = $this->vtuFlow->isAvailable();
+
+        if (! $ng) {
+            $range = $wallet->isTier2() ? '*4*, *6*, *7*' : '*4*, *6*';
+        } elseif ($wallet->isTier2()) {
+            $range = $vtu ? '*1*, *2*, *4*, *5*, *6*, *7*' : '*1*, *2*, *4*, *6*, *7*';
+        } else {
+            $range = $vtu ? '*1*–*6*' : '*1*–*4*, *6*';
+        }
+
+        $plainHint = $ng
+            ? "or say something like *send 5k to Tunde Opay* if you've paid them before.\n\n"
+            : "or type a *WhatsApp send* (amount + their number).\n\n";
+
         $this->client->sendText(
             $instance,
             $phone,
-            "Hey — tap a number ({$range}), or say something like *send 5k to Tunde Opay* if you've paid them before.\n\n*00* or *MENU* = all services · *WALLET* = this screen again."
+            "Hey — tap a number ({$range}), {$plainHint}*00* or *MENU* = all services · *WALLET* = this screen again."
         );
     }
 
@@ -759,6 +846,13 @@ class WhatsappWaWalletMenuHandler
         array $ctx,
         WhatsappWallet $wallet,
     ): void {
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
         $raw = trim($text);
         $raw = preg_replace('/^[\*_~\s]+|[\*_~\s]+$/u', '', $raw) ?? $raw;
         $raw = trim((string) $raw);
@@ -820,6 +914,16 @@ class WhatsappWaWalletMenuHandler
         WhatsappWallet $wallet,
         array $casual,
     ): void {
+        if (($casual['flow'] ?? '') === 'bank' && ! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Plain-English *bank* sends are only for *Nigeria* wallet numbers. Use *4* for WhatsApp sends.'."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+            );
+
+            return;
+        }
+
         if ($casual['flow'] === 'bank') {
             $wallet->refresh();
             $check = $wallet->canDebit($casual['amount']);
@@ -842,7 +946,8 @@ class WhatsappWaWalletMenuHandler
         }
 
         $recipient = $casual['recipient_e164'];
-        if ($recipient === PhoneNormalizer::canonicalNgE164Digits($phone)) {
+        $senderCanon = $this->walletSenderCanonicalE164($phone);
+        if ($recipient === $senderCanon) {
             $this->client->sendText($instance, $phone, "You can't send to your own number — pick someone else.\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
 
             return;
@@ -856,13 +961,21 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
+        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, (float) $casual['amount']);
+        if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
+            $this->client->sendText($instance, $phone, (string) ($eval['message'] ?? 'This send is not available.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
+
+            return;
+        }
+
+        $creditAmt = (float) $eval['credit'];
         $recvWallet = WhatsappWallet::query()
             ->where('phone_e164', $recipient)
             ->where('status', WhatsappWallet::STATUS_ACTIVE)
             ->first();
 
         if ($recvWallet) {
-            $creditCheck = $recvWallet->canCredit($casual['amount']);
+            $creditCheck = $recvWallet->canCredit($creditAmt);
             if (! $creditCheck['ok']) {
                 $this->client->sendText(
                     $instance,
@@ -874,26 +987,27 @@ class WhatsappWaWalletMenuHandler
             }
         }
 
-        $ctx = [
+        $ctx = $this->applyP2pFxEvalToContext([
             'step' => 'p2p_verify_recipient',
             'p2p_recipient_e164' => $recipient,
             'p2p_amount' => round((float) $casual['amount'], 2),
-        ];
+        ], $eval);
         if (! $recvWallet) {
             $ctx['p2p_recipient_unregistered'] = true;
         }
         $session->update(['chat_context' => $ctx]);
 
         $mask = $this->maskPhoneForDisplay($recipient);
-        $amt = number_format((float) $casual['amount'], 2);
+        $sCur = (string) $eval['sender_currency'];
+        $amtFmt = WhatsappWalletMoneyFormatter::format((float) $casual['amount'], $sCur);
 
         if (! $recvWallet) {
             $this->client->sendText(
                 $instance,
                 $phone,
-                "Got it — *₦{$amt}* to *{$mask}* (they haven't opened a wallet here yet).\n\n".
-                "If you continue, they open *WALLET* on that number to receive it (no time limit). They can send *CANCEL* to return it to you.\n\n".
-                "Reply *YES* to go ahead — then we'll do your usual security check (PIN or email).\n\n".
+                "*{$amtFmt}* → *{$mask}* · no wallet yet\n".
+                "They open *WALLET* to claim · *CANCEL* refunds\n\n".
+                "*1* continue · YES ok\n\n".
                 WhatsappMenuInputNormalizer::navigationHelpFooter()
             );
 
@@ -902,20 +1016,30 @@ class WhatsappWaWalletMenuHandler
 
         $recvName = $recvWallet->normalizedSenderName();
         $nameLine = $recvName !== null
-            ? "Their saved send name: *{$recvName}*"
-            : 'They have a wallet on this number.';
+            ? "Name: *{$recvName}*"
+            : 'Has wallet.';
 
         $this->client->sendText(
             $instance,
             $phone,
-            "Got it — *₦{$amt}* to *{$mask}*.\n{$nameLine}\n\n".
-            "Reply *YES* if that's the right person — then we'll ask for your PIN or email code like always.\n\n".
+            "*{$amtFmt}* → *{$mask}*\n{$nameLine}\n\n".
+            "*1* continue · YES ok\n\n".
             WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
     private function sendReceiveTopupHelp(string $instance, string $phone, WhatsappWallet $wallet): void
     {
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Adding money via bank is only set up for *Nigeria* numbers right now. You can still receive from others with *4* (WhatsApp wallet send).'
+            );
+
+            return;
+        }
+
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
             $this->client->sendText(
                 $instance,
@@ -1106,6 +1230,18 @@ class WhatsappWaWalletMenuHandler
         array $ctx,
         WhatsappWallet $wallet
     ): void {
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Bank transfers are only for *Nigeria* wallet numbers. Use *4* for WhatsApp sends.'
+            );
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
         $trim = trim($text);
         $pick = $this->normalizeWalletCommand($text);
         if (preg_match('/^[1-3]$/', $pick)) {
@@ -1550,14 +1686,19 @@ class WhatsappWaWalletMenuHandler
         WhatsappWallet $wallet
     ): void {
         $digits = PhoneNormalizer::digitsOnly($text);
-        $recipient = PhoneNormalizer::canonicalNgE164Digits($digits);
-        if ($recipient === null || strlen($recipient) < 12) {
-            $this->client->sendText($instance, $phone, 'Send a valid Nigerian mobile number (e.g. *08012345678*).');
+        $recipient = PhoneNormalizer::canonicalInternationalWalletRecipientDigits($digits ?? '');
+        if ($recipient === null) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Send a valid mobile number (NG *080…*, NA, GH, UK +44, US/CA +1…).'
+            );
 
             return;
         }
 
-        if ($recipient === PhoneNormalizer::canonicalNgE164Digits($phone)) {
+        $senderCanon = $this->walletSenderCanonicalE164($phone);
+        if ($recipient === $senderCanon) {
             $this->client->sendText($instance, $phone, 'You cannot send to your own number. Pick someone else.');
 
             return;
@@ -1579,12 +1720,9 @@ class WhatsappWaWalletMenuHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Confirm recipient*\n\n".
-                "Number: {$mask}\n".
-                "They have *not* opened *WALLET* here yet.\n\n".
-                "After you send, they'll get a message to open *WALLET* / *REGISTER*, or *CANCEL* to return the money to you.\n\n".
-                "Reply *YES* if this is the right person.\n\n".
-                '*BACK* — enter a different number'
+                "*{$mask}* · no wallet yet\n".
+                "*WALLET* to claim · *CANCEL* refunds\n\n".
+                "*1* confirm · *0* change · YES ok"
             );
 
             return;
@@ -1595,17 +1733,14 @@ class WhatsappWaWalletMenuHandler
 
         $recvName = $recvWallet->normalizedSenderName();
         $nameBlock = $recvName !== null
-            ? "Registered send name (their wallet):\n{$recvName}"
-            : 'Registered send name: not on file yet — rely on the number and your contact.';
+            ? "Name: *{$recvName}*"
+            : 'No name on file.';
 
         $this->client->sendText(
             $instance,
             $phone,
-            "*Confirm recipient*\n\n".
-            "Wallet: {$mask}\n".
-            "{$nameBlock}\n\n".
-            "Reply *YES* if this is the right person.\n\n".
-            '*BACK* — enter a different number'
+            "*{$mask}*\n{$nameBlock}\n\n".
+            "*1* confirm · *0* change · YES ok"
         );
     }
 
@@ -1664,6 +1799,13 @@ class WhatsappWaWalletMenuHandler
 
                     return;
                 }
+                $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $preset);
+                if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
+                    $this->client->sendText($instance, $phone, (string) ($eval['message'] ?? 'This send is not available.'));
+
+                    return;
+                }
+                $creditAmt = (float) $eval['credit'];
                 if (! $unreg) {
                     $recvWallet = WhatsappWallet::query()
                         ->where('phone_e164', $recipient)
@@ -1674,7 +1816,7 @@ class WhatsappWaWalletMenuHandler
 
                         return;
                     }
-                    $creditCheck = $recvWallet->canCredit($preset);
+                    $creditCheck = $recvWallet->canCredit($creditAmt);
                     if (! $creditCheck['ok']) {
                         $this->client->sendText(
                             $instance,
@@ -1685,16 +1827,23 @@ class WhatsappWaWalletMenuHandler
                         return;
                     }
                 }
-                $this->secureTransferAuth->beginP2pTransferConfirmation($session, $instance, $phone, $wallet, $ctx);
+                $ctx = $this->applyP2pFxEvalToContext($ctx, $eval);
+                $session->update(['chat_context' => $ctx]);
+                if ($eval['status'] === 'ok') {
+                    $this->client->sendText($instance, $phone, $this->crossBorderFx->formatCrossBorderPrompt($eval));
+                }
+                $this->secureTransferAuth->beginP2pTransferConfirmation($session->fresh(), $instance, $phone, $wallet->fresh(), $ctx);
 
                 return;
             }
             $ctx['step'] = 'p2p_amount';
             $session->update(['chat_context' => $ctx]);
+            $sCur = $this->crossBorderFx->senderCurrencyForInstance($instance);
+            $sym = WhatsappWalletMoneyFormatter::symbol($sCur);
             $this->client->sendText(
                 $instance,
                 $phone,
-                "How much in Naira? (numbers only, min ₦1)\n\n*0* back · *00* wallet menu"
+                "How much? (numbers only, min {$sym}1)\n\n*0* back · *00* wallet menu"
             );
 
             return;
@@ -1703,7 +1852,7 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "If that’s the right person, reply *YES*. Otherwise *0* to change the number.\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+            "*1* or YES · *0* change number\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
@@ -1734,8 +1883,10 @@ class WhatsappWaWalletMenuHandler
             return;
         }
         $amount = round((float) $t, 2);
+        $sCur = $this->crossBorderFx->senderCurrencyForInstance($instance);
+        $sym = WhatsappWalletMoneyFormatter::symbol($sCur);
         if ($amount < 1) {
-            $this->client->sendText($instance, $phone, 'Minimum amount is ₦1.');
+            $this->client->sendText($instance, $phone, "Minimum amount is {$sym}1.");
 
             return;
         }
@@ -1748,6 +1899,15 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
+        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount);
+        if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
+            $this->client->sendText($instance, $phone, (string) ($eval['message'] ?? 'This send is not available.'));
+
+            return;
+        }
+
+        $creditAmt = (float) $eval['credit'];
+
         $recv = WhatsappWallet::query()
             ->where('phone_e164', $recipient)
             ->where('status', WhatsappWallet::STATUS_ACTIVE)
@@ -1758,7 +1918,7 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($recv) {
-            $creditCheck = $recv->canCredit($amount);
+            $creditCheck = $recv->canCredit($creditAmt);
             if (! $creditCheck['ok']) {
                 $this->client->sendText(
                     $instance,
@@ -1771,7 +1931,12 @@ class WhatsappWaWalletMenuHandler
         }
 
         $ctx['p2p_amount'] = $amount;
-        $this->secureTransferAuth->beginP2pTransferConfirmation($session, $instance, $phone, $wallet, $ctx);
+        $ctx = $this->applyP2pFxEvalToContext($ctx, $eval);
+        $session->update(['chat_context' => $ctx]);
+        if ($eval['status'] === 'ok') {
+            $this->client->sendText($instance, $phone, $this->crossBorderFx->formatCrossBorderPrompt($eval));
+        }
+        $this->secureTransferAuth->beginP2pTransferConfirmation($session->fresh(), $instance, $phone, $wallet->fresh(), $ctx);
     }
 
     /**
@@ -1814,10 +1979,30 @@ class WhatsappWaWalletMenuHandler
             $instance,
             $phone,
             "*Send to WhatsApp (P2P)*\n\n".
-            "Send the recipient's Nigerian mobile number (e.g. *080…* or *234…*).\n".
+            "Send the recipient's mobile in international form (e.g. *080…* / *234…*, *+264…*, *+233…*, *+44…*, *+1…*).\n".
             "They must have sent *WALLET* here once so their wallet exists.\n\n".
             '*BACK* — cancel'
         );
+    }
+
+    private function walletSenderCanonicalE164(string $sessionPhoneE164): string
+    {
+        $d = PhoneNormalizer::digitsOnly($sessionPhoneE164) ?? $sessionPhoneE164;
+
+        return PhoneNormalizer::canonicalInternationalWalletRecipientDigits($d) ?? $d;
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     * @return array<string, mixed>
+     */
+    private function applyP2pFxEvalToContext(array $ctx, array $eval): array
+    {
+        $ctx['p2p_recipient_credit_amount'] = round((float) $eval['credit'], 2);
+        $ctx['p2p_sender_currency'] = (string) $eval['sender_currency'];
+        $ctx['p2p_recipient_currency'] = (string) $eval['recipient_currency'];
+
+        return $ctx;
     }
 
     private function maskPhoneForDisplay(string $e164): string

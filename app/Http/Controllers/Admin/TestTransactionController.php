@@ -101,6 +101,7 @@ class TestTransactionController extends Controller
             $result = $svc->createTempVa(
                 $validated['fname'],
                 $validated['lname'],
+                null,
                 $validated['bvn']
             );
 

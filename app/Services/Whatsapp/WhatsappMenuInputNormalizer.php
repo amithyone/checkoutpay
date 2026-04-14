@@ -37,9 +37,9 @@ final class WhatsappMenuInputNormalizer
         };
     }
 
-    /** One-line hint for footers (wallet, checkout, linked, VTU). */
+    /** One-line hint for footers — numbers first; words still work where handlers map them. */
     public static function navigationHelpFooter(): string
     {
-        return '*0* = back a step · *00* = all services · *000* / *restart* = start over';
+        return '*0* back · *00* menu · *000* restart';
     }
 }

@@ -82,10 +82,9 @@ final class WhatsappWalletCasualSendParser
             return null;
         }
 
-        $senderE164 = PhoneNormalizer::canonicalNgE164Digits(
-            PhoneNormalizer::digitsOnly($wallet->phone_e164) ?? $wallet->phone_e164
-        );
-        $recipientPhone = self::extractNigerianPhoneE164($normalized);
+        $senderDigits = PhoneNormalizer::digitsOnly($wallet->phone_e164) ?? $wallet->phone_e164;
+        $senderE164 = PhoneNormalizer::canonicalInternationalWalletRecipientDigits($senderDigits) ?? $senderDigits;
+        $recipientPhone = self::extractWalletP2pPhoneE164($normalized, $senderE164);
         if ($recipientPhone !== null && $recipientPhone !== $senderE164) {
             return ['flow' => 'p2p', 'amount' => $amount, 'recipient_e164' => $recipientPhone];
         }
@@ -168,7 +167,7 @@ final class WhatsappWalletCasualSendParser
         if (preg_match_all('/\b(\d{2,}(?:\.\d{1,2})?)\b/', $text, $m)) {
             foreach ($m[1] as $x) {
                 $digits = preg_replace('/\D+/', '', $x) ?? '';
-                if (self::digitsLookLikeNgPhone($digits)) {
+                if (self::digitsLookLikeInternationalPhone($digits)) {
                     continue;
                 }
                 $n = (float) str_replace([',', ' '], '', $x);
@@ -197,6 +196,63 @@ final class WhatsappWalletCasualSendParser
         }
 
         return false;
+    }
+
+    private static function digitsLookLikeInternationalPhone(string $digits): bool
+    {
+        if (self::digitsLookLikeNgPhone($digits)) {
+            return true;
+        }
+        if (str_starts_with($digits, '233') && strlen($digits) >= 12) {
+            return true;
+        }
+        if (str_starts_with($digits, '264') && strlen($digits) >= 11) {
+            return true;
+        }
+        if (str_starts_with($digits, '44') && strlen($digits) >= 11) {
+            return true;
+        }
+        if (strlen($digits) === 11 && str_starts_with($digits, '1')) {
+            return true;
+        }
+        if (strlen($digits) === 10 && $digits[0] !== '0' && preg_match('/^[2-9]\d{9}$/', $digits) === 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function extractWalletP2pPhoneE164(string $text, ?string $senderCanonical): ?string
+    {
+        $ng = self::extractNigerianPhoneE164($text);
+        if ($ng !== null && ($senderCanonical === null || $ng !== $senderCanonical)) {
+            return $ng;
+        }
+
+        $digitsOnly = preg_replace('/\D+/', '', $text) ?? '';
+        if ($digitsOnly !== '' && preg_match_all('/\d{10,16}/', $digitsOnly, $m)) {
+            foreach ($m[0] as $chunk) {
+                $c = PhoneNormalizer::canonicalInternationalWalletRecipientDigits($chunk);
+                if ($c !== null && ($senderCanonical === null || $c !== $senderCanonical)) {
+                    return $c;
+                }
+            }
+        }
+
+        if (preg_match_all('/(?:\+|00)\s*\d[\d\s\-()]{8,18}\d/u', $text, $m)) {
+            foreach ($m[0] as $frag) {
+                $d = PhoneNormalizer::digitsOnly($frag);
+                if ($d === null) {
+                    continue;
+                }
+                $c = PhoneNormalizer::canonicalInternationalWalletRecipientDigits($d);
+                if ($c !== null && ($senderCanonical === null || $c !== $senderCanonical)) {
+                    return $c;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static function extractNigerianPhoneE164(string $text): ?string
@@ -243,7 +299,7 @@ final class WhatsappWalletCasualSendParser
             return null;
         }
 
-        if (self::extractNigerianPhoneE164($clause) !== null) {
+        if (self::extractWalletP2pPhoneE164($clause, null) !== null) {
             $letters = preg_replace('/[\d\s\+\-()]/u', '', $clause) ?? '';
             if ($letters === '' || ! preg_match('/[a-z]/i', $letters)) {
                 return null;

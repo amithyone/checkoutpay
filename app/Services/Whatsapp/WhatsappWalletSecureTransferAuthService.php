@@ -255,12 +255,23 @@ class WhatsappWalletSecureTransferAuthService
     private function summarizeP2p(array $execCtx): string
     {
         $amount = isset($execCtx['p2p_amount']) && is_numeric($execCtx['p2p_amount']) ? (float) $execCtx['p2p_amount'] : 0.0;
+        $credit = isset($execCtx['p2p_recipient_credit_amount']) && is_numeric($execCtx['p2p_recipient_credit_amount'])
+            ? (float) $execCtx['p2p_recipient_credit_amount']
+            : $amount;
+        $sCur = isset($execCtx['p2p_sender_currency']) && is_string($execCtx['p2p_sender_currency']) ? $execCtx['p2p_sender_currency'] : 'NGN';
+        $rCur = isset($execCtx['p2p_recipient_currency']) && is_string($execCtx['p2p_recipient_currency']) ? $execCtx['p2p_recipient_currency'] : 'NGN';
         $to = isset($execCtx['p2p_recipient_e164']) && is_string($execCtx['p2p_recipient_e164']) ? $execCtx['p2p_recipient_e164'] : '';
         $suffix = ! empty($execCtx['p2p_recipient_unregistered'])
             ? ' (recipient opens WALLET to receive; CANCEL returns to sender)'
             : '';
 
-        return 'WhatsApp send: ₦'.number_format($amount, 2).' → '.$to.$suffix;
+        $debitFmt = WhatsappWalletMoneyFormatter::format($amount, $sCur);
+        if (strtoupper($sCur) === strtoupper($rCur) || abs($amount - $credit) < 0.005) {
+            return 'WhatsApp send: '.$debitFmt.' → '.$to.$suffix;
+        }
+        $credFmt = WhatsappWalletMoneyFormatter::format($credit, $rCur);
+
+        return 'WhatsApp send: '.$debitFmt.' → '.$to.' (recipient gets '.$credFmt.')'.$suffix;
     }
 
     /**

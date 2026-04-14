@@ -27,6 +27,7 @@ class WhatsappWalletTopupNotifier
         string $senderPhoneE164,
         ?string $senderWalletDisplayName = null,
         ?Carbon $transferredAt = null,
+        string $creditCurrency = 'NGN',
     ): void {
         if ($amount <= 0) {
             return;
@@ -50,7 +51,7 @@ class WhatsappWalletTopupNotifier
             return;
         }
 
-        $amountStr = '₦'.number_format($amount, 2);
+        $amountStr = WhatsappWalletMoneyFormatter::format($amount, $creditCurrency);
         $at = $transferredAt ?? now();
         $when = $at->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
             ' ('.(string) config('app.timezone').')';

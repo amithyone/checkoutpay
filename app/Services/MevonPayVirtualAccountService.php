@@ -30,30 +30,8 @@ class MevonPayVirtualAccountService
 
     protected function authorizationHeaderValue(): string
     {
-        $key = trim($this->secretKey);
-        if ($key === '') {
-            return '';
-        }
-
-        // Some environments store "Bearer <token>", others store only "<token>".
-        if (stripos($key, 'bearer ') === 0) {
-            return $key;
-        }
-
-        return 'Bearer ' . $key;
-    }
-
-    /**
-     * Some temporary-VA endpoints expect raw token without "Bearer ".
-     */
-    protected function rawAuthorizationHeaderValue(): string
-    {
-        $key = trim($this->secretKey);
-        if ($key === '') {
-            return '';
-        }
-
-        return (string) preg_replace('/^Bearer\s+/i', '', $key);
+        // Keep auth behavior aligned with transfer service: send configured value as-is.
+        return trim($this->secretKey);
     }
 
     /**
@@ -74,7 +52,7 @@ class MevonPayVirtualAccountService
 
         $url = rtrim($this->baseUrl, '/') . '/V1/createtempva.php';
 
-        $authorization = $this->rawAuthorizationHeaderValue();
+        $authorization = $this->authorizationHeaderValue();
 
         $effectiveRegistrationNumber = trim((string) ($registrationNumber ?: config('services.mevonpay.temp_va_registration_number', '')));
 

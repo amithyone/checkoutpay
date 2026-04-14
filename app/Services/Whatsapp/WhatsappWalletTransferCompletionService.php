@@ -24,6 +24,8 @@ class WhatsappWalletTransferCompletionService
         private WhatsappWalletTopupNotifier $walletNotifier,
         private WhatsappWalletPendingP2pService $pendingP2p,
         private VtuNgApiClient $vtuApi,
+        private WhatsappCrossBorderP2pFxService $crossBorderFx,
+        private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
     private function waBrand(): string
@@ -67,7 +69,7 @@ class WhatsappWalletTransferCompletionService
 
     private function forwardableReceiptFooter(): string
     {
-        return "\n\n_You can forward this as proof — it does *not* show your wallet balance._";
+        return "\n\n_Forward ok — no balance shown._";
     }
 
     /**
@@ -83,9 +85,9 @@ class WhatsappWalletTransferCompletionService
         float $amount,
         string $reference,
         string $whenLine,
-    ): void {
+    ): bool {
         if (! config('whatsapp.wallet.send_transfer_receipt_image', true)) {
-            return;
+            return false;
         }
         $png = WhatsappTransferReceiptImage::bankTransferPngBytes(
             $brand,
@@ -97,7 +99,7 @@ class WhatsappWalletTransferCompletionService
             $whenLine,
         );
         if ($png === null) {
-            return;
+            return false;
         }
         $this->client->sendMedia(
             $instance,
@@ -105,9 +107,11 @@ class WhatsappWalletTransferCompletionService
             'image',
             'image/png',
             base64_encode($png),
-            '📎 Receipt — ok to forward (no balance).',
+            '✅ Receipt',
             'transfer-receipt.png'
         );
+
+        return true;
     }
 
     private function maybeSendP2pReceiptImage(
@@ -118,13 +122,15 @@ class WhatsappWalletTransferCompletionService
         float $amount,
         string $whenLine,
         string $receiptId,
-    ): void {
+        string $debitCurrency = 'NGN',
+        ?string $recipientCreditLine = null,
+    ): bool {
         if (! config('whatsapp.wallet.send_transfer_receipt_image', true)) {
-            return;
+            return false;
         }
-        $png = WhatsappTransferReceiptImage::p2pSentPngBytes($brand, $toMasked, $amount, $whenLine, $receiptId);
+        $png = WhatsappTransferReceiptImage::p2pSentPngBytes($brand, $toMasked, $amount, $whenLine, $receiptId, $debitCurrency, $recipientCreditLine);
         if ($png === null) {
-            return;
+            return false;
         }
         $this->client->sendMedia(
             $instance,
@@ -132,9 +138,11 @@ class WhatsappWalletTransferCompletionService
             'image',
             'image/png',
             base64_encode($png),
-            '📎 Receipt — ok to forward (no balance).',
+            '✅ Receipt',
             'p2p-receipt.png'
         );
+
+        return true;
     }
 
     /**
@@ -153,68 +161,83 @@ class WhatsappWalletTransferCompletionService
             return;
         }
 
-        $bal = '₦'.number_format((float) $wallet->balance, 2);
+        $ngRails = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
+        $cur = $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);
+        $bal = WhatsappWalletMoneyFormatter::format((float) $wallet->balance, $cur);
         $t1max = number_format((float) config('whatsapp.wallet.tier1_max_balance', 50000), 0);
         $isTier2 = $wallet->isTier2();
         $pinSection = $wallet->hasPin()
             ? ''
-            : "*REGISTER* — set wallet PIN via secure link (required before *2* Transfer).\n\n";
+            : "*REGISTER* — PIN link first.\n\n";
 
         $vaBlock = '';
-        if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
-            $vaBlock = "\n*Your bank account*\n".
-                'Bank: *'.($wallet->mevon_bank_name ?? 'Rubies MFB')."*\n".
-                'Account: *'.$wallet->mevon_virtual_account_number."*\n";
+        if ($ngRails && $wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
+            $vaBlock = "\n*Pay-in:* ".($wallet->mevon_bank_name ?? 'Rubies MFB').' *'.$wallet->mevon_virtual_account_number."*\n";
         }
 
         $tier1VaNote = '';
-        if (! $isTier2 && (int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
-            $tier1VaNote = "\nTier 1: *1* gives a *new temporary* pay-in account each time.\n";
+        if ($ngRails && ! $isTier2 && (int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY && $this->tier1TopupVa->isAvailable()) {
+            $tier1VaNote = "Tier 1: *1* = new temp account each time.\n";
         }
 
-        $upgradeLine = $isTier2
-            ? ''
-            : "*3* — Get a permanent bank account (*UPGRADE* / Tier 2)\n";
+        $upgradeLine = ($ngRails && ! $isTier2)
+            ? "*3* Upgrade (permanent VA)\n"
+            : '';
 
-        $tier1HeadsUp = $isTier2
-            ? ''
-            : "Tier 1 max balance: ₦{$t1max} until you upgrade.\n";
+        $tier1HeadsUp = '';
+        if (! $isTier2) {
+            $tier1HeadsUp = $ngRails
+                ? "Max ₦{$t1max} until *3* upgrade.\n"
+                : "NG pay-in only · use *4* to receive.\n";
+        }
 
         $brand = $this->waBrand();
-        $bankNote = $this->bankPayout->isConfigured()
-            ? "Bank sends use *{$brand}*: we only keep the debit when the transfer is *confirmed successful* — failed or *pending* responses refund your wallet."
-            : "Bank sends are recorded on your balance; connect *{$brand}* for live payouts.";
+        $bankNote = '';
+        if ($ngRails) {
+            $bankNote = $this->bankPayout->isConfigured()
+                ? "*2* bank: {$brand} — debit only when payout succeeds."
+                : "*2* bank: ledger until {$brand} live.";
+        }
 
-        $vtuLine = $this->vtuApi->isConfigured()
-            ? "*5* — Airtime / Data / Electricity\n"
+        $vtuLine = ($ngRails && $this->vtuApi->isConfigured())
+            ? "*5* Bills (airtime / data / power)\n"
             : '';
 
         $settingsLine = $isTier2
-            ? "*7* — *SETTINGS* — email code for transfers *ON* / *OFF*\n"
+            ? "*7* Settings (email code on/off)\n"
+            : '';
+
+        $line1 = $ngRails ? "*1* Add / receive\n" : '';
+        $line2 = $ngRails ? "*2* Bank send\n" : '';
+        $p2pTip = $ngRails
+            ? "Paste *080…* / *234…* anytime for *4*.\n"
+            : "*4* WhatsApp send (intl OK).\n";
+
+        $casualLine = $ngRails
+            ? "Or: *send 5k to Name Opay*\n\n"
             : '';
 
         $this->client->sendText(
             $instance,
             $phone,
-            "Here's your wallet 👋\n".
-            "💰 Balance: *{$bal}*\n".
+            "*Wallet* *{$bal}*\n".
             $vaBlock.
-            "\nWhat would you like to do?\n".
-            "*1* — Add money / receive\n".
-            "*2* — Send to someone's *bank* account\n".
+            "\n".
+            $line1.
+            $line2.
             $upgradeLine.
-            "*4* — Send money to another *WhatsApp* user\n".
-            "Tip: paste *080…* / *234…* anytime to start a WhatsApp send.\n".
+            "*4* WhatsApp send\n".
+            $p2pTip.
             $vtuLine.
-            "*6* — Recent activity (*MORE* / *PREV*)\n".
+            "*6* History (*MORE* / *PREV*)\n".
             $settingsLine.
             "\n".
             $pinSection.
             $tier1HeadsUp.
-            $tier1VaNote.
-            "{$bankNote}\n\n".
-            "If you've sent to someone before, try *send 5k to Tunde Opay* in plain English.\n\n".
-            WhatsappMenuInputNormalizer::navigationHelpFooter().' · *STOP* — pause replies'
+            ($tier1VaNote !== '' ? $tier1VaNote."\n" : '').
+            ($bankNote !== '' ? $bankNote."\n\n" : '').
+            $casualLine.
+            WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
@@ -237,6 +260,18 @@ class WhatsappWalletTransferCompletionService
 
         if ($amount < 1 || strlen($acct) !== 10 || $bankCode === '' || $beneficiary === '') {
             $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Bank transfers are only for *Nigeria* wallet numbers. Use *4* for WhatsApp sends.'
+            );
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
 
             return;
@@ -310,20 +345,7 @@ class WhatsappWalletTransferCompletionService
         $when = $this->transferNoticeTimeLine();
         $tail = $this->accountLast4($acct);
         $brand = $this->waBrand();
-        $this->client->sendText(
-            $instance,
-            $phone,
-            "✅ *Transfer recorded*\n\n".
-            "*To:* {$beneficiary}\n".
-            "*Bank:* {$bankName}\n".
-            "*Account:* ****{$tail}\n".
-            '*Amount:* ₦'.number_format($amount, 2)."\n".
-            "*Time:* {$when}\n\n".
-            "🏦 *{$brand}* bank payouts are not on yet — this is *ledger-only* until support enables live sends.".
-            $this->forwardableReceiptFooter().
-            $this->pinDeleteReminderSuffix($userTypedPinInChat)
-        );
-        $this->maybeSendBankTransferReceiptImage(
+        $receiptOk = $this->maybeSendBankTransferReceiptImage(
             $instance,
             $phone,
             $brand,
@@ -334,6 +356,24 @@ class WhatsappWalletTransferCompletionService
             'ledger-'.now()->format('Ymd-His'),
             $when
         );
+        $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
+        if (! $receiptOk) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "✅ *Transfer recorded*\n\n".
+                "*To:* {$beneficiary}\n".
+                "*Bank:* {$bankName}\n".
+                "*Account:* ****{$tail}\n".
+                '*Amount:* ₦'.number_format($amount, 2)."\n".
+                "*Time:* {$when}\n\n".
+                "🏦 *{$brand}* bank payouts are not on yet — this is *ledger-only* until support enables live sends.".
+                $this->forwardableReceiptFooter().
+                $pin
+            );
+        } elseif ($pin !== '') {
+            $this->client->sendText($instance, $phone, ltrim($pin, "\n\n"));
+        }
         $this->sendWalletSubmenu($instance, $phone, $wallet);
     }
 
@@ -452,20 +492,7 @@ class WhatsappWalletTransferCompletionService
         $acctTail = $this->accountLast4($acct);
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "✅ *Bank transfer sent!*\n\n".
-                "*To:* {$beneficiary}\n".
-                "*Bank:* {$bankName}\n".
-                "*Account:* ****{$acctTail}\n".
-                '*Amount:* ₦'.number_format($amount, 2)."\n".
-                "*Time:* {$when}\n".
-                'Ref: *'.$refShown.'*'.
-                $this->forwardableReceiptFooter().
-                $this->pinDeleteReminderSuffix($userTypedPinInChat)
-            );
-            $this->maybeSendBankTransferReceiptImage(
+            $receiptOk = $this->maybeSendBankTransferReceiptImage(
                 $instance,
                 $phone,
                 $brand,
@@ -476,6 +503,24 @@ class WhatsappWalletTransferCompletionService
                 $refShown,
                 $when
             );
+            $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
+            if (! $receiptOk) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    "✅ *Bank transfer sent!*\n\n".
+                    "*To:* {$beneficiary}\n".
+                    "*Bank:* {$bankName}\n".
+                    "*Account:* ****{$acctTail}\n".
+                    '*Amount:* ₦'.number_format($amount, 2)."\n".
+                    "*Time:* {$when}\n".
+                    'Ref: *'.$refShown.'*'.
+                    $this->forwardableReceiptFooter().
+                    $pin
+                );
+            } elseif ($pin !== '') {
+                $this->client->sendText($instance, $phone, ltrim($pin, "\n\n"));
+            }
         } else {
             $detail = $bucket === MavonPayTransferService::BUCKET_PENDING
                 ? '*'.$this->waBrand().'* returned *pending* (not a final success). Transfers only complete when the bank confirms — your wallet has been *refunded*.'
@@ -520,13 +565,33 @@ class WhatsappWalletTransferCompletionService
             return;
         }
 
+        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount);
+        if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                (string) ($eval['message'] ?? 'This send is not available.').
+                $this->pinDeleteReminderSuffix($userTypedPinInChat)
+            );
+            $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
+        $debitAmount = (float) $eval['debit'];
+        $creditAmount = (float) $eval['credit'];
+        $senderCur = (string) $eval['sender_currency'];
+        $recvCur = (string) $eval['recipient_currency'];
+        $isFx = $senderCur !== $recvCur;
+
         $recvRow = WhatsappWallet::query()
             ->where('phone_e164', $recipient)
             ->where('status', WhatsappWallet::STATUS_ACTIVE)
             ->first();
 
         if (! $recvRow) {
-            $hold = $this->pendingP2p->createHold($wallet->fresh(), $recipient, $amount, $instance);
+            $hold = $this->pendingP2p->createHold($wallet->fresh(), $recipient, $debitAmount, $instance, $creditAmount);
             if (! ($hold['ok'] ?? false)) {
                 $this->client->sendText(
                     $instance,
@@ -541,12 +606,16 @@ class WhatsappWalletTransferCompletionService
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $wallet = $wallet->fresh();
             $masked = $this->maskPhoneTail($recipient);
+            $debitFmt = WhatsappWalletMoneyFormatter::format($debitAmount, $senderCur);
+            $creditNote = $isFx
+                ? "\n*They receive:* ".WhatsappWalletMoneyFormatter::format($creditAmount, $recvCur)."\n"
+                : "\n";
             $this->client->sendText(
                 $instance,
                 $phone,
                 "⏳ *Sent — waiting for them*\n\n".
                 '*To:* '.$masked."\n".
-                '*Amount:* ₦'.number_format($amount, 2)."\n\n".
+                "*You sent:* {$debitFmt}{$creditNote}".
                 "They need to open *WALLET* on that *WhatsApp* number to receive.\n\n".
                 "The funds are for them here until they do. They can send *CANCEL* to return it to you.\n\n".
                 '💡 Open *WALLET* anytime here to see your balance.'.
@@ -559,7 +628,7 @@ class WhatsappWalletTransferCompletionService
         }
 
         try {
-            DB::transaction(function () use ($wallet, $recipient, $amount, $phone) {
+            DB::transaction(function () use ($wallet, $recipient, $debitAmount, $creditAmount, $phone, $senderCur, $recvCur, $isFx) {
                 $recvId = WhatsappWallet::query()->where('phone_e164', $recipient)->value('id');
                 $ids = array_values(array_unique(array_filter([$wallet->id, $recvId])));
                 if (count($ids) < 2) {
@@ -591,15 +660,15 @@ class WhatsappWalletTransferCompletionService
                 $sender->resetDailyTransferIfNeeded();
                 $recv->resetDailyTransferIfNeeded();
 
-                if (! $sender->hasPin() || ! $sender->canDebit($amount)['ok'] || ! $recv->canCredit($amount)['ok']) {
+                if (! $sender->hasPin() || ! $sender->canDebit($debitAmount)['ok'] || ! $recv->canCredit($creditAmount)['ok']) {
                     throw new \RuntimeException('limits');
                 }
 
-                $newSenderBal = round((float) $sender->balance - $amount, 2);
-                $newRecvBal = round((float) $recv->balance + $amount, 2);
+                $newSenderBal = round((float) $sender->balance - $debitAmount, 2);
+                $newRecvBal = round((float) $recv->balance + $creditAmount, 2);
 
                 $sender->balance = $newSenderBal;
-                $sender->daily_transfer_total = round((float) $sender->daily_transfer_total + $amount, 2);
+                $sender->daily_transfer_total = round((float) $sender->daily_transfer_total + $debitAmount, 2);
                 $sender->daily_transfer_for_date = now()->toDateString();
                 $sender->pin_failed_attempts = 0;
                 $sender->save();
@@ -607,24 +676,31 @@ class WhatsappWalletTransferCompletionService
                 $recv->balance = $newRecvBal;
                 $recv->save();
 
+                $fxMeta = $isFx ? [
+                    'cross_border' => true,
+                    'sender_currency' => $senderCur,
+                    'recipient_currency' => $recvCur,
+                    'recipient_credit_amount' => $creditAmount,
+                ] : [];
+
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $sender->id,
                     'sender_name' => $sender->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_P2P_DEBIT,
-                    'amount' => $amount,
+                    'amount' => $debitAmount,
                     'balance_after' => $newSenderBal,
                     'counterparty_phone_e164' => $recipient,
-                    'meta' => ['channel' => 'whatsapp_menu'],
+                    'meta' => array_merge(['channel' => 'whatsapp_menu'], $fxMeta),
                 ]);
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $recv->id,
                     'sender_name' => $sender->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_P2P_CREDIT,
-                    'amount' => $amount,
+                    'amount' => $creditAmount,
                     'balance_after' => $newRecvBal,
                     'counterparty_phone_e164' => $phone,
-                    'meta' => ['channel' => 'whatsapp_menu'],
+                    'meta' => array_merge(['channel' => 'whatsapp_menu'], $fxMeta),
                 ]);
             });
         } catch (\Throwable $e) {
@@ -651,10 +727,11 @@ class WhatsappWalletTransferCompletionService
             $this->walletNotifier->notifyP2pReceived(
                 $instance,
                 $recvFresh,
-                $amount,
+                $creditAmount,
                 $phone,
                 $senderDisplayName,
-                $sentAt
+                $sentAt,
+                $recvCur,
             );
         }
 
@@ -666,26 +743,40 @@ class WhatsappWalletTransferCompletionService
         $brand = $this->waBrand();
         $maskedTo = $this->maskPhoneTail($recipient);
         $receiptId = 'P2P-'.$sentAt->timezone(config('app.timezone'))->format('Ymd-His');
-        $this->client->sendText(
-            $instance,
-            $phone,
-            "✅ *Sent!*\n\n".
-            $toLine."\n".
-            '*Amount:* ₦'.number_format($amount, 2)."\n".
-            "*Time:* {$when}\n".
-            'Receipt: *'.$receiptId.'*'.
-            $this->forwardableReceiptFooter().
-            $this->pinDeleteReminderSuffix($userTypedPinInChat)
-        );
-        $this->maybeSendP2pReceiptImage(
+        $debitFmt = WhatsappWalletMoneyFormatter::format($debitAmount, $senderCur);
+        $amountBlock = $isFx
+            ? "*You sent:* {$debitFmt}\n*They receive:* ".WhatsappWalletMoneyFormatter::format($creditAmount, $recvCur)
+            : '*Amount:* '.$debitFmt;
+        $recvReceiptLine = $isFx
+            ? 'They receive: '.strtoupper($recvCur).' '.number_format($creditAmount, 2)
+            : null;
+        $receiptOk = $this->maybeSendP2pReceiptImage(
             $instance,
             $phone,
             $brand,
             $maskedTo,
-            $amount,
+            $debitAmount,
             $when,
-            $receiptId
+            $receiptId,
+            $senderCur,
+            $recvReceiptLine
         );
+        $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
+        if (! $receiptOk) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "✅ *Sent!*\n\n".
+                $toLine."\n".
+                $amountBlock."\n".
+                "*Time:* {$when}\n".
+                'Receipt: *'.$receiptId.'*'.
+                $this->forwardableReceiptFooter().
+                $pin
+            );
+        } elseif ($pin !== '') {
+            $this->client->sendText($instance, $phone, ltrim($pin, "\n\n"));
+        }
         $this->sendWalletSubmenu($instance, $phone, $wallet);
     }
 }

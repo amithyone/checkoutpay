@@ -47,16 +47,22 @@ final class WhatsappTransferReceiptImage
         float $amount,
         string $whenLine,
         string $receiptId,
+        string $debitCurrency = 'NGN',
+        ?string $recipientCreditLine = null,
     ): ?string {
+        $debitLine = 'Amount: '.strtoupper($debitCurrency).' '.number_format($amount, 2);
         $lines = [
             'WHATSAPP WALLET SEND — SUCCESS',
-            'Amount: NGN '.number_format($amount, 2),
-            'To: '.self::foldForReceipt($toMasked, 44),
-            'Receipt: '.self::foldForReceipt($receiptId, 44),
-            'Time: '.self::foldForReceipt($whenLine, 44),
-            '',
-            self::foldForReceipt($brand, 44),
+            $debitLine,
         ];
+        if ($recipientCreditLine !== null && $recipientCreditLine !== '') {
+            $lines[] = self::foldForReceipt($recipientCreditLine, 44);
+        }
+        $lines[] = 'To: '.self::foldForReceipt($toMasked, 44);
+        $lines[] = 'Receipt: '.self::foldForReceipt($receiptId, 44);
+        $lines[] = 'Time: '.self::foldForReceipt($whenLine, 44);
+        $lines[] = '';
+        $lines[] = self::foldForReceipt($brand, 44);
 
         return self::renderPng($lines);
     }
