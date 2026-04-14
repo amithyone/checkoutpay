@@ -565,7 +565,7 @@ class WhatsappWalletTransferCompletionService
             return;
         }
 
-        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount);
+        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount, (string) $wallet->phone_e164);
         if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $this->client->sendText(

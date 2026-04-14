@@ -35,6 +35,19 @@ final class WhatsappCrossBorderP2pFxService
     }
 
     /**
+     * Sender currency for P2P: wallet owner's number (correct when one Evolution instance serves several countries).
+     * Falls back to {@see currencyForEvolutionInstance} when phone is empty.
+     */
+    public function senderCurrencyForWalletPhone(string $evolutionInstance, ?string $senderWalletPhoneE164): string
+    {
+        $d = preg_replace('/\D+/', '', (string) $senderWalletPhoneE164) ?? '';
+
+        return $d !== ''
+            ? $this->countries->currencyForPhoneE164($senderWalletPhoneE164)
+            : $this->countries->currencyForEvolutionInstance($evolutionInstance);
+    }
+
+    /**
      * @return array{
      *   status: 'domestic'|'ok'|'blocked'|'missing_rate',
      *   sender_currency: string,
@@ -44,9 +57,13 @@ final class WhatsappCrossBorderP2pFxService
      *   message?: string
      * }
      */
-    public function evaluateP2p(string $evolutionInstance, string $recipientPhoneE164, float $debitAmount): array
-    {
-        $senderCur = $this->countries->currencyForEvolutionInstance($evolutionInstance);
+    public function evaluateP2p(
+        string $evolutionInstance,
+        string $recipientPhoneE164,
+        float $debitAmount,
+        ?string $senderWalletPhoneE164 = null,
+    ): array {
+        $senderCur = $this->senderCurrencyForWalletPhone($evolutionInstance, $senderWalletPhoneE164);
         $recvCur = $this->countries->currencyForPhoneE164($recipientPhoneE164);
         $debit = round($debitAmount, 2);
 

@@ -961,7 +961,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, (float) $casual['amount']);
+        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, (float) $casual['amount'], (string) $wallet->phone_e164);
         if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
             $this->client->sendText($instance, $phone, (string) ($eval['message'] ?? 'This send is not available.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
 
@@ -1799,7 +1799,7 @@ class WhatsappWaWalletMenuHandler
 
                     return;
                 }
-                $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $preset);
+                $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $preset, (string) $wallet->phone_e164);
                 if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
                     $this->client->sendText($instance, $phone, (string) ($eval['message'] ?? 'This send is not available.'));
 
@@ -1838,7 +1838,7 @@ class WhatsappWaWalletMenuHandler
             }
             $ctx['step'] = 'p2p_amount';
             $session->update(['chat_context' => $ctx]);
-            $sCur = $this->crossBorderFx->senderCurrencyForInstance($instance);
+            $sCur = $this->crossBorderFx->senderCurrencyForWalletPhone($instance, (string) $wallet->phone_e164);
             $sym = WhatsappWalletMoneyFormatter::symbol($sCur);
             $this->client->sendText(
                 $instance,
@@ -1883,7 +1883,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
         $amount = round((float) $t, 2);
-        $sCur = $this->crossBorderFx->senderCurrencyForInstance($instance);
+        $sCur = $this->crossBorderFx->senderCurrencyForWalletPhone($instance, (string) $wallet->phone_e164);
         $sym = WhatsappWalletMoneyFormatter::symbol($sCur);
         if ($amount < 1) {
             $this->client->sendText($instance, $phone, "Minimum amount is {$sym}1.");
@@ -1899,7 +1899,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount);
+        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount, (string) $wallet->phone_e164);
         if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
             $this->client->sendText($instance, $phone, (string) ($eval['message'] ?? 'This send is not available.'));
 
