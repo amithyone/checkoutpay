@@ -27,4 +27,28 @@ final class WhatsappWalletMoneyFormatter
 
         return str_ends_with($sym, ' ') ? $sym.$n : $sym.$n;
     }
+
+    /**
+     * Human-readable cross-rate: units of credit currency per 1 unit of debit currency.
+     */
+    public static function crossRateLine(float $debitAmount, string $debitCurrency, float $creditAmount, string $creditCurrency): string
+    {
+        if ($debitAmount <= 0) {
+            return '';
+        }
+        $from = strtoupper($debitCurrency);
+        $to = strtoupper($creditCurrency);
+        $per = $creditAmount / $debitAmount;
+        $n = self::trimmedDecimalString($per, 6);
+
+        return "1 {$from} ≈ {$n} {$to}";
+    }
+
+    private static function trimmedDecimalString(float $x, int $maxDecimals): string
+    {
+        $s = number_format($x, $maxDecimals, '.', '');
+        $s = rtrim(rtrim($s, '0'), '.');
+
+        return $s === '' || $s === '-' ? '0' : $s;
+    }
 }

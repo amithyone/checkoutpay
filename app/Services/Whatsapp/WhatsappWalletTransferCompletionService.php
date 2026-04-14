@@ -724,6 +724,12 @@ class WhatsappWalletTransferCompletionService
         $recipientDisplayName = $recvFresh?->normalizedSenderName();
 
         if ($recvFresh) {
+            $crossBorderFx = $isFx ? [
+                'debit_amount' => $debitAmount,
+                'debit_currency' => $senderCur,
+                'credit_amount' => $creditAmount,
+                'credit_currency' => $recvCur,
+            ] : null;
             $this->walletNotifier->notifyP2pReceived(
                 $instance,
                 $recvFresh,
@@ -732,6 +738,7 @@ class WhatsappWalletTransferCompletionService
                 $senderDisplayName,
                 $sentAt,
                 $recvCur,
+                $crossBorderFx,
             );
         }
 

@@ -111,8 +111,11 @@ class WhatsappWalletPendingP2pService
                 $recipientPhoneE164,
                 $credit,
                 $senderFresh,
+                $amount,
             ) {
-                $creditCur = app(WhatsappWalletCountryResolver::class)->currencyForPhoneE164($recipientPhoneE164);
+                $resolver = app(WhatsappWalletCountryResolver::class);
+                $creditCur = $resolver->currencyForPhoneE164($recipientPhoneE164);
+                $senderCur = $resolver->currencyForPhoneE164((string) $senderFresh->phone_e164);
                 $this->notifyRecipientToClaim(
                     $evolutionInstance,
                     $recipientPhoneE164,
@@ -120,6 +123,8 @@ class WhatsappWalletPendingP2pService
                     (string) $senderFresh->phone_e164,
                     $senderFresh->normalizedSenderName(),
                     $creditCur,
+                    round((float) $amount, 2),
+                    $senderCur,
                 );
             });
 
@@ -226,10 +231,25 @@ class WhatsappWalletPendingP2pService
                 $pending->save();
 
                 $senderId = (int) $pending->sender_wallet_id;
-                DB::afterCommit(function () use ($recv, $amount, $senderId, $evolutionInstance) {
+                $pendingMeta = is_array($pending->meta) ? $pending->meta : [];
+                $senderDebitFromMeta = isset($pendingMeta['sender_debit_amount']) && is_numeric($pendingMeta['sender_debit_amount'])
+                    ? (float) $pendingMeta['sender_debit_amount']
+                    : null;
+                DB::afterCommit(function () use ($recv, $amount, $senderId, $evolutionInstance, $senderDebitFromMeta) {
                     $sender = WhatsappWallet::query()->find($senderId);
                     if ($sender) {
-                        $recvCur = app(WhatsappWalletCountryResolver::class)->currencyForPhoneE164((string) $recv->phone_e164);
+                        $resolver = app(WhatsappWalletCountryResolver::class);
+                        $recvCur = $resolver->currencyForPhoneE164((string) $recv->phone_e164);
+                        $senderCur = $resolver->currencyForPhoneE164((string) $sender->phone_e164);
+                        $crossBorderFx = null;
+                        if ($senderDebitFromMeta !== null && strtoupper($senderCur) !== strtoupper($recvCur)) {
+                            $crossBorderFx = [
+                                'debit_amount' => round($senderDebitFromMeta, 2),
+                                'debit_currency' => $senderCur,
+                                'credit_amount' => round($amount, 2),
+                                'credit_currency' => $recvCur,
+                            ];
+                        }
                         $this->walletNotifier->notifyP2pReceived(
                             $evolutionInstance,
                             $recv->fresh(),
@@ -238,6 +258,7 @@ class WhatsappWalletPendingP2pService
                             $sender->normalizedSenderName(),
                             now(),
                             $recvCur,
+                            $crossBorderFx,
                         );
                     }
                 });
@@ -418,6 +439,8 @@ class WhatsappWalletPendingP2pService
         string $senderPhoneE164,
         ?string $senderDisplayName,
         string $creditCurrency = 'NGN',
+        ?float $senderDebitAmount = null,
+        ?string $senderDebitCurrency = null,
     ): void {
         if ($evolutionInstance === '') {
             $evolutionInstance = (string) config('whatsapp.evolution.instance', '');
@@ -426,17 +449,34 @@ class WhatsappWalletPendingP2pService
             return;
         }
 
-        $amountStr = WhatsappWalletMoneyFormatter::format($amount, $creditCurrency);
+        $creditCur = strtoupper($creditCurrency);
+        $amountStr = WhatsappWalletMoneyFormatter::format($amount, $creditCur);
         $fromWho = trim((string) $senderDisplayName);
-        $senderLabel = $fromWho !== '' ? $fromWho : 'A wallet user';
+        $senderLabel = $fromWho !== '' ? $fromWho : 'Someone';
         $maskedSender = $this->maskPhoneTail($senderPhoneE164);
+
+        $dCur = $senderDebitCurrency !== null ? strtoupper($senderDebitCurrency) : '';
+        $isFx = $senderDebitAmount !== null && $senderDebitAmount > 0 && $dCur !== '' && $dCur !== $creditCur;
+        if ($isFx) {
+            $debitFmt = WhatsappWalletMoneyFormatter::format((float) $senderDebitAmount, $dCur);
+            $rate = WhatsappWalletMoneyFormatter::crossRateLine((float) $senderDebitAmount, $dCur, $amount, $creditCur);
+            $body = "🌍 *Money waiting for you* (international)\n\n".
+                "*{$senderLabel}* sent *{$debitFmt}* → you'll get *{$amountStr}*\n".
+                ($rate !== '' ? "*Approx. rate:* {$rate}\n" : '').
+                "\n".
+                "*From:* {$maskedSender}\n\n".
+                "Send *WALLET* then *REGISTER* to claim · *CANCEL* refunds them";
+        } else {
+            $body = "💸 *{$senderLabel}* sent you *{$amountStr}*\n\n".
+                "*From number:* {$maskedSender}\n\n".
+                "Send *WALLET* → *REGISTER* to claim it\n".
+                "*CANCEL* → refund to sender";
+        }
 
         $this->client->sendText(
             $evolutionInstance,
             $recipientPhoneE164,
-            "*{$amountStr}* · *{$senderLabel}* · {$maskedSender}\n".
-            "*WALLET* → *REGISTER* to claim\n".
-            "*CANCEL* → refund"
+            $body
         );
     }
 

@@ -19,6 +19,9 @@ class WhatsappWalletTopupNotifier
     /**
      * Notify the recipient after another wallet sends them money (P2P). Runs after DB commit.
      * Message is forward-friendly and does not include their wallet balance.
+     *
+     * @param  array{debit_amount: float, debit_currency: string, credit_amount: float, credit_currency: string}|null  $crossBorderFx
+     *        When set and debit/recipient currencies differ, shows what the sender paid and an approximate rate.
      */
     public function notifyP2pReceived(
         string $senderChatInstance,
@@ -28,6 +31,7 @@ class WhatsappWalletTopupNotifier
         ?string $senderWalletDisplayName = null,
         ?Carbon $transferredAt = null,
         string $creditCurrency = 'NGN',
+        ?array $crossBorderFx = null,
     ): void {
         if ($amount <= 0) {
             return;
@@ -51,7 +55,8 @@ class WhatsappWalletTopupNotifier
             return;
         }
 
-        $amountStr = WhatsappWalletMoneyFormatter::format($amount, $creditCurrency);
+        $creditCur = strtoupper($creditCurrency);
+        $amountStr = WhatsappWalletMoneyFormatter::format($amount, $creditCur);
         $at = $transferredAt ?? now();
         $when = $at->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
             ' ('.(string) config('app.timezone').')';
@@ -60,6 +65,8 @@ class WhatsappWalletTopupNotifier
         $fromWho = $name !== '' ? $name : 'Someone';
         $masked = $this->maskPhoneForNotify($senderPhoneE164);
 
+        $isFx = $this->isCrossBorderNotify($crossBorderFx, $creditCur);
+
         if ($recipientWallet->needsQuickWalletSetup()) {
             $pinLine = $recipientWallet->hasPin()
                 ? ''
@@ -67,24 +74,66 @@ class WhatsappWalletTopupNotifier
             $nameLine = $recipientWallet->hasPin()
                 ? '• Send *your name* (what people see when you send)'
                 : '• Then *your name* (what people see when you send)';
-            $text = "💸 *You received {$amountStr}*\n\n".
-                "*From:* {$fromWho}\n".
-                "*Number:* {$masked}\n".
-                "*Time:* {$when}\n\n".
+            $head = $isFx
+                ? $this->p2pReceivedHeadCrossBorder($fromWho, $crossBorderFx, $amountStr, $amount, $creditCur)
+                : $this->p2pReceivedHeadDomestic($fromWho, $amountStr);
+            $text = $head.
+                "*Time:* {$when}\n".
+                "*From number:* {$masked}\n\n".
                 "Finish on WhatsApp (takes a minute):\n".
                 "• Send *WALLET*\n".
                 $pinLine.
                 $nameLine."\n\n".
                 '*MENU* — other services';
         } else {
-            $text = "💸 *You received {$amountStr}*\n\n".
-                "*From:* {$fromWho}\n".
-                "*Number:* {$masked}\n".
-                "*Time:* {$when}\n\n".
+            $head = $isFx
+                ? $this->p2pReceivedHeadCrossBorder($fromWho, $crossBorderFx, $amountStr, $amount, $creditCur)
+                : $this->p2pReceivedHeadDomestic($fromWho, $amountStr);
+            $text = $head.
+                "*Time:* {$when}\n".
+                "*From number:* {$masked}\n\n".
                 'Send *WALLET* for balance & options · *MENU* for all services.';
         }
 
         $this->client->sendText($instance, $recipientWallet->phone_e164, $text);
+    }
+
+    /**
+     * @param  array{debit_amount: float, debit_currency: string, credit_amount: float, credit_currency: string}|null  $fx
+     */
+    private function isCrossBorderNotify(?array $fx, string $creditCurrencyUpper): bool
+    {
+        if ($fx === null) {
+            return false;
+        }
+        $dCur = strtoupper((string) ($fx['debit_currency'] ?? ''));
+        $cCur = strtoupper((string) ($fx['credit_currency'] ?? $creditCurrencyUpper));
+
+        return $dCur !== '' && $cCur !== '' && $dCur !== $cCur;
+    }
+
+    private function p2pReceivedHeadDomestic(string $fromWho, string $amountStr): string
+    {
+        return "💸 *{$fromWho}* sent you *{$amountStr}*\n\n".
+            "That amount is now in your wallet.\n\n";
+    }
+
+    /**
+     * @param  array{debit_amount: float, debit_currency: string, credit_amount: float, credit_currency: string}  $fx
+     */
+    private function p2pReceivedHeadCrossBorder(string $fromWho, array $fx, string $creditFmt, float $creditAmount, string $creditCurrencyUpper): string
+    {
+        $debit = (float) ($fx['debit_amount'] ?? 0);
+        $dCur = strtoupper((string) ($fx['debit_currency'] ?? ''));
+        $cCur = strtoupper((string) ($fx['credit_currency'] ?? $creditCurrencyUpper));
+        $debitFmt = WhatsappWalletMoneyFormatter::format($debit, $dCur);
+        $rate = WhatsappWalletMoneyFormatter::crossRateLine($debit, $dCur, $creditAmount, $cCur);
+
+        return "🌍 *International wallet send*\n\n".
+            "*{$fromWho}* paid *{$debitFmt}*\n".
+            "*You received:* {$creditFmt}\n".
+            ($rate !== '' ? "*Approx. rate:* {$rate}\n" : '').
+            "\n";
     }
 
     private function maskPhoneForNotify(string $e164Digits): string
