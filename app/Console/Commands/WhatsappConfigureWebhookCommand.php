@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Setting;
+use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
@@ -17,25 +19,28 @@ class WhatsappConfigureWebhookCommand extends Command
 
     public function handle(): int
     {
-        $base = config('whatsapp.evolution.base_url');
-        $apiKey = config('whatsapp.evolution.api_key');
-        $instance = config('whatsapp.evolution.instance');
+        $base = WhatsappEvolutionConfigResolver::baseUrl();
+        $apiKey = WhatsappEvolutionConfigResolver::apiKey();
+        $instance = WhatsappEvolutionConfigResolver::defaultInstance();
 
         if ($base === '' || $apiKey === '' || $instance === '') {
-            $this->error('Set WHATSAPP_EVOLUTION_BASE_URL, WHATSAPP_EVOLUTION_API_KEY, and WHATSAPP_EVOLUTION_INSTANCE in .env');
+            $this->error('Set Evolution URL, API key, and default instance in Admin → WhatsApp wallet, or WHATSAPP_EVOLUTION_* in .env');
 
             return self::FAILURE;
         }
 
         $webhookUrl = $this->option('url');
         if (! is_string($webhookUrl) || $webhookUrl === '') {
-            $public = rtrim((string) config('whatsapp.public_url', ''), '/');
+            $public = WhatsappEvolutionConfigResolver::publicAppBaseUrl();
             if ($public === '') {
                 $this->error('Set WHATSAPP_APP_URL (or APP_URL) to your public Checkout base URL, or pass --url=');
 
                 return self::FAILURE;
             }
-            $secret = (string) config('whatsapp.webhook_secret', '');
+            $dbSecret = Setting::get('whatsapp_webhook_secret');
+            $secret = is_string($dbSecret) && trim($dbSecret) !== ''
+                ? trim($dbSecret)
+                : (string) config('whatsapp.webhook_secret', '');
             $webhookUrl = $public.'/api/v1/whatsapp/webhook';
             if ($secret !== '') {
                 $webhookUrl .= '?'.http_build_query(['secret' => $secret]);

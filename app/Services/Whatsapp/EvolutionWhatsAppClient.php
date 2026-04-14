@@ -9,11 +9,16 @@ class EvolutionWhatsAppClient
 {
     public function sendText(string $instanceName, string $numberDigits, string $text): bool
     {
-        $base = config('whatsapp.evolution.base_url');
-        $key = config('whatsapp.evolution.api_key');
+        $base = WhatsappEvolutionConfigResolver::baseUrl();
+        $key = WhatsappEvolutionConfigResolver::apiKey();
+        $instanceName = $instanceName !== '' ? $instanceName : WhatsappEvolutionConfigResolver::defaultInstance();
 
         if ($base === '' || $key === '' || $instanceName === '') {
-            Log::warning('whatsapp.evolution: missing base_url, api_key, or instance');
+            Log::warning('whatsapp.evolution: missing base_url, api_key, or instance', [
+                'has_base' => $base !== '',
+                'has_key' => $key !== '',
+                'has_instance' => $instanceName !== '',
+            ]);
 
             return false;
         }
@@ -62,11 +67,16 @@ class EvolutionWhatsAppClient
         ?string $caption = null,
         ?string $fileName = null,
     ): bool {
-        $base = config('whatsapp.evolution.base_url');
-        $key = config('whatsapp.evolution.api_key');
+        $base = WhatsappEvolutionConfigResolver::baseUrl();
+        $key = WhatsappEvolutionConfigResolver::apiKey();
+        $instanceName = $instanceName !== '' ? $instanceName : WhatsappEvolutionConfigResolver::defaultInstance();
 
         if ($base === '' || $key === '' || $instanceName === '') {
-            Log::warning('whatsapp.evolution: missing base_url, api_key, or instance');
+            Log::warning('whatsapp.evolution: missing base_url, api_key, or instance', [
+                'has_base' => $base !== '',
+                'has_key' => $key !== '',
+                'has_instance' => $instanceName !== '',
+            ]);
 
             return false;
         }

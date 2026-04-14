@@ -133,6 +133,16 @@ class EvolutionWebhookPayloadParser
             return null;
         }
 
+        if (isset($message['editedMessage']['message']) && is_array($message['editedMessage']['message'])) {
+            return $this->extractText($message['editedMessage']['message']);
+        }
+        if (isset($message['ephemeralMessage']['message']) && is_array($message['ephemeralMessage']['message'])) {
+            return $this->extractText($message['ephemeralMessage']['message']);
+        }
+        if (isset($message['viewOnceMessage']['message']) && is_array($message['viewOnceMessage']['message'])) {
+            return $this->extractText($message['viewOnceMessage']['message']);
+        }
+
         if (isset($message['conversation']) && is_string($message['conversation'])) {
             $t = trim($message['conversation']);
 
@@ -141,6 +151,34 @@ class EvolutionWebhookPayloadParser
 
         if (isset($message['extendedTextMessage']['text']) && is_string($message['extendedTextMessage']['text'])) {
             $t = trim($message['extendedTextMessage']['text']);
+
+            return $t !== '' ? $t : null;
+        }
+
+        foreach (['imageMessage', 'videoMessage', 'documentMessage'] as $k) {
+            if (isset($message[$k]['caption']) && is_string($message[$k]['caption'])) {
+                $t = trim($message[$k]['caption']);
+
+                return $t !== '' ? $t : null;
+            }
+        }
+
+        if (isset($message['buttonsResponseMessage']) && is_array($message['buttonsResponseMessage'])) {
+            $b = $message['buttonsResponseMessage'];
+            if (isset($b['selectedDisplayText']) && is_string($b['selectedDisplayText'])) {
+                $t = trim($b['selectedDisplayText']);
+
+                return $t !== '' ? $t : null;
+            }
+            if (isset($b['selectedButtonId']) && is_string($b['selectedButtonId'])) {
+                $t = trim($b['selectedButtonId']);
+
+                return $t !== '' ? $t : null;
+            }
+        }
+
+        if (isset($message['listResponseMessage']['singleSelectReply']['selectedRowId']) && is_string($message['listResponseMessage']['singleSelectReply']['selectedRowId'])) {
+            $t = trim($message['listResponseMessage']['singleSelectReply']['selectedRowId']);
 
             return $t !== '' ? $t : null;
         }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Services\Whatsapp\WhatsappInboundHandler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ class WhatsappWebhookController extends Controller
 {
     public function receive(Request $request, WhatsappInboundHandler $handler): JsonResponse
     {
-        $secret = (string) config('whatsapp.webhook_secret', '');
+        $secret = $this->resolvedWebhookSecret();
         if ($secret !== '') {
             $provided = $request->header('X-Checkout-WhatsApp-Secret', $request->query('secret', ''));
             if (! is_string($provided) || ! hash_equals($secret, $provided)) {
@@ -39,7 +40,17 @@ class WhatsappWebhookController extends Controller
         return response()->json([
             'status' => 'ok',
             'service' => 'checkout-whatsapp-webhook',
-            'auth' => config('whatsapp.webhook_secret') ? 'secret_required' : 'open',
+            'auth' => $this->resolvedWebhookSecret() !== '' ? 'secret_required' : 'open',
         ]);
+    }
+
+    private function resolvedWebhookSecret(): string
+    {
+        $db = Setting::get('whatsapp_webhook_secret');
+        if (is_string($db) && trim($db) !== '') {
+            return trim($db);
+        }
+
+        return (string) config('whatsapp.webhook_secret', '');
     }
 }

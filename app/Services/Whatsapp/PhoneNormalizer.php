@@ -196,4 +196,71 @@ final class PhoneNormalizer
             default => null,
         };
     }
+
+    /**
+     * Baileys / Evolution {@code remoteJid} (e.g. 234...@s.whatsapp.net) → E.164 digits only, no leading +.
+     * Returns null for groups, LID addresses, or non-standard JIDs.
+     */
+    public static function e164FromRemoteJid(string $remoteJid): ?string
+    {
+        $remoteJid = trim($remoteJid);
+        if ($remoteJid === '' || str_ends_with($remoteJid, '@g.us')) {
+            return null;
+        }
+
+        if (preg_match('/^(\d{10,15})@(?:s\.whatsapp\.net|c\.us|whatsapp\.net)$/i', $remoteJid, $m) === 1) {
+            return $m[1];
+        }
+
+        // Some gateways send only digits before @
+        if (preg_match('/^(\d{10,15})@/i', $remoteJid, $m) === 1) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Nigerian E.164 digits → 11-digit local form starting with 0 (Mevon / bank APIs).
+     * Returns null if the number is not a Nigerian mobile in a known shape.
+     */
+    public static function e164DigitsToNgLocal11(string $e164Digits): ?string
+    {
+        $d = self::digitsOnly($e164Digits);
+        if ($d === null) {
+            return null;
+        }
+        if (strlen($d) === 13 && str_starts_with($d, '234')) {
+            return '0'.substr($d, 3);
+        }
+        if (strlen($d) === 11 && str_starts_with($d, '0')) {
+            return $d;
+        }
+        if (strlen($d) === 10 && $d[0] !== '0') {
+            return '0'.$d;
+        }
+
+        return null;
+    }
+
+    /**
+     * Message is only a phone number (no letters): “paste NG mobile” P2P shortcut from root / services.
+     * Nigerian numbers only — use *4* in the wallet menu for other countries (see {@see canonicalInternationalWalletRecipientDigits}).
+     */
+    public static function parseBareNigerianMobileForP2pShortcut(string $text): ?string
+    {
+        $raw = trim($text);
+        if ($raw === '') {
+            return null;
+        }
+        if (preg_match('/[A-Za-z]/', $raw) === 1) {
+            return null;
+        }
+        $compact = preg_replace('/\s+/', '', $raw) ?? '';
+        if (preg_match('/^\+?[\d().\-]+$/', $compact) !== 1) {
+            return null;
+        }
+
+        return self::canonicalNgE164Digits($raw);
+    }
 }
