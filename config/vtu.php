@@ -17,6 +17,9 @@ return [
     'electricity_min' => (float) env('VTU_NG_ELECTRICITY_MIN', 500),
     'data_plans_page_size' => max(3, min(12, (int) env('VTU_NG_DATA_PAGE_SIZE', 6))),
     'prefer_reseller_price' => (bool) env('VTU_NG_PREFER_RESELLER_PRICE', false),
+    'webhook_secret' => (string) env('VTU_NG_WEBHOOK_SECRET', ''),
+    'webhook_allowed_ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('VTU_NG_WEBHOOK_ALLOWED_IPS', ''))))),
+    'refund_statuses' => array_values(array_filter(array_map('trim', explode(',', (string) env('VTU_NG_REFUND_STATUSES', 'refund,refunded,reversed,reversal,failed'))))),
 
     /** VTU.ng `network_id` / data `service_id` values */
     'networks' => [

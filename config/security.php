@@ -19,7 +19,7 @@ return [
             "/(?:information_schema|mysql\\.user|pg_catalog)/i",
             "/(?:sleep\\s*\\(|benchmark\\s*\\(|pg_sleep\\s*\\()/i",
             "/(?:\\b(?:drop|truncate|alter)\\b\\s+\\b(?:database|schema|table)\\b)/i",
-            "/(?:--|#|\\/\\*)/",
+            "/(?:--\\s+|#\\s+|\\/\\*)/i",
         ],
     ],
 

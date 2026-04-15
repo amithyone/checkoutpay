@@ -69,7 +69,7 @@ class WhatsappInboundHandler
                 ->where('is_active', true)
                 ->first();
             if ($lr) {
-                $this->linkedMenu->sendRootForRenter($lr->fresh(), $instance, $phone);
+                $this->waWalletMenu->openMenu($session->fresh(), $instance, $phone, $lr->fresh());
             } else {
                 $this->checkoutServicesMenu->sendRootMenu($instance, $phone);
             }
@@ -100,11 +100,9 @@ class WhatsappInboundHandler
             $resume = [
                 'START', 'MENU', 'SERVICES', 'HI', 'HELLO', 'HELP', 'HOME',
                 'BACK', 'RESTART', 'MAIN',
-                'RENTALS', 'BROWSE', 'SHOP', 'CATALOG',
-                'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
-                'INVOICE', 'INVOICES', 'PAY', 'PAYMENT',
+                'WALLET',
                 'TOPUP', 'TOP UP', 'UPGRADE', 'TIER2', 'TIER 2',
-                '1', '2', '3', '4', '5', '6',
+                '1', '2', '3', '4', '5', '6', '7',
             ];
             if (! in_array($cmd, $resume, true)) {
                 $session->save();
@@ -189,16 +187,6 @@ class WhatsappInboundHandler
             $session = $session->fresh();
         }
 
-        if (
-            $session->chat_flow === WhatsappGuestRentalBrowseHandler::FLOW
-            || $this->isGuestRentalBrowseCommand($text)
-        ) {
-            $session->save();
-            $this->guestRentalBrowse->handle($session->fresh(), $instance, $phone, $text);
-
-            return;
-        }
-
         if ($this->isCheckoutServicesCommand($text)) {
             $session->save();
             $this->checkoutServicesMenu->handleCommand($session->fresh(), $instance, $phone, $text);
@@ -248,9 +236,7 @@ class WhatsappInboundHandler
 
     private function isGuestRentalBrowseCommand(string $text): bool
     {
-        $cmd = WhatsappMenuInputNormalizer::commandToken($text);
-
-        return in_array($cmd, ['RENTALS', 'BROWSE', 'SHOP', 'CATALOG', '1'], true);
+        return false;
     }
 
     private function isCheckoutServicesCommand(string $text): bool
@@ -259,10 +245,9 @@ class WhatsappInboundHandler
 
         return in_array($cmd, [
             'MENU', 'START', 'SERVICES', 'HI', 'HELLO', 'HELP', 'HOME',
-            'BACK', 'WALLET', 'TICKET', 'TICKETS', 'SUPPORT',
-            'INVOICE', 'INVOICES', 'PAY', 'PAYMENT',
+            'BACK', 'WALLET',
             'TOPUP', 'TOP UP',
-            '2', '3', '4',
+            '1',
         ], true);
     }
 
@@ -497,14 +482,9 @@ class WhatsappInboundHandler
                 'renter_id' => $renter->id,
             ]
         );
-
-        $this->linkedMenu->handle(
-            $renter->fresh(),
-            $session->fresh(),
-            $instance,
-            $phone,
-            $text ?? '',
-            $justLinked
-        );
+        if ($justLinked) {
+            $this->client->sendText($instance, $phone, "Linked successfully, {$renter->name}. Opening Wallet...");
+        }
+        $this->waWalletMenu->openMenu($session->fresh(), $instance, $phone, $renter->fresh());
     }
 }

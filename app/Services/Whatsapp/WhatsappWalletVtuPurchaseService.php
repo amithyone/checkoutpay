@@ -5,6 +5,7 @@ namespace App\Services\Whatsapp;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\VtuNg\VtuNgApiClient;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -48,8 +49,10 @@ class WhatsappWalletVtuPurchaseService
 
         $this->finalizeTxnMeta($ref, [
             'vtu_ok' => true,
+            'vtu_status' => 'success',
             'vtu_message' => $api['message'] ?? null,
             'vtu_data' => $api['data'] ?? null,
+            'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
         $w = $wallet->fresh();
 
@@ -100,8 +103,10 @@ class WhatsappWalletVtuPurchaseService
 
         $this->finalizeTxnMeta($ref, [
             'vtu_ok' => true,
+            'vtu_status' => 'success',
             'vtu_message' => $api['message'] ?? null,
             'vtu_data' => $api['data'] ?? null,
+            'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
         $w = $wallet->fresh();
 
@@ -151,8 +156,10 @@ class WhatsappWalletVtuPurchaseService
 
         $this->finalizeTxnMeta($ref, [
             'vtu_ok' => true,
+            'vtu_status' => 'success',
             'vtu_message' => $api['message'] ?? null,
             'vtu_data' => $api['data'] ?? null,
+            'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
         $w = $wallet->fresh();
 
@@ -218,23 +225,47 @@ class WhatsappWalletVtuPurchaseService
         try {
             DB::transaction(function () use ($walletId, $externalRef, $amount, $reason) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($walletId);
-                if ($w) {
-                    $w->balance = round((float) $w->balance + $amount, 2);
-                    $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
-                    $w->save();
-                }
                 $txn = WhatsappWalletTransaction::query()
                     ->where('external_reference', $externalRef)
                     ->where('whatsapp_wallet_id', $walletId)
                     ->first();
-                if ($txn) {
-                    $meta = is_array($txn->meta) ? $txn->meta : [];
-                    $meta['vtu_pending'] = false;
-                    $meta['vtu_refunded'] = true;
-                    $meta['vtu_refund_reason'] = $reason;
-                    $meta['vtu_refunded_at'] = now()->toIso8601String();
-                    $txn->update(['meta' => $meta]);
+
+                if (! $txn) {
+                    return;
                 }
+
+                $meta = is_array($txn->meta) ? $txn->meta : [];
+                $alreadyRefunded = (bool) ($meta['vtu_refunded'] ?? false);
+                if ($alreadyRefunded) {
+                    return;
+                }
+
+                if ($w) {
+                    $w->balance = round((float) $w->balance + $amount, 2);
+                    $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
+                    $w->save();
+
+                    WhatsappWalletTransaction::query()->create([
+                        'whatsapp_wallet_id' => $w->id,
+                        'sender_name' => $w->normalizedSenderName(),
+                        'type' => WhatsappWalletTransaction::TYPE_ADJUSTMENT,
+                        'amount' => $amount,
+                        'balance_after' => (float) $w->balance,
+                        'external_reference' => $externalRef.'-REFUND',
+                        'meta' => [
+                            'channel' => 'whatsapp_vtu',
+                            'adjustment_kind' => 'vtu_refund',
+                            'refunded_external_reference' => $externalRef,
+                            'reason' => $reason,
+                        ],
+                    ]);
+                }
+
+                $meta['vtu_pending'] = false;
+                $meta['vtu_refunded'] = true;
+                $meta['vtu_refund_reason'] = $reason;
+                $meta['vtu_refunded_at'] = now()->toIso8601String();
+                $txn->update(['meta' => $meta]);
             });
         } catch (\Throwable $e) {
             Log::error('whatsapp.wallet.vtu_refund_failed', [
@@ -257,5 +288,125 @@ class WhatsappWalletVtuPurchaseService
         $meta = is_array($txn->meta) ? $txn->meta : [];
         $meta['vtu_pending'] = false;
         $txn->update(['meta' => array_merge($meta, $extra)]);
+    }
+
+    /**
+     * Handle asynchronous provider status updates (e.g. reversed/refunded).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, message: string}
+     */
+    public function processProviderStatusWebhook(array $payload): array
+    {
+        $status = strtolower(trim((string) (
+            Arr::get($payload, 'status')
+            ?? Arr::get($payload, 'data.status')
+            ?? Arr::get($payload, 'event')
+            ?? Arr::get($payload, 'code')
+            ?? ''
+        )));
+
+        $refundStatuses = array_map(
+            static fn ($s) => strtolower(trim((string) $s)),
+            (array) config('vtu.refund_statuses', ['refund', 'refunded', 'reversed', 'reversal', 'failed'])
+        );
+
+        $references = array_filter(array_unique(array_map(
+            static fn ($v) => trim((string) $v),
+            [
+                Arr::get($payload, 'reference'),
+                Arr::get($payload, 'request_id'),
+                Arr::get($payload, 'transaction_id'),
+                Arr::get($payload, 'id'),
+                Arr::get($payload, 'data.reference'),
+                Arr::get($payload, 'data.request_id'),
+                Arr::get($payload, 'data.transaction_id'),
+                Arr::get($payload, 'data.id'),
+            ]
+        )));
+
+        if ($references === []) {
+            return ['ok' => false, 'message' => 'No reference in webhook payload.'];
+        }
+
+        $txn = $this->findVtuDebitTransactionByReferences($references);
+        if (! $txn) {
+            return ['ok' => false, 'message' => 'No matching VTU transaction found.'];
+        }
+
+        if (in_array($status, $refundStatuses, true)) {
+            $amount = (float) $txn->amount;
+            $this->refundDebit((int) $txn->whatsapp_wallet_id, (string) $txn->external_reference, $amount, 'Provider status: '.$status);
+
+            return ['ok' => true, 'message' => 'Wallet refunded for VTU reversal.'];
+        }
+
+        $meta = is_array($txn->meta) ? $txn->meta : [];
+        $meta['vtu_status'] = $status !== '' ? $status : 'unknown';
+        $meta['vtu_status_payload'] = Arr::only($payload, ['status', 'event', 'code', 'message', 'data']);
+        $meta['vtu_last_status_at'] = now()->toIso8601String();
+        $meta['vtu_pending'] = false;
+        $txn->update(['meta' => $meta]);
+
+        return ['ok' => true, 'message' => 'VTU status updated.'];
+    }
+
+    /**
+     * @param  array<int, string>  $references
+     */
+    private function findVtuDebitTransactionByReferences(array $references): ?WhatsappWalletTransaction
+    {
+        $txn = WhatsappWalletTransaction::query()
+            ->whereIn('type', [
+                WhatsappWalletTransaction::TYPE_VTU_AIRTIME,
+                WhatsappWalletTransaction::TYPE_VTU_DATA,
+                WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY,
+            ])
+            ->whereIn('external_reference', $references)
+            ->latest('id')
+            ->first();
+
+        if ($txn) {
+            return $txn;
+        }
+
+        // Fallback for provider references stored in metadata.
+        $candidates = WhatsappWalletTransaction::query()
+            ->whereIn('type', [
+                WhatsappWalletTransaction::TYPE_VTU_AIRTIME,
+                WhatsappWalletTransaction::TYPE_VTU_DATA,
+                WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY,
+            ])
+            ->latest('id')
+            ->limit(300)
+            ->get();
+
+        foreach ($candidates as $candidate) {
+            $meta = is_array($candidate->meta) ? $candidate->meta : [];
+            $providerRef = trim((string) ($meta['vtu_provider_reference'] ?? ''));
+            if ($providerRef !== '' && in_array($providerRef, $references, true)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $api
+     */
+    private function extractProviderReference(array $api): ?string
+    {
+        $ref = (string) (
+            Arr::get($api, 'data.reference')
+            ?? Arr::get($api, 'data.request_id')
+            ?? Arr::get($api, 'data.transaction_id')
+            ?? Arr::get($api, 'data.id')
+            ?? ''
+        );
+
+        $ref = trim($ref);
+
+        return $ref !== '' ? $ref : null;
     }
 }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\MevonPayWebhookController;
 use App\Http\Controllers\Api\LiveSyncReceiverController;
+use App\Http\Controllers\Api\VtuWebhookController;
 use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -64,6 +65,10 @@ Route::prefix('v1')->group(function () {
     Route::post('/webhooks/sla', [MevonPayWebhookController::class, 'receive']); // plural alias
     Route::post('/webhook/mavonpay', [MevonPayWebhookController::class, 'receive']); // backward compatibility
     Route::post('/webhooks/mavonpay', [MevonPayWebhookController::class, 'receive']); // plural alias
+
+    // VTU provider webhook (reversals/refunds/status updates)
+    Route::post('/webhook/vtu', [VtuWebhookController::class, 'receive'])->middleware('throttle:120,1');
+    Route::post('/webhooks/vtu', [VtuWebhookController::class, 'receive'])->middleware('throttle:120,1');
 
     /**
      * Tax Calculator open API

@@ -27,40 +27,11 @@ class WhatsappLinkedMenuHandler
         string $rawText,
         bool $justLinked
     ): void {
+        $this->clearFlow($session);
         if ($justLinked) {
-            $this->clearFlow($session);
-            $wallet = $this->formatMoney((float) ($renter->wallet_balance ?? 0));
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "Linked successfully, {$renter->name}.\n\n*Rentals wallet:* {$wallet}\n\n".$this->menuBody()
-            );
-
-            return;
+            $this->client->sendText($instance, $phone, "Linked successfully, {$renter->name}. Opening Wallet...");
         }
-
-        $text = trim($rawText);
-        $cmd = WhatsappMenuInputNormalizer::commandToken($rawText);
-
-        if ($cmd === 'CHECK' && preg_match('/^CHECK\s+(\S+)/i', $text, $m)) {
-            $this->runFundCheck($renter, $session, $instance, $phone, $m[1]);
-
-            return;
-        }
-
-        if ($session->chat_flow === 'rental_fund') {
-            $this->handleRentalFundFlow($renter, $session, $instance, $phone, $text, $cmd);
-
-            return;
-        }
-
-        if ($session->chat_flow === 'rentals') {
-            $this->handleRentalsFlow($renter, $session, $instance, $phone, $text, $cmd);
-
-            return;
-        }
-
-        $this->handleGlobalCommands($renter, $session, $instance, $phone, $text, $cmd);
+        app(WhatsappWaWalletMenuHandler::class)->openMenu($session->fresh(), $instance, $phone, $renter->fresh());
     }
 
     private function appBase(): string
@@ -91,11 +62,11 @@ class WhatsappLinkedMenuHandler
 
     public function sendRootForRenter(Renter $renter, string $instance, string $phone): void
     {
-        $rwallet = $this->formatMoney((float) ($renter->fresh()->wallet_balance ?? 0));
-        $this->client->sendText(
+        app(WhatsappWaWalletMenuHandler::class)->openMenu(
+            WhatsappSession::query()->firstOrCreate(['phone_e164' => $phone]),
             $instance,
             $phone,
-            "CheckoutNow — {$renter->email}\n*Rentals wallet:* {$rwallet}\n\n".$this->menuBody()
+            $renter->fresh()
         );
     }
 

@@ -24,11 +24,16 @@ class BlockSqlInjectionPayload
 
             foreach ($patterns as $pattern) {
                 if (@preg_match($pattern, $value) === 1) {
+                    if ($this->isLikelyBenignMatch($pattern, $value)) {
+                        continue;
+                    }
+
                     Log::warning('Blocked request by SQL injection payload guard', [
                         'path' => $request->path(),
                         'ip' => $request->ip(),
                         'method' => $request->method(),
                         'ua' => $request->userAgent(),
+                        'pattern' => $pattern,
                     ]);
 
                     abort(422, 'Request contains blocked SQL-like payload.');
@@ -56,5 +61,16 @@ class BlockSqlInjectionPayload
         }
 
         return $values;
+    }
+
+    private function isLikelyBenignMatch(string $pattern, string $value): bool
+    {
+        // Only treat SQL-style comment markers as suspicious when the same value
+        // also contains query-like SQL verbs/tokens.
+        if ($pattern !== '/(?:--\s+|#\s+|\/\*)/i') {
+            return false;
+        }
+
+        return @preg_match('/\b(select|insert|update|delete|union|drop|alter|truncate|from|where)\b/i', $value) !== 1;
     }
 }

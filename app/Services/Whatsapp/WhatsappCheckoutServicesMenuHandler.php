@@ -2,11 +2,10 @@
 
 namespace App\Services\Whatsapp;
 
-use App\Models\Renter;
 use App\Models\WhatsappSession;
 
 /**
- * Guest hub: two main categories — *RENTALS* and *WALLET* (WhatsApp wallet), plus support stubs.
+ * Guest hub: wallet-only mode.
  */
 class WhatsappCheckoutServicesMenuHandler
 {
@@ -45,20 +44,8 @@ class WhatsappCheckoutServicesMenuHandler
             return;
         }
 
-        if (in_array($cmd, ['WALLET', 'TOPUP', 'TOP UP', '2'], true)) {
+        if (in_array($cmd, ['WALLET', 'TOPUP', 'TOP UP', '1'], true)) {
             app(WhatsappWaWalletMenuHandler::class)->openMenu($session->fresh(), $instance, $phone, null);
-
-            return;
-        }
-
-        if (in_array($cmd, ['TICKET', 'TICKETS', 'SUPPORT', '3'], true)) {
-            $this->client->sendText($instance, $phone, $this->ticketsBody());
-
-            return;
-        }
-
-        if (in_array($cmd, ['INVOICE', 'INVOICES', 'PAY', 'PAYMENT', '4'], true)) {
-            $this->client->sendText($instance, $phone, $this->invoiceBody());
 
             return;
         }
@@ -73,19 +60,11 @@ class WhatsappCheckoutServicesMenuHandler
 
     public function rootMenuBody(): string
     {
-        $biz = $this->portalBusiness();
-        $rentals = $this->portalRentals();
-
         return "*Checkout*\n\n".
-            "*1* — Rentals (browse)\n".
-            "*2* — *WALLET* — balance, receive money, PIN & name\n".
-            "*3* — Support\n".
-            "*4* — Invoices\n\n".
-            "Reply with the *number* or *keyword*.\n".
-            "Rentals: link with your *email* here.\n\n".
+            "*1* — *WALLET* — balance, receive, send, bills, PIN & name\n\n".
+            "Reply with *1* or *WALLET*.\n\n".
             WhatsappMenuInputNormalizer::navigationHelpFooter()."\n".
-            "*RESTART* / *000* · *STOP* / *START* / *MENU*\n\n".
-            "{$rentals}\n{$biz}";
+            "*RESTART* / *000* · *STOP* / *START* / *MENU*";
     }
 
     public function sendWalletIntro(string $instance, string $phone): void
@@ -105,26 +84,7 @@ class WhatsappCheckoutServicesMenuHandler
             "*Tier 1:* WhatsApp number = your wallet ID. Cap ₦{$t1max} balance & ₦{$t1day} sent per day.\n\n".
             '*Tier 2:* *UPGRADE* in the wallet menu — KYC; permanent bank account via *'.(string) config('whatsapp.bot_brand_name', 'CheckoutNow')."*.\n\n".
             "Web app:\n{$url}\n\n".
-            "*MENU* — main categories (or *1*–*4*)";
-    }
-
-    private function ticketsBody(): string
-    {
-        $biz = $this->portalBusiness();
-
-        return "*Tickets / support*\n\n".
-            "Sign in to your business or account dashboard:\n{$biz}/dashboard/login\n\n".
-            "Rentals guests: use the rentals site contact options.\n\n".
-            "*MENU* — main categories (or *1*–*4*)";
-    }
-
-    private function invoiceBody(): string
-    {
-        $biz = $this->portalBusiness();
-
-        return "*Invoices & payments*\n\n".
-            "Open your Checkout business dashboard to view and pay:\n{$biz}/dashboard/login\n\n".
-            "*MENU* — main categories (or *1*–*4*)";
+            "*MENU* — main categories";
     }
 
     private function walletAppUrl(): string
