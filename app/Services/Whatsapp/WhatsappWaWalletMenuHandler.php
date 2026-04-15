@@ -185,6 +185,11 @@ class WhatsappWaWalletMenuHandler
         $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
 
         if (in_array($cmd, ['UPGRADE', 'TIER2', 'TIER 2'], true)) {
+            if ($wallet->needsQuickWalletSetup()) {
+                $this->client->sendText($instance, $phone, 'Finish *WALLET* first: *1* register, then your *full name*. Then *3* upgrade is available (NG).');
+
+                return;
+            }
             if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
                 $this->client->sendText(
                     $instance,
@@ -227,6 +232,29 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
+        }
+
+        if ($step === 'submenu' && in_array($cmd, ['CANCEL', 'DECLINE'], true) && $wallet->needsQuickWalletSetup()) {
+            $n = $this->pendingP2p->refundIncomingPendingAsRecipient($phone, $instance);
+            if ($n > 0) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    $n === 1
+                        ? '*Done* — pending money was returned to the sender. Send *WALLET* for your balance.'
+                        : "*Done* — {$n} pending sends were returned. Send *WALLET* for your balance."
+                );
+            } else {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Nothing pending to return. Finish setup: send *WALLET* then *1* (register).'
+                );
+            }
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
         }
 
         match ($step) {
@@ -312,9 +340,6 @@ class WhatsappWaWalletMenuHandler
         $bal = WhatsappWalletMoneyFormatter::format((float) $wallet->balance, $cur);
         $t1max = number_format((float) config('whatsapp.wallet.tier1_max_balance', 50000), 0);
         $isTier2 = $wallet->isTier2();
-        $pinSection = $wallet->hasPin()
-            ? ''
-            : "*1* — register (PIN link first)\n\n";
 
         $vaBlock = '';
         if ($ngRails && $wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
@@ -369,6 +394,7 @@ class WhatsappWaWalletMenuHandler
             "*Wallet* *{$bal}*\n".
             $vaBlock.
             "\n".
+            "Pick one:\n".
             $line1.
             $line2.
             $upgradeLine.
@@ -378,7 +404,6 @@ class WhatsappWaWalletMenuHandler
             "*6* History (*MORE* / *PREV*)\n".
             $settingsLine.
             "\n".
-            $pinSection.
             $tier1HeadsUp.
             ($tier1VaNote !== '' ? $tier1VaNote."\n" : '').
             ($bankNote !== '' ? $bankNote."\n\n" : '').
@@ -414,6 +439,42 @@ class WhatsappWaWalletMenuHandler
             "*Do not* send your PIN in this chat.\n\n".
             'Lost the link? Reply *LINK*. *BACK* — cancel'
         );
+    }
+
+    /** No PIN yet: block *1*–*7* menu actions until user completes *1* register + name. */
+    private function submenuCommandBlockedBeforeFullWallet(string $cmd, WhatsappWallet $wallet): bool
+    {
+        if ($wallet->hasPin()) {
+            return false;
+        }
+        $u = strtoupper(trim($cmd));
+        $blocked = [
+            '2', '3', '4', '5', '6', '7',
+            'TRANSFER', 'P2P', 'SEND', 'VTU',
+            'HISTORY', 'STATEMENT', 'TRANSACTIONS', 'TRANSACTION',
+            'SETTINGS', 'UPGRADE', 'TIER2', 'TIER 2',
+            'RECEIVE', 'TOPUP', 'TOP UP',
+        ];
+
+        return in_array($u, $blocked, true);
+    }
+
+    /** PIN set but no display name: block menu until they send their name. */
+    private function submenuCommandBlockedUntilSenderName(string $cmd, WhatsappWallet $wallet): bool
+    {
+        if (! $wallet->hasPin() || $wallet->normalizedSenderName() !== null) {
+            return false;
+        }
+        $u = strtoupper(trim($cmd));
+        $blocked = [
+            '1', '2', '3', '4', '5', '6', '7',
+            'TRANSFER', 'P2P', 'SEND', 'VTU',
+            'HISTORY', 'STATEMENT', 'TRANSACTIONS', 'TRANSACTION',
+            'SETTINGS', 'UPGRADE', 'TIER2', 'TIER 2',
+            'RECEIVE', 'TOPUP', 'TOP UP',
+        ];
+
+        return in_array($u, $blocked, true);
     }
 
     private function sendWalletSettingsScreen(string $instance, string $phone, WhatsappWallet $wallet): void
@@ -515,6 +576,26 @@ class WhatsappWaWalletMenuHandler
         WhatsappWallet $wallet,
         ?Renter $linkedRenter
     ): void {
+        if ($this->submenuCommandBlockedBeforeFullWallet($cmd, $wallet)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                '*Finish registration first* — send *WALLET*, then *1* (PIN link) and your *full name*. Then *1*–*7* unlocks.'
+            );
+
+            return;
+        }
+
+        if ($this->submenuCommandBlockedUntilSenderName($cmd, $wallet)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Send *your full name* in one message (e.g. *Ade Johnson*). Then *WALLET* shows *1* top-up, *2* bank send, *3* KYC / upgrade, etc.'
+            );
+
+            return;
+        }
+
         if ($cmd === '7' || $cmd === 'SETTINGS') {
             if (! $wallet->isTier2()) {
                 $tier1Msg = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)
@@ -566,25 +647,6 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
-            try {
-                $this->sendReceiveTopupHelp($instance, $phone, $wallet);
-            } catch (\Throwable $e) {
-                Log::error('whatsapp.wallet.receive_topup_help_failed', [
-                    'error' => $e->getMessage(),
-                    'phone' => $phone,
-                ]);
-                $topupErr = $wallet->isTier2()
-                    ? "We couldn't load receive details just now. Your dedicated account is unchanged — try again shortly or *MENU*."
-                    : "We couldn't load top-up details just now. Try again in a moment.\n\n".
-                        'Tier 2 users: your bank details are unchanged. Tier 1: try *UPGRADE* or *MENU*.';
-                $this->client->sendText($instance, $phone, $topupErr);
-            }
-
-            return;
-        }
-
-        // Onboarding: compact menu uses *2* for add/receive (NG); bank send also uses *2* once PIN exists.
-        if ($cmd === '2' && ! $wallet->hasPin() && $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
             try {
                 $this->sendReceiveTopupHelp($instance, $phone, $wallet);
             } catch (\Throwable $e) {
@@ -797,12 +859,9 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($wallet->needsQuickWalletSetup()) {
-            $ng = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
             $hint = $wallet->hasPin()
-                ? ($ng ? 'Send *your name*, or *1* to add money. *MENU* — all services.' : 'Send *your name*. *MENU* — all services.')
-                : ($ng
-                    ? '*1* — register (PIN link) · then your name · *2* — add money (NG). *MENU*'
-                    : '*1* — register (PIN link) · then your name. *MENU*');
+                ? 'Send *your full name* here, then *WALLET* for the full menu. *MENU* — other services.'
+                : '*1* — register (PIN link, then your name). *CANCEL* — refund pending money. *MENU*';
             $this->client->sendText($instance, $phone, $hint);
 
             return;
