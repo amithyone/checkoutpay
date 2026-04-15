@@ -98,4 +98,13 @@ return [
         'calculator_url' => env('NIGTAX_CALCULATOR_URL', ''),
     ],
 
+    'live_sync' => [
+        'enabled' => (bool) env('LIVE_SYNC_ENABLED', false),
+        'key_id' => env('LIVE_SYNC_KEY_ID', 'live-site-1'),
+        'secret' => env('LIVE_SYNC_SECRET', ''),
+        'max_drift_seconds' => (int) env('LIVE_SYNC_MAX_DRIFT_SECONDS', 300),
+        'nonce_ttl_seconds' => (int) env('LIVE_SYNC_NONCE_TTL_SECONDS', 600),
+        'allowed_ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('LIVE_SYNC_ALLOWED_IPS', ''))))),
+    ],
+
 ];

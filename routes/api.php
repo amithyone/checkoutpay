@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\MevonPayWebhookController;
+use App\Http\Controllers\Api\LiveSyncReceiverController;
 use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,10 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
 
 // Public routes (no API key required)
 Route::prefix('v1')->group(function () {
+    // Secure inbound sync receiver (live site -> this app)
+    Route::post('sync/live', [LiveSyncReceiverController::class, 'receive'])
+        ->middleware([\App\Http\Middleware\VerifyLiveSyncSignature::class, 'throttle:120,1']);
+
     // Statistics routes
     Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index']);
 
