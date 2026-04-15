@@ -22,19 +22,23 @@ final class WhatsappWalletOnboardingCopy
             : "_Bank add-money is only for Nigeria numbers for now — you can still receive via *4* (WhatsApp send to you)._\n";
 
         if (! $wallet->hasPin()) {
+            $addMoneyShort = $nigeriaRails
+                ? "*2* — Add / receive money (NG)\n"
+                : "_NG bank pay-in only · you can still get paid with *4* (wallet send)._\n";
+
             return "*Wallet*\n".
                 "Balance: *{$bal}*\n\n".
-                "Finish setup so you can use your money:\n".
-                "1️⃣ *REGISTER* — open the *link* to set your PIN (not in chat)\n".
-                "2️⃣ Then send *your name* (what people see when you pay them)\n\n".
-                $addMoneyLine.
+                "To *send* or *pay out*, finish setup (one short step at a time):\n\n".
+                "*1* — *Register* → opens a *link* to set your *PIN* (never type your PIN here)\n".
+                "Then reply here with *your full name* (what people see when you pay them)\n\n".
+                $addMoneyShort.
                 "*MENU* — all services\n\n".
                 $footer;
         }
 
         return "*Wallet*\n".
             "Balance: *{$bal}*\n\n".
-            "Send *your name* in one message (e.g. *Ade Johnson*) — needed before you can send to others.\n\n".
+            "Last step: reply with *your full name* once (e.g. *Ade Johnson*) — required before you send to others.\n\n".
             $addMoneyLine.
             "*MENU* — all services\n\n".
             $footer;

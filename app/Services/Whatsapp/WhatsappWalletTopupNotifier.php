@@ -68,22 +68,16 @@ class WhatsappWalletTopupNotifier
         $isFx = $this->isCrossBorderNotify($crossBorderFx, $creditCur);
 
         if ($recipientWallet->needsQuickWalletSetup()) {
-            $pinLine = $recipientWallet->hasPin()
-                ? ''
-                : "• *REGISTER* — PIN (secure link)\n";
-            $nameLine = $recipientWallet->hasPin()
-                ? '• Send *your name* (what people see when you send)'
-                : '• Then *your name* (what people see when you send)';
+            $setupLine = $recipientWallet->hasPin()
+                ? "Reply with *your name* (shown when you send), then *WALLET* for options.\n"
+                : "Send *WALLET* → *1* to register (*PIN* on the link, then your *name* here).\n";
             $head = $isFx
                 ? $this->p2pReceivedHeadCrossBorder($fromWho, $crossBorderFx, $amountStr, $amount, $creditCur)
                 : $this->p2pReceivedHeadDomestic($fromWho, $amountStr);
             $text = $head.
                 "*Time:* {$when}\n".
                 "*From number:* {$masked}\n\n".
-                "Finish on WhatsApp (takes a minute):\n".
-                "• Send *WALLET*\n".
-                $pinLine.
-                $nameLine."\n\n".
+                $setupLine.
                 '*MENU* — other services';
         } else {
             $head = $isFx
@@ -92,7 +86,7 @@ class WhatsappWalletTopupNotifier
             $text = $head.
                 "*Time:* {$when}\n".
                 "*From number:* {$masked}\n\n".
-                'Send *WALLET* for balance & options · *MENU* for all services.';
+                '*WALLET* — balance & sends · *MENU* — all services';
         }
 
         $this->client->sendText($instance, $recipientWallet->phone_e164, $text);
@@ -175,20 +169,17 @@ class WhatsappWalletTopupNotifier
         $balStr = '₦'.number_format($balanceAfter, 2);
 
         if ($wallet->needsQuickWalletSetup()) {
-            $pinLine = $wallet->hasPin()
-                ? ''
-                : "• *REGISTER* — PIN (link)\n";
+            $setup = $wallet->hasPin()
+                ? "Reply with *your name*, then *WALLET*.\n"
+                : "Send *WALLET* → *1* to register (*PIN* link, then your *name*).\n";
             $text = "✅ *{$amountStr}* received\n".
                 "Balance: *{$balStr}*\n\n".
-                "Quick setup:\n".
-                "• Send *WALLET*\n".
-                $pinLine.
-                "• Your *display name*\n\n".
+                $setup.
                 '*MENU* — other services';
         } else {
             $text = "✅ *{$amountStr}* received\n".
                 "Balance: *{$balStr}*\n\n".
-                'Send *WALLET* for your wallet · *MENU* for all services.';
+                '*WALLET* — your wallet · *MENU* — all services';
         }
 
         $this->client->sendText($instance, $wallet->phone_e164, $text);

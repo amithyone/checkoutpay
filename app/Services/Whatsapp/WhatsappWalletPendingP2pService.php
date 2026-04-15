@@ -465,11 +465,11 @@ class WhatsappWalletPendingP2pService
                 ($rate !== '' ? "*Approx. rate:* {$rate}\n" : '').
                 "\n".
                 "*From:* {$maskedSender}\n\n".
-                "Send *WALLET* then *REGISTER* to claim · *CANCEL* refunds them";
+                "Send *WALLET* → *1* to register & claim · *CANCEL* refunds them";
         } else {
             $body = "💸 *{$senderLabel}* sent you *{$amountStr}*\n\n".
                 "*From number:* {$maskedSender}\n\n".
-                "Send *WALLET* → *REGISTER* to claim it\n".
+                "Send *WALLET* → *1* to register & claim\n".
                 "*CANCEL* → refund to sender";
         }
 

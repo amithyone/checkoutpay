@@ -83,7 +83,7 @@ class WhatsappWaWalletMenuHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Set a wallet PIN first: send *WALLET* then *REGISTER*.'
+                'Send *WALLET*, then *1* to register your PIN (secure link).'
             );
 
             return;
@@ -208,7 +208,7 @@ class WhatsappWaWalletMenuHandler
         if ($step === 'submenu') {
             if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) !== null) {
                 if (! $wallet->hasPin()) {
-                    $this->client->sendText($instance, $phone, 'Set a wallet PIN first. Reply *REGISTER*.');
+                    $this->client->sendText($instance, $phone, 'Send *1* in *WALLET* to register your PIN first.');
 
                     return;
                 }
@@ -314,7 +314,7 @@ class WhatsappWaWalletMenuHandler
         $isTier2 = $wallet->isTier2();
         $pinSection = $wallet->hasPin()
             ? ''
-            : "*REGISTER* — PIN link first.\n\n";
+            : "*1* — register (PIN link first)\n\n";
 
         $vaBlock = '';
         if ($ngRails && $wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
@@ -384,6 +384,35 @@ class WhatsappWaWalletMenuHandler
             ($bankNote !== '' ? $bankNote."\n\n" : '').
             $casualLine.
             WhatsappMenuInputNormalizer::navigationHelpFooter()
+        );
+    }
+
+    /**
+     * Start secure web PIN setup (same path as *REGISTER* / *PIN*).
+     */
+    private function sendWalletPinSetupLink(WhatsappSession $session, string $instance, string $phone, WhatsappWallet $wallet): void
+    {
+        $created = $this->pinSetupWeb->createAndStoreToken($session->fresh(), $instance, $phone, $wallet);
+        if (! ($created['ok'] ?? false) || ! isset($created['token']) || ! is_string($created['token'])) {
+            $this->client->sendText($instance, $phone, 'Could not start PIN setup. Try again or contact support.');
+
+            return;
+        }
+        $token = $created['token'];
+        $session->update([
+            'chat_context' => [
+                'step' => 'pin_setup_web',
+                'pin_setup_web_token' => $token,
+            ],
+        ]);
+        $url = $this->pinSetupWeb->setupUrl($token);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Set wallet PIN*\n\n".
+            "Open this link to choose your *4-digit PIN* on a secure page:\n{$url}\n\n".
+            "*Do not* send your PIN in this chat.\n\n".
+            'Lost the link? Reply *LINK*. *BACK* — cancel'
         );
     }
 
@@ -501,6 +530,12 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
+        if ($cmd === '1' && ! $wallet->hasPin()) {
+            $this->sendWalletPinSetupLink($session, $instance, $phone, $wallet);
+
+            return;
+        }
+
         if (in_array($cmd, ['REGISTER', 'PIN'], true)) {
             if ($wallet->hasPin()) {
                 if ($wallet->normalizedSenderName() === null) {
@@ -516,28 +551,7 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
-            $created = $this->pinSetupWeb->createAndStoreToken($session->fresh(), $instance, $phone, $wallet);
-            if (! ($created['ok'] ?? false) || ! isset($created['token']) || ! is_string($created['token'])) {
-                $this->client->sendText($instance, $phone, 'Could not start PIN setup. Try again or contact support.');
-
-                return;
-            }
-            $token = $created['token'];
-            $session->update([
-                'chat_context' => [
-                    'step' => 'pin_setup_web',
-                    'pin_setup_web_token' => $token,
-                ],
-            ]);
-            $url = $this->pinSetupWeb->setupUrl($token);
-            $this->client->sendText(
-                $instance,
-                $phone,
-                "*Set wallet PIN*\n\n".
-                "Open this link to choose your *4-digit PIN* on a secure page:\n{$url}\n\n".
-                "*Do not* send your PIN in this chat.\n\n".
-                'Lost the link? Reply *LINK* anytime. *BACK* — cancel'
-            );
+            $this->sendWalletPinSetupLink($session, $instance, $phone, $wallet);
 
             return;
         }
@@ -569,6 +583,25 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
+        // Onboarding: compact menu uses *2* for add/receive (NG); bank send also uses *2* once PIN exists.
+        if ($cmd === '2' && ! $wallet->hasPin() && $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            try {
+                $this->sendReceiveTopupHelp($instance, $phone, $wallet);
+            } catch (\Throwable $e) {
+                Log::error('whatsapp.wallet.receive_topup_help_failed', [
+                    'error' => $e->getMessage(),
+                    'phone' => $phone,
+                ]);
+                $topupErr = $wallet->isTier2()
+                    ? "We couldn't load receive details just now. Your dedicated account is unchanged — try again shortly or *MENU*."
+                    : "We couldn't load top-up details just now. Try again in a moment.\n\n".
+                        'Tier 2 users: your bank details are unchanged. Tier 1: try *UPGRADE* or *MENU*.';
+                $this->client->sendText($instance, $phone, $topupErr);
+            }
+
+            return;
+        }
+
         if ($cmd === '2' || $cmd === 'TRANSFER') {
             if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
                 $this->client->sendText(
@@ -583,7 +616,7 @@ class WhatsappWaWalletMenuHandler
                 $this->client->sendText(
                     $instance,
                     $phone,
-                    'Set a wallet PIN first. Reply *REGISTER*.'
+                    'Send *1* in *WALLET* to register your PIN first.'
                 );
 
                 return;
@@ -622,7 +655,7 @@ class WhatsappWaWalletMenuHandler
                 return;
             }
             if (! $wallet->hasPin()) {
-                $this->client->sendText($instance, $phone, 'Set a wallet PIN first. Reply *REGISTER*.');
+                $this->client->sendText($instance, $phone, 'Send *1* in *WALLET* to register your PIN first.');
 
                 return;
             }
@@ -643,7 +676,7 @@ class WhatsappWaWalletMenuHandler
 
         if ($cmd === '4' || $cmd === 'P2P' || $cmd === 'SEND') {
             if (! $wallet->hasPin()) {
-                $this->client->sendText($instance, $phone, 'Set a wallet PIN first. Reply *REGISTER*.');
+                $this->client->sendText($instance, $phone, 'Send *1* in *WALLET* to register your PIN first.');
 
                 return;
             }
@@ -768,8 +801,8 @@ class WhatsappWaWalletMenuHandler
             $hint = $wallet->hasPin()
                 ? ($ng ? 'Send *your name*, or *1* to add money. *MENU* — all services.' : 'Send *your name*. *MENU* — all services.')
                 : ($ng
-                    ? 'Reply *REGISTER* (PIN link), send *your name*, or *1* to add money. *MENU* — all services.'
-                    : 'Reply *REGISTER* (PIN link) or send *your name*. *MENU* — all services.');
+                    ? '*1* — register (PIN link) · then your name · *2* — add money (NG). *MENU*'
+                    : '*1* — register (PIN link) · then your name. *MENU*');
             $this->client->sendText($instance, $phone, $hint);
 
             return;
@@ -1150,7 +1183,7 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        if (in_array($cmd, ['REGISTER', 'PIN'], true)) {
+        if (in_array($cmd, ['REGISTER', 'PIN', '1'], true)) {
             $this->client->sendText(
                 $instance,
                 $phone,
@@ -1175,7 +1208,7 @@ class WhatsappWaWalletMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "Use the *PIN setup link* we sent when you tapped *REGISTER*. Lost it? Reply *LINK*.\n\n*BACK* — cancel"
+            "Use the *PIN setup link* from when you sent *1* / *REGISTER*. Lost it? Reply *LINK*.\n\n*BACK* — cancel"
         );
     }
 

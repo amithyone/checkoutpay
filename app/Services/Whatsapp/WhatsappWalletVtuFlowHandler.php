@@ -51,7 +51,7 @@ class WhatsappWalletVtuFlowHandler
             return;
         }
         if (! $wallet->hasPin()) {
-            $this->client->sendText($instance, $phone, 'Set a wallet PIN first. Open *WALLET* and reply *REGISTER*.');
+            $this->client->sendText($instance, $phone, 'Open *WALLET* and send *1* to register your PIN first.');
 
             return;
         }
@@ -64,7 +64,7 @@ class WhatsappWalletVtuFlowHandler
             $this->client->sendText(
                 $instance,
                 $phone,
-                'Set your *send name* first. Open *WALLET* and start a bank or P2P send once to save your name, or contact support.'
+                'Open *WALLET* and send *your full name* once (shown when you pay).'
             );
 
             return;
