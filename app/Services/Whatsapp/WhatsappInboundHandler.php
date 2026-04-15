@@ -161,7 +161,7 @@ class WhatsappInboundHandler
         if (
             $session->chat_flow !== WhatsappGuestRentalBrowseHandler::FLOW
             && $session->state !== WhatsappSession::STATE_AWAIT_EMAIL
-            && PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) !== null
+            && PhoneNormalizer::parseBareWalletMobileForP2pShortcut($text, $phone) !== null
         ) {
             $this->waWalletMenu->enterP2pFlowFromPhoneShortcut($session->fresh(), $instance, $phone, $text, $linkedRenter);
 

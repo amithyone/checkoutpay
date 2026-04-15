@@ -72,7 +72,7 @@ class WhatsappWaWalletMenuHandler
         string $text,
         ?Renter $linkedRenter
     ): void {
-        if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) === null) {
+        if (PhoneNormalizer::parseBareWalletMobileForP2pShortcut($text, $phone) === null) {
             return;
         }
 
@@ -210,28 +210,26 @@ class WhatsappWaWalletMenuHandler
             $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
         }
 
-        if ($step === 'submenu') {
-            if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($text) !== null) {
-                if (! $wallet->hasPin()) {
-                    $this->client->sendText($instance, $phone, 'Send *1* in *WALLET* to register your PIN first.');
-
-                    return;
-                }
-                if ($wallet->isPinLocked()) {
-                    $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked. Try again later or contact support.');
-
-                    return;
-                }
-                if ($wallet->normalizedSenderName() === null) {
-                    $this->startSenderNameStep($session, $instance, $phone);
-
-                    return;
-                }
-                $session->update(['chat_context' => ['step' => 'p2p_phone']]);
-                $this->handleP2pPhone($session->fresh(), $instance, $phone, $text, [], $wallet);
+        if ($this->canInterpretAsGlobalP2pPhoneShortcut($step) && PhoneNormalizer::parseBareWalletMobileForP2pShortcut($text, $phone) !== null) {
+            if (! $wallet->hasPin()) {
+                $this->client->sendText($instance, $phone, 'Send *1* in *WALLET* to register your PIN first.');
 
                 return;
             }
+            if ($wallet->isPinLocked()) {
+                $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked. Try again later or contact support.');
+
+                return;
+            }
+            if ($wallet->normalizedSenderName() === null) {
+                $this->startSenderNameStep($session, $instance, $phone);
+
+                return;
+            }
+            $session->update(['chat_context' => ['step' => 'p2p_phone']]);
+            $this->handleP2pPhone($session->fresh(), $instance, $phone, $text, [], $wallet);
+
+            return;
         }
 
         if ($step === 'submenu' && in_array($cmd, ['CANCEL', 'DECLINE'], true) && $wallet->needsQuickWalletSetup()) {
@@ -1777,8 +1775,7 @@ class WhatsappWaWalletMenuHandler
         array $ctx,
         WhatsappWallet $wallet
     ): void {
-        $digits = PhoneNormalizer::digitsOnly($text);
-        $recipient = PhoneNormalizer::canonicalInternationalWalletRecipientDigits($digits ?? '');
+        $recipient = PhoneNormalizer::canonicalWalletRecipientForSender($text, $phone);
         if ($recipient === null) {
             $this->client->sendText(
                 $instance,
@@ -1834,6 +1831,21 @@ class WhatsappWaWalletMenuHandler
             "*{$mask}*\n{$nameBlock}\n\n".
             "*1* confirm · *0* change · YES ok"
         );
+    }
+
+    private function canInterpretAsGlobalP2pPhoneShortcut(string $step): bool
+    {
+        return ! in_array($step, [
+            'pin_setup_web',
+            'pin_new',
+            'pin_confirm',
+            'pin_sender_name',
+            'transfer_otp',
+            'transfer_pin',
+            'wallet_tx_history',
+            'wallet_settings',
+            'casual_bank_pick',
+        ], true);
     }
 
     /**

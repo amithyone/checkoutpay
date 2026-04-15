@@ -34,7 +34,7 @@ class WhatsappCheckoutServicesMenuHandler
             return;
         }
 
-        if (PhoneNormalizer::parseBareNigerianMobileForP2pShortcut($rawText) !== null) {
+        if (PhoneNormalizer::parseBareWalletMobileForP2pShortcut($rawText, $phone) !== null) {
             $linked = Renter::query()
                 ->where('whatsapp_phone_e164', $phone)
                 ->where('is_active', true)

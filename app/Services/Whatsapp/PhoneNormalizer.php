@@ -198,6 +198,34 @@ final class PhoneNormalizer
     }
 
     /**
+     * Parse a recipient number using sender-country defaults:
+     * - If input already includes a known country code, keep existing behavior.
+     * - If input is local/no country code, normalize using sender country first.
+     */
+    public static function canonicalWalletRecipientForSender(string $input, ?string $senderPhoneE164): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+
+        $explicit = self::canonicalInternationalWalletRecipientDigits($input);
+        if ($explicit !== null && self::looksExplicitInternational($d)) {
+            return $explicit;
+        }
+
+        $senderCountry = self::countryFromE164($senderPhoneE164 ?? '');
+        if ($senderCountry !== null) {
+            $senderLocal = self::canonicalE164ForCountry($input, $senderCountry);
+            if ($senderLocal !== null) {
+                return $senderLocal;
+            }
+        }
+
+        return $explicit;
+    }
+
+    /**
      * Baileys / Evolution {@code remoteJid} (e.g. 234...@s.whatsapp.net) → E.164 digits only, no leading +.
      * Returns null for groups, LID addresses, or non-standard JIDs.
      */
@@ -262,5 +290,60 @@ final class PhoneNormalizer
         }
 
         return self::canonicalNgE164Digits($raw);
+    }
+
+    /**
+     * Phone-only shortcut parser across supported wallet countries.
+     */
+    public static function parseBareWalletMobileForP2pShortcut(string $text, ?string $senderPhoneE164): ?string
+    {
+        $raw = trim($text);
+        if ($raw === '') {
+            return null;
+        }
+        if (preg_match('/[A-Za-z]/', $raw) === 1) {
+            return null;
+        }
+        $compact = preg_replace('/\s+/', '', $raw) ?? '';
+        if (preg_match('/^\+?[\d().\-]+$/', $compact) !== 1) {
+            return null;
+        }
+
+        return self::canonicalWalletRecipientForSender($raw, $senderPhoneE164);
+    }
+
+    private static function looksExplicitInternational(string $digits): bool
+    {
+        return str_starts_with($digits, '234')
+            || str_starts_with($digits, '264')
+            || str_starts_with($digits, '233')
+            || str_starts_with($digits, '44')
+            || (str_starts_with($digits, '1') && strlen($digits) === 11);
+    }
+
+    private static function countryFromE164(string $senderPhoneE164): ?string
+    {
+        $d = self::digitsOnly($senderPhoneE164);
+        if ($d === null) {
+            return null;
+        }
+
+        if (str_starts_with($d, '234')) {
+            return 'NG';
+        }
+        if (str_starts_with($d, '264')) {
+            return 'NA';
+        }
+        if (str_starts_with($d, '233')) {
+            return 'GH';
+        }
+        if (str_starts_with($d, '44')) {
+            return 'GB';
+        }
+        if (str_starts_with($d, '1') && strlen($d) === 11) {
+            return 'US';
+        }
+
+        return null;
     }
 }
