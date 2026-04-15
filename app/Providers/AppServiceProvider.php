@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Notifications\ChannelManager;
 use App\Notifications\Channels\TelegramChannel;
@@ -26,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
             return new TelegramChannel();
         });
 
+        $this->registerSqlQueryFirewall();
+
         // Warm up critical caches on application boot (for fast server)
         // This ensures caches are populated immediately, reducing first-request latency
         if (app()->environment('production')) {
@@ -33,11 +38,46 @@ class AppServiceProvider extends ServiceProvider
                 $this->warmUpCaches();
             } catch (\Exception $e) {
                 // Silently fail - don't break app if cache warm-up fails
-                \Illuminate\Support\Facades\Log::warning('Cache warm-up failed on boot', [
+                Log::warning('Cache warm-up failed on boot', [
                     'error' => $e->getMessage()
                 ]);
             }
         }
+    }
+
+    protected function registerSqlQueryFirewall(): void
+    {
+        if (!config('security.query_firewall.enabled', true)) {
+            return;
+        }
+
+        $runningInConsole = $this->app->runningInConsole();
+        $blockInConsole = config('security.query_firewall.block_in_console', false);
+
+        if ($runningInConsole && !$blockInConsole) {
+            return;
+        }
+
+        $patterns = config('security.query_firewall.patterns', []);
+
+        DB::listen(function (QueryExecuted $query) use ($patterns): void {
+            $sql = strtolower(trim($query->sql));
+
+            foreach ($patterns as $pattern) {
+                if (@preg_match($pattern, $sql) !== 1) {
+                    continue;
+                }
+
+                Log::critical('Blocked dangerous SQL statement by query firewall', [
+                    'sql' => $query->sql,
+                    'connection' => $query->connectionName,
+                    'ip' => request()?->ip(),
+                    'url' => request()?->fullUrl(),
+                ]);
+
+                throw new \RuntimeException('Blocked dangerous SQL statement.');
+            }
+        });
     }
 
     /**
