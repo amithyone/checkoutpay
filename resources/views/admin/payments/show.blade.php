@@ -54,10 +54,20 @@
                         data-payment-id="{{ $payment->id }}">
                         <i class="fas fa-search mr-2"></i> <span>Check Match</span>
                     </button>
-                    <button onclick="showManualVerifyModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
-                        class="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center text-sm">
-                        <i class="fas fa-check-double mr-2"></i> <span>Manual Verify</span>
-                    </button>
+                    @if($isExternalAccountNumberPayment ?? false)
+                        <button
+                            type="button"
+                            disabled
+                            title="External API account-number payments cannot be manually verified."
+                            class="w-full sm:w-auto bg-gray-300 text-gray-600 px-4 py-2 rounded-lg cursor-not-allowed flex items-center justify-center text-sm">
+                            <i class="fas fa-ban mr-2"></i> <span>Manual Verify (Blocked)</span>
+                        </button>
+                    @else
+                        <button onclick="showManualVerifyModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
+                            class="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center text-sm">
+                            <i class="fas fa-check-double mr-2"></i> <span>Manual Verify</span>
+                        </button>
+                    @endif
                     @if($isExternalAccountNumberPayment ?? false)
                         <button
                             type="button"

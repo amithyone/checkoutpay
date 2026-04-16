@@ -352,6 +352,8 @@ class PaymentController extends Controller
      */
     public function manualVerify(Request $request, Payment $payment): RedirectResponse
     {
+        $payment->loadMissing('accountNumberDetails');
+
         $request->validate([
             'verification_notes' => 'nullable|string|max:1000',
             'verified_amount' => 'nullable|numeric|min:0',
@@ -361,6 +363,11 @@ class PaymentController extends Controller
         if ($payment->status !== Payment::STATUS_PENDING) {
             return redirect()->route('admin.payments.show', $payment)
                 ->with('error', 'Only pending payments can be manually verified.');
+        }
+
+        if ((bool) optional($payment->accountNumberDetails)->is_external || $payment->isExternalGatewayPayment()) {
+            return redirect()->route('admin.payments.show', $payment)
+                ->with('error', 'Manual verification is not allowed for external API account-number payments. Only internal account-number payments can be manually verified.');
         }
 
         $verifiedAmount = $request->verified_amount ?? $payment->amount;
