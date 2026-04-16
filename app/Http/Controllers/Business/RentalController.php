@@ -10,11 +10,14 @@ use App\Services\RentalPaymentService;
 use App\Mail\RentalApprovedPayNow;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 class RentalController extends Controller
 {
@@ -90,8 +93,19 @@ class RentalController extends Controller
     public function storeItem(Request $request): RedirectResponse
     {
         $business = $request->user('business');
-        
-        $validated = $request->validate([
+
+        $payloadForLog = $request->except(['images', '_token']);
+
+        Log::info('rental_items.store.start', [
+            'business_id' => $business?->id,
+            'route' => $request->path(),
+            'method' => $request->method(),
+            'has_images' => $request->hasFile('images'),
+            'images_count' => is_array($request->file('images')) ? count($request->file('images')) : 0,
+            'payload' => $payloadForLog,
+        ]);
+
+        $validator = Validator::make($request->all(), [
             'category_id' => 'required|exists:rental_categories,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -110,26 +124,54 @@ class RentalController extends Controller
             'is_featured' => 'sometimes|boolean',
         ]);
 
-        $validated['business_id'] = $business->id;
-        $validated['is_active'] = $validated['is_active'] ?? true;
-        $validated['is_available'] = $validated['is_available'] ?? true;
-        $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
-        $validated['is_featured'] = (bool) ($validated['is_featured'] ?? false);
-        $validated['caution_fee_percent'] = $validated['caution_fee_enabled']
-            ? (float) ($validated['caution_fee_percent'] ?? 0)
-            : 0;
-
-        // Handle image uploads
-        if ($request->hasFile('images')) {
-            $imagePaths = [];
-            foreach ($request->file('images') as $image) {
-                $path = $image->store('rental-items', 'public');
-                $imagePaths[] = $path;
-            }
-            $validated['images'] = $imagePaths;
+        if ($validator->fails()) {
+            Log::warning('rental_items.store.validation_failed', [
+                'business_id' => $business?->id,
+                'errors' => $validator->errors()->toArray(),
+                'payload' => $payloadForLog,
+            ]);
+            throw new ValidationException($validator);
         }
 
-        RentalItem::create($validated);
+        try {
+            $validated = $validator->validated();
+
+            $validated['business_id'] = $business->id;
+            $validated['is_active'] = $validated['is_active'] ?? true;
+            $validated['is_available'] = $validated['is_available'] ?? true;
+            $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
+            $validated['is_featured'] = (bool) ($validated['is_featured'] ?? false);
+            $validated['caution_fee_percent'] = $validated['caution_fee_enabled']
+                ? (float) ($validated['caution_fee_percent'] ?? 0)
+                : 0;
+
+            // Handle image uploads
+            if ($request->hasFile('images')) {
+                $imagePaths = [];
+                foreach ($request->file('images') as $image) {
+                    $path = $image->store('rental-items', 'public');
+                    $imagePaths[] = $path;
+                }
+                $validated['images'] = $imagePaths;
+            }
+
+            $item = RentalItem::create($validated);
+
+            Log::info('rental_items.store.success', [
+                'business_id' => $business->id,
+                'rental_item_id' => $item->id,
+                'name' => $item->name,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('rental_items.store.exception', [
+                'business_id' => $business?->id,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+                'payload' => $payloadForLog,
+            ]);
+            throw $e;
+        }
 
         return redirect()->route('business.rentals.items')
             ->with('success', 'Rental item created successfully.');
