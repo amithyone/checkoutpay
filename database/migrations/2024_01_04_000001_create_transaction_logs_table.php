@@ -41,7 +41,6 @@ return new class extends Migration
             $table->string('user_agent')->nullable();
             $table->timestamps();
 
-            $table->index('transaction_id');
             $table->index('event_type');
             $table->index('created_at');
             $table->index(['transaction_id', 'created_at']);

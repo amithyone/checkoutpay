@@ -7,6 +7,9 @@
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Rentals</h1>
         <div class="flex gap-2">
+            <a href="{{ route('business.rentals.items.catalog') }}" class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-copy mr-2"></i> Clone Item
+            </a>
             <a href="{{ route('business.rentals.items.create') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">
                 <i class="fas fa-plus mr-2"></i> Add Item
             </a>

@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('events')) {
+            return;
+        }
+
         Schema::table('events', function (Blueprint $table) {
             $table->unsignedBigInteger('view_count')->default(0)->after('status');
         });
@@ -21,6 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('events')) {
+            return;
+        }
+
         Schema::table('events', function (Blueprint $table) {
             $table->dropColumn('view_count');
         });

@@ -85,8 +85,11 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::prefix('rentals')->name('rentals.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Business\RentalController::class, 'index'])->name('index');
             Route::get('/items', [\App\Http\Controllers\Business\RentalController::class, 'items'])->name('items');
+            Route::get('/items/catalog', [\App\Http\Controllers\Business\RentalController::class, 'catalog'])->name('items.catalog');
             Route::get('/items/create', [\App\Http\Controllers\Business\RentalController::class, 'createItem'])->name('items.create');
             Route::post('/items', [\App\Http\Controllers\Business\RentalController::class, 'storeItem'])->name('items.store');
+            Route::get('/items/{item}/clone', [\App\Http\Controllers\Business\RentalController::class, 'cloneItem'])->name('items.clone');
+            Route::post('/items/{item}/clone', [\App\Http\Controllers\Business\RentalController::class, 'storeClonedItem'])->name('items.clone.store');
             Route::get('/items/{item}/edit', [\App\Http\Controllers\Business\RentalController::class, 'editItem'])->name('items.edit');
             Route::put('/items/{item}', [\App\Http\Controllers\Business\RentalController::class, 'updateItem'])->name('items.update');
             Route::patch('/items/{item}/daily-rate', [\App\Http\Controllers\Business\RentalController::class, 'updateDailyRate'])->name('items.update-daily-rate');

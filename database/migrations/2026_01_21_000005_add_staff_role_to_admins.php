@@ -12,6 +12,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
+        if (!Schema::hasTable('admins')) {
+            return;
+        }
+
         // Update the enum to include 'staff' role
         DB::statement("ALTER TABLE admins MODIFY COLUMN role ENUM('super_admin', 'admin', 'support', 'staff') DEFAULT 'admin'");
     }
@@ -21,6 +29,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
+        if (!Schema::hasTable('admins')) {
+            return;
+        }
+
         // Remove 'staff' role from enum
         DB::statement("ALTER TABLE admins MODIFY COLUMN role ENUM('super_admin', 'admin', 'support') DEFAULT 'admin'");
     }

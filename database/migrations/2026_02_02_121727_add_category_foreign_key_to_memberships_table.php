@@ -11,10 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $db = Schema::getConnection();
+        if (method_exists($db, 'getDriverName') && $db->getDriverName() === 'sqlite') {
+            return;
+        }
+
         // Only add foreign key if both tables exist
         if (Schema::hasTable('membership_categories') && Schema::hasTable('memberships')) {
             // Check if foreign key already exists
-            $db = Schema::getConnection();
             $foreignKeys = $db->select("
                 SELECT CONSTRAINT_NAME 
                 FROM information_schema.KEY_COLUMN_USAGE 
@@ -40,6 +44,15 @@ return new class extends Migration
      */
     public function down(): void
     {
+        $db = Schema::getConnection();
+        if (method_exists($db, 'getDriverName') && $db->getDriverName() === 'sqlite') {
+            return;
+        }
+
+        if (!Schema::hasTable('memberships')) {
+            return;
+        }
+
         Schema::table('memberships', function (Blueprint $table) {
             $table->dropForeign(['category_id']);
         });

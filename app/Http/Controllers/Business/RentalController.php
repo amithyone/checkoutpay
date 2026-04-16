@@ -11,6 +11,8 @@ use App\Mail\RentalApprovedPayNow;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -105,13 +107,14 @@ class RentalController extends Controller
             'images' => 'nullable|array',
             'images.*' => 'image|max:2048',
             'specifications' => 'nullable|array',
-            'is_featured' => 'boolean',
+            'is_featured' => 'sometimes|boolean',
         ]);
 
         $validated['business_id'] = $business->id;
         $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['is_available'] = $validated['is_available'] ?? true;
         $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
+        $validated['is_featured'] = (bool) ($validated['is_featured'] ?? false);
         $validated['caution_fee_percent'] = $validated['caution_fee_enabled']
             ? (float) ($validated['caution_fee_percent'] ?? 0)
             : 0;
@@ -165,6 +168,111 @@ class RentalController extends Controller
     }
 
     /**
+     * Browse all uploaded rental items (for cloning).
+     */
+    public function catalog(Request $request): View
+    {
+        $business = $request->user('business');
+
+        $query = RentalItem::query()
+            ->whereNull('deleted_at')
+            ->with(['category', 'business'])
+            ->latest();
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->filled('q')) {
+            $q = trim((string) $request->q);
+            $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('city', 'like', "%{$q}%")
+                    ->orWhere('state', 'like', "%{$q}%");
+            });
+        }
+
+        $items = $query->paginate(20)->withQueryString();
+        $categories = RentalCategory::where('is_active', true)->get();
+
+        return view('business.rentals.catalog', compact('items', 'categories', 'business'));
+    }
+
+    /**
+     * Show clone screen (only description editable).
+     */
+    public function cloneItem(Request $request, RentalItem $item): View
+    {
+        $business = $request->user('business');
+
+        $item->load(['category', 'business']);
+
+        return view('business.rentals.clone-item', compact('item', 'business'));
+    }
+
+    /**
+     * Store a cloned item owned by the current business.
+     * Only description is editable during cloning.
+     */
+    public function storeClonedItem(Request $request, RentalItem $item): RedirectResponse
+    {
+        $business = $request->user('business');
+
+        $validated = $request->validate([
+            'description' => 'nullable|string',
+        ]);
+
+        $data = $item->only([
+            'category_id',
+            'name',
+            'city',
+            'state',
+            'address',
+            'daily_rate',
+            'weekly_rate',
+            'monthly_rate',
+            'currency',
+            'caution_fee_enabled',
+            'caution_fee_percent',
+            'quantity_available',
+            'specifications',
+            'terms_and_conditions',
+            'is_featured',
+        ]);
+
+        $data['business_id'] = $business->id;
+        $data['description'] = $validated['description'] ?? $item->description;
+        $data['is_active'] = true;
+        $data['is_available'] = true;
+        $data['is_featured'] = (bool) ($data['is_featured'] ?? false);
+
+        // Copy images so one business can't delete another's files.
+        $newImages = [];
+        $sourceImages = is_array($item->images) ? $item->images : [];
+        foreach ($sourceImages as $src) {
+            $src = (string) $src;
+            if ($src === '') {
+                continue;
+            }
+            if (! Storage::disk('public')->exists($src)) {
+                continue;
+            }
+            $ext = pathinfo($src, PATHINFO_EXTENSION);
+            $dest = 'rental-items/' . $business->id . '/clones/' . Str::random(20) . ($ext ? ('.' . $ext) : '');
+            Storage::disk('public')->copy($src, $dest);
+            $newImages[] = $dest;
+        }
+        if (count($newImages) > 0) {
+            $data['images'] = $newImages;
+        }
+
+        $cloned = RentalItem::create($data);
+
+        return redirect()->route('business.rentals.items.edit', $cloned)
+            ->with('success', 'Item cloned. You can now edit your copy.');
+    }
+
+    /**
      * Show the form for editing a rental item
      */
     public function editItem(RentalItem $item): View
@@ -206,12 +314,15 @@ class RentalController extends Controller
             'images' => 'nullable|array',
             'images.*' => 'image|max:2048',
             'specifications' => 'nullable|array',
-            'is_featured' => 'boolean',
-            'is_active' => 'boolean',
-            'is_available' => 'boolean',
+            'is_featured' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
+            'is_available' => 'sometimes|boolean',
             'remove_images' => 'nullable|array',
         ]);
         $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
+        if (array_key_exists('is_featured', $validated)) {
+            $validated['is_featured'] = (bool) $validated['is_featured'];
+        }
         $validated['caution_fee_percent'] = $validated['caution_fee_enabled']
             ? (float) ($validated['caution_fee_percent'] ?? 0)
             : 0;

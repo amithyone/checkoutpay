@@ -12,6 +12,15 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // SQLite (used in tests) doesn't support SHOW COLUMNS / MODIFY like MySQL.
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
+        if (!Schema::hasTable('processed_emails')) {
+            return;
+        }
+
         // Change html_body and text_body to longText to handle large emails
         Schema::table('processed_emails', function (Blueprint $table) {
             // Check if column exists and is not already longText
@@ -40,6 +49,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
+        if (!Schema::hasTable('processed_emails')) {
+            return;
+        }
+
         // Revert back to TEXT (optional - usually we don't need to revert this)
         Schema::table('processed_emails', function (Blueprint $table) {
             if (Schema::hasColumn('processed_emails', 'html_body')) {
