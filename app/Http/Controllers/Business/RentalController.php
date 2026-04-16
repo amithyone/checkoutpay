@@ -112,6 +112,7 @@ class RentalController extends Controller
             'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',
             'address' => 'nullable|string',
+            'currency' => 'nullable|string|size:3',
             'daily_rate' => 'required|numeric|min:0',
             'weekly_rate' => 'nullable|numeric|min:0',
             'monthly_rate' => 'nullable|numeric|min:0',
@@ -121,7 +122,11 @@ class RentalController extends Controller
             'images' => 'nullable|array',
             'images.*' => 'image|max:2048',
             'specifications' => 'nullable|array',
+            'specifications_json' => 'nullable|string',
+            'terms_and_conditions' => 'nullable|string',
             'is_featured' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
+            'is_available' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -141,9 +146,26 @@ class RentalController extends Controller
             $validated['is_available'] = $validated['is_available'] ?? true;
             $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
             $validated['is_featured'] = (bool) ($validated['is_featured'] ?? false);
+            $validated['currency'] = strtoupper((string) ($validated['currency'] ?? 'NGN'));
             $validated['caution_fee_percent'] = $validated['caution_fee_enabled']
                 ? (float) ($validated['caution_fee_percent'] ?? 0)
                 : 0;
+
+            if (isset($validated['specifications_json']) && trim((string) $validated['specifications_json']) !== '') {
+                $decodedSpecs = json_decode($validated['specifications_json'], true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decodedSpecs)) {
+                    Log::warning('rental_items.store.invalid_specifications_json', [
+                        'business_id' => $business?->id,
+                        'error' => json_last_error_msg(),
+                        'value' => $validated['specifications_json'],
+                    ]);
+                    throw ValidationException::withMessages([
+                        'specifications_json' => 'Specifications JSON must be a valid JSON object or array.',
+                    ]);
+                }
+                $validated['specifications'] = $decodedSpecs;
+            }
+            unset($validated['specifications_json']);
 
             // Handle image uploads
             if ($request->hasFile('images')) {
@@ -247,6 +269,12 @@ class RentalController extends Controller
     {
         $business = $request->user('business');
 
+        Log::info('rental_items.clone.view', [
+            'business_id' => $business?->id,
+            'source_item_id' => $item->id,
+            'source_item_business_id' => $item->business_id,
+        ]);
+
         $item->load(['category', 'business']);
 
         return view('business.rentals.clone-item', compact('item', 'business'));
@@ -259,6 +287,12 @@ class RentalController extends Controller
     public function storeClonedItem(Request $request, RentalItem $item): RedirectResponse
     {
         $business = $request->user('business');
+
+        Log::info('rental_items.clone.start', [
+            'business_id' => $business?->id,
+            'source_item_id' => $item->id,
+            'source_item_business_id' => $item->business_id,
+        ]);
 
         $validated = $request->validate([
             'description' => 'nullable|string',
@@ -308,7 +342,24 @@ class RentalController extends Controller
             $data['images'] = $newImages;
         }
 
-        $cloned = RentalItem::create($data);
+        try {
+            $cloned = RentalItem::create($data);
+        } catch (\Throwable $e) {
+            Log::error('rental_items.clone.exception', [
+                'business_id' => $business?->id,
+                'source_item_id' => $item->id,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+
+        Log::info('rental_items.clone.success', [
+            'business_id' => $business?->id,
+            'source_item_id' => $item->id,
+            'cloned_item_id' => $cloned->id,
+        ]);
 
         return redirect()->route('business.rentals.items.edit', $cloned)
             ->with('success', 'Item cloned. You can now edit your copy.');

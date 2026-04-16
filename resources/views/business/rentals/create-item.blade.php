@@ -55,9 +55,18 @@
                     <input type="text" name="state" class="w-full border border-gray-300 rounded-md">
                 </div>
                 <div>
+                    <label class="block text-sm font-medium mb-1">Currency</label>
+                    <input type="text" name="currency" value="NGN" maxlength="3" class="w-full border border-gray-300 rounded-md uppercase">
+                </div>
+                <div>
                     <label class="block text-sm font-medium mb-1">Quantity Available *</label>
                     <input type="number" name="quantity_available" value="1" min="1" required class="w-full border border-gray-300 rounded-md">
                 </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Address</label>
+                <textarea name="address" rows="2" class="w-full border border-gray-300 rounded-md"></textarea>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -105,6 +114,28 @@
                     <input type="checkbox" name="is_featured" value="1" class="mr-2">
                     <span>Feature this item</span>
                 </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <label class="flex items-center">
+                    <input type="checkbox" name="is_active" value="1" checked class="mr-2">
+                    <span>Active</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" name="is_available" value="1" checked class="mr-2">
+                    <span>Available</span>
+                </label>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Terms and Conditions</label>
+                <textarea name="terms_and_conditions" rows="3" class="w-full border border-gray-300 rounded-md" placeholder="Rental terms, damages policy, late return policy..."></textarea>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-1">Specifications (JSON)</label>
+                <textarea name="specifications_json" rows="4" class="w-full border border-gray-300 rounded-md font-mono text-sm" placeholder='{"brand":"Canon","model":"R5","sensor":"45MP"}'></textarea>
+                <p class="text-xs text-gray-500 mt-1">Optional. Provide valid JSON object/array.</p>
             </div>
 
             <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">
