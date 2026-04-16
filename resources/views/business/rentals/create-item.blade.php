@@ -4,9 +4,14 @@
 
 @section('content')
 <div class="p-6">
-    <a href="{{ route('business.rentals.items') }}" class="text-primary hover:underline mb-4 inline-block">
-        <i class="fas fa-arrow-left"></i> Back to Items
-    </a>
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+        <a href="{{ route('business.rentals.items') }}" class="text-primary hover:underline inline-block">
+            <i class="fas fa-arrow-left"></i> Back to Items
+        </a>
+        <a href="{{ route('business.rentals.items.catalog') }}" class="inline-flex items-center px-3 py-1.5 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+            <i class="fas fa-copy mr-2"></i> Clone Item
+        </a>
+    </div>
 
     <div class="bg-white rounded-lg shadow p-6 max-w-3xl">
         <h1 class="text-2xl font-bold mb-6">Create Rental Item</h1>
@@ -17,7 +22,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Category *</label>
-                    <select name="category_id" required class="w-full border-gray-300 rounded-md">
+                    <select name="category_id" required class="w-full border border-gray-300 rounded-md">
                         <option value="">Select Category</option>
                         @foreach($categories as $category)
                             <option value="{{ $category->id }}">{{ $category->name }}</option>
@@ -26,19 +31,19 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Item Name *</label>
-                    <input type="text" name="name" required class="w-full border-gray-300 rounded-md">
+                    <input type="text" name="name" required class="w-full border border-gray-300 rounded-md">
                 </div>
             </div>
 
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-1">Description</label>
-                <textarea name="description" rows="3" class="w-full border-gray-300 rounded-md"></textarea>
+                <textarea name="description" rows="3" class="w-full border border-gray-300 rounded-md"></textarea>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">City</label>
-                    <select name="city" class="w-full border-gray-300 rounded-md">
+                    <select name="city" class="w-full border border-gray-300 rounded-md">
                         <option value="">Select City</option>
                         @foreach(config('cities.major_cities', []) as $city)
                             <option value="{{ $city }}">{{ $city }}</option>
@@ -47,26 +52,26 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">State</label>
-                    <input type="text" name="state" class="w-full border-gray-300 rounded-md">
+                    <input type="text" name="state" class="w-full border border-gray-300 rounded-md">
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Quantity Available *</label>
-                    <input type="number" name="quantity_available" value="1" min="1" required class="w-full border-gray-300 rounded-md">
+                    <input type="number" name="quantity_available" value="1" min="1" required class="w-full border border-gray-300 rounded-md">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Daily Rate (₦) *</label>
-                    <input type="number" name="daily_rate" step="0.01" min="0" required class="w-full border-gray-300 rounded-md">
+                    <input type="number" name="daily_rate" step="0.01" min="0" required class="w-full border border-gray-300 rounded-md">
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Weekly Rate (₦)</label>
-                    <input type="number" name="weekly_rate" step="0.01" min="0" class="w-full border-gray-300 rounded-md">
+                    <input type="number" name="weekly_rate" step="0.01" min="0" class="w-full border border-gray-300 rounded-md">
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Monthly Rate (₦)</label>
-                    <input type="number" name="monthly_rate" step="0.01" min="0" class="w-full border-gray-300 rounded-md">
+                    <input type="number" name="monthly_rate" step="0.01" min="0" class="w-full border border-gray-300 rounded-md">
                 </div>
             </div>
 
@@ -84,14 +89,14 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                     <div>
                         <label class="block text-sm font-medium mb-1">Caution fee (%)</label>
-                        <input type="number" name="caution_fee_percent" step="0.01" min="0" max="100" value="0" class="w-full border-gray-300 rounded-md">
+                        <input type="number" name="caution_fee_percent" step="0.01" min="0" max="100" value="0" class="w-full border border-gray-300 rounded-md">
                     </div>
                 </div>
             </div>
 
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-1">Images</label>
-                <input type="file" name="images[]" multiple accept="image/*" class="w-full border-gray-300 rounded-md">
+                <input type="file" name="images[]" multiple accept="image/*" class="w-full border border-gray-300 rounded-md">
                 <p class="text-xs text-gray-500 mt-1">You can select multiple images</p>
             </div>
 

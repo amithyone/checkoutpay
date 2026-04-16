@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary Meta Tags -->
+    <title>MEVONPAY API Documentation – Virtual Account, Payment API & Fintech Solutions for Nigeria</title>
+    <meta
+      name="description"
+      content="Complete MEVONPAY API developer documentation. Integrate virtual accounts, bank transfers, BVN/NIN verification, webhooks, USDT payments, currency exchange, and bulk SMS. Supports Rubies MFB, Loma Bank, Paga MFB, and Bell MFB."
+    />
+    <meta
+      name="keywords"
+      content="Mevonpay API, Nigeria Payment API, Virtual Account API, Bank Transfer API, BVN Verification API, NIN Verification, Payment Gateway Nigeria, Fintech API, Webhook Integration, Rubies MFB, Loma Bank, Paga MFB, USDT API, Cryptocurrency Payment, Currency Exchange API, Bulk SMS API, Temporary Virtual Account, API Documentation"
+    />
+    <meta name="author" content="Mevonpay - Metravon Innovation Limited" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://www.mevonpay.com.ng/documentation/" />
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#0a8a47" />
+    <meta name="msapplication-TileColor" content="#0a8a47" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MEVONPAY" />
+    <meta property="og:title" content="MEVONPAY API Documentation – Payment Solutions for Developers" />
+    <meta
+      property="og:description"
+      content="Developer-friendly API documentation for MEVONPAY. Create virtual accounts, process transfers, verify BVN/NIN, integrate webhooks, and access fintech payment services across Nigeria."
+    />
+    <meta
+      property="og:image"
+      content="https://www.mevonpay.com.ng/images/16393007481563335660service-icon-1.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:url"
+      content="https://www.mevonpay.com.ng/documentation/"
+    />
+    <meta property="og:locale" content="en_NG" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MEVONPAY API Documentation – Fintech Payment Solutions" />
+    <meta
+      name="twitter:description"
+      content="Comprehensive API docs for virtual accounts, payments, verification, and more. Integrate MEVONPAY fintech services into your application."
+    />
+    <meta
+      name="twitter:image"
+      content="https://www.mevonpay.com.ng/images/16393007481563335660service-icon-1.png"
+    />
+    <meta name="twitter:site" content="@mevonpay" />
+    <meta name="twitter:creator" content="@mevonpay" />
+
+    <!-- Additional SEO -->
+    <meta name="language" content="English" />
+    <meta name="revisit-after" content="7 days" />
+    <meta name="distribution" content="global" />
+    <meta name="rating" content="general" />
+    <meta http-equiv="content-language" content="en-NG" />
+    <meta name="geo.region" content="NG" />
+    <meta name="geo.placename" content="Nigeria" />
+
+    <!-- Favicon -->
+    <link
+      rel="shortcut icon"
+      href="./assets/GhoybXUR1703565621.png"
+      type="image/png"
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="./assets/GhoybXUR1703565621.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./assets/GhoybXUR1703565621.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./auth-styles.css" />
+
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+
+    <!-- Prism.js for Syntax Highlighting -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      integrity="sha512-vswe+cgvic/XBoF1OcM/TeJ2FW0OofqAVdCZiEYkd6dwGXthvkSFWOoGGJgS2CW70VK5dQM5Oh+7ne47s74VTg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="./styles.css">
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "MEVONPAY API Documentation",
+      "description": "Complete developer documentation for MEVONPAY API including virtual accounts, payments, verification services, and cryptocurrency integration.",
+      "author": {
+        "@type": "Organization",
+        "name": "Mevonpay",
+        "url": "https://www.mevonpay.com.ng",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.mevonpay.com.ng/images/16393007481563335660service-icon-1.png"
+        },
+        "sameAs": [
+          "https://twitter.com/mevonpay",
+          "https://www.facebook.com/mevonpay"
+        ]
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Mevonpay",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.mevonpay.com.ng/images/16393007481563335660service-icon-1.png"
+        }
+      },
+      "datePublished": "2025-02-16",
+      "dateModified": "2025-02-16",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://www.mevonpay.com.ng/documentation/"
+      },
+      "keywords": "API documentation, payment gateway, virtual account, fintech, Nigeria",
+      "articleSection": "Technical Documentation",
+      "inLanguage": "en-NG"
+    }
+    </script>
+
+    <!-- Organization Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "MEVONPAY",
+      "legalName": "Metravon Innovation Limited",
+      "url": "https://www.mevonpay.com.ng",
+      "logo": "https://www.mevonpay.com.ng/images/16393007481563335660service-icon-1.png",
+      "description": "Licensed and insured fintech payment solutions provider in Nigeria",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "NG"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Customer Service",
+        "url": "https://www.mevonpay.com.ng/en/developers"
+      }
+    }
+    </script>
+
+    <!-- WebSite Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "MEVONPAY API Documentation",
+      "url": "https://www.mevonpay.com.ng/documentation/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.mevonpay.com.ng/documentation/#/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <!-- Mobile Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-container">
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle Menu">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="logo">
+         <img src="./assets/mevonpay-logo.png" alt="MEVONPAY API" onerror="this.onerror=null; this.src='./assets/GhoybXUR1703565621.png';">
+         <span></span>
+       </div>
+        <div class="header-actions">
+          <button
+            class="theme-toggle"
+            id="themeToggle"
+            aria-label="Toggle Dark Mode"
+          >
+            <i class="fas fa-moon"></i>
+          </button>
+          <a
+            href="https://mevonpay.com.ng/en/signin"
+            class="btn-primary"
+            target="_blank"
+          >
+            <i class="fas fa-sign-in-alt"></i> Login
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <h3>Documentation</h3>
+          <button class="sidebar-close" id="sidebarClose">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <!-- Search Box -->
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search documentation..."
+          />
+        </div>
+
+        <!-- Navigation Menu -->
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <h4 class="nav-section-title">Implementation Docs</h4>
+            <ul class="nav-list">
+              <li>
+                <a href="#/home" class="nav-link" data-page="home">
+                  <i class="fas fa-home"></i> Home
+                </a>
+              </li>
+              <li>
+                <a href="#/overview" class="nav-link" data-page="overview">
+                  <i class="fas fa-info-circle"></i> Overview
+                </a>
+              </li>
+              <li>
+                <a href="#/components" class="nav-link" data-page="components">
+                  <i class="fas fa-cubes"></i> Components
+                </a>
+              </li>
+              <li>
+                <a href="#/endpoints" class="nav-link" data-page="endpoints">
+                  <i class="fas fa-link"></i> Endpoints
+                </a>
+              </li>
+              <li>
+                <a href="#/flows" class="nav-link" data-page="flows">
+                  <i class="fas fa-project-diagram"></i> Runtime Flows
+                </a>
+              </li>
+              <li>
+                <a href="#/configuration" class="nav-link" data-page="configuration">
+                  <i class="fas fa-cog"></i> Configuration
+                </a>
+              </li>
+              <li>
+                <a href="#/resiliency" class="nav-link" data-page="resiliency">
+                  <i class="fas fa-shield-alt"></i> Resiliency
+                </a>
+              </li>
+              <li>
+                <a href="#/operations" class="nav-link" data-page="operations">
+                  <i class="fas fa-tasks"></i> Operations
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="nav-section">
+            <h4 class="nav-section-title">Resources</h4>
+            <ul class="nav-list">
+              <li>
+                <a
+                  href="https://mevonpay.com.ng/en/developers"
+                  class="nav-link"
+                  target="_blank"
+                >
+                  <i class="fas fa-code"></i> Developer Portal
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://mevonpay.com.ng/pricing"
+                  class="nav-link"
+                  target="_blank"
+                >
+                  <i class="fas fa-tag"></i> Pricing
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="content" id="mainContent">
+        <div class="content-wrapper">
+          <!-- Dynamic content will be loaded here -->
+          <div id="pageContent">
+            <!-- Loading spinner -->
+            <div class="loading">
+              <div class="spinner"></div>
+              <p>Loading documentation...</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-section">
+          <p><strong>Powered By METRAVON INNOVATION LIMITED</strong></p>
+          <p>Licensed By CBN • Insured By NDIC</p>
+        </div>
+        <div class="footer-divider"></div>
+        <div class="footer-section">
+          <p>© 2025 • All Rights Reserved • <strong>MEVONPAY</strong></p>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+
+    <script src="./documentation-content.js"></script>
+  <script src="./app.js"></script>
+  </body>
+</html>

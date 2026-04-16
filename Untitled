@@ -1,0 +1,3 @@
+LIVE_SYNC_ENABLED=true
+LIVE_SYNC_KEY_ID=live-site-1
+LIVE_SYNC_SECRET=<strong-random-secret>
