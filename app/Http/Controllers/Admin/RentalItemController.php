@@ -10,9 +10,81 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class RentalItemController extends Controller
 {
+    /**
+     * Clone all rental items from one business to another.
+     */
+    public function cloneCatalog(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'source_business_id' => 'required|exists:businesses,id|different:target_business_id',
+            'target_business_id' => 'required|exists:businesses,id',
+        ]);
+
+        $sourceBusiness = Business::findOrFail($validated['source_business_id']);
+        $targetBusiness = Business::findOrFail($validated['target_business_id']);
+
+        $sourceItems = RentalItem::where('business_id', $sourceBusiness->id)->get();
+
+        if ($sourceItems->isEmpty()) {
+            return redirect()->route('admin.rental-items.index')
+                ->with('error', "No rental items found for {$sourceBusiness->name}.");
+        }
+
+        $clonedCount = 0;
+        foreach ($sourceItems as $sourceItem) {
+            $data = $sourceItem->only([
+                'category_id',
+                'name',
+                'description',
+                'city',
+                'state',
+                'address',
+                'daily_rate',
+                'weekly_rate',
+                'monthly_rate',
+                'currency',
+                'caution_fee_enabled',
+                'caution_fee_percent',
+                'quantity_available',
+                'is_available',
+                'specifications',
+                'terms_and_conditions',
+                'is_active',
+                'is_featured',
+            ]);
+            $data['business_id'] = $targetBusiness->id;
+
+            // Copy images so businesses keep independent media files.
+            $newImages = [];
+            $sourceImages = is_array($sourceItem->images) ? $sourceItem->images : [];
+            foreach ($sourceImages as $src) {
+                $src = (string) $src;
+                if ($src === '' || !Storage::disk('public')->exists($src)) {
+                    continue;
+                }
+                $ext = pathinfo($src, PATHINFO_EXTENSION);
+                $dest = 'rental-items/' . $targetBusiness->id . '/catalog-clones/' . Str::random(20) . ($ext ? '.' . $ext : '');
+                Storage::disk('public')->copy($src, $dest);
+                $newImages[] = $dest;
+            }
+            if (!empty($newImages)) {
+                $data['images'] = $newImages;
+            } else {
+                $data['images'] = null;
+            }
+
+            RentalItem::create($data);
+            $clonedCount++;
+        }
+
+        return redirect()->route('admin.rental-items.index')
+            ->with('success', "Cloned {$clonedCount} rental item(s) from {$sourceBusiness->name} to {$targetBusiness->name}.");
+    }
+
     /**
      * Display a listing of rental items
      */

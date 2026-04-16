@@ -59,6 +59,38 @@
         </form>
     </div>
 
+    <!-- Clone Entire Catalog -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 class="text-lg font-semibold mb-3">Clone Entire Catalog Between Businesses</h2>
+        <form method="POST" action="{{ route('admin.rental-items.clone-catalog') }}" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            @csrf
+            <div>
+                <label class="block text-sm font-medium mb-1">Source Business</label>
+                <select name="source_business_id" required class="w-full border-gray-300 rounded-md">
+                    <option value="">Select source business</option>
+                    @foreach($businesses as $business)
+                        <option value="{{ $business->id }}">{{ $business->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Target Business</label>
+                <select name="target_business_id" required class="w-full border-gray-300 rounded-md">
+                    <option value="">Select target business</option>
+                    @foreach($businesses as $business)
+                        <option value="{{ $business->id }}">{{ $business->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                    <i class="fas fa-copy mr-2"></i> Clone Entire Catalog
+                </button>
+            </div>
+        </form>
+        <p class="text-xs text-gray-500 mt-2">This copies all rental items from source to target business, including item images.</p>
+    </div>
+
     <!-- Items Table -->
     <div class="bg-white rounded-lg shadow overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">

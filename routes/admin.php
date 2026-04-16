@@ -285,6 +285,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('rental-categories', \App\Http\Controllers\Admin\RentalCategoryController::class);
 
         // Rental Items Management
+        Route::post('rental-items/clone-catalog', [\App\Http\Controllers\Admin\RentalItemController::class, 'cloneCatalog'])
+            ->name('rental-items.clone-catalog');
         Route::resource('rental-items', \App\Http\Controllers\Admin\RentalItemController::class);
     });
 });
