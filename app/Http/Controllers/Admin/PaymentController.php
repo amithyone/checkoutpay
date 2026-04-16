@@ -134,6 +134,9 @@ class PaymentController extends Controller
             ->where('payment_status', Payment::STATUS_PENDING)
             ->count();
 
+        $isExternalAccountNumberPayment = (bool) optional($payment->accountNumberDetails)->is_external
+            || $payment->isExternalGatewayPayment();
+
         // Get unmatched emails that could be linked to this payment (same amount, same email account if applicable)
         $unmatchedEmails = \App\Models\ProcessedEmail::unmatched()
             ->where(function($q) use ($payment) {
@@ -149,7 +152,7 @@ class PaymentController extends Controller
             ->limit(20)
             ->get();
             
-        return view('admin.payments.show', compact('payment', 'statusChecksCount', 'unmatchedEmails'));
+        return view('admin.payments.show', compact('payment', 'statusChecksCount', 'unmatchedEmails', 'isExternalAccountNumberPayment'));
     }
 
     /**
@@ -397,6 +400,8 @@ class PaymentController extends Controller
      */
     public function manualApprove(Request $request, Payment $payment): RedirectResponse
     {
+        $payment->loadMissing('accountNumberDetails');
+
         $request->validate([
             'admin_notes' => 'nullable|string|max:1000',
             'received_amount' => 'nullable|numeric|min:0',
@@ -408,6 +413,11 @@ class PaymentController extends Controller
         if ($payment->status !== Payment::STATUS_PENDING) {
             return redirect()->route('admin.payments.show', $payment)
                 ->with('error', 'Payment is already ' . $payment->status);
+        }
+
+        if ((bool) optional($payment->accountNumberDetails)->is_external || $payment->isExternalGatewayPayment()) {
+            return redirect()->route('admin.payments.show', $payment)
+                ->with('error', 'Manual approval is not allowed for external API account-number payments. Only internal account-number payments can be manually approved.');
         }
 
         $receivedAmount = $request->filled('received_amount') ? (float)$request->received_amount : $payment->amount;

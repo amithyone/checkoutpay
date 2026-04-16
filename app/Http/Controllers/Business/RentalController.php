@@ -372,7 +372,7 @@ class RentalController extends Controller
     {
         $business = request()->user('business');
         
-        if ($item->business_id !== $business->id) {
+        if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
 
@@ -387,7 +387,7 @@ class RentalController extends Controller
     {
         $business = $request->user('business');
         
-        if ($item->business_id !== $business->id) {
+        if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
 
@@ -456,7 +456,7 @@ class RentalController extends Controller
     public function updateDailyRate(Request $request, RentalItem $item): JsonResponse
     {
         $business = $request->user('business');
-        if ($item->business_id !== $business->id) {
+        if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
         $validated = $request->validate([
@@ -476,7 +476,7 @@ class RentalController extends Controller
     public function addItemPhoto(Request $request, RentalItem $item): JsonResponse
     {
         $business = $request->user('business');
-        if ($item->business_id !== $business->id) {
+        if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
         $request->validate([
@@ -500,7 +500,7 @@ class RentalController extends Controller
     {
         $business = request()->user('business');
         
-        if ($item->business_id !== $business->id) {
+        if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
 
@@ -517,7 +517,7 @@ class RentalController extends Controller
     {
         $business = $request->user('business');
         
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             abort(403);
         }
 
@@ -564,7 +564,7 @@ class RentalController extends Controller
     {
         $business = request()->user('business');
         
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             abort(403);
         }
 
@@ -576,7 +576,7 @@ class RentalController extends Controller
     public function markPickedUp(Request $request, Rental $rental): RedirectResponse
     {
         $business = $request->user('business');
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             abort(403);
         }
 
@@ -599,7 +599,7 @@ class RentalController extends Controller
     public function confirmReturn(Request $request, Rental $rental): RedirectResponse
     {
         $business = $request->user('business');
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             abort(403);
         }
 
@@ -625,7 +625,7 @@ class RentalController extends Controller
     {
         $business = $request->user('business');
 
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             abort(403);
         }
 

@@ -58,10 +58,20 @@
                         class="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center justify-center text-sm">
                         <i class="fas fa-check-double mr-2"></i> <span>Manual Verify</span>
                     </button>
-                    <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
-                        class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm">
-                        <i class="fas fa-check-circle mr-2"></i> <span>Manual Approve</span>
-                    </button>
+                    @if($isExternalAccountNumberPayment ?? false)
+                        <button
+                            type="button"
+                            disabled
+                            title="External API account-number payments cannot be manually approved."
+                            class="w-full sm:w-auto bg-gray-300 text-gray-600 px-4 py-2 rounded-lg cursor-not-allowed flex items-center justify-center text-sm">
+                            <i class="fas fa-ban mr-2"></i> <span>Manual Approve (Blocked)</span>
+                        </button>
+                    @else
+                        <button onclick="showManualApproveModal({{ $payment->id }}, '{{ $payment->transaction_id }}', {{ $payment->amount }})" 
+                            class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm">
+                            <i class="fas fa-check-circle mr-2"></i> <span>Manual Approve</span>
+                        </button>
+                    @endif
                     @if(!$payment->expires_at || $payment->expires_at->isFuture())
                         <button onclick="markAsExpired({{ $payment->id }})" 
                             class="w-full sm:w-auto bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center justify-center text-sm">
@@ -150,6 +160,13 @@
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">Account Details</label>
                 <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">
                     {{ $payment->accountNumberDetails->account_name }} - {{ $payment->accountNumberDetails->bank_name }}
+                </p>
+                <p class="text-xs mt-1">
+                    @if($isExternalAccountNumberPayment ?? false)
+                        <span class="px-2 py-1 bg-red-100 text-red-800 rounded">External API account number</span>
+                    @else
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Internal account number</span>
+                    @endif
                 </p>
             </div>
             @endif
