@@ -6,9 +6,17 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Rental Items</h1>
-        <a href="{{ route('admin.rental-items.create') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">
-            <i class="fas fa-plus mr-2"></i> Add Item
-        </a>
+        <div class="flex gap-2">
+            <a href="{{ route('admin.rentals.index') }}" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-list mr-2"></i> Rental Requests
+            </a>
+            <a href="{{ route('admin.rental-categories.index') }}" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-tags mr-2"></i> Categories
+            </a>
+            <a href="{{ route('admin.rental-items.create') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">
+                <i class="fas fa-plus mr-2"></i> Add Item
+            </a>
+        </div>
     </div>
 
     <!-- Filters -->

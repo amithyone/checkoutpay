@@ -6,6 +6,14 @@
 <div class="p-6">
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Rental Requests</h1>
+        <div class="flex gap-2">
+            <a href="{{ route('admin.rental-items.index') }}" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-box mr-2"></i> Rental Items
+            </a>
+            <a href="{{ route('admin.rental-categories.index') }}" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-tags mr-2"></i> Categories
+            </a>
+        </div>
     </div>
 
     <!-- Stats Cards -->
