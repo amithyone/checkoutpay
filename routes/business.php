@@ -110,6 +110,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
 
         // API Keys & Integration
         Route::get('/keys', [KeysController::class, 'index'])->name('keys.index');
+        Route::post('/keys/regenerate-api-key', [KeysController::class, 'regenerateApiKey'])->name('keys.regenerate-api-key');
         Route::post('/keys/request-account-number', [KeysController::class, 'requestAccountNumber'])->name('keys.request-account-number');
         Route::get('/api-documentation', [\App\Http\Controllers\Business\ApiDocumentationController::class, 'index'])->name('api-documentation.index');
 

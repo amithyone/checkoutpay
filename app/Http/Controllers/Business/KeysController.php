@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
+use App\Models\Business;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 
 class KeysController extends Controller
 {
@@ -13,6 +14,17 @@ class KeysController extends Controller
     {
         $business = Auth::guard('business')->user();
         return view('business.keys.index', compact('business'));
+    }
+
+    public function regenerateApiKey(): RedirectResponse
+    {
+        $business = Auth::guard('business')->user();
+        $business->update([
+            'api_key' => Business::generateApiKey(),
+        ]);
+
+        return redirect()->route('business.keys.index')
+            ->with('success', 'API key regenerated successfully');
     }
 
     public function requestAccountNumber(Request $request)

@@ -30,9 +30,8 @@
                 </p>
             </div>
 
-            <form method="POST" action="{{ route('business.settings.regenerate-api-key') }}" onsubmit="return confirm('Are you sure you want to regenerate your API key? This will invalidate your current key.')">
+            <form method="POST" action="{{ route('business.keys.regenerate-api-key') }}" onsubmit="return confirm('Are you sure you want to regenerate your API key? This will invalidate your current key.')">
                 @csrf
-                @method('POST')
                 <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
                     <i class="fas fa-sync-alt mr-2"></i> Regenerate API Key
                 </button>

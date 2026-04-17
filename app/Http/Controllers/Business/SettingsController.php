@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
+use App\Models\Business;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -115,15 +116,16 @@ class SettingsController extends Controller
             ->with('success', 'Profile picture removed successfully');
     }
 
-    public function regenerateApiKey()
+    public function regenerateApiKey(Request $request)
     {
         $business = Auth::guard('business')->user();
-        
+
         $business->update([
-            'api_key' => 'pk_' . Str::random(32),
+            'api_key' => Business::generateApiKey(),
         ]);
 
-        return redirect()->route('business.settings.index')
+        return redirect()
+            ->back(fallback: route('business.settings.index'))
             ->with('success', 'API key regenerated successfully');
     }
 
