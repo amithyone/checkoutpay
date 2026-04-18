@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\Renter;
-use App\Models\User;
+use App\Services\Rentals\RenterPortalAccountBridge;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -73,37 +73,16 @@ class AuthController extends Controller
 
         $validated = $validator->validated();
 
-        // 1) Try direct renter login first
-        $renter = Renter::where('email', $validated['email'])->first();
+        $email = RenterPortalAccountBridge::normalizedEmail($validated['email']);
+        $renter = Renter::where('email', $email)->first();
 
-        if (! $renter || ! Hash::check($validated['password'], $renter->password)) {
-            // 2) Fallback: try existing My Account user
-            $user = User::where('email', $validated['email'])->first();
-            if ($user && Hash::check($validated['password'], $user->password)) {
-                $renter = Renter::firstOrCreate(
-                    ['email' => strtolower($user->email)],
-                    [
-                        'name' => $user->name ?? $user->email,
-                        'email_verified_at' => $user->email_verified_at ?? null,
-                        'password' => $user->password, // keep same hash
-                    ]
-                );
-            } else {
-                // 3) Fallback: try business account
-                $business = Business::where('email', $validated['email'])->first();
-                if ($business && Hash::check($validated['password'], $business->password)) {
-                    $renter = Renter::firstOrCreate(
-                        ['email' => strtolower($business->email)],
-                        [
-                            'name' => $business->name ?? $business->email,
-                            'email_verified_at' => $business->email_verified_at ?? null,
-                            'password' => $business->password,
-                        ]
-                    );
-                }
-            }
-
-            // If renter is still null here, credentials are invalid everywhere
+        if ($renter && Hash::check($validated['password'], $renter->password)) {
+            // direct renter login
+        } else {
+            $renter = RenterPortalAccountBridge::linkRenterWithPasswordFromUserOrBusiness(
+                $validated['email'],
+                $validated['password']
+            );
             if (! $renter) {
                 return response()->json([
                     'message' => 'The provided credentials are incorrect.',

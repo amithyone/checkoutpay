@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Rentals;
 
 use App\Http\Controllers\Controller;
+use App\Services\Rentals\RenterPortalAccountBridge;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Validator;
@@ -28,8 +29,12 @@ class PasswordResetController extends Controller
             ], 422);
         }
 
+        $email = RenterPortalAccountBridge::provisionShadowRenterIfLinkedAccountExists(
+            $validator->validated()['email']
+        );
+
         $status = Password::broker('renters')->sendResetLink(
-            $validator->validated(),
+            ['email' => $email],
             function ($user, string $token) {
                 $user->notify(new \App\Notifications\RenterResetPasswordNotification($token));
             }
@@ -39,6 +44,12 @@ class PasswordResetController extends Controller
             return response()->json([
                 'message' => __($status),
             ]);
+        }
+
+        if ($status === Password::RESET_THROTTLED) {
+            return response()->json([
+                'message' => __($status),
+            ], 429);
         }
 
         return response()->json([
