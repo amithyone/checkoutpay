@@ -144,10 +144,27 @@ class ItemsController extends Controller
         if (isset($validated['images']) && is_array($validated['images'])) {
             $images = array_values(array_filter(array_map(fn ($x) => is_string($x) ? trim($x) : null, $validated['images'])));
         }
+        $normalizePath = static function (string $path): string {
+            $path = trim($path);
+            if ($path === '' || str_contains($path, '..')) {
+                return '';
+            }
+            $path = preg_replace('#^https?://[^/]+/storage/#i', '', $path);
+            $path = preg_replace('#^storage/#', '', $path);
+
+            return ltrim($path, '/');
+        };
+
         $removeList = [];
         if (isset($validated['remove_images']) && is_array($validated['remove_images'])) {
-            $removeList = array_values(array_filter(array_map('strval', $validated['remove_images'])));
-            $images = array_values(array_filter($images, fn ($p) => ! in_array($p, $removeList, true)));
+            $removeList = array_values(array_filter(array_map(
+                static fn ($p) => $normalizePath((string) $p),
+                $validated['remove_images']
+            )));
+            $images = array_values(array_filter(
+                $images,
+                static fn ($p) => ! in_array($normalizePath((string) $p), $removeList, true)
+            ));
         }
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $img) {
@@ -158,14 +175,18 @@ class ItemsController extends Controller
         }
         $validated['images'] = $images ?: null;
 
-        foreach ($removeList as $path) {
-            if (! is_string($path) || $path === '' || str_contains($path, '..')) {
+        foreach ($removeList as $normalizedRemove) {
+            if ($normalizedRemove === '') {
                 continue;
             }
-            if (! in_array($path, $originalImages, true)) {
-                continue;
+            foreach ($originalImages as $orig) {
+                $orig = (string) $orig;
+                if ($normalizePath($orig) !== $normalizedRemove) {
+                    continue;
+                }
+                Storage::disk('public')->delete($orig);
+                break;
             }
-            Storage::disk('public')->delete($path);
         }
 
         unset($validated['remove_images']);

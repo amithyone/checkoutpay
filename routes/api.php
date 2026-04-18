@@ -205,7 +205,8 @@ Route::prefix('v1/rentals')
             ->whereNumber('rental');
         Route::get('business/items', [\App\Http\Controllers\Api\Rentals\Business\ItemsController::class, 'index']);
         Route::post('business/items', [\App\Http\Controllers\Api\Rentals\Business\ItemsController::class, 'store']);
-        Route::patch('business/items/{item}', [\App\Http\Controllers\Api\Rentals\Business\ItemsController::class, 'update'])
+        // POST included so multipart updates can use _method=PATCH (some proxies strip PATCH bodies).
+        Route::match(['patch', 'post'], 'business/items/{item}', [\App\Http\Controllers\Api\Rentals\Business\ItemsController::class, 'update'])
             ->whereNumber('item');
         Route::get('business/withdrawals', [\App\Http\Controllers\Api\Rentals\Business\WithdrawalsController::class, 'index']);
         Route::post('business/withdrawals', [\App\Http\Controllers\Api\Rentals\Business\WithdrawalsController::class, 'store']);
