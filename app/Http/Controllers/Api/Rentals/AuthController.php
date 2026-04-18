@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Rentals;
 
 use App\Http\Controllers\Controller;
-use App\Models\Business;
 use App\Models\Renter;
 use App\Services\Rentals\RenterPortalAccountBridge;
 use Illuminate\Auth\Events\Verified;
@@ -112,7 +111,7 @@ class AuthController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        $business = Business::where('email', $renter->email)->first();
+        $business = RenterPortalAccountBridge::businessLinkedToRenterEmail($renter->email);
 
         return response()->json([
             'renter' => $this->renterResource($renter),
@@ -216,9 +215,7 @@ class AuthController extends Controller
             ->where('status', \App\Models\Rental::STATUS_COMPLETED)
             ->count();
 
-        $linkedBusinessId = \App\Models\Business::query()
-            ->whereRaw('LOWER(email) = LOWER(?)', [$renter->email])
-            ->value('id');
+        $linkedBusinessId = RenterPortalAccountBridge::businessLinkedToRenterEmail($renter->email)?->id;
 
         $salesCount = $linkedBusinessId
             ? \App\Models\Rental::query()

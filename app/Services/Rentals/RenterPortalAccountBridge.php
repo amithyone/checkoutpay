@@ -9,8 +9,16 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Keeps rentals portal "renter" rows aligned with existing User / Business accounts
- * (same emails as login fallback in {@see \App\Http\Controllers\Api\Rentals\AuthController::login}).
+ * Rentals portal identity model:
+ *
+ * - **Renter** — everyone using the Abuja/Cam rentals SPA signs in as a `Renter` (browse, book, wallet, KYC).
+ * - **Business** — optional. If a `businesses` row exists with the **same email** as the renter, that account
+ *   may call host APIs (`/api/v1/rentals/business/*`). Otherwise those routes return 403 ("Business access required").
+ * - **User** (`users` table) — legacy "My Account" only on some installs; when present, login/password-reset
+ *   can create or match a renter row from the same email (see {@see self::usersTableExists}).
+ *
+ * Managing inventory and rental orders as a **host** remains tied to an approved **business** profile
+ * (typically created on the main Checkout business dashboard), not to renter-only accounts.
  */
 final class RenterPortalAccountBridge
 {
@@ -110,5 +118,15 @@ final class RenterPortalAccountBridge
         }
 
         return null;
+    }
+
+    /**
+     * Business profile linked to this renter for host tools (same email, case-insensitive).
+     */
+    public static function businessLinkedToRenterEmail(string $renterEmail): ?Business
+    {
+        $email = self::normalizedEmail($renterEmail);
+
+        return Business::query()->whereRaw('LOWER(email) = ?', [$email])->first();
     }
 }
