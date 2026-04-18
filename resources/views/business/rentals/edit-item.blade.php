@@ -85,11 +85,11 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">Starts</label>
-                        <input type="date" name="discount_starts_at" class="w-full border-gray-300 rounded-md" value="{{ old('discount_starts_at', optional($item->discount_starts_at)->format('Y-m-d'))) }}">
+                        <input type="date" name="discount_starts_at" class="w-full border-gray-300 rounded-md" value="{{ old('discount_starts_at', optional($item->discount_starts_at)->format('Y-m-d')) }}">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">Ends</label>
-                        <input type="date" name="discount_ends_at" class="w-full border-gray-300 rounded-md" value="{{ old('discount_ends_at', optional($item->discount_ends_at)->format('Y-m-d'))) }}">
+                        <input type="date" name="discount_ends_at" class="w-full border-gray-300 rounded-md" value="{{ old('discount_ends_at', optional($item->discount_ends_at)->format('Y-m-d')) }}">
                     </div>
                 </div>
             </div>

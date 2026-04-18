@@ -105,11 +105,11 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-medium text-gray-600 mb-0.5">Start</label>
-                        <input type="date" name="discount_starts_at" class="w-full text-sm border-gray-300 rounded-md py-1.5" value="{{ old('discount_starts_at', optional($rentalItem->discount_starts_at)->format('Y-m-d'))) }}">
+                        <input type="date" name="discount_starts_at" class="w-full text-sm border-gray-300 rounded-md py-1.5" value="{{ old('discount_starts_at', optional($rentalItem->discount_starts_at)->format('Y-m-d')) }}">
                     </div>
                     <div>
                         <label class="block text-[10px] font-medium text-gray-600 mb-0.5">End</label>
-                        <input type="date" name="discount_ends_at" class="w-full text-sm border-gray-300 rounded-md py-1.5" value="{{ old('discount_ends_at', optional($rentalItem->discount_ends_at)->format('Y-m-d'))) }}">
+                        <input type="date" name="discount_ends_at" class="w-full text-sm border-gray-300 rounded-md py-1.5" value="{{ old('discount_ends_at', optional($rentalItem->discount_ends_at)->format('Y-m-d')) }}">
                     </div>
                 </div>
             </div>
