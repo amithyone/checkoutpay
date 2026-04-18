@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\Renter;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Keeps rentals portal "renter" rows aligned with existing User / Business accounts
@@ -16,6 +17,15 @@ final class RenterPortalAccountBridge
     public static function normalizedEmail(string $rawEmail): string
     {
         return strtolower(trim($rawEmail));
+    }
+
+    /**
+     * Some production DBs only have `businesses` (no legacy `users` / My Account table).
+     * Skip User lookups when the table is missing to avoid SQLSTATE 42S02.
+     */
+    private static function usersTableExists(): bool
+    {
+        return Schema::hasTable((new User)->getTable());
     }
 
     /**
@@ -31,18 +41,20 @@ final class RenterPortalAccountBridge
             return $email;
         }
 
-        $user = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
-        if ($user && (string) $user->getAuthPassword() !== '') {
-            Renter::firstOrCreate(
-                ['email' => $email],
-                [
-                    'name' => $user->name ?? $user->email,
-                    'email_verified_at' => $user->email_verified_at,
-                    'password' => $user->getAuthPassword(),
-                ]
-            );
+        if (self::usersTableExists()) {
+            $user = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+            if ($user && (string) $user->getAuthPassword() !== '') {
+                Renter::firstOrCreate(
+                    ['email' => $email],
+                    [
+                        'name' => $user->name ?? $user->email,
+                        'email_verified_at' => $user->email_verified_at,
+                        'password' => $user->getAuthPassword(),
+                    ]
+                );
 
-            return $email;
+                return $email;
+            }
         }
 
         $business = Business::query()->whereRaw('LOWER(email) = ?', [$email])->first();
@@ -70,16 +82,18 @@ final class RenterPortalAccountBridge
     {
         $email = self::normalizedEmail($rawEmail);
 
-        $user = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
-        if ($user && Hash::check($plainPassword, $user->getAuthPassword())) {
-            return Renter::firstOrCreate(
-                ['email' => $email],
-                [
-                    'name' => $user->name ?? $user->email,
-                    'email_verified_at' => $user->email_verified_at,
-                    'password' => $user->getAuthPassword(),
-                ]
-            );
+        if (self::usersTableExists()) {
+            $user = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
+            if ($user && Hash::check($plainPassword, $user->getAuthPassword())) {
+                return Renter::firstOrCreate(
+                    ['email' => $email],
+                    [
+                        'name' => $user->name ?? $user->email,
+                        'email_verified_at' => $user->email_verified_at,
+                        'password' => $user->getAuthPassword(),
+                    ]
+                );
+            }
         }
 
         $business = Business::query()->whereRaw('LOWER(email) = ?', [$email])->first();
