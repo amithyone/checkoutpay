@@ -127,6 +127,10 @@ class RentalController extends Controller
             'is_featured' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
             'is_available' => 'sometimes|boolean',
+            'discount_active' => 'sometimes|boolean',
+            'discount_percent' => 'nullable|numeric|min:0|max:95',
+            'discount_starts_at' => 'nullable|date',
+            'discount_ends_at' => 'nullable|date',
         ]);
 
         if ($validator->fails()) {
@@ -166,6 +170,8 @@ class RentalController extends Controller
                 $validated['specifications'] = $decodedSpecs;
             }
             unset($validated['specifications_json']);
+
+            $validated = array_merge($validated, RentalItem::discountFieldsFromRequest($request));
 
             // Handle image uploads
             if ($request->hasFile('images')) {
@@ -411,7 +417,12 @@ class RentalController extends Controller
             'is_active' => 'sometimes|boolean',
             'is_available' => 'sometimes|boolean',
             'remove_images' => 'nullable|array',
+            'discount_active' => 'sometimes|boolean',
+            'discount_percent' => 'nullable|numeric|min:0|max:95',
+            'discount_starts_at' => 'nullable|date',
+            'discount_ends_at' => 'nullable|date',
         ]);
+        $validated = array_merge($validated, RentalItem::discountFieldsFromRequest($request));
         $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
         if (array_key_exists('is_featured', $validated)) {
             $validated['is_featured'] = (bool) $validated['is_featured'];

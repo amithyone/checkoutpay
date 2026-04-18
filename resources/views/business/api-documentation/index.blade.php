@@ -68,23 +68,15 @@
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
             <i class="fas fa-server mr-2 text-primary"></i> API Base URL
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Production</label>
-                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    <code class="text-sm text-gray-900 break-all">https://check-outpay.com/api/v1</code>
-                </div>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Development</label>
-                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    <code class="text-sm text-gray-900 break-all">{{ url('/api/v1') }}</code>
-                </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">API base for this installation</label>
+            <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <code class="text-sm text-gray-900 break-all">{{ url('/api/v1') }}</code>
             </div>
         </div>
         <p class="text-xs text-gray-600 mt-3">
             <i class="fas fa-info-circle mr-1"></i>
-            Use <code class="bg-gray-100 px-1 py-0.5 rounded">CHECKOUT_BASE_URL</code> in your config (e.g. in <code class="bg-gray-100 px-1 py-0.5 rounded">.env</code>) for the base URL.
+            Use this host in production integrations (or set <code class="bg-gray-100 px-1 py-0.5 rounded">APP_URL</code> / <code class="bg-gray-100 px-1 py-0.5 rounded">CHECKOUT_BASE_URL</code> in <code class="bg-gray-100 px-1 py-0.5 rounded">.env</code> on your server so it matches your live checkout domain).
         </p>
     </div>
 
@@ -98,6 +90,7 @@
             <!-- Create Payment Request -->
             <div>
                 <h4 class="text-base font-semibold text-gray-900 mb-3">1. Create Payment Request</h4>
+                <p class="text-sm text-gray-600 mb-2">Use <strong>POST</strong> only. Opening this path in a browser (GET) returns <strong>405 Method Not Allowed</strong>.</p>
                 <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
                     <pre class="text-xs text-gray-100"><code>POST {{ url('/api/v1/payment-request') }}
 Content-Type: application/json
@@ -110,11 +103,12 @@ X-API-Key: {{ $business->api_key }}
   "webhook_url": "https://yourwebsite.com/webhook/checkout"
 }</code></pre>
                 </div>
+                <p class="text-xs text-gray-600 mt-2">You may send <code class="bg-gray-800 text-gray-100 px-1 rounded">payer_name</code> instead of <code class="bg-gray-800 text-gray-100 px-1 rounded">name</code>. <code class="bg-gray-800 text-gray-100 px-1 rounded">webhook_url</code> must be on a domain you have approved in the dashboard.</p>
                 <p class="text-sm font-medium text-gray-700 mt-3 mb-1">Expected response (201 Created)</p>
                 <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
                     <pre class="text-xs text-gray-100"><code>{
   "success": true,
-  "message": "Payment request received and monitoring started",
+  "message": "Payment request created successfully",
   "data": {
     "transaction_id": "TXN-1234567890-abc123",
     "amount": 5000.00,

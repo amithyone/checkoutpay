@@ -107,6 +107,7 @@
             <!-- Create Payment Request -->
             <div>
                 <h4 class="text-sm font-semibold text-gray-900 mb-2">Create Payment Request</h4>
+                <p class="text-xs text-gray-600 mb-2"><strong>POST only</strong> (GET in a browser returns 405). <code class="bg-gray-100 px-1 rounded">webhook_url</code> must use a domain approved for your account.</p>
                 <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 overflow-x-auto">
                     <pre class="text-xs text-gray-800"><code>POST {{ url('/api/v1/payment-request') }}
 Content-Type: application/json
@@ -115,7 +116,7 @@ X-API-Key: {{ $business->api_key }}
 {
   "amount": 1000.00,
   "payer_name": "John Doe",
-  "expires_in_minutes": 60
+  "webhook_url": "https://your-approved-domain.com/webhooks/checkout"
 }</code></pre>
                 </div>
             </div>

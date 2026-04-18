@@ -55,6 +55,10 @@ class RentalItemController extends Controller
                 'terms_and_conditions',
                 'is_active',
                 'is_featured',
+                'discount_active',
+                'discount_percent',
+                'discount_starts_at',
+                'discount_ends_at',
             ]);
             $data['business_id'] = $targetBusiness->id;
 
@@ -165,10 +169,15 @@ class RentalItemController extends Controller
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
             'is_available' => 'boolean',
+            'discount_active' => 'sometimes|boolean',
+            'discount_percent' => 'nullable|numeric|min:0|max:95',
+            'discount_starts_at' => 'nullable|date',
+            'discount_ends_at' => 'nullable|date',
         ]);
 
         $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['is_available'] = $validated['is_available'] ?? true;
+        $validated = array_merge($validated, RentalItem::discountFieldsFromRequest($request));
 
         // Handle image uploads
         if ($request->hasFile('images')) {
@@ -229,31 +238,42 @@ class RentalItemController extends Controller
             'is_active' => 'boolean',
             'is_available' => 'boolean',
             'remove_images' => 'nullable|array',
+            'discount_active' => 'sometimes|boolean',
+            'discount_percent' => 'nullable|numeric|min:0|max:95',
+            'discount_starts_at' => 'nullable|date',
+            'discount_ends_at' => 'nullable|date',
         ]);
 
-        // Handle image removal
+        $validated = array_merge($validated, RentalItem::discountFieldsFromRequest($request));
+
+        $currentImages = is_array($rentalItem->images) ? array_values($rentalItem->images) : [];
+
         if ($request->filled('remove_images')) {
-            $currentImages = $rentalItem->images ?? [];
-            foreach ($request->remove_images as $imageToRemove) {
+            foreach ((array) $request->remove_images as $imageToRemove) {
+                if (! is_string($imageToRemove) || $imageToRemove === '' || str_contains($imageToRemove, '..')) {
+                    continue;
+                }
                 if (Storage::disk('public')->exists($imageToRemove)) {
                     Storage::disk('public')->delete($imageToRemove);
                 }
-                $currentImages = array_filter($currentImages, function($img) use ($imageToRemove) {
-                    return $img !== $imageToRemove;
-                });
+                $currentImages = array_values(array_filter($currentImages, fn ($img) => $img !== $imageToRemove));
             }
-            $validated['images'] = array_values($currentImages);
         }
 
-        // Handle new image uploads
         if ($request->hasFile('images')) {
-            $imagePaths = $rentalItem->images ?? [];
             foreach ($request->file('images') as $image) {
-                $path = $image->store('rental-items', 'public');
-                $imagePaths[] = $path;
+                if (! $image) {
+                    continue;
+                }
+                $currentImages[] = $image->store('rental-items', 'public');
             }
-            $validated['images'] = $imagePaths;
         }
+
+        if ($request->filled('remove_images') || $request->hasFile('images')) {
+            $validated['images'] = count($currentImages) > 0 ? $currentImages : null;
+        }
+
+        unset($validated['remove_images']);
 
         $rentalItem->update($validated);
 

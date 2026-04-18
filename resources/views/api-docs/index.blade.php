@@ -122,10 +122,16 @@
                                 <p class="text-gray-700 mb-3">All API requests must:</p>
                                 <ul class="list-disc list-inside text-gray-700 space-y-2 mb-4">
                                     <li>Use HTTPS</li>
-                                    <li>Include <code class="bg-gray-100 px-2 py-1 rounded">X-API-Key</code> header for authenticated endpoints</li>
+                                    <li>Include <code class="bg-gray-100 px-2 py-1 rounded">X-API-Key</code> header for authenticated endpoints (or send <code class="bg-gray-100 px-2 py-1 rounded">api_key</code> in the JSON body for POST/PATCH only—prefer the header in production)</li>
                                     <li>Send JSON data in request body (for POST/PUT requests)</li>
                                     <li>Use <code class="bg-gray-100 px-2 py-1 rounded">Content-Type: application/json</code> header</li>
                                 </ul>
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <p class="text-sm text-amber-900 mb-2">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                                        <strong>Use the correct HTTP method.</strong> For example, <code class="bg-amber-100 px-1 rounded">POST /api/v1/payment-request</code> creates a payment. Opening that URL in a browser sends <strong>GET</strong>, which returns <strong>405 Method Not Allowed</strong> (only POST is supported). Call the API from your server, Postman, or curl with <code class="bg-amber-100 px-1 rounded">POST</code>.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -136,7 +142,7 @@
                             <i class="fas fa-key text-primary mr-2"></i>Authentication
                         </h2>
                         
-                        <p class="text-gray-700 mb-4">All authenticated API requests require your API key in the request header.</p>
+                        <p class="text-gray-700 mb-4">Authenticated routes accept your API key in the <code class="bg-gray-100 px-2 py-1 rounded">X-API-Key</code> header (recommended), or as <code class="bg-gray-100 px-2 py-1 rounded">api_key</code> in the JSON body for POST/PATCH requests.</p>
                         
                         <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto mb-4">
                             <pre class="text-sm text-gray-100"><code>X-API-Key: pk_your_api_key_here</code></pre>
@@ -166,7 +172,7 @@
                                     <span class="endpoint-badge badge-post">POST</span>
                                     <code class="text-lg font-mono text-gray-900">/payment-request</code>
                                 </div>
-                                <p class="text-gray-700 mb-4">Create a new payment request. Returns account details for the customer to make payment.</p>
+                                <p class="text-gray-700 mb-4">Create a new payment request. Returns account details for the customer to make payment. <strong>POST only</strong>—do not use GET (e.g. pasting the URL into a browser).</p>
 
                                 <div class="mb-4">
                                     <h4 class="font-semibold text-gray-900 mb-2">Request Body</h4>
@@ -222,6 +228,30 @@
                                                     <td class="px-4 py-3 text-gray-700">Customer's bank name</td>
                                                 </tr>
                                                 <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">fname</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Customer first name</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">lname</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Customer last name</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">bvn</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">BVN (if collected)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">registration_number</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Registration number (if applicable)</td>
+                                                </tr>
+                                                <tr>
                                                     <td class="px-4 py-3 font-mono text-gray-900">webhook_url</td>
                                                     <td class="px-4 py-3 text-gray-700">string</td>
                                                     <td class="px-4 py-3 text-gray-700">Yes</td>
@@ -237,7 +267,7 @@
                                                     <td class="px-4 py-3 font-mono text-gray-900">transaction_id</td>
                                                     <td class="px-4 py-3 text-gray-700">string</td>
                                                     <td class="px-4 py-3 text-gray-700">No</td>
-                                                    <td class="px-4 py-3 text-gray-700">Your unique transaction ID (auto-generated if not provided)</td>
+                                                    <td class="px-4 py-3 text-gray-700">Your unique transaction ID if provided; must not duplicate an existing payment</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="px-4 py-3 font-mono text-gray-900">business_website_id</td>
@@ -740,7 +770,7 @@ if ($payload['event'] === 'payment.approved') {
                         <div class="space-y-6">
                             <div>
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3">Error Response Format</h3>
-                                <p class="text-gray-700 mb-4">All errors follow a consistent format:</p>
+                                <p class="text-gray-700 mb-4">Application-level errors (API key, webhook domain, not found) usually return <code class="bg-gray-100 px-1 rounded">success: false</code> and a <code class="bg-gray-100 px-1 rounded">message</code> string. Laravel <strong>validation</strong> errors (HTTP 422) return <code class="bg-gray-100 px-1 rounded">message</code> (often the first problem found) and an <code class="bg-gray-100 px-1 rounded">errors</code> object keyed by field—inspect <code class="bg-gray-100 px-1 rounded">errors</code> in your client.</p>
                                 <div class="code-block">
                                     <pre><code>{
   "success": false,
@@ -770,15 +800,27 @@ if ($payload['event'] === 'payment.approved') {
                                             </tr>
                                             <tr>
                                                 <td class="px-4 py-3 font-mono text-gray-900">400</td>
-                                                <td class="px-4 py-3 text-gray-700">Bad Request (validation error)</td>
+                                                <td class="px-4 py-3 text-gray-700">Bad Request (e.g. webhook domain not approved)</td>
                                             </tr>
                                             <tr>
                                                 <td class="px-4 py-3 font-mono text-gray-900">401</td>
-                                                <td class="px-4 py-3 text-gray-700">Unauthorized (invalid or missing API key)</td>
+                                                <td class="px-4 py-3 text-gray-700">Unauthorized (invalid, inactive, or missing API key)</td>
                                             </tr>
                                             <tr>
                                                 <td class="px-4 py-3 font-mono text-gray-900">404</td>
                                                 <td class="px-4 py-3 text-gray-700">Not Found</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-4 py-3 font-mono text-gray-900">405</td>
+                                                <td class="px-4 py-3 text-gray-700">Method Not Allowed (wrong HTTP verb, e.g. GET on POST-only routes)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-4 py-3 font-mono text-gray-900">422</td>
+                                                <td class="px-4 py-3 text-gray-700">Unprocessable Entity (Laravel validation errors; response includes <code class="bg-gray-100 px-1 rounded">errors</code> by field)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="px-4 py-3 font-mono text-gray-900">429</td>
+                                                <td class="px-4 py-3 text-gray-700">Too Many Requests (rate limit exceeded)</td>
                                             </tr>
                                             <tr>
                                                 <td class="px-4 py-3 font-mono text-gray-900">500</td>
@@ -793,24 +835,39 @@ if ($payload['event'] === 'payment.approved') {
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3">Common Errors</h3>
                                 <div class="space-y-3">
                                     <div class="border-l-4 border-red-500 pl-4">
-                                        <h4 class="font-semibold text-gray-900">Invalid API Key</h4>
+                                        <h4 class="font-semibold text-gray-900">Invalid or inactive API key</h4>
                                         <p class="text-gray-700 text-sm">Status: 401</p>
                                         <div class="code-block mt-2">
                                             <pre><code>{
   "success": false,
-  "message": "Invalid API key"
+  "message": "Invalid or inactive API key"
 }</code></pre>
                                         </div>
                                     </div>
                                     <div class="border-l-4 border-red-500 pl-4">
-                                        <h4 class="font-semibold text-gray-900">Missing Payer Name</h4>
-                                        <p class="text-gray-700 text-sm">Status: 400</p>
+                                        <h4 class="font-semibold text-gray-900">Missing API key</h4>
+                                        <p class="text-gray-700 text-sm">Status: 401</p>
                                         <div class="code-block mt-2">
                                             <pre><code>{
   "success": false,
-  "message": "The payer name field is required. Please provide either \"name\" or \"payer_name\"."
+  "message": "API key is required"
 }</code></pre>
                                         </div>
+                                    </div>
+                                    <div class="border-l-4 border-red-500 pl-4">
+                                        <h4 class="font-semibold text-gray-900">Missing payer name</h4>
+                                        <p class="text-gray-700 text-sm">Status: 422 (validation)</p>
+                                        <div class="code-block mt-2">
+                                            <pre><code>{
+  "message": "The payer name is required to get an account number. Please provide either \"name\" or \"payer_name\".",
+  "errors": {
+    "payer_name": [
+      "The payer name is required to get an account number. Please provide either \"name\" or \"payer_name\"."
+    ]
+  }
+}</code></pre>
+                                        </div>
+                                        <p class="text-gray-600 text-xs mt-2">Exact wording may vary slightly; always inspect the <code class="bg-gray-100 px-1 rounded">errors</code> object.</p>
                                     </div>
                                     <div class="border-l-4 border-red-500 pl-4">
                                         <h4 class="font-semibold text-gray-900">Webhook URL Not Approved</h4>
@@ -845,12 +902,8 @@ if ($payload['event'] === 'payment.approved') {
                         </h2>
                         <div class="space-y-4">
                             <p class="text-gray-700">
-                                API rate limits are applied per API key. Current limits:
+                                The <code class="bg-gray-100 px-1 py-0.5 rounded">api</code> middleware applies Laravel’s default API rate limiter: <strong>60 requests per minute</strong>, keyed by authenticated user id when the request is authenticated, otherwise by IP address.
                             </p>
-                            <ul class="list-disc list-inside text-gray-700 space-y-2">
-                                <li><strong>100 requests per minute</strong> per API key</li>
-                                <li><strong>1000 requests per hour</strong> per API key</li>
-                            </ul>
                             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <p class="text-sm text-blue-800">
                                     <i class="fas fa-info-circle mr-2"></i>

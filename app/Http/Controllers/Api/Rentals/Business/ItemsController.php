@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\RentalCategory;
 use App\Models\RentalItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ItemsController extends Controller
 {
@@ -61,6 +62,10 @@ class ItemsController extends Controller
             'images' => 'nullable|array',
             'images.*' => 'nullable',
             'images_uploads' => 'nullable',
+            'discount_active' => 'nullable|boolean',
+            'discount_percent' => 'nullable|numeric|min:0|max:95',
+            'discount_starts_at' => 'nullable|date',
+            'discount_ends_at' => 'nullable|date',
         ]);
 
         $categoryId = $validated['category_id'] ?? null;
@@ -90,7 +95,7 @@ class ItemsController extends Controller
             'is_available' => (bool) ($validated['is_available'] ?? true),
             'is_active' => (bool) ($validated['is_active'] ?? true),
             'images' => $images ?: null,
-        ]));
+        ], RentalItem::discountPatchFromRequest($request)));
 
         return response()->json([
             'data' => $item,
@@ -127,16 +132,22 @@ class ItemsController extends Controller
             'images.*' => 'nullable',
             'remove_images' => 'sometimes|nullable|array',
             'remove_images.*' => 'string',
+            'discount_active' => 'sometimes|boolean',
+            'discount_percent' => 'sometimes|nullable|numeric|min:0|max:95',
+            'discount_starts_at' => 'sometimes|nullable|date',
+            'discount_ends_at' => 'sometimes|nullable|date',
         ]);
 
         // Handle images: allow removal + appending uploads
-        $images = is_array($item->images) ? $item->images : [];
+        $originalImages = is_array($item->images) ? $item->images : [];
+        $images = $originalImages;
         if (isset($validated['images']) && is_array($validated['images'])) {
             $images = array_values(array_filter(array_map(fn ($x) => is_string($x) ? trim($x) : null, $validated['images'])));
         }
+        $removeList = [];
         if (isset($validated['remove_images']) && is_array($validated['remove_images'])) {
-            $toRemove = array_map('strval', $validated['remove_images']);
-            $images = array_values(array_filter($images, fn ($p) => !in_array($p, $toRemove, true)));
+            $removeList = array_values(array_filter(array_map('strval', $validated['remove_images'])));
+            $images = array_values(array_filter($images, fn ($p) => ! in_array($p, $removeList, true)));
         }
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $img) {
@@ -146,6 +157,20 @@ class ItemsController extends Controller
             }
         }
         $validated['images'] = $images ?: null;
+
+        foreach ($removeList as $path) {
+            if (! is_string($path) || $path === '' || str_contains($path, '..')) {
+                continue;
+            }
+            if (! in_array($path, $originalImages, true)) {
+                continue;
+            }
+            Storage::disk('public')->delete($path);
+        }
+
+        unset($validated['remove_images']);
+
+        $validated = array_merge($validated, RentalItem::discountPatchFromRequest($request));
 
         $item->update($validated);
 

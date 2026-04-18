@@ -72,6 +72,28 @@
                 </div>
             </div>
 
+            <div class="border border-emerald-100 rounded-lg p-4 mb-4 bg-emerald-50/40">
+                <div class="font-semibold text-emerald-900 mb-1">Discount</div>
+                <label class="flex items-center gap-2 mb-3">
+                    <input type="checkbox" name="discount_active" value="1" {{ old('discount_active', $item->discount_active) ? 'checked' : '' }} class="rounded">
+                    <span class="text-sm">Discount active</span>
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Percent off (0–95)</label>
+                        <input type="number" name="discount_percent" step="0.01" min="0" max="95" class="w-full border-gray-300 rounded-md" value="{{ old('discount_percent', $item->discount_percent) }}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Starts</label>
+                        <input type="date" name="discount_starts_at" class="w-full border-gray-300 rounded-md" value="{{ old('discount_starts_at', optional($item->discount_starts_at)->format('Y-m-d'))) }}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Ends</label>
+                        <input type="date" name="discount_ends_at" class="w-full border-gray-300 rounded-md" value="{{ old('discount_ends_at', optional($item->discount_ends_at)->format('Y-m-d'))) }}">
+                    </div>
+                </div>
+            </div>
+
             <div class="border border-gray-200 rounded-lg p-4 mb-4">
                 <div class="flex items-center justify-between">
                     <div>

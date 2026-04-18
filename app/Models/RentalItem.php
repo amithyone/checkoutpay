@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class RentalItem extends Model
@@ -33,6 +35,10 @@ class RentalItem extends Model
         'terms_and_conditions',
         'is_active',
         'is_featured',
+        'discount_active',
+        'discount_percent',
+        'discount_starts_at',
+        'discount_ends_at',
     ];
 
     protected $casts = [
@@ -45,8 +51,20 @@ class RentalItem extends Model
         'is_available' => 'boolean',
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
+        'discount_active' => 'boolean',
+        'discount_percent' => 'decimal:2',
+        'discount_starts_at' => 'datetime',
+        'discount_ends_at' => 'datetime',
         'images' => 'array',
         'specifications' => 'array',
+    ];
+
+    /**
+     * @var array<int, string>
+     */
+    protected $appends = [
+        'is_on_discount',
+        'effective_daily_rate',
     ];
 
     protected static function boot()
@@ -58,6 +76,56 @@ class RentalItem extends Model
                 $item->slug = Str::slug($item->name) . '-' . Str::random(6);
             }
         });
+    }
+
+    /**
+     * Normalize discount fields from admin / business web forms or API (multipart / JSON).
+     */
+    public static function discountFieldsFromRequest(Request $request): array
+    {
+        $percent = null;
+        if ($request->filled('discount_percent')) {
+            $p = (float) $request->input('discount_percent');
+            $percent = $p > 0 ? min(95.0, max(0.0, $p)) : null;
+        }
+
+        return [
+            'discount_active' => $request->boolean('discount_active'),
+            'discount_percent' => $percent,
+            'discount_starts_at' => $request->filled('discount_starts_at') ? $request->date('discount_starts_at') : null,
+            'discount_ends_at' => $request->filled('discount_ends_at') ? $request->date('discount_ends_at') : null,
+        ];
+    }
+
+    /**
+     * For API PATCH: only set discount keys that appear on the request.
+     *
+     * @return array<string, mixed>
+     */
+    public static function discountPatchFromRequest(Request $request): array
+    {
+        if (! $request->hasAny(['discount_active', 'discount_percent', 'discount_starts_at', 'discount_ends_at'])) {
+            return [];
+        }
+
+        $out = [];
+        if ($request->has('discount_active')) {
+            $out['discount_active'] = $request->boolean('discount_active');
+        }
+        if ($request->exists('discount_percent')) {
+            $v = $request->input('discount_percent');
+            $out['discount_percent'] = ($v === '' || $v === null)
+                ? null
+                : min(95.0, max(0.0, (float) $v));
+        }
+        if ($request->has('discount_starts_at')) {
+            $out['discount_starts_at'] = $request->filled('discount_starts_at') ? $request->date('discount_starts_at') : null;
+        }
+        if ($request->has('discount_ends_at')) {
+            $out['discount_ends_at'] = $request->filled('discount_ends_at') ? $request->date('discount_ends_at') : null;
+        }
+
+        return $out;
     }
 
     /**
@@ -87,16 +155,77 @@ class RentalItem extends Model
     }
 
     /**
+     * Whether the configured discount applies right now (business or admin set the same fields).
+     */
+    public function isDiscountActiveAt(?Carbon $moment = null): bool
+    {
+        $moment = $moment ?? now();
+
+        if (! $this->discount_active) {
+            return false;
+        }
+
+        $pct = (float) ($this->discount_percent ?? 0);
+        if ($pct <= 0 || $pct >= 100) {
+            return false;
+        }
+
+        if ($this->discount_starts_at && $moment->lt($this->discount_starts_at->copy()->startOfDay())) {
+            return false;
+        }
+
+        if ($this->discount_ends_at && $moment->gt($this->discount_ends_at->copy()->endOfDay())) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Multiplier applied to list prices when a discount is active (e.g. 0.85 for 15% off).
+     */
+    public function discountPriceMultiplier(): float
+    {
+        if (! $this->isDiscountActiveAt()) {
+            return 1.0;
+        }
+
+        return round((100 - (float) $this->discount_percent) / 100, 4);
+    }
+
+    public function getIsOnDiscountAttribute(): bool
+    {
+        return $this->isDiscountActiveAt();
+    }
+
+    /**
+     * Per-day amount renters pay when discounted; otherwise equals list daily_rate.
+     */
+    public function getEffectiveDailyRateAttribute(): string
+    {
+        $base = (float) $this->daily_rate;
+        if (! $this->isDiscountActiveAt()) {
+            return number_format($base, 2, '.', '');
+        }
+
+        return number_format(round($base * $this->discountPriceMultiplier(), 2), 2, '.', '');
+    }
+
+    /**
      * Calculate rate for period
      */
     public function getRateForPeriod(int $days): float
     {
+        $mult = $this->discountPriceMultiplier();
+
         if ($days >= 30 && $this->monthly_rate) {
-            return $this->monthly_rate;
-        } elseif ($days >= 7 && $this->weekly_rate) {
-            return $this->weekly_rate;
+            return round((float) $this->monthly_rate * $mult, 2);
         }
-        return $this->daily_rate * $days;
+        if ($days >= 7 && $this->weekly_rate) {
+            return round((float) $this->weekly_rate * $mult, 2);
+        }
+
+        return round((float) $this->daily_rate * $days * $mult, 2);
     }
 
     /**
