@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Cron;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendWebhookNotification;
-use App\Models\Payment;
+use App\Services\PendingWebhookDispatchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -13,46 +13,51 @@ class WebhookCronController extends Controller
     /**
      * Process pending webhooks via cron
      * This endpoint can be called by external cron services
-     * 
+     *
      * URL: /api/v1/cron/process-webhooks
      * Public endpoint - no authentication required
+     *
+     * Query:
+     * - limit: batch size (default 50, max 100) when all=0
+     * - all=1: repeat batches until empty or max reached
+     * - max: with all=1, cap total payments (default 10000, max 20000)
+     * - force=1: ignore 5-minute webhook_sent_at retry cooldown
      */
-    public function processWebhooks(Request $request)
+    public function processWebhooks(Request $request, PendingWebhookDispatchService $dispatcher)
     {
         try {
-            // Get pending/failed webhooks that need to be sent
-            $limit = min((int) ($request->query('limit', 50)), 100); // Max 100 per run
-            
-            $payments = Payment::where('status', Payment::STATUS_APPROVED)
-                ->where(function ($query) {
-                    $query->whereNull('webhook_status')
-                        ->orWhere('webhook_status', 'pending')
-                        ->orWhere('webhook_status', 'failed');
-                })
-                ->where(function ($query) {
-                    // Only process payments that haven't been sent recently (avoid spam)
-                    $query->whereNull('webhook_sent_at')
-                        ->orWhere('webhook_sent_at', '<', now()->subMinutes(5)); // Retry after 5 minutes
-                })
-                ->where(function ($query) {
-                    // Limit retry attempts
-                    $query->whereNull('webhook_attempts')
-                        ->orWhere('webhook_attempts', '<', 5);
-                })
-                ->orderBy('matched_at', 'asc') // Process oldest first
-                ->limit($limit)
-                ->get();
+            $force = $request->boolean('force');
+            $all = $request->boolean('all');
 
-            $processed = 0;
+            if ($all) {
+                $batch = max(1, min(500, (int) $request->query('batch', 100)));
+                $max = max(1, min(20000, (int) $request->query('max', 10000)));
+                $result = $dispatcher->processUntilExhausted($batch, $max, $force);
+
+                Log::info('Webhook cron processed (all mode)', $result);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Processed {$result['sent']} webhook(s)",
+                    'sent' => $result['sent'],
+                    'errors' => $result['errors'],
+                    'batches' => $result['batches'],
+                    'pending_after' => $result['pending_after'],
+                    'timestamp' => now()->toISOString(),
+                ]);
+            }
+
+            $limit = min((int) $request->query('limit', 50), 100);
+
+            $payments = $dispatcher->collectPending($limit, $force);
             $errors = [];
+            $processed = 0;
 
             foreach ($payments as $payment) {
                 try {
-                    // Run webhook SYNCHRONOUSLY - sends immediately without needing queue worker
-                    // This ensures webhooks are sent when cron runs, even if queue worker is not running
                     SendWebhookNotification::dispatchSync($payment);
                     $processed++;
-                    
+
                     Log::info('Webhook sent via cron (sync)', [
                         'payment_id' => $payment->id,
                         'transaction_id' => $payment->transaction_id,
@@ -74,7 +79,6 @@ class WebhookCronController extends Controller
                 'total_found' => $payments->count(),
                 'timestamp' => now()->toISOString(),
             ]);
-
         } catch (\Exception $e) {
             Log::error('Error processing webhooks via cron', [
                 'error' => $e->getMessage(),

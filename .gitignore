@@ -41,6 +41,9 @@ resources/views/components/beta-badge.blade.php
 database/backups/*.sql
 database/backups/*.zip
 
+# Business JSON exports (PII, API keys; never commit)
+/storage/app/business-exports/
+
 # Local exports/dumps (never commit)
 database/*.sql
 database/*.sql.zip
