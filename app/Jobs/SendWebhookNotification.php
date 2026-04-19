@@ -16,6 +16,14 @@ class SendWebhookNotification implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * Populated after each synchronous run of handle() when at least one HTTP attempt was made.
+     * Each entry: url, success, http_status, response_body (truncated), error (if any).
+     *
+     * @var list<array<string, mixed>>|null
+     */
+    public static ?array $lastHttpDeliveryLog = null;
+
+    /**
      * The payment instance.
      *
      * @var Payment
@@ -35,6 +43,8 @@ class SendWebhookNotification implements ShouldQueue
      */
     public function handle(): void
     {
+        self::$lastHttpDeliveryLog = [];
+
         // Reload payment with relationships
         $this->payment->refresh();
         $this->payment->load(['business.websites', 'website']);
@@ -55,6 +65,11 @@ class SendWebhookNotification implements ShouldQueue
                 'payment_id' => $this->payment->id,
                 'business_id' => $this->payment->business_id,
             ]);
+
+            self::$lastHttpDeliveryLog[] = [
+                'url' => null,
+                'note' => 'No merchant webhook URLs resolved for this payment (website webhook empty or internal-only URL filtered).',
+            ];
             
             // Mark as sent even if no URLs (prevents retry loops)
             $this->payment->update([
@@ -71,6 +86,14 @@ class SendWebhookNotification implements ShouldQueue
         foreach ($webhookUrls as $webhookUrl) {
             try {
                 $response = $this->sendWebhook($webhookUrl);
+
+                self::$lastHttpDeliveryLog[] = [
+                    'url' => $webhookUrl,
+                    'success' => $response['success'],
+                    'http_status' => $response['status'] ?? null,
+                    'response_body' => $response['response_body'] ?? null,
+                    'error' => $response['error'] ?? null,
+                ];
                 
                 if ($response['success']) {
                     $successCount++;
@@ -90,6 +113,14 @@ class SendWebhookNotification implements ShouldQueue
                 
                 $failedUrls[] = [
                     'url' => $webhookUrl,
+                    'error' => $this->formatFullError($e),
+                ];
+
+                self::$lastHttpDeliveryLog[] = [
+                    'url' => $webhookUrl,
+                    'success' => false,
+                    'http_status' => null,
+                    'response_body' => null,
                     'error' => $this->formatFullError($e),
                 ];
             }
@@ -200,13 +231,19 @@ class SendWebhookNotification implements ShouldQueue
                 ->retry(2, 100) // Retry twice with 100ms delay
                 ->post($webhookUrl, $payload);
 
+            $rawBody = $response->body();
+            $bodyPreview = mb_strlen($rawBody) > 4000
+                ? mb_substr($rawBody, 0, 4000).'…(truncated)'
+                : $rawBody;
+
             if ($response->successful()) {
                 return [
                     'success' => true,
                     'status' => $response->status(),
+                    'response_body' => $bodyPreview !== '' ? $bodyPreview : null,
                 ];
             } else {
-                $body = $response->body();
+                $body = $rawBody;
                 $fullError = sprintf(
                     "HTTP %d %s\nResponse body: %s",
                     $response->status(),
@@ -217,12 +254,15 @@ class SendWebhookNotification implements ShouldQueue
                     'success' => false,
                     'error' => trim($fullError),
                     'status' => $response->status(),
+                    'response_body' => $bodyPreview !== '' ? $bodyPreview : null,
                 ];
             }
         } catch (\Throwable $e) {
             return [
                 'success' => false,
                 'error' => $this->formatFullError($e),
+                'status' => null,
+                'response_body' => null,
             ];
         }
     }

@@ -11,7 +11,8 @@ class ResendPaymentWebhookCommand extends Command
     protected $signature = 'webhooks:resend
                             {transaction_id? : payments.transaction_id — resend this approved payment}
                             {--latest-pending : Most recent approved payment with webhook null/pending/failed}
-                            {--latest-approved : Most recent approved payment (even if webhook already sent)}';
+                            {--latest-approved : Most recent approved payment (even if webhook already sent)}
+                            {--show-response : Print HTTP status and response body preview from the merchant endpoint}';
 
     protected $description = 'Synchronously POST payment.approved webhook for one approved payment (bypasses queue).';
 
@@ -74,6 +75,17 @@ class ResendPaymentWebhookCommand extends Command
         $payment->refresh();
 
         $this->info('Done. webhook_status='.($payment->webhook_status ?? 'null'));
+
+        if ($this->option('show-response')) {
+            $log = SendWebhookNotification::$lastHttpDeliveryLog;
+            if ($log === null || $log === []) {
+                $this->warn('No HTTP delivery log captured (non-approved skip or empty URL list).');
+            } else {
+                $this->newLine();
+                $this->info('Merchant endpoint response(s):');
+                $this->line(json_encode($log, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
+            }
+        }
 
         return self::SUCCESS;
     }
