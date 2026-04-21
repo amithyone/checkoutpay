@@ -24,6 +24,9 @@
         .info-item { background-color: #f7fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3C50E0; }
         .info-item .label { font-size: 12px; color: #718096; text-transform: uppercase; margin-bottom: 5px; }
         .info-item .value { font-size: 16px; font-weight: 600; color: #1a202c; }
+        .balance-box { background-color: #f0f4ff; border: 2px solid #3C50E0; border-radius: 8px; padding: 20px; margin: 25px 0; text-align: center; }
+        .balance-box .label { font-size: 14px; color: #475569; margin-bottom: 5px; }
+        .balance-box .balance { font-size: 24px; font-weight: 700; color: #3C50E0; }
         .status-badge { display: inline-block; background: #fef3c7; color: #78350f; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 10px; }
         .cta-button { display: inline-block; background: linear-gradient(135deg, #3C50E0 0%, #2E40C7 100%); color: #ffffff !important; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 20px 0; box-shadow: 0 4px 12px rgba(60, 80, 224, 0.4); }
         .email-footer { background-color: #1a202c; padding: 30px; text-align: center; }
@@ -84,6 +87,11 @@
                         <div class="label">Submitted Date</div>
                         <div class="value">{{ $withdrawal->created_at->format('F d, Y \a\t g:i A') }}</div>
                     </div>
+                </div>
+                <div class="balance-box">
+                    <div class="label">Current account balance</div>
+                    <div class="balance">₦{{ number_format($business->balance, 2) }}</div>
+                    <div style="font-size: 13px; color: #64748b; margin-top: 10px;">Above: requested withdrawal ₦{{ number_format($withdrawal->amount, 2) }}</div>
                 </div>
                 <div class="content-text">We'll review your request and notify you once it's been processed. This usually takes 1-2 business days.</div>
                 <div style="text-align: center;">
