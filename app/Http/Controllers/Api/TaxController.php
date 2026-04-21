@@ -41,7 +41,7 @@ class TaxController extends Controller
         $total_tax_due = (float)($data['total_tax_due'] ?? 0);
         $is_small_company = (int)($data['is_small_company'] ?? 0);
 
-        // Each PDF download submits a new row (admin submissions / analytics). Do not dedupe by RC+phone.
+        // Each recorded calculation submits a new row (live calculator debounce + download / PRO regen). Do not dedupe by RC+phone.
 
         $insert = [
             'business_name' => $business_name,
