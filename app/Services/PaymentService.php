@@ -51,8 +51,8 @@ class PaymentService
             $website = $business->websites()->find($businessWebsiteId);
         }
 
-        // Before assigning any account number (VA or pool), ensure explicit webhook matches saved website webhook.
-        $this->assertIncomingWebhookMatchesConfiguredWebsite($data, $website);
+        // Before assigning any account number (VA or pool), ensure explicit webhook matches saved URLs (website or business).
+        $this->assertIncomingWebhookMatchesConfiguredWebsite($data, $business, $website);
 
         $requestedService = (string) ($data['service'] ?? ($useInvoicePool ? 'invoice' : 'general'));
 
@@ -232,27 +232,66 @@ class PaymentService
     }
 
     /**
-     * When an approved website has a saved webhook URL, a non-empty incoming webhook_url must match it
-     * before any account number is assigned (VA or pool). Null/empty incoming webhook_url skips this check;
-     * the payment row is then filled from the website or business webhook in the database.
+     * Non-empty webhook_url must match what is saved on the dashboard when we can determine it:
+     * - explicit business_website_id → that approved site's webhook if set;
+     * - else exactly one approved website has a webhook → compare to that one;
+     * - else multiple approved sites have webhooks and no ID was sent → reject (ambiguous);
+     * - else compare to business-level webhook_url when set.
+     * Empty webhook_url skips here (filled from DB later in createPayment).
      */
-    protected function assertIncomingWebhookMatchesConfiguredWebsite(array $data, ?BusinessWebsite $website): void
+    protected function assertIncomingWebhookMatchesConfiguredWebsite(array $data, Business $business, ?BusinessWebsite $websiteFromId): void
     {
-        if (! $website || ! $website->is_approved || ! filled($website->webhook_url)) {
-            return;
-        }
-
         $explicit = isset($data['webhook_url']) ? trim((string) $data['webhook_url']) : '';
         if ($explicit === '') {
             return;
         }
 
-        $expected = $this->normalizeWebhookUrlForComparison((string) $website->webhook_url);
-        $received = $this->normalizeWebhookUrlForComparison($explicit);
-        if ($expected !== $received) {
+        $approvedSitesWithWebhook = $business->approvedWebsites()
+            ->whereNotNull('webhook_url')
+            ->where('webhook_url', '!=', '')
+            ->get();
+
+        $providedWebsiteId = isset($data['business_website_id']) ? (int) $data['business_website_id'] : null;
+
+        $websiteForComparison = null;
+
+        if ($providedWebsiteId) {
+            $selected = ($websiteFromId && (int) $websiteFromId->id === $providedWebsiteId)
+                ? $websiteFromId
+                : $business->websites()->find($providedWebsiteId);
+            if ($selected && $selected->is_approved && filled($selected->webhook_url)) {
+                $websiteForComparison = $selected;
+            }
+        } elseif ($approvedSitesWithWebhook->count() === 1) {
+            $websiteForComparison = $approvedSitesWithWebhook->first();
+        }
+
+        if (! $websiteForComparison && $approvedSitesWithWebhook->count() > 1 && ! $providedWebsiteId) {
             throw new \InvalidArgumentException(
-                'The webhook URL does not match the webhook URL configured for this website in your dashboard.'
+                'Provide business_website_id: multiple approved websites have webhook URLs configured.'
             );
+        }
+
+        if ($websiteForComparison && filled($websiteForComparison->webhook_url)) {
+            $expected = $this->normalizeWebhookUrlForComparison((string) $websiteForComparison->webhook_url);
+            $received = $this->normalizeWebhookUrlForComparison($explicit);
+            if ($expected !== $received) {
+                throw new \InvalidArgumentException(
+                    'The webhook URL does not match the webhook URL configured for this website in your dashboard.'
+                );
+            }
+
+            return;
+        }
+
+        if (filled($business->webhook_url)) {
+            $expected = $this->normalizeWebhookUrlForComparison((string) $business->webhook_url);
+            $received = $this->normalizeWebhookUrlForComparison($explicit);
+            if ($expected !== $received) {
+                throw new \InvalidArgumentException(
+                    'The webhook URL does not match your business webhook URL in settings.'
+                );
+            }
         }
     }
 
