@@ -31,7 +31,8 @@ class PaymentRequest extends FormRequest
             'bank' => ['nullable', 'string', 'max:255'],
             'bvn' => ['nullable', 'string', 'max:30'],
             'registration_number' => ['nullable', 'string', 'max:60'],
-            'webhook_url' => ['required', 'url', 'max:500'],
+            // Optional: omit or leave empty to use webhook saved on Business Website / business (see withValidator).
+            'webhook_url' => ['nullable', 'string', 'max:500'],
             'service' => ['nullable', 'string', 'max:255'], // Accept service field
             'transaction_id' => ['nullable', 'string', 'max:255', 'unique:payments,transaction_id'],
             'business_website_id' => ['nullable', 'integer', 'exists:business_websites,id'], // Allow explicit website ID
@@ -52,6 +53,24 @@ class PaymentRequest extends FormRequest
             if (!$hasName && !$hasPayerName) {
                 $validator->errors()->add('payer_name', 'The payer name is required to get an account number. Please provide either "name" or "payer_name".');
             }
+
+            $webhookTrim = trim((string) ($this->input('webhook_url') ?? ''));
+            if ($webhookTrim !== '') {
+                if (! filter_var($webhookTrim, FILTER_VALIDATE_URL)) {
+                    $validator->errors()->add('webhook_url', 'The webhook URL must be a valid URL.');
+                }
+            } elseif ($business = $this->user()) {
+                // Empty webhook: must have one stored on the linked website or business (PaymentService resolution).
+                $wid = $this->input('business_website_id');
+                $website = $wid ? $business->websites()->find((int) $wid) : null;
+                $hasStored = filled($website?->webhook_url) || filled($business->webhook_url);
+                if (! $hasStored) {
+                    $validator->errors()->add(
+                        'webhook_url',
+                        'Provide webhook_url, or save a webhook on this business website / business settings first.'
+                    );
+                }
+            }
         });
     }
 
@@ -67,7 +86,6 @@ class PaymentRequest extends FormRequest
             'amount.numeric' => 'The payment amount must be a valid number.',
             'amount.min' => 'The payment amount must be at least 0.01.',
             'payer_name.required' => 'The payer name is required to get an account number.',
-            'webhook_url.required' => 'The webhook URL is required.',
             'webhook_url.url' => 'The webhook URL must be a valid URL.',
             'transaction_id.unique' => 'This transaction ID already exists.',
         ];

@@ -3,8 +3,9 @@
 namespace App\Services;
 
 use App\Models\AccountNumber;
-use App\Models\Payment;
 use App\Models\Business;
+use App\Models\BusinessWebsite;
+use App\Models\Payment;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -44,6 +45,15 @@ class PaymentService
 
         $payerName = isset($data['payer_name']) ? trim((string) $data['payer_name']) : null;
         $businessWebsiteId = isset($data['business_website_id']) ? (int) $data['business_website_id'] : null;
+
+        $website = null;
+        if ($businessWebsiteId) {
+            $website = $business->websites()->find($businessWebsiteId);
+        }
+
+        // Before assigning any account number (VA or pool), ensure explicit webhook matches saved website webhook.
+        $this->assertIncomingWebhookMatchesConfiguredWebsite($data, $website);
+
         $requestedService = (string) ($data['service'] ?? ($useInvoicePool ? 'invoice' : 'general'));
 
         $externalOverride = $data['external_override'] ?? null;
@@ -157,11 +167,6 @@ class PaymentService
             throw new \RuntimeException('No account number available. Please contact support.');
         }
 
-        $website = null;
-        if (!empty($data['business_website_id'])) {
-            $website = $business->websites()->find($data['business_website_id']);
-        }
-
         // Stored payment.webhook_url: explicit request wins, then website row for this business_website_id,
         // then business-level webhook (matches SendWebhookNotification URL priority for typical flows).
         $webhookUrlForPayment = '';
@@ -224,5 +229,35 @@ class PaymentService
         }
 
         return $payment;
+    }
+
+    /**
+     * When an approved website has a saved webhook URL, a non-empty incoming webhook_url must match it
+     * before any account number is assigned (VA or pool). Null/empty incoming webhook_url skips this check;
+     * the payment row is then filled from the website or business webhook in the database.
+     */
+    protected function assertIncomingWebhookMatchesConfiguredWebsite(array $data, ?BusinessWebsite $website): void
+    {
+        if (! $website || ! $website->is_approved || ! filled($website->webhook_url)) {
+            return;
+        }
+
+        $explicit = isset($data['webhook_url']) ? trim((string) $data['webhook_url']) : '';
+        if ($explicit === '') {
+            return;
+        }
+
+        $expected = $this->normalizeWebhookUrlForComparison((string) $website->webhook_url);
+        $received = $this->normalizeWebhookUrlForComparison($explicit);
+        if ($expected !== $received) {
+            throw new \InvalidArgumentException(
+                'The webhook URL does not match the webhook URL configured for this website in your dashboard.'
+            );
+        }
+    }
+
+    protected function normalizeWebhookUrlForComparison(string $url): string
+    {
+        return rtrim(trim($url), '/');
     }
 }

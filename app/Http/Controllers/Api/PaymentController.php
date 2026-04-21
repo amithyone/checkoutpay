@@ -30,39 +30,16 @@ class PaymentController extends Controller
         try {
             $business = $request->user();
 
-            // Validate webhook URL is from approved website
-            $webhookUrl = $request->webhook_url;
-            if (!$this->isUrlFromApprovedWebsites($webhookUrl, $business)) {
+            // Domain check only when caller sends a non-empty webhook (omit/null/empty → use DB in PaymentService).
+            $webhookUrlInput = trim((string) ($request->input('webhook_url') ?? ''));
+            if ($webhookUrlInput !== '' && ! $this->isUrlFromApprovedWebsites($webhookUrlInput, $business)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Webhook URL must be from your approved website domain.',
                 ], 400);
             }
 
-            if ($request->filled('business_website_id')) {
-                $websiteRecord = $business->websites()->find((int) $request->business_website_id);
-                if (
-                    $websiteRecord
-                    && $websiteRecord->is_approved
-                    && filled($websiteRecord->webhook_url)
-                ) {
-                    $expected = $this->normalizeWebhookUrlForComparison((string) $websiteRecord->webhook_url);
-                    $received = $this->normalizeWebhookUrlForComparison((string) $webhookUrl);
-                    if ($expected !== $received) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'The webhook URL does not match the webhook URL configured for this website in your dashboard.',
-                            'errors' => [
-                                'webhook_url' => [
-                                    'Must match the webhook URL saved for this business website (Business Website settings). Update your integration or change the saved webhook URL to match.',
-                                ],
-                            ],
-                        ], 422);
-                    }
-                }
-            }
-
-            // Create payment request
+            // Create payment request (PaymentService rejects mismatch before assigning an account number)
             $paymentData = [
                 'amount' => $request->amount,
                 'payer_name' => $request->payer_name ?? $request->name,
@@ -71,7 +48,7 @@ class PaymentController extends Controller
                 'lname' => $request->lname,
                 'bvn' => $request->bvn,
                 'registration_number' => $request->registration_number,
-                'webhook_url' => $webhookUrl,
+                'webhook_url' => $webhookUrlInput,
                 'service' => $request->service,
                 'transaction_id' => $request->transaction_id,
                 'business_website_id' => $request->business_website_id,
@@ -130,6 +107,16 @@ class PaymentController extends Controller
                     ] : null,
                 ],
             ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'errors' => [
+                    'webhook_url' => [
+                        'Must match the webhook URL saved for this business website (Business Website settings). Update your integration or change the saved webhook URL to match.',
+                    ],
+                ],
+            ], 422);
         } catch (\Illuminate\Database\QueryException $e) {
             Log::error('Database error creating payment via API', [
                 'error' => $e->getMessage(),
@@ -408,14 +395,6 @@ class PaymentController extends Controller
                 'message' => 'An error occurred while trying to update the amount. Please try again.',
             ], 500);
         }
-    }
-
-    /**
-     * Normalize webhook URLs for equality checks (trim, strip trailing slash).
-     */
-    protected function normalizeWebhookUrlForComparison(string $url): string
-    {
-        return rtrim(trim($url), '/');
     }
 
     /**

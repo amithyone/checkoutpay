@@ -88,10 +88,14 @@ class NigtaxCertifiedReportService
             throw new \RuntimeException('Payment business has no website configured for webhooks.');
         }
 
-        $webhookUrl = config('services.nigtax.payment_webhook_url');
-        if (!is_string($webhookUrl) || $webhookUrl === '') {
-            $webhookUrl = rtrim((string) $website->website_url, '/');
+        $fallbackWebhook = config('services.nigtax.payment_webhook_url');
+        if (!is_string($fallbackWebhook) || $fallbackWebhook === '') {
+            $fallbackWebhook = rtrim((string) $website->website_url, '/');
         }
+        // Align with PaymentService / approved website row so webhook mismatch guard does not block VA assignment.
+        $webhookUrl = filled($website->webhook_url)
+            ? (string) $website->webhook_url
+            : $fallbackWebhook;
 
         $amount = (float) $settings->certified_fee_ngn;
 
