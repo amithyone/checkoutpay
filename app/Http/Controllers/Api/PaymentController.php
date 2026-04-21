@@ -39,6 +39,29 @@ class PaymentController extends Controller
                 ], 400);
             }
 
+            if ($request->filled('business_website_id')) {
+                $websiteRecord = $business->websites()->find((int) $request->business_website_id);
+                if (
+                    $websiteRecord
+                    && $websiteRecord->is_approved
+                    && filled($websiteRecord->webhook_url)
+                ) {
+                    $expected = $this->normalizeWebhookUrlForComparison((string) $websiteRecord->webhook_url);
+                    $received = $this->normalizeWebhookUrlForComparison((string) $webhookUrl);
+                    if ($expected !== $received) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'The webhook URL does not match the webhook URL configured for this website in your dashboard.',
+                            'errors' => [
+                                'webhook_url' => [
+                                    'Must match the webhook URL saved for this business website (Business Website settings). Update your integration or change the saved webhook URL to match.',
+                                ],
+                            ],
+                        ], 422);
+                    }
+                }
+            }
+
             // Create payment request
             $paymentData = [
                 'amount' => $request->amount,
@@ -385,6 +408,14 @@ class PaymentController extends Controller
                 'message' => 'An error occurred while trying to update the amount. Please try again.',
             ], 500);
         }
+    }
+
+    /**
+     * Normalize webhook URLs for equality checks (trim, strip trailing slash).
+     */
+    protected function normalizeWebhookUrlForComparison(string $url): string
+    {
+        return rtrim(trim($url), '/');
     }
 
     /**

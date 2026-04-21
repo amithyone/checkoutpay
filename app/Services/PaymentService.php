@@ -20,7 +20,9 @@ class PaymentService
     /**
      * Create a payment request.
      *
-     * @param array $data amount, payer_name, webhook_url, service?, transaction_id?, business_website_id?, bank?, return_url?, website_url?
+     * @param array $data amount, payer_name, webhook_url?, service?, transaction_id?, business_website_id?, bank?, return_url?, website_url?
+     *                       If webhook_url omitted/empty and business_website_id resolves to an approved website row
+     *                       with webhook_url, that stored URL is copied onto the payment row.
      * @param Business $business
      * @param Request|null $request
      * @param bool $useInvoicePool Use invoice pool for account assignment (e.g. invoice payments)
@@ -160,6 +162,18 @@ class PaymentService
             $website = $business->websites()->find($data['business_website_id']);
         }
 
+        // Stored payment.webhook_url: explicit request wins, then website row for this business_website_id,
+        // then business-level webhook (matches SendWebhookNotification URL priority for typical flows).
+        $webhookUrlForPayment = '';
+        $explicitWebhook = isset($data['webhook_url']) ? trim((string) $data['webhook_url']) : '';
+        if ($explicitWebhook !== '') {
+            $webhookUrlForPayment = $explicitWebhook;
+        } elseif ($website && filled($website->webhook_url)) {
+            $webhookUrlForPayment = $website->webhook_url;
+        } elseif (! empty($business->webhook_url)) {
+            $webhookUrlForPayment = (string) $business->webhook_url;
+        }
+
         if ($useInvoicePool) {
             $charges = $this->chargeService->calculateInvoiceCharges($amount, $business);
             $chargePercentage = $charges['charge_percentage'] ?? 0;
@@ -186,7 +200,7 @@ class PaymentService
             'amount' => $amount,
             'payer_name' => $data['payer_name'] ?? null,
             'bank' => $data['bank'] ?? null,
-            'webhook_url' => $data['webhook_url'] ?? $business->webhook_url ?? '',
+            'webhook_url' => $webhookUrlForPayment,
             'account_number' => $account->account_number,
             'business_id' => $business->id,
             'business_website_id' => $data['business_website_id'] ?? null,

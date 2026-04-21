@@ -178,13 +178,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $payment->transaction_id }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $payment->business->name ?? 'N/A' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">
+                            @php
+                                $__resolvedMerchantWebhook = $payment->primaryMerchantWebhookUrl();
+                            @endphp
                             @if($payment->website)
-                                <a href="{{ $payment->website->website_url }}" target="_blank" class="text-primary hover:underline" title="{{ $payment->website->website_url }}">
+                                <a href="{{ $payment->website->website_url }}" target="_blank" class="text-primary hover:underline"
+                                    title="Storefront: {{ $payment->website->website_url }}@if($__resolvedMerchantWebhook){{ ' — Notification webhook: ' . $__resolvedMerchantWebhook }}@endif">
                                     {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
                                     <i class="fas fa-external-link-alt text-xs ml-1"></i>
                                 </a>
-                            @elseif($payment->webhook_url)
-                                <span class="text-gray-600" title="Webhook sent to: {{ $payment->webhook_url }}">{{ parse_url($payment->webhook_url, PHP_URL_HOST) ?? 'Webhook' }}</span>
+                            @elseif($__resolvedMerchantWebhook)
+                                <span class="text-gray-600" title="Notification webhook: {{ $__resolvedMerchantWebhook }}">{{ parse_url($__resolvedMerchantWebhook, PHP_URL_HOST) ?? 'Webhook' }}</span>
                             @else
                                 <span class="text-gray-400">N/A</span>
                             @endif

@@ -379,6 +379,23 @@ class Payment extends Model
     }
 
     /**
+     * Resolved merchant webhook destination for UI — same priority as
+     * {@see \App\Jobs\SendWebhookNotification::getWebhookUrls()} (approved website
+     * {@see BusinessWebsite::$webhook_url} first, then legacy {@see Payment::$webhook_url}).
+     */
+    public function primaryMerchantWebhookUrl(): ?string
+    {
+        if ($this->business_website_id) {
+            $website = $this->relationLoaded('website') ? $this->website : $this->website()->first();
+            if ($website && $website->is_approved && filled($website->webhook_url)) {
+                return $website->webhook_url;
+            }
+        }
+
+        return $this->webhook_url ?: null;
+    }
+
+    /**
      * Get the rental this payment is for (when payment is for an approved rental)
      */
     public function rental()

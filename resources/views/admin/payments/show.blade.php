@@ -144,13 +144,24 @@
                     <p class="text-xs sm:text-sm font-medium text-gray-900 break-words">
                         <a href="{{ $payment->website->website_url }}" target="_blank" class="text-primary hover:underline">{{ $payment->website->website_url }}</a>
                     </p>
-                @elseif($payment->webhook_url)
-                    <p class="text-xs sm:text-sm font-medium text-gray-600 break-words" title="Webhook sent to this URL">
-                        {{ parse_url($payment->webhook_url, PHP_URL_HOST) ?? $payment->webhook_url }}
-                    </p>
-                    <p class="text-xs text-gray-500 mt-1 break-all">Webhook: {{ $payment->webhook_url }}</p>
                 @else
                     <p class="text-xs sm:text-sm font-medium text-gray-400">N/A</p>
+                @endif
+            </div>
+            <div>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Webhook URL <span class="text-gray-400 font-normal">(stored / used for notifications)</span></label>
+                @php
+                    $resolvedWebhook = $payment->primaryMerchantWebhookUrl();
+                @endphp
+                @if($resolvedWebhook)
+                    <p class="text-xs sm:text-sm font-medium text-gray-900 break-all font-mono">{{ $resolvedWebhook }}</p>
+                    @if($payment->website && $payment->website->is_approved && filled($payment->website->webhook_url) && $resolvedWebhook === $payment->website->webhook_url)
+                        <p class="text-xs text-gray-500 mt-1">From approved website settings</p>
+                    @elseif($payment->webhook_url && $resolvedWebhook === $payment->webhook_url)
+                        <p class="text-xs text-gray-500 mt-1">From payment record{{ $payment->website ? ' (fallback)' : '' }}</p>
+                    @endif
+                @else
+                    <p class="text-xs sm:text-sm font-medium text-gray-400">None configured — no merchant webhook destination</p>
                 @endif
             </div>
             <div>
