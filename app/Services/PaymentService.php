@@ -233,10 +233,11 @@ class PaymentService
 
     /**
      * Non-empty webhook_url must match what is saved on the dashboard when we can determine it:
-     * - explicit business_website_id → that approved site's webhook if set;
+     * - business_website_id → compare only to that approved site's webhook (when set);
+     * - else same URL as one of the approved sites' saved webhooks → accept (disambiguates multiple sites);
      * - else exactly one approved website has a webhook → compare to that one;
-     * - else multiple approved sites have webhooks and no ID was sent → reject (ambiguous);
-     * - else compare to business-level webhook_url when set.
+     * - else compare to business-level webhook_url when set;
+     * - else explicit URL does not match any saved site webhook → error.
      * Empty webhook_url skips here (filled from DB later in createPayment).
      */
     protected function assertIncomingWebhookMatchesConfiguredWebsite(array $data, Business $business, ?BusinessWebsite $websiteFromId): void
@@ -262,14 +263,19 @@ class PaymentService
             if ($selected && $selected->is_approved && filled($selected->webhook_url)) {
                 $websiteForComparison = $selected;
             }
-        } elseif ($approvedSitesWithWebhook->count() === 1) {
-            $websiteForComparison = $approvedSitesWithWebhook->first();
-        }
-
-        if (! $websiteForComparison && $approvedSitesWithWebhook->count() > 1 && ! $providedWebsiteId) {
-            throw new \InvalidArgumentException(
-                'Provide business_website_id: multiple approved websites have webhook URLs configured.'
-            );
+        } else {
+            foreach ($approvedSitesWithWebhook as $site) {
+                if (
+                    $this->normalizeWebhookUrlForComparison((string) $site->webhook_url)
+                    === $this->normalizeWebhookUrlForComparison($explicit)
+                ) {
+                    $websiteForComparison = $site;
+                    break;
+                }
+            }
+            if (! $websiteForComparison && $approvedSitesWithWebhook->count() === 1) {
+                $websiteForComparison = $approvedSitesWithWebhook->first();
+            }
         }
 
         if ($websiteForComparison && filled($websiteForComparison->webhook_url)) {
@@ -292,6 +298,14 @@ class PaymentService
                     'The webhook URL does not match your business webhook URL in settings.'
                 );
             }
+
+            return;
+        }
+
+        if ($approvedSitesWithWebhook->isNotEmpty()) {
+            throw new \InvalidArgumentException(
+                'The webhook URL does not match any webhook URL saved on your approved websites. Fix webhook_url or send business_website_id.'
+            );
         }
     }
 
