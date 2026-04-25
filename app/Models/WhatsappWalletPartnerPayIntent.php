@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -31,13 +32,11 @@ class WhatsappWalletPartnerPayIntent extends Model
         'expires_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'amount' => 'decimal:2',
-            'expires_at' => 'datetime',
-        ];
-    }
+    /** @var array<string, string> Laravel 10 uses $casts; {@see casts()} is Laravel 11+. */
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'expires_at' => 'datetime',
+    ];
 
     public function business(): BelongsTo
     {
@@ -51,8 +50,10 @@ class WhatsappWalletPartnerPayIntent extends Model
 
     public function isPending(): bool
     {
-        return $this->status === self::STATUS_PENDING_PIN
-            && $this->expires_at !== null
-            && $this->expires_at->isFuture();
+        if ($this->status !== self::STATUS_PENDING_PIN || $this->expires_at === null) {
+            return false;
+        }
+
+        return Carbon::parse($this->expires_at)->isFuture();
     }
 }

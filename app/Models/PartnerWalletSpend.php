@@ -18,13 +18,11 @@ class PartnerWalletSpend extends Model
         'response_payload',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'amount' => 'decimal:2',
-            'response_payload' => 'array',
-        ];
-    }
+    /** @var array<string, string> Laravel 10 uses $casts; {@see casts()} is Laravel 11+. */
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'response_payload' => 'array',
+    ];
 
     public function business(): BelongsTo
     {
