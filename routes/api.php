@@ -40,6 +40,7 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
         Route::post('/whatsapp-wallet/lookup', [WhatsappWalletApiController::class, 'lookup']);
         Route::post('/whatsapp-wallet/ensure', [WhatsappWalletApiController::class, 'ensure']);
         Route::post('/whatsapp-wallet/send-message', [WhatsappWalletApiController::class, 'sendMessage']);
+        Route::post('/whatsapp-wallet/topup/virtual-account', [WhatsappWalletApiController::class, 'issueTopupVirtualAccount']);
         Route::post('/whatsapp-wallet/pay/start', [WhatsappWalletApiController::class, 'startPartnerPay']);
     });
 });
