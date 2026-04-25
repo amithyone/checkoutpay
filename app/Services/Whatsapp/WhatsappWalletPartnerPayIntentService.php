@@ -259,7 +259,47 @@ final class WhatsappWalletPartnerPayIntentService
             'failure_reason' => null,
         ]);
 
+        $this->notifyPartnerPaySuccessWhatsApp($intent, $business, $wallet, $data);
+
         return ['ok' => true, 'data' => $data];
+    }
+
+    /**
+     * Customer confirmation: send WhatsApp receipt + new balance (non-fatal if Evolution fails).
+     */
+    private function notifyPartnerPaySuccessWhatsApp(
+        WhatsappWalletPartnerPayIntent $intent,
+        Business $business,
+        WhatsappWallet $wallet,
+        array $settleData
+    ): void {
+        $cur = 'NGN';
+        $newBal = (float) ($settleData['wallet_balance_after'] ?? $wallet->fresh()->balance);
+        $bizName = $business->name ?? 'Merchant';
+        $amountFmt = WhatsappWalletMoneyFormatter::format((float) $intent->amount, $cur);
+        $balFmt = WhatsappWalletMoneyFormatter::format($newBal, $cur);
+        $ref = (string) ($intent->order_reference ?? '');
+        $refLine = $ref !== '' ? "Ref: `{$ref}`\n" : '';
+
+        $message =
+            "✅ *Payment successful*\n\n".
+            "You paid {$amountFmt} to *{$bizName}*.\n".
+            $refLine."\n".
+            "New wallet balance: *{$balFmt}*\n\n".
+            '_Send *WALLET* anytime for your balance._';
+
+        try {
+            $instance = WhatsappEvolutionConfigResolver::defaultInstance();
+            $sent = $this->whatsapp->sendText($instance, $intent->phone_e164, $message);
+            if (! $sent) {
+                Log::warning('partner_pay: post-success WhatsApp failed', ['intent_id' => $intent->id]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('partner_pay: post-success WhatsApp exception', [
+                'intent_id' => $intent->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
