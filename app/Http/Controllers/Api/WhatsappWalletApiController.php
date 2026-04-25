@@ -1,0 +1,196 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Business;
+use App\Services\Whatsapp\EvolutionWhatsAppClient;
+use App\Services\Whatsapp\PhoneNormalizer;
+use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
+use App\Services\Whatsapp\WhatsappWalletPartnerApiService;
+use App\Services\Whatsapp\WhatsappWalletPartnerPayIntentService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
+class WhatsappWalletApiController extends Controller
+{
+    public function __construct(
+        private WhatsappWalletPartnerApiService $partnerApi,
+        private WhatsappWalletPartnerPayIntentService $partnerPayIntent,
+        private EvolutionWhatsAppClient $whatsapp
+    ) {}
+
+    public function lookup(Request $request): JsonResponse
+    {
+        $business = $request->user();
+        if (! $business instanceof Business) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        if ($gate = $this->gateWalletApi($business)) {
+            return $gate;
+        }
+
+        $request->validate([
+            'phone' => 'required|string|min:10',
+        ]);
+
+        $result = $this->partnerApi->getWalletSummary((string) $request->input('phone'));
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Lookup failed',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'phone_e164' => $result['phone_e164'],
+                'wallet_id' => $result['wallet_id'],
+                'balance' => $result['balance'],
+                'has_pin' => $result['has_pin'],
+                'tier' => $result['tier'],
+                'status' => $result['status'],
+            ],
+        ]);
+    }
+
+    /**
+     * Deliver a merchant-composed plain-text WhatsApp (e.g. login OTP body) via Evolution.
+     * Authenticated by the same X-API-Key + whatsapp_wallet_api_enabled gate as lookup / ensure / pay/start.
+     */
+    public function sendMessage(Request $request): JsonResponse
+    {
+        $business = $request->user();
+        if (! $business instanceof Business) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        if ($gate = $this->gateWalletApi($business)) {
+            return $gate;
+        }
+
+        $request->validate([
+            'phone' => 'required|string|min:10',
+            'message' => 'required|string|max:4000',
+        ]);
+
+        $e164 = PhoneNormalizer::canonicalNgE164Digits((string) $request->input('phone'));
+        if ($e164 === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid Nigerian mobile number.',
+            ], 422);
+        }
+
+        $instance = WhatsappEvolutionConfigResolver::defaultInstance();
+        $text = (string) $request->input('message');
+        $sent = $this->whatsapp->sendText($instance, $e164, $text);
+        if (! $sent) {
+            Log::warning('whatsapp_wallet.merchant_send_message failed', [
+                'business_id' => $business->id,
+                'phone_e164' => $e164,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not send WhatsApp. Check Evolution settings.',
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['sent' => true],
+        ]);
+    }
+
+    public function ensure(Request $request): JsonResponse
+    {
+        $business = $request->user();
+        if (! $business instanceof Business) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        if ($gate = $this->gateWalletApi($business)) {
+            return $gate;
+        }
+
+        $request->validate([
+            'phone' => 'required|string|min:10',
+        ]);
+
+        $result = $this->partnerApi->ensureWallet((string) $request->input('phone'));
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Ensure failed',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['data'],
+        ]);
+    }
+
+    public function startPartnerPay(Request $request): JsonResponse
+    {
+        $business = $request->user();
+        if (! $business instanceof Business) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        if ($gate = $this->gateWalletApi($business)) {
+            return $gate;
+        }
+
+        $validated = $request->validate([
+            'phone' => 'required|string|min:10',
+            'amount' => 'required|numeric|min:0.01',
+            'order_reference' => 'required|string|max:120',
+            'order_summary' => 'required|string|max:8000',
+            'payer_name' => 'required|string|max:120',
+            'webhook_url' => 'required|string|max:500',
+            'idempotency_key' => 'required|string|min:8|max:80',
+        ]);
+
+        $result = $this->partnerPayIntent->start(
+            $business,
+            (string) $validated['phone'],
+            (float) $validated['amount'],
+            (string) $validated['order_reference'],
+            (string) $validated['order_summary'],
+            (string) $validated['payer_name'],
+            (string) $validated['webhook_url'],
+            (string) $validated['idempotency_key']
+        );
+
+        if (! $result['ok']) {
+            $status = (int) ($result['http_status'] ?? 400);
+
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not start wallet pay',
+            ], $status >= 400 && $status < 600 ? $status : 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['data'],
+        ], 201);
+    }
+
+    private function gateWalletApi(Business $business): ?JsonResponse
+    {
+        if (! $business->whatsapp_wallet_api_enabled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'WhatsApp wallet API is not enabled for this merchant. Ask Checkout support to enable it on your business account.',
+            ], 403);
+        }
+
+        return null;
+    }
+}

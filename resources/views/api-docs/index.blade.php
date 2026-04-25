@@ -85,6 +85,7 @@
                             <a href="#endpoints" class="block text-sm text-gray-700 hover:text-primary py-2">API Endpoints</a>
                             <a href="#payments" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Payments</a>
                             <a href="#update-amount" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Update payment amount</a>
+                            <a href="#whatsapp-wallet" class="block text-sm text-gray-700 hover:text-primary py-2">WhatsApp wallet API</a>
                             <a href="#webhooks" class="block text-sm text-gray-700 hover:text-primary py-2">Webhooks</a>
                             <a href="#code-examples" class="block text-sm text-gray-700 hover:text-primary py-2">Code Examples</a>
                             <a href="#error-handling" class="block text-sm text-gray-700 hover:text-primary py-2">Error Handling</a>
@@ -474,6 +475,70 @@ X-API-Key: pk_your_api_key_here</code></pre>
                         </div>
                     </div>
 
+                    <!-- WhatsApp wallet merchant API -->
+                    <div id="whatsapp-wallet" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">
+                            <i class="fab fa-whatsapp text-green-600 mr-2"></i>WhatsApp wallet (merchant API)
+                        </h2>
+                        <p class="text-gray-700 mb-4">
+                            Lets your server use the same <code class="bg-gray-100 px-2 py-1 rounded text-sm">X-API-Key</code> as bank-transfer payments. Checkout must <strong>enable WhatsApp wallet API</strong> on your business (admin). Nigerian wallet numbers only. Throttle: <strong>30 requests/minute</strong> on this group (in addition to global API limits).
+                        </p>
+
+                        <div class="space-y-8">
+                            <div class="border-l-4 border-green-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-post">POST</span>
+                                    <code class="text-lg font-mono text-gray-900">/whatsapp-wallet/lookup</code>
+                                </div>
+                                <p class="text-gray-700 mb-3">JSON body: <code class="bg-gray-100 px-1 rounded">phone</code>. Returns <code class="bg-gray-100 px-1 rounded">balance</code>, <code class="bg-gray-100 px-1 rounded">wallet_id</code>, <code class="bg-gray-100 px-1 rounded">has_pin</code>, <code class="bg-gray-100 px-1 rounded">tier</code>.</p>
+                            </div>
+
+                            <div class="border-l-4 border-green-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-post">POST</span>
+                                    <code class="text-lg font-mono text-gray-900">/whatsapp-wallet/ensure</code>
+                                </div>
+                                <p class="text-gray-700 mb-3">JSON body: <code class="bg-gray-100 px-1 rounded">phone</code>. Creates a Tier-1 wallet row if missing.</p>
+                            </div>
+
+                            <div class="border-l-4 border-green-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-post">POST</span>
+                                    <code class="text-lg font-mono text-gray-900">/whatsapp-wallet/send-message</code>
+                                </div>
+                                <p class="text-gray-700 mb-3">JSON body: <code class="bg-gray-100 px-1 rounded">phone</code>, <code class="bg-gray-100 px-1 rounded">message</code> (max 4000). Sends your composed plain text via WhatsApp (e.g. OTP). Same <code class="bg-gray-100 px-1 rounded">X-API-Key</code> as other wallet routes — no extra Checkout env secret per merchant.</p>
+                            </div>
+
+                            <div class="border-l-4 border-green-600 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-post">POST</span>
+                                    <code class="text-lg font-mono text-gray-900">/whatsapp-wallet/pay/start</code>
+                                </div>
+                                <p class="text-gray-700 mb-3"><strong>Recommended:</strong> Your backend sends <code class="bg-gray-100 px-1 rounded">order_summary</code> and amount; Checkout sends the customer a WhatsApp with a <strong>secure PIN link</strong>. On success, credits your business and POSTs <code class="bg-gray-100 px-1 rounded">payment.approved</code> to <code class="bg-gray-100 px-1 rounded">webhook_url</code> (must match your saved business or approved website webhook URL).</p>
+                                <div class="code-block mb-3">
+                                    <pre><code>POST {{ url('/api/v1/whatsapp-wallet/pay/start') }}
+Content-Type: application/json
+X-API-Key: pk_your_api_key_here
+
+{
+  "phone": "08012345678",
+  "amount": 2500.00,
+  "order_reference": "ORDER-TRACK-123",
+  "order_summary": "2x Jollof rice\n1x Zobo\nDelivery: Surulere",
+  "payer_name": "Ada Customer",
+  "webhook_url": "https://your-app.com/api/webhooks/checkout/payment",
+  "idempotency_key": "order-123-wallet-try-1"
+}</code></pre>
+                                </div>
+                                <p class="text-sm text-gray-600">Response <code class="bg-gray-100 px-1 rounded">data.confirm_url</code> is the same URL messaged to the customer. Link TTL from env <code class="bg-gray-100 px-1 rounded">WHATSAPP_WALLET_PARTNER_PAY_INTENT_TTL_MINUTES</code> (default 30).</p>
+                            </div>
+
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <p class="text-sm text-amber-900"><strong>No PIN-less debit endpoint.</strong> Merchant debits always require the customer to confirm on the Checkout PIN page after <strong>pay/start</strong> (WhatsApp link).</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Webhooks Section -->
                     <div id="webhooks" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
                         <h2 class="text-3xl font-bold text-gray-900 mb-4">
@@ -505,6 +570,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
                                     <pre><code>{
   "event": "payment.approved",
   "transaction_id": "TXN-1234567890",
+  "external_reference": "ORDER-TRACK-123",
   "status": "approved",
   "amount": 5000.00,
   "received_amount": 5000.00,
@@ -524,7 +590,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
   "email_data": {}
 }</code></pre>
                                 </div>
-                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>email_data</code> (optional raw email info).</p>
+                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>email_data</code> (optional raw email info).</p>
                             </div>
 
                             <div>

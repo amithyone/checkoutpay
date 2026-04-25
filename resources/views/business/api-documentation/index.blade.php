@@ -175,6 +175,7 @@ Content-Type: application/json
 {
   "event": "payment.approved",
   "transaction_id": "TXN-1234567890",
+  "external_reference": "ORDER-TRACK-123",
   "status": "approved",
   "amount": 5000.00,
   "received_amount": 5000.00,
@@ -189,13 +190,87 @@ Content-Type: application/json
   "email_data": {}
 }</code></pre>
                 </div>
-                <p class="text-xs text-gray-600 mt-2">Use <code>transaction_id</code> to identify the payment; use <code>received_amount</code> and <code>charges.business_receives</code> for reconciliation. Response structure is stable.</p>
+                <p class="text-xs text-gray-600 mt-2">Use <code>transaction_id</code> to identify the payment; use <code>external_reference</code> when present (e.g. your <code>order_reference</code> from WhatsApp wallet <code>pay/start</code>). Use <code>received_amount</code> and <code>charges.business_receives</code> for reconciliation.</p>
                 <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p class="text-xs text-green-800">
                         <i class="fas fa-check-circle mr-1"></i>
                         Configure your webhook URL in <a href="{{ route('business.settings.index') }}" class="underline font-medium">Settings</a> to receive automatic notifications.
                     </p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp wallet merchant API -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6" id="whatsapp-wallet">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fab fa-whatsapp mr-2 text-green-600"></i> WhatsApp wallet (merchant API)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">
+            Requires admin to <strong>enable WhatsApp wallet API</strong> on your business. Authenticate with <code class="bg-gray-100 px-1 rounded text-xs">X-API-Key</code> like other routes. Base: <code class="bg-gray-100 px-1 rounded text-xs">{{ url('/api/v1/whatsapp-wallet') }}</code>
+        </p>
+
+        <div class="space-y-6">
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-2">POST …/lookup — wallet balance</h4>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>POST {{ url('/api/v1/whatsapp-wallet/lookup') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{ "phone": "08012345678" }</code></pre>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-2">POST …/ensure — create wallet shell if missing</h4>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>POST {{ url('/api/v1/whatsapp-wallet/ensure') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{ "phone": "08012345678" }</code></pre>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-2">POST …/send-message — WhatsApp text you compose (e.g. OTP)</h4>
+                <p class="text-sm text-gray-600 mb-2">Same API key as orders; no separate Checkout secret per app. Body includes the full <code class="bg-gray-100 px-1 rounded text-xs">message</code> (max 4000 chars).</p>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>POST {{ url('/api/v1/whatsapp-wallet/send-message') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{
+  "phone": "08012345678",
+  "message": "Your login code is 123456. Valid 10 minutes."
+}</code></pre>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-2">POST …/pay/start — customer pays via WhatsApp + PIN link (recommended)</h4>
+                <p class="text-sm text-gray-600 mb-2">Checkout WhatsApps the customer a summary and secure link. <code class="bg-gray-100 px-1 rounded text-xs">webhook_url</code> must match your saved business or approved website webhook URL exactly. After PIN success you receive <code class="bg-gray-100 px-1 rounded text-xs">payment.approved</code> including <code class="bg-gray-100 px-1 rounded text-xs">external_reference</code> = your <code class="bg-gray-100 px-1 rounded text-xs">order_reference</code>.</p>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>POST {{ url('/api/v1/whatsapp-wallet/pay/start') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{
+  "phone": "08012345678",
+  "amount": 2500.00,
+  "order_reference": "ORDER-TRACK-123",
+  "order_summary": "2x Jollof rice\n1x Zobo\nDelivery: Surulere",
+  "payer_name": "Ada Customer",
+  "webhook_url": "https://your-app.example.com/api/webhooks/checkout/payment",
+  "idempotency_key": "order-123-wallet-try-1"
+}</code></pre>
+                </div>
+                <p class="text-xs text-gray-600 mt-2"><strong>201 response</strong> includes <code class="bg-gray-800 text-gray-100 px-1 rounded">confirm_url</code> (same link sent on WhatsApp). Customer opens it and enters their 4-digit wallet PIN.</p>
+            </div>
+
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p class="text-sm text-amber-900"><strong>No PIN-less debit.</strong> Wallet charges to your business only run after the customer opens the secure link from WhatsApp and enters their wallet PIN (<strong>pay/start</strong> only).</p>
             </div>
         </div>
     </div>

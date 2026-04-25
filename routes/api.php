@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\MevonPayWebhookController;
 use App\Http\Controllers\Api\LiveSyncReceiverController;
 use App\Http\Controllers\Api\V1StatusController;
 use App\Http\Controllers\Api\VtuWebhookController;
+use App\Http\Controllers\Api\TagineBridgeController;
+use App\Http\Controllers\Api\WhatsappWalletApiController;
 use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,6 +35,13 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
     Route::post('/withdrawal', [\App\Http\Controllers\Api\WithdrawalController::class, 'store']);
     Route::get('/withdrawals', [\App\Http\Controllers\Api\WithdrawalController::class, 'index']);
     Route::get('/balance', [\App\Http\Controllers\Api\WithdrawalController::class, 'balance']);
+
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::post('/whatsapp-wallet/lookup', [WhatsappWalletApiController::class, 'lookup']);
+        Route::post('/whatsapp-wallet/ensure', [WhatsappWalletApiController::class, 'ensure']);
+        Route::post('/whatsapp-wallet/send-message', [WhatsappWalletApiController::class, 'sendMessage']);
+        Route::post('/whatsapp-wallet/pay/start', [WhatsappWalletApiController::class, 'startPartnerPay']);
+    });
 });
 
 // Public routes (no API key required)
@@ -261,6 +270,16 @@ Route::prefix('v1/tax-admin')->group(function () {
             ->whereNumber('id');
     });
 });
+
+/*
+| Tagine ↔ Checkout bridge (shared secret). Tagine generates OTP locally; Checkout only sends WhatsApp + stores wallet.
+*/
+Route::middleware(['throttle:12,1', 'tagine.otp.secret'])
+    ->prefix('tagine')
+    ->group(function () {
+        Route::post('whatsapp/send-text', [TagineBridgeController::class, 'sendWhatsAppText']);
+        Route::post('wallet/ensure', [TagineBridgeController::class, 'ensureWallet']);
+    });
 
 // Health check
 Route::get('/health', function () {

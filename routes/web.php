@@ -45,6 +45,13 @@ Route::post('/wallet/whatsapp/vtu-confirm/{token}', [\App\Http\Controllers\Whats
     ->middleware('throttle:30,1')
     ->name('wallet.whatsapp.vtu-confirm.submit');
 
+Route::get('/wallet/partner-pay/{token}', [\App\Http\Controllers\WhatsappWalletPartnerPayWebController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('wallet.partner-pay.show');
+Route::post('/wallet/partner-pay/{token}', [\App\Http\Controllers\WhatsappWalletPartnerPayWebController::class, 'submit'])
+    ->middleware('throttle:30,1')
+    ->name('wallet.partner-pay.submit');
+
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');

@@ -88,8 +88,10 @@ class BusinessController extends Controller
             'is_active' => 'boolean',
             'website_approved' => 'boolean',
             'uses_external_account_numbers' => 'boolean',
+            'whatsapp_wallet_api_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
+        $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
 
         Business::create($validated);
 
@@ -131,8 +133,10 @@ class BusinessController extends Controller
             'website_approved' => 'boolean',
             'balance' => 'nullable|numeric|min:0',
             'uses_external_account_numbers' => 'boolean',
+            'whatsapp_wallet_api_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
+        $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
 
         $business->update($validated);
 
@@ -301,6 +305,19 @@ class BusinessController extends Controller
         $status = $business->is_active ? 'activated' : 'deactivated';
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', "Business {$status} successfully");
+    }
+
+    public function toggleWhatsappWalletApi(Business $business): RedirectResponse
+    {
+        $business->update([
+            'whatsapp_wallet_api_enabled' => ! $business->whatsapp_wallet_api_enabled,
+        ]);
+
+        $msg = $business->whatsapp_wallet_api_enabled
+            ? 'WhatsApp wallet merchant API is now enabled for this business (X-API-Key: lookup, ensure, pay/start).'
+            : 'WhatsApp wallet merchant API is now disabled for this business.';
+
+        return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
     }
 
     public function updateBalance(Request $request, Business $business): RedirectResponse

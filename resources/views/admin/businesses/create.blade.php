@@ -79,6 +79,17 @@
                     </label>
                 </div>
 
+                <div id="whatsapp-wallet-merchant-api" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
+                    <h4 class="text-sm font-semibold text-gray-900">
+                        <i class="fab fa-whatsapp text-green-600 mr-1"></i> WhatsApp wallet merchant API
+                    </h4>
+                    <p class="text-xs text-gray-600">If enabled, this business may call Checkout <code class="bg-white px-1 rounded">/api/v1/whatsapp-wallet/*</code> with their API key after you save.</p>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="whatsapp_wallet_api_enabled" value="1" {{ old('whatsapp_wallet_api_enabled') ? 'checked' : '' }} class="mt-1">
+                        <span class="text-sm text-gray-800"><strong>Enable</strong> WhatsApp wallet API for integrations</span>
+                    </label>
+                </div>
+
                 <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
                     <a href="{{ route('admin.businesses.index') }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                         Cancel

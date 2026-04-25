@@ -51,6 +51,8 @@ return [
     'wallet' => [
         'tier1_max_balance' => (float) env('WHATSAPP_WALLET_TIER1_MAX_BALANCE', 50000),
         'tier1_daily_transfer_limit' => (float) env('WHATSAPP_WALLET_TIER1_DAILY_TRANSFER', 50000),
+        /** TTL for partner pay intent (WhatsApp + PIN link). */
+        'partner_pay_intent_ttl_minutes' => max(5, min(120, (int) env('WHATSAPP_WALLET_PARTNER_PAY_INTENT_TTL_MINUTES', 30))),
         /** MevonPay createtempva: display name parts (last name gets phone suffix for uniqueness). */
         'tier1_temp_va_fname' => (string) env('WHATSAPP_WALLET_TIER1_TEMP_VA_FNAME', 'WhatsApp'),
         'tier1_temp_va_lname' => (string) env('WHATSAPP_WALLET_TIER1_TEMP_VA_LNAME', 'User'),

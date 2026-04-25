@@ -25,6 +25,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'api_key',
         'webhook_url',
         'uses_external_account_numbers',
+        'whatsapp_wallet_api_enabled',
         'email_account_id',
         'is_active',
         'rental_auto_approve',
@@ -123,6 +124,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_fixed' => 'decimal:2',
         'charge_exempt' => 'boolean',
         'uses_external_account_numbers' => 'boolean',
+        'whatsapp_wallet_api_enabled' => 'boolean',
     ];
 
     /**
@@ -438,6 +440,71 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function approvedWebsites()
     {
         return $this->hasMany(BusinessWebsite::class)->where('is_approved', true);
+    }
+
+    /**
+     * True when $url host matches an approved business website host (same rules as Pay API webhook validation).
+     */
+    public function webhookUrlMatchesApprovedWebsites(string $url): bool
+    {
+        $parsedUrl = parse_url(trim($url));
+        $urlHost = $parsedUrl['host'] ?? null;
+        if (! $urlHost) {
+            return false;
+        }
+
+        $urlHost = strtolower(preg_replace('/^www\./', '', $urlHost));
+
+        foreach ($this->approvedWebsites as $website) {
+            $websiteUrl = $website->website_url;
+            $websiteHost = parse_url($websiteUrl, PHP_URL_HOST);
+            if (! $websiteHost) {
+                $websiteHost = preg_replace('#^https?://#', '', $websiteUrl);
+                $websiteHost = preg_replace('#/.*$#', '', $websiteHost);
+            }
+            if (! $websiteHost) {
+                continue;
+            }
+            $websiteHost = strtolower(preg_replace('/^www\./', '', $websiteHost));
+            if ($urlHost === $websiteHost) {
+                return true;
+            }
+            $urlParts = explode('.', $urlHost);
+            $websiteParts = explode('.', $websiteHost);
+            if (count($urlParts) >= count($websiteParts)) {
+                $urlSuffix = implode('.', array_slice($urlParts, -count($websiteParts)));
+                if ($urlSuffix === $websiteHost) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Partner wallet pay: full webhook URL must match business or an approved website saved webhook (normalized), or host-only match.
+     */
+    public function incomingPartnerWebhookUrlIsAllowed(string $url): bool
+    {
+        $normalized = rtrim(trim($url), '/');
+        if ($normalized === '') {
+            return false;
+        }
+
+        $businessHook = $this->webhook_url ? rtrim(trim((string) $this->webhook_url), '/') : '';
+        if ($businessHook !== '' && hash_equals($businessHook, $normalized)) {
+            return true;
+        }
+
+        foreach ($this->approvedWebsites()->whereNotNull('webhook_url')->where('webhook_url', '!=', '')->get() as $site) {
+            $saved = rtrim(trim((string) $site->webhook_url), '/');
+            if ($saved !== '' && hash_equals($saved, $normalized)) {
+                return true;
+            }
+        }
+
+        return $this->webhookUrlMatchesApprovedWebsites($url);
     }
 
     /**

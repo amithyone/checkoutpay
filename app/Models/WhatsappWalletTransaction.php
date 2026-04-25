@@ -23,6 +23,12 @@ class WhatsappWalletTransaction extends Model
 
     public const TYPE_VTU_ELECTRICITY = 'vtu_electricity';
 
+    /** Merchant X-API-Key partner API: wallet debit to pay the authenticated business. */
+    public const TYPE_PARTNER_MERCHANT_PAY = 'partner_merchant_pay';
+
+    /** @deprecated Use TYPE_PARTNER_MERCHANT_PAY; kept for existing rows. */
+    public const TYPE_TAGINE_MERCHANT_PAY = 'tagine_merchant_pay';
+
     protected $fillable = [
         'whatsapp_wallet_id',
         'sender_name',

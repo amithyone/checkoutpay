@@ -290,6 +290,7 @@ class SendWebhookNotification implements ShouldQueue
         return [
             'event' => 'payment.approved',
             'transaction_id' => $this->payment->transaction_id,
+            'external_reference' => $this->payment->external_reference,
             'status' => $this->payment->status,
             'amount' => (float) $this->payment->amount,
             'received_amount' => $this->payment->received_amount ? (float) $this->payment->received_amount : (float) $this->payment->amount,

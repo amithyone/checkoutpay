@@ -98,6 +98,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('businesses.websites.toggle-charges');
         Route::post('businesses/{business}/toggle-status', [BusinessController::class, 'toggleStatus'])
             ->name('businesses.toggle-status');
+        Route::post('businesses/{business}/toggle-whatsapp-wallet-api', [BusinessController::class, 'toggleWhatsappWalletApi'])
+            ->name('businesses.toggle-whatsapp-wallet-api');
         Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
             ->middleware('super_admin')
             ->name('businesses.update-balance');

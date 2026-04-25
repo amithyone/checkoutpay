@@ -86,6 +86,12 @@ class Payment extends Model
     /** Tier 1 WhatsApp wallet temp VA top-up (admin payments visibility; not a merchant checkout). */
     const SOURCE_WHATSAPP_WALLET = 'whatsapp_wallet';
 
+    /** @deprecated Use SOURCE_PARTNER_WALLET_API */
+    const SOURCE_TAGINE_APP = 'tagine_app';
+
+    /** Debit customer WhatsApp wallet, credit merchant via X-API-Key partner API (no chat PIN). */
+    const SOURCE_PARTNER_WALLET_API = 'partner_wallet_api';
+
     /**
      * Get pending payments
      */
