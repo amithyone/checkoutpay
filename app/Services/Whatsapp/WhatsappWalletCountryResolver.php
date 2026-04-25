@@ -22,8 +22,8 @@ final class WhatsappWalletCountryResolver
             return $this->fallbackCurrency();
         }
 
-        $rows = config('whatsapp_wallet_regions.country_by_dial', []);
-        if (! is_array($rows)) {
+        $rows = WhatsappWalletRegionConfig::countryByDial();
+        if (! is_array($rows) || $rows === []) {
             return $this->fallbackCurrency();
         }
 
@@ -52,7 +52,7 @@ final class WhatsappWalletCountryResolver
 
     public function currencyForEvolutionInstance(string $instance): string
     {
-        $instances = config('whatsapp_wallet_regions.instances', []);
+        $instances = WhatsappWalletRegionConfig::instances();
         if (is_array($instances) && isset($instances[$instance]) && is_array($instances[$instance])) {
             $cur = (string) ($instances[$instance]['currency'] ?? '');
             if ($cur !== '') {
@@ -68,8 +68,8 @@ final class WhatsappWalletCountryResolver
     public function currencyForCountryIso(string $countryIso): string
     {
         $iso = strtoupper($countryIso);
-        $rows = config('whatsapp_wallet_regions.country_by_dial', []);
-        if (! is_array($rows)) {
+        $rows = WhatsappWalletRegionConfig::countryByDial();
+        if (! is_array($rows) || $rows === []) {
             return $this->fallbackCurrency();
         }
         foreach ($rows as $row) {

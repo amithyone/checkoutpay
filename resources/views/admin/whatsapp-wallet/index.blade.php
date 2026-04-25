@@ -56,7 +56,7 @@
 
         <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
             <h3 class="text-lg font-semibold text-gray-900 mb-3">Enabled regions (Evolution instances)</h3>
-            <p class="text-xs text-gray-500 mb-3">From <code class="bg-gray-100 px-1 rounded">config/whatsapp_wallet_regions.php</code> + env. Update env or save overrides below.</p>
+            <p class="text-xs text-gray-500 mb-3">Merged: <code class="bg-gray-100 px-1 rounded">config/whatsapp_wallet_regions.php</code> + env + <strong>admin extra rows</strong> (see Integration settings). Same dial or instance name is overridden by admin.</p>
             @if($regions === [])
                 <p class="text-sm text-gray-500">No instances configured.</p>
             @else
@@ -160,6 +160,56 @@
         }
     @endphp
 
+    @php
+        if (is_array(old('country_dial_extra'))) {
+            $dialExtraFormRows = old('country_dial_extra');
+        } else {
+            $dialExtraFormRows = \App\Models\Setting::get('whatsapp_country_dial_extra', []) ?: [];
+        }
+        if (! is_array($dialExtraFormRows)) {
+            $dialExtraFormRows = [];
+        }
+        while (count($dialExtraFormRows) < 8) {
+            $dialExtraFormRows[] = ['dial' => '', 'country' => '', 'currency' => '', 'label' => ''];
+        }
+        if (is_array(old('instances_extra'))) {
+            $instancesExtraFormRows = old('instances_extra');
+        } else {
+            $instancesExtraFormRows = [];
+            $st = \App\Models\Setting::get('whatsapp_wallet_instances_extra', []);
+            if (is_array($st)) {
+                foreach ($st as $n => $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
+                    $f = $row['features'] ?? [];
+                    if (! is_array($f)) {
+                        $f = [];
+                    }
+                    $instancesExtraFormRows[] = [
+                        'name' => $n,
+                        'label' => $row['label'] ?? '',
+                        'country' => $row['country'] ?? '',
+                        'currency' => $row['currency'] ?? '',
+                        'feature_p2p' => ! empty($f['p2p']),
+                        'feature_bank' => ! empty($f['bank']),
+                        'feature_vtu' => ! empty($f['vtu']),
+                        'feature_rentals' => ! empty($f['rentals']),
+                    ];
+                }
+            }
+        }
+        if (! is_array($instancesExtraFormRows)) {
+            $instancesExtraFormRows = [];
+        }
+        while (count($instancesExtraFormRows) < 4) {
+            $instancesExtraFormRows[] = [
+                'name' => '', 'label' => '', 'country' => '', 'currency' => '',
+                'feature_p2p' => true, 'feature_bank' => false, 'feature_vtu' => false, 'feature_rentals' => false,
+            ];
+        }
+    @endphp
+
     <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Integration settings</h3>
         <p class="text-sm text-gray-600 mb-4">Saved in the <code class="bg-gray-100 px-1 rounded">settings</code> table (group <code class="bg-gray-100 px-1 rounded">whatsapp</code>). Empty fields fall back to <code class="bg-gray-100 px-1 rounded">.env</code> where the app reads env directly.</p>
@@ -167,6 +217,98 @@
         <form action="{{ route('admin.whatsapp-wallet.update') }}" method="POST" class="space-y-4">
             @csrf
             @method('PUT')
+
+            <div class="border border-indigo-100 bg-indigo-50/50 rounded-lg p-4 space-y-4">
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-900">Add or override countries (dial → currency)</h4>
+                    <p class="text-xs text-gray-600 mt-1">Base list comes from <code class="bg-white px-1 rounded">config/whatsapp_wallet_regions.php</code>. Rows here are <strong>merged</strong>: the same <code class="text-xs">dial</code> (e.g. 260) replaces the file entry. Use full E.164-style codes without +. For local-only number parsing, some regions may still need code changes — full international numbers work for wallet currency detection.</p>
+                </div>
+                <div class="overflow-x-auto border border-indigo-100 rounded-lg bg-white">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-gray-700">
+                            <tr>
+                                <th class="px-3 py-2 font-medium">Dial (digits)</th>
+                                <th class="px-3 py-2 font-medium">Country ISO2</th>
+                                <th class="px-3 py-2 font-medium">Currency ISO3</th>
+                                <th class="px-3 py-2 font-medium">Label</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($dialExtraFormRows as $i => $dr)
+                                <tr>
+                                    <td class="px-3 py-2">
+                                        <input type="text" name="country_dial_extra[{{ $i }}][dial]" value="{{ $dr['dial'] ?? '' }}" inputmode="numeric" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm font-mono" placeholder="e.g. 260" maxlength="4">
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <input type="text" name="country_dial_extra[{{ $i }}][country]" value="{{ $dr['country'] ?? '' }}" maxlength="2" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm font-mono uppercase" placeholder="ZM">
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <input type="text" name="country_dial_extra[{{ $i }}][currency]" value="{{ $dr['currency'] ?? '' }}" maxlength="3" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm font-mono uppercase" placeholder="ZMW">
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <input type="text" name="country_dial_extra[{{ $i }}][label]" value="{{ $dr['label'] ?? '' }}" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm" placeholder="Zambia">
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-900">Extra Evolution instances (optional)</h4>
+                    <p class="text-xs text-gray-600 mt-1">Instance <strong>name</strong> must match the name in your Evolution API. Merged with config; same name is overridden. Features match the wallet product toggles (e.g. P2P on, bank rails off for new markets).</p>
+                </div>
+                <div class="overflow-x-auto border border-indigo-100 rounded-lg bg-white text-xs">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50 text-left text-gray-700">
+                            <tr>
+                                <th class="px-2 py-2 font-medium">Instance name</th>
+                                <th class="px-2 py-2 font-medium">Label</th>
+                                <th class="px-2 py-2 font-medium">CC</th>
+                                <th class="px-2 py-2 font-medium">Cur</th>
+                                <th class="px-2 py-2 font-medium text-center">P2P</th>
+                                <th class="px-2 py-2 font-medium text-center">Bank</th>
+                                <th class="px-2 py-2 font-medium text-center">VTU</th>
+                                <th class="px-2 py-2 font-medium text-center">Rent</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($instancesExtraFormRows as $i => $ir)
+                                <tr>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <input type="text" name="instances_extra[{{ $i }}][name]" value="{{ $ir['name'] ?? '' }}" class="w-full border border-gray-300 rounded px-1.5 py-1" placeholder="Zambia">
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <input type="text" name="instances_extra[{{ $i }}][label]" value="{{ $ir['label'] ?? '' }}" class="w-full border border-gray-300 rounded px-1.5 py-1" placeholder="Zambia">
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <input type="text" name="instances_extra[{{ $i }}][country]" value="{{ $ir['country'] ?? '' }}" maxlength="2" class="w-14 border border-gray-300 rounded px-1.5 py-1 font-mono uppercase" placeholder="ZM">
+                                    </td>
+                                    <td class="px-2 py-1.5 align-top">
+                                        <input type="text" name="instances_extra[{{ $i }}][currency]" value="{{ $ir['currency'] ?? '' }}" maxlength="3" class="w-16 border border-gray-300 rounded px-1.5 py-1 font-mono uppercase" placeholder="ZMW">
+                                    </td>
+                                    <td class="px-2 py-1.5 text-center align-middle">
+                                        <input type="hidden" name="instances_extra[{{ $i }}][feature_p2p]" value="0">
+                                        <input type="checkbox" name="instances_extra[{{ $i }}][feature_p2p]" value="1" class="rounded border-gray-300" @checked(!empty($ir['feature_p2p']))>
+                                    </td>
+                                    <td class="px-2 py-1.5 text-center align-middle">
+                                        <input type="hidden" name="instances_extra[{{ $i }}][feature_bank]" value="0">
+                                        <input type="checkbox" name="instances_extra[{{ $i }}][feature_bank]" value="1" class="rounded border-gray-300" @checked(!empty($ir['feature_bank']))>
+                                    </td>
+                                    <td class="px-2 py-1.5 text-center align-middle">
+                                        <input type="hidden" name="instances_extra[{{ $i }}][feature_vtu]" value="0">
+                                        <input type="checkbox" name="instances_extra[{{ $i }}][feature_vtu]" value="1" class="rounded border-gray-300" @checked(!empty($ir['feature_vtu']))>
+                                    </td>
+                                    <td class="px-2 py-1.5 text-center align-middle">
+                                        <input type="hidden" name="instances_extra[{{ $i }}][feature_rentals]" value="0">
+                                        <input type="checkbox" name="instances_extra[{{ $i }}][feature_rentals]" value="1" class="rounded border-gray-300" @checked(!empty($ir['feature_rentals']))>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

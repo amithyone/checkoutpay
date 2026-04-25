@@ -8,6 +8,7 @@ use App\Models\WhatsappCrossBorderFxRate;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
+use App\Services\Whatsapp\WhatsappWalletRegionConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -44,8 +45,8 @@ class WhatsappWalletAdminController extends Controller
             ->limit(40)
             ->get();
 
-        $regions = config('whatsapp_wallet_regions.instances', []);
-        $dialMap = config('whatsapp_wallet_regions.country_by_dial', []);
+        $regions = WhatsappWalletRegionConfig::instances();
+        $dialMap = WhatsappWalletRegionConfig::countryByDial();
 
         $wa = Setting::getByGroup('whatsapp');
         $fxRates = WhatsappCrossBorderFxRate::query()->orderBy('from_currency')->orderBy('to_currency')->get();
@@ -139,7 +140,7 @@ class WhatsappWalletAdminController extends Controller
     private function fxCurrencyCodesForAdmin(): array
     {
         $codes = [];
-        $dial = config('whatsapp_wallet_regions.country_by_dial', []);
+        $dial = WhatsappWalletRegionConfig::countryByDial();
         if (is_array($dial)) {
             foreach ($dial as $row) {
                 if (is_array($row) && ! empty($row['currency'])) {
@@ -147,7 +148,7 @@ class WhatsappWalletAdminController extends Controller
                 }
             }
         }
-        $instances = config('whatsapp_wallet_regions.instances', []);
+        $instances = WhatsappWalletRegionConfig::instances();
         if (is_array($instances)) {
             foreach ($instances as $row) {
                 if (is_array($row) && ! empty($row['currency'])) {
@@ -208,6 +209,8 @@ class WhatsappWalletAdminController extends Controller
         Setting::set('whatsapp_cross_border_disabled_message', $validated['whatsapp_cross_border_disabled_message'] ?: null, 'string', 'whatsapp', 'Message when cross-border off');
         Setting::set('whatsapp_cross_border_missing_rate_message', $validated['whatsapp_cross_border_missing_rate_message'] ?: null, 'string', 'whatsapp', 'Message when FX pair missing');
 
+        $this->saveWhatsappRegionOverrides($request);
+
         WhatsappCrossBorderP2pFxService::forgetRatesCache();
 
         return redirect()->route('admin.whatsapp-wallet.index')
@@ -217,8 +220,8 @@ class WhatsappWalletAdminController extends Controller
     private function countryFromPhoneE164(string $phoneE164): string
     {
         $d = preg_replace('/\D+/', '', $phoneE164) ?? '';
-        $rows = config('whatsapp_wallet_regions.country_by_dial', []);
-        if (! is_array($rows)) {
+        $rows = WhatsappWalletRegionConfig::countryByDial();
+        if (! is_array($rows) || $rows === []) {
             return 'Other';
         }
         usort($rows, static fn ($a, $b): int => strlen((string) ($b['dial'] ?? '')) <=> strlen((string) ($a['dial'] ?? '')));
@@ -233,5 +236,91 @@ class WhatsappWalletAdminController extends Controller
         }
 
         return 'Other';
+    }
+
+    /**
+     * Persist admin-only dial map and Evolution instance rows (merge with file config at runtime).
+     */
+    private function saveWhatsappRegionOverrides(Request $request): void
+    {
+        $dialRows = $request->input('country_dial_extra', []);
+        $dialClean = [];
+        if (is_array($dialRows)) {
+            foreach ($dialRows as $r) {
+                if (! is_array($r)) {
+                    continue;
+                }
+                $d = preg_replace('/\D+/', '', (string) ($r['dial'] ?? '')) ?? '';
+                $cc = strtoupper(substr(preg_replace('/\s+/', '', (string) ($r['country'] ?? '')), 0, 2));
+                if ($d === '' || strlen($cc) !== 2) {
+                    continue;
+                }
+                $cur = strtoupper(substr(preg_replace('/\s+/', '', (string) ($r['currency'] ?? 'USD')), 0, 3));
+                if (strlen($cur) !== 3) {
+                    $cur = 'USD';
+                }
+                $label = trim((string) ($r['label'] ?? ''));
+                if ($label === '') {
+                    $label = $cc;
+                }
+                $dialClean[] = [
+                    'dial' => $d,
+                    'country' => $cc,
+                    'currency' => $cur,
+                    'label' => $label,
+                ];
+            }
+        }
+        Setting::set(
+            'whatsapp_country_dial_extra',
+            $dialClean,
+            'json',
+            'whatsapp',
+            'Admin extra country dial map (merges with config/whatsapp_wallet_regions.php; same dial replaces file entry)'
+        );
+
+        $instRows = $request->input('instances_extra', []);
+        $out = [];
+        if (is_array($instRows)) {
+            foreach ($instRows as $r) {
+                if (! is_array($r)) {
+                    continue;
+                }
+                $name = trim((string) ($r['name'] ?? ''));
+                if ($name === '') {
+                    continue;
+                }
+                $cc = strtoupper(substr(preg_replace('/\s+/', '', (string) ($r['country'] ?? '')), 0, 2));
+                if (strlen($cc) !== 2) {
+                    continue;
+                }
+                $cur = strtoupper(substr(preg_replace('/\s+/', '', (string) ($r['currency'] ?? 'USD')), 0, 3));
+                if (strlen($cur) !== 3) {
+                    $cur = 'USD';
+                }
+                $label = trim((string) ($r['label'] ?? ''));
+                if ($label === '') {
+                    $label = $name;
+                }
+                $out[$name] = [
+                    'country' => $cc,
+                    'currency' => $cur,
+                    'label' => $label,
+                    'features' => [
+                        'p2p' => ! empty($r['feature_p2p']),
+                        'bank' => ! empty($r['feature_bank']),
+                        'vtu' => ! empty($r['feature_vtu']),
+                        'rentals' => ! empty($r['feature_rentals']),
+                    ],
+                ];
+            }
+        }
+        Setting::set(
+            'whatsapp_wallet_instances_extra',
+            $out,
+            'json',
+            'whatsapp',
+            'Admin extra Evolution instance → country (merges with config; same name replaces / extends file entry)'
+        );
     }
 }

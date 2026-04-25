@@ -3,7 +3,7 @@
 namespace App\Services\Whatsapp;
 
 /**
- * E.164 digits only (no leading +). Nigeria, Namibia, Ghana, UK, NANP (+1) for WhatsApp wallet P2P.
+ * E.164 digits only (no leading +). Nigeria, Namibia, Ghana, ZM/ZW/BW/BJ/TZ/ZA, UK, NANP (+1) for WhatsApp wallet P2P.
  */
 final class PhoneNormalizer
 {
@@ -125,6 +125,150 @@ final class PhoneNormalizer
     }
 
     /**
+     * Zambia: 260 + 9-digit national.
+     */
+    public static function canonicalZmE164Digits(string $input): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+        if (str_starts_with($d, '260')) {
+            $rest = substr($d, 3);
+
+            return strlen($rest) === 9 ? $d : null;
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '0')) {
+            return '260'.substr($d, 1);
+        }
+        if (strlen($d) === 9) {
+            return '260'.$d;
+        }
+
+        return null;
+    }
+
+    /**
+     * Zimbabwe: 263 + 9-digit national.
+     */
+    public static function canonicalZwE164Digits(string $input): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+        if (str_starts_with($d, '263')) {
+            $rest = substr($d, 3);
+
+            return strlen($rest) === 9 ? $d : null;
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '0')) {
+            return '263'.substr($d, 1);
+        }
+        if (strlen($d) === 9) {
+            return '263'.$d;
+        }
+
+        return null;
+    }
+
+    /**
+     * Botswana: 267 + 8-digit national.
+     */
+    public static function canonicalBwE164Digits(string $input): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+        if (str_starts_with($d, '267')) {
+            $rest = substr($d, 3);
+
+            return strlen($rest) === 8 ? $d : null;
+        }
+        if (strlen($d) === 9 && str_starts_with($d, '0')) {
+            return '267'.substr($d, 1);
+        }
+        if (strlen($d) === 8) {
+            return '267'.$d;
+        }
+
+        return null;
+    }
+
+    /**
+     * Tanzania: 255 + 9-digit national.
+     */
+    public static function canonicalTzE164Digits(string $input): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+        if (str_starts_with($d, '255')) {
+            $rest = substr($d, 3);
+
+            return strlen($rest) === 9 ? $d : null;
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '0')) {
+            return '255'.substr($d, 1);
+        }
+        if (strlen($d) === 9) {
+            return '255'.$d;
+        }
+
+        return null;
+    }
+
+    /**
+     * Benin: 229 + 8-digit national.
+     */
+    public static function canonicalBjE164Digits(string $input): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+        if (str_starts_with($d, '229')) {
+            $rest = substr($d, 3);
+
+            return strlen($rest) === 8 ? $d : null;
+        }
+        if (strlen($d) === 9 && str_starts_with($d, '0')) {
+            return '229'.substr($d, 1);
+        }
+        if (strlen($d) === 8) {
+            return '229'.$d;
+        }
+
+        return null;
+    }
+
+    /**
+     * South Africa: 27 + 9-digit national (E.164 length 11).
+     */
+    public static function canonicalZaE164Digits(string $input): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+        if (str_starts_with($d, '27')) {
+            $rest = substr($d, 2);
+
+            return strlen($rest) === 9 ? $d : null;
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '0')) {
+            return '27'.substr($d, 1);
+        }
+        if (strlen($d) === 9) {
+            return '27'.$d;
+        }
+
+        return null;
+    }
+
+    /**
      * Resolve wallet P2P recipient numbers across supported regions.
      * 10-digit strings without a country code: leading 7/8/9 are treated as Nigeria (backward compatible);
      * other leading digits are treated as NANP (+1) first, then Nigeria as a fallback.
@@ -136,20 +280,38 @@ final class PhoneNormalizer
             return null;
         }
 
-        if (str_starts_with($d, '234')) {
-            return self::canonicalNgE164Digits($input);
+        if (str_starts_with($d, '260')) {
+            return self::canonicalZmE164Digits($input);
+        }
+        if (str_starts_with($d, '263')) {
+            return self::canonicalZwE164Digits($input);
         }
         if (str_starts_with($d, '264')) {
             return self::canonicalNaE164Digits($input);
         }
+        if (str_starts_with($d, '267')) {
+            return self::canonicalBwE164Digits($input);
+        }
+        if (str_starts_with($d, '255')) {
+            return self::canonicalTzE164Digits($input);
+        }
+        if (str_starts_with($d, '234')) {
+            return self::canonicalNgE164Digits($input);
+        }
         if (str_starts_with($d, '233')) {
             return self::canonicalGhE164Digits($input);
+        }
+        if (str_starts_with($d, '229')) {
+            return self::canonicalBjE164Digits($input);
         }
         if (str_starts_with($d, '44')) {
             return self::canonicalGbE164Digits($input);
         }
         if (str_starts_with($d, '1') && strlen($d) === 11) {
             return self::canonicalNanpE164Digits($input);
+        }
+        if (str_starts_with($d, '27')) {
+            return self::canonicalZaE164Digits($input);
         }
 
         if (strlen($d) === 11 && str_starts_with($d, '0')) {
@@ -179,7 +341,13 @@ final class PhoneNormalizer
             return self::canonicalNgE164Digits($input);
         }
 
-        return self::canonicalNaE164Digits($input)
+        return self::canonicalZmE164Digits($input)
+            ?? self::canonicalZwE164Digits($input)
+            ?? self::canonicalBwE164Digits($input)
+            ?? self::canonicalTzE164Digits($input)
+            ?? self::canonicalBjE164Digits($input)
+            ?? self::canonicalZaE164Digits($input)
+            ?? self::canonicalNaE164Digits($input)
             ?? self::canonicalGhE164Digits($input)
             ?? self::canonicalGbE164Digits($input)
             ?? self::canonicalNanpE164Digits($input);
@@ -191,6 +359,12 @@ final class PhoneNormalizer
             'NG' => self::canonicalNgE164Digits($input),
             'NA' => self::canonicalNaE164Digits($input),
             'GH' => self::canonicalGhE164Digits($input),
+            'ZM' => self::canonicalZmE164Digits($input),
+            'ZW' => self::canonicalZwE164Digits($input),
+            'BW' => self::canonicalBwE164Digits($input),
+            'TZ' => self::canonicalTzE164Digits($input),
+            'BJ' => self::canonicalBjE164Digits($input),
+            'ZA' => self::canonicalZaE164Digits($input),
             'GB', 'UK' => self::canonicalGbE164Digits($input),
             'US', 'CA' => self::canonicalNanpE164Digits($input),
             default => null,
@@ -314,11 +488,17 @@ final class PhoneNormalizer
 
     private static function looksExplicitInternational(string $digits): bool
     {
-        return str_starts_with($digits, '234')
+        return str_starts_with($digits, '260')
+            || str_starts_with($digits, '263')
             || str_starts_with($digits, '264')
+            || str_starts_with($digits, '267')
+            || str_starts_with($digits, '255')
+            || str_starts_with($digits, '234')
             || str_starts_with($digits, '233')
+            || str_starts_with($digits, '229')
             || str_starts_with($digits, '44')
-            || (str_starts_with($digits, '1') && strlen($digits) === 11);
+            || (str_starts_with($digits, '1') && strlen($digits) === 11)
+            || (str_starts_with($digits, '27') && strlen($digits) >= 11);
     }
 
     private static function countryFromE164(string $senderPhoneE164): ?string
@@ -328,14 +508,32 @@ final class PhoneNormalizer
             return null;
         }
 
-        if (str_starts_with($d, '234')) {
-            return 'NG';
+        if (str_starts_with($d, '260')) {
+            return 'ZM';
+        }
+        if (str_starts_with($d, '263')) {
+            return 'ZW';
         }
         if (str_starts_with($d, '264')) {
             return 'NA';
         }
+        if (str_starts_with($d, '267')) {
+            return 'BW';
+        }
+        if (str_starts_with($d, '255')) {
+            return 'TZ';
+        }
+        if (str_starts_with($d, '234')) {
+            return 'NG';
+        }
         if (str_starts_with($d, '233')) {
             return 'GH';
+        }
+        if (str_starts_with($d, '229')) {
+            return 'BJ';
+        }
+        if (str_starts_with($d, '27') && strlen($d) === 11) {
+            return 'ZA';
         }
         if (str_starts_with($d, '44')) {
             return 'GB';
