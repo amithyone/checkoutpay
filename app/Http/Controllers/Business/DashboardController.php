@@ -108,7 +108,8 @@ class DashboardController extends Controller
                 'total_revenue' => (clone $websitePaymentsQuery)
                     ->where('status', 'approved')
                     ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0,
-                'total_payments' => (clone $websitePaymentsQuery)->where('status', 'approved')->count(),
+                'total_payments' => (clone $websitePaymentsQuery)->count(),
+                'approved_payments' => (clone $websitePaymentsQuery)->where('status', 'approved')->count(),
                 'pending_payments' => (clone $websitePaymentsQuery)->where('status', 'pending')->count(),
                 'today_revenue' => $todayRevenue, // Calculated from actual transactions
                 'today_payments' => $todayPayments,

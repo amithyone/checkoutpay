@@ -206,7 +206,7 @@
                     </div>
                     
                     <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-gray-600 mt-3">
-                        <span><strong>{{ number_format($websiteStat['total_payments']) }}</strong> approved</span>
+                        <span><strong>{{ number_format($websiteStat['approved_payments']) }}</strong> approved</span>
                         @if($websiteStat['pending_payments'] > 0)
                             <span class="text-yellow-600"><strong>{{ number_format($websiteStat['pending_payments']) }}</strong> pending</span>
                         @endif
