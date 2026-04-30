@@ -15,8 +15,6 @@ class StatisticsController extends Controller
         $business = Auth::guard('business')->user();
         $nigeriaTz = 'Africa/Lagos';
         $approvedAtExpr = DB::raw('COALESCE(matched_at, created_at)');
-        $approvedAtNigeriaDateExpr = DB::raw("DATE(CONVERT_TZ(COALESCE(matched_at, created_at), '+00:00', '+01:00'))");
-        $createdAtNigeriaDateExpr = DB::raw("DATE(CONVERT_TZ(created_at, '+00:00', '+01:00'))");
 
         // Period selector (daily, monthly, yearly)
         $period = $request->get('period', 'monthly'); // daily, monthly, yearly
@@ -91,7 +89,7 @@ class StatisticsController extends Controller
             $dailyStats = (clone $websitePayments)
                 ->whereBetween('created_at', [$rangeStartUtc, $rangeEndUtc])
                 ->select(
-                    $createdAtNigeriaDateExpr.' as date',
+                    DB::raw("DATE(CONVERT_TZ(created_at, '+00:00', '+01:00')) as date"),
                     DB::raw('COUNT(*) as count'),
                     DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                     DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count'),
@@ -201,7 +199,7 @@ class StatisticsController extends Controller
         $dailyStats = $business->payments()
             ->whereBetween('created_at', [$rangeStartUtc, $rangeEndUtc])
             ->select(
-                $createdAtNigeriaDateExpr.' as date',
+                DB::raw("DATE(CONVERT_TZ(created_at, '+00:00', '+01:00')) as date"),
                 DB::raw('COUNT(*) as count'),
                 DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                 DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count')
