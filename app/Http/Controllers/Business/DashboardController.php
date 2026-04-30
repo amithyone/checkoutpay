@@ -12,25 +12,28 @@ class DashboardController extends Controller
     public function index()
     {
         $business = Auth::guard('business')->user();
+        // Revenue periods should reflect when a payment was approved, not when it was created.
+        // matched_at is the primary approval timestamp in this codebase.
+        $approvedAtExpr = DB::raw('COALESCE(matched_at, approved_at, created_at)');
 
         // Calculate business revenue from actual transactions (not edited values)
         // Today's revenue: sum of all approved payments for today
         $todayRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereDate('created_at', today())
+            ->whereDate($approvedAtExpr, today())
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
         // Monthly revenue: sum of all approved payments for current month
         $monthlyRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->whereYear($approvedAtExpr, now()->year)
+            ->whereMonth($approvedAtExpr, now()->month)
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
         // Yearly revenue: sum of all approved payments for current year
         $yearlyRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereYear('created_at', now()->year)
+            ->whereYear($approvedAtExpr, now()->year)
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
 
         // Get statistics
@@ -61,36 +64,38 @@ class DashboardController extends Controller
             // Calculate revenue from actual transactions
             $todayRevenue = $website->payments()
                 ->where('status', 'approved')
-                ->whereDate('created_at', today())
+                ->whereDate($approvedAtExpr, today())
                 ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             
             // Calculate monthly/yearly revenue from actual transactions
             $monthlyRevenue = $website->payments()
                 ->where('status', 'approved')
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+                ->whereYear($approvedAtExpr, now()->year)
+                ->whereMonth($approvedAtExpr, now()->month)
                 ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             $yearlyRevenue = $website->payments()
                 ->where('status', 'approved')
-                ->whereYear('created_at', now()->year)
+                ->whereYear($approvedAtExpr, now()->year)
                 ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             
             // Calculate daily payments count
             $todayPayments = $website->payments()
                 ->where('status', 'approved')
-                ->whereDate('created_at', today())
+                ->whereDate($approvedAtExpr, today())
                 ->count();
             
             // Calculate monthly payments count
             $monthlyPayments = $website->payments()
                 ->where('status', 'approved')
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+                ->whereYear($approvedAtExpr, now()->year)
+                ->whereMonth($approvedAtExpr, now()->month)
                 ->count();
             
             $websiteStats[] = [
                 'website' => $website,
-                'total_revenue' => $websitePayments->sum('amount'), // Real transaction data for reference
+                'total_revenue' => $websitePayments->sum(function ($payment) {
+                    return (float) ($payment->business_receives ?? $payment->amount);
+                }),
                 'total_payments' => $websitePayments->count(),
                 'pending_payments' => $website->payments()->where('status', 'pending')->count(),
                 'today_revenue' => $todayRevenue, // Calculated from actual transactions
