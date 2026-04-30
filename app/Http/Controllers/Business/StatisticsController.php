@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,10 @@ class StatisticsController extends Controller
     public function index(Request $request)
     {
         $business = Auth::guard('business')->user();
+        $nigeriaTz = 'Africa/Lagos';
+        $approvedAtExpr = DB::raw('COALESCE(matched_at, created_at)');
+        $approvedAtNigeriaDateExpr = DB::raw("DATE(CONVERT_TZ(COALESCE(matched_at, created_at), '+00:00', '+01:00'))");
+        $createdAtNigeriaDateExpr = DB::raw("DATE(CONVERT_TZ(created_at, '+00:00', '+01:00'))");
 
         // Period selector (daily, monthly, yearly)
         $period = $request->get('period', 'monthly'); // daily, monthly, yearly
@@ -21,41 +26,45 @@ class StatisticsController extends Controller
             $dateFrom = $request->date_from;
             $dateTo = $request->date_to;
         } else {
+            $nigeriaNow = now($nigeriaTz);
             switch ($period) {
                 case 'daily':
-                    $dateFrom = now()->subDays(30)->format('Y-m-d');
-                    $dateTo = now()->format('Y-m-d');
+                    $dateFrom = $nigeriaNow->copy()->subDays(30)->format('Y-m-d');
+                    $dateTo = $nigeriaNow->format('Y-m-d');
                     break;
                 case 'yearly':
-                    $dateFrom = now()->subYears(2)->startOfYear()->format('Y-m-d');
-                    $dateTo = now()->format('Y-m-d');
+                    $dateFrom = $nigeriaNow->copy()->subYears(2)->startOfYear()->format('Y-m-d');
+                    $dateTo = $nigeriaNow->format('Y-m-d');
                     break;
                 default: // monthly
-                    $dateFrom = now()->subMonths(12)->startOfMonth()->format('Y-m-d');
-                    $dateTo = now()->format('Y-m-d');
+                    $dateFrom = $nigeriaNow->copy()->subMonths(12)->startOfMonth()->format('Y-m-d');
+                    $dateTo = $nigeriaNow->format('Y-m-d');
             }
         }
 
+        $rangeStartUtc = Carbon::parse($dateFrom, $nigeriaTz)->startOfDay()->utc();
+        $rangeEndUtc = Carbon::parse($dateTo, $nigeriaTz)->endOfDay()->utc();
+        $todayStartUtc = now($nigeriaTz)->startOfDay()->utc();
+        $todayEndUtc = now($nigeriaTz)->endOfDay()->utc();
+        $monthStartUtc = now($nigeriaTz)->startOfMonth()->utc();
+        $monthEndUtc = now($nigeriaTz)->endOfMonth()->utc();
+        $yearStartUtc = now($nigeriaTz)->startOfYear()->utc();
+        $yearEndUtc = now($nigeriaTz)->endOfYear()->utc();
+
         // Calculate business revenue from actual transactions (not edited values)
-        $todayDate = today()->toDateString();
-        
-        // Today's revenue: sum of all approved payments for today
         $todayRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereDate('created_at', $todayDate)
+            ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
             ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
-        // Monthly revenue: sum of all approved payments for current month
         $monthlyRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
             ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
-        // Yearly revenue: sum of all approved payments for current year
         $yearlyRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereYear('created_at', now()->year)
+            ->whereBetween($approvedAtExpr, [$yearStartUtc, $yearEndUtc])
             ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
 
         // Overall statistics
@@ -74,13 +83,17 @@ class StatisticsController extends Controller
         // Website-specific statistics
         $websiteStats = [];
         foreach ($business->websites as $website) {
+            $websitePayments = $business->payments()
+                ->where('business_id', $business->id)
+                ->where('business_website_id', $website->id);
+
             // Daily stats for this website
-            $dailyStats = $website->payments()
-                ->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59'])
+            $dailyStats = (clone $websitePayments)
+                ->whereBetween('created_at', [$rangeStartUtc, $rangeEndUtc])
                 ->select(
-                    DB::raw('DATE(created_at) as date'),
+                    $createdAtNigeriaDateExpr.' as date',
                     DB::raw('COUNT(*) as count'),
-                    DB::raw('SUM(CASE WHEN status = "approved" THEN amount ELSE 0 END) as revenue'),
+                    DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                     DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count'),
                     DB::raw('SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) as pending_count'),
                     DB::raw('SUM(CASE WHEN status = "rejected" THEN 1 ELSE 0 END) as rejected_count')
@@ -90,13 +103,13 @@ class StatisticsController extends Controller
                 ->get();
 
             // Monthly stats for this website
-            $monthlyStats = $website->payments()
-                ->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59'])
+            $monthlyStats = (clone $websitePayments)
+                ->whereBetween('created_at', [$rangeStartUtc, $rangeEndUtc])
                 ->select(
-                    DB::raw('YEAR(created_at) as year'),
-                    DB::raw('MONTH(created_at) as month'),
+                    DB::raw("YEAR(CONVERT_TZ(created_at, '+00:00', '+01:00')) as year"),
+                    DB::raw("MONTH(CONVERT_TZ(created_at, '+00:00', '+01:00')) as month"),
                     DB::raw('COUNT(*) as count'),
-                    DB::raw('SUM(CASE WHEN status = "approved" THEN amount ELSE 0 END) as revenue'),
+                    DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                     DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count'),
                     DB::raw('SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) as pending_count'),
                     DB::raw('SUM(CASE WHEN status = "rejected" THEN 1 ELSE 0 END) as rejected_count')
@@ -107,11 +120,11 @@ class StatisticsController extends Controller
                 ->get();
 
             // Yearly stats for this website
-            $yearlyStats = $website->payments()
+            $yearlyStats = (clone $websitePayments)
                 ->select(
-                    DB::raw('YEAR(created_at) as year'),
+                    DB::raw("YEAR(CONVERT_TZ(created_at, '+00:00', '+01:00')) as year"),
                     DB::raw('COUNT(*) as count'),
-                    DB::raw('SUM(CASE WHEN status = "approved" THEN amount ELSE 0 END) as revenue'),
+                    DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                     DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count'),
                     DB::raw('SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) as pending_count'),
                     DB::raw('SUM(CASE WHEN status = "rejected" THEN 1 ELSE 0 END) as rejected_count')
@@ -121,41 +134,41 @@ class StatisticsController extends Controller
                 ->get();
 
             // Overall website stats
-            $totalRevenue = $website->payments()->where('status', 'approved')->sum('amount');
-            $totalPayments = $website->payments()->count();
-            $approvedPayments = $website->payments()->where('status', 'approved')->count();
-            $pendingPayments = $website->payments()->where('status', 'pending')->count();
-            $rejectedPayments = $website->payments()->where('status', 'rejected')->count();
+            $totalRevenue = (clone $websitePayments)->where('status', 'approved')->sum(DB::raw('COALESCE(business_receives, amount)'));
+            $totalPayments = (clone $websitePayments)->count();
+            $approvedPayments = (clone $websitePayments)->where('status', 'approved')->count();
+            $pendingPayments = (clone $websitePayments)->where('status', 'pending')->count();
+            $rejectedPayments = (clone $websitePayments)->where('status', 'rejected')->count();
             $averageTransaction = $approvedPayments > 0 ? $totalRevenue / $approvedPayments : 0;
             $approvalRate = $totalPayments > 0 ? ($approvedPayments / $totalPayments) * 100 : 0;
 
             // Today's stats - calculate from actual transactions
-            $todayRevenue = $website->payments()
+            $todayRevenue = (clone $websitePayments)
                 ->where('status', 'approved')
-                ->whereDate('created_at', today())
+                ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
                 ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
-            $todayPayments = $website->payments()
-                ->whereDate('created_at', today())
+            $todayPayments = (clone $websitePayments)
+                ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
                 ->count();
 
             // This month's stats - calculate from actual transactions
-            $monthlyRevenue = $website->payments()
+            $monthlyRevenue = (clone $websitePayments)
                 ->where('status', 'approved')
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+                ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
                 ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
-            $monthlyPayments = $website->payments()
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
+            $monthlyPayments = (clone $websitePayments)
+                ->where('status', 'approved')
+                ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
                 ->count();
 
             // This year's stats - calculate from actual transactions
-            $yearlyRevenue = $website->payments()
+            $yearlyRevenue = (clone $websitePayments)
                 ->where('status', 'approved')
-                ->whereYear('created_at', now()->year)
+                ->whereBetween($approvedAtExpr, [$yearStartUtc, $yearEndUtc])
                 ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0;
-            $yearlyPayments = $website->payments()
-                ->whereYear('created_at', now()->year)
+            $yearlyPayments = (clone $websitePayments)
+                ->where('status', 'approved')
+                ->whereBetween($approvedAtExpr, [$yearStartUtc, $yearEndUtc])
                 ->count();
 
             $websiteStats[] = [
@@ -186,11 +199,11 @@ class StatisticsController extends Controller
 
         // Overall daily statistics for the selected period
         $dailyStats = $business->payments()
-            ->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59'])
+            ->whereBetween('created_at', [$rangeStartUtc, $rangeEndUtc])
             ->select(
-                DB::raw('DATE(created_at) as date'),
+                $createdAtNigeriaDateExpr.' as date',
                 DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(CASE WHEN status = "approved" THEN amount ELSE 0 END) as revenue'),
+                DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                 DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count')
             )
             ->groupBy('date')
@@ -199,12 +212,12 @@ class StatisticsController extends Controller
 
         // Overall monthly statistics
         $monthlyStats = $business->payments()
-            ->whereBetween('created_at', [$dateFrom, $dateTo . ' 23:59:59'])
+            ->whereBetween('created_at', [$rangeStartUtc, $rangeEndUtc])
             ->select(
-                DB::raw('YEAR(created_at) as year'),
-                DB::raw('MONTH(created_at) as month'),
+                DB::raw("YEAR(CONVERT_TZ(created_at, '+00:00', '+01:00')) as year"),
+                DB::raw("MONTH(CONVERT_TZ(created_at, '+00:00', '+01:00')) as month"),
                 DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(CASE WHEN status = "approved" THEN amount ELSE 0 END) as revenue'),
+                DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                 DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count')
             )
             ->groupBy('year', 'month')
@@ -215,9 +228,9 @@ class StatisticsController extends Controller
         // Overall yearly statistics
         $yearlyStats = $business->payments()
             ->select(
-                DB::raw('YEAR(created_at) as year'),
+                DB::raw("YEAR(CONVERT_TZ(created_at, '+00:00', '+01:00')) as year"),
                 DB::raw('COUNT(*) as count'),
-                DB::raw('SUM(CASE WHEN status = "approved" THEN amount ELSE 0 END) as revenue'),
+                DB::raw('SUM(CASE WHEN status = "approved" THEN COALESCE(business_receives, amount) ELSE 0 END) as revenue'),
                 DB::raw('SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count')
             )
             ->groupBy('year')
@@ -234,9 +247,9 @@ class StatisticsController extends Controller
         $monthlyRevenue = $business->payments()
             ->where('status', 'approved')
             ->select(
-                DB::raw('YEAR(created_at) as year'),
-                DB::raw('MONTH(created_at) as month'),
-                DB::raw('SUM(amount) as revenue'),
+                DB::raw("YEAR(CONVERT_TZ(created_at, '+00:00', '+01:00')) as year"),
+                DB::raw("MONTH(CONVERT_TZ(created_at, '+00:00', '+01:00')) as month"),
+                DB::raw('SUM(COALESCE(business_receives, amount)) as revenue'),
                 DB::raw('COUNT(*) as count')
             )
             ->groupBy('year', 'month')
