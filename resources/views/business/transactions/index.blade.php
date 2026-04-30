@@ -63,9 +63,15 @@
                             <div class="text-sm font-medium text-gray-900">{{ $transaction->transaction_id }}</div>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
-                            @if($transaction->website)
-                                <a href="{{ $transaction->website->website_url }}" target="_blank" class="text-primary hover:underline" title="{{ $transaction->website->website_url }}">
-                                    {{ parse_url($transaction->website->website_url, PHP_URL_HOST) }}
+                            @php
+                                $websiteUrl = $transaction->website->website_url
+                                    ?? data_get($transaction->email_data, 'website_url')
+                                    ?? $transaction->webhook_url;
+                                $websiteHost = $websiteUrl ? parse_url($websiteUrl, PHP_URL_HOST) : null;
+                            @endphp
+                            @if($websiteUrl && $websiteHost)
+                                <a href="{{ $websiteUrl }}" target="_blank" class="text-primary hover:underline" title="{{ $websiteUrl }}">
+                                    {{ $websiteHost }}
                                     <i class="fas fa-external-link-alt text-xs ml-1"></i>
                                 </a>
                             @else
@@ -109,8 +115,14 @@
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-gray-900 truncate mb-1">{{ Str::limit($transaction->transaction_id, 20) }}</p>
                         <p class="text-xs text-gray-500">
-                            @if($transaction->website)
-                                {{ parse_url($transaction->website->website_url, PHP_URL_HOST) }} • 
+                            @php
+                                $mobileWebsiteUrl = $transaction->website->website_url
+                                    ?? data_get($transaction->email_data, 'website_url')
+                                    ?? $transaction->webhook_url;
+                                $mobileWebsiteHost = $mobileWebsiteUrl ? parse_url($mobileWebsiteUrl, PHP_URL_HOST) : null;
+                            @endphp
+                            @if($mobileWebsiteHost)
+                                {{ $mobileWebsiteHost }} •
                             @endif
                             {{ $transaction->created_at->format('M d, Y H:i') }}
                         </p>
