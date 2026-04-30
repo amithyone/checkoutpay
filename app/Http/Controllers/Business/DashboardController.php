@@ -15,25 +15,32 @@ class DashboardController extends Controller
         // Revenue periods should reflect when a payment was approved, not when it was created.
         // matched_at is the primary approval timestamp in this codebase.
         $approvedAtExpr = DB::raw('COALESCE(matched_at, created_at)');
+        $nigeriaTz = 'Africa/Lagos';
+        $nigeriaNow = now($nigeriaTz);
+        $todayStartUtc = $nigeriaNow->copy()->startOfDay()->utc();
+        $todayEndUtc = $nigeriaNow->copy()->endOfDay()->utc();
+        $monthStartUtc = $nigeriaNow->copy()->startOfMonth()->utc();
+        $monthEndUtc = $nigeriaNow->copy()->endOfMonth()->utc();
+        $yearStartUtc = $nigeriaNow->copy()->startOfYear()->utc();
+        $yearEndUtc = $nigeriaNow->copy()->endOfYear()->utc();
 
         // Calculate business revenue from actual transactions (not edited values)
-        // Today's revenue: sum of all approved payments for today
+        // Today's revenue: sum of all approved payments for Nigeria's current day window
         $todayRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereDate($approvedAtExpr, today())
+            ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
-        // Monthly revenue: sum of all approved payments for current month
+        // Monthly revenue: Nigeria calendar month window
         $monthlyRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereYear($approvedAtExpr, now()->year)
-            ->whereMonth($approvedAtExpr, now()->month)
+            ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
-        // Yearly revenue: sum of all approved payments for current year
+        // Yearly revenue: Nigeria calendar year window
         $yearlyRevenue = $business->payments()
             ->where('status', 'approved')
-            ->whereYear($approvedAtExpr, now()->year)
+            ->whereBetween($approvedAtExpr, [$yearStartUtc, $yearEndUtc])
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
 
         // Get statistics
@@ -59,45 +66,46 @@ class DashboardController extends Controller
         // Get website statistics with daily and monthly breakdowns
         $websiteStats = [];
         foreach ($business->websites as $website) {
-            $websitePayments = $website->payments()->where('status', 'approved')->get();
+            // Enforce both business_id and business_website_id ownership filters.
+            $websitePaymentsQuery = $business->payments()
+                ->where('business_id', $business->id)
+                ->where('business_website_id', $website->id);
             
             // Calculate revenue from actual transactions
-            $todayRevenue = $website->payments()
+            $todayRevenue = (clone $websitePaymentsQuery)
                 ->where('status', 'approved')
-                ->whereDate($approvedAtExpr, today())
+                ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
                 ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             
             // Calculate monthly/yearly revenue from actual transactions
-            $monthlyRevenue = $website->payments()
+            $monthlyRevenue = (clone $websitePaymentsQuery)
                 ->where('status', 'approved')
-                ->whereYear($approvedAtExpr, now()->year)
-                ->whereMonth($approvedAtExpr, now()->month)
+                ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
                 ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
-            $yearlyRevenue = $website->payments()
+            $yearlyRevenue = (clone $websitePaymentsQuery)
                 ->where('status', 'approved')
-                ->whereYear($approvedAtExpr, now()->year)
+                ->whereBetween($approvedAtExpr, [$yearStartUtc, $yearEndUtc])
                 ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
             
             // Calculate daily payments count
-            $todayPayments = $website->payments()
+            $todayPayments = (clone $websitePaymentsQuery)
                 ->where('status', 'approved')
-                ->whereDate($approvedAtExpr, today())
+                ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
                 ->count();
             
             // Calculate monthly payments count
-            $monthlyPayments = $website->payments()
+            $monthlyPayments = (clone $websitePaymentsQuery)
                 ->where('status', 'approved')
-                ->whereYear($approvedAtExpr, now()->year)
-                ->whereMonth($approvedAtExpr, now()->month)
+                ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
                 ->count();
             
             $websiteStats[] = [
                 'website' => $website,
-                'total_revenue' => $websitePayments->sum(function ($payment) {
-                    return (float) ($payment->business_receives ?? $payment->amount);
-                }),
-                'total_payments' => $websitePayments->count(),
-                'pending_payments' => $website->payments()->where('status', 'pending')->count(),
+                'total_revenue' => (clone $websitePaymentsQuery)
+                    ->where('status', 'approved')
+                    ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0,
+                'total_payments' => (clone $websitePaymentsQuery)->where('status', 'approved')->count(),
+                'pending_payments' => (clone $websitePaymentsQuery)->where('status', 'pending')->count(),
                 'today_revenue' => $todayRevenue, // Calculated from actual transactions
                 'today_payments' => $todayPayments,
                 'monthly_revenue' => $monthlyRevenue, // Calculated from actual transactions
