@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -17,29 +18,32 @@ class DashboardController extends Controller
         $approvedAtExpr = DB::raw('COALESCE(matched_at, created_at)');
         $nigeriaTz = 'Africa/Lagos';
         $nigeriaNow = now($nigeriaTz);
+        $nowUtc = $nigeriaNow->copy()->utc();
         $todayStartUtc = $nigeriaNow->copy()->startOfDay()->utc();
-        $todayEndUtc = $nigeriaNow->copy()->endOfDay()->utc();
+        $todayEndUtc = $nowUtc;
         $monthStartUtc = $nigeriaNow->copy()->startOfMonth()->utc();
-        $monthEndUtc = $nigeriaNow->copy()->endOfMonth()->utc();
+        $monthEndUtc = $nowUtc;
         $yearStartUtc = $nigeriaNow->copy()->startOfYear()->utc();
-        $yearEndUtc = $nigeriaNow->copy()->endOfYear()->utc();
+        $yearEndUtc = $nowUtc;
+
+        // Use payments table directly for deterministic stats (business_id scoped).
+        $approvedBusinessPayments = Payment::query()
+            ->where('business_id', $business->id)
+            ->where('status', Payment::STATUS_APPROVED);
 
         // Calculate business revenue from actual transactions (not edited values)
         // Today's revenue: sum of all approved payments for Nigeria's current day window
-        $todayRevenue = $business->payments()
-            ->where('status', 'approved')
+        $todayRevenue = (clone $approvedBusinessPayments)
             ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
         // Monthly revenue: Nigeria calendar month window
-        $monthlyRevenue = $business->payments()
-            ->where('status', 'approved')
+        $monthlyRevenue = (clone $approvedBusinessPayments)
             ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
         
         // Yearly revenue: Nigeria calendar year window
-        $yearlyRevenue = $business->payments()
-            ->where('status', 'approved')
+        $yearlyRevenue = (clone $approvedBusinessPayments)
             ->whereBetween($approvedAtExpr, [$yearStartUtc, $yearEndUtc])
             ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
 
@@ -51,7 +55,7 @@ class DashboardController extends Controller
             'rejected_payments' => $business->payments()->where('status', 'rejected')->count(),
             'total_withdrawals' => $business->withdrawalRequests()->count(),
             'pending_withdrawals' => $business->withdrawalRequests()->where('status', 'pending')->count(),
-            'total_revenue' => $business->payments()->where('status', 'approved')->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0,
+            'total_revenue' => (clone $approvedBusinessPayments)->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0,
             'today_revenue' => $todayRevenue, // Calculated from actual transactions
             'monthly_revenue' => $monthlyRevenue, // Calculated from actual transactions
             'yearly_revenue' => $yearlyRevenue, // Calculated from actual transactions
@@ -67,7 +71,7 @@ class DashboardController extends Controller
         $websiteStats = [];
         foreach ($business->websites as $website) {
             // Enforce both business_id and business_website_id ownership filters.
-            $websitePaymentsQuery = $business->payments()
+            $websitePaymentsQuery = Payment::query()
                 ->where('business_id', $business->id)
                 ->where('business_website_id', $website->id);
             
