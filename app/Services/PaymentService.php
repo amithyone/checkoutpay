@@ -54,6 +54,15 @@ class PaymentService
         // Before assigning any account number (VA or pool), ensure explicit webhook matches saved URLs (website or business).
         $this->assertIncomingWebhookMatchesConfiguredWebsite($data, $business, $website);
 
+        // If caller omitted business_website_id but sent website/webhook hints, bind to the matching approved website.
+        // This ensures website-level charges are applied even when the account number is business-level.
+        if (! $website) {
+            $website = $this->resolveWebsiteFromIncomingData($business, $data);
+            if ($website) {
+                $businessWebsiteId = (int) $website->id;
+            }
+        }
+
         $requestedService = (string) ($data['service'] ?? ($useInvoicePool ? 'invoice' : 'general'));
 
         $externalOverride = $data['external_override'] ?? null;
@@ -208,7 +217,7 @@ class PaymentService
             'webhook_url' => $webhookUrlForPayment,
             'account_number' => $account->account_number,
             'business_id' => $business->id,
-            'business_website_id' => $data['business_website_id'] ?? null,
+            'business_website_id' => $businessWebsiteId,
             'status' => Payment::STATUS_PENDING,
             'email_data' => array_filter([
                 'service' => $data['service'] ?? null,
@@ -312,5 +321,65 @@ class PaymentService
     protected function normalizeWebhookUrlForComparison(string $url): string
     {
         return rtrim(trim($url), '/');
+    }
+
+    /**
+     * Best-effort website resolver for API callers that do not pass business_website_id.
+     * Priority:
+     * 1) Exact webhook_url match with approved website webhook_url
+     * 2) website_url host/domain match with approved website website_url
+     */
+    protected function resolveWebsiteFromIncomingData(Business $business, array $data): ?BusinessWebsite
+    {
+        $approvedWebsites = $business->approvedWebsites()->get();
+        if ($approvedWebsites->isEmpty()) {
+            return null;
+        }
+
+        $incomingWebhook = isset($data['webhook_url']) ? trim((string) $data['webhook_url']) : '';
+        if ($incomingWebhook !== '') {
+            $incomingWebhookNormalized = $this->normalizeWebhookUrlForComparison($incomingWebhook);
+            foreach ($approvedWebsites as $site) {
+                $siteWebhook = trim((string) ($site->webhook_url ?? ''));
+                if ($siteWebhook === '') {
+                    continue;
+                }
+                if ($this->normalizeWebhookUrlForComparison($siteWebhook) === $incomingWebhookNormalized) {
+                    return $site;
+                }
+            }
+        }
+
+        $incomingWebsiteUrl = isset($data['website_url']) ? trim((string) $data['website_url']) : '';
+        if ($incomingWebsiteUrl === '') {
+            return null;
+        }
+
+        $incomingHost = $this->normalizeHost($incomingWebsiteUrl);
+        if (! $incomingHost) {
+            return null;
+        }
+
+        foreach ($approvedWebsites as $site) {
+            $siteHost = $this->normalizeHost((string) ($site->website_url ?? ''));
+            if (! $siteHost) {
+                continue;
+            }
+            if ($incomingHost === $siteHost || str_ends_with($incomingHost, '.'.$siteHost)) {
+                return $site;
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizeHost(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! $host) {
+            return null;
+        }
+
+        return strtolower(preg_replace('/^www\./', '', $host));
     }
 }
