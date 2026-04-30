@@ -14,7 +14,7 @@ class DashboardController extends Controller
         $business = Auth::guard('business')->user();
         // Revenue periods should reflect when a payment was approved, not when it was created.
         // matched_at is the primary approval timestamp in this codebase.
-        $approvedAtExpr = DB::raw('COALESCE(matched_at, approved_at, created_at)');
+        $approvedAtExpr = DB::raw('COALESCE(matched_at, created_at)');
 
         // Calculate business revenue from actual transactions (not edited values)
         // Today's revenue: sum of all approved payments for today
