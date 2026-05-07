@@ -7,6 +7,9 @@ use App\Models\Business;
 use App\Models\BusinessVerification;
 use App\Models\BusinessWebsite;
 use App\Models\EmailAccount;
+use App\Services\Credit\OverdraftFundingService;
+use App\Services\Credit\OverdraftInstallmentService;
+use App\Services\TransactionLogService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -341,9 +344,9 @@ class BusinessController extends Controller
     }
 
     /** Overdraft limit tiers (in Naira). */
-    public const OVERDRAFT_LIMITS = [200000, 500000, 1000000];
+    public const OVERDRAFT_LIMITS = [200000, 500000, 1000000, 2000000, 5000000, 10000000];
 
-    public function approveOverdraft(Request $request, Business $business): RedirectResponse
+    public function approveOverdraft(Request $request, Business $business, TransactionLogService $logService): RedirectResponse
     {
         $admin = auth('admin')->user();
         if (!$admin->isSuperAdmin()) {
@@ -351,14 +354,63 @@ class BusinessController extends Controller
         }
         $request->validate([
             'overdraft_limit' => 'required|numeric|in:' . implode(',', self::OVERDRAFT_LIMITS),
+            'overdraft_funding_source' => 'required|string|in:platform,peer_pool,capital_reserve',
+            'overdraft_approval_notes' => 'nullable|string|max:2000',
         ]);
         $limit = (float) $request->overdraft_limit;
+        $fundingSource = (string) $request->overdraft_funding_source;
+
+        $fundingService = app(OverdraftFundingService::class);
+        if ($fundingSource === OverdraftFundingService::FUNDING_CAPITAL_RESERVE) {
+            $funder = $fundingService->fundingBusiness(OverdraftFundingService::FUNDING_CAPITAL_RESERVE);
+            if (! $funder) {
+                return back()
+                    ->withErrors(['overdraft_funding_source' => 'Capital reserve business ('.$fundingService->capitalReserveEmail().') was not found.'])
+                    ->withInput();
+            }
+            if ($funder->id === $business->id) {
+                return back()
+                    ->withErrors(['overdraft_funding_source' => 'Capital reserve business cannot fund its own overdraft.'])
+                    ->withInput();
+            }
+            if ($fundingService->availableCapacity(OverdraftFundingService::FUNDING_CAPITAL_RESERVE) < $limit) {
+                return back()
+                    ->withErrors(['overdraft_funding_source' => 'Capital reserve has insufficient balance to back this limit.'])
+                    ->withInput();
+            }
+        }
+
         $business->update([
             'overdraft_limit' => $limit,
             'overdraft_approved_at' => now(),
             'overdraft_approved_by' => $admin->id,
             'overdraft_status' => 'approved',
+            'overdraft_funding_source' => $fundingSource,
+            'overdraft_approval_notes' => $request->overdraft_approval_notes,
         ]);
+        $business->refresh();
+        $logService->logOverdraftApproved($business, [
+            'overdraft_limit' => $limit,
+            'overdraft_funding_source' => $fundingSource,
+            'overdraft_repayment_mode' => $business->overdraft_repayment_mode,
+            'overdraft_approval_notes' => $request->overdraft_approval_notes,
+            'admin_id' => $admin->id,
+        ], $request);
+
+        if ((float) $business->balance < 0) {
+            if ($business->overdraft_repayment_mode === OverdraftInstallmentService::MODE_SPLIT_30D) {
+                app(OverdraftInstallmentService::class)->startCycle($business->fresh());
+            }
+            if ($fundingSource === OverdraftFundingService::FUNDING_CAPITAL_RESERVE) {
+                // Backfill funding for any existing negative balance at approval time.
+                $fundingService->syncOnBalanceChange(
+                    $business->fresh(),
+                    0.0,
+                    (float) $business->balance
+                );
+            }
+        }
+
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Overdraft approved with limit ₦' . number_format($limit, 2));
     }
@@ -373,8 +425,25 @@ class BusinessController extends Controller
             'overdraft_status' => 'rejected',
             'overdraft_requested_at' => $business->overdraft_requested_at, // keep for history
         ]);
+
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Overdraft application rejected.');
+    }
+
+    public function updateCreditEligibility(Request $request, Business $business): RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        if (! $admin->isSuperAdmin()) {
+            abort(403);
+        }
+        $business->update([
+            'overdraft_eligible' => $request->has('overdraft_eligible'),
+            'peer_lending_lend_eligible' => $request->has('peer_lending_lend_eligible'),
+            'peer_lending_borrow_eligible' => $request->has('peer_lending_borrow_eligible'),
+        ]);
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', 'Credit program eligibility updated.');
     }
 
     /**

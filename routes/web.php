@@ -65,6 +65,9 @@ Route::get('/tickets', [\App\Http\Controllers\Public\TicketsController::class, '
 Route::get('/payout', [\App\Http\Controllers\PayoutController::class, 'index'])->name('payout.index');
 Route::get('/collections', [\App\Http\Controllers\CollectionsController::class, 'index'])->name('collections.index');
 Route::get('/checkout-demo', [\App\Http\Controllers\CheckoutDemoController::class, 'index'])->name('checkout-demo.index');
+Route::get('/business-loans', [\App\Http\Controllers\Public\PeerLoansController::class, 'index'])->name('peer-loans.index');
+Route::get('/business-loans/{slug}', [\App\Http\Controllers\Public\PeerLoansController::class, 'show'])->name('peer-loans.show')->where('slug', '[a-zA-Z0-9]+');
+
 Route::get('/charity', [\App\Http\Controllers\Public\CharityController::class, 'index'])->name('charity.index');
 Route::get('/charity/{slug}', [\App\Http\Controllers\Public\CharityController::class, 'show'])->name('charity.show')->where('slug', '[a-z0-9\-]+');
 Route::get('/about-us', [\App\Http\Controllers\AboutController::class, 'index'])->name('about.index');

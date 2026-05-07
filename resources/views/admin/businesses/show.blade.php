@@ -83,22 +83,42 @@
             </div>
             <div class="md:col-span-2">
                 <label class="text-xs text-gray-600">Overdraft</label>
+                <p class="text-xs text-gray-500 mt-0.5">Eligible to apply: {{ $business->overdraft_eligible ? 'Yes' : 'No' }} · Repayment mode on file: {{ $business->overdraft_repayment_mode ?? '—' }}</p>
                 <div class="mt-1 flex flex-wrap items-center gap-2">
                     @if($business->hasOverdraftApproved())
                         <span class="text-sm font-medium text-green-700">Approved</span>
                         <span class="text-sm text-gray-700">Limit: ₦{{ number_format($business->overdraft_limit, 2) }}</span>
                         <span class="text-xs text-gray-500">Available: ₦{{ number_format($business->getAvailableBalance(), 2) }}</span>
+                        <span class="text-xs text-gray-500">Funding: {{ $business->overdraft_funding_source ?? 'platform' }}</span>
                     @elseif($business->overdraft_status === 'pending')
                         <span class="text-sm font-medium text-amber-600">Pending application</span>
+                        @if($business->overdraft_application_notes)
+                            <span class="text-xs text-gray-600 block w-full">Notes: {{ \Illuminate\Support\Str::limit($business->overdraft_application_notes, 200) }}</span>
+                        @endif
                         @if(auth('admin')->user()->isSuperAdmin())
-                        <form action="{{ route('admin.businesses.overdraft-approve', $business) }}" method="POST" class="inline flex items-center gap-2">
+                        <form action="{{ route('admin.businesses.overdraft-approve', $business) }}" method="POST" class="flex flex-wrap items-end gap-2 w-full mt-2 p-3 bg-gray-50 rounded border border-gray-200">
                             @csrf
-                            <select name="overdraft_limit" class="text-sm border border-gray-300 rounded px-2 py-1" required>
-                                <option value="200000">₦200,000</option>
-                                <option value="500000">₦500,000</option>
-                                <option value="1000000">₦1,000,000</option>
-                            </select>
-                            <button type="submit" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
+                            <div>
+                                <label class="text-xs text-gray-600">Limit</label>
+                                <select name="overdraft_limit" class="text-sm border border-gray-300 rounded px-2 py-1 block" required>
+                                    @foreach(\App\Http\Controllers\Admin\BusinessController::OVERDRAFT_LIMITS as $tier)
+                                        <option value="{{ $tier }}">₦{{ number_format($tier) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">Funding source</label>
+                                <select name="overdraft_funding_source" class="text-sm border border-gray-300 rounded px-2 py-1 block" required>
+                                    <option value="platform">Platform</option>
+                                    <option value="peer_pool">Peer pool</option>
+                                    <option value="capital_reserve">Capital reserve (admin@check-outpay.com)</option>
+                                </select>
+                            </div>
+                            <div class="flex-1 min-w-[12rem]">
+                                <label class="text-xs text-gray-600">Approval notes</label>
+                                <input type="text" name="overdraft_approval_notes" class="text-sm border border-gray-300 rounded px-2 py-1 w-full" placeholder="Optional">
+                            </div>
+                            <button type="submit" class="text-xs px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700">Approve</button>
                         </form>
                         <form action="{{ route('admin.businesses.overdraft-reject', $business) }}" method="POST" class="inline" onsubmit="return confirm('Reject overdraft application?');">
                             @csrf
@@ -108,19 +128,55 @@
                     @else
                         <span class="text-sm text-gray-500">{{ $business->overdraft_status === 'rejected' ? 'Rejected' : 'Not applied' }}</span>
                         @if(auth('admin')->user()->isSuperAdmin())
-                        <form action="{{ route('admin.businesses.overdraft-approve', $business) }}" method="POST" class="inline flex items-center gap-2">
+                        <form action="{{ route('admin.businesses.overdraft-approve', $business) }}" method="POST" class="flex flex-wrap items-end gap-2 w-full mt-2 p-3 bg-gray-50 rounded border border-gray-200">
                             @csrf
-                            <select name="overdraft_limit" class="text-sm border border-gray-300 rounded px-2 py-1" required>
-                                <option value="200000">₦200,000</option>
-                                <option value="500000">₦500,000</option>
-                                <option value="1000000">₦1,000,000</option>
-                            </select>
-                            <button type="submit" class="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Enable overdraft</button>
+                            <div>
+                                <label class="text-xs text-gray-600">Limit</label>
+                                <select name="overdraft_limit" class="text-sm border border-gray-300 rounded px-2 py-1 block" required>
+                                    @foreach(\App\Http\Controllers\Admin\BusinessController::OVERDRAFT_LIMITS as $tier)
+                                        <option value="{{ $tier }}">₦{{ number_format($tier) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">Funding source</label>
+                                <select name="overdraft_funding_source" class="text-sm border border-gray-300 rounded px-2 py-1 block" required>
+                                    <option value="platform">Platform</option>
+                                    <option value="peer_pool">Peer pool</option>
+                                    <option value="capital_reserve">Capital reserve (admin@check-outpay.com)</option>
+                                </select>
+                            </div>
+                            <div class="flex-1 min-w-[12rem]">
+                                <label class="text-xs text-gray-600">Approval notes</label>
+                                <input type="text" name="overdraft_approval_notes" class="text-sm border border-gray-300 rounded px-2 py-1 w-full" placeholder="Optional">
+                            </div>
+                            <button type="submit" class="text-xs px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700">Enable overdraft</button>
                         </form>
                         @endif
                     @endif
                 </div>
             </div>
+            @if(auth('admin')->user()->isSuperAdmin())
+            <div class="md:col-span-3 pt-4 border-t border-gray-100 mt-2">
+                <label class="text-xs text-gray-600 font-semibold">Credit program eligibility</label>
+                <form action="{{ route('admin.businesses.credit-eligibility', $business) }}" method="POST" class="mt-2 flex flex-wrap gap-4 items-center">
+                    @csrf
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="overdraft_eligible" value="1" class="rounded border-gray-300" {{ $business->overdraft_eligible ? 'checked' : '' }}>
+                        Overdraft apply
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="peer_lending_lend_eligible" value="1" class="rounded border-gray-300" {{ $business->peer_lending_lend_eligible ? 'checked' : '' }}>
+                        Peer lend
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="peer_lending_borrow_eligible" value="1" class="rounded border-gray-300" {{ $business->peer_lending_borrow_eligible ? 'checked' : '' }}>
+                        Peer borrow
+                    </label>
+                    <button type="submit" class="text-xs px-3 py-1.5 bg-primary text-white rounded hover:bg-primary/90">Save</button>
+                </form>
+            </div>
+            @endif
             @if(auth('admin')->user()->isSuperAdmin() || auth('admin')->user()->role === 'admin')
             <div>
                 <label class="text-xs text-gray-600">Daily Revenue <span class="text-gray-400">(sum of all websites)</span></label>

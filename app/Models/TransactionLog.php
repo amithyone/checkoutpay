@@ -40,6 +40,9 @@ class TransactionLog extends Model
     const EVENT_WITHDRAWAL_APPROVED = 'withdrawal_approved';
     const EVENT_WITHDRAWAL_REJECTED = 'withdrawal_rejected';
     const EVENT_WITHDRAWAL_PROCESSED = 'withdrawal_processed';
+    const EVENT_OVERDRAFT_APPROVED = 'overdraft_approved';
+    const EVENT_OVERDRAFT_FUNDING_DEBIT = 'overdraft_funding_debit';
+    const EVENT_OVERDRAFT_FUNDING_CREDIT = 'overdraft_funding_credit';
 
     /**
      * Get the payment associated with this log

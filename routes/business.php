@@ -62,6 +62,16 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/overdraft', [\App\Http\Controllers\Business\OverdraftController::class, 'index'])->name('overdraft.index');
         Route::post('/overdraft', [\App\Http\Controllers\Business\OverdraftController::class, 'store'])->name('overdraft.store');
 
+        // Peer loans (borrow + lend)
+        Route::get('/peer-loans/my-loans', [\App\Http\Controllers\Business\PeerLoanBorrowerController::class, 'myLoans'])->name('peer-loans.my-loans');
+        Route::post('/peer-loans/apply/{slug}', [\App\Http\Controllers\Business\PeerLoanBorrowerController::class, 'apply'])->name('peer-loans.apply')->where('slug', '[a-zA-Z0-9]+');
+        Route::get('/lending-offers', [\App\Http\Controllers\Business\LendingOfferController::class, 'index'])->name('lending-offers.index');
+        Route::get('/lending-offers/create', [\App\Http\Controllers\Business\LendingOfferController::class, 'create'])->name('lending-offers.create');
+        Route::post('/lending-offers', [\App\Http\Controllers\Business\LendingOfferController::class, 'store'])->name('lending-offers.store');
+        Route::post('/lending-offers/{business_lending_offer}/pause', [\App\Http\Controllers\Business\LendingOfferController::class, 'pause'])->name('lending-offers.pause');
+        Route::post('/lending-offers/{business_lending_offer}/resume', [\App\Http\Controllers\Business\LendingOfferController::class, 'resume'])->name('lending-offers.resume');
+        Route::post('/lending-offers/{business_lending_offer}/close', [\App\Http\Controllers\Business\LendingOfferController::class, 'close'])->name('lending-offers.close');
+
         // Statistics
         Route::get('/statistics', [StatisticsController::class, 'index'])->name('statistics.index');
 

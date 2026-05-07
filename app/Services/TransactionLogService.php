@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Business;
 use App\Models\TransactionLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -288,6 +289,18 @@ class TransactionLogService
             eventType: TransactionLog::EVENT_WITHDRAWAL_PROCESSED,
             description: "Withdrawal marked as processed",
             businessId: $withdrawal->business_id
+        );
+    }
+
+    public function logOverdraftApproved(Business $business, array $metadata, ?Request $request = null): TransactionLog
+    {
+        return $this->log(
+            transactionId: 'ODR-'.$business->id.'-'.now()->timestamp,
+            eventType: TransactionLog::EVENT_OVERDRAFT_APPROVED,
+            description: 'Overdraft approved: limit ₦'.number_format((float) $business->overdraft_limit, 2),
+            metadata: $metadata,
+            businessId: $business->id,
+            request: $request
         );
     }
 }

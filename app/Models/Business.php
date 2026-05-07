@@ -36,6 +36,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_interest_last_charged_at',
         'overdraft_status',
         'overdraft_requested_at',
+        'overdraft_eligible',
+        'overdraft_repayment_mode',
+        'overdraft_application_notes',
+        'overdraft_funding_source',
+        'overdraft_approval_notes',
+        'overdraft_repayment_started_at',
+        'peer_lending_lend_eligible',
+        'peer_lending_borrow_eligible',
         'business_id',
         'email_verified_at',
         'profile_picture',
@@ -92,6 +100,10 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_approved_at' => 'datetime',
         'overdraft_interest_last_charged_at' => 'datetime',
         'overdraft_requested_at' => 'datetime',
+        'overdraft_eligible' => 'boolean',
+        'overdraft_repayment_started_at' => 'datetime',
+        'peer_lending_lend_eligible' => 'boolean',
+        'peer_lending_borrow_eligible' => 'boolean',
         'password' => 'hashed',
         'email_verified_at' => 'datetime',
         'created_at' => 'datetime',
@@ -172,6 +184,39 @@ class Business extends Authenticatable implements CanResetPasswordContract
         static::created(function ($business) {
             \App\Models\User::where('email', $business->email)->whereNull('business_id')->update(['business_id' => $business->id]);
         });
+
+        static::updated(function (Business $business) {
+            if (! $business->wasChanged('balance')) {
+                return;
+            }
+
+            $previousBalance = (float) $business->getOriginal('balance');
+            $newBalance = (float) $business->balance;
+
+            if ($business->hasOverdraftApproved()
+                && $business->overdraft_funding_source === \App\Services\Credit\OverdraftFundingService::FUNDING_CAPITAL_RESERVE) {
+                app(\App\Services\Credit\OverdraftFundingService::class)
+                    ->syncOnBalanceChange($business, $previousBalance, $newBalance);
+            }
+
+            if (! $business->hasOverdraftApproved()) {
+                return;
+            }
+            if ($business->overdraft_repayment_mode !== \App\Services\Credit\OverdraftInstallmentService::MODE_SPLIT_30D) {
+                return;
+            }
+            if ($newBalance >= 0) {
+                app(\App\Services\Credit\OverdraftInstallmentService::class)->syncInstallmentStatuses($business->fresh());
+
+                return;
+            }
+            if ($business->overdraft_repayment_started_at) {
+                app(\App\Services\Credit\OverdraftInstallmentService::class)->syncInstallmentStatuses($business->fresh());
+
+                return;
+            }
+            app(\App\Services\Credit\OverdraftInstallmentService::class)->startCycle($business->fresh());
+        });
     }
 
     /**
@@ -204,6 +249,21 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function withdrawalRequests()
     {
         return $this->hasMany(WithdrawalRequest::class);
+    }
+
+    public function overdraftInstallments()
+    {
+        return $this->hasMany(BusinessOverdraftInstallment::class);
+    }
+
+    public function lendingOffers()
+    {
+        return $this->hasMany(BusinessLendingOffer::class, 'lender_business_id');
+    }
+
+    public function loansAsBorrower()
+    {
+        return $this->hasMany(BusinessLoan::class, 'borrower_business_id');
     }
 
     /**
@@ -662,6 +722,21 @@ class Business extends Authenticatable implements CanResetPasswordContract
     {
         return $this->overdraft_approved_at !== null
             && (float) $this->overdraft_limit > 0;
+    }
+
+    public function canApplyForOverdraft(): bool
+    {
+        if (! $this->overdraft_eligible || ! $this->is_active) {
+            return false;
+        }
+        if ($this->hasOverdraftApproved()) {
+            return false;
+        }
+        if ($this->overdraft_status === 'pending') {
+            return false;
+        }
+
+        return true;
     }
 
     /**

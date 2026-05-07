@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
+
+class BusinessLendingOffer extends Model
+{
+    public const STATUS_PENDING_ADMIN = 'pending_admin';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_PAUSED = 'paused';
+
+    public const STATUS_CLOSED = 'closed';
+
+    public const STATUS_REJECTED = 'rejected';
+
+    public const REPAYMENT_LUMP = 'lump';
+
+    public const REPAYMENT_SPLIT = 'split';
+
+    protected $fillable = [
+        'lender_business_id',
+        'amount',
+        'interest_rate_percent',
+        'term_days',
+        'repayment_type',
+        'status',
+        'public_slug',
+        'list_publicly',
+        'starts_at',
+        'ends_at',
+        'admin_notes',
+    ];
+
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'interest_rate_percent' => 'decimal:4',
+        'list_publicly' => 'boolean',
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (BusinessLendingOffer $offer) {
+            if (empty($offer->public_slug)) {
+                $offer->public_slug = Str::lower(Str::random(12));
+            }
+        });
+    }
+
+    public function lender(): BelongsTo
+    {
+        return $this->belongsTo(Business::class, 'lender_business_id');
+    }
+
+    public function loans(): HasMany
+    {
+        return $this->hasMany(BusinessLoan::class);
+    }
+
+    public function scopePubliclyListed($query)
+    {
+        return $query->where('list_publicly', true)
+            ->where('status', self::STATUS_ACTIVE)
+            ->where(function ($q) {
+                $q->whereNull('starts_at')->orWhere('starts_at', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('ends_at')->orWhere('ends_at', '>=', now());
+            });
+    }
+}

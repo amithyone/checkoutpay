@@ -65,6 +65,10 @@ class DashboardController extends Controller
             'available_balance' => $business->getAvailableBalance(),
             'has_overdraft' => $business->hasOverdraftApproved(),
             'overdraft_status' => $business->overdraft_status,
+            'overdraft_eligible' => (bool) $business->overdraft_eligible,
+            'can_apply_overdraft' => $business->canApplyForOverdraft(),
+            'peer_lending_borrow_eligible' => (bool) $business->peer_lending_borrow_eligible,
+            'peer_lending_lend_eligible' => (bool) $business->peer_lending_lend_eligible,
         ];
 
         // Get website statistics with daily and monthly breakdowns

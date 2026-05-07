@@ -14,6 +14,9 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('banks:sync')->weekly();
         $schedule->command('whatsapp-wallet:expire-pending-p2p')->everyFiveMinutes();
+        $schedule->command('overdraft:charge-interest')->weekly();
+        $schedule->command('overdraft:process-installments')->daily();
+        $schedule->command('business-loans:collect-due')->daily();
     }
 
     /**

@@ -109,6 +109,21 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('businesses/{business}/overdraft-reject', [BusinessController::class, 'rejectOverdraft'])
             ->middleware('super_admin')
             ->name('businesses.overdraft-reject');
+        Route::post('businesses/{business}/credit-eligibility', [BusinessController::class, 'updateCreditEligibility'])
+            ->middleware('super_admin')
+            ->name('businesses.credit-eligibility');
+
+        Route::get('overdraft-applications', [\App\Http\Controllers\Admin\OverdraftApplicationsController::class, 'index'])
+            ->name('overdraft-applications.index');
+
+        Route::middleware('super_admin')->prefix('peer-lending')->name('peer-lending.')->group(function () {
+            Route::get('offers', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'offersIndex'])->name('offers.index');
+            Route::post('offers/{business_lending_offer}/approve', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'approveOffer'])->name('offers.approve');
+            Route::post('offers/{business_lending_offer}/reject', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'rejectOffer'])->name('offers.reject');
+            Route::get('loans', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'loansIndex'])->name('loans.index');
+            Route::post('loans/{loan}/approve', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'approveLoan'])->name('loans.approve');
+            Route::post('loans/{loan}/reject', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'rejectLoan'])->name('loans.reject');
+        });
         Route::post('businesses/{business}/update-charges', [BusinessController::class, 'updateCharges'])
             ->middleware('super_admin')
             ->name('businesses.update-charges');

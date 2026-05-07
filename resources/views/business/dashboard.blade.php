@@ -92,7 +92,7 @@
                     <a href="{{ route('business.withdrawals.create') }}" class="text-xs text-primary hover:underline inline-flex items-center">
                         Request Withdrawal <i class="fas fa-arrow-right ml-1 text-xs"></i>
                     </a>
-                    @if(!($stats['has_overdraft'] ?? false) && ($stats['overdraft_status'] ?? null) !== 'pending')
+                    @if(($stats['overdraft_eligible'] ?? false) && ($stats['can_apply_overdraft'] ?? false))
                         <a href="{{ route('business.overdraft.index') }}" class="text-xs text-primary hover:underline inline-flex items-center">
                             Apply for overdraft <i class="fas fa-arrow-right ml-1 text-xs"></i>
                         </a>
@@ -100,6 +100,8 @@
                         <a href="{{ route('business.overdraft.index') }}" class="text-xs text-amber-600 hover:underline inline-flex items-center">
                             Overdraft pending <i class="fas fa-arrow-right ml-1 text-xs"></i>
                         </a>
+                    @elseif(!($stats['overdraft_eligible'] ?? false) && !($stats['has_overdraft'] ?? false))
+                        <span class="text-xs text-gray-400">Overdraft not enabled for your account</span>
                     @endif
                 </div>
             </div>

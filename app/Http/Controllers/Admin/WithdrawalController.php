@@ -57,10 +57,10 @@ class WithdrawalController extends Controller
 
         $business = Business::findOrFail($validated['business_id']);
 
-        // Check if business has sufficient balance
-        if ($business->balance < $validated['amount']) {
+        $available = $business->getAvailableBalance();
+        if ($available < $validated['amount']) {
             return back()
-                ->withErrors(['amount' => 'Insufficient balance. Available: ₦' . number_format($business->balance, 2)])
+                ->withErrors(['amount' => 'Insufficient balance. Available: ₦' . number_format($available, 2)])
                 ->withInput();
         }
 

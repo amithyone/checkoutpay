@@ -134,6 +134,19 @@
                     <span>Withdrawals</span>
                 </a>
 
+                <a href="{{ route('peer-loans.index') }}" target="_blank" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100">
+                    <i class="fas fa-search-dollar w-5 mr-3"></i>
+                    <span>Loan marketplace</span>
+                </a>
+                <a href="{{ route('business.peer-loans.my-loans') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.peer-loans.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-file-signature w-5 mr-3"></i>
+                    <span>My loans</span>
+                </a>
+                <a href="{{ route('business.lending-offers.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.lending-offers.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-piggy-bank w-5 mr-3"></i>
+                    <span>Lending offers</span>
+                </a>
+
                 @php
                     $hasRenterAccount = \App\Models\Renter::where('email', auth('business')->user()->email)->exists();
                 @endphp
