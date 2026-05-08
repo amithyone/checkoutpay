@@ -35,13 +35,22 @@ class BusinessPeerLoanService
             ]];
         }
 
-        $weeks = max(1, (int) ceil($offer->term_days / 7));
-        $base = round($totalRepayment / $weeks, 2);
+        $frequency = $offer->repayment_frequency ?: BusinessLendingOffer::FREQUENCY_WEEKLY;
+        $stepDays = match ($frequency) {
+            BusinessLendingOffer::FREQUENCY_DAILY => 1,
+            BusinessLendingOffer::FREQUENCY_MONTHLY => 30,
+            default => 7,
+        };
+        $installments = max(1, (int) ceil($offer->term_days / $stepDays));
+        $base = round($totalRepayment / $installments, 2);
         $out = [];
-        for ($i = 1; $i <= $weeks; $i++) {
-            $amt = $i === $weeks ? round($totalRepayment - $base * ($weeks - 1), 2) : $base;
+        for ($i = 1; $i <= $installments; $i++) {
+            $amt = $i === $installments ? round($totalRepayment - $base * ($installments - 1), 2) : $base;
+            $dueAt = $i === $installments
+                ? $asOf->copy()->addDays($offer->term_days)
+                : $asOf->copy()->addDays($stepDays * $i);
             $out[] = [
-                'due_at' => $asOf->copy()->addDays(7 * $i),
+                'due_at' => $dueAt,
                 'amount' => $amt,
             ];
         }

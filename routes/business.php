@@ -68,6 +68,9 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/lending-offers', [\App\Http\Controllers\Business\LendingOfferController::class, 'index'])->name('lending-offers.index');
         Route::get('/lending-offers/create', [\App\Http\Controllers\Business\LendingOfferController::class, 'create'])->name('lending-offers.create');
         Route::post('/lending-offers', [\App\Http\Controllers\Business\LendingOfferController::class, 'store'])->name('lending-offers.store');
+        Route::get('/lending-offers/{business_lending_offer}/edit', [\App\Http\Controllers\Business\LendingOfferController::class, 'edit'])->name('lending-offers.edit');
+        Route::put('/lending-offers/{business_lending_offer}', [\App\Http\Controllers\Business\LendingOfferController::class, 'update'])->name('lending-offers.update');
+        Route::delete('/lending-offers/{business_lending_offer}', [\App\Http\Controllers\Business\LendingOfferController::class, 'destroy'])->name('lending-offers.destroy');
         Route::post('/lending-offers/{business_lending_offer}/pause', [\App\Http\Controllers\Business\LendingOfferController::class, 'pause'])->name('lending-offers.pause');
         Route::post('/lending-offers/{business_lending_offer}/resume', [\App\Http\Controllers\Business\LendingOfferController::class, 'resume'])->name('lending-offers.resume');
         Route::post('/lending-offers/{business_lending_offer}/close', [\App\Http\Controllers\Business\LendingOfferController::class, 'close'])->name('lending-offers.close');

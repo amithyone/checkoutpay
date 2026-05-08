@@ -23,12 +23,25 @@ class BusinessLendingOffer extends Model
 
     public const REPAYMENT_SPLIT = 'split';
 
+    public const FREQUENCY_DAILY = 'daily';
+
+    public const FREQUENCY_WEEKLY = 'weekly';
+
+    public const FREQUENCY_MONTHLY = 'monthly';
+
+    public const FREQUENCIES = [
+        self::FREQUENCY_DAILY,
+        self::FREQUENCY_WEEKLY,
+        self::FREQUENCY_MONTHLY,
+    ];
+
     protected $fillable = [
         'lender_business_id',
         'amount',
         'interest_rate_percent',
         'term_days',
         'repayment_type',
+        'repayment_frequency',
         'status',
         'public_slug',
         'list_publicly',

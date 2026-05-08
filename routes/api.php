@@ -282,6 +282,15 @@ Route::middleware(['throttle:12,1', 'tagine.otp.secret'])
         Route::post('wallet/ensure', [TagineBridgeController::class, 'ensureWallet']);
     });
 
+/*
+| Amithy DRM desktop telemetry + policy webhook (HMAC + bearer)
+| Bearer maps to either a desktop_app_tokens row or env AMITHY_API_TOKEN.
+*/
+Route::prefix('desktop')->middleware('throttle:120,1')->group(function () {
+    Route::post('/events/batch', [\App\Http\Controllers\Api\DesktopTelemetryController::class, 'ingestBatch']);
+    Route::get('/policy', [\App\Http\Controllers\Api\DesktopTelemetryController::class, 'getPolicy']);
+});
+
 // Health check
 Route::get('/health', function () {
     return response()->json([

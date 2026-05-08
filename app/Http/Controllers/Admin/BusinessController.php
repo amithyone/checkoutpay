@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessVerification;
 use App\Models\BusinessWebsite;
 use App\Models\EmailAccount;
+use App\Notifications\PeerLendingLenderProgramConfiguredNotification;
 use App\Services\Credit\OverdraftFundingService;
 use App\Services\Credit\OverdraftInstallmentService;
 use App\Services\TransactionLogService;
@@ -436,14 +437,60 @@ class BusinessController extends Controller
         if (! $admin->isSuperAdmin()) {
             abort(403);
         }
+
+        $validated = $request->validate([
+            'peer_lending_lender_max_offer_amount' => 'nullable|numeric|min:0',
+            'peer_lending_lender_max_interest_percent' => 'nullable|numeric|min:0|max:100',
+            'peer_lending_lender_min_term_days' => 'nullable|integer|min:1|max:730',
+            'peer_lending_lender_max_term_days' => 'nullable|integer|min:1|max:730',
+            'peer_lending_lender_min_balance_reserve' => 'nullable|numeric|min:0',
+            'peer_lending_lender_conditions' => 'nullable|string|max:10000',
+        ]);
+
+        $minTerm = $validated['peer_lending_lender_min_term_days'] ?? null;
+        $maxTerm = $validated['peer_lending_lender_max_term_days'] ?? null;
+        if ($minTerm !== null && $maxTerm !== null && $minTerm > $maxTerm) {
+            return back()
+                ->withErrors(['peer_lending_lender_max_term_days' => 'Max term must be greater than or equal to min term.'])
+                ->withInput();
+        }
+
+        $wasLendEligible = (bool) $business->peer_lending_lend_eligible;
+
         $business->update([
             'overdraft_eligible' => $request->has('overdraft_eligible'),
             'peer_lending_lend_eligible' => $request->has('peer_lending_lend_eligible'),
             'peer_lending_borrow_eligible' => $request->has('peer_lending_borrow_eligible'),
+            'peer_lending_lender_max_offer_amount' => $request->filled('peer_lending_lender_max_offer_amount')
+                ? $validated['peer_lending_lender_max_offer_amount'] : null,
+            'peer_lending_lender_max_interest_percent' => $request->filled('peer_lending_lender_max_interest_percent')
+                ? $validated['peer_lending_lender_max_interest_percent'] : null,
+            'peer_lending_lender_min_term_days' => $request->filled('peer_lending_lender_min_term_days')
+                ? $validated['peer_lending_lender_min_term_days'] : null,
+            'peer_lending_lender_max_term_days' => $request->filled('peer_lending_lender_max_term_days')
+                ? $validated['peer_lending_lender_max_term_days'] : null,
+            'peer_lending_lender_min_balance_reserve' => $request->filled('peer_lending_lender_min_balance_reserve')
+                ? $validated['peer_lending_lender_min_balance_reserve'] : null,
+            'peer_lending_lender_conditions' => $request->filled('peer_lending_lender_conditions')
+                ? $validated['peer_lending_lender_conditions'] : null,
         ]);
 
+        $business->refresh();
+        $notify = $business->peer_lending_lend_eligible
+            && ($request->has('notify_lender_program') || (! $wasLendEligible && $business->peer_lending_lend_eligible));
+        if ($notify) {
+            try {
+                $business->notify(new PeerLendingLenderProgramConfiguredNotification($business));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Peer lending lender program email failed', [
+                    'business_id' => $business->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', 'Credit program eligibility updated.');
+            ->with('success', 'Credit programs and lender conditions updated.');
     }
 
     /**

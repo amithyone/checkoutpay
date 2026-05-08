@@ -158,22 +158,64 @@
             </div>
             @if(auth('admin')->user()->isSuperAdmin())
             <div class="md:col-span-3 pt-4 border-t border-gray-100 mt-2">
-                <label class="text-xs text-gray-600 font-semibold">Credit program eligibility</label>
-                <form action="{{ route('admin.businesses.credit-eligibility', $business) }}" method="POST" class="mt-2 flex flex-wrap gap-4 items-center">
+                <h4 class="text-sm font-semibold text-gray-800 mb-2">Credit &amp; loan programs</h4>
+                <p class="text-xs text-gray-500 mb-3">Opt businesses into overdraft, peer borrowing, or peer lending. For lenders, set caps and optional written conditions; the business sees these when creating offers.</p>
+                <form action="{{ route('admin.businesses.credit-eligibility', $business) }}" method="POST" class="space-y-4">
                     @csrf
-                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" name="overdraft_eligible" value="1" class="rounded border-gray-300" {{ $business->overdraft_eligible ? 'checked' : '' }}>
-                        Overdraft apply
-                    </label>
-                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" name="peer_lending_lend_eligible" value="1" class="rounded border-gray-300" {{ $business->peer_lending_lend_eligible ? 'checked' : '' }}>
-                        Peer lend
-                    </label>
-                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" name="peer_lending_borrow_eligible" value="1" class="rounded border-gray-300" {{ $business->peer_lending_borrow_eligible ? 'checked' : '' }}>
-                        Peer borrow
-                    </label>
-                    <button type="submit" class="text-xs px-3 py-1.5 bg-primary text-white rounded hover:bg-primary/90">Save</button>
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="overdraft_eligible" value="1" class="rounded border-gray-300" {{ $business->overdraft_eligible ? 'checked' : '' }}>
+                            Overdraft (can apply)
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="peer_lending_lend_eligible" value="1" class="rounded border-gray-300" {{ $business->peer_lending_lend_eligible ? 'checked' : '' }}>
+                            Peer lend (lender program)
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="peer_lending_borrow_eligible" value="1" class="rounded border-gray-300" {{ $business->peer_lending_borrow_eligible ? 'checked' : '' }}>
+                            Peer borrow
+                        </label>
+                    </div>
+
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                        <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Lender conditions</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div>
+                                <label class="text-xs text-gray-600">Max offer amount (₦, optional cap)</label>
+                                <input type="number" name="peer_lending_lender_max_offer_amount" step="0.01" min="0" value="{{ old('peer_lending_lender_max_offer_amount', $business->peer_lending_lender_max_offer_amount) }}" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="No cap beyond balance">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">Max interest (%)</label>
+                                <input type="number" name="peer_lending_lender_max_interest_percent" step="0.01" min="0" max="100" value="{{ old('peer_lending_lender_max_interest_percent', $business->peer_lending_lender_max_interest_percent) }}" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="Default 100%">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">Min balance reserve (₦)</label>
+                                <input type="number" name="peer_lending_lender_min_balance_reserve" step="0.01" min="0" value="{{ old('peer_lending_lender_min_balance_reserve', $business->peer_lending_lender_min_balance_reserve) }}" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="0">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">Min term (days)</label>
+                                <input type="number" name="peer_lending_lender_min_term_days" min="1" max="730" value="{{ old('peer_lending_lender_min_term_days', $business->peer_lending_lender_min_term_days) }}" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="Default 7">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-600">Max term (days)</label>
+                                <input type="number" name="peer_lending_lender_max_term_days" min="1" max="730" value="{{ old('peer_lending_lender_max_term_days', $business->peer_lending_lender_max_term_days) }}" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="Default 730">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-600">Conditions / notes for the business (shown on their offer form)</label>
+                            <textarea name="peer_lending_lender_conditions" rows="3" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="e.g. Only split repayment; max one active offer at a time.">{{ old('peer_lending_lender_conditions', $business->peer_lending_lender_conditions) }}</textarea>
+                        </div>
+                        <label class="inline-flex items-center gap-2 text-xs text-gray-700">
+                            <input type="checkbox" name="notify_lender_program" value="1" class="rounded border-gray-300" checked>
+                            Email business a summary when saving (if &quot;Peer lend&quot; is enabled)
+                        </label>
+                    </div>
+
+                    @error('peer_lending_lender_max_term_days')
+                        <p class="text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+
+                    <button type="submit" class="text-sm px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">Save credit &amp; lender settings</button>
                 </form>
             </div>
             @endif

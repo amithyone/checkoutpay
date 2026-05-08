@@ -124,6 +124,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('loans/{loan}/approve', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'approveLoan'])->name('loans.approve');
             Route::post('loans/{loan}/reject', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'rejectLoan'])->name('loans.reject');
         });
+
+        Route::middleware('super_admin')->prefix('desktop-telemetry')->name('desktop-telemetry.')->group(function () {
+            Route::get('events', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'eventsIndex'])->name('events.index');
+            Route::get('events/{event}', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'eventShow'])->name('events.show');
+
+            Route::get('policies', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'policiesIndex'])->name('policies.index');
+            Route::get('policies/create', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'policyEdit'])->name('policies.create');
+            Route::post('policies', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'policyStore'])->name('policies.store');
+            Route::get('policies/{policy}/edit', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'policyEdit'])->name('policies.edit');
+            Route::put('policies/{policy}', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'policyUpdate'])->name('policies.update');
+            Route::delete('policies/{policy}', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'policyDestroy'])->name('policies.destroy');
+
+            Route::get('tokens', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'tokensIndex'])->name('tokens.index');
+            Route::post('tokens', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'tokenStore'])->name('tokens.store');
+            Route::post('tokens/{token}/rotate', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'tokenRotate'])->name('tokens.rotate');
+            Route::post('tokens/{token}/toggle', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'tokenToggle'])->name('tokens.toggle');
+            Route::delete('tokens/{token}', [\App\Http\Controllers\Admin\DesktopTelemetryController::class, 'tokenDestroy'])->name('tokens.destroy');
+        });
         Route::post('businesses/{business}/update-charges', [BusinessController::class, 'updateCharges'])
             ->middleware('super_admin')
             ->name('businesses.update-charges');

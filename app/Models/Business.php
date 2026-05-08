@@ -44,6 +44,12 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_repayment_started_at',
         'peer_lending_lend_eligible',
         'peer_lending_borrow_eligible',
+        'peer_lending_lender_max_offer_amount',
+        'peer_lending_lender_max_interest_percent',
+        'peer_lending_lender_min_term_days',
+        'peer_lending_lender_max_term_days',
+        'peer_lending_lender_min_balance_reserve',
+        'peer_lending_lender_conditions',
         'business_id',
         'email_verified_at',
         'profile_picture',
@@ -104,6 +110,11 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_repayment_started_at' => 'datetime',
         'peer_lending_lend_eligible' => 'boolean',
         'peer_lending_borrow_eligible' => 'boolean',
+        'peer_lending_lender_max_offer_amount' => 'decimal:2',
+        'peer_lending_lender_max_interest_percent' => 'decimal:4',
+        'peer_lending_lender_min_term_days' => 'integer',
+        'peer_lending_lender_max_term_days' => 'integer',
+        'peer_lending_lender_min_balance_reserve' => 'decimal:2',
         'password' => 'hashed',
         'email_verified_at' => 'datetime',
         'created_at' => 'datetime',
@@ -737,6 +748,56 @@ class Business extends Authenticatable implements CanResetPasswordContract
         }
 
         return true;
+    }
+
+    /**
+     * Maximum principal this lender may post on an offer (balance minus reserve, capped by admin max if set).
+     */
+    public function peerLendingMaxOfferAmountAllowed(): float
+    {
+        $balance = (float) $this->balance;
+        $reserve = (float) ($this->peer_lending_lender_min_balance_reserve ?? 0);
+        $fromBalance = max(0.0, round($balance - $reserve, 2));
+        $adminCap = $this->peer_lending_lender_max_offer_amount;
+        if ($adminCap !== null && (float) $adminCap > 0) {
+            return min($fromBalance, (float) $adminCap);
+        }
+
+        return $fromBalance;
+    }
+
+    public function peerLendingMinTermDaysForOffers(): int
+    {
+        return max(1, (int) ($this->peer_lending_lender_min_term_days ?? 7));
+    }
+
+    public function peerLendingMaxTermDaysForOffers(): int
+    {
+        return min(730, max($this->peerLendingMinTermDaysForOffers(), (int) ($this->peer_lending_lender_max_term_days ?? 730)));
+    }
+
+    public function peerLendingMaxInterestPercentForOffers(): float
+    {
+        if ($this->peer_lending_lender_max_interest_percent !== null) {
+            return min(100.0, max(0.0, (float) $this->peer_lending_lender_max_interest_percent));
+        }
+
+        return 100.0;
+    }
+
+    /**
+     * @return array{max_amount: float, min_term: int, max_term: int, max_interest: float, reserve: float, conditions: ?string}
+     */
+    public function peerLendingLenderRulesSummary(): array
+    {
+        return [
+            'max_amount' => $this->peerLendingMaxOfferAmountAllowed(),
+            'min_term' => $this->peerLendingMinTermDaysForOffers(),
+            'max_term' => $this->peerLendingMaxTermDaysForOffers(),
+            'max_interest' => $this->peerLendingMaxInterestPercentForOffers(),
+            'reserve' => (float) ($this->peer_lending_lender_min_balance_reserve ?? 0),
+            'conditions' => $this->peer_lending_lender_conditions,
+        ];
     }
 
     /**

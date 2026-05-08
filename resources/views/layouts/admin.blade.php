@@ -129,6 +129,10 @@
                     <i class="fas fa-money-check-alt w-5 mr-3"></i>
                     <span>Peer loan queue</span>
                 </a>
+                <a href="{{ route('admin.desktop-telemetry.events.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.desktop-telemetry.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-laptop-code w-5 mr-3"></i>
+                    <span>Desktop DRM</span>
+                </a>
                 @endif
 
                 <a href="{{ route('admin.payments.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.payments.*') && !request()->routeIs('admin.payments.needs-review') ? 'bg-primary/10 text-primary' : '' }}">

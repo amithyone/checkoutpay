@@ -22,7 +22,7 @@
                 <div class="flex flex-wrap justify-between gap-2">
                     <div>
                         <p class="font-semibold text-gray-900">{{ $offer->lender->name }}</p>
-                        <p class="text-xs text-gray-500 mt-1">Repayment: {{ $offer->repayment_type === 'lump' ? 'One-time' : 'Split' }} · {{ $offer->term_days }} days</p>
+                        <p class="text-xs text-gray-500 mt-1">Repayment: {{ $offer->repayment_type === 'lump' ? 'One-time' : 'Split ('.ucfirst($offer->repayment_frequency ?? 'weekly').')' }} · {{ $offer->term_days }} days</p>
                     </div>
                     <div class="text-right">
                         <p class="text-lg font-bold text-primary">₦{{ number_format($offer->amount, 2) }}</p>

@@ -146,7 +146,7 @@
                         <div>
                             <label for="split_installments" class="block text-sm font-medium text-gray-700 mb-1">Number of installments</label>
                             <input type="number" name="split_installments" id="split_installments" min="2" max="12" value="{{ old('split_installments', $invoice->split_installments ?? 2) }}"
-                                class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" onchange="buildSplitPercentages()">
+                                class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary" onblur="commitSplitInstallments()">
                             <p class="text-xs text-gray-500 mt-1">How many times the client can pay (e.g. 3 = 3 separate payments).</p>
                         </div>
                         <div>
@@ -260,6 +260,7 @@ const existingSplitPercentages = @json(old('split_percentages', $invoice->split_
 function toggleSplitOptions() {
     const opts = document.getElementById('split-options');
     const cb = document.getElementById('allow_split_payment');
+    if (!opts || !cb) return;
     if (cb.checked) {
         opts.classList.remove('hidden');
         buildSplitPercentages();
@@ -268,14 +269,32 @@ function toggleSplitOptions() {
     }
 }
 
+function readCurrentSplitPercentages() {
+    const inputs = document.querySelectorAll('#split-percentages-container input[name="split_percentages[]"]');
+    return Array.from(inputs).map(el => el.value);
+}
+
+function commitSplitInstallments() {
+    const inp = document.getElementById('split_installments');
+    if (!inp) return;
+    let t = inp.value.trim();
+    let n = 2;
+    if (t !== '' && !isNaN(parseInt(t, 10))) {
+        n = Math.min(12, Math.max(2, parseInt(t, 10)));
+    }
+    inp.value = n;
+    buildSplitPercentages();
+}
+
 function buildSplitPercentages() {
-    const n = Math.min(12, Math.max(2, parseInt(document.getElementById('split_installments').value, 10) || 2));
-    document.getElementById('split_installments').value = n;
+    const inp = document.getElementById('split_installments');
     const container = document.getElementById('split-percentages-container');
+    if (!inp || !container) return;
+    const n = Math.min(12, Math.max(2, parseInt(inp.value, 10) || 2));
+    const fromInputs = readCurrentSplitPercentages();
+    const existingFromOld = Array.isArray(existingSplitPercentages) && existingSplitPercentages.length === n ? existingSplitPercentages : null;
+    const existing = fromInputs.length === n ? fromInputs : existingFromOld;
     container.innerHTML = '';
-    const existing = Array.isArray(existingSplitPercentages) && existingSplitPercentages.length === n
-        ? existingSplitPercentages
-        : null;
     const equalPct = (100 / n).toFixed(2);
     for (let i = 0; i < n; i++) {
         const val = existing ? (existing[i] ?? equalPct) : equalPct;
@@ -283,7 +302,7 @@ function buildSplitPercentages() {
         div.className = 'flex items-center gap-1';
         div.innerHTML = `
             <label class="text-xs text-gray-600 w-16">Installment ${i + 1}</label>
-            <input type="number" name="split_percentages[]" step="0.01" min="0" max="100" value="${val}"
+            <input type="number" name="split_percentages[]" step="0.01" min="0" value="${val}"
                 class="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-primary focus:border-primary" oninput="updateSplitSum()">
             <span class="text-gray-500 text-sm">%</span>
         `;
@@ -293,7 +312,10 @@ function buildSplitPercentages() {
 }
 
 function equalSplit() {
-    const n = Math.min(12, Math.max(2, parseInt(document.getElementById('split_installments').value, 10) || 2));
+    const inp = document.getElementById('split_installments');
+    if (!inp) return;
+    commitSplitInstallments();
+    const n = Math.min(12, Math.max(2, parseInt(inp.value, 10) || 2));
     const inputs = document.querySelectorAll('input[name="split_percentages[]"]');
     const pct = (100 / n).toFixed(2);
     const lastPct = (100 - (n - 1) * parseFloat(pct)).toFixed(2);
@@ -413,6 +435,16 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleSplitOptions();
     if (document.getElementById('allow_split_payment').checked) {
         buildSplitPercentages();
+    }
+
+    const invForm = document.getElementById('invoiceForm');
+    if (invForm) {
+        invForm.addEventListener('submit', function () {
+            const cb = document.getElementById('allow_split_payment');
+            if (cb && cb.checked) {
+                commitSplitInstallments();
+            }
+        });
     }
 
     document.getElementById('currency').addEventListener('change', function() {
