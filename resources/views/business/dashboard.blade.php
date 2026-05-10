@@ -109,7 +109,6 @@
                         @if($rubiesName !== '')
                             <p class="text-xs text-gray-600 mt-0.5"><span class="text-gray-500">Account name:</span> {{ $rubiesName }}</p>
                         @endif
-                        <p class="text-[11px] text-gray-500 mt-1.5 leading-snug">Transfers to this account are credited to your balance when we receive the MevonPay funding webhook.</p>
                     </div>
                 @else
                     <p class="text-xs text-gray-500 mt-2">
