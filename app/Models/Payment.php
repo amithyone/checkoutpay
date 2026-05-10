@@ -77,14 +77,24 @@ class Payment extends Model
      * Status constants
      */
     const STATUS_PENDING = 'pending';
+
     const STATUS_APPROVED = 'approved';
+
     const STATUS_REJECTED = 'rejected';
+
     const SOURCE_INTERNAL = 'internal';
+
     const SOURCE_EXTERNAL_MEVONPAY = 'external_mevonpay';
+
     const SOURCE_EXTERNAL_SLA = 'external_sla';
+
     const SOURCE_EXTERNAL_MAVONPAY = 'external_mavonpay'; // legacy
+
     /** Tier 1 WhatsApp wallet temp VA top-up (admin payments visibility; not a merchant checkout). */
     const SOURCE_WHATSAPP_WALLET = 'whatsapp_wallet';
+
+    /** Merchant Rubies pay-in VA (Mevon createrubies business account on `businesses.rubies_business_account_number`). */
+    const SOURCE_BUSINESS_RUBIES_VA = 'business_rubies_va';
 
     /** @deprecated Use SOURCE_PARTNER_WALLET_API */
     const SOURCE_TAGINE_APP = 'tagine_app';
@@ -162,14 +172,14 @@ class Payment extends Model
     public static function sanitizeEmailData(array $emailData): array
     {
         $sanitized = [];
-        
+
         // Only keep these essential fields
         if (isset($emailData['sender_name'])) {
             $sanitized['name'] = $emailData['sender_name'];
         } elseif (isset($emailData['payer_name'])) {
             $sanitized['name'] = $emailData['payer_name'];
         }
-        
+
         // Prioritize received_amount if it exists (for edited amounts in manual approval)
         if (isset($emailData['received_amount'])) {
             $sanitized['amount'] = $emailData['received_amount'];
@@ -177,32 +187,32 @@ class Payment extends Model
         } elseif (isset($emailData['amount'])) {
             $sanitized['amount'] = $emailData['amount'];
         }
-        
+
         if (isset($emailData['date'])) {
             $sanitized['time'] = $emailData['date'];
         } elseif (isset($emailData['transaction_date'])) {
             $sanitized['time'] = $emailData['transaction_date'];
         }
-        
+
         if (isset($emailData['subject'])) {
             $sanitized['subject'] = $emailData['subject'];
         }
-        
+
         if (isset($emailData['from'])) {
             $sanitized['from'] = $emailData['from'];
         }
-        
+
         if (isset($emailData['processed_email_id'])) {
             $sanitized['email_id'] = $emailData['processed_email_id'];
         } elseif (isset($emailData['linked_email_id'])) {
             $sanitized['email_id'] = $emailData['linked_email_id'];
         }
-        
+
         // Preserve manual_verification if it exists (admin tracking metadata)
         if (isset($emailData['manual_verification'])) {
             $sanitized['manual_verification'] = $emailData['manual_verification'];
         }
-        
+
         return $sanitized;
     }
 
@@ -231,6 +241,9 @@ class Payment extends Model
             'whatsapp_wallet_id',
             'whatsapp_pending_topup_id',
             'wa_permanent_va',
+            'rubies_business_va',
+            'mevonpay_reference',
+            'reported_amount',
         ];
     }
 
@@ -240,7 +253,7 @@ class Payment extends Model
     public function approve(array $emailData = [], bool $isMismatch = false, ?float $receivedAmount = null, ?string $mismatchReason = null): bool
     {
         // Ensure amount is in email_data if not provided
-        if (!isset($emailData['amount']) && !isset($emailData['received_amount'])) {
+        if (! isset($emailData['amount']) && ! isset($emailData['received_amount'])) {
             $emailData['amount'] = $this->amount;
         }
 
@@ -268,17 +281,17 @@ class Payment extends Model
         // Update payer_name, bank, and payer_account_number from email_data if provided
         // Map sender_name to payer_name if payer_name is not set (they are the same)
         $payerName = $emailData['payer_name'] ?? $emailData['sender_name'] ?? null;
-        if (!empty($payerName)) {
+        if (! empty($payerName)) {
             $updateData['payer_name'] = strtolower(trim($payerName));
         }
         // If payment doesn't have payer_name but email has sender_name, use it
-        if (empty($this->payer_name) && !empty($emailData['sender_name'])) {
+        if (empty($this->payer_name) && ! empty($emailData['sender_name'])) {
             $updateData['payer_name'] = strtolower(trim($emailData['sender_name']));
         }
-        if (!empty($emailData['bank'])) {
+        if (! empty($emailData['bank'])) {
             $updateData['bank'] = $emailData['bank'];
         }
-        if (!empty($emailData['payer_account_number'])) {
+        if (! empty($emailData['payer_account_number'])) {
             $updateData['payer_account_number'] = $emailData['payer_account_number'];
         }
 
@@ -289,6 +302,7 @@ class Payment extends Model
         if ($updated && $this->renter_id) {
             $this->creditRenterWallet($receivedAmount ?? (float) $this->amount);
         }
+
         return $updated;
     }
 

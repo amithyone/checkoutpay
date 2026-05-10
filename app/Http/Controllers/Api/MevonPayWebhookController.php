@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Events\PaymentApproved;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Services\BusinessRubiesFundingWebhookService;
 use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Support\Str;
 class MevonPayWebhookController extends Controller
 {
     private const WEBHOOK_SOURCE_CACHE_KEY = 'mevonpay:webhook:recent_sources';
+
     private const WEBHOOK_SOURCE_CACHE_LIMIT = 200;
 
     public function receive(Request $request): JsonResponse
@@ -35,8 +37,9 @@ class MevonPayWebhookController extends Controller
         $secret = (string) config('services.mevonpay.webhook_secret', '');
         if ($secret !== '') {
             $token = (string) preg_replace('/^Bearer\s+/i', '', (string) $request->header('Authorization', ''));
-            if (!hash_equals($secret, $token)) {
+            if (! hash_equals($secret, $token)) {
                 $this->recordWebhookSource($request, 'blocked_secret');
+
                 return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
             }
         }
@@ -45,6 +48,7 @@ class MevonPayWebhookController extends Controller
         $event = (string) data_get($payload, 'event', '');
         if ($event !== 'funding.success') {
             $this->recordWebhookSource($request, 'ignored_event');
+
             return response()->json(['success' => true, 'message' => 'Ignored']);
         }
 
@@ -54,6 +58,7 @@ class MevonPayWebhookController extends Controller
 
         if ($accountNumber === '') {
             $this->recordWebhookSource($request, 'invalid_payload');
+
             return response()->json(['success' => false, 'message' => 'Invalid payload'], 422);
         }
 
@@ -67,6 +72,7 @@ class MevonPayWebhookController extends Controller
             }
 
             $this->recordWebhookSource($request, 'invalid_payload');
+
             return response()->json(['success' => false, 'message' => 'Invalid payload'], 422);
         }
 
@@ -89,6 +95,12 @@ class MevonPayWebhookController extends Controller
             ->first();
 
         if (! $payment) {
+            if (app(BusinessRubiesFundingWebhookService::class)->tryFulfillFromWebhook($accountNumber, $amount, $reference, $webhookMeta)) {
+                $this->recordWebhookSource($request, 'business_rubies_va');
+
+                return response()->json(['success' => true, 'message' => 'Business Rubies funding applied']);
+            }
+
             if ($waTopup->tryFulfillFromWebhook($accountNumber, $amount, $reference, $webhookMeta)) {
                 $this->recordWebhookSource($request, 'whatsapp_wallet_topup');
 
@@ -143,7 +155,7 @@ class MevonPayWebhookController extends Controller
     private function recordWebhookSource(Request $request, string $status): void
     {
         $entries = Cache::get(self::WEBHOOK_SOURCE_CACHE_KEY, []);
-        if (!is_array($entries)) {
+        if (! is_array($entries)) {
             $entries = [];
         }
 
@@ -174,7 +186,7 @@ class MevonPayWebhookController extends Controller
             return true;
         }
 
-        if (!empty($allowedIps) && !in_array((string) $request->ip(), $allowedIps, true)) {
+        if (! empty($allowedIps) && ! in_array((string) $request->ip(), $allowedIps, true)) {
             return false;
         }
 

@@ -88,6 +88,36 @@
                     <p class="text-xs text-gray-600">Overdraft limit: <span class="font-medium text-gray-900">₦{{ number_format($stats['overdraft_limit'], 2) }}</span></p>
                     <p class="text-xs text-gray-600">Available to withdraw: <span class="font-medium text-green-600">₦{{ number_format($stats['available_balance'], 2) }}</span></p>
                 @endif
+                @php
+                    $bizUser = auth('business')->user();
+                    $rubiesAcct = $bizUser && ! empty($bizUser->rubies_business_account_number) ? trim((string) $bizUser->rubies_business_account_number) : '';
+                    $rubiesBank = $bizUser ? trim((string) ($bizUser->rubies_business_bank_name ?? '')) : '';
+                    $rubiesName = $bizUser ? trim((string) ($bizUser->rubies_business_account_name ?? '')) : '';
+                @endphp
+                @if($rubiesAcct !== '')
+                    <div class="mt-3 pt-3 border-t border-gray-100 rounded-lg bg-slate-50 px-3 py-2 -mx-1">
+                        <p class="text-xs font-medium text-gray-700 mb-1">
+                            <i class="fas fa-university text-gray-500 mr-1"></i>Rubies pay-in account (permanent)
+                        </p>
+                        <p class="text-xs text-gray-600">
+                            <span class="text-gray-500">Account number:</span>
+                            <span class="font-mono font-semibold text-gray-900 select-all">{{ $rubiesAcct }}</span>
+                        </p>
+                        @if($rubiesBank !== '')
+                            <p class="text-xs text-gray-600 mt-0.5"><span class="text-gray-500">Bank:</span> {{ $rubiesBank }}</p>
+                        @endif
+                        @if($rubiesName !== '')
+                            <p class="text-xs text-gray-600 mt-0.5"><span class="text-gray-500">Account name:</span> {{ $rubiesName }}</p>
+                        @endif
+                        <p class="text-[11px] text-gray-500 mt-1.5 leading-snug">Transfers to this account are credited to your balance when we receive the MevonPay funding webhook.</p>
+                    </div>
+                @else
+                    <p class="text-xs text-gray-500 mt-2">
+                        <a href="{{ route('business.verification.index') }}" class="text-primary hover:underline">Complete verification</a>
+                        <span class="text-gray-400"> — </span>
+                        <span>Rubies business pay-in account appears here after KYC and account creation.</span>
+                    </p>
+                @endif
                 <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2">
                     <a href="{{ route('business.withdrawals.create') }}" class="text-xs text-primary hover:underline inline-flex items-center">
                         Request Withdrawal <i class="fas fa-arrow-right ml-1 text-xs"></i>
