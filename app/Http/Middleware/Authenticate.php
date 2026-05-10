@@ -11,7 +11,7 @@ class Authenticate extends Middleware
 {
     /**
      * Handle an incoming request.
-     * 
+     *
      * Override to allow admin impersonation for business routes.
      */
     public function handle($request, Closure $next, ...$guards)
@@ -26,16 +26,17 @@ class Authenticate extends Middleware
             if ($request->session()->has('admin_impersonating_business_id')) {
                 $businessId = $request->session()->get('admin_impersonating_business_id');
                 $adminId = $request->session()->get('admin_impersonating_admin_id');
-                
-                // Verify admin is still authenticated and is super admin
+
+                // Verify admin is still authenticated and may impersonate
                 $admin = Auth::guard('admin')->user();
-                if ($admin && $admin->id == $adminId && $admin->isSuperAdmin()) {
+                if ($admin && $admin->id == $adminId && $admin->canImpersonateBusiness()) {
                     $business = \App\Models\Business::find($businessId);
                     if ($business) {
                         // Login as business if not already logged in as this business
-                        if (!Auth::guard('business')->check() || Auth::guard('business')->id() != $businessId) {
+                        if (! Auth::guard('business')->check() || Auth::guard('business')->id() != $businessId) {
                             Auth::guard('business')->login($business);
                         }
+
                         // Allow the request to proceed without further auth checks
                         return $next($request);
                     } else {

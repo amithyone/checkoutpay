@@ -3,18 +3,18 @@
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
 use App\Http\Controllers\Admin\BusinessController;
+use App\Http\Controllers\Admin\BusinessKycController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EmailAccountController;
+use App\Http\Controllers\Admin\ExternalApiController;
 use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
-use App\Http\Controllers\Admin\BusinessKycController;
-use App\Http\Controllers\Admin\ExternalApiController;
 use App\Http\Controllers\Admin\RenterController;
 use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
-use App\Http\Controllers\Admin\WithdrawalController;
 use App\Http\Controllers\Admin\WhatsappWalletAdminController;
+use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -146,7 +146,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->middleware('super_admin')
             ->name('businesses.update-charges');
         Route::post('businesses/{business}/login-as', [BusinessController::class, 'loginAsBusiness'])
-            ->middleware('super_admin')
             ->name('businesses.login-as');
         Route::post('businesses/exit-impersonation', [BusinessController::class, 'exitImpersonation'])
             ->name('businesses.exit-impersonation');

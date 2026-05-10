@@ -11,9 +11,9 @@ class AllowAdminImpersonation
 {
     /**
      * Handle an incoming request.
-     * 
-     * This middleware allows super admins to impersonate businesses by checking
-     * if there's an admin impersonation session active and logging in as the business.
+     *
+     * When an allowed admin is impersonating a business, keep the business guard
+     * logged in for dashboard routes.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -21,15 +21,15 @@ class AllowAdminImpersonation
         if ($request->session()->has('admin_impersonating_business_id')) {
             $businessId = $request->session()->get('admin_impersonating_business_id');
             $adminId = $request->session()->get('admin_impersonating_admin_id');
-            
-            // Verify admin is still authenticated and is super admin
+
+            // Verify admin is still authenticated and may impersonate
             $admin = Auth::guard('admin')->user();
-            if ($admin && $admin->id == $adminId && $admin->isSuperAdmin()) {
+            if ($admin && $admin->id == $adminId && $admin->canImpersonateBusiness()) {
                 // Set the business as the authenticated user for this request
                 $business = \App\Models\Business::find($businessId);
                 if ($business) {
                     // Login as business if not already logged in as this business
-                    if (!Auth::guard('business')->check() || Auth::guard('business')->id() != $businessId) {
+                    if (! Auth::guard('business')->check() || Auth::guard('business')->id() != $businessId) {
                         Auth::guard('business')->login($business);
                     }
                 } else {

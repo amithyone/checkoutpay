@@ -934,14 +934,14 @@ class BusinessController extends Controller
     }
 
     /**
-     * Login as business (impersonation) - Super Admin only
+     * Login as business (impersonation). Allowed for active admins except tax-only role.
      */
     public function loginAsBusiness(Request $request, Business $business): RedirectResponse
     {
         $admin = auth('admin')->user();
 
-        if (! $admin || ! $admin->isSuperAdmin()) {
-            abort(403, 'Only super admins can impersonate businesses.');
+        if (! $admin || ! $admin->canImpersonateBusiness()) {
+            abort(403, 'You are not allowed to view as this business.');
         }
 
         // Store impersonation data in session

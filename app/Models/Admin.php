@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,7 +10,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class Admin extends Authenticatable
 {
-    use HasFactory, Notifiable, SoftDeletes, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -33,9 +32,13 @@ class Admin extends Authenticatable
     ];
 
     const ROLE_SUPER_ADMIN = 'super_admin';
+
     const ROLE_ADMIN = 'admin';
+
     const ROLE_SUPPORT = 'support';
+
     const ROLE_STAFF = 'staff';
+
     const ROLE_TAX = 'tax';
 
     /**
@@ -140,5 +143,18 @@ class Admin extends Authenticatable
     public function canManageAdmins(): bool
     {
         return $this->role === self::ROLE_SUPER_ADMIN;
+    }
+
+    /**
+     * Whether this admin may open the business dashboard as a merchant (impersonation).
+     * Super admins, admins, support, and staff can; tax-only and inactive admins cannot.
+     */
+    public function canImpersonateBusiness(): bool
+    {
+        if (! $this->is_active) {
+            return false;
+        }
+
+        return ! $this->isTaxAdmin();
     }
 }
