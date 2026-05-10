@@ -24,6 +24,58 @@ class VerificationController extends Controller
     }
 
     /**
+     * Save pay-in profile fields and request permanent business pay-in account (independent of KYC document submission).
+     */
+    public function requestPermanentAccount(Request $request)
+    {
+        $business = auth('business')->user();
+
+        $validated = $request->validate([
+            'cac_registration_number' => 'required|string|max:100',
+            'business_phone' => 'required|string|max:30',
+            'business_email' => 'required|email|max:255',
+            'signatory_dob' => 'required|date_format:Y-m-d|before:today',
+            'legal_name' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $this->normalizeNigerianPhoneToLocal11((string) $validated['business_phone']);
+        } catch (\Throwable) {
+            return back()->withErrors([
+                'business_phone' => 'Enter a valid Nigerian mobile number (e.g. 08012345678 or +2348012345678).',
+            ])->withInput();
+        }
+
+        $this->applyKycProfileFields($business, $validated);
+
+        $business->refresh();
+        $auto = app(BusinessRubiesKycAutoVerificationService::class)->attemptIndependentPermanentAccount($business);
+
+        if ($auto['verified'] && $auto['attempted']) {
+            return redirect()->route('business.verification.index')
+                ->with('success', 'Your permanent business pay-in account is ready. Details are shown below.');
+        }
+
+        if ($auto['skipped'] && $auto['message'] === '') {
+            return redirect()->route('business.verification.index')
+                ->with('info', 'Your permanent pay-in account is already set up.');
+        }
+
+        if ($auto['skipped'] && $auto['message'] === 'pay_in_unavailable') {
+            return redirect()->route('business.verification.index')
+                ->with('warning', $this->formatPayInUserMessage('pay_in_unavailable'));
+        }
+
+        if ($auto['attempted'] && ! $auto['skipped'] && $auto['message'] !== '') {
+            return redirect()->route('business.verification.index')
+                ->with('warning', $this->formatPayInUserMessage($auto['message']));
+        }
+
+        return redirect()->route('business.verification.index')
+            ->with('info', 'Your details were saved. You can try again in a moment.');
+    }
+
+    /**
      * Submit verification document
      */
     public function store(Request $request)
@@ -53,14 +105,38 @@ class VerificationController extends Controller
             'bank_code' => 'nullable|string|max:20',
             'bvn' => 'nullable|string|max:11|min:11',
             'nin' => 'nullable|string|max:11|min:11',
+            'business_phone' => 'nullable|string|max:30',
+            'legal_name' => 'nullable|string|max:255',
+            'business_email' => 'nullable|email|max:255',
+            'cac_registration_number' => 'nullable|string|max:100',
+            'signatory_dob' => 'nullable|date_format:Y-m-d|before:today',
         ];
+
+        if (in_array($typeIn, [BusinessVerification::TYPE_BVN, BusinessVerification::TYPE_NIN], true)) {
+            $rules['business_phone'] = 'required|string|max:30';
+            $rules['legal_name'] = 'required|string|max:255';
+        }
 
         if (in_array($typeIn, [BusinessVerification::TYPE_CAC_CERTIFICATE, BusinessVerification::TYPE_CAC_APPLICATION], true)) {
             $rules['cac_registration_number'] = 'required|string|max:100';
-            $rules['rubies_signatory_dob'] = 'required|date_format:Y-m-d|before:today';
+            $rules['signatory_dob'] = 'required|date_format:Y-m-d|before:today';
+            $rules['business_phone'] = 'required|string|max:30';
+            $rules['business_email'] = 'required|email|max:255';
         }
 
         $validated = $request->validate($rules);
+
+        if (! empty($validated['business_phone'])) {
+            try {
+                $this->normalizeNigerianPhoneToLocal11((string) $validated['business_phone']);
+            } catch (\Throwable) {
+                return back()->withErrors([
+                    'business_phone' => 'Enter a valid Nigerian mobile number (e.g. 08012345678 or +2348012345678).',
+                ])->withInput();
+            }
+        }
+
+        $this->applyKycProfileFields($business, $validated);
 
         // Handle text-based verifications (account_number + bank, BVN, NIN)
         $textBasedTypes = [
@@ -146,12 +222,6 @@ class VerificationController extends Controller
             $path = $request->file('document')->store('verifications/'.$business->id, 'public');
             $documentType = $validated['document_type'] ?? BusinessVerification::getTypeLabel($validated['verification_type']);
 
-            if (in_array($validated['verification_type'], [BusinessVerification::TYPE_CAC_CERTIFICATE, BusinessVerification::TYPE_CAC_APPLICATION], true)) {
-                $business->update([
-                    'cac_registration_number' => strtoupper(trim((string) $validated['cac_registration_number'])),
-                    'rubies_signatory_dob' => $validated['rubies_signatory_dob'],
-                ]);
-            }
         }
 
         // Create verification record
@@ -168,15 +238,21 @@ class VerificationController extends Controller
 
         if ($auto['verified'] && $auto['attempted']) {
             return redirect()->route('business.verification.index')
-                ->with('success', 'Your business is verified. We created your Rubies business pay-in account — details are shown below.');
+                ->with('success', 'Verification complete. Your permanent business pay-in account is active — details are shown below.');
         }
 
         if ($auto['attempted'] && ! $auto['skipped'] && $auto['message'] !== '') {
             return redirect()->route('business.verification.index')
                 ->with('warning',
-                    'All KYC items are submitted, but we could not create your business bank account yet: '.$auto['message']
-                    .' Your documents are saved; fix the issue or contact support if it persists.'
+                    'All KYC items are submitted, but we could not finish pay-in account setup yet: '
+                    .$this->formatPayInUserMessage($auto['message'])
+                    .' Your submissions are saved; fix the issue or contact support if it persists.'
                 );
+        }
+
+        if ($auto['skipped'] && $auto['message'] === 'pay_in_unavailable') {
+            return redirect()->route('business.verification.index')
+                ->with('warning', $this->formatPayInUserMessage('pay_in_unavailable'));
         }
 
         $success = 'Verification document submitted successfully.';
@@ -205,5 +281,70 @@ class VerificationController extends Controller
         }
 
         return Storage::disk('public')->download($verification->document_path);
+    }
+
+    /**
+     * Persist profile fields used for pay-in account and KYC.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function applyKycProfileFields(\App\Models\Business $business, array $validated): void
+    {
+        $updates = [];
+
+        if (! empty($validated['business_phone'])) {
+            $updates['phone'] = $this->normalizeNigerianPhoneToLocal11((string) $validated['business_phone']);
+        }
+
+        if (array_key_exists('cac_registration_number', $validated) && trim((string) $validated['cac_registration_number']) !== '') {
+            $updates['cac_registration_number'] = strtoupper(trim((string) $validated['cac_registration_number']));
+        }
+
+        if (! empty($validated['signatory_dob'])) {
+            $updates['rubies_signatory_dob'] = $validated['signatory_dob'];
+        }
+
+        if (array_key_exists('legal_name', $validated) && trim((string) $validated['legal_name']) !== '') {
+            $updates['name'] = trim((string) $validated['legal_name']);
+        }
+
+        if (! empty($validated['business_email'])) {
+            $updates['email'] = strtolower(trim((string) $validated['business_email']));
+        }
+
+        if ($updates !== []) {
+            $business->update($updates);
+        }
+    }
+
+    private function formatPayInUserMessage(string $message): string
+    {
+        return match ($message) {
+            'pay_in_unavailable' => 'Pay-in account setup is temporarily unavailable. Try again later or contact support.',
+            'cac_dob_required' => 'Enter your CAC / RC number and signatory date of birth in the pay-in section.',
+            default => $message,
+        };
+    }
+
+    /**
+     * Nigerian mobile normalization consistent with pay-in provisioning.
+     */
+    private function normalizeNigerianPhoneToLocal11(string $phone): string
+    {
+        $d = preg_replace('/\D+/', '', $phone) ?? '';
+        if ($d === '') {
+            throw new \InvalidArgumentException('Invalid phone number.');
+        }
+        if (strlen($d) === 11 && str_starts_with($d, '0')) {
+            return $d;
+        }
+        if (strlen($d) === 13 && str_starts_with($d, '234')) {
+            return '0'.substr($d, 3);
+        }
+        if (strlen($d) === 10 && $d[0] !== '0') {
+            return '0'.$d;
+        }
+
+        throw new \InvalidArgumentException('Phone must be a valid Nigerian mobile (e.g. 080… or +234…).');
     }
 }

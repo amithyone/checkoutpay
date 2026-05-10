@@ -135,6 +135,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
 
         // Verification/KYC
         Route::get('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'index'])->name('verification.index');
+        Route::post('/verification/permanent-account', [\App\Http\Controllers\Business\VerificationController::class, 'requestPermanentAccount'])->name('verification.permanent-account');
         Route::post('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'store'])->name('verification.store');
 
         // Invoices
