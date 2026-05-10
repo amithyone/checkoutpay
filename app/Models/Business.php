@@ -1002,10 +1002,24 @@ class Business extends Authenticatable implements CanResetPasswordContract
         $website = $payment && $payment->relationLoaded('website') ? $payment->website : ($payment ? $payment->website()->first() : null);
 
         $emailData = ($payment && is_array($payment->email_data)) ? $payment->email_data : [];
-        // Permanent Rubies business VA pay-ins: use exact net (skip "nice" ₦500 rounding used for website checkouts)
-        $skipReceiveRounding = ! empty($emailData['rubies_business_va']);
+        // Permanent merchant pay-in VA (Rubies business account): credit gross — no platform charges.
+        // Checkout / temporary generated VAs use {@see ChargeService::calculateCharges()} as usual.
+        $isPermanentRubiesBusinessVa = ! empty($emailData['rubies_business_va']);
 
-        $charges = $chargeService->calculateCharges($amountForCharges, $website, $this, $skipReceiveRounding);
+        if ($isPermanentRubiesBusinessVa) {
+            $charges = [
+                'original_amount' => $amountForCharges,
+                'charge_percentage' => 0,
+                'charge_fixed' => 0,
+                'total_charges' => 0,
+                'amount_to_pay' => $amountForCharges,
+                'business_receives' => $amountForCharges,
+                'paid_by_customer' => false,
+                'exempt' => true,
+            ];
+        } else {
+            $charges = $chargeService->calculateCharges($amountForCharges, $website, $this);
+        }
 
         // Store charge details in payment if provided
         if ($payment) {
@@ -1029,14 +1043,13 @@ class Business extends Authenticatable implements CanResetPasswordContract
         // Increment balance with the amount business receives (after charges)
         $this->increment('balance', $charges['business_receives']);
 
-        if ($skipReceiveRounding && $payment) {
+        if ($isPermanentRubiesBusinessVa && $payment) {
             \Log::info('business.balance_credit.permanent_va', [
                 'business_id' => $this->id,
                 'payment_id' => $payment->id,
-                'charge_exempt' => (bool) $this->charge_exempt,
                 'gross_naira' => $amountForCharges,
-                'total_charges' => $charges['total_charges'] ?? null,
                 'credited_naira' => $charges['business_receives'],
+                'platform_charges_applied' => false,
             ]);
         }
 

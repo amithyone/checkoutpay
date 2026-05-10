@@ -19,14 +19,11 @@ class ChargeService
     const DEFAULT_FIXED = 50.0;
 
     /**
-     * Calculate charges for a payment amount
+     * Calculate charges for a payment amount (checkout / temp VA flows). Permanent business pay-in VA credits skip this in {@see Business::incrementBalanceWithCharges()}.
      *
-     * @param  float  $amount  Original payment amount
-     * @param  bool  $skipReceiveRounding  When true, credit exact net (2 dp). Used for merchant Rubies VA pay-ins so
-     *                                     {@see roundBusinessReceives()} does not shrink credits (e.g. ₦1,295 gross → ₦1,000 net).
      * @return array<string, mixed>
      */
-    public function calculateCharges(float $amount, ?BusinessWebsite $website = null, ?Business $business = null, bool $skipReceiveRounding = false): array
+    public function calculateCharges(float $amount, ?BusinessWebsite $website = null, ?Business $business = null): array
     {
         // Check if charges are enabled for website
         $chargesEnabled = $this->areChargesEnabled($website, $business);
@@ -57,33 +54,24 @@ class ChargeService
 
         if ($paidByCustomer) {
             // Customer pays charges - add to amount
-            $businessReceives = $skipReceiveRounding
-                ? round($amount, 2)
-                : $this->roundBusinessReceives($amount);
-
             return [
                 'original_amount' => $amount,
                 'charge_percentage' => round($percentageCharge, 2),
                 'charge_fixed' => $fixed,
                 'total_charges' => round($totalCharges, 2),
                 'amount_to_pay' => round($amount + $totalCharges, 2),
-                'business_receives' => $businessReceives,
+                'business_receives' => $this->roundBusinessReceives($amount),
                 'paid_by_customer' => true,
                 'exempt' => false,
             ];
         }
 
-        // Business pays charges - deduct from amount
-        $businessReceivesNet = max(0, $amount - $totalCharges);
+        // Business pays charges - deduct from amount and round business receives
+        $businessReceives = $amount - $totalCharges;
+        $roundedBusinessReceives = $this->roundBusinessReceives($businessReceives);
 
-        if ($skipReceiveRounding) {
-            $roundedBusinessReceives = round($businessReceivesNet, 2);
-            $adjustedTotalCharges = round($amount - $roundedBusinessReceives, 2);
-        } else {
-            $roundedBusinessReceives = $this->roundBusinessReceives($businessReceivesNet);
-            // Adjust total charges to match rounded business receives (legacy checkout rounding)
-            $adjustedTotalCharges = $amount - $roundedBusinessReceives;
-        }
+        // Adjust total charges to match rounded business receives
+        $adjustedTotalCharges = $amount - $roundedBusinessReceives;
 
         return [
             'original_amount' => $amount,
