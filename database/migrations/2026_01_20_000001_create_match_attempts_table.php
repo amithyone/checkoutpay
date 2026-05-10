@@ -74,9 +74,6 @@ return new class extends Migration
             $table->index(['match_result', 'created_at']);
             $table->index(['manual_review_status', 'created_at']);
             $table->index(['extraction_method', 'match_result']);
-            
-            // Full text index for searching reasons
-            $table->index('reason', 'match_attempts_reason_idx');
         });
     }
 

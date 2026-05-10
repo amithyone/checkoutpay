@@ -275,6 +275,29 @@ X-API-Key: {{ $business->api_key }}
         </div>
     </div>
 
+    <!-- Consumer mobile wallet API (end-user app) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6" id="consumer-wallet-api">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-mobile-alt mr-2 text-primary"></i> Consumer wallet API (Android / iOS)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">
+            End-user apps authenticate with <strong>WhatsApp OTP</strong> (code sent to the same number as the wallet) and a <code class="bg-gray-100 px-1 rounded text-xs">Bearer</code> token from Sanctum.
+            Base path: <code class="bg-gray-100 px-1 rounded text-xs">{{ url('/api/v1/consumer') }}</code>.
+            This uses the same <code class="bg-gray-100 px-1 rounded text-xs">whatsapp_wallets</code> rows as the WhatsApp bot.
+        </p>
+        <div class="space-y-4 text-sm text-gray-700">
+            <p><strong>1. Request OTP:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/auth/otp/request</code> JSON <code class="text-xs">{"phone":"080…"}</code></p>
+            <p><strong>2. Verify &amp; token:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/auth/otp/verify</code> JSON <code class="text-xs">{"phone":"080…","code":"123456"}</code> → returns <code class="text-xs">token</code>; send <code class="text-xs">Authorization: Bearer &lt;token&gt;</code> on all following calls.</p>
+            <p><strong>3. Wallet:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/wallet</code>, <code class="text-xs">POST …/wallet/ensure</code>, <code class="text-xs">GET …/wallet/transactions</code>, <code class="text-xs">POST …/wallet/topup/virtual-account</code></p>
+            <p><strong>4. PIN:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/wallet/pin</code> (first-time), <code class="text-xs">PUT …/wallet/pin</code> (change). Debits require 4-digit <code class="text-xs">pin</code> on transfer/VTU routes.</p>
+            <p><strong>5. Transfers:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/transfers/p2p</code> (<code class="text-xs">to_phone</code>, <code class="text-xs">amount</code>, <code class="text-xs">pin</code>), <code class="text-xs">POST …/transfers/bank</code> (account + bank + <code class="text-xs">pin</code>), <code class="text-xs">GET …/banks/name-enquiry</code></p>
+            <p><strong>6. VTU:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/vtu/networks</code>, <code class="text-xs">GET …/vtu/data-plans</code>, <code class="text-xs">POST …/vtu/airtime</code>, <code class="text-xs">POST …/vtu/data</code></p>
+            <p><strong>7. Tier 2 KYC:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/kyc/tier2</code>, <code class="text-xs">POST …/kyc/tier2/personal</code>, <code class="text-xs">POST …/kyc/tier2/business</code></p>
+            <p><strong>Errors:</strong> JSON <code class="text-xs">success: false</code> and <code class="text-xs">message</code>; HTTP 401 without/invalid token, 422 validation or business rules, 423 PIN locked, 502 provider failures where applicable.</p>
+            <p class="text-xs text-gray-500">Logout: <code class="bg-gray-100 px-1 rounded">POST …/auth/logout</code> (Bearer).</p>
+        </div>
+    </div>
+
     <!-- Code Examples -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">

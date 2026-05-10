@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         // Seed GTBank email template
         $this->call([
+            PageSeeder::class,
             GtbankTemplateSeeder::class,
             EmailTemplateSeeder::class,
             SuperAdminBusinessSeeder::class,

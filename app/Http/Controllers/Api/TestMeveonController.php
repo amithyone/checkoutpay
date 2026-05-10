@@ -300,38 +300,28 @@ class TestMeveonController extends Controller
             'email' => 'required|email|max:255',
         ]);
 
-        $url = rtrim((string) (config('services.mevonrubies.base_url') ?: config('services.mevonpay.base_url', '')), '/')
-            .'/'.ltrim((string) config('services.mevonrubies.create_path', '/V1/createrubies'), '/');
-        $secret = trim((string) (config('services.mevonrubies.secret_key') ?: config('services.mevonpay.secret_key', '')));
-
-        $payload = [
-            'action' => 'create',
-            'account_type' => 'business',
-            'cac' => (string) $validated['cac'],
-            'phone' => (string) $validated['phone'],
-            'dob' => (string) $validated['dob'],
-            'email' => strtolower(trim((string) $validated['email'])),
-        ];
-
-        $resp = Http::withHeaders([
-            'Authorization' => $secret,
-        ])
-            ->acceptJson()
-            ->asJson()
-            ->timeout((int) (config('services.mevonrubies.timeout_seconds') ?: config('services.mevonpay.timeout_seconds', 20)))
-            ->post($url, $payload);
-
-        $json = $resp->json();
+        try {
+            $parsed = $this->rubiesService->createRubiesBusinessAccount(
+                (string) $validated['cac'],
+                (string) $validated['phone'],
+                (string) $validated['dob'],
+                strtolower(trim((string) $validated['email'])),
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'action' => 'createrubies_business',
+                'provider_endpoint' => '/V1/createrubies',
+                'message' => $e->getMessage(),
+            ], 502);
+        }
 
         return response()->json([
-            'success' => $resp->successful(),
+            'success' => true,
             'action' => 'createrubies_business',
             'provider_endpoint' => '/V1/createrubies',
-            'http_status' => $resp->status(),
-            'request' => $payload,
-            'response' => is_array($json) ? $json : ['raw' => $resp->body()],
-            'note' => 'Business Rubies creation is available for docs/testing. WhatsApp Tier 2 currently uses personal flow only.',
-        ], $resp->successful() ? 200 : 502);
+            'normalized' => $parsed,
+        ]);
     }
 
     private function authorizeRequest(Request $request): void
@@ -490,4 +480,3 @@ class TestMeveonController extends Controller
         ], $resp->successful() ? 200 : 502);
     }
 }
-

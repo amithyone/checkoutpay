@@ -699,6 +699,28 @@
                 </div>
             @endforeach
         </div>
+
+        @if($allApproved)
+            <div class="mt-6 p-4 rounded-lg border {{ !empty($business->rubies_business_account_number) ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200' }}">
+                <h4 class="text-sm font-semibold text-gray-900 mb-2">
+                    <i class="fas fa-building-columns mr-1"></i> Rubies business pay-in account (KYC)
+                </h4>
+                @if(!empty($business->rubies_business_account_number))
+                    <dl class="text-sm text-gray-800 space-y-1">
+                        <div><span class="text-gray-600">Account:</span> <span class="font-mono font-medium">{{ $business->rubies_business_account_number }}</span></div>
+                        <div><span class="text-gray-600">Bank:</span> {{ $business->rubies_business_bank_name ?? '—' }}</div>
+                        <div><span class="text-gray-600">Name:</span> {{ $business->rubies_business_account_name ?? '—' }}</div>
+                        @if($business->cac_registration_number)
+                            <div><span class="text-gray-600">CAC:</span> {{ $business->cac_registration_number }}</div>
+                        @endif
+                    </dl>
+                @else
+                    <p class="text-sm text-amber-900">
+                        No Rubies business account on file yet. It is created automatically when the last KYC item is approved, if Mevon Rubies is configured and CAC + signatory DOB are present on the merchant profile (from CAC document submission).
+                    </p>
+                @endif
+            </div>
+        @endif
     </div>
 
     <!-- Account Numbers -->

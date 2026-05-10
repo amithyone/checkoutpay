@@ -10,19 +10,21 @@ use App\Models\EmailAccount;
 use App\Notifications\PeerLendingLenderProgramConfiguredNotification;
 use App\Services\Credit\OverdraftFundingService;
 use App\Services\Credit\OverdraftInstallmentService;
+use App\Services\MevonRubiesVirtualAccountService;
 use App\Services\TransactionLogService;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\View\View;
 
 class BusinessController extends Controller
 {
     public function index(Request $request): View
     {
         $query = Business::withCount(['payments', 'withdrawalRequests', 'verifications'])
-            ->with(['verifications' => function($q) {
+            ->with(['verifications' => function ($q) {
                 $q->latest()->limit(1);
             }])
             ->latest();
@@ -46,11 +48,11 @@ class BusinessController extends Controller
         // Filter by KYC status
         if ($request->has('kyc_status')) {
             if ($request->kyc_status === 'verified') {
-                $query->whereHas('verifications', function($q) {
+                $query->whereHas('verifications', function ($q) {
                     $q->where('status', BusinessVerification::STATUS_APPROVED);
                 });
             } elseif ($request->kyc_status === 'pending') {
-                $query->whereHas('verifications', function($q) {
+                $query->whereHas('verifications', function ($q) {
                     $q->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW]);
                 });
             } elseif ($request->kyc_status === 'not_submitted') {
@@ -61,10 +63,10 @@ class BusinessController extends Controller
         // Search
         if ($request->has('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('website', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('website', 'like', "%{$search}%");
             });
         }
 
@@ -76,6 +78,7 @@ class BusinessController extends Controller
     public function create(): View
     {
         $emailAccounts = EmailAccount::where('is_active', true)->get();
+
         return view('admin.businesses.create', compact('emailAccounts'));
     }
 
@@ -106,20 +109,29 @@ class BusinessController extends Controller
     public function show(Business $business): View
     {
         $business->load([
-            'payments' => function($q) { $q->latest()->limit(10); },
-            'withdrawalRequests' => function($q) { $q->latest()->limit(10); },
+            'payments' => function ($q) {
+                $q->latest()->limit(10);
+            },
+            'withdrawalRequests' => function ($q) {
+                $q->latest()->limit(10);
+            },
             'accountNumbers',
-            'verifications' => function($q) { $q->latest(); },
-            'activityLogs' => function($q) { $q->latest()->limit(10); },
-            'websites'
+            'verifications' => function ($q) {
+                $q->latest();
+            },
+            'activityLogs' => function ($q) {
+                $q->latest()->limit(10);
+            },
+            'websites',
         ]);
-        
+
         return view('admin.businesses.show', compact('business'));
     }
 
     public function edit(Business $business): View
     {
         $emailAccounts = EmailAccount::where('is_active', true)->get();
+
         return view('admin.businesses.edit', compact('business', 'emailAccounts'));
     }
 
@@ -127,7 +139,7 @@ class BusinessController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:businesses,email,' . $business->id,
+            'email' => 'required|email|unique:businesses,email,'.$business->id,
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'website' => 'nullable|url|max:500',
@@ -171,8 +183,8 @@ class BusinessController extends Controller
         // Check KYC status (warning but allow bypass)
         $missingDocs = $business->getMissingKycDocuments();
         $allApproved = $business->hasAllKycDocumentsApproved();
-        
-        if (!$request->bypass_kyc && (!$business->hasAllRequiredKycDocuments() || !$allApproved)) {
+
+        if (! $request->bypass_kyc && (! $business->hasAllRequiredKycDocuments() || ! $allApproved)) {
             return redirect()->route('admin.businesses.show', $business)
                 ->with('warning', 'KYC verification is incomplete. Please verify all required documents before approving website, or use bypass option.');
         }
@@ -214,7 +226,7 @@ class BusinessController extends Controller
         ]);
 
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', 'Website approval revoked. Reason: ' . $request->rejection_reason);
+            ->with('success', 'Website approval revoked. Reason: '.$request->rejection_reason);
     }
 
     public function addWebsite(Request $request, Business $business): RedirectResponse
@@ -252,8 +264,8 @@ class BusinessController extends Controller
         ]);
 
         // Use explicit type casting for comparison
-        $websiteBusinessId = (int)$website->business_id;
-        $businessId = (int)$business->id;
+        $websiteBusinessId = (int) $website->business_id;
+        $businessId = (int) $business->id;
 
         \Log::info('Admin comparing business IDs', [
             'website_business_id' => $websiteBusinessId,
@@ -303,10 +315,11 @@ class BusinessController extends Controller
     public function toggleStatus(Business $business): RedirectResponse
     {
         $business->update([
-            'is_active' => !$business->is_active,
+            'is_active' => ! $business->is_active,
         ]);
 
         $status = $business->is_active ? 'activated' : 'deactivated';
+
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', "Business {$status} successfully");
     }
@@ -327,8 +340,8 @@ class BusinessController extends Controller
     public function updateBalance(Request $request, Business $business): RedirectResponse
     {
         $admin = auth('admin')->user();
-        
-        if (!$admin->canUpdateBusinessBalance()) {
+
+        if (! $admin->canUpdateBusinessBalance()) {
             abort(403, 'Only super admins can update business balances.');
         }
 
@@ -341,7 +354,7 @@ class BusinessController extends Controller
         $business->update(['balance' => $request->balance]);
 
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', "Balance updated from ₦" . number_format($oldBalance, 2) . " to ₦" . number_format($request->balance, 2));
+            ->with('success', 'Balance updated from ₦'.number_format($oldBalance, 2).' to ₦'.number_format($request->balance, 2));
     }
 
     /** Overdraft limit tiers (in Naira). */
@@ -350,11 +363,11 @@ class BusinessController extends Controller
     public function approveOverdraft(Request $request, Business $business, TransactionLogService $logService): RedirectResponse
     {
         $admin = auth('admin')->user();
-        if (!$admin->isSuperAdmin()) {
+        if (! $admin->isSuperAdmin()) {
             abort(403, 'Only super admins can approve overdraft.');
         }
         $request->validate([
-            'overdraft_limit' => 'required|numeric|in:' . implode(',', self::OVERDRAFT_LIMITS),
+            'overdraft_limit' => 'required|numeric|in:'.implode(',', self::OVERDRAFT_LIMITS),
             'overdraft_funding_source' => 'required|string|in:platform,peer_pool,capital_reserve',
             'overdraft_approval_notes' => 'nullable|string|max:2000',
         ]);
@@ -413,13 +426,13 @@ class BusinessController extends Controller
         }
 
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', 'Overdraft approved with limit ₦' . number_format($limit, 2));
+            ->with('success', 'Overdraft approved with limit ₦'.number_format($limit, 2));
     }
 
     public function rejectOverdraft(Business $business): RedirectResponse
     {
         $admin = auth('admin')->user();
-        if (!$admin->isSuperAdmin()) {
+        if (! $admin->isSuperAdmin()) {
             abort(403, 'Only super admins can reject overdraft.');
         }
         $business->update([
@@ -496,22 +509,22 @@ class BusinessController extends Controller
     /**
      * Preview transactions for transfer (Super Admin only)
      */
-    public function previewTransactions(Request $request, Business $business, BusinessWebsite $website = null): \Illuminate\Http\JsonResponse
+    public function previewTransactions(Request $request, Business $business, ?BusinessWebsite $website = null): \Illuminate\Http\JsonResponse
     {
         $admin = auth('admin')->user();
-        
-        if (!$admin->isSuperAdmin()) {
+
+        if (! $admin->isSuperAdmin()) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         // Check if transfer feature is enabled
         $enabled = \App\Models\Setting::get('transaction_transfer_enabled', config('transaction_transfer.enabled', true));
-        if (!$enabled) {
+        if (! $enabled) {
             return response()->json(['error' => 'Transaction transfer feature is disabled'], 403);
         }
 
         $query = \App\Models\Payment::where('business_id', $business->id);
-        
+
         if ($website) {
             $query->where('business_website_id', $website->id);
         }
@@ -536,17 +549,17 @@ class BusinessController extends Controller
 
         // If target_amount is specified, find transactions that sum to that amount
         if ($request->filled('target_amount')) {
-            $targetAmount = (float)$request->target_amount;
+            $targetAmount = (float) $request->target_amount;
             $selectedTransactions = $this->findTransactionsForAmount($transactions, $targetAmount);
             $transactions = $selectedTransactions;
         } else {
             // Apply limit if specified
-            $limit = $request->filled('limit') ? (int)$request->limit : 100;
+            $limit = $request->filled('limit') ? (int) $request->limit : 100;
             $transactions = $transactions->take($limit);
         }
 
         // Calculate total amount
-        $totalAmount = $transactions->sum(function($payment) {
+        $totalAmount = $transactions->sum(function ($payment) {
             return $payment->business_receives ?? $payment->amount;
         });
 
@@ -568,15 +581,15 @@ class BusinessController extends Controller
         }
 
         // Convert to array with amounts
-        $items = $transactions->map(function($payment) {
+        $items = $transactions->map(function ($payment) {
             return [
                 'payment' => $payment,
-                'amount' => (float)($payment->business_receives ?? $payment->amount),
+                'amount' => (float) ($payment->business_receives ?? $payment->amount),
             ];
         })->values()->all();
 
         // Sort by amount descending
-        usort($items, function($a, $b) {
+        usort($items, function ($a, $b) {
             return $b['amount'] <=> $a['amount'];
         });
 
@@ -587,7 +600,7 @@ class BusinessController extends Controller
         // Try multiple strategies
         // Strategy 1: Greedy from largest
         $this->tryGreedyStrategy($items, $targetAmount, $bestSelection, $bestSum, $bestDiff);
-        
+
         // Strategy 2: Greedy from smallest (for cases with many small transactions)
         $itemsReversed = array_reverse($items);
         $this->tryGreedyStrategy($itemsReversed, $targetAmount, $bestSelection, $bestSum, $bestDiff);
@@ -640,7 +653,7 @@ class BusinessController extends Controller
 
         foreach ($items as $item) {
             $newSum = $sum + $item['amount'];
-            
+
             // Only add if we don't exceed too much
             if ($newSum <= $targetAmount + $maxOver) {
                 $selection[] = $item['payment'];
@@ -664,17 +677,17 @@ class BusinessController extends Controller
     /**
      * Transfer transactions from business/website to super admin business (Super Admin only)
      */
-    public function transferTransactions(Request $request, Business $business, BusinessWebsite $website = null): \Illuminate\Http\JsonResponse|RedirectResponse
+    public function transferTransactions(Request $request, Business $business, ?BusinessWebsite $website = null): \Illuminate\Http\JsonResponse|RedirectResponse
     {
         $admin = auth('admin')->user();
-        
-        if (!$admin->isSuperAdmin()) {
+
+        if (! $admin->isSuperAdmin()) {
             abort(403, 'Only super admins can transfer transactions.');
         }
 
         // Check if transfer feature is enabled
         $enabled = \App\Models\Setting::get('transaction_transfer_enabled', config('transaction_transfer.enabled', true));
-        if (!$enabled) {
+        if (! $enabled) {
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => 'Transaction transfer feature is disabled'], 403);
             }
@@ -687,10 +700,11 @@ class BusinessController extends Controller
             $paymentIds = json_decode($paymentIds, true);
         }
 
-        if (empty($paymentIds) || !is_array($paymentIds)) {
+        if (empty($paymentIds) || ! is_array($paymentIds)) {
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => 'No transactions selected'], 400);
             }
+
             return redirect()->route('admin.businesses.show', $business)
                 ->with('error', 'No transactions selected');
         }
@@ -703,7 +717,7 @@ class BusinessController extends Controller
 
         foreach ($paymentIds as $paymentId) {
             $payment = \App\Models\Payment::find($paymentId);
-            
+
             // Verify payment belongs to this business/website
             if ($payment && $payment->business_id == $business->id) {
                 if ($website && $payment->business_website_id != $website->id) {
@@ -750,8 +764,8 @@ class BusinessController extends Controller
         $revenueService->recalculateBusinessRevenueFromWebsites($business);
         $revenueService->recalculateBusinessRevenueFromWebsites($superAdminBusiness);
 
-        $message = "{$transferred} transaction(s) transferred to super admin business. Total amount: ₦" . number_format($totalAmount, 2);
-        
+        $message = "{$transferred} transaction(s) transferred to super admin business. Total amount: ₦".number_format($totalAmount, 2);
+
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => $message]);
         }
@@ -766,17 +780,17 @@ class BusinessController extends Controller
     public function toggleWebsiteCharges(Business $business, BusinessWebsite $website): RedirectResponse
     {
         $admin = auth('admin')->user();
-        
-        if (!$admin->isSuperAdmin()) {
+
+        if (! $admin->isSuperAdmin()) {
             abort(403, 'Only super admins can toggle website charges.');
         }
 
         $website->update([
-            'charges_enabled' => !($website->charges_enabled ?? true),
+            'charges_enabled' => ! ($website->charges_enabled ?? true),
         ]);
 
         $status = $website->charges_enabled ? 'enabled' : 'disabled';
-        
+
         \Illuminate\Support\Facades\Log::info('Website charges toggled by admin', [
             'website_id' => $website->id,
             'charges_enabled' => $website->charges_enabled,
@@ -788,7 +802,7 @@ class BusinessController extends Controller
     }
 
     // KYC Management Methods
-    public function approveVerification(Request $request, Business $business, BusinessVerification $verification): RedirectResponse
+    public function approveVerification(Request $request, Business $business, BusinessVerification $verification, MevonRubiesVirtualAccountService $mevonRubies): RedirectResponse
     {
         $request->validate([
             'admin_notes' => 'nullable|string|max:1000',
@@ -801,8 +815,45 @@ class BusinessController extends Controller
             'admin_notes' => $request->admin_notes,
         ]);
 
-        return redirect()->route('admin.businesses.show', $business)
-            ->with('success', 'Verification approved successfully');
+        $business->refresh();
+
+        $success = 'Verification approved successfully.';
+        $warning = null;
+
+        if ($business->hasAllKycDocumentsApproved() && empty($business->rubies_business_account_number)) {
+            if (! $mevonRubies->isConfigured()) {
+                Log::warning('business.rubies_business_va.skipped_not_configured', ['business_id' => $business->id]);
+                $warning = 'Full KYC is approved, but Mevon Rubies is not configured — no business pay-in account was created.';
+            } elseif (trim((string) $business->cac_registration_number) === '' || $business->rubies_signatory_dob === null) {
+                $warning = 'Full KYC is approved, but CAC / RC number or signatory date of birth is missing. The merchant must submit CAC documents again with those fields, or you must set them before a Rubies pay-in account can be created.';
+            } else {
+                try {
+                    $va = $mevonRubies->createRubiesBusinessAccountForBusiness($business);
+                    $business->update([
+                        'rubies_business_account_number' => $va['account_number'] ?? null,
+                        'rubies_business_account_name' => $va['account_name'] ?? null,
+                        'rubies_business_bank_name' => $va['bank_name'] ?? null,
+                        'rubies_business_bank_code' => $va['bank_code'] ?? null,
+                        'rubies_business_reference' => $va['reference'] ?? null,
+                        'rubies_business_account_created_at' => now(),
+                    ]);
+                    $success .= ' Business pay-in bank account (Rubies) was created.';
+                } catch (\Throwable $e) {
+                    Log::warning('business.rubies_business_va.provision_failed', [
+                        'business_id' => $business->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $warning = 'Full KYC is approved, but creating the Rubies business pay-in account failed: '.$e->getMessage();
+                }
+            }
+        }
+
+        $redirect = redirect()->route('admin.businesses.show', $business)->with('success', $success);
+        if ($warning !== null) {
+            $redirect->with('warning', $warning);
+        }
+
+        return $redirect;
     }
 
     public function rejectVerification(Request $request, Business $business, BusinessVerification $verification): RedirectResponse
@@ -837,18 +888,19 @@ class BusinessController extends Controller
         ];
 
         if (in_array($verification->verification_type, $textBasedTypes)) {
-            $data = match($verification->verification_type) {
+            $data = match ($verification->verification_type) {
                 BusinessVerification::TYPE_ACCOUNT_NUMBER => [
                     'Account Number' => $business->account_number,
                     'Bank' => $business->bank_name ?? $business->bank_code,
                 ],
                 default => ['Details' => $verification->document_type],
             };
+
             return response()->json($data);
         }
 
         // For file-based verifications
-        if (!$verification->document_path || !Storage::disk('public')->exists($verification->document_path)) {
+        if (! $verification->document_path || ! Storage::disk('public')->exists($verification->document_path)) {
             abort(404, 'Document not found');
         }
 
@@ -858,8 +910,8 @@ class BusinessController extends Controller
     public function updateCharges(Request $request, Business $business): RedirectResponse
     {
         $admin = auth('admin')->user();
-        
-        if (!$admin->canUpdateBusinessBalance()) {
+
+        if (! $admin->canUpdateBusinessBalance()) {
             abort(403, 'Only super admins can update business charges.');
         }
 
@@ -878,7 +930,7 @@ class BusinessController extends Controller
         ]);
 
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', "Charge settings updated successfully");
+            ->with('success', 'Charge settings updated successfully');
     }
 
     /**
@@ -887,18 +939,18 @@ class BusinessController extends Controller
     public function loginAsBusiness(Request $request, Business $business): RedirectResponse
     {
         $admin = auth('admin')->user();
-        
-        if (!$admin || !$admin->isSuperAdmin()) {
+
+        if (! $admin || ! $admin->isSuperAdmin()) {
             abort(403, 'Only super admins can impersonate businesses.');
         }
 
         // Store impersonation data in session
         $request->session()->put('admin_impersonating_business_id', $business->id);
         $request->session()->put('admin_impersonating_admin_id', $admin->id);
-        
+
         // Actually log in as the business
         Auth::guard('business')->login($business);
-        
+
         // Save session immediately to ensure it's persisted
         $request->session()->save();
 
@@ -928,13 +980,13 @@ class BusinessController extends Controller
     public function exitImpersonation(Request $request): RedirectResponse
     {
         $businessId = $request->session()->get('admin_impersonating_business_id');
-        
+
         // Clear impersonation session
         $request->session()->forget(['admin_impersonating_business_id', 'admin_impersonating_admin_id']);
-        
+
         // Logout from business guard
         Auth::guard('business')->logout();
-        
+
         // Log the exit
         if ($businessId) {
             \Illuminate\Support\Facades\Log::info('Admin exited business impersonation', [

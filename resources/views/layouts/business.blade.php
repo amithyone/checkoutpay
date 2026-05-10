@@ -273,6 +273,13 @@
                     </div>
                 @endif
 
+                @if(session('warning'))
+                    <div class="mb-4 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span class="text-sm">{{ session('warning') }}</span>
+                    </div>
+                @endif
+
                 @if(session('info'))
                     <div class="mb-4 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg flex items-center">
                         <i class="fas fa-info-circle mr-2"></i>

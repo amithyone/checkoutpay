@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('event_coupons')) {
+            return;
+        }
+
         Schema::create('event_coupons', function (Blueprint $table) {
             $table->id();
             $table->foreignId('event_id')->constrained()->onDelete('cascade');
@@ -23,7 +27,7 @@ return new class extends Migration
             $table->dateTime('valid_until')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            
+
             $table->index(['event_id', 'code']);
         });
     }

@@ -41,6 +41,8 @@ class WhatsappWallet extends Model
         'kyc_dob',
         'kyc_bvn',
         'kyc_email',
+        'rubies_account_type',
+        'kyc_cac',
         'transfer_email_otp_enabled',
         'status',
     ];

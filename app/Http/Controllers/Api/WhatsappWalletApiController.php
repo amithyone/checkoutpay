@@ -171,6 +171,12 @@ class WhatsappWalletApiController extends Controller
             }
 
             $displayName = trim(trim((string) $wallet->kyc_fname).' '.trim((string) $wallet->kyc_lname));
+            if ($displayName === '' && (string) $wallet->rubies_account_type === 'business' && trim((string) $wallet->kyc_cac) !== '') {
+                $displayName = 'Business · '.trim((string) $wallet->kyc_cac);
+            }
+            if ($displayName === '') {
+                $displayName = trim((string) ($wallet->sender_name ?? ''));
+            }
             if ($displayName === '') {
                 $displayName = (string) ($wallet->mevon_reference ?? 'Wallet account');
             }

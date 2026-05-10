@@ -1,13 +1,15 @@
 ---
-description: Never destroy databases without explicit user approval and a fresh backup file
+description: Agents must never wipe or reset the whole DB without explicit user approval and backup
 alwaysApply: true
 ---
 
 # Database safety (non-negotiable)
 
+**Do not run destructive database commands on your own** — not to “fix migrations”, not to “clean state”, not in CI debugging. If the user did not type an explicit instruction that names the exact command **and** the target environment (e.g. “run `migrate:fresh` on my local Docker DB only”), **refuse and suggest safer alternatives**.
+
 ## Forbidden unless the user explicitly orders it in writing **and** a backup file was just created
 
-- `php artisan db:wipe`
+- `php artisan db:wipe` (**never** use this to troubleshoot migrations)
 - `php artisan migrate:fresh` / `migrate:fresh --seed`
 - `php artisan schema:dump` when used to replace a live schema destructively
 - `DROP DATABASE`, `DROP SCHEMA`

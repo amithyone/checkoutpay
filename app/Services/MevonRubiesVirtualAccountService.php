@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Business;
 use App\Models\Renter;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -207,6 +208,97 @@ class MevonRubiesVirtualAccountService
         }
 
         return $out;
+    }
+
+    /**
+     * Create a business Rubies VA in one call (no OTP). Mevon createrubies: action=create, account_type=business.
+     *
+     * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
+     */
+    public function createRubiesBusinessAccount(
+        string $cac,
+        string $phoneLocal11,
+        string $dobYmd,
+        string $email,
+    ): array {
+        $cac = strtoupper(trim($cac));
+        $email = strtolower(trim($email));
+        if ($cac === '' || strlen($cac) < 3) {
+            throw new \RuntimeException('CAC / company registration number is required.');
+        }
+        if (strlen($cac) > 100) {
+            throw new \RuntimeException('CAC / registration number is too long.');
+        }
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dobYmd)) {
+            throw new \RuntimeException('Date of birth must be YYYY-MM-DD.');
+        }
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('Valid email is required.');
+        }
+
+        $phoneLocal11 = $this->normalizeToLocal11($phoneLocal11);
+
+        $json = $this->postCreaterubies([
+            'action' => 'create',
+            'account_type' => 'business',
+            'cac' => $cac,
+            'phone' => $phoneLocal11,
+            'dob' => $dobYmd,
+            'email' => $email,
+        ]);
+
+        $out = $this->parseVaPayload($json);
+        if (trim($out['account_number']) === '') {
+            Log::channel('whatsapp_wallet_kyc')->error('MevonRubies business create: unparseable VA payload', [
+                'top_level_keys' => array_keys($json),
+                'data_is_array' => isset($json['data']) && is_array($json['data']),
+                'data_keys' => isset($json['data']) && is_array($json['data']) ? array_keys($json['data']) : [],
+                'raw_response' => $json,
+                'va_field_debug' => $this->rubiesVaFieldDebugSnapshot($json),
+            ]);
+            throw new \RuntimeException('MevonRubies business create: missing account_number in response.');
+        }
+
+        return $out;
+    }
+
+    /**
+     * Merchant KYC: create business Rubies VA from profile (CAC, phone, signatory DOB, email).
+     *
+     * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
+     */
+    public function createRubiesBusinessAccountForBusiness(Business $business): array
+    {
+        $cac = strtoupper(trim((string) $business->cac_registration_number));
+        if ($cac === '') {
+            throw new \RuntimeException('CAC / company registration number is missing on the business profile.');
+        }
+
+        $email = strtolower(trim((string) $business->email));
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('Business email is required.');
+        }
+
+        $phone = trim((string) $business->phone);
+        if ($phone === '') {
+            throw new \RuntimeException('Business phone is required.');
+        }
+
+        $dob = null;
+        $signatoryDob = $business->rubies_signatory_dob;
+        if ($signatoryDob !== null) {
+            $dob = $signatoryDob instanceof \DateTimeInterface
+                ? $signatoryDob->format('Y-m-d')
+                : (string) $signatoryDob;
+        }
+        if ($dob === null || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+            $dob = (string) config('services.mevonrubies.business_signatory_placeholder_dob', '1990-01-01');
+        }
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+            $dob = '1990-01-01';
+        }
+
+        return $this->createRubiesBusinessAccount($cac, $phone, $dob, $email);
     }
 
     /**
@@ -433,6 +525,6 @@ class MevonRubiesVirtualAccountService
             return '0'.$d;
         }
 
-        throw new \RuntimeException('Renter phone must be a valid Nigerian mobile (e.g. 080… or +234…).');
+        throw new \RuntimeException('Phone must be a valid Nigerian mobile (e.g. 080… or +234…).');
     }
 }

@@ -40,8 +40,11 @@
                 <i class="fas fa-info-circle text-blue-400 text-xl"></i>
             </div>
             <div class="ml-3">
-                <h3 class="text-sm font-medium text-blue-800">Documents Under Review</h3>
-                <p class="mt-2 text-sm text-blue-700">All required documents have been submitted and are being reviewed by our team.</p>
+                <h3 class="text-sm font-medium text-blue-800">Almost there</h3>
+                <p class="mt-2 text-sm text-blue-700">
+                    All required documents are submitted. When your details match Mevon’s checks, we create your Rubies business account and mark KYC complete automatically — no manual review wait.
+                    If something fails, you’ll see a message above with next steps.
+                </p>
             </div>
         </div>
     </div>
@@ -51,9 +54,19 @@
             <div class="flex-shrink-0">
                 <i class="fas fa-check-circle text-green-400 text-xl"></i>
             </div>
-            <div class="ml-3">
+            <div class="ml-3 flex-1">
                 <h3 class="text-sm font-medium text-green-800">KYC Verification Complete</h3>
                 <p class="mt-2 text-sm text-green-700">All required documents have been submitted and approved.</p>
+                @if(!empty($business->rubies_business_account_number))
+                    <div class="mt-4 p-3 bg-white rounded-lg border border-green-200 text-sm text-gray-800">
+                        <p class="font-semibold text-green-900 mb-2">Your business pay-in account (Rubies)</p>
+                        <p><span class="text-gray-600">Account:</span> <span class="font-mono font-medium">{{ $business->rubies_business_account_number }}</span></p>
+                        <p><span class="text-gray-600">Bank:</span> {{ $business->rubies_business_bank_name ?? 'Rubies MFB' }}</p>
+                        @if(!empty($business->rubies_business_account_name))
+                            <p><span class="text-gray-600">Name:</span> {{ $business->rubies_business_account_name }}</p>
+                        @endif
+                    </div>
+                @endif
             </div>
         </div>
     </div>
@@ -195,6 +208,28 @@
 
                 <!-- File-based fields (CAC Certificate, CAC Application, Utility Bill) -->
                 <div id="file-fields" class="hidden">
+                    <div id="cac-metadata-fields" class="hidden space-y-4 mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p class="text-xs text-gray-600">Required for CAC uploads — used to create your business pay-in account after KYC is approved.</p>
+                        <div>
+                            <label for="cac_registration_number" class="block text-sm font-medium text-gray-700 mb-1">CAC / RC number <span class="text-red-500">*</span></label>
+                            <input type="text" name="cac_registration_number" id="cac_registration_number" maxlength="100"
+                                placeholder="e.g. RC123456"
+                                value="{{ old('cac_registration_number', $business->cac_registration_number) }}"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                            @error('cac_registration_number')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="rubies_signatory_dob" class="block text-sm font-medium text-gray-700 mb-1">Signatory date of birth <span class="text-red-500">*</span></label>
+                            <input type="date" name="rubies_signatory_dob" id="rubies_signatory_dob"
+                                value="{{ old('rubies_signatory_dob', optional($business->rubies_signatory_dob)?->format('Y-m-d')) }}"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                            @error('rubies_signatory_dob')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
                     <div>
                         <label for="document_type" class="block text-sm font-medium text-gray-700 mb-1">Document Description</label>
                         <input type="text" name="document_type" id="document_type"
@@ -298,6 +333,14 @@ document.getElementById('verification_type').addEventListener('change', function
     document.getElementById('account_number').required = false;
     document.getElementById('bank_code_kyc').removeAttribute('required');
     document.getElementById('document').required = false;
+    const cacMeta = document.getElementById('cac-metadata-fields');
+    const cacReg = document.getElementById('cac_registration_number');
+    const signDob = document.getElementById('rubies_signatory_dob');
+    if (cacMeta && cacReg && signDob) {
+        cacMeta.classList.add('hidden');
+        cacReg.required = false;
+        signDob.required = false;
+    }
 
     if (['bvn', 'nin', 'account_number'].includes(type)) {
         textFields.classList.remove('hidden');
@@ -317,6 +360,11 @@ document.getElementById('verification_type').addEventListener('change', function
     } else if (['cac_certificate', 'cac_application', 'utility_bill'].includes(type)) {
         fileFields.classList.remove('hidden');
         document.getElementById('document').required = true;
+        if (['cac_certificate', 'cac_application'].includes(type) && cacMeta && cacReg && signDob) {
+            cacMeta.classList.remove('hidden');
+            cacReg.required = true;
+            signDob.required = true;
+        }
     }
 });
 

@@ -2,17 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Auth\Passwords\CanResetPassword;
+use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Auth\Passwords\CanResetPassword;
-use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class Business extends Authenticatable implements CanResetPasswordContract
 {
-    use HasFactory, SoftDeletes, Notifiable, CanResetPassword;
+    use CanResetPassword, HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -89,6 +90,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'last_yearly_revenue_update',
         'rental_global_caution_fee_enabled',
         'rental_global_caution_fee_percent',
+        'cac_registration_number',
+        'rubies_signatory_dob',
+        'rubies_business_account_number',
+        'rubies_business_account_name',
+        'rubies_business_bank_name',
+        'rubies_business_bank_code',
+        'rubies_business_reference',
+        'rubies_business_account_created_at',
     ];
 
     protected $hidden = [
@@ -148,6 +157,8 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_exempt' => 'boolean',
         'uses_external_account_numbers' => 'boolean',
         'whatsapp_wallet_api_enabled' => 'boolean',
+        'rubies_signatory_dob' => 'date',
+        'rubies_business_account_created_at' => 'datetime',
     ];
 
     /**
@@ -155,7 +166,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
      */
     public static function generateApiKey(): string
     {
-        return 'pk_' . Str::random(32);
+        return 'pk_'.Str::random(32);
     }
 
     /**
@@ -167,7 +178,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
             // Generate 5 random alphanumeric characters (uppercase letters and numbers)
             $businessId = strtoupper(Str::random(5));
             // Ensure it contains both letters and numbers
-            if (!preg_match('/[A-Z]/', $businessId) || !preg_match('/[0-9]/', $businessId)) {
+            if (! preg_match('/[A-Z]/', $businessId) || ! preg_match('/[0-9]/', $businessId)) {
                 // If it doesn't have both, regenerate
                 continue;
             }
@@ -193,7 +204,9 @@ class Business extends Authenticatable implements CanResetPasswordContract
         });
 
         static::created(function ($business) {
-            \App\Models\User::where('email', $business->email)->whereNull('business_id')->update(['business_id' => $business->id]);
+            if (Schema::hasTable('users')) {
+                \App\Models\User::where('email', $business->email)->whereNull('business_id')->update(['business_id' => $business->id]);
+            }
         });
 
         static::updated(function (Business $business) {
@@ -383,17 +396,46 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
+     * Each required KYC type has at least one submission that is not rejected (pending, under review, or approved).
+     * Used before calling Mevon Rubies to auto-complete KYC.
+     */
+    public function hasAllRequiredKycDocumentsSubmittedForAutoVerify(): bool
+    {
+        $requiredTypes = BusinessVerification::getRequiredTypes();
+        foreach ($requiredTypes as $type) {
+            $hasActive = $this->verifications()
+                ->where('verification_type', $type)
+                ->whereIn('status', [
+                    BusinessVerification::STATUS_PENDING,
+                    BusinessVerification::STATUS_UNDER_REVIEW,
+                    BusinessVerification::STATUS_APPROVED,
+                ])
+                ->exists();
+            if (! $hasActive) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Check if all required KYC documents are approved
      */
     public function hasAllKycDocumentsApproved(): bool
     {
         $requiredTypes = BusinessVerification::getRequiredTypes();
-        $approvedCount = $this->verifications()
-            ->whereIn('verification_type', $requiredTypes)
-            ->where('status', BusinessVerification::STATUS_APPROVED)
-            ->count();
+        foreach ($requiredTypes as $type) {
+            $approved = $this->verifications()
+                ->where('verification_type', $type)
+                ->where('status', BusinessVerification::STATUS_APPROVED)
+                ->exists();
+            if (! $approved) {
+                return false;
+            }
+        }
 
-        return $approvedCount === count($requiredTypes);
+        return true;
     }
 
     /**
@@ -445,7 +487,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
 
     public function usesExternalProvider(string $providerKey): bool
     {
-        if (!$this->relationLoaded('externalApis')) {
+        if (! $this->relationLoaded('externalApis')) {
             $this->load('externalApis');
         }
 
@@ -457,7 +499,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
 
     public function getExternalProviderAssignment(string $providerKey): ?ExternalApi
     {
-        if (!$this->relationLoaded('externalApis')) {
+        if (! $this->relationLoaded('externalApis')) {
             $this->load('externalApis');
         }
 
@@ -470,7 +512,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function externalProviderModeForService(string $providerKey, ?string $service = null): string
     {
         $assignment = $this->getExternalProviderAssignment($providerKey);
-        if (!$assignment) {
+        if (! $assignment) {
             return 'internal_only';
         }
 
@@ -479,7 +521,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         $services = is_array($services) ? $services : (is_string($services) ? json_decode($services, true) : null);
         $services = is_array($services) ? array_values(array_filter($services)) : [];
 
-        if (!empty($services) && $service !== null && !in_array($service, $services, true)) {
+        if (! empty($services) && $service !== null && ! in_array($service, $services, true)) {
             return 'internal_only';
         }
 
@@ -493,12 +535,12 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function externalProviderVaGenerationMode(string $providerKey): string
     {
         $assignment = $this->getExternalProviderAssignment($providerKey);
-        if (!$assignment) {
+        if (! $assignment) {
             return 'dynamic';
         }
 
         $mode = strtolower(trim((string) ($assignment->pivot->va_generation_mode ?? 'dynamic')));
-        if (!in_array($mode, ['dynamic', 'temp'], true)) {
+        if (! in_array($mode, ['dynamic', 'temp'], true)) {
             return 'dynamic';
         }
 
@@ -592,7 +634,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
      */
     public function getPrimaryWebsiteAttribute()
     {
-        return $this->approvedWebsites()->first() 
+        return $this->approvedWebsites()->first()
             ?? $this->websites()->first();
     }
 
@@ -609,7 +651,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
      */
     public function hasVerifiedEmail(): bool
     {
-        return !is_null($this->email_verified_at);
+        return ! is_null($this->email_verified_at);
     }
 
     /**
@@ -627,7 +669,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
      */
     public function sendEmailVerificationNotification()
     {
-        $this->notify(new \App\Notifications\BusinessEmailVerificationNotification());
+        $this->notify(new \App\Notifications\BusinessEmailVerificationNotification);
     }
 
     /**
@@ -675,7 +717,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
      */
     public function isTelegramConfigured(): bool
     {
-        return !empty($this->telegram_bot_token) && !empty($this->telegram_chat_id);
+        return ! empty($this->telegram_bot_token) && ! empty($this->telegram_chat_id);
     }
 
     /**
@@ -692,6 +734,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function generateTwoFactorSecret(): string
     {
         $google2fa = app(\PragmaRX\Google2FA\Google2FA::class);
+
         return $google2fa->generateSecretKey();
     }
 
@@ -707,6 +750,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
             $this->email,
             $this->two_factor_secret
         );
+
         return $qrCodeUrl;
     }
 
@@ -715,11 +759,12 @@ class Business extends Authenticatable implements CanResetPasswordContract
      */
     public function verifyTwoFactorCode(string $code): bool
     {
-        if (!$this->two_factor_enabled || !$this->two_factor_secret) {
+        if (! $this->two_factor_enabled || ! $this->two_factor_secret) {
             return false;
         }
 
         $google2fa = app(\PragmaRX\Google2FA\Google2FA::class);
+
         return $google2fa->verifyKey($this->two_factor_secret, $code);
     }
 
@@ -817,12 +862,13 @@ class Business extends Authenticatable implements CanResetPasswordContract
         if ($this->hasOverdraftApproved()) {
             return $balance + (float) $this->overdraft_limit;
         }
+
         return $balance;
     }
 
     public function shouldTriggerAutoWithdrawal(): bool
     {
-        if (!$this->auto_withdraw_threshold || $this->auto_withdraw_threshold <= 0) {
+        if (! $this->auto_withdraw_threshold || $this->auto_withdraw_threshold <= 0) {
             return false;
         }
 
@@ -876,12 +922,12 @@ class Business extends Authenticatable implements CanResetPasswordContract
      */
     public function triggerAutoWithdrawal(bool $fromEndOfDayScheduler = false): ?\App\Models\WithdrawalRequest
     {
-        if (!$this->shouldTriggerAutoWithdrawal()) {
+        if (! $this->shouldTriggerAutoWithdrawal()) {
             return null;
         }
 
         // If business chose "end of day" (5pm), only run from the scheduled job, not on payment
-        if ($this->auto_withdraw_end_of_day && !$fromEndOfDayScheduler) {
+        if ($this->auto_withdraw_end_of_day && ! $fromEndOfDayScheduler) {
             return null;
         }
 
@@ -897,13 +943,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
         // Get default withdrawal details
         $details = $this->getDefaultWithdrawalDetails();
 
-        if (!$details) {
+        if (! $details) {
             // No withdrawal details available, cannot auto-withdraw
             \Log::warning('Auto-withdrawal triggered but no withdrawal details found', [
                 'business_id' => $this->id,
                 'balance' => $this->balance,
                 'threshold' => $this->auto_withdraw_threshold,
             ]);
+
             return null;
         }
 
@@ -915,7 +962,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
             'bank_name' => $details['bank_name'],
             'account_number' => $details['account_number'],
             'account_name' => $details['account_name'],
-            'notes' => 'Auto-withdrawal triggered - Balance reached threshold of ₦' . number_format($this->auto_withdraw_threshold, 2),
+            'notes' => 'Auto-withdrawal triggered - Balance reached threshold of ₦'.number_format($this->auto_withdraw_threshold, 2),
             'status' => 'pending',
         ]);
 
@@ -939,18 +986,18 @@ class Business extends Authenticatable implements CanResetPasswordContract
     /**
      * Increment balance with charges applied
      *
-     * @param float $amount Original payment amount (or received amount for mismatches)
-     * @param Payment|null $payment Payment model (optional, for storing charge details)
-     * @param float|null $receivedAmount If provided, use this instead of amount for charge calculation
+     * @param  float  $amount  Original payment amount (or received amount for mismatches)
+     * @param  Payment|null  $payment  Payment model (optional, for storing charge details)
+     * @param  float|null  $receivedAmount  If provided, use this instead of amount for charge calculation
      * @return float Amount actually added to balance
      */
     public function incrementBalanceWithCharges(float $amount, ?Payment $payment = null, ?float $receivedAmount = null): float
     {
         $chargeService = app(\App\Services\ChargeService::class);
-        
+
         // Use received amount if provided (for mismatches), otherwise use original amount
         $amountForCharges = $receivedAmount ?? $amount;
-        
+
         // Use website-based charges if payment has website, fallback to business
         $website = $payment && $payment->relationLoaded('website') ? $payment->website : ($payment ? $payment->website()->first() : null);
         $charges = $chargeService->calculateCharges($amountForCharges, $website, $this);

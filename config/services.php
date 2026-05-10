@@ -62,6 +62,8 @@ return [
         'default_gender' => env('MEVONRUBIES_DEFAULT_GENDER', 'male'),
         /** DOB (Y-m-d) when Renter has no date of birth on file (API requires dob). */
         'renter_placeholder_dob' => env('MEVONRUBIES_RENTER_PLACEHOLDER_DOB', '1990-01-01'),
+        /** Fallback signatory DOB for business createrubies if missing (prefer collecting rubies_signatory_dob on KYC). */
+        'business_signatory_placeholder_dob' => env('MEVONRUBIES_BUSINESS_SIGNATORY_PLACEHOLDER_DOB', '1990-01-01'),
     ],
 
     /*

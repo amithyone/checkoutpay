@@ -1,11 +1,13 @@
 <?php
 
-use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\MevonPayWebhookController;
+use App\Http\Controllers\Api\ConsumerWalletApiController;
+use App\Http\Controllers\Api\ConsumerWalletAuthController;
 use App\Http\Controllers\Api\LiveSyncReceiverController;
+use App\Http\Controllers\Api\MevonPayWebhookController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\TagineBridgeController;
 use App\Http\Controllers\Api\V1StatusController;
 use App\Http\Controllers\Api\VtuWebhookController;
-use App\Http\Controllers\Api\TagineBridgeController;
 use App\Http\Controllers\Api\WhatsappWalletApiController;
 use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +51,36 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
 Route::prefix('v1')->group(function () {
     // GET /api/v1 — JSON status; webhook_base_url from WHATSAPP_APP_URL or APP_URL (see config/whatsapp.php)
     Route::get('/', V1StatusController::class)->name('api.v1.status');
+
+    /**
+     * Consumer mobile wallet API (Android/iOS): WhatsApp OTP login + Sanctum Bearer token.
+     * Same whatsapp_wallets / transactions as the WhatsApp bot.
+     */
+    Route::prefix('consumer')->middleware('throttle:consumer_wallet_otp')->group(function () {
+        Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
+        Route::post('auth/otp/verify', [ConsumerWalletAuthController::class, 'verifyOtp']);
+    });
+
+    Route::prefix('consumer')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+        Route::post('auth/logout', [ConsumerWalletAuthController::class, 'logout']);
+        Route::get('wallet', [ConsumerWalletApiController::class, 'showWallet']);
+        Route::post('wallet/ensure', [ConsumerWalletApiController::class, 'ensure']);
+        Route::get('wallet/transactions', [ConsumerWalletApiController::class, 'transactions']);
+        Route::post('wallet/topup/virtual-account', [ConsumerWalletApiController::class, 'issueTopupVirtualAccount']);
+        Route::post('wallet/pin', [ConsumerWalletApiController::class, 'setPin']);
+        Route::put('wallet/pin', [ConsumerWalletApiController::class, 'changePin']);
+        Route::patch('profile/sender-name', [ConsumerWalletApiController::class, 'updateSenderName']);
+        Route::post('transfers/p2p', [ConsumerWalletApiController::class, 'transferP2p']);
+        Route::post('transfers/bank', [ConsumerWalletApiController::class, 'transferBank']);
+        Route::get('banks/name-enquiry', [ConsumerWalletApiController::class, 'bankNameEnquiry']);
+        Route::get('vtu/networks', [ConsumerWalletApiController::class, 'vtuNetworks']);
+        Route::get('vtu/data-plans', [ConsumerWalletApiController::class, 'vtuDataPlans']);
+        Route::post('vtu/airtime', [ConsumerWalletApiController::class, 'vtuAirtime']);
+        Route::post('vtu/data', [ConsumerWalletApiController::class, 'vtuData']);
+        Route::get('kyc/tier2', [ConsumerWalletApiController::class, 'kycTier2Status']);
+        Route::post('kyc/tier2/personal', [ConsumerWalletApiController::class, 'kycTier2Personal']);
+        Route::post('kyc/tier2/business', [ConsumerWalletApiController::class, 'kycTier2Business']);
+    });
 
     // Secure inbound sync receiver (live site -> this app)
     Route::post('sync/live', [LiveSyncReceiverController::class, 'receive'])

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
 use App\Models\BusinessVerification;
+use App\Services\BusinessRubiesKycAutoVerificationService;
 use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +30,9 @@ class VerificationController extends Controller
     {
         $business = auth('business')->user();
 
-        $validated = $request->validate([
+        $typeIn = (string) $request->input('verification_type', '');
+
+        $rules = [
             'verification_type' => ['required', Rule::in([
                 BusinessVerification::TYPE_BASIC,
                 BusinessVerification::TYPE_BUSINESS_REGISTRATION,
@@ -50,7 +53,14 @@ class VerificationController extends Controller
             'bank_code' => 'nullable|string|max:20',
             'bvn' => 'nullable|string|max:11|min:11',
             'nin' => 'nullable|string|max:11|min:11',
-        ]);
+        ];
+
+        if (in_array($typeIn, [BusinessVerification::TYPE_CAC_CERTIFICATE, BusinessVerification::TYPE_CAC_APPLICATION], true)) {
+            $rules['cac_registration_number'] = 'required|string|max:100';
+            $rules['rubies_signatory_dob'] = 'required|date_format:Y-m-d|before:today';
+        }
+
+        $validated = $request->validate($rules);
 
         // Handle text-based verifications (account_number + bank, BVN, NIN)
         $textBasedTypes = [
@@ -71,7 +81,7 @@ class VerificationController extends Controller
                 }
                 $nubanService = app(NubanValidationService::class);
                 $nubanResult = $nubanService->validate($accountNumber, $validated['bank_code']);
-                if (!$nubanResult || !($nubanResult['valid'] ?? false)) {
+                if (! $nubanResult || ! ($nubanResult['valid'] ?? false)) {
                     return back()->withErrors(['account_number' => 'Invalid account number or bank. We could not verify this account. Please check and try again.']);
                 }
             }
@@ -110,15 +120,15 @@ class VerificationController extends Controller
                     $nubanResult['account_name'] ?? ''
                 );
             } elseif ($validated['verification_type'] === BusinessVerification::TYPE_BVN) {
-                $documentType = 'BVN: ' . ($validated['bvn'] ?? '');
+                $documentType = 'BVN: '.($validated['bvn'] ?? '');
             } elseif ($validated['verification_type'] === BusinessVerification::TYPE_NIN) {
-                $documentType = 'NIN: ' . ($validated['nin'] ?? '');
+                $documentType = 'NIN: '.($validated['nin'] ?? '');
             } else {
                 $documentType = $validated['document_type'] ?? '';
             }
             $path = null;
         } else {
-            if (!$request->hasFile('document')) {
+            if (! $request->hasFile('document')) {
                 return back()->withErrors(['document' => 'Document file is required for this verification type.']);
             }
 
@@ -133,8 +143,15 @@ class VerificationController extends Controller
             }
 
             // Store document
-            $path = $request->file('document')->store('verifications/' . $business->id, 'public');
+            $path = $request->file('document')->store('verifications/'.$business->id, 'public');
             $documentType = $validated['document_type'] ?? BusinessVerification::getTypeLabel($validated['verification_type']);
+
+            if (in_array($validated['verification_type'], [BusinessVerification::TYPE_CAC_CERTIFICATE, BusinessVerification::TYPE_CAC_APPLICATION], true)) {
+                $business->update([
+                    'cac_registration_number' => strtoupper(trim((string) $validated['cac_registration_number'])),
+                    'rubies_signatory_dob' => $validated['rubies_signatory_dob'],
+                ]);
+            }
         }
 
         // Create verification record
@@ -146,8 +163,29 @@ class VerificationController extends Controller
             'status' => BusinessVerification::STATUS_PENDING,
         ]);
 
-        return redirect()->route('business.verification.index')
-            ->with('success', 'Verification document submitted successfully. Our team will review it shortly.');
+        $business->refresh();
+        $auto = app(BusinessRubiesKycAutoVerificationService::class)->attemptAfterSubmission($business);
+
+        if ($auto['verified'] && $auto['attempted']) {
+            return redirect()->route('business.verification.index')
+                ->with('success', 'Your business is verified. We created your Rubies business pay-in account — details are shown below.');
+        }
+
+        if ($auto['attempted'] && ! $auto['skipped'] && $auto['message'] !== '') {
+            return redirect()->route('business.verification.index')
+                ->with('warning',
+                    'All KYC items are submitted, but we could not create your business bank account yet: '.$auto['message']
+                    .' Your documents are saved; fix the issue or contact support if it persists.'
+                );
+        }
+
+        $success = 'Verification document submitted successfully.';
+        $business->refresh();
+        if (! $business->hasAllRequiredKycDocuments()) {
+            $success .= ' Submit the remaining required items to finish.';
+        }
+
+        return redirect()->route('business.verification.index')->with('success', $success);
     }
 
     /**
@@ -162,7 +200,7 @@ class VerificationController extends Controller
             abort(403);
         }
 
-        if (!$verification->document_path || !Storage::disk('public')->exists($verification->document_path)) {
+        if (! $verification->document_path || ! Storage::disk('public')->exists($verification->document_path)) {
             abort(404);
         }
 
