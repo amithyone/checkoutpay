@@ -44,6 +44,15 @@ class BusinessRubiesFundingWebhookService
                 return;
             }
 
+            Log::info('business.rubies_funding.matched_account', [
+                'business_id' => $business->id,
+                'account_number' => $accountNumber,
+                'amount' => $amount,
+                'reference' => $reference,
+                'sender' => $webhookMeta['sender'] ?? null,
+                'bank_name' => $webhookMeta['bank_name'] ?? null,
+            ]);
+
             if ($reference !== '') {
                 $existing = Payment::query()
                     ->where('business_id', $business->id)
@@ -143,6 +152,11 @@ class BusinessRubiesFundingWebhookService
             'business_id' => $business->id,
             'payment_id' => $payment->id,
             'reference' => $reference,
+            'gross_amount' => $amount,
+            'payment_amount_field' => $payment->amount,
+            'total_charges' => $payment->total_charges,
+            'business_receives' => $payment->business_receives,
+            'charge_exempt' => (bool) $business->charge_exempt,
         ]);
     }
 }

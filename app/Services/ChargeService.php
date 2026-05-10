@@ -21,16 +21,16 @@ class ChargeService
     /**
      * Calculate charges for a payment amount
      *
-     * @param float $amount Original payment amount
-     * @param BusinessWebsite|null $website Website model (optional, for custom charges)
-     * @param Business|null $business Business model (fallback if website not provided)
-     * @return array
+     * @param  float  $amount  Original payment amount
+     * @param  bool  $skipReceiveRounding  When true, credit exact net (2 dp). Used for merchant Rubies VA pay-ins so
+     *                                     {@see roundBusinessReceives()} does not shrink credits (e.g. ₦1,295 gross → ₦1,000 net).
+     * @return array<string, mixed>
      */
-    public function calculateCharges(float $amount, ?BusinessWebsite $website = null, ?Business $business = null): array
+    public function calculateCharges(float $amount, ?BusinessWebsite $website = null, ?Business $business = null, bool $skipReceiveRounding = false): array
     {
         // Check if charges are enabled for website
         $chargesEnabled = $this->areChargesEnabled($website, $business);
-        
+
         // Get charge settings - prioritize website over business
         $percentage = $this->getChargePercentage($website, $business);
         $fixed = $this->getChargeFixed($website, $business);
@@ -38,7 +38,7 @@ class ChargeService
         $paidByCustomer = $this->isPaidByCustomer($website, $business);
 
         // If charges are disabled or business is exempt, no charges
-        if (!$chargesEnabled || $isExempt) {
+        if (! $chargesEnabled || $isExempt) {
             return [
                 'original_amount' => $amount,
                 'charge_percentage' => 0,
@@ -57,43 +57,50 @@ class ChargeService
 
         if ($paidByCustomer) {
             // Customer pays charges - add to amount
+            $businessReceives = $skipReceiveRounding
+                ? round($amount, 2)
+                : $this->roundBusinessReceives($amount);
+
             return [
                 'original_amount' => $amount,
                 'charge_percentage' => round($percentageCharge, 2),
                 'charge_fixed' => $fixed,
                 'total_charges' => round($totalCharges, 2),
                 'amount_to_pay' => round($amount + $totalCharges, 2),
-                'business_receives' => $this->roundBusinessReceives($amount),
+                'business_receives' => $businessReceives,
                 'paid_by_customer' => true,
                 'exempt' => false,
             ];
-        } else {
-            // Business pays charges - deduct from amount and round business receives
-            $businessReceives = $amount - $totalCharges;
-            $roundedBusinessReceives = $this->roundBusinessReceives($businessReceives);
-            
-            // Adjust total charges to match rounded business receives
-            $adjustedTotalCharges = $amount - $roundedBusinessReceives;
-            
-            return [
-                'original_amount' => $amount,
-                'charge_percentage' => round($percentageCharge, 2),
-                'charge_fixed' => $fixed,
-                'total_charges' => round($adjustedTotalCharges, 2),
-                'amount_to_pay' => $amount,
-                'business_receives' => $roundedBusinessReceives,
-                'paid_by_customer' => false,
-                'exempt' => false,
-            ];
         }
+
+        // Business pays charges - deduct from amount
+        $businessReceivesNet = max(0, $amount - $totalCharges);
+
+        if ($skipReceiveRounding) {
+            $roundedBusinessReceives = round($businessReceivesNet, 2);
+            $adjustedTotalCharges = round($amount - $roundedBusinessReceives, 2);
+        } else {
+            $roundedBusinessReceives = $this->roundBusinessReceives($businessReceivesNet);
+            // Adjust total charges to match rounded business receives (legacy checkout rounding)
+            $adjustedTotalCharges = $amount - $roundedBusinessReceives;
+        }
+
+        return [
+            'original_amount' => $amount,
+            'charge_percentage' => round($percentageCharge, 2),
+            'charge_fixed' => $fixed,
+            'total_charges' => round($adjustedTotalCharges, 2),
+            'amount_to_pay' => $amount,
+            'business_receives' => $roundedBusinessReceives,
+            'paid_by_customer' => false,
+            'exempt' => false,
+        ];
     }
 
     /**
      * Get charge percentage - website-based (default: 1%), no fallback to business
      *
-     * @param BusinessWebsite|null $website
-     * @param Business|null $business (kept for backward compatibility, not used)
-     * @return float
+     * @param  Business|null  $business  (kept for backward compatibility, not used)
      */
     public function getChargePercentage(?BusinessWebsite $website = null, ?Business $business = null): float
     {
@@ -109,9 +116,7 @@ class ChargeService
     /**
      * Get fixed charge - website-based (default: 100), no fallback to business
      *
-     * @param BusinessWebsite|null $website
-     * @param Business|null $business (kept for backward compatibility, not used)
-     * @return float
+     * @param  Business|null  $business  (kept for backward compatibility, not used)
      */
     public function getChargeFixed(?BusinessWebsite $website = null, ?Business $business = null): float
     {
@@ -126,10 +131,6 @@ class ChargeService
 
     /**
      * Check if charges are enabled for website
-     *
-     * @param BusinessWebsite|null $website
-     * @param Business|null $business
-     * @return bool
      */
     public function areChargesEnabled(?BusinessWebsite $website = null, ?Business $business = null): bool
     {
@@ -149,10 +150,6 @@ class ChargeService
 
     /**
      * Check if website/business is exempt from charges
-     *
-     * @param BusinessWebsite|null $website
-     * @param Business|null $business
-     * @return bool
      */
     public function isChargeExempt(?BusinessWebsite $website = null, ?Business $business = null): bool
     {
@@ -168,9 +165,7 @@ class ChargeService
     /**
      * Check if charges are paid by customer - website-based (default: false)
      *
-     * @param BusinessWebsite|null $website
-     * @param Business|null $business (kept for backward compatibility, not used)
-     * @return bool
+     * @param  Business|null  $business  (kept for backward compatibility, not used)
      */
     public function isPaidByCustomer(?BusinessWebsite $website = null, ?Business $business = null): bool
     {
@@ -187,18 +182,17 @@ class ChargeService
      * Calculate charges for invoice payment
      * Invoices are free by default, but charges apply when amount exceeds threshold
      *
-     * @param float $amount Invoice amount
-     * @param Business|null $business Business that owns the invoice
-     * @return array
+     * @param  float  $amount  Invoice amount
+     * @param  Business|null  $business  Business that owns the invoice
      */
     public function calculateInvoiceCharges(float $amount, ?Business $business = null): array
     {
         // Check if invoice charges are enabled
         $chargesEnabled = Setting::get('invoice_charges_enabled', false);
         $threshold = Setting::get('invoice_charge_threshold', 0);
-        
+
         // If charges disabled or amount below threshold, no charges
-        if (!$chargesEnabled || $amount <= $threshold) {
+        if (! $chargesEnabled || $amount <= $threshold) {
             return [
                 'original_amount' => $amount,
                 'charge_percentage' => 0,
@@ -231,9 +225,6 @@ class ChargeService
     /**
      * Round business receives to nearest nice round number
      * Rounds to nearest 500 for amounts >= 1000, nearest 100 for amounts < 1000
-     *
-     * @param float $amount
-     * @return float
      */
     protected function roundBusinessReceives(float $amount): float
     {

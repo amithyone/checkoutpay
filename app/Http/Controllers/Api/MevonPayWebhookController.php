@@ -56,6 +56,15 @@ class MevonPayWebhookController extends Controller
         $amount = (float) data_get($payload, 'data.amount', 0);
         $reference = (string) data_get($payload, 'data.reference', '');
 
+        Log::info('mevonpay.webhook.funding_success', [
+            'account_number' => $accountNumber,
+            'amount' => $amount,
+            'reference' => $reference,
+            'sender' => data_get($payload, 'data.sender'),
+            'bank_name' => data_get($payload, 'data.bank_name'),
+            'payload' => $payload,
+        ]);
+
         if ($accountNumber === '') {
             $this->recordWebhookSource($request, 'invalid_payload');
 

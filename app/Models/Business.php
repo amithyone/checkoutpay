@@ -1000,7 +1000,12 @@ class Business extends Authenticatable implements CanResetPasswordContract
 
         // Use website-based charges if payment has website, fallback to business
         $website = $payment && $payment->relationLoaded('website') ? $payment->website : ($payment ? $payment->website()->first() : null);
-        $charges = $chargeService->calculateCharges($amountForCharges, $website, $this);
+
+        $emailData = ($payment && is_array($payment->email_data)) ? $payment->email_data : [];
+        // Permanent Rubies business VA pay-ins: use exact net (skip "nice" ₦500 rounding used for website checkouts)
+        $skipReceiveRounding = ! empty($emailData['rubies_business_va']);
+
+        $charges = $chargeService->calculateCharges($amountForCharges, $website, $this, $skipReceiveRounding);
 
         // Store charge details in payment if provided
         if ($payment) {
@@ -1023,6 +1028,17 @@ class Business extends Authenticatable implements CanResetPasswordContract
 
         // Increment balance with the amount business receives (after charges)
         $this->increment('balance', $charges['business_receives']);
+
+        if ($skipReceiveRounding && $payment) {
+            \Log::info('business.balance_credit.permanent_va', [
+                'business_id' => $this->id,
+                'payment_id' => $payment->id,
+                'charge_exempt' => (bool) $this->charge_exempt,
+                'gross_naira' => $amountForCharges,
+                'total_charges' => $charges['total_charges'] ?? null,
+                'credited_naira' => $charges['business_receives'],
+            ]);
+        }
 
         // Record transaction and update revenue
         if ($payment) {
