@@ -79,6 +79,7 @@ class WhatsappWalletSecureTransferAuthService
         string $token,
         string $linkUrl,
         string $reason,
+        string $summaryLine,
     ): void {
         $ctx['step'] = $kind === 'bank' ? 'transfer_pin' : 'p2p_pin';
         $ctx['wallet_transfer_confirm_token'] = $token;
@@ -100,6 +101,7 @@ class WhatsappWalletSecureTransferAuthService
         $this->client->sendText(
             $instance,
             $phone,
+            "*Confirm details*\n{$summaryLine}\n\n".
             "{$preamble}\n\n".
             "*Do not* send your wallet PIN in this chat.\n\n".
             '*BACK* — cancel'
@@ -184,7 +186,7 @@ class WhatsappWalletSecureTransferAuthService
             $reason = ! $wallet->isTier2()
                 ? 'tier1'
                 : ($email === null ? 'no_email' : 'otp_disabled');
-            $this->beginLinkOnlyTransferConfirmation($session, $ctx, $instance, $phone, $kind, $token, $linkUrl, $reason);
+            $this->beginLinkOnlyTransferConfirmation($session, $ctx, $instance, $phone, $kind, $token, $linkUrl, $reason, $summaryLine);
 
             return;
         }
@@ -203,7 +205,7 @@ class WhatsappWalletSecureTransferAuthService
             ));
         } catch (\Throwable $e) {
             Log::error('whatsapp.wallet.transfer_otp_mail_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
-            $this->beginLinkOnlyTransferConfirmation($session, $ctx, $instance, $phone, $kind, $token, $linkUrl, 'mail_failed');
+            $this->beginLinkOnlyTransferConfirmation($session, $ctx, $instance, $phone, $kind, $token, $linkUrl, 'mail_failed', $summaryLine);
 
             return;
         }
@@ -219,6 +221,7 @@ class WhatsappWalletSecureTransferAuthService
         $this->client->sendText(
             $instance,
             $phone,
+            "*Confirm details*\n{$summaryLine}\n\n".
             "*Check your email* ({$masked})\n\n".
             "We sent a *6-digit code*. Send that code *here* in WhatsApp — *do not* send your wallet PIN in this chat.\n\n".
             "Or open the link in the email to enter your wallet PIN on the secure page (never type your wallet PIN here).\n\n".
@@ -245,8 +248,11 @@ class WhatsappWalletSecureTransferAuthService
         $amount = isset($execCtx['amount']) && is_numeric($execCtx['amount']) ? (float) $execCtx['amount'] : 0.0;
         $bank = isset($execCtx['dest_bank']) && is_string($execCtx['dest_bank']) ? $execCtx['dest_bank'] : '';
         $acct = isset($execCtx['dest_acct']) && is_string($execCtx['dest_acct']) ? $execCtx['dest_acct'] : '';
+        $name = isset($execCtx['dest_acct_name']) && is_string($execCtx['dest_acct_name']) ? trim($execCtx['dest_acct_name']) : '';
+        $tail = strlen($acct) >= 4 ? '****'.substr($acct, -4) : $acct;
+        $nameLine = $name !== '' ? $name.' · ' : '';
 
-        return 'Bank transfer: ₦'.number_format($amount, 2).' → '.$bank.' / '.$acct;
+        return 'Bank transfer: ₦'.number_format($amount, 2).' → '.$nameLine.$bank.' / '.$tail;
     }
 
     /**
