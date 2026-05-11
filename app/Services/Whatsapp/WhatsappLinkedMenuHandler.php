@@ -114,6 +114,11 @@ class WhatsappLinkedMenuHandler
         return '₦'.number_format($n, 2);
     }
 
+    private function navControls(): string
+    {
+        return "\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -409,6 +414,7 @@ class WhatsappLinkedMenuHandler
             $i++;
         }
         $lines[] = "\n*BACK* — cancel";
+        $lines[] = WhatsappMenuInputNormalizer::navigationHelpFooter();
 
         $this->saveContext($session, 'rentals', [
             'step' => 'category',
@@ -475,7 +481,7 @@ class WhatsappLinkedMenuHandler
                 $this->client->sendText(
                     $instance,
                     $phone,
-                    '*How many?* (reply a number)\n\n*BACK* — item list'
+                    '*How many?* (reply a number)\n\n*BACK* — item list'.$this->navControls()
                 );
 
                 return;
@@ -612,6 +618,7 @@ class WhatsappLinkedMenuHandler
             $i++;
         }
         $lines[] = "\n*BACK* — categories";
+        $lines[] = WhatsappMenuInputNormalizer::navigationHelpFooter();
 
         $this->saveContext($session, 'rentals', [
             'step' => 'brand',
@@ -698,6 +705,7 @@ class WhatsappLinkedMenuHandler
         }
         $back = $brandWasPrompted ? '*BACK* — brand list' : '*BACK* — categories';
         $lines[] = "\n{$back}";
+        $lines[] = WhatsappMenuInputNormalizer::navigationHelpFooter();
 
         $this->saveContext($session, 'rentals', array_merge($this->rentalsBrowsePersistKeys([
             'cat_ids' => $catIds,
@@ -805,7 +813,7 @@ class WhatsappLinkedMenuHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "*How many?* (reply a number, default 1)\n\n*BACK* — item list"
+            "*How many?* (reply a number, default 1)\n\n*BACK* — item list".$this->navControls()
         );
     }
 
@@ -842,7 +850,7 @@ class WhatsappLinkedMenuHandler
             "*Rental days*\n\n".
             "Send *start date* and *number of consecutive days*, separated by space.\n".
             "Example: *2026-04-15 3* (3 days from 15 April)\n\n".
-            '*BACK* — change quantity'
+            '*BACK* — change quantity'.$this->navControls()
         );
     }
 
@@ -940,7 +948,8 @@ class WhatsappLinkedMenuHandler
             "*Your wallet:* {$wallet}\n\n".
             'Reply *YES* to pay from wallet, or *BACK* to change dates.'.
             $kycNote.
-            $emailNote
+            $emailNote.
+            $this->navControls()
         );
     }
 

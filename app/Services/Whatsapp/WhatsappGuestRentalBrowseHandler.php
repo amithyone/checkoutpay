@@ -143,7 +143,8 @@ class WhatsappGuestRentalBrowseHandler
 
         return "*CheckoutNow (guest)*\n\n".
             "*1* or *RENTALS* — browse categories & prices (no account needed)\n\n".
-            "To link this WhatsApp and pay from your wallet, send the *email* you use on {$rentals}.";
+            "To link this WhatsApp and pay from your wallet, send the *email* you use on {$rentals}.".
+            $this->navControls();
     }
 
     private function portalRentals(): string
@@ -156,6 +157,11 @@ class WhatsappGuestRentalBrowseHandler
     private function formatMoney(float $n): string
     {
         return '₦'.number_format($n, 2);
+    }
+
+    private function navControls(): string
+    {
+        return "\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter();
     }
 
     /**
@@ -216,6 +222,7 @@ class WhatsappGuestRentalBrowseHandler
             $i++;
         }
         $lines[] = "\n*BACK* — exit browse";
+        $lines[] = WhatsappMenuInputNormalizer::navigationHelpFooter();
 
         $this->saveContext($session, [
             'step' => 'category',
@@ -297,6 +304,7 @@ class WhatsappGuestRentalBrowseHandler
             $i++;
         }
         $lines[] = "\n*BACK* — categories";
+        $lines[] = WhatsappMenuInputNormalizer::navigationHelpFooter();
 
         $this->saveContext($session, [
             'step' => 'brand',
@@ -384,6 +392,7 @@ class WhatsappGuestRentalBrowseHandler
         }
         $back = $brandWasPrompted ? '*BACK* — brand list' : '*BACK* — categories';
         $lines[] = "\n{$back}";
+        $lines[] = WhatsappMenuInputNormalizer::navigationHelpFooter();
 
         $this->saveContext($session, array_merge($this->browsePersistKeys([
             'cat_ids' => $catIds,
@@ -492,7 +501,8 @@ class WhatsappGuestRentalBrowseHandler
         $this->client->sendText(
             $instance,
             $phone,
-            "*How many?* (reply a number, default 1)\n\n*BACK* — item list"
+            "*How many?* (reply a number, default 1)\n\n*BACK* — item list".
+            $this->navControls()
         );
     }
 
@@ -528,7 +538,8 @@ class WhatsappGuestRentalBrowseHandler
             $phone,
             "*Rental days*\n\n".
             "Send *start date* and *consecutive days*, e.g. *2026-04-15 3*\n\n".
-            '*BACK* — change quantity'
+            '*BACK* — change quantity'.
+            $this->navControls()
         );
     }
 
@@ -615,7 +626,8 @@ class WhatsappGuestRentalBrowseHandler
             "*Estimated total:* {$grand}\n\n".
             "To *book and pay*, open:\n{$rentals}\n\n".
             "Or link this WhatsApp: send your account *email* here (same as on the rentals site).\n\n".
-            '*BACK* — change dates  *RENTALS* — browse again'
+            '*BACK* — change dates  *RENTALS* — browse again'.
+            $this->navControls()
         );
     }
 
@@ -638,7 +650,8 @@ class WhatsappGuestRentalBrowseHandler
         $this->client->sendText(
             $instance,
             $phone,
-            '*BACK* — edit dates  *RENTALS* — new browse  *MENU* — guest help'
+            '*BACK* — edit dates  *RENTALS* — new browse  *MENU* — guest help'.
+            $this->navControls()
         );
     }
 
