@@ -9,7 +9,6 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\WhatsappWalletBankPayoutService;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -383,7 +382,7 @@ class WhatsappWaWalletMenuHandler
             : "*4* WhatsApp send (intl OK).\n";
 
         $casualLine = $ngRails
-            ? "Or: *send 5k to Name Opay*\n\n"
+            ? "Or: *send 5k to Name Opay* · *send 20000 to 0210085995 gtbank* · *send 5000 on whatsapp to 081...*\n\n"
             : '';
 
         $this->client->sendText(
@@ -833,7 +832,8 @@ class WhatsappWaWalletMenuHandler
                 if (WhatsappWalletCasualSendParser::largestNairaAmount($norm) !== null) {
                     $bankTips = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)
                         ? "• Use *2* once to send to their account (we save it for next time).\n".
-                            "• Then try e.g. *send 5k to Tunde Opay* or *pay 2000 for mama GTB*.\n"
+                            "• Then try e.g. *send 5k to Tunde Opay* or *pay 2000 for mama GTB*.\n".
+                            "• Direct account+bank: *send 20000 to 0210085995 gtbank*.\n"
                         : '';
                     $this->client->sendText(
                         $instance,
@@ -995,7 +995,7 @@ class WhatsappWaWalletMenuHandler
     /**
      * Natural-language shortcut from submenu: bank repeat-pay or P2P with amount + phone in one line.
      *
-     * @param  array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'p2p', amount: float, recipient_e164: string}  $casual
+     * @param  array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_direct', amount: float, ctx: array<string, mixed>}|array{flow: 'p2p', amount: float, recipient_e164: string}  $casual
      */
     private function handleCasualSendFromSubmenu(
         WhatsappSession $session,
@@ -1004,7 +1004,7 @@ class WhatsappWaWalletMenuHandler
         WhatsappWallet $wallet,
         array $casual,
     ): void {
-        if (($casual['flow'] ?? '') === 'bank' && ! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+        if (in_array(($casual['flow'] ?? ''), ['bank', 'bank_direct'], true) && ! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
             $this->client->sendText(
                 $instance,
                 $phone,
@@ -1014,7 +1014,43 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
-        if ($casual['flow'] === 'bank') {
+        if (in_array($casual['flow'], ['bank', 'bank_direct'], true)) {
+            if ($casual['flow'] === 'bank_direct') {
+                $acct = isset($casual['ctx']['dest_acct']) && is_string($casual['ctx']['dest_acct']) ? $casual['ctx']['dest_acct'] : '';
+                $bankCode = isset($casual['ctx']['dest_bank_code']) && is_string($casual['ctx']['dest_bank_code']) ? $casual['ctx']['dest_bank_code'] : '';
+                $bankName = isset($casual['ctx']['dest_bank']) && is_string($casual['ctx']['dest_bank']) ? $casual['ctx']['dest_bank'] : '';
+                if (strlen($acct) !== 10 || $bankCode === '' || $bankName === '') {
+                    $this->client->sendText(
+                        $instance,
+                        $phone,
+                        "I couldn't read that bank destination clearly.\n\nTry: *send 20000 to 0210085995 gtbank* or use *2* Bank send."
+                    );
+
+                    return;
+                }
+                if (! $this->bankPayout->isNameEnquiryAvailable()) {
+                    $this->client->sendText(
+                        $instance,
+                        $phone,
+                        "I can parse account+bank, but account-name verification is unavailable right now.\nPlease use *2* Bank send."
+                    );
+
+                    return;
+                }
+                $ne = $this->bankPayout->nameEnquiry($bankCode, $acct);
+                $verified = $ne['account_name'] ?? null;
+                if (! is_string($verified) || trim($verified) === '' || $this->bankPayout->isWeakVerifiedName($verified)) {
+                    $this->client->sendText(
+                        $instance,
+                        $phone,
+                        "I couldn't verify that account name for *{$bankName}* / *{$acct}*.\nCheck the details or use *2* Bank send."
+                    );
+
+                    return;
+                }
+                $casual['ctx']['dest_acct_name'] = trim($verified);
+            }
+
             $wallet->refresh();
             $check = $wallet->canDebit($casual['amount']);
             if (! $check['ok']) {
@@ -1811,7 +1847,7 @@ class WhatsappWaWalletMenuHandler
                 $phone,
                 "*{$mask}* · no wallet yet\n".
                 "*WALLET* to claim · *CANCEL* refunds\n\n".
-                "*1* confirm · *0* change · YES ok"
+                '*1* confirm · *0* change · YES ok'
             );
 
             return;
@@ -1829,7 +1865,7 @@ class WhatsappWaWalletMenuHandler
             $instance,
             $phone,
             "*{$mask}*\n{$nameBlock}\n\n".
-            "*1* confirm · *0* change · YES ok"
+            '*1* confirm · *0* change · YES ok'
         );
     }
 

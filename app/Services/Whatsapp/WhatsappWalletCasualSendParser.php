@@ -10,7 +10,8 @@ use App\Services\WhatsappWalletBankPayoutService;
  *
  * Text is normalized (strip *bold*, full-width digits) before matching. Supports
  * "send 5k to Name Bank", "pay 2000 for name opay", "transfer 5k name opay" (no "to"),
- * and "send 5k to 080…" for P2P. Bank repeat uses recent outbound transfers.
+ * "send 20000 to 0210085995 gtbank" (direct acct+bank), and "send 5k to 080…" for P2P.
+ * Bank repeat uses recent outbound transfers.
  */
 final class WhatsappWalletCasualSendParser
 {
@@ -64,7 +65,7 @@ final class WhatsappWalletCasualSendParser
 
     /**
      * @param  list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>  $recentBank
-     * @return array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_disambiguate', amount: float, candidates: list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>}|array{flow: 'p2p', amount: float, recipient_e164: string}|null
+     * @return array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_direct', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_disambiguate', amount: float, candidates: list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>}|array{flow: 'p2p', amount: float, recipient_e164: string}|null
      */
     public static function tryParse(
         string $text,
@@ -80,6 +81,20 @@ final class WhatsappWalletCasualSendParser
         $amount = self::pickLargestAmount($normalized);
         if ($amount === null || $amount < self::MIN_AMOUNT) {
             return null;
+        }
+
+        $directBank = self::extractDirectBankAccountAndBank($normalized, $bankPayout);
+        if ($directBank !== null) {
+            return [
+                'flow' => 'bank_direct',
+                'amount' => $amount,
+                'ctx' => [
+                    'dest_acct' => $directBank['acct'],
+                    'dest_bank_code' => $directBank['bank']['code'],
+                    'dest_bank' => $directBank['bank']['name'],
+                    'amount' => $amount,
+                ],
+            ];
         }
 
         $senderDigits = PhoneNormalizer::digitsOnly($wallet->phone_e164) ?? $wallet->phone_e164;
@@ -281,6 +296,89 @@ final class WhatsappWalletCasualSendParser
         }
 
         return null;
+    }
+
+    /**
+     * Supports phrases like:
+     * - send 20000 to 0210085995 gtbank
+     * - transfer 5000 0123456789 access bank
+     *
+     * @return array{acct: string, bank: array{code: string, name: string}}|null
+     */
+    private static function extractDirectBankAccountAndBank(
+        string $text,
+        WhatsappWalletBankPayoutService $bankPayout
+    ): ?array {
+        if (preg_match_all('/\b(\d{10})\b/', $text, $m) !== 1 || empty($m[1])) {
+            return null;
+        }
+
+        foreach ($m[1] as $acct) {
+            $acct = trim((string) $acct);
+            if (strlen($acct) !== 10) {
+                continue;
+            }
+
+            $parts = preg_split('/\b'.preg_quote($acct, '/').'\b/i', $text, 2) ?: [];
+            $tail = isset($parts[1]) ? trim((string) $parts[1]) : '';
+            if ($tail === '') {
+                continue;
+            }
+
+            $tail = preg_replace('/^(?:to|for)\s+/iu', '', $tail) ?? $tail;
+            $tail = trim($tail);
+            if ($tail === '') {
+                continue;
+            }
+
+            $bank = self::resolveBankFromLooseTail($tail, $bankPayout);
+            if ($bank === null) {
+                continue;
+            }
+
+            return [
+                'acct' => $acct,
+                'bank' => $bank,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Try best-effort bank matching from messy user tail text.
+     *
+     * @return array{code: string, name: string}|null
+     */
+    private static function resolveBankFromLooseTail(
+        string $tail,
+        WhatsappWalletBankPayoutService $bankPayout
+    ): ?array {
+        $clean = trim((string) preg_replace('/[^a-z0-9\s&.\-]/iu', ' ', $tail));
+        $clean = preg_replace('/\s+/u', ' ', $clean) ?? $clean;
+        $clean = trim($clean);
+        if ($clean === '') {
+            return null;
+        }
+
+        if (preg_match('/^\d{3,}$/', $clean) === 1) {
+            return $bankPayout->resolveBankFromUserInput($clean);
+        }
+
+        $words = preg_split('/\s+/u', $clean, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($words === []) {
+            return null;
+        }
+
+        for ($n = min(4, count($words)); $n >= 1; $n--) {
+            $head = implode(' ', array_slice($words, 0, $n));
+            $hit = $bankPayout->resolveBankFromUserInput($head);
+            if ($hit !== null) {
+                return $hit;
+            }
+        }
+
+        return $bankPayout->resolveBankFromUserInput($clean);
     }
 
     /**
