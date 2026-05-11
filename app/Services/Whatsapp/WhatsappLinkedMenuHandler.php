@@ -17,6 +17,7 @@ class WhatsappLinkedMenuHandler
         private RenterWalletFundPaymentService $fundPaymentService,
         private RenterRentalWalletSubmitService $rentalWalletSubmit,
         private WhatsappCheckoutServicesMenuHandler $checkoutServicesMenu,
+        private WhatsappRentalNlIntentParser $nlIntentParser,
     ) {}
 
     public function handle(
@@ -251,8 +252,79 @@ class WhatsappLinkedMenuHandler
         }
 
         if ($cmd !== '') {
+            if ($this->tryNaturalLanguageRentalsIntent($session, $instance, $phone, $text)) {
+                return;
+            }
             $this->client->sendText($instance, $phone, 'Send *MENU* for options, *FUND* to add money, or *RENTALS* to book.');
         }
+    }
+
+    private function tryNaturalLanguageRentalsIntent(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text
+    ): bool {
+        $intent = $this->nlIntentParser->parse($text);
+        if (! ($intent['matched'] ?? false)) {
+            return false;
+        }
+
+        $itemId = (int) ($intent['item_id'] ?? 0);
+        if ($itemId <= 0) {
+            return false;
+        }
+
+        $itemLabel = (string) ($intent['item_label'] ?? 'that item');
+        if (($intent['weekday_mentioned'] ?? false) === true) {
+            $weekday = (string) ($intent['weekday_label'] ?? 'that day');
+            $this->saveContext($session, 'rentals', [
+                'step' => 'dates',
+                'item_ids' => [$itemId],
+                'item_id' => $itemId,
+                'qty' => 1,
+                'nl_weekday' => $weekday,
+            ]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "I found *{$itemLabel}*.\n\nYou said *{$weekday}* — please send the exact date as *YYYY-MM-DD* plus days, e.g. *2026-05-15 1*.".
+                $this->navControls()
+            );
+
+            return true;
+        }
+
+        if (is_string($intent['explicit_date'] ?? null) && $intent['explicit_date'] !== '') {
+            $date = (string) $intent['explicit_date'];
+            $this->saveContext($session, 'rentals', [
+                'step' => 'dates',
+                'item_ids' => [$itemId],
+                'item_id' => $itemId,
+                'qty' => 1,
+            ]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "I found *{$itemLabel}*.\n\nHow many consecutive days?\nReply like: *{$date} 1* (or another day count).".
+                $this->navControls()
+            );
+
+            return true;
+        }
+
+        $this->saveContext($session, 'rentals', [
+            'step' => 'qty',
+            'item_ids' => [$itemId],
+            'item_id' => $itemId,
+        ]);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "I found *{$itemLabel}*.\n\n*How many?* (reply a number, default 1)\n\n*BACK* — item list".$this->navControls()
+        );
+
+        return true;
     }
 
     private function handleRentalFundFlow(
@@ -458,6 +530,11 @@ class WhatsappLinkedMenuHandler
             if ($step === 'qty') {
                 $catIds = isset($ctx['cat_ids']) && is_array($ctx['cat_ids']) ? $ctx['cat_ids'] : [];
                 $categoryId = (int) ($ctx['category_id'] ?? 0);
+                if ($categoryId <= 0) {
+                    $this->startRentalsFlow($renter, $session, $instance, $phone);
+
+                    return;
+                }
                 $this->showRentalsItemPage(
                     $session,
                     $instance,

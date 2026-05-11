@@ -17,6 +17,7 @@ class WhatsappGuestRentalBrowseHandler
 
     public function __construct(
         private EvolutionWhatsAppClient $client,
+        private WhatsappRentalNlIntentParser $nlIntentParser,
     ) {}
 
     public function handle(WhatsappSession $session, string $instance, string $phone, string $rawText): void
@@ -30,6 +31,8 @@ class WhatsappGuestRentalBrowseHandler
         if ($session->chat_flow !== self::FLOW) {
             if ($this->isGuestBrowseCommand($cmd) || $cmd === '1' || $isRoot || $cmd === '') {
                 $this->start($session->fresh(), $instance, $phone);
+            } elseif ($this->tryNaturalLanguageIntent($session, $instance, $phone, $text)) {
+                // handled
             } else {
                 $this->client->sendText($instance, $phone, $this->guestHelpMessage());
             }
@@ -61,11 +64,17 @@ class WhatsappGuestRentalBrowseHandler
             }
 
             if ($step === 'qty') {
+                $categoryId = (int) ($ctx['category_id'] ?? 0);
+                if ($categoryId <= 0) {
+                    $this->start($session->fresh(), $instance, $phone);
+
+                    return;
+                }
                 $this->showItemPage(
                     $session,
                     $instance,
                     $phone,
-                    (int) ($ctx['category_id'] ?? 0),
+                    $categoryId,
                     isset($ctx['cat_ids']) && is_array($ctx['cat_ids']) ? $ctx['cat_ids'] : [],
                     (string) ($ctx['brand_key'] ?? WhatsappRentalCatalogHelper::BRAND_KEY_ALL),
                     (int) ($ctx['item_page'] ?? 0),
@@ -119,6 +128,10 @@ class WhatsappGuestRentalBrowseHandler
             return;
         }
 
+        if ($this->tryNaturalLanguageIntent($session, $instance, $phone, $text)) {
+            return;
+        }
+
         $step = (string) ($ctx['step'] ?? '');
 
         match ($step) {
@@ -162,6 +175,74 @@ class WhatsappGuestRentalBrowseHandler
     private function navControls(): string
     {
         return "\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter();
+    }
+
+    private function tryNaturalLanguageIntent(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text
+    ): bool {
+        $intent = $this->nlIntentParser->parse($text);
+        if (! ($intent['matched'] ?? false)) {
+            return false;
+        }
+
+        $itemId = (int) ($intent['item_id'] ?? 0);
+        if ($itemId <= 0) {
+            return false;
+        }
+
+        $itemLabel = (string) ($intent['item_label'] ?? 'that item');
+        if (($intent['weekday_mentioned'] ?? false) === true) {
+            $weekday = (string) ($intent['weekday_label'] ?? 'that day');
+            $this->saveContext($session, [
+                'step' => 'dates',
+                'item_ids' => [$itemId],
+                'item_id' => $itemId,
+                'qty' => 1,
+                'nl_weekday' => $weekday,
+            ]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "I found *{$itemLabel}*.\n\nYou said *{$weekday}* — please send the exact date as *YYYY-MM-DD* plus days, e.g. *2026-05-15 1*.".
+                $this->navControls()
+            );
+
+            return true;
+        }
+
+        if (is_string($intent['explicit_date'] ?? null) && $intent['explicit_date'] !== '') {
+            $date = (string) $intent['explicit_date'];
+            $this->saveContext($session, [
+                'step' => 'dates',
+                'item_ids' => [$itemId],
+                'item_id' => $itemId,
+                'qty' => 1,
+            ]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "I found *{$itemLabel}*.\n\nHow many consecutive days?\nReply like: *{$date} 1* (or another day count).".
+                $this->navControls()
+            );
+
+            return true;
+        }
+
+        $this->saveContext($session, [
+            'step' => 'qty',
+            'item_ids' => [$itemId],
+            'item_id' => $itemId,
+        ]);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "I found *{$itemLabel}*.\n\n*How many?* (reply a number, default 1)\n\n*BACK* — item list".$this->navControls()
+        );
+
+        return true;
     }
 
     /**
