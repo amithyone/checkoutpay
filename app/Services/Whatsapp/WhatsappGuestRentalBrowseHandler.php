@@ -25,10 +25,13 @@ class WhatsappGuestRentalBrowseHandler
 
         $text = trim($rawText);
         $cmd = WhatsappMenuInputNormalizer::commandToken($rawText);
+        $isRoot = in_array($cmd, ['MENU', 'START', 'SERVICES', 'HI', 'HELLO', 'HELP', 'HOME', 'BACK'], true);
 
         if ($session->chat_flow !== self::FLOW) {
-            if ($this->isGuestBrowseCommand($cmd) || $cmd === '1') {
+            if ($this->isGuestBrowseCommand($cmd) || $cmd === '1' || $isRoot || $cmd === '') {
                 $this->start($session->fresh(), $instance, $phone);
+            } else {
+                $this->client->sendText($instance, $phone, $this->guestHelpMessage());
             }
 
             return;

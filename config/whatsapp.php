@@ -77,6 +77,10 @@ return [
         'api_key' => (string) env('WHATSAPP_EVOLUTION_API_KEY', ''),
         /** Default instance name if the webhook payload omits it */
         'instance' => (string) env('WHATSAPP_EVOLUTION_INSTANCE', ''),
+        /** Wallet/default operational instance for wallet sends. */
+        'wallet_instance' => (string) env('WHATSAPP_EVOLUTION_INSTANCE_WALLET', ''),
+        /** Dedicated rentals-only inbound instance (optional). */
+        'rentals_instance' => (string) env('WHATSAPP_EVOLUTION_INSTANCE_RENTALS', ''),
     ],
 
     'otp' => [

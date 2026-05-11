@@ -91,7 +91,7 @@ class WhatsappWalletApiController extends Controller
             ], 422);
         }
 
-        $instance = WhatsappEvolutionConfigResolver::defaultInstance();
+        $instance = WhatsappEvolutionConfigResolver::walletInstance();
         $text = (string) $request->input('message');
         $sent = $this->whatsapp->sendText($instance, $e164, $text);
         if (! $sent) {

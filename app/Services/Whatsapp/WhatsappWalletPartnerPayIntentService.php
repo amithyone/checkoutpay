@@ -155,13 +155,13 @@ final class WhatsappWalletPartnerPayIntentService
 
         $message =
             "🔔 *Checkout — pay {$bizName}*\n\n".
-            "You are about to pay *₦".number_format((float) $amount, 2)."*\n\n".
+            'You are about to pay *₦'.number_format((float) $amount, 2)."*\n\n".
             "*Order:*\n{$summaryShort}\n\n".
             "Open the secure link below and enter your *4-digit wallet PIN* only on that page — *never* in this chat.\n\n".
             $url."\n\n".
             "_Link expires in {$ttlMin} min._";
 
-        $instance = WhatsappEvolutionConfigResolver::defaultInstance();
+        $instance = WhatsappEvolutionConfigResolver::walletInstance();
         $sent = $this->whatsapp->sendText($instance, $e164, $message);
         if (! $sent) {
             Log::warning('partner_pay: WhatsApp notify failed', ['intent_id' => $intent->id]);
@@ -289,7 +289,7 @@ final class WhatsappWalletPartnerPayIntentService
             '_Send *WALLET* anytime for your balance._';
 
         try {
-            $instance = WhatsappEvolutionConfigResolver::defaultInstance();
+            $instance = WhatsappEvolutionConfigResolver::walletInstance();
             $sent = $this->whatsapp->sendText($instance, $intent->phone_e164, $message);
             if (! $sent) {
                 Log::warning('partner_pay: post-success WhatsApp failed', ['intent_id' => $intent->id]);

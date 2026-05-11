@@ -48,7 +48,7 @@ class ConsumerWalletOtpService
             'expires_at' => now()->addSeconds($ttl)->timestamp,
         ], $ttl);
 
-        $instance = WhatsappEvolutionConfigResolver::defaultInstance();
+        $instance = WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance === '') {
             Log::warning('consumer_wallet.otp: no evolution instance');
 

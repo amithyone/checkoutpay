@@ -239,7 +239,7 @@ class ConsumerWalletApiController extends Controller
         $wallet->pin_locked_until = null;
         $wallet->save();
 
-        $instance = \App\Services\Whatsapp\WhatsappEvolutionConfigResolver::defaultInstance();
+        $instance = \App\Services\Whatsapp\WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance !== '') {
             $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
         }

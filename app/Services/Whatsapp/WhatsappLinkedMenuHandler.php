@@ -27,11 +27,26 @@ class WhatsappLinkedMenuHandler
         string $rawText,
         bool $justLinked
     ): void {
-        $this->clearFlow($session);
-        if ($justLinked) {
-            $this->client->sendText($instance, $phone, "Linked successfully, {$renter->name}. Opening Wallet...");
+        $text = trim($rawText);
+        $cmd = WhatsappMenuInputNormalizer::commandToken($rawText);
+
+        if ($session->chat_flow === 'rental_fund') {
+            $this->handleRentalFundFlow($renter, $session, $instance, $phone, $text, $cmd);
+
+            return;
         }
-        app(WhatsappWaWalletMenuHandler::class)->openMenu($session->fresh(), $instance, $phone, $renter->fresh());
+
+        if ($session->chat_flow === 'rentals') {
+            $this->handleRentalsFlow($renter, $session, $instance, $phone, $text, $cmd);
+
+            return;
+        }
+
+        if ($justLinked) {
+            $this->client->sendText($instance, $phone, "Linked successfully, {$renter->name}. Opening Rentals...");
+        }
+
+        $this->handleGlobalCommands($renter, $session, $instance, $phone, $text, $cmd);
     }
 
     private function appBase(): string
@@ -62,11 +77,11 @@ class WhatsappLinkedMenuHandler
 
     public function sendRootForRenter(Renter $renter, string $instance, string $phone): void
     {
-        app(WhatsappWaWalletMenuHandler::class)->openMenu(
-            WhatsappSession::query()->firstOrCreate(['phone_e164' => $phone]),
+        $wallet = $this->formatMoney((float) ($renter->fresh()->wallet_balance ?? 0));
+        $this->client->sendText(
             $instance,
             $phone,
-            $renter->fresh()
+            "CheckoutNow — {$renter->email}\n*Rentals wallet:* {$wallet}\n\n".$this->menuBody()
         );
     }
 
@@ -723,7 +738,7 @@ class WhatsappLinkedMenuHandler
 
         $kycNote = '';
         if (! $renter->isKycVerified()) {
-            $kycNote = "\n\nComplete rentals KYC at ".$this->portalRentals()." before you can pay.";
+            $kycNote = "\n\nComplete rentals KYC at ".$this->portalRentals().' before you can pay.';
         }
 
         $emailNote = '';
@@ -741,7 +756,7 @@ class WhatsappLinkedMenuHandler
             "Caution (if any): *{$caution}*\n".
             "*Total due:* {$grand}\n".
             "*Your wallet:* {$wallet}\n\n".
-            "Reply *YES* to pay from wallet, or *BACK* to change dates.".
+            'Reply *YES* to pay from wallet, or *BACK* to change dates.'.
             $kycNote.
             $emailNote
         );

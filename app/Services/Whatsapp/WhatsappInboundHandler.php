@@ -6,9 +6,9 @@ use App\Mail\WhatsappLoginOtpMail;
 use App\Models\Renter;
 use App\Models\WhatsappSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class WhatsappInboundHandler
@@ -45,6 +45,7 @@ class WhatsappInboundHandler
     private function handleOne(array $msg): void
     {
         $instance = $msg['instance'] ?: (string) config('whatsapp.evolution.instance', '');
+        $isRentalsOnlyInstance = WhatsappEvolutionConfigResolver::isRentalsOnlyInstance($instance);
         if ($instance === '') {
             Log::warning('whatsapp.inbound: missing evolution instance name');
 
@@ -68,7 +69,13 @@ class WhatsappInboundHandler
                 ->where('whatsapp_phone_e164', $phone)
                 ->where('is_active', true)
                 ->first();
-            if ($lr) {
+            if ($isRentalsOnlyInstance) {
+                if ($lr) {
+                    $this->linkedMenu->handle($lr->fresh(), $session->fresh(), $instance, $phone, 'MENU', false);
+                } else {
+                    $this->guestRentalBrowse->handle($session->fresh(), $instance, $phone, 'RENTALS');
+                }
+            } elseif ($lr) {
                 $this->waWalletMenu->openMenu($session->fresh(), $instance, $phone, $lr->fresh());
             } else {
                 $this->checkoutServicesMenu->sendRootMenu($instance, $phone);
@@ -124,6 +131,42 @@ class WhatsappInboundHandler
             ->where('whatsapp_phone_e164', $phone)
             ->where('is_active', true)
             ->first();
+
+        if ($isRentalsOnlyInstance) {
+            Log::info('whatsapp.routing.decision', [
+                'instance' => $instance,
+                'mode' => 'rentals_only',
+                'phone_e164' => $phone,
+                'is_linked_renter' => (bool) $linkedRenter,
+                'command' => $cmd,
+            ]);
+
+            if (in_array($cmd, ['WALLET', 'TOPUP', 'TOP UP', 'UPGRADE', 'TIER2', 'TIER 2'], true)) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'This WhatsApp line is dedicated to *Rentals* only. Send *RENTALS* or *MENU* to continue.'
+                );
+
+                return;
+            }
+
+            if ($linkedRenter) {
+                $this->linkedMenu->handle($linkedRenter, $session->fresh(), $instance, $phone, $text, false);
+            } else {
+                $this->guestRentalBrowse->handle($session->fresh(), $instance, $phone, $text);
+            }
+
+            return;
+        }
+
+        Log::info('whatsapp.routing.decision', [
+            'instance' => $instance,
+            'mode' => 'wallet_default',
+            'phone_e164' => $phone,
+            'is_linked_renter' => (bool) $linkedRenter,
+            'command' => $cmd,
+        ]);
 
         if ($session && $session->chat_flow === WhatsappWalletUpgradeFlowHandler::FLOW) {
             $this->walletUpgradeFlow->handle($session, $instance, $phone, $text, $cmd);

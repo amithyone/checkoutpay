@@ -29,7 +29,7 @@ class ConsumerWalletTransferService
 
     private function evolutionInstance(): string
     {
-        return WhatsappEvolutionConfigResolver::defaultInstance();
+        return WhatsappEvolutionConfigResolver::walletInstance();
     }
 
     /**
