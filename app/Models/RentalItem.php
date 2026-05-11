@@ -17,6 +17,7 @@ class RentalItem extends Model
         'business_id',
         'category_id',
         'name',
+        'brand',
         'slug',
         'description',
         'city',
@@ -73,7 +74,7 @@ class RentalItem extends Model
 
         static::creating(function ($item) {
             if (empty($item->slug)) {
-                $item->slug = Str::slug($item->name) . '-' . Str::random(6);
+                $item->slug = Str::slug($item->name).'-'.Str::random(6);
             }
         });
     }
@@ -233,7 +234,7 @@ class RentalItem extends Model
      */
     public function isAvailableForDates($startDate, $endDate): bool
     {
-        if (!$this->is_available || !$this->is_active) {
+        if (! $this->is_available || ! $this->is_active) {
             return false;
         }
 
@@ -243,16 +244,16 @@ class RentalItem extends Model
         })
         // Only block dates for rentals that still occupy inventory.
         // Once returned/completed, the item should be available again.
-        ->whereIn('status', [Rental::STATUS_PENDING, Rental::STATUS_APPROVED, Rental::STATUS_ACTIVE])
-        ->where(function ($q) use ($startDate, $endDate) {
-            $q->whereBetween('start_date', [$startDate, $endDate])
-              ->orWhereBetween('end_date', [$startDate, $endDate])
-              ->orWhere(function ($q2) use ($startDate, $endDate) {
-                  $q2->where('start_date', '<=', $startDate)
-                     ->where('end_date', '>=', $endDate);
-              });
-        })
-        ->get();
+            ->whereIn('status', [Rental::STATUS_PENDING, Rental::STATUS_APPROVED, Rental::STATUS_ACTIVE])
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('start_date', [$startDate, $endDate])
+                    ->orWhereBetween('end_date', [$startDate, $endDate])
+                    ->orWhere(function ($q2) use ($startDate, $endDate) {
+                        $q2->where('start_date', '<=', $startDate)
+                            ->where('end_date', '>=', $endDate);
+                    });
+            })
+            ->get();
 
         // Calculate total quantity rented during this period
         $totalRented = 0;
@@ -277,10 +278,11 @@ class RentalItem extends Model
         $unavailable = [];
         for ($d = $start->copy(); $d->lte($end); $d->addDay()) {
             $dateStr = $d->format('Y-m-d');
-            if (!$this->isAvailableForDates($dateStr, $dateStr)) {
+            if (! $this->isAvailableForDates($dateStr, $dateStr)) {
                 $unavailable[] = $dateStr;
             }
         }
+
         return $unavailable;
     }
 }

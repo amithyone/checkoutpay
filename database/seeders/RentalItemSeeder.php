@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\RentalItem;
-use App\Models\RentalCategory;
 use App\Models\Business;
-use Illuminate\Support\Str;
+use App\Models\RentalCategory;
+use App\Models\RentalItem;
+use Illuminate\Database\Seeder;
 
 class RentalItemSeeder extends Seeder
 {
@@ -22,11 +21,13 @@ class RentalItemSeeder extends Seeder
 
         if ($businesses->isEmpty()) {
             $this->command->warn('No active businesses found. Please create a business first.');
+
             return;
         }
 
         if ($categories->isEmpty()) {
             $this->command->warn('No categories found. Please run RentalCategorySeeder first.');
+
             return;
         }
 
@@ -34,6 +35,7 @@ class RentalItemSeeder extends Seeder
         $items = [
             [
                 'name' => 'Canon EOS R5 Professional Camera',
+                'brand' => 'Canon',
                 'category' => 'Camera',
                 'description' => 'Professional mirrorless camera with 45MP full-frame sensor, 8K video recording, and advanced autofocus system. Perfect for professional photography and videography.',
                 'city' => 'Lagos',
@@ -54,6 +56,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'Sony A7III Mirrorless Camera',
+                'brand' => 'Sony',
                 'category' => 'Camera',
                 'description' => 'Full-frame mirrorless camera with 24MP sensor, 4K video, and excellent low-light performance. Great for both photography and video.',
                 'city' => 'Abuja',
@@ -74,6 +77,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'Godox SL-60W LED Video Light',
+                'brand' => 'Godox',
                 'category' => 'Lighting',
                 'description' => 'Professional LED video light with 60W output, adjustable color temperature (3200K-5600K), and dimmer control. Perfect for studio and on-location shoots.',
                 'city' => 'Lagos',
@@ -113,6 +117,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'Toyota Camry 2022',
+                'brand' => 'Toyota',
                 'category' => 'Cars',
                 'description' => 'Reliable and comfortable sedan perfect for city driving and long trips. Includes insurance, fuel, and 24/7 roadside assistance.',
                 'city' => 'Abuja',
@@ -132,6 +137,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'Shure SM58 Dynamic Microphone',
+                'brand' => 'Shure',
                 'category' => 'Audio Equipment',
                 'description' => 'Industry-standard vocal microphone with excellent sound quality and durability. Perfect for live performances, recording, and events.',
                 'city' => 'Port Harcourt',
@@ -151,6 +157,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'DJI Mavic Air 2 Drone',
+                'brand' => 'DJI',
                 'category' => 'Video Equipment',
                 'description' => 'Professional drone with 4K video, 48MP photos, and intelligent flight modes. Perfect for aerial photography and videography.',
                 'city' => 'Lagos',
@@ -190,6 +197,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'MacBook Pro 16-inch M1',
+                'brand' => 'Apple',
                 'category' => 'Electronics',
                 'description' => 'Powerful laptop perfect for video editing, graphic design, and professional work. Includes charger and carrying case.',
                 'city' => 'Lagos',
@@ -228,6 +236,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'Bosch Professional Drill Set',
+                'brand' => 'Bosch',
                 'category' => 'Tools & Equipment',
                 'description' => 'Professional power drill set with multiple drill bits and accessories. Perfect for construction and DIY projects.',
                 'city' => 'Aba',
@@ -247,6 +256,7 @@ class RentalItemSeeder extends Seeder
             ],
             [
                 'name' => 'Canon EF 24-70mm f/2.8L Lens',
+                'brand' => 'Canon',
                 'category' => 'Camera',
                 'description' => 'Professional zoom lens with constant f/2.8 aperture. Perfect for portraits, events, and general photography. Sharp and versatile.',
                 'city' => 'Enugu',
@@ -271,7 +281,7 @@ class RentalItemSeeder extends Seeder
         foreach ($items as $itemData) {
             // Find category by name
             $category = $categories->firstWhere('name', $itemData['category']);
-            if (!$category) {
+            if (! $category) {
                 continue;
             }
 
@@ -280,7 +290,7 @@ class RentalItemSeeder extends Seeder
 
             // Randomly select city if not in predefined list
             $city = $itemData['city'];
-            if (!in_array($city, $cities)) {
+            if (! in_array($city, $cities)) {
                 $city = $cities[array_rand($cities)] ?? 'Lagos';
             }
 
@@ -288,6 +298,7 @@ class RentalItemSeeder extends Seeder
                 'business_id' => $business->id,
                 'category_id' => $category->id,
                 'name' => $itemData['name'],
+                'brand' => $itemData['brand'] ?? null,
                 'description' => $itemData['description'],
                 'city' => $city,
                 'state' => $itemData['state'] ?? null,

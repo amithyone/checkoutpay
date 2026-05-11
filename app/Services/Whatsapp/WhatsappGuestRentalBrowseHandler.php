@@ -48,32 +48,39 @@ class WhatsappGuestRentalBrowseHandler
                 return;
             }
 
-            if ($step === 'item') {
+            if ($step === 'brand') {
                 $this->start($session->fresh(), $instance, $phone);
 
                 return;
             }
 
+            if ($step === 'item') {
+                $this->backFromItemStep($session, $instance, $phone, $ctx);
+
+                return;
+            }
+
             if ($step === 'qty') {
-                $this->showItemsForCategory(
+                $this->showItemPage(
                     $session,
                     $instance,
                     $phone,
                     (int) ($ctx['category_id'] ?? 0),
-                    isset($ctx['cat_ids']) && is_array($ctx['cat_ids']) ? $ctx['cat_ids'] : []
+                    isset($ctx['cat_ids']) && is_array($ctx['cat_ids']) ? $ctx['cat_ids'] : [],
+                    (string) ($ctx['brand_key'] ?? WhatsappRentalCatalogHelper::BRAND_KEY_ALL),
+                    (int) ($ctx['item_page'] ?? 0),
+                    (bool) ($ctx['brand_was_prompted'] ?? false)
                 );
 
                 return;
             }
 
             if ($step === 'dates') {
-                $this->saveContext($session, [
+                $this->saveContext($session, array_merge($this->browsePersistKeys($ctx), [
                     'step' => 'qty',
-                    'cat_ids' => $ctx['cat_ids'] ?? [],
-                    'category_id' => (int) ($ctx['category_id'] ?? 0),
                     'item_ids' => $ctx['item_ids'] ?? [],
                     'item_id' => (int) ($ctx['item_id'] ?? 0),
-                ]);
+                ]));
                 $this->client->sendText(
                     $instance,
                     $phone,
@@ -84,14 +91,12 @@ class WhatsappGuestRentalBrowseHandler
             }
 
             if ($step === 'summary') {
-                $this->saveContext($session, [
+                $this->saveContext($session, array_merge($this->browsePersistKeys($ctx), [
                     'step' => 'dates',
-                    'cat_ids' => $ctx['cat_ids'] ?? [],
-                    'category_id' => (int) ($ctx['category_id'] ?? 0),
                     'item_ids' => $ctx['item_ids'] ?? [],
                     'item_id' => (int) ($ctx['item_id'] ?? 0),
                     'qty' => (int) ($ctx['qty'] ?? 1),
-                ]);
+                ]));
                 $this->client->sendText(
                     $instance,
                     $phone,
@@ -118,6 +123,7 @@ class WhatsappGuestRentalBrowseHandler
 
         match ($step) {
             'category' => $this->pickCategory($session, $instance, $phone, $text, $ctx),
+            'brand' => $this->pickBrand($session, $instance, $phone, $text, $ctx),
             'item' => $this->pickItem($session, $instance, $phone, $text, $ctx),
             'qty' => $this->pickQty($session, $instance, $phone, $text, $ctx),
             'dates' => $this->pickDates($session, $instance, $phone, $text, $ctx),
@@ -238,51 +244,206 @@ class WhatsappGuestRentalBrowseHandler
         }
 
         $categoryId = (int) $catIds[$idx - 1];
-        $this->showItemsForCategory($session, $instance, $phone, $categoryId, $catIds);
+        if (WhatsappRentalCatalogHelper::shouldOfferBrandPicker($categoryId)) {
+            $this->showBrandPicker($session, $instance, $phone, $categoryId, $catIds);
+
+            return;
+        }
+
+        $this->showItemPage(
+            $session,
+            $instance,
+            $phone,
+            $categoryId,
+            $catIds,
+            WhatsappRentalCatalogHelper::BRAND_KEY_ALL,
+            0,
+            false
+        );
     }
 
     /**
      * @param  array<int>  $catIds
      */
-    private function showItemsForCategory(
+    private function showBrandPicker(
         WhatsappSession $session,
         string $instance,
         string $phone,
         int $categoryId,
         array $catIds
     ): void {
-        $items = RentalItem::query()
-            ->where('category_id', $categoryId)
-            ->where('is_active', true)
-            ->where('is_available', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'daily_rate']);
-
-        if ($items->isEmpty()) {
-            $this->client->sendText($instance, $phone, 'No items in that category. Try another number or *BACK*.');
+        $rows = WhatsappRentalCatalogHelper::brandMenuRows($categoryId);
+        if ($rows === []) {
+            $this->showItemPage(
+                $session,
+                $instance,
+                $phone,
+                $categoryId,
+                $catIds,
+                WhatsappRentalCatalogHelper::BRAND_KEY_ALL,
+                0,
+                false
+            );
 
             return;
         }
 
-        $lines = ["*Pick an item* (number):\n"];
+        $keys = [];
+        $lines = ["*Pick a brand / filter* (number):\n"];
+        $i = 1;
+        foreach ($rows as $row) {
+            $keys[] = $row['key'];
+            $lines[] = "*{$i}.* {$row['label']}";
+            $i++;
+        }
+        $lines[] = "\n*BACK* — categories";
+
+        $this->saveContext($session, [
+            'step' => 'brand',
+            'cat_ids' => $catIds,
+            'category_id' => $categoryId,
+            'brand_pick_keys' => $keys,
+            'brand_was_prompted' => true,
+        ]);
+
+        $this->client->sendText($instance, $phone, implode("\n", $lines));
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    private function pickBrand(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        array $ctx
+    ): void {
+        $keys = isset($ctx['brand_pick_keys']) && is_array($ctx['brand_pick_keys']) ? $ctx['brand_pick_keys'] : [];
+        $idx = (int) preg_replace('/\D+/', '', $text);
+        if ($idx < 1 || $idx > count($keys)) {
+            $this->client->sendText($instance, $phone, 'Reply with a number from the brand list.');
+
+            return;
+        }
+
+        $brandKey = (string) $keys[$idx - 1];
+        $categoryId = (int) ($ctx['category_id'] ?? 0);
+        $catIds = isset($ctx['cat_ids']) && is_array($ctx['cat_ids']) ? $ctx['cat_ids'] : [];
+        $this->showItemPage($session, $instance, $phone, $categoryId, $catIds, $brandKey, 0, true);
+    }
+
+    /**
+     * @param  array<int>  $catIds
+     */
+    private function showItemPage(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        int $categoryId,
+        array $catIds,
+        string $brandKey,
+        int $itemPage,
+        bool $brandWasPrompted
+    ): void {
+        $pack = WhatsappRentalCatalogHelper::paginatedItems($categoryId, $brandKey, $itemPage);
+        /** @var \Illuminate\Support\Collection<int, RentalItem> $items */
+        $items = $pack['items'];
+        $total = (int) $pack['total'];
+        $page = (int) $pack['page'];
+        $totalPages = (int) $pack['total_pages'];
+
+        if ($total === 0) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'No items for that filter. Try *BACK* or pick another brand/category.'
+            );
+
+            return;
+        }
+
+        $lines = ['*Pick an item* (number) — page '.($page + 1)." of {$totalPages} ({$total} items)\n"];
         $ids = [];
         $n = 1;
         foreach ($items as $it) {
             $ids[] = (int) $it->id;
             $rate = $this->formatMoney((float) $it->daily_rate);
-            $lines[] = "*{$n}.* {$it->name} — from {$rate}/day";
+            $lines[] = "*{$n}.* {$it->name} — {$rate}/day";
             $n++;
         }
-        $lines[] = "\n*BACK* — categories";
+        $nav = [];
+        if ($page > 0) {
+            $nav[] = '*PREV* — previous page';
+        }
+        if ($page < $totalPages - 1) {
+            $nav[] = '*NEXT* — more items';
+        }
+        if ($nav !== []) {
+            $lines[] = "\n".implode("\n  ", $nav);
+        }
+        $back = $brandWasPrompted ? '*BACK* — brand list' : '*BACK* — categories';
+        $lines[] = "\n{$back}";
 
-        $this->saveContext($session, [
-            'step' => 'item',
+        $this->saveContext($session, array_merge($this->browsePersistKeys([
             'cat_ids' => $catIds,
             'category_id' => $categoryId,
+            'brand_key' => $brandKey,
+            'item_page' => $page,
+            'brand_was_prompted' => $brandWasPrompted,
+        ]), [
+            'step' => 'item',
             'item_ids' => $ids,
-        ]);
+        ]));
 
         $this->client->sendText($instance, $phone, implode("\n", $lines));
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    private function backFromItemStep(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        array $ctx
+    ): void {
+        $page = (int) ($ctx['item_page'] ?? 0);
+        $categoryId = (int) ($ctx['category_id'] ?? 0);
+        $catIds = isset($ctx['cat_ids']) && is_array($ctx['cat_ids']) ? $ctx['cat_ids'] : [];
+        $brandKey = (string) ($ctx['brand_key'] ?? WhatsappRentalCatalogHelper::BRAND_KEY_ALL);
+        $brandWasPrompted = (bool) ($ctx['brand_was_prompted'] ?? false);
+
+        if ($page > 0) {
+            $this->showItemPage($session, $instance, $phone, $categoryId, $catIds, $brandKey, $page - 1, $brandWasPrompted);
+
+            return;
+        }
+
+        if ($brandWasPrompted && WhatsappRentalCatalogHelper::shouldOfferBrandPicker($categoryId)) {
+            $this->showBrandPicker($session, $instance, $phone, $categoryId, $catIds);
+
+            return;
+        }
+
+        $this->start($session->fresh(), $instance, $phone);
+    }
+
+    /**
+     * Keys carried through qty → dates → summary so *BACK* restores the item list.
+     *
+     * @param  array<string, mixed>  $ctx
+     * @return array<string, mixed>
+     */
+    private function browsePersistKeys(array $ctx): array
+    {
+        return [
+            'cat_ids' => $ctx['cat_ids'] ?? [],
+            'category_id' => (int) ($ctx['category_id'] ?? 0),
+            'brand_key' => (string) ($ctx['brand_key'] ?? WhatsappRentalCatalogHelper::BRAND_KEY_ALL),
+            'item_page' => (int) ($ctx['item_page'] ?? 0),
+            'brand_was_prompted' => (bool) ($ctx['brand_was_prompted'] ?? false),
+        ];
     }
 
     /**
@@ -295,22 +456,38 @@ class WhatsappGuestRentalBrowseHandler
         string $text,
         array $ctx
     ): void {
+        $nav = WhatsappMenuInputNormalizer::commandToken($text);
+        $categoryId = (int) ($ctx['category_id'] ?? 0);
+        $catIds = isset($ctx['cat_ids']) && is_array($ctx['cat_ids']) ? $ctx['cat_ids'] : [];
+        $brandKey = (string) ($ctx['brand_key'] ?? WhatsappRentalCatalogHelper::BRAND_KEY_ALL);
+        $page = (int) ($ctx['item_page'] ?? 0);
+        $brandWasPrompted = (bool) ($ctx['brand_was_prompted'] ?? false);
+
+        if (in_array($nav, ['NEXT', 'MORE'], true)) {
+            $this->showItemPage($session, $instance, $phone, $categoryId, $catIds, $brandKey, $page + 1, $brandWasPrompted);
+
+            return;
+        }
+        if (in_array($nav, ['PREV', 'PREVIOUS'], true)) {
+            $this->showItemPage($session, $instance, $phone, $categoryId, $catIds, $brandKey, max(0, $page - 1), $brandWasPrompted);
+
+            return;
+        }
+
         $itemIds = isset($ctx['item_ids']) && is_array($ctx['item_ids']) ? $ctx['item_ids'] : [];
         $idx = (int) preg_replace('/\D+/', '', $text);
         if ($idx < 1 || $idx > count($itemIds)) {
-            $this->client->sendText($instance, $phone, 'Reply with a valid item number.');
+            $this->client->sendText($instance, $phone, 'Reply with an item number, *NEXT*, or *PREV*.');
 
             return;
         }
 
         $itemId = (int) $itemIds[$idx - 1];
-        $this->saveContext($session, [
+        $this->saveContext($session, array_merge($this->browsePersistKeys($ctx), [
             'step' => 'qty',
-            'cat_ids' => $ctx['cat_ids'] ?? [],
-            'category_id' => (int) ($ctx['category_id'] ?? 0),
             'item_ids' => $itemIds,
             'item_id' => $itemId,
-        ]);
+        ]));
 
         $this->client->sendText(
             $instance,
@@ -339,14 +516,12 @@ class WhatsappGuestRentalBrowseHandler
 
         $itemId = (int) ($ctx['item_id'] ?? 0);
 
-        $this->saveContext($session, [
+        $this->saveContext($session, array_merge($this->browsePersistKeys($ctx), [
             'step' => 'dates',
-            'cat_ids' => $ctx['cat_ids'] ?? [],
-            'category_id' => (int) ($ctx['category_id'] ?? 0),
             'item_ids' => $ctx['item_ids'] ?? [],
             'item_id' => $itemId,
             'qty' => $qty,
-        ]);
+        ]));
 
         $this->client->sendText(
             $instance,
@@ -411,10 +586,8 @@ class WhatsappGuestRentalBrowseHandler
             return;
         }
 
-        $this->saveContext($session, [
+        $this->saveContext($session, array_merge($this->browsePersistKeys($ctx), [
             'step' => 'summary',
-            'cat_ids' => $ctx['cat_ids'] ?? [],
-            'category_id' => (int) ($ctx['category_id'] ?? 0),
             'item_ids' => $ctx['item_ids'] ?? [],
             'item_id' => $itemId,
             'qty' => $qty,
@@ -423,7 +596,7 @@ class WhatsappGuestRentalBrowseHandler
             'caution' => $quote['caution'],
             'grand' => $quote['grand'],
             'label' => $quote['label'],
-        ]);
+        ]));
 
         $rentals = $this->portalRentals();
         $grand = $this->formatMoney($quote['grand']);

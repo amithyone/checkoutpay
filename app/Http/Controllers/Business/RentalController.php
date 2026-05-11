@@ -3,21 +3,21 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
-use App\Models\Rental;
-use App\Models\RentalItem;
-use App\Models\RentalCategory;
-use App\Services\RentalPaymentService;
 use App\Mail\RentalApprovedPayNow;
-use Illuminate\Http\Request;
+use App\Models\Rental;
+use App\Models\RentalCategory;
+use App\Models\RentalItem;
+use App\Services\RentalPaymentService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class RentalController extends Controller
 {
@@ -37,14 +37,13 @@ class RentalController extends Controller
         ]);
     }
 
-
     /**
      * Display a listing of rental requests
      */
     public function index(Request $request): View
     {
         $business = $request->user('business');
-        
+
         $query = Rental::where('business_id', $business->id)
             ->with(['renter', 'items'])
             ->latest();
@@ -59,8 +58,8 @@ class RentalController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('rental_number', 'like', "%{$search}%")
-                  ->orWhere('renter_name', 'like', "%{$search}%")
-                  ->orWhere('renter_email', 'like', "%{$search}%");
+                    ->orWhere('renter_name', 'like', "%{$search}%")
+                    ->orWhere('renter_email', 'like', "%{$search}%");
             });
         }
 
@@ -84,6 +83,7 @@ class RentalController extends Controller
     {
         $business = request()->user('business');
         $categories = RentalCategory::where('is_active', true)->get();
+
         return view('business.rentals.create-item', compact('categories'));
     }
 
@@ -108,6 +108,7 @@ class RentalController extends Controller
         $validator = Validator::make($request->all(), [
             'category_id' => 'required|exists:rental_categories,id',
             'name' => 'required|string|max:255',
+            'brand' => 'nullable|string|max:120',
             'description' => 'nullable|string',
             'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',
@@ -146,6 +147,8 @@ class RentalController extends Controller
             $validated = $validator->validated();
 
             $validated['business_id'] = $business->id;
+            $b = trim((string) ($validated['brand'] ?? ''));
+            $validated['brand'] = $b === '' ? null : $b;
             $validated['is_active'] = $validated['is_active'] ?? true;
             $validated['is_available'] = $validated['is_available'] ?? true;
             $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
@@ -157,7 +160,7 @@ class RentalController extends Controller
 
             if (isset($validated['specifications_json']) && trim((string) $validated['specifications_json']) !== '') {
                 $decodedSpecs = json_decode($validated['specifications_json'], true);
-                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decodedSpecs)) {
+                if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decodedSpecs)) {
                     Log::warning('rental_items.store.invalid_specifications_json', [
                         'business_id' => $business?->id,
                         'error' => json_last_error_msg(),
@@ -211,7 +214,7 @@ class RentalController extends Controller
     public function items(Request $request): View
     {
         $business = $request->user('business');
-        
+
         $query = RentalItem::where('business_id', $business->id)
             ->with('category');
 
@@ -307,6 +310,7 @@ class RentalController extends Controller
         $data = $item->only([
             'category_id',
             'name',
+            'brand',
             'city',
             'state',
             'address',
@@ -340,7 +344,7 @@ class RentalController extends Controller
                 continue;
             }
             $ext = pathinfo($src, PATHINFO_EXTENSION);
-            $dest = 'rental-items/' . $business->id . '/clones/' . Str::random(20) . ($ext ? ('.' . $ext) : '');
+            $dest = 'rental-items/'.$business->id.'/clones/'.Str::random(20).($ext ? ('.'.$ext) : '');
             Storage::disk('public')->copy($src, $dest);
             $newImages[] = $dest;
         }
@@ -377,12 +381,13 @@ class RentalController extends Controller
     public function editItem(RentalItem $item): View
     {
         $business = request()->user('business');
-        
+
         if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
 
         $categories = RentalCategory::where('is_active', true)->get();
+
         return view('business.rentals.edit-item', compact('item', 'categories'));
     }
 
@@ -392,7 +397,7 @@ class RentalController extends Controller
     public function updateItem(Request $request, RentalItem $item): RedirectResponse
     {
         $business = $request->user('business');
-        
+
         if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
@@ -400,6 +405,7 @@ class RentalController extends Controller
         $validated = $request->validate([
             'category_id' => 'required|exists:rental_categories,id',
             'name' => 'required|string|max:255',
+            'brand' => 'nullable|string|max:120',
             'description' => 'nullable|string',
             'city' => 'nullable|string|max:255',
             'state' => 'nullable|string|max:255',
@@ -422,6 +428,12 @@ class RentalController extends Controller
             'discount_starts_at' => 'nullable|date',
             'discount_ends_at' => 'nullable|date',
         ]);
+        if (array_key_exists('brand', $validated)) {
+            $validated['brand'] = trim((string) $validated['brand']);
+            if ($validated['brand'] === '') {
+                $validated['brand'] = null;
+            }
+        }
         $validated = array_merge($validated, RentalItem::discountFieldsFromRequest($request));
         $validated['caution_fee_enabled'] = (bool) ($validated['caution_fee_enabled'] ?? false);
         if (array_key_exists('is_featured', $validated)) {
@@ -438,7 +450,7 @@ class RentalController extends Controller
                 if (\Illuminate\Support\Facades\Storage::disk('public')->exists($imageToRemove)) {
                     \Illuminate\Support\Facades\Storage::disk('public')->delete($imageToRemove);
                 }
-                $currentImages = array_filter($currentImages, function($img) use ($imageToRemove) {
+                $currentImages = array_filter($currentImages, function ($img) use ($imageToRemove) {
                     return $img !== $imageToRemove;
                 });
             }
@@ -474,10 +486,11 @@ class RentalController extends Controller
             'daily_rate' => 'required|numeric|min:0',
         ]);
         $item->update(['daily_rate' => $validated['daily_rate']]);
+
         return response()->json([
             'success' => true,
             'daily_rate' => (float) $item->daily_rate,
-            'formatted' => '₦' . number_format($item->daily_rate, 2),
+            'formatted' => '₦'.number_format($item->daily_rate, 2),
         ]);
     }
 
@@ -497,10 +510,11 @@ class RentalController extends Controller
         $images = $item->images ?? [];
         $images[] = $path;
         $item->update(['images' => $images]);
+
         return response()->json([
             'success' => true,
             'image_path' => $path,
-            'image_url' => asset('storage/' . $path),
+            'image_url' => asset('storage/'.$path),
         ]);
     }
 
@@ -510,7 +524,7 @@ class RentalController extends Controller
     public function deleteItem(RentalItem $item): RedirectResponse
     {
         $business = request()->user('business');
-        
+
         if ((int) $item->business_id !== (int) $business->id) {
             abort(403);
         }
@@ -527,7 +541,7 @@ class RentalController extends Controller
     public function updateStatus(Request $request, Rental $rental): RedirectResponse
     {
         $business = $request->user('business');
-        
+
         if ((int) $rental->business_id !== (int) $business->id) {
             abort(403);
         }
@@ -539,7 +553,7 @@ class RentalController extends Controller
         $wasApproved = $rental->isApproved();
         $rental->update(['status' => $validated['status']]);
 
-        if ($validated['status'] === 'approved' && !$wasApproved) {
+        if ($validated['status'] === 'approved' && ! $wasApproved) {
             try {
                 $paymentService = app(RentalPaymentService::class);
                 $paymentService->createPaymentForRental($rental->fresh());
@@ -552,7 +566,7 @@ class RentalController extends Controller
             }
         }
 
-        if ($validated['status'] === 'active' && !$rental->started_at) {
+        if ($validated['status'] === 'active' && ! $rental->started_at) {
             $rental->update(['started_at' => now()]);
         }
 
@@ -560,7 +574,7 @@ class RentalController extends Controller
             $rental->markAsReturned();
         }
 
-        if ($validated['status'] === 'cancelled' && !$rental->cancelled_at) {
+        if ($validated['status'] === 'cancelled' && ! $rental->cancelled_at) {
             $rental->update(['cancelled_at' => now()]);
         }
 
@@ -574,7 +588,7 @@ class RentalController extends Controller
     public function show(Rental $rental): View
     {
         $business = request()->user('business');
-        
+
         if ((int) $rental->business_id !== (int) $business->id) {
             abort(403);
         }
@@ -655,6 +669,7 @@ class RentalController extends Controller
                 'rental_id' => $rental->id,
                 'error' => $e->getMessage(),
             ]);
+
             return redirect()->route('business.rentals.show', $rental)
                 ->with('error', 'Rental approved but payment link could not be created. Please try again or contact support.');
         }
@@ -669,7 +684,7 @@ class RentalController extends Controller
     public function reject(Request $request, Rental $rental): RedirectResponse
     {
         $business = $request->user('business');
-        
+
         if ($rental->business_id !== $business->id) {
             abort(403);
         }

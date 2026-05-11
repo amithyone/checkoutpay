@@ -30,6 +30,10 @@
                     <label class="block text-sm font-medium mb-1">Item Name *</label>
                     <input type="text" name="name" required class="w-full border-gray-300 rounded-md" value="{{ old('name', $item->name) }}">
                 </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Brand <span class="text-gray-500 font-normal">(optional — groups items in WhatsApp)</span></label>
+                    <input type="text" name="brand" maxlength="120" placeholder="e.g. Sony, Canon" class="w-full border-gray-300 rounded-md" value="{{ old('brand', $item->brand) }}">
+                </div>
             </div>
 
             <div class="mb-4">
