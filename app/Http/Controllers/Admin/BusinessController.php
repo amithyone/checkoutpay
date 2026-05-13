@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Business;
+use App\Models\BusinessActivityLog;
 use App\Models\BusinessVerification;
 use App\Models\BusinessWebsite;
 use App\Models\EmailAccount;
@@ -15,6 +16,7 @@ use App\Services\TransactionLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -125,7 +127,17 @@ class BusinessController extends Controller
             'websites',
         ]);
 
-        return view('admin.businesses.show', compact('business'));
+        $transferTargets = collect();
+        $admin = auth('admin')->user();
+        if ($admin && $admin->canUpdateBusinessBalance()) {
+            $transferTargets = Business::query()
+                ->where('id', '!=', $business->id)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'balance']);
+        }
+
+        return view('admin.businesses.show', compact('business', 'transferTargets'));
     }
 
     public function edit(Business $business): View
@@ -355,6 +367,111 @@ class BusinessController extends Controller
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Balance updated from ₦'.number_format($oldBalance, 2).' to ₦'.number_format($request->balance, 2));
+    }
+
+    public function transferBalance(Request $request, Business $business): RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        if (! $admin || ! $admin->canUpdateBusinessBalance()) {
+            abort(403, 'Only super admins can transfer business balances.');
+        }
+
+        $validated = $request->validate([
+            'target_business_id' => 'required|exists:businesses,id',
+            'amount' => 'required|numeric|min:0.01',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $targetBusinessId = (int) $validated['target_business_id'];
+        $amount = round((float) $validated['amount'], 2);
+        $notes = isset($validated['notes']) ? trim((string) $validated['notes']) : null;
+        if ($notes === '') {
+            $notes = null;
+        }
+
+        if ($targetBusinessId === (int) $business->id) {
+            return back()->withErrors(['target_business_id' => 'Source and destination businesses must be different.']);
+        }
+
+        $businessIds = [(int) $business->id, $targetBusinessId];
+        sort($businessIds, SORT_NUMERIC);
+
+        $result = DB::transaction(function () use ($business, $targetBusinessId, $amount, $notes, $admin, $request, $businessIds) {
+            $locked = [];
+            foreach ($businessIds as $id) {
+                $row = Business::query()->lockForUpdate()->find($id);
+                if (! $row) {
+                    throw new \RuntimeException('business_not_found');
+                }
+                $locked[$id] = $row;
+            }
+
+            /** @var Business $source */
+            $source = $locked[(int) $business->id];
+            /** @var Business $target */
+            $target = $locked[$targetBusinessId];
+
+            if ((float) $source->balance < $amount) {
+                return ['ok' => false, 'error' => 'Insufficient source balance for this transfer.'];
+            }
+
+            $sourceOld = (float) $source->balance;
+            $targetOld = (float) $target->balance;
+            $sourceNew = round($sourceOld - $amount, 2);
+            $targetNew = round($targetOld + $amount, 2);
+
+            $source->balance = $sourceNew;
+            $source->save();
+            $target->balance = $targetNew;
+            $target->save();
+
+            $meta = [
+                'amount' => $amount,
+                'source_business_id' => $source->id,
+                'source_business_name' => $source->name,
+                'source_balance_before' => $sourceOld,
+                'source_balance_after' => $sourceNew,
+                'target_business_id' => $target->id,
+                'target_business_name' => $target->name,
+                'target_balance_before' => $targetOld,
+                'target_balance_after' => $targetNew,
+                'admin_id' => $admin->id,
+                'admin_email' => $admin->email,
+                'notes' => $notes,
+            ];
+
+            BusinessActivityLog::query()->create([
+                'business_id' => $source->id,
+                'action' => 'admin_balance_transfer_out',
+                'description' => 'Admin transferred ₦'.number_format($amount, 2).' to '.$target->name,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => $meta,
+            ]);
+            BusinessActivityLog::query()->create([
+                'business_id' => $target->id,
+                'action' => 'admin_balance_transfer_in',
+                'description' => 'Admin credited ₦'.number_format($amount, 2).' from '.$source->name,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => $meta,
+            ]);
+
+            Log::info('admin.business.balance_transfer', $meta);
+
+            return ['ok' => true, 'target' => $target];
+        });
+
+        if (! ($result['ok'] ?? false)) {
+            return back()->withErrors(['amount' => $result['error'] ?? 'Transfer failed.']);
+        }
+
+        /** @var Business $target */
+        $target = $result['target'];
+
+        return redirect()
+            ->route('admin.businesses.show', $business)
+            ->with('success', 'Transferred ₦'.number_format($amount, 2).' from '.$business->name.' to '.$target->name.'.');
     }
 
     /** Overdraft limit tiers (in Naira). */

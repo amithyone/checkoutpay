@@ -103,6 +103,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
             ->middleware('super_admin')
             ->name('businesses.update-balance');
+        Route::post('businesses/{business}/transfer-balance', [BusinessController::class, 'transferBalance'])
+            ->middleware('super_admin')
+            ->name('businesses.transfer-balance');
         Route::post('businesses/{business}/overdraft-approve', [BusinessController::class, 'approveOverdraft'])
             ->middleware('super_admin')
             ->name('businesses.overdraft-approve');

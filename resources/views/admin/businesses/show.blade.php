@@ -78,6 +78,11 @@
                     <button onclick="showBalanceModal()" class="text-xs text-primary hover:underline">
                         <i class="fas fa-edit mr-1"></i> Update
                     </button>
+                    @if(isset($transferTargets) && $transferTargets->count() > 0)
+                    <button onclick="showTransferBalanceModal()" class="text-xs text-orange-600 hover:underline ml-3">
+                        <i class="fas fa-exchange-alt mr-1"></i> Transfer
+                    </button>
+                    @endif
                     @endif
                 </div>
             </div>
@@ -1113,6 +1118,53 @@
         </form>
     </div>
 </div>
+
+@if(isset($transferTargets) && $transferTargets->count() > 0)
+<!-- Business-to-Business Transfer Modal -->
+<div id="transferBalanceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Transfer Balance to Another Business</h3>
+        <form action="{{ route('admin.businesses.transfer-balance', $business) }}" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">From</label>
+                <p class="text-sm font-semibold text-gray-900">{{ $business->name }} — ₦{{ number_format($business->balance, 2) }}</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">To Business <span class="text-red-500">*</span></label>
+                <select name="target_business_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm">
+                    <option value="">Select destination business</option>
+                    @foreach($transferTargets as $target)
+                        <option value="{{ $target->id }}">
+                            {{ $target->name }} ({{ $target->email }}) — ₦{{ number_format((float) $target->balance, 2) }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Amount (₦) <span class="text-red-500">*</span></label>
+                <input type="number" name="amount" step="0.01" min="0.01" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                    placeholder="e.g. 10000">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
+                <textarea name="notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
+                    placeholder="Reason for this transfer..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeTransferBalanceModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                    onclick="return confirm('Proceed with this business-to-business balance transfer?')">
+                    Transfer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 @endif
 
 @if(auth('admin')->user()->isSuperAdmin() && (\App\Models\Setting::get('transaction_transfer_enabled', config('transaction_transfer.enabled', true))))
@@ -1266,6 +1318,20 @@ function showBalanceModal() {
 
 function closeBalanceModal() {
     document.getElementById('balanceModal').classList.add('hidden');
+}
+
+function showTransferBalanceModal() {
+    const modal = document.getElementById('transferBalanceModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeTransferBalanceModal() {
+    const modal = document.getElementById('transferBalanceModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
 }
 
 let currentWebsiteId = null;
