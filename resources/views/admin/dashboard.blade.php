@@ -567,7 +567,7 @@
             <i class="fas fa-clock mr-2"></i> Cron Job URLs
         </h3>
         <p class="text-sm text-blue-800 mb-4">
-            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically process emails, match payments, and (super admin) peer loan repayments:
+            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically process emails and match payments:
         </p>
         
         <div class="space-y-4">
