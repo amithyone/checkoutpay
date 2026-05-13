@@ -136,6 +136,9 @@ class BusinessPeerLoanService
 
     /**
      * Collect due installments from borrower positive balance; credit lender.
+     * Only schedule rows whose due date is in the past or today (due_at <= now) are
+     * considered, so split schedules (e.g. daily = total/term_days per slice) are not
+     * fully collected in one run just because the borrower has a high balance.
      *
      * @param  'daily'|'weekly'|'monthly'|null  $cadence  When set (scheduler), only loans whose offer matches that repayment rhythm are processed. Null = all offers (manual runs).
      */
@@ -156,6 +159,7 @@ class BusinessPeerLoanService
 
         $schedulesQuery = BusinessLoanSchedule::query()
             ->whereIn('status', ['pending', 'overdue'])
+            ->where('due_at', '<=', now())
             ->orderBy('due_at')
             ->orderBy('id')
             ->with(['loan.borrower', 'loan.offer.lender']);
