@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\BusinessLoan;
 use App\Models\BusinessLendingOffer;
+use App\Models\BusinessLoan;
 use App\Services\Credit\BusinessPeerLoanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,12 +59,18 @@ class PeerLendingAdminController extends Controller
 
     public function loansIndex(): View
     {
-        $loans = BusinessLoan::with(['offer.lender', 'borrower'])
+        $pendingLoans = BusinessLoan::with(['offer.lender', 'borrower', 'schedules'])
             ->where('status', BusinessLoan::STATUS_PENDING_ADMIN)
             ->latest()
             ->paginate(25);
 
-        return view('admin.peer-lending.loans-index', compact('loans'));
+        $activeLoans = BusinessLoan::with(['offer.lender', 'borrower', 'schedules'])
+            ->where('status', BusinessLoan::STATUS_ACTIVE)
+            ->latest('disbursed_at')
+            ->limit(200)
+            ->get();
+
+        return view('admin.peer-lending.loans-index', compact('pendingLoans', 'activeLoans'));
     }
 
     public function approveLoan(BusinessPeerLoanService $loanService, BusinessLoan $loan): RedirectResponse

@@ -30,6 +30,36 @@
         <div class="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg text-sm">Your business is not approved to publish lending offers. Ask an administrator to enable “Peer lend” on your account.</div>
     @endif
 
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-4 py-3 border-b">
+            <h3 class="text-sm font-semibold text-gray-800">Active loans (you are lender)</h3>
+        </div>
+        @forelse($activeLoans as $loan)
+            @php
+                $p = $loan->progressPercent();
+                $sch = $loan->scheduleProgress();
+            @endphp
+            <div class="p-4 border-b last:border-b-0">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-sm font-medium text-gray-900">{{ $loan->borrower->name }}</p>
+                    <p class="text-xs text-gray-500">Principal ₦{{ number_format($loan->principal, 2) }} · Repay ₦{{ number_format($loan->total_repayment, 2) }}</p>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div class="bg-green-600 h-2.5 rounded-full" style="width: {{ $p }}%"></div>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">
+                    {{ number_format($p, 1) }}% repaid · ₦{{ number_format($loan->repaidAmount(), 2) }} / ₦{{ number_format($loan->total_repayment, 2) }}
+                    · Outstanding ₦{{ number_format($loan->outstandingAmount(), 2) }}
+                    @if(($sch['total'] ?? 0) > 0)
+                        · {{ $sch['paid'] }}/{{ $sch['total'] }} schedules paid
+                    @endif
+                </p>
+            </div>
+        @empty
+            <p class="p-6 text-sm text-gray-600">No active disbursed loans yet.</p>
+        @endforelse
+    </div>
+
     <div class="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
         @forelse($offers as $o)
             @php

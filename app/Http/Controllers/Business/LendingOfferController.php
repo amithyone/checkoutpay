@@ -14,12 +14,24 @@ class LendingOfferController extends Controller
 {
     public function index(): View
     {
-        $offers = Auth::guard('business')->user()
+        $business = Auth::guard('business')->user();
+
+        $offers = $business
             ->lendingOffers()
             ->latest()
             ->paginate(20);
 
-        return view('business.lending-offers.index', compact('offers'));
+        $activeLoans = \App\Models\BusinessLoan::query()
+            ->with(['borrower', 'offer', 'schedules'])
+            ->where('status', \App\Models\BusinessLoan::STATUS_ACTIVE)
+            ->whereHas('offer', function ($q) use ($business) {
+                $q->where('lender_business_id', $business->id);
+            })
+            ->latest('disbursed_at')
+            ->limit(200)
+            ->get();
+
+        return view('business.lending-offers.index', compact('offers', 'activeLoans'));
     }
 
     public function create(): View

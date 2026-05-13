@@ -55,4 +55,60 @@ class BusinessLoan extends Model
     {
         return $this->hasMany(BusinessLoanLedgerEntry::class);
     }
+
+    public function totalScheduledAmount(): float
+    {
+        if ($this->relationLoaded('schedules')) {
+            return (float) $this->schedules->sum(fn ($s) => (float) $s->amount_due);
+        }
+
+        return (float) $this->schedules()->sum('amount_due');
+    }
+
+    public function repaidAmount(): float
+    {
+        if ($this->relationLoaded('schedules')) {
+            return (float) $this->schedules->sum(fn ($s) => (float) $s->amount_paid);
+        }
+
+        return (float) $this->schedules()->sum('amount_paid');
+    }
+
+    public function outstandingAmount(): float
+    {
+        $base = $this->totalScheduledAmount();
+        if ($base <= 0) {
+            $base = (float) $this->total_repayment;
+        }
+
+        return max(0.0, round($base - $this->repaidAmount(), 2));
+    }
+
+    public function progressPercent(): float
+    {
+        $base = $this->totalScheduledAmount();
+        if ($base <= 0) {
+            $base = (float) $this->total_repayment;
+        }
+        if ($base <= 0) {
+            return 0.0;
+        }
+
+        return max(0.0, min(100.0, round(($this->repaidAmount() / $base) * 100, 2)));
+    }
+
+    public function scheduleProgress(): array
+    {
+        if ($this->relationLoaded('schedules')) {
+            $total = $this->schedules->count();
+            $paid = $this->schedules->where('status', 'paid')->count();
+
+            return ['paid' => $paid, 'total' => $total];
+        }
+
+        $total = $this->schedules()->count();
+        $paid = $this->schedules()->where('status', 'paid')->count();
+
+        return ['paid' => $paid, 'total' => $total];
+    }
 }
