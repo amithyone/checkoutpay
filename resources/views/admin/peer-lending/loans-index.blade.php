@@ -6,6 +6,7 @@
 @section('content')
 @if(session('success'))<div class="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm">{{ session('success') }}</div>@endif
 @if(session('error'))<div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded text-sm">{{ session('error') }}</div>@endif
+@include('partials.peer-lending-interest-explainer', ['variant' => 'panel'])
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
     <div class="px-4 py-3 border-b bg-gray-50">
         <h3 class="text-sm font-semibold text-gray-800">Active loans</h3>
@@ -26,7 +27,10 @@
                     $sch = $loan->scheduleProgress();
                 @endphp
                 <tr>
-                    <td class="px-4 py-3">{{ $loan->borrower->name }}</td>
+                    <td class="px-4 py-3">
+                        <span class="block">{{ $loan->borrower->name }}</span>
+                        <span class="text-xs text-gray-500">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d offer</span>
+                    </td>
                     <td class="px-4 py-3">{{ $loan->offer->lender->name }}</td>
                     <td class="px-4 py-3 min-w-[16rem]">
                         <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -57,7 +61,7 @@
             <tr>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Borrower</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Lender / Offer</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Principal → Total</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Principal → Total repay</th>
                 <th class="px-4 py-3"></th>
             </tr>
         </thead>
@@ -66,7 +70,10 @@
                 <tr>
                     <td class="px-4 py-3">{{ $loan->borrower->name }}</td>
                     <td class="px-4 py-3">{{ $loan->offer->lender->name }} <span class="text-gray-400">#{{ $loan->offer->id }}</span></td>
-                    <td class="px-4 py-3">₦{{ number_format($loan->principal, 2) }} → ₦{{ number_format($loan->total_repayment, 2) }}</td>
+                    <td class="px-4 py-3">
+                        <span class="block">₦{{ number_format($loan->principal, 2) }} → ₦{{ number_format($loan->total_repayment, 2) }}</span>
+                        <span class="text-xs text-gray-500">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d</span>
+                    </td>
                     <td class="px-4 py-3 text-right space-x-2">
                         <form action="{{ route('admin.peer-lending.loans.approve', $loan) }}" method="POST" class="inline">@csrf<button class="text-xs px-2 py-1 bg-green-600 text-white rounded">Disburse</button></form>
                         <form action="{{ route('admin.peer-lending.loans.reject', $loan) }}" method="POST" class="inline" onsubmit="return confirm('Reject?');">@csrf<button class="text-xs px-2 py-1 bg-red-100 text-red-800 rounded">Reject</button></form>

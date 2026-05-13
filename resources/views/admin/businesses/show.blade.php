@@ -164,7 +164,7 @@
             @if(auth('admin')->user()->isSuperAdmin())
             <div class="md:col-span-3 pt-4 border-t border-gray-100 mt-2">
                 <h4 class="text-sm font-semibold text-gray-800 mb-2">Credit &amp; loan programs</h4>
-                <p class="text-xs text-gray-500 mb-3">Opt businesses into overdraft, peer borrowing, or peer lending. For lenders, set caps and optional written conditions; the business sees these when creating offers.</p>
+                <p class="text-xs text-gray-500 mb-3">Opt businesses into overdraft, peer borrowing, or peer lending. For lenders, set caps and optional written conditions; the business sees these when creating offers. Peer loan interest is a percentage of principal for each offer’s term (not annualised); term limits only affect due dates and installments.</p>
                 <form action="{{ route('admin.businesses.credit-eligibility', $business) }}" method="POST" class="space-y-4">
                     @csrf
                     <div class="flex flex-wrap gap-4 items-center">
@@ -190,7 +190,7 @@
                                 <input type="number" name="peer_lending_lender_max_offer_amount" step="0.01" min="0" value="{{ old('peer_lending_lender_max_offer_amount', $business->peer_lending_lender_max_offer_amount) }}" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="No cap beyond balance">
                             </div>
                             <div>
-                                <label class="text-xs text-gray-600">Max interest (%)</label>
+                                <label class="text-xs text-gray-600">Max interest (% of principal per offer term)</label>
                                 <input type="number" name="peer_lending_lender_max_interest_percent" step="0.01" min="0" max="100" value="{{ old('peer_lending_lender_max_interest_percent', $business->peer_lending_lender_max_interest_percent) }}" class="mt-0.5 w-full text-sm border border-gray-300 rounded px-2 py-1.5" placeholder="Default 100%">
                             </div>
                             <div>

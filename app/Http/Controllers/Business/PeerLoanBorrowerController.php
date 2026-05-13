@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
-use App\Models\BusinessLoan;
 use App\Models\BusinessLendingOffer;
+use App\Models\BusinessLoan;
 use App\Services\Credit\BusinessPeerLoanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,7 +59,6 @@ class PeerLoanBorrowerController extends Controller
         $total = $loanService->computeTotalRepayment(
             $principal,
             (float) $offer->interest_rate_percent,
-            (int) $offer->term_days
         );
 
         BusinessLoan::create([

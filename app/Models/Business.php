@@ -831,6 +831,10 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
+     * Caps for the lender offer form (balance, term bounds, interest cap, reserve, conditions).
+     *
+     * The `max_interest` value is the largest allowed percentage of principal for one offer’s term (not annualised).
+     *
      * @return array{max_amount: float, min_term: int, max_term: int, max_interest: float, reserve: float, conditions: ?string}
      */
     public function peerLendingLenderRulesSummary(): array

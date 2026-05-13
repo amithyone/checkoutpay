@@ -6,6 +6,7 @@
 @section('content')
 <div class="max-w-4xl mx-auto space-y-4">
     @if(session('success'))<div class="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm">{{ session('success') }}</div>@endif
+    @include('partials.peer-lending-interest-explainer', ['variant' => 'panel'])
     <p class="text-sm text-gray-600"><a href="{{ route('peer-loans.index') }}" class="text-primary hover:underline" target="_blank">Browse marketplace</a></p>
     <div class="bg-white rounded-lg border border-gray-200 divide-y">
         @forelse($loans as $loan)
@@ -18,6 +19,7 @@
                     <div>
                         <p class="font-medium text-gray-900">Lender: {{ $loan->offer->lender->name }}</p>
                         <p class="text-sm text-gray-600">Principal ₦{{ number_format($loan->principal, 2) }} → repay ₦{{ number_format($loan->total_repayment, 2) }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Offer: {{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }} days (not annualised)</p>
                         <p class="text-xs text-amber-700 mt-1">Status: {{ $loan->status }}</p>
                         @if($loan->status === \App\Models\BusinessLoan::STATUS_ACTIVE || $loan->status === \App\Models\BusinessLoan::STATUS_REPAID)
                             <div class="w-full max-w-md bg-gray-200 rounded-full h-2.5 mt-2">

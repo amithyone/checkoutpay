@@ -16,7 +16,16 @@ class Kernel extends ConsoleKernel
         $schedule->command('whatsapp-wallet:expire-pending-p2p')->everyFiveMinutes();
         $schedule->command('overdraft:charge-interest')->weekly();
         $schedule->command('overdraft:process-installments')->daily();
-        $schedule->command('business-loans:collect-due')->daily();
+        // Peer loans: one scheduler pass per repayment rhythm (offer frequency). Lump-sum loans run with the daily pass.
+        $schedule->command('business-loans:collect-due --frequency=daily')
+            ->dailyAt('06:30')
+            ->withoutOverlapping(45);
+        $schedule->command('business-loans:collect-due --frequency=weekly')
+            ->weeklyOn(1, '07:00')
+            ->withoutOverlapping(120);
+        $schedule->command('business-loans:collect-due --frequency=monthly')
+            ->monthlyOn(1, '07:30')
+            ->withoutOverlapping(180);
     }
 
     /**

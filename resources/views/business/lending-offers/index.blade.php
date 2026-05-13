@@ -8,11 +8,13 @@
     @if(session('success'))<div class="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm">{{ session('success') }}</div>@endif
     @if(session('error'))<div class="p-3 bg-red-50 border border-red-200 text-red-800 rounded text-sm">{{ session('error') }}</div>@endif
 
+    @include('partials.peer-lending-interest-explainer', ['variant' => 'panel'])
+
     @if(auth('business')->user()->peer_lending_lend_eligible)
         @php $lenderRules = auth('business')->user()->peerLendingLenderRulesSummary(); @endphp
         <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
             <p class="font-semibold mb-1">Your lender limits (set by admin)</p>
-            <p class="text-xs">Max offer now: ₦{{ number_format($lenderRules['max_amount'], 2) }} · Interest cap {{ number_format($lenderRules['max_interest'], 2) }}% · Terms {{ $lenderRules['min_term'] }}–{{ $lenderRules['max_term'] }} days @if($lenderRules['reserve'] > 0) · Reserve ₦{{ number_format($lenderRules['reserve'], 2) }} @endif</p>
+            <p class="text-xs">Max offer now: ₦{{ number_format($lenderRules['max_amount'], 2) }} · Interest cap (of principal per term): {{ number_format($lenderRules['max_interest'], 2) }}% · Terms {{ $lenderRules['min_term'] }}–{{ $lenderRules['max_term'] }} days @if($lenderRules['reserve'] > 0) · Reserve ₦{{ number_format($lenderRules['reserve'], 2) }} @endif</p>
             @if(!empty($lenderRules['conditions']))
                 <p class="text-xs mt-2 whitespace-pre-wrap border-t border-blue-200 pt-2">{{ $lenderRules['conditions'] }}</p>
             @endif
@@ -43,6 +45,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-sm font-medium text-gray-900">{{ $loan->borrower->name }}</p>
                     <p class="text-xs text-gray-500">Principal ₦{{ number_format($loan->principal, 2) }} · Repay ₦{{ number_format($loan->total_repayment, 2) }}</p>
+                    <p class="text-xs text-gray-400">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d offer</p>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
                     <div class="bg-green-600 h-2.5 rounded-full" style="width: {{ $p }}%"></div>
@@ -68,8 +71,8 @@
             @endphp
             <div class="p-4 flex flex-wrap justify-between gap-2 items-center">
                 <div>
-                    <p class="font-semibold text-gray-900">₦{{ number_format($o->amount, 2) }} · {{ number_format($o->interest_rate_percent, 2) }}%</p>
-                    <p class="text-xs text-gray-500 mt-1">{{ $o->term_days }} days · {{ $o->repayment_type === 'lump' ? 'One-time' : 'Split ('.$o->repayment_frequency.')' }} · {{ $o->status }}</p>
+                    <p class="font-semibold text-gray-900">₦{{ number_format($o->amount, 2) }} · {{ number_format($o->interest_rate_percent, 2) }}% of principal</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ $o->term_days }} days (due dates only) · {{ $o->repayment_type === 'lump' ? 'One-time' : 'Split ('.$o->repayment_frequency.')' }} · {{ $o->status }}</p>
                     <p class="text-xs text-gray-400 mt-1">Public: /business-loans/{{ $o->public_slug }}</p>
                 </div>
                 <div class="flex gap-2 flex-wrap">

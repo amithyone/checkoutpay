@@ -3,20 +3,25 @@
 namespace App\Services\Credit;
 
 use App\Models\Business;
+use App\Models\BusinessLendingOffer;
 use App\Models\BusinessLoan;
 use App\Models\BusinessLoanLedgerEntry;
 use App\Models\BusinessLoanSchedule;
-use App\Models\BusinessLendingOffer;
 use App\Notifications\PeerLoanRepaymentCollectedNotification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class BusinessPeerLoanService
 {
-    public function computeTotalRepayment(float $principal, float $ratePercent, int $termDays): float
+    /**
+     * Total to repay = principal + interest where interest is {@see $ratePercent}% of principal (flat for the offer; not annualised).
+     * Offer {@see BusinessLendingOffer::term_days} is used only for due dates / installment layout, not to scale this amount.
+     */
+    public function computeTotalRepayment(float $principal, float $ratePercent): float
     {
-        $interest = round($principal * ($ratePercent / 100) * ($termDays / 365), 2);
+        $interest = round($principal * ($ratePercent / 100), 2);
 
         return round($principal + $interest, 2);
     }
@@ -131,29 +136,31 @@ class BusinessPeerLoanService
 
     /**
      * Collect due installments from borrower positive balance; credit lender.
+     *
+     * @param  'daily'|'weekly'|'monthly'|null  $cadence  When set (scheduler), only loans whose offer matches that repayment rhythm are processed. Null = all offers (manual runs).
      */
-    public function collectDue(): int
+    public function collectDue(?string $cadence = null): int
     {
+        if ($cadence !== null && ! in_array($cadence, ['daily', 'weekly', 'monthly'], true)) {
+            throw new \InvalidArgumentException('cadence must be daily, weekly, monthly, or null.');
+        }
+
         $count = 0;
 
-        BusinessLoanSchedule::query()
+        $overdueBase = BusinessLoanSchedule::query()
             ->where('status', 'pending')
             ->where('due_at', '<', now())
-            ->whereHas('loan', function ($q) {
-                $q->where('status', BusinessLoan::STATUS_ACTIVE);
-            })
-            ->whereRaw('amount_paid < amount_due')
-            ->update(['status' => 'overdue']);
+            ->whereRaw('amount_paid < amount_due');
+        $this->filterSchedulesByOfferCadence($overdueBase, $cadence);
+        $overdueBase->update(['status' => 'overdue']);
 
-        $schedules = BusinessLoanSchedule::query()
+        $schedulesQuery = BusinessLoanSchedule::query()
             ->whereIn('status', ['pending', 'overdue'])
-            ->whereHas('loan', function ($q) {
-                $q->where('status', BusinessLoan::STATUS_ACTIVE);
-            })
             ->orderBy('due_at')
             ->orderBy('id')
-            ->with(['loan.borrower', 'loan.offer.lender'])
-            ->get();
+            ->with(['loan.borrower', 'loan.offer.lender']);
+        $this->filterSchedulesByOfferCadence($schedulesQuery, $cadence);
+        $schedules = $schedulesQuery->get();
 
         foreach ($schedules as $schedule) {
             $loan = $schedule->loan;
@@ -162,6 +169,7 @@ class BusinessPeerLoanService
             $remaining = $schedule->remaining();
             if ($remaining < 0.01) {
                 $schedule->update(['status' => 'paid']);
+
                 continue;
             }
 
@@ -218,6 +226,46 @@ class BusinessPeerLoanService
         }
 
         return $count;
+    }
+
+    /**
+     * @param  Builder<\App\Models\BusinessLoanSchedule>  $query
+     */
+    private function filterSchedulesByOfferCadence(Builder $query, ?string $cadence): void
+    {
+        $query->whereHas('loan', function ($loanQ) use ($cadence) {
+            $loanQ->where('status', BusinessLoan::STATUS_ACTIVE);
+            if ($cadence === null) {
+                return;
+            }
+            $loanQ->whereHas('offer', function ($offerQ) use ($cadence) {
+                $this->applyOfferCollectCadenceFilter($offerQ, $cadence);
+            });
+        });
+    }
+
+    /**
+     * @param  Builder<\App\Models\BusinessLendingOffer>  $query
+     */
+    private function applyOfferCollectCadenceFilter(Builder $query, string $cadence): void
+    {
+        match ($cadence) {
+            'daily' => $query->where(function (Builder $w) {
+                $w->where('repayment_type', BusinessLendingOffer::REPAYMENT_LUMP)
+                    ->orWhere(function (Builder $w2) {
+                        $w2->where('repayment_type', BusinessLendingOffer::REPAYMENT_SPLIT)
+                            ->where('repayment_frequency', BusinessLendingOffer::FREQUENCY_DAILY);
+                    });
+            }),
+            'weekly' => $query->where('repayment_type', BusinessLendingOffer::REPAYMENT_SPLIT)
+                ->where(function (Builder $w) {
+                    $w->whereNull('repayment_frequency')
+                        ->orWhere('repayment_frequency', BusinessLendingOffer::FREQUENCY_WEEKLY);
+                }),
+            'monthly' => $query->where('repayment_type', BusinessLendingOffer::REPAYMENT_SPLIT)
+                ->where('repayment_frequency', BusinessLendingOffer::FREQUENCY_MONTHLY),
+            default => throw new \InvalidArgumentException("Unknown cadence: {$cadence}"),
+        };
     }
 
     private function notifyRepaymentCollected(BusinessLoan $loan, BusinessLoanSchedule $schedule, float $amountCollected): void

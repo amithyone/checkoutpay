@@ -15,7 +15,7 @@
                 @if(($lenderCaps['reserve'] ?? 0) > 0)
                     <li>Minimum balance to keep: <strong>₦{{ number_format($lenderCaps['reserve'], 2) }}</strong></li>
                 @endif
-                <li>Interest cap: <strong>{{ number_format($lenderCaps['max_interest'], 2) }}%</strong></li>
+                <li>Interest cap (of principal per term): <strong>{{ number_format($lenderCaps['max_interest'], 2) }}%</strong></li>
                 <li>Term must be between <strong>{{ $lenderCaps['min_term'] }}</strong> and <strong>{{ $lenderCaps['max_term'] }}</strong> days</li>
             </ul>
             @if(!empty($lenderCaps['conditions']))
@@ -40,7 +40,8 @@
             @error('amount')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Interest rate (% flat over term)</label>
+            <label class="block text-sm font-medium text-gray-700">Interest (% of principal for this term)</label>
+            @include('partials.peer-lending-interest-explainer', ['variant' => 'field-help'])
             <input type="number" name="interest_rate_percent" step="0.01" min="0" max="{{ number_format($lenderCaps['max_interest'], 4, '.', '') }}" value="{{ old('interest_rate_percent', $offer->interest_rate_percent) }}" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required>
             @error('interest_rate_percent')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
         </div>
@@ -48,6 +49,7 @@
             <label class="block text-sm font-medium text-gray-700">Term (days)</label>
             <input type="number" name="term_days" min="1" max="{{ $lenderCaps['max_term'] }}" value="{{ old('term_days', $offer->term_days) }}" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required>
             <p class="text-xs text-gray-500 mt-1">Term must be between {{ $lenderCaps['min_term'] }} and {{ $lenderCaps['max_term'] }} days (checked when you submit).</p>
+            @include('partials.peer-lending-interest-explainer', ['variant' => 'term-field-help'])
             @error('term_days')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
         </div>
         <div>

@@ -21,12 +21,12 @@
 <div class="wrap">
     <div class="card">
         <h1>Hello {{ $business->name }},</h1>
-        <p class="muted">Your administrator has configured your business for the <strong>peer lending (lender)</strong> program. You can publish loan offers from your dashboard when you are opted in.</p>
+        <p class="muted">Your administrator has configured your business for the <strong>peer lending (lender)</strong> program. You can publish loan offers from your dashboard when you are opted in. Interest on offers is a percentage of the loan principal for that offer’s term; it is not annualised.</p>
 
         <table>
             <tr><th>Max offer amount (effective now)</th><td>₦{{ number_format($rules['max_amount'], 2) }}</td></tr>
             <tr><th>Min balance to keep in account</th><td>₦{{ number_format($rules['reserve'], 2) }}</td></tr>
-            <tr><th>Interest rate cap</th><td>{{ number_format($rules['max_interest'], 2) }}%</td></tr>
+            <tr><th>Interest rate cap</th><td>{{ number_format($rules['max_interest'], 2) }}% of principal per offer term (not annualised)</td></tr>
             <tr><th>Term allowed</th><td>{{ $rules['min_term'] }}–{{ $rules['max_term'] }} days</td></tr>
         </table>
 

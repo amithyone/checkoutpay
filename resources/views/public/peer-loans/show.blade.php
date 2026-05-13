@@ -19,7 +19,7 @@
     <div class="mt-4 bg-white rounded-lg border border-gray-200 p-6 space-y-3">
         <h1 class="text-xl font-bold text-gray-900">₦{{ number_format($offer->amount, 2) }}</h1>
         <p class="text-sm text-gray-600">Lender: <span class="font-medium text-gray-900">{{ $offer->lender->name }}</span></p>
-        <p class="text-sm text-gray-600">Interest rate: <span class="font-medium">{{ number_format($offer->interest_rate_percent, 2) }}%</span> (flat over term)</p>
+        @include('partials.peer-lending-interest-explainer', ['variant' => 'offer-detail', 'offer' => $offer])
         <p class="text-sm text-gray-600">Term: <span class="font-medium">{{ $offer->term_days }} days</span></p>
         <p class="text-sm text-gray-600">Repayment: <span class="font-medium">{{ $offer->repayment_type === 'lump' ? 'One-time at end' : 'Split installments ('.ucfirst($offer->repayment_frequency ?? 'weekly').')' }}</span></p>
     </div>
