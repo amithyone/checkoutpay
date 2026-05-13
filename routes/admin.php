@@ -126,6 +126,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('loans', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'loansIndex'])->name('loans.index');
             Route::post('loans/{loan}/approve', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'approveLoan'])->name('loans.approve');
             Route::post('loans/{loan}/reject', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'rejectLoan'])->name('loans.reject');
+            Route::post('collect-installments', [DashboardController::class, 'collectPeerLoanInstallments'])->name('collect-installments');
         });
 
         Route::middleware('super_admin')->prefix('desktop-telemetry')->name('desktop-telemetry.')->group(function () {

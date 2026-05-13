@@ -544,13 +544,30 @@
         <div id="monitoring-result" class="mt-4 hidden"></div>
     </div>
 
+    @if(auth('admin')->user()->isSuperAdmin())
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">Peer lending repayments</h3>
+                <p class="text-sm text-gray-600 mt-1">Collect installments from borrower balances (same logic as the peer-loan cron URLs below).</p>
+            </div>
+            <button type="button" onclick="collectPeerLoanInstallments()" id="peer-loan-collect-btn"
+                class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 flex items-center">
+                <i class="fas fa-hand-holding-usd mr-2"></i> Run collection now
+            </button>
+        </div>
+        <p class="text-xs text-gray-500">Runs all three cadence passes once (daily split + lump, weekly split, monthly split). For production, prefer scheduling the three URLs or server <code class="bg-gray-100 px-1 rounded">php artisan schedule:run</code>.</p>
+        <div id="peer-loan-collect-result" class="mt-3 hidden"></div>
+    </div>
+    @endif
+
     <!-- Cron Job Info -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 class="text-lg font-semibold text-blue-900 mb-2">
             <i class="fas fa-clock mr-2"></i> Cron Job URLs
         </h3>
         <p class="text-sm text-blue-800 mb-4">
-            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically process emails and match payments:
+            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically process emails, match payments, and (super admin) peer loan repayments:
         </p>
         
         <div class="space-y-4">
@@ -652,6 +669,60 @@
                     <strong>Frequency:</strong> Every 1-5 minutes
                 </p>
             </div>
+
+            @if(auth('admin')->user()->isSuperAdmin())
+            <!-- Peer loan repayments (daily cadence: split daily + lump offers) -->
+            <div class="bg-white rounded-lg p-4 border border-emerald-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded">PEER LOANS</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Collect installments (daily cadence)</span>
+                    </div>
+                    <button type="button" onclick="copyCronUrl('peer-loan-daily')" class="text-emerald-600 hover:text-emerald-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/peer-loans/collect-daily') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Daily split</strong> offers and <strong>lump-sum</strong> loans. Schedule once per day (e.g. cron-job.org daily).
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Token:</strong> If <code class="bg-gray-100 px-1 rounded">CRON_EMAIL_FETCH_TOKEN</code> is set in <code class="bg-gray-100 px-1 rounded">.env</code>, append <code class="bg-gray-100 px-1 rounded">?token=YOUR_TOKEN</code> (same as other cron URLs).
+                </p>
+            </div>
+
+            <div class="bg-white rounded-lg p-4 border border-teal-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-teal-700 bg-teal-100 px-2 py-1 rounded">PEER LOANS</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Collect installments (weekly cadence)</span>
+                    </div>
+                    <button type="button" onclick="copyCronUrl('peer-loan-weekly')" class="text-teal-600 hover:text-teal-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/peer-loans/collect-weekly') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Weekly split</strong> offers (including when frequency is left blank). Schedule once per week.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-lg p-4 border border-cyan-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-cyan-700 bg-cyan-100 px-2 py-1 rounded">PEER LOANS</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Collect installments (monthly cadence)</span>
+                    </div>
+                    <button type="button" onclick="copyCronUrl('peer-loan-monthly')" class="text-cyan-600 hover:text-cyan-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/peer-loans/collect-monthly') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Monthly split</strong> offers (30-day step schedules). Schedule once per month.
+                </p>
+            </div>
+            @endif
         </div>
 
         <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
@@ -662,6 +733,9 @@
                 <li><strong>Email Reading:</strong> Every 5-15 minutes (Direct Filesystem or IMAP)</li>
                 <li><strong>Extract Missing Names:</strong> Every 5-10 minutes (extracts sender names from emails)</li>
                 <li><strong>Global Matching:</strong> Every 10-30 minutes (matches unmatched items)</li>
+                @if(auth('admin')->user()->isSuperAdmin())
+                <li><strong>Peer loan repayments:</strong> Three URLs above — schedule <strong>daily</strong>, <strong>weekly</strong>, and <strong>monthly</strong> cadences separately (or use server cron <code class="bg-yellow-100 px-1 rounded text-yellow-900">php artisan schedule:run</code> every minute instead).</li>
+                @endif
             </ul>
             <p class="text-xs text-yellow-700 mt-2">
                 <strong>Note:</strong> If IMAP is disabled, only use the "Direct Filesystem Reading" URL above.
@@ -1080,6 +1154,59 @@ function checkTransactionUpdates() {
     });
 }
 
+function collectPeerLoanInstallments() {
+    const btn = document.getElementById('peer-loan-collect-btn');
+    const resultDiv = document.getElementById('peer-loan-collect-result');
+    if (!btn || !resultDiv) {
+        return;
+    }
+    if (!confirm('Run peer loan collection for daily, weekly, and monthly offer cadences? This moves wallet balances when installments are due.')) {
+        return;
+    }
+    const originalHTML = btn.innerHTML;
+    const csrfToken = getCsrfToken();
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Running...';
+    resultDiv.classList.add('hidden');
+
+    fetch("{{ route('admin.peer-lending.collect-installments') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const by = data.by_cadence || {};
+            resultDiv.className = 'mt-3 bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-lg text-sm';
+            resultDiv.innerHTML = '<strong>Done.</strong> ' + (data.message || '') +
+                '<br><span class="text-xs">Daily: ' + (by.daily ?? 0) + ' · Weekly: ' + (by.weekly ?? 0) + ' · Monthly: ' + (by.monthly ?? 0) + ' collection(s)</span>';
+        } else {
+            resultDiv.className = 'mt-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm';
+            resultDiv.innerHTML = '<strong>Error.</strong> ' + (data.message || 'Unknown error');
+        }
+        resultDiv.classList.remove('hidden');
+    })
+    .catch(err => {
+        console.error(err);
+        resultDiv.className = 'mt-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm';
+        resultDiv.innerHTML = '<strong>Error.</strong> ' + err.message;
+        resultDiv.classList.remove('hidden');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    });
+}
+
 function copyCronUrl(type = 'direct') {
     let url;
     
@@ -1093,6 +1220,12 @@ function copyCronUrl(type = 'direct') {
         url = '{{ url('/cron/extract-missing-names') }}';
     } else if (type === 'webhooks') {
         url = '{{ url('/api/v1/cron/process-webhooks') }}';
+    } else if (type === 'peer-loan-daily') {
+        url = '{{ url('/cron/peer-loans/collect-daily') }}';
+    } else if (type === 'peer-loan-weekly') {
+        url = '{{ url('/cron/peer-loans/collect-weekly') }}';
+    } else if (type === 'peer-loan-monthly') {
+        url = '{{ url('/cron/peer-loans/collect-monthly') }}';
     } else {
         url = '{{ url('/cron/read-emails-direct') }}';
     }

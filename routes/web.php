@@ -708,6 +708,11 @@ Route::get('/cron/extract-missing-names', function (\Illuminate\Http\Request $re
     }
 })->name('cron.extract-missing-names');
 
+// Peer lending repayment (HTTP cron for EasyCron / cron-job.org — matches Artisan business-loans:collect-due --frequency=*)
+Route::get('/cron/peer-loans/collect-daily', [\App\Http\Controllers\Cron\PeerLoanCronController::class, 'collectDaily'])->name('cron.peer-loans.collect-daily');
+Route::get('/cron/peer-loans/collect-weekly', [\App\Http\Controllers\Cron\PeerLoanCronController::class, 'collectWeekly'])->name('cron.peer-loans.collect-weekly');
+Route::get('/cron/peer-loans/collect-monthly', [\App\Http\Controllers\Cron\PeerLoanCronController::class, 'collectMonthly'])->name('cron.peer-loans.collect-monthly');
+
 // Master Email Processing Cron (All 3 Steps Sequentially)
 Route::get('/cron/process-emails', function () {
     try {

@@ -11,6 +11,7 @@ use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
 use App\Models\WithdrawalRequest;
+use App\Services\Credit\BusinessPeerLoanService;
 use App\Services\NigtaxRevenueStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,12 +39,12 @@ class DashboardController extends Controller
                 ->whereDate('created_at', $today)
                 ->count(),
         ];
-        
+
         // Calculate percentage change
         $dailyStats['amount_change_percent'] = $dailyStats['amount_received_yesterday'] > 0
             ? round((($dailyStats['amount_received'] - $dailyStats['amount_received_yesterday']) / $dailyStats['amount_received_yesterday']) * 100, 2)
             : 0;
-        
+
         // Statistics
         $stats = [
             'daily' => $dailyStats,
@@ -210,15 +211,15 @@ class DashboardController extends Controller
     {
         try {
             $limit = (int) $request->input('limit', 50);
-            
+
             // TODO: Command 'payment:extract-missing-names' does not exist
             // Using alternative: ReExtractFromTextBody command which extracts missing sender names
             \Illuminate\Support\Facades\Artisan::call('payment:re-extract-text-body', [
                 '--limit' => $limit,
             ]);
-            
+
             $output = \Illuminate\Support\Facades\Artisan::output();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Name extraction completed successfully',
@@ -228,10 +229,10 @@ class DashboardController extends Controller
             \Illuminate\Support\Facades\Log::error('Error running extract missing names', [
                 'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -242,21 +243,21 @@ class DashboardController extends Controller
     public function testSenderExtraction(Request $request)
     {
         try {
-            $matchingService = new \App\Services\PaymentMatchingService();
-            
+            $matchingService = new \App\Services\PaymentMatchingService;
+
             // Get initial stats
             $totalEmails = ProcessedEmail::count();
             $emailsWithSenderName = ProcessedEmail::whereNotNull('sender_name')->count();
-            
+
             // Clear all sender names
             $cleared = ProcessedEmail::query()->update(['sender_name' => null]);
-            
+
             // Re-extract sender names
             $emails = ProcessedEmail::all();
             $successCount = 0;
             $failedCount = 0;
             $skippedCount = 0;
-            
+
             foreach ($emails as $email) {
                 try {
                     $extracted = $matchingService->extractMissingFromTextBody($email);
@@ -273,17 +274,17 @@ class DashboardController extends Controller
                     ]);
                 }
             }
-            
+
             // Get final stats
             $newCount = ProcessedEmail::whereNotNull('sender_name')->count();
             $accuracy = $totalEmails > 0 ? round(($newCount / $totalEmails) * 100, 2) : 0;
-            
+
             // Get sample extracted names
             $samples = ProcessedEmail::whereNotNull('sender_name')
                 ->orderBy('id', 'desc')
                 ->limit(10)
                 ->get(['id', 'sender_name', 'subject']);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Sender name extraction test completed',
@@ -310,10 +311,41 @@ class DashboardController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Run peer loan installment collection for all cadences (same logic as HTTP cron URLs).
+     */
+    public function collectPeerLoanInstallments(BusinessPeerLoanService $loanService)
+    {
+        try {
+            $results = [];
+            $total = 0;
+            foreach (['daily', 'weekly', 'monthly'] as $cadence) {
+                $n = $loanService->collectDue($cadence);
+                $results[$cadence] = $n;
+                $total += $n;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Peer loan collection finished ({$total} installment payment(s) across daily, weekly, and monthly offer cadences).",
+                'by_cadence' => $results,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Admin peer loan collect failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: '.$e->getMessage(),
             ], 500);
         }
     }
