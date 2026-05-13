@@ -380,8 +380,20 @@ class WhatsappWalletSecureTransferAuthService
     }
 
     /**
+     * Same as {@see confirmViaWebPin} but requires the authenticated consumer wallet to own the pending token.
+     *
      * @return array{ok: bool, error?: string}
      */
+    public function confirmViaWebPinForConsumerApp(WhatsappWallet $wallet, string $token, string $pinDigits): array
+    {
+        $payload = Cache::get($this->cacheKey($token));
+        if (! is_array($payload) || (int) ($payload['wallet_id'] ?? 0) !== (int) $wallet->id) {
+            return ['ok' => false, 'error' => 'Invalid or expired confirmation for this wallet.'];
+        }
+
+        return $this->confirmViaWebPin($token, $pinDigits);
+    }
+
     public function confirmViaWebPin(string $token, string $pinDigits): array
     {
         $payload = Cache::get($this->cacheKey($token));

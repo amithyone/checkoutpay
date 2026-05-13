@@ -43,6 +43,8 @@
                     <li><a href="{{ route('support.index') }}" class="hover:text-white transition-colors">Support</a></li>
                     <li><a href="{{ route('blog.index') }}" class="hover:text-white transition-colors">Blog</a></li>
                     <li><a href="{{ route('developers.index') }}" class="hover:text-white transition-colors">Developers</a></li>
+                    <li><a href="{{ route('developers.program') }}" class="hover:text-white transition-colors">Developer Program</a></li>
+                    <li><a href="{{ url('/developers/program/apply') }}" class="hover:text-white transition-colors">Apply to Developer Program</a></li>
                     <li><a href="{{ route('status.index') }}" class="hover:text-white transition-colors">Status</a></li>
                     <li><a href="{{ route('faqs.index') }}" class="hover:text-white transition-colors">FAQs</a></li>
                 </ul>

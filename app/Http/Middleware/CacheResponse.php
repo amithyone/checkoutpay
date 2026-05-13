@@ -41,20 +41,29 @@ class CacheResponse
             return $response;
         }
 
-        // Cache homepage and public pages for 1 hour (3600 seconds)
-        // Browser will cache, reducing server load
-        if ($request->is('/') || $request->is('page/*')) {
+        // Homepage: avoid long-lived public HTML cache so shared nav/footer (e.g. mobile menu) stay current.
+        if ($request->is('/')) {
+            $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate, max-age=0');
+            $response->headers->set('Pragma', 'no-cache');
+
+            return $response;
+        }
+
+        // Cache CMS-backed static pages for 1 hour (3600 seconds)
+        if ($request->is('page/*')) {
             $response->headers->set('Cache-Control', 'public, max-age=3600, s-maxage=3600');
-            $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 3600) . ' GMT');
+            $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 3600).' GMT');
             $response->headers->set('Vary', 'Accept-Encoding');
+
             return $response;
         }
 
         // Cache static content pages for 30 minutes
         if ($request->is('about') || $request->is('contact') || $request->is('privacy') || $request->is('terms')) {
             $response->headers->set('Cache-Control', 'public, max-age=1800, s-maxage=1800');
-            $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 1800) . ' GMT');
+            $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 1800).' GMT');
             $response->headers->set('Vary', 'Accept-Encoding');
+
             return $response;
         }
 

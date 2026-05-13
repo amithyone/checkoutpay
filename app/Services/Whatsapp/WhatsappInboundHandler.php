@@ -40,6 +40,33 @@ class WhatsappInboundHandler
     }
 
     /**
+     * Consumer mobile app: one wallet-instance turn using the same routing as WhatsApp inbound (wallet_default).
+     * Caller is responsible for {@see WalletConversationCapture} when Evolution must not be called.
+     *
+     * @internal
+     */
+    public function handleConsumerAppTurn(string $phoneE164, string $text): void
+    {
+        $instance = WhatsappEvolutionConfigResolver::walletInstance();
+        if ($instance === '') {
+            $instance = (string) config('whatsapp.evolution.instance', '');
+        }
+        if ($instance === '') {
+            Log::warning('whatsapp.consumer_app: missing evolution instance');
+
+            return;
+        }
+        $phone = trim($phoneE164);
+        $remoteJid = str_contains($phone, '@') ? $phone : $phone.'@s.whatsapp.net';
+        $this->handleOne([
+            'instance' => $instance,
+            'remote_jid' => $remoteJid,
+            'phone_e164' => $phone,
+            'text' => $text,
+        ]);
+    }
+
+    /**
      * @param  array{instance: string, remote_jid: string, phone_e164: string, text: string}  $msg
      */
     private function handleOne(array $msg): void

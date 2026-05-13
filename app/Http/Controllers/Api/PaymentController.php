@@ -53,6 +53,7 @@ class PaymentController extends Controller
                 'transaction_id' => $request->transaction_id,
                 'business_website_id' => $request->business_website_id,
                 'website_url' => $request->website_url,
+                'developer_program_partner_business_id' => $request->developer_program_partner_business_id,
             ];
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);

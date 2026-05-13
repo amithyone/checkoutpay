@@ -15,9 +15,11 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('events', function (Blueprint $table) {
-            $table->unsignedBigInteger('view_count')->default(0)->after('status');
-        });
+        if (! Schema::hasColumn('events', 'view_count')) {
+            Schema::table('events', function (Blueprint $table) {
+                $table->unsignedBigInteger('view_count')->default(0)->after('status');
+            });
+        }
     }
 
     /**
@@ -29,8 +31,10 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('events', function (Blueprint $table) {
-            $table->dropColumn('view_count');
-        });
+        if (Schema::hasColumn('events', 'view_count')) {
+            Schema::table('events', function (Blueprint $table) {
+                $table->dropColumn('view_count');
+            });
+        }
     }
 };

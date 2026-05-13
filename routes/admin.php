@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BankEmailTemplateController;
 use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\BusinessKycController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DeveloperProgramController;
 use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\ExternalApiController;
 use App\Http\Controllers\Admin\GmailAuthController;
@@ -118,6 +119,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         Route::get('overdraft-applications', [\App\Http\Controllers\Admin\OverdraftApplicationsController::class, 'index'])
             ->name('overdraft-applications.index');
+
+        Route::get('developer-program', [DeveloperProgramController::class, 'index'])->name('developer-program.index');
+        Route::put('developer-program/settings', [DeveloperProgramController::class, 'updateSettings'])
+            ->middleware('admin_or_super')
+            ->name('developer-program.settings.update');
+        Route::patch('developer-program/applications/{application}', [DeveloperProgramController::class, 'updateApplication'])->name('developer-program.applications.update');
 
         Route::middleware('super_admin')->prefix('peer-lending')->name('peer-lending.')->group(function () {
             Route::get('offers', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'offersIndex'])->name('offers.index');

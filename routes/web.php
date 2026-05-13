@@ -1,8 +1,8 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\TestEmailController;
+use Illuminate\Support\Facades\Route;
 
 // Rental storefront hostnames: same app, no redirect — browser stays on the host the user typed
 foreach (
@@ -76,27 +76,36 @@ Route::get('/faqs', [\App\Http\Controllers\FaqsController::class, 'index'])->nam
 Route::get('/status', [\App\Http\Controllers\StatusController::class, 'index'])->name('status.index');
 Route::get('/security', function () {
     $page = \App\Models\Page::getBySlug('security');
-    if (!$page) {
+    if (! $page) {
         abort(404);
     }
+
     return view('page', compact('page'));
 })->name('security');
 Route::get('/esg-policy', function () {
     $page = \App\Models\Page::getBySlug('esg-policy');
-    if (!$page) {
+    if (! $page) {
         abort(404);
     }
+
     return view('page', compact('page'));
 })->name('esg-policy');
 Route::get('/fraud-awareness', function () {
     $page = \App\Models\Page::getBySlug('fraud-awareness');
-    if (!$page) {
+    if (! $page) {
         abort(404);
     }
+
     return view('page', compact('page'));
 })->name('fraud-awareness');
 Route::get('/resources', [\App\Http\Controllers\ResourcesController::class, 'index'])->name('resources.index');
 Route::get('/developers', [\App\Http\Controllers\DevelopersController::class, 'index'])->name('developers.index');
+Route::get('/developers/program/apply/thanks', [\App\Http\Controllers\DevelopersController::class, 'applyThanks'])->name('developers.program.apply.thanks');
+Route::get('/developers/program/apply', [\App\Http\Controllers\DevelopersController::class, 'apply'])->name('developers.program.apply');
+Route::post('/developers/program/apply', [\App\Http\Controllers\DevelopersController::class, 'applyStore'])
+    ->middleware('throttle:10,1')
+    ->name('developers.program.apply.store');
+Route::get('/developers/program', [\App\Http\Controllers\DevelopersController::class, 'program'])->name('developers.program');
 Route::get('/support', [\App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
 Route::get('/pricing', [\App\Http\Controllers\PricingController::class, 'index'])->name('pricing');
 Route::get('/api-docs', [\App\Http\Controllers\ApiDocsController::class, 'index'])->name('api-docs');
@@ -107,17 +116,19 @@ Route::get('/page/{slug}', [\App\Http\Controllers\PageController::class, 'show']
 // Static page routes for common pages
 Route::get('/privacy-policy', function () {
     $page = \App\Models\Page::getBySlug('privacy-policy');
-    if (!$page) {
+    if (! $page) {
         abort(404);
     }
+
     return view('page', compact('page'));
 })->name('privacy-policy');
 
 Route::get('/terms-and-conditions', function () {
     $page = \App\Models\Page::getBySlug('terms-and-conditions');
-    if (!$page) {
+    if (! $page) {
         abort(404);
     }
+
     return view('page', compact('page'));
 })->name('terms');
 
@@ -170,17 +181,17 @@ Route::prefix('invoices')->name('invoices.')->group(function () {
 Route::prefix('memberships')->name('memberships.')->group(function () {
     Route::get('/', [\App\Http\Controllers\Public\MembershipController::class, 'index'])->name('index');
     Route::get('{slug}', [\App\Http\Controllers\Public\MembershipController::class, 'show'])->name('show');
-    
+
     // Payment flow
     Route::get('{slug}/payment', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'show'])->name('payment.show');
     Route::post('{slug}/payment', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'process'])->name('payment.process');
     Route::post('{slug}/payment/webhook', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'webhook'])->name('payment.webhook');
     Route::get('success/{subscriptionNumber}', [\App\Http\Controllers\Public\MembershipPaymentController::class, 'success'])->name('payment.success');
-    
+
     // Card download
     Route::get('card/{subscriptionNumber}/download', [\App\Http\Controllers\Public\MembershipCardController::class, 'download'])->name('card.download');
     Route::get('card/{subscriptionNumber}/view', [\App\Http\Controllers\Public\MembershipCardController::class, 'view'])->name('card.view');
-    
+
     // Find membership
     Route::post('find', [\App\Http\Controllers\Public\MembershipController::class, 'findMembership'])->name('find');
 });
@@ -203,35 +214,35 @@ Route::prefix('rentals')->name('rentals.')->group(function () {
     // Public browsing (no auth required)
     Route::get('/', [\App\Http\Controllers\Public\RentalController::class, 'index'])->name('index');
     Route::get('item/{slug}', [\App\Http\Controllers\Public\RentalController::class, 'show'])->name('show');
-    
+
     // Cart operations (no auth required)
     Route::post('cart/add', [\App\Http\Controllers\Public\RentalRequestController::class, 'addToCart'])->name('cart.add');
     Route::post('cart/dates', [\App\Http\Controllers\Public\RentalRequestController::class, 'updateCartDates'])->name('cart.dates');
     Route::delete('cart/{itemId}', [\App\Http\Controllers\Public\RentalRequestController::class, 'removeFromCart'])->name('cart.remove');
-    
+
     // Checkout flow
     Route::get('checkout', [\App\Http\Controllers\Public\RentalRequestController::class, 'checkout'])->name('checkout');
     Route::get('checkout/unavailable-dates', [\App\Http\Controllers\Public\RentalRequestController::class, 'unavailableDates'])->name('checkout.unavailable-dates');
     Route::post('account/create', [\App\Http\Controllers\Public\RentalRequestController::class, 'createAccount'])->name('account.create');
     Route::post('checkout/continue', [\App\Http\Controllers\Public\RentalRequestController::class, 'checkoutContinue'])->name('checkout.continue')->middleware('auth:renter,web');
-    
+
     // Email verification
     Route::get('verify-email', [\App\Http\Controllers\Public\RentalRequestController::class, 'verifyEmail'])->name('verify-email')->middleware('auth:renter');
     Route::get('verification/verify/{id}/{hash}', [\App\Http\Controllers\Public\RentalRequestController::class, 'verify'])->name('verification.verify');
     Route::post('verification/resend', [\App\Http\Controllers\Public\RentalRequestController::class, 'resendVerification'])->name('verification.resend');
     Route::post('verification/verify-pin', [\App\Http\Controllers\Public\RentalRequestController::class, 'verifyPin'])->name('verification.verify-pin');
-    
+
     // KYC verification (public AJAX endpoint for checkout form)
     Route::post('kyc/verify', [\App\Http\Controllers\Public\RentalRequestController::class, 'verifyKycAjax'])->name('kyc.verify');
-    
+
     // KYC verification (authenticated)
     Route::get('kyc', [\App\Http\Controllers\Public\RentalRequestController::class, 'kyc'])->name('kyc')->middleware('auth:renter');
     Route::post('kyc', [\App\Http\Controllers\Public\RentalRequestController::class, 'kyc'])->middleware('auth:renter');
-    
+
     // Review and submit
     Route::get('review', [\App\Http\Controllers\Public\RentalRequestController::class, 'review'])->name('review')->middleware('auth:renter');
     Route::post('review', [\App\Http\Controllers\Public\RentalRequestController::class, 'review'])->middleware('auth:renter');
-    
+
     // Success page
     Route::get('success', [\App\Http\Controllers\Public\RentalRequestController::class, 'success'])->name('success')->middleware('auth:renter');
 
@@ -253,13 +264,14 @@ Route::post('/logout', function () {
     auth()->logout();
     request()->session()->invalidate();
     request()->session()->regenerateToken();
+
     return redirect('/');
 })->name('logout')->middleware('auth');
 
 // Renter authentication routes (login now handled by business login)
 Route::prefix('renter')->name('renter.')->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Renter\Auth\LoginController::class, 'logout'])->name('logout');
-    
+
     // Protected renter routes
     Route::middleware('auth:renter')->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Renter\DashboardController::class, 'index'])->name('dashboard');
@@ -295,7 +307,7 @@ Route::get('/cron/monitor-emails', function () {
     try {
         // Check if IMAP is disabled
         $disableImap = \App\Models\Setting::get('disable_imap_fetching', false);
-        
+
         if ($disableImap) {
             return response()->json([
                 'success' => false,
@@ -305,10 +317,10 @@ Route::get('/cron/monitor-emails', function () {
         }
 
         $startTime = microtime(true);
-        
+
         // Get last cron run time from settings
         $lastCronRun = \App\Models\Setting::get('last_cron_run', null);
-        
+
         if ($lastCronRun) {
             $lastCronTime = \Carbon\Carbon::parse($lastCronRun);
             // Only fetch emails since last cron run (with 1 minute buffer)
@@ -322,23 +334,23 @@ Route::get('/cron/monitor-emails', function () {
                 $oldestPendingPayment = \App\Models\Payment::pending()
                     ->orderBy('created_at', 'asc')
                     ->first();
-                $sinceDate = $oldestPendingPayment 
+                $sinceDate = $oldestPendingPayment
                     ? $oldestPendingPayment->created_at->subMinutes(5)
                     : now()->subHours(1); // Default to last hour if nothing else
             }
         }
-        
+
         // Store current cron run time BEFORE processing (so we don't miss emails)
         \App\Models\Setting::set('last_cron_run', now()->toDateTimeString(), 'string', 'system', 'Last time cron job was executed');
-        
+
         // Call the IMAP monitoring command
         \Illuminate\Support\Facades\Artisan::call('payment:monitor-emails', [
             '--since' => $sinceDate->toDateTimeString(),
         ]);
-        
+
         $output = \Illuminate\Support\Facades\Artisan::output();
         $executionTime = round(microtime(true) - $startTime, 2);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Email monitoring (IMAP) completed',
@@ -354,25 +366,25 @@ Route::get('/cron/monitor-emails', function () {
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
-        
+
         return response()->json([
             'success' => false,
-            'message' => 'Error: ' . $e->getMessage(),
+            'message' => 'Error: '.$e->getMessage(),
             'timestamp' => now()->toDateTimeString(),
         ], 500);
     }
 })->name('cron.monitor-emails');
 
 // Helper functions for UTF-8 sanitization in routes
-if (!function_exists('sanitizeUtf8ForJson')) {
+if (! function_exists('sanitizeUtf8ForJson')) {
     function sanitizeUtf8ForJson(string $string): string
     {
         if (empty($string)) {
             return $string;
         }
-        
+
         // First, try to fix encoding using mb_convert_encoding
-        if (!mb_check_encoding($string, 'UTF-8')) {
+        if (! mb_check_encoding($string, 'UTF-8')) {
             // Try to convert from various encodings
             $encodings = ['ISO-8859-1', 'Windows-1252', 'UTF-8'];
             foreach ($encodings as $encoding) {
@@ -383,36 +395,36 @@ if (!function_exists('sanitizeUtf8ForJson')) {
                 }
             }
         }
-        
+
         // Use iconv to remove invalid UTF-8 sequences
         $sanitized = @iconv('UTF-8', 'UTF-8//IGNORE', $string);
-        
+
         // If iconv failed, use mb_convert_encoding with IGNORE flag
-        if ($sanitized === false || !mb_check_encoding($sanitized, 'UTF-8')) {
+        if ($sanitized === false || ! mb_check_encoding($sanitized, 'UTF-8')) {
             $sanitized = mb_convert_encoding($string, 'UTF-8', 'UTF-8');
         }
-        
+
         // Remove control characters except newlines, carriage returns, and tabs
         $sanitized = preg_replace('/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
-        
+
         // Final check: ensure valid UTF-8
-        if (!mb_check_encoding($sanitized, 'UTF-8')) {
+        if (! mb_check_encoding($sanitized, 'UTF-8')) {
             // Last resort: remove any remaining invalid bytes
             $sanitized = mb_convert_encoding($sanitized, 'UTF-8', 'UTF-8');
         }
-        
+
         return $sanitized ?: '';
     }
 }
 
-if (!function_exists('sanitizeArrayForJson')) {
+if (! function_exists('sanitizeArrayForJson')) {
     function sanitizeArrayForJson(array $array): array
     {
         $sanitized = [];
-        
+
         foreach ($array as $key => $value) {
             $sanitizedKey = is_string($key) ? sanitizeUtf8ForJson($key) : $key;
-            
+
             if (is_string($value)) {
                 $sanitized[$sanitizedKey] = sanitizeUtf8ForJson($value);
             } elseif (is_array($value)) {
@@ -421,7 +433,7 @@ if (!function_exists('sanitizeArrayForJson')) {
                 $sanitized[$sanitizedKey] = $value;
             }
         }
-        
+
         return $sanitized;
     }
 }
@@ -434,13 +446,13 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
     // Increase memory limit and execution time for cron jobs
     ini_set('memory_limit', '512M');
     set_time_limit(300); // 5 minutes max
-    
+
     // Detect if this is a cron request (minimal response needed)
-    $isCronRequest = $request->hasHeader('User-Agent') && 
-                     (stripos($request->header('User-Agent'), 'curl') !== false || 
+    $isCronRequest = $request->hasHeader('User-Agent') &&
+                     (stripos($request->header('User-Agent'), 'curl') !== false ||
                       stripos($request->header('User-Agent'), 'cron') !== false ||
                       $request->query('minimal') === 'true');
-    
+
     try {
         // Optional security: Check for secret token if configured
         $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
@@ -451,7 +463,7 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                     'ip' => $request->ip(),
                     'user_agent' => $request->userAgent(),
                 ]);
-                
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized: Invalid or missing token',
@@ -459,13 +471,13 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                 ], 401);
             }
         }
-        
+
         $startTime = microtime(true);
-        
+
         // Use the same controller method as the admin dashboard button
         // This ensures emails are processed and matched exactly like the dashboard button
-        $controller = new \App\Http\Controllers\Admin\EmailMonitorController();
-        
+        $controller = new \App\Http\Controllers\Admin\EmailMonitorController;
+
         try {
             $response = $controller->fetchEmailsDirect($request);
             $responseContent = $response->getContent();
@@ -476,44 +488,44 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Error processing emails: ' . $e->getMessage(),
+                'message' => 'Error processing emails: '.$e->getMessage(),
                 'timestamp' => now()->toDateTimeString(),
             ], 500);
         }
-        
+
         // Safely decode JSON, handle large responses
         $responseData = json_decode($responseContent, true);
-        
+
         // For cron requests, return minimal response (stats only, no verbose output)
         if ($isCronRequest) {
             $executionTime = round(microtime(true) - $startTime, 2);
-            
+
             // Extract stats from response content
             $stats = [
                 'processed' => 0,
                 'skipped' => 0,
                 'failed' => 0,
             ];
-            
+
             // Try to extract stats from the response content
             if (preg_match('/Total processed:\s*(\d+)/i', $responseContent, $matches)) {
-                $stats['processed'] = (int)$matches[1];
+                $stats['processed'] = (int) $matches[1];
             }
             if (preg_match('/Total skipped:\s*(\d+)/i', $responseContent, $matches)) {
-                $stats['skipped'] = (int)$matches[1];
+                $stats['skipped'] = (int) $matches[1];
             }
             if (preg_match('/Total failed:\s*(\d+)/i', $responseContent, $matches)) {
-                $stats['failed'] = (int)$matches[1];
+                $stats['failed'] = (int) $matches[1];
             }
-            
+
             // If responseData has stats, use those instead
             if (isset($responseData['stats']) && is_array($responseData['stats'])) {
                 $stats = array_merge($stats, $responseData['stats']);
             }
-            
+
             // Log full output for debugging (but don't return it)
             if (strlen($responseContent) > 10000) {
                 \Illuminate\Support\Facades\Log::info('Cron email fetch completed (large output logged)', [
@@ -522,7 +534,7 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                     'output_length' => strlen($responseContent),
                 ]);
             }
-            
+
             // Return minimal response for cron
             return response()->json([
                 'success' => true,
@@ -533,7 +545,7 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                 'timestamp' => now()->toDateTimeString(),
             ], 200);
         }
-        
+
         // For non-cron requests (admin dashboard), return full response
         // If JSON decode failed or response is too large, create a minimal response
         if (json_last_error() !== JSON_ERROR_NONE || strlen($responseContent) > 100000) {
@@ -541,7 +553,7 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                 'content_length' => strlen($responseContent),
                 'json_error' => json_last_error_msg(),
             ]);
-            
+
             // Extract just the essential info from the response
             $responseData = [
                 'success' => true,
@@ -552,45 +564,45 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                     'failed' => 0,
                 ],
             ];
-            
+
             // Try to extract stats from the response content if possible
             if (preg_match('/Total processed:\s*(\d+)/i', $responseContent, $matches)) {
-                $responseData['stats']['processed'] = (int)$matches[1];
+                $responseData['stats']['processed'] = (int) $matches[1];
             }
             if (preg_match('/Total skipped:\s*(\d+)/i', $responseContent, $matches)) {
-                $responseData['stats']['skipped'] = (int)$matches[1];
+                $responseData['stats']['skipped'] = (int) $matches[1];
             }
             if (preg_match('/Total failed:\s*(\d+)/i', $responseContent, $matches)) {
-                $responseData['stats']['failed'] = (int)$matches[1];
+                $responseData['stats']['failed'] = (int) $matches[1];
             }
         }
-        
+
         $executionTime = round(microtime(true) - $startTime, 2);
-        
+
         // Add execution time to response
         if ($responseData) {
             $responseData['execution_time_seconds'] = $executionTime;
             $responseData['method'] = 'direct_filesystem';
             $responseData['timestamp'] = now()->toDateTimeString();
-            
+
             // Remove or truncate large output fields for non-cron responses
             if (isset($responseData['output']) && strlen($responseData['output']) > 2000) {
-                $responseData['output'] = substr($responseData['output'], 0, 2000) . "\n\n... (truncated) ...";
+                $responseData['output'] = substr($responseData['output'], 0, 2000)."\n\n... (truncated) ...";
             }
             if (isset($responseData['summary']) && strlen($responseData['summary']) > 2000) {
-                $responseData['summary'] = substr($responseData['summary'], 0, 2000) . "\n\n... (truncated) ...";
+                $responseData['summary'] = substr($responseData['summary'], 0, 2000)."\n\n... (truncated) ...";
             }
-            
+
             // Sanitize UTF-8 in all string fields before JSON encoding
             $responseData = sanitizeArrayForJson($responseData);
         }
-        
+
         // Ensure we return a valid status code
         $statusCode = $response->getStatusCode();
         if ($statusCode >= 500) {
             $statusCode = 200; // Don't return 500 to cron, return 200 with success=false
         }
-        
+
         return response()->json($responseData, $statusCode);
     } catch (\Throwable $e) {
         \Illuminate\Support\Facades\Log::error('Cron job error (Direct Filesystem)', [
@@ -599,13 +611,13 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
             'line' => $e->getLine(),
             'trace' => $e->getTraceAsString(),
         ]);
-        
+
         // Sanitize error message before JSON encoding
         $errorMessage = sanitizeUtf8ForJson($e->getMessage());
-        
+
         return response()->json([
             'success' => false,
-            'message' => 'Error: ' . $errorMessage,
+            'message' => 'Error: '.$errorMessage,
             'timestamp' => now()->toDateTimeString(),
         ], 200); // Return 200 instead of 500 to prevent cron failures
     }
@@ -615,15 +627,15 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
 Route::get('/cron/fill-sender-names', function () {
     try {
         $startTime = microtime(true);
-        
+
         // STEP 2: Fill in sender_name from text_body if it's null
         \Illuminate\Support\Facades\Artisan::call('payment:re-extract-text-body', [
             '--missing-only' => true,
         ]);
-        
+
         $output = \Illuminate\Support\Facades\Artisan::output();
         $executionTime = round(microtime(true) - $startTime, 2);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Sender name extraction from text_body completed',
@@ -637,10 +649,10 @@ Route::get('/cron/fill-sender-names', function () {
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
-        
+
         return response()->json([
             'success' => false,
-            'message' => 'Error: ' . $e->getMessage(),
+            'message' => 'Error: '.$e->getMessage(),
             'timestamp' => now()->toDateTimeString(),
         ], 500);
     }
@@ -662,7 +674,7 @@ Route::get('/cron/extract-missing-names', function (\Illuminate\Http\Request $re
                     'ip' => $request->ip(),
                     'user_agent' => $request->userAgent(),
                 ]);
-                
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized: Invalid or missing token',
@@ -670,39 +682,39 @@ Route::get('/cron/extract-missing-names', function (\Illuminate\Http\Request $re
                 ], 401);
             }
         }
-        
+
         $startTime = microtime(true);
-        
+
         // Use the same controller method as the admin dashboard button
         // This ensures name extraction works exactly like the dashboard button
-        $controller = new \App\Http\Controllers\Admin\DashboardController();
-        
+        $controller = new \App\Http\Controllers\Admin\DashboardController;
+
         // Get limit from query parameter (default 50, same as dashboard button)
         $limit = (int) $request->query('limit', 50);
         $request->merge(['limit' => $limit]);
-        
+
         $response = $controller->extractMissingNames($request);
         $responseData = json_decode($response->getContent(), true);
-        
+
         $executionTime = round(microtime(true) - $startTime, 2);
-        
+
         // Add execution time to response
         if ($responseData) {
             $responseData['execution_time_seconds'] = $executionTime;
             $responseData['method'] = 'extract_missing_names';
             $responseData['timestamp'] = now()->toDateTimeString();
         }
-        
+
         return response()->json($responseData, $response->getStatusCode());
     } catch (\Exception $e) {
         \Illuminate\Support\Facades\Log::error('Cron job error (Extract Missing Names)', [
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
-        
+
         return response()->json([
             'success' => false,
-            'message' => 'Error: ' . $e->getMessage(),
+            'message' => 'Error: '.$e->getMessage(),
             'timestamp' => now()->toDateTimeString(),
         ], 500);
     }
@@ -722,7 +734,7 @@ Route::get('/cron/process-emails', function () {
             'step2_fill_sender' => ['success' => false, 'message' => '', 'execution_time' => 0],
             'step3_match' => ['success' => false, 'message' => '', 'execution_time' => 0],
         ];
-        
+
         // ============================================
         // STEP 1: Fetch emails from filesystem
         // ============================================
@@ -746,11 +758,11 @@ Route::get('/cron/process-emails', function () {
             ]);
             $results['step1_fetch'] = [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: '.$e->getMessage(),
                 'execution_time' => round(microtime(true) - $step1Start, 2),
             ];
         }
-        
+
         // ============================================
         // STEP 2: Fill sender_name from text_body if null
         // ============================================
@@ -773,11 +785,11 @@ Route::get('/cron/process-emails', function () {
             ]);
             $results['step2_fill_sender'] = [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: '.$e->getMessage(),
                 'execution_time' => round(microtime(true) - $step2Start, 2),
             ];
         }
-        
+
         // ============================================
         // STEP 3: Match transactions
         // ============================================
@@ -785,9 +797,9 @@ Route::get('/cron/process-emails', function () {
         $step3Start = microtime(true);
         try {
             $matchingService = new \App\Services\PaymentMatchingService(
-                new \App\Services\TransactionLogService()
+                new \App\Services\TransactionLogService
             );
-            $descriptionExtractor = new \App\Services\DescriptionFieldExtractor();
+            $descriptionExtractor = new \App\Services\DescriptionFieldExtractor;
 
             $matchResults = [
                 'payments_checked' => 0,
@@ -822,7 +834,7 @@ Route::get('/cron/process-emails', function () {
             // STEP 3a: Extract missing sender_name and description_field from text_body (if still needed)
             $textBodyExtractedCount = 0;
             foreach ($unmatchedEmails as $processedEmail) {
-                if (!$processedEmail->sender_name || !$processedEmail->description_field) {
+                if (! $processedEmail->sender_name || ! $processedEmail->description_field) {
                     try {
                         $extracted = $matchingService->extractMissingFromTextBody($processedEmail);
                         if ($extracted) {
@@ -842,7 +854,7 @@ Route::get('/cron/process-emails', function () {
             $parsedCount = 0;
             foreach ($unmatchedEmails as $processedEmail) {
                 $processedEmail->refresh();
-                if ($processedEmail->description_field && !$processedEmail->account_number) {
+                if ($processedEmail->description_field && ! $processedEmail->account_number) {
                     try {
                         $parsedData = $descriptionExtractor->parseDescriptionField($processedEmail->description_field);
                         if ($parsedData['account_number']) {
@@ -851,7 +863,7 @@ Route::get('/cron/process-emails', function () {
                             $currentExtractedData['account_number'] = $parsedData['account_number'];
                             $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'];
                             $currentExtractedData['date_from_description'] = $parsedData['extracted_date'];
-                            
+
                             $processedEmail->update([
                                 'account_number' => $parsedData['account_number'],
                                 'extracted_data' => $currentExtractedData,
@@ -917,14 +929,14 @@ Route::get('/cron/process-emails', function () {
             foreach ($pendingPayments as $payment) {
                 try {
                     $payment->refresh();
-                    
+
                     if ($payment->status !== \App\Models\Payment::STATUS_PENDING || $payment->isExpired()) {
                         continue;
                     }
 
                     $matchResults['payments_checked']++;
                     $matchedEmail = $matchingService->matchPaymentToStoredEmail($payment);
-                    
+
                     if ($matchedEmail) {
                         $matchResults['matches_found']++;
                         $matchResults['matched_payments'][] = [
@@ -943,7 +955,7 @@ Route::get('/cron/process-emails', function () {
             }
 
             $matchResults['attempts_logged'] = \App\Models\MatchAttempt::where('created_at', '>=', now()->subMinutes(1))->count();
-            
+
             $results['step3_match'] = [
                 'success' => true,
                 'message' => sprintf(
@@ -962,20 +974,20 @@ Route::get('/cron/process-emails', function () {
             ]);
             $results['step3_match'] = [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => 'Error: '.$e->getMessage(),
                 'execution_time' => round(microtime(true) - $step3Start, 2),
             ];
         }
-        
+
         $totalExecutionTime = round(microtime(true) - $overallStartTime, 2);
-        
+
         \Illuminate\Support\Facades\Log::info('Master email processing cron completed', [
             'total_time' => $totalExecutionTime,
             'step1' => $results['step1_fetch']['success'],
             'step2' => $results['step2_fill_sender']['success'],
             'step3' => $results['step3_match']['success'],
         ]);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Email processing completed (3 steps)',
@@ -989,10 +1001,10 @@ Route::get('/cron/process-emails', function () {
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
-        
+
         return response()->json([
             'success' => false,
-            'message' => 'Error: ' . $e->getMessage(),
+            'message' => 'Error: '.$e->getMessage(),
             'timestamp' => now()->toDateTimeString(),
         ], 500);
     }
@@ -1003,12 +1015,12 @@ Route::get('/cron/global-match', function () {
     $matchLogger = null;
     try {
         $startTime = microtime(true);
-        
+
         // Extract the logic from MatchController to avoid authentication issues
         $matchingService = new \App\Services\PaymentMatchingService(
-            new \App\Services\TransactionLogService()
+            new \App\Services\TransactionLogService
         );
-        $descriptionExtractor = new \App\Services\DescriptionFieldExtractor();
+        $descriptionExtractor = new \App\Services\DescriptionFieldExtractor;
 
         $results = [
             'payments_checked' => 0,
@@ -1020,7 +1032,7 @@ Route::get('/cron/global-match', function () {
             'matched_emails' => [],
         ];
 
-        $matchLogger = (new \App\Services\MatchAttemptLogger())->setDeferAutoClear(true);
+        $matchLogger = (new \App\Services\MatchAttemptLogger)->setDeferAutoClear(true);
         $emailExtractionCache = []; // reused in second pass to avoid re-parsing email bodies
 
         // Get all unmatched pending payments (not expired)
@@ -1056,13 +1068,13 @@ Route::get('/cron/global-match', function () {
         // OPTIMIZED: Batch load all data upfront to avoid N+1 queries
         // Reload emails after extraction to get updated data (single query)
         $emailIds = $unmatchedEmails->pluck('id')->toArray();
-        
+
         // STEP 1: Extract missing sender_name and description_field from text_body
         // This runs ONLY before global match to fill in missing data
         $textBodyExtractedCount = 0;
         foreach ($unmatchedEmails as $processedEmail) {
             // Only extract if sender_name is null OR description_field is null
-            if (!$processedEmail->sender_name || !$processedEmail->description_field) {
+            if (! $processedEmail->sender_name || ! $processedEmail->description_field) {
                 try {
                     $extracted = $matchingService->extractMissingFromTextBody($processedEmail);
                     if ($extracted) {
@@ -1076,7 +1088,7 @@ Route::get('/cron/global-match', function () {
                 }
             }
         }
-        
+
         if ($textBodyExtractedCount > 0) {
             \Illuminate\Support\Facades\Log::info("Extracted {$textBodyExtractedCount} missing fields from text_body before matching");
             // Reload emails once after all extractions (single query instead of N queries)
@@ -1085,14 +1097,14 @@ Route::get('/cron/global-match', function () {
                 ->where('is_matched', false)
                 ->get();
         }
-        
+
         // STEP 2: Parse description fields for emails that have them but missing account_number
         // This ensures account numbers are extracted before matching
-        $descriptionExtractor = new \App\Services\DescriptionFieldExtractor();
+        $descriptionExtractor = new \App\Services\DescriptionFieldExtractor;
         $parsedCount = 0;
         foreach ($unmatchedEmails as $processedEmail) {
             // OPTIMIZED: No refresh needed - data is already fresh from reload above
-            if ($processedEmail->description_field && !$processedEmail->account_number) {
+            if ($processedEmail->description_field && ! $processedEmail->account_number) {
                 try {
                     $parsedData = $descriptionExtractor->parseDescriptionField($processedEmail->description_field);
                     if ($parsedData['account_number']) {
@@ -1102,7 +1114,7 @@ Route::get('/cron/global-match', function () {
                         $currentExtractedData['payer_account_number'] = $parsedData['payer_account_number'];
                         // SKIP amount_from_description - not reliable, use amount field instead
                         $currentExtractedData['date_from_description'] = $parsedData['extracted_date'];
-                        
+
                         $processedEmail->update([
                             'account_number' => $parsedData['account_number'],
                             'extracted_data' => $currentExtractedData,
@@ -1117,7 +1129,7 @@ Route::get('/cron/global-match', function () {
                 }
             }
         }
-        
+
         if ($parsedCount > 0) {
             \Illuminate\Support\Facades\Log::info("Parsed {$parsedCount} description fields before matching");
         }
@@ -1146,7 +1158,7 @@ Route::get('/cron/global-match', function () {
             }
             $paymentsByRoundedAmount[$bucket]->push($payment);
         }
-        
+
         // Strategy: For each unmatched email, try to match against candidate pending payments (same amount ±1)
         // FIXED: Use same approach as admin checkMatch - use matchPayment() directly instead of matchEmail()
         foreach ($unmatchedEmails as $processedEmail) {
@@ -1157,7 +1169,7 @@ Route::get('/cron/global-match', function () {
                 }
 
                 // Skip emails without amount (can't match without amount)
-                if (!$processedEmail->amount || $processedEmail->amount <= 0) {
+                if (! $processedEmail->amount || $processedEmail->amount <= 0) {
                     continue;
                 }
 
@@ -1175,7 +1187,7 @@ Route::get('/cron/global-match', function () {
 
                 // Extract payment info from email (same as admin checkMatch)
                 $extractionResult = $matchingService->extractPaymentInfo($emailData);
-                
+
                 // Handle new format: ['data' => [...], 'method' => '...']
                 $extractedInfo = null;
                 if (is_array($extractionResult) && isset($extractionResult['data'])) {
@@ -1185,7 +1197,7 @@ Route::get('/cron/global-match', function () {
                 }
 
                 // Use stored values as fallback if extraction fails (same as admin checkMatch)
-                if (!$extractedInfo || !isset($extractedInfo['amount']) || !$extractedInfo['amount']) {
+                if (! $extractedInfo || ! isset($extractedInfo['amount']) || ! $extractedInfo['amount']) {
                     $extractedInfo = [
                         'amount' => $processedEmail->amount,
                         'sender_name' => $processedEmail->sender_name,
@@ -1193,13 +1205,13 @@ Route::get('/cron/global-match', function () {
                     ];
                 } else {
                     // Merge stored values if extraction didn't provide them
-                    if (!isset($extractedInfo['amount']) && $processedEmail->amount) {
+                    if (! isset($extractedInfo['amount']) && $processedEmail->amount) {
                         $extractedInfo['amount'] = $processedEmail->amount;
                     }
-                    if (!isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
+                    if (! isset($extractedInfo['sender_name']) && $processedEmail->sender_name) {
                         $extractedInfo['sender_name'] = $processedEmail->sender_name;
                     }
-                    if (!isset($extractedInfo['account_number']) && $processedEmail->account_number) {
+                    if (! isset($extractedInfo['account_number']) && $processedEmail->account_number) {
                         $extractedInfo['account_number'] = $processedEmail->account_number;
                     }
                 }
@@ -1245,7 +1257,7 @@ Route::get('/cron/global-match', function () {
                 ];
 
                 $matchedPayment = null;
-                
+
                 foreach ($potentialPayments as $potentialPayment) {
                     // Use matchPayment() directly (same as PaymentController::checkMatch)
                     $match = $matchingService->matchPayment($potentialPayment, $extractedInfo, $emailDate);
@@ -1256,7 +1268,7 @@ Route::get('/cron/global-match', function () {
                         if (is_array($extractionResult) && isset($extractionResult['method'])) {
                             $extractionMethod = $extractionResult['method'];
                         }
-                        
+
                         $matchLogger->logAttempt([
                             'payment_id' => $potentialPayment->id,
                             'processed_email_id' => $processedEmail->id,
@@ -1285,7 +1297,7 @@ Route::get('/cron/global-match', function () {
                             'email_id' => $processedEmail->id,
                         ]);
                     }
-                    
+
                     if ($match['matched']) {
                         $matchedPayment = $potentialPayment;
                         break;
@@ -1313,7 +1325,7 @@ Route::get('/cron/global-match', function () {
                         'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                         'sender_name' => $processedEmail->sender_name,
                     ]);
-                    
+
                     // Update payer_account_number if extracted (same as PaymentController::checkMatch)
                     if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
                         $matchedPayment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
@@ -1323,10 +1335,10 @@ Route::get('/cron/global-match', function () {
                     if ($matchedPayment->business_id) {
                         $matchedPayment->business->incrementBalanceWithCharges($matchedPayment->amount, $matchedPayment);
                         $matchedPayment->business->refresh();
-                        
+
                         // Send new deposit notification
                         $matchedPayment->business->notify(new \App\Notifications\NewDepositNotification($matchedPayment));
-                        
+
                         // Check for auto-withdrawal
                         $matchedPayment->business->triggerAutoWithdrawal();
                     }
@@ -1375,7 +1387,7 @@ Route::get('/cron/global-match', function () {
         });
         $results['payments_second_pass_total_pending'] = $pendingPayments->count();
         $results['payments_second_pass_considered'] = $pendingPaymentsSecondPass->count();
-        
+
         // Also check pending payments that weren't matched in the first pass
         foreach ($pendingPaymentsSecondPass as $payment) {
             try {
@@ -1393,22 +1405,22 @@ Route::get('/cron/global-match', function () {
                 // CRITICAL: Only check emails received AFTER transaction creation
                 $timeWindowMinutes = \App\Models\Setting::get('payment_time_window_minutes', 120);
                 $checkUntil = $payment->created_at->copy()->addMinutes($timeWindowMinutes);
-                
+
                 // OPTIMIZED: Filter from pre-loaded emails instead of querying database
                 $amountKey = round($payment->amount);
                 $potentialEmails = ($unmatchedEmailsByAmount[$amountKey] ?? collect())
                     ->filter(function ($email) use ($payment, $checkUntil) {
                         // Amount match (already filtered by groupBy)
                         $amountMatch = abs($email->amount - $payment->amount) <= 1;
-                        
+
                         // Time constraints
-                        $timeMatch = $email->email_date 
-                            && $email->email_date >= $payment->created_at 
+                        $timeMatch = $email->email_date
+                            && $email->email_date >= $payment->created_at
                             && $email->email_date <= $checkUntil;
-                        
+
                         // Not matched
-                        $notMatched = !$email->is_matched;
-                        
+                        $notMatched = ! $email->is_matched;
+
                         return $amountMatch && $timeMatch && $notMatched;
                     });
 
@@ -1468,7 +1480,7 @@ Route::get('/cron/global-match', function () {
 
                         $emailDate = $processedEmail->email_date ? \Carbon\Carbon::parse($processedEmail->email_date) : null;
                         $match = $matchingService->matchPayment($payment, $extractedInfo, $emailDate);
-                        
+
                         // Log match attempt (same as PaymentController::checkMatch)
                         try {
                             $matchLogger->logAttempt([
@@ -1522,7 +1534,7 @@ Route::get('/cron/global-match', function () {
                                 'date' => $processedEmail->email_date ? $processedEmail->email_date->toDateTimeString() : now()->toDateTimeString(),
                                 'sender_name' => $processedEmail->sender_name,
                             ]);
-                            
+
                             // Update payer_account_number if extracted (same as PaymentController::checkMatch)
                             if (isset($extractedInfo['payer_account_number']) && $extractedInfo['payer_account_number']) {
                                 $payment->update(['payer_account_number' => $extractedInfo['payer_account_number']]);
@@ -1532,10 +1544,10 @@ Route::get('/cron/global-match', function () {
                             if ($payment->business_id) {
                                 $payment->business->incrementBalanceWithCharges($payment->amount, $payment);
                                 $payment->business->refresh();
-                                
+
                                 // Send new deposit notification
                                 $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
-                                
+
                                 // Check for auto-withdrawal
                                 $payment->business->triggerAutoWithdrawal();
                             }
@@ -1601,10 +1613,10 @@ Route::get('/cron/global-match', function () {
             'error' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
         ]);
-        
+
         return response()->json([
             'success' => false,
-            'message' => 'Error: ' . $e->getMessage(),
+            'message' => 'Error: '.$e->getMessage(),
             'timestamp' => now()->toDateTimeString(),
         ], 500);
     } finally {
@@ -1613,6 +1625,6 @@ Route::get('/cron/global-match', function () {
             $matchLogger->flushAutoClearIfNeeded();
         }
     }
-    
+
     // Helper function removed - now using DescriptionFieldExtractor service instead
 })->name('cron.global-match');

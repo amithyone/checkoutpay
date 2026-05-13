@@ -44,6 +44,8 @@ class TransactionLog extends Model
     const EVENT_OVERDRAFT_FUNDING_DEBIT = 'overdraft_funding_debit';
     const EVENT_OVERDRAFT_FUNDING_CREDIT = 'overdraft_funding_credit';
 
+    const EVENT_DEVELOPER_PROGRAM_PARTNER_SHARE_CREDITED = 'developer_program_partner_share_credited';
+
     /**
      * Get the payment associated with this log
      */

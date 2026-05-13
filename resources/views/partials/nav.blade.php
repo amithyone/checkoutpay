@@ -52,6 +52,9 @@
                         Developers <i class="fas fa-chevron-down ml-1 text-xs"></i>
                     </a>
                     <div class="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <a href="{{ route('developers.program') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary font-semibold">Developer Program</a>
+                        <a href="{{ url('/developers/program/apply') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Apply to program</a>
+                        <div class="border-t border-gray-200 my-1"></div>
                         <a href="{{ route('developers.index') }}#api-reference" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">API Reference</a>
                         <a href="{{ route('developers.index') }}#webhooks" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Webhooks</a>
                         <a href="{{ route('developers.index') }}#testing" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Testing</a>
@@ -94,13 +97,15 @@
                 <i class="fas fa-bars text-xl" id="mobile-menu-icon"></i>
             </button>
         </div>
-        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 mt-2" role="menu" aria-label="Mobile navigation">
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 mt-2 relative z-[60] bg-white" role="menu" aria-label="Mobile navigation">
             <div class="pt-3 pb-4 px-2">
                 <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
                     <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Products</a>
                     <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Pricing</a>
                     <a href="{{ route('products.invoices') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Invoices</a>
                     <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Developers</a>
+                    <a href="{{ route('developers.program') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Dev program</a>
+                    <a href="{{ url('/developers/program/apply') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium touch-manipulation">Apply to program</a>
                     <a href="{{ route('rentals.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Rentals</a>
                     <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Support</a>
                     <a href="{{ route('memberships.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Memberships</a>
@@ -150,6 +155,22 @@
             }
             btn.setAttribute('aria-expanded', !isHidden);
             btn.setAttribute('aria-label', isHidden ? 'Close menu' : 'Open menu');
+        });
+        menu.addEventListener('click', function(e) {
+            var el = e.target;
+            while (el && el !== menu) {
+                if (el.tagName === 'A' && el.getAttribute('href')) {
+                    menu.classList.add('hidden');
+                    if (icon) {
+                        icon.classList.add('fa-bars');
+                        icon.classList.remove('fa-times');
+                    }
+                    btn.setAttribute('aria-expanded', 'false');
+                    btn.setAttribute('aria-label', 'Open menu');
+                    break;
+                }
+                el = el.parentElement;
+            }
         });
     }
     if (document.readyState === 'loading') {

@@ -63,6 +63,31 @@
         </div>
     </div>
 
+    <!-- Developer program -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-handshake mr-2 text-primary"></i> Developer program (partner attribution)
+        </h3>
+        <p class="text-sm text-gray-600 mb-3">Attribute payments to an approved developer partner (their CheckoutPay <strong>Business ID</strong> = <code>businesses.id</code>). Optional on <strong>POST {{ url('/api/v1/payment-request') }}</strong> as <code class="bg-gray-100 px-1 rounded text-xs">developer_program_partner_business_id</code> or alias <code class="bg-gray-100 px-1 rounded text-xs">devprogram</code>. Omitted = unchanged behavior. Partner must have an approved developer program application and cannot be your own business.</p>
+        <p class="text-sm text-gray-600 mb-3">When the payment is <strong>approved</strong>, the partner may receive a credit to their <strong>business balance</strong>: a percentage of platform <strong>fees</strong> on that payment (<code>charges.total</code> in the webhook), using the global default and/or per-partner override set by admins—not a deduction from your <code>business_receives</code>.</p>
+        <h4 class="text-sm font-semibold text-gray-800 mb-2">Where partner fields apply</h4>
+        <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full text-xs text-left">
+                <thead class="bg-gray-50 text-gray-700">
+                    <tr>
+                        <th class="px-3 py-2 font-semibold">Flow</th>
+                        <th class="px-3 py-2 font-semibold">Partner ID on create</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 text-gray-700">
+                    <tr><td class="px-3 py-2">REST <code class="bg-gray-100 rounded px-1">POST /api/v1/payment-request</code></td><td class="px-3 py-2">Optional</td></tr>
+                    <tr><td class="px-3 py-2">Hosted checkout, invoice links, tickets, membership, rentals (built-in flows)</td><td class="px-3 py-2">Not supported—use the REST payment request for attribution</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-xs text-gray-600 mt-3"><strong>WordPress plugin:</strong> store the partner Business ID in settings and send the same JSON key on <code>payment-request</code> only.</p>
+    </div>
+
     <!-- API Base URL -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
@@ -100,10 +125,12 @@ X-API-Key: {{ $business->api_key }}
   "name": "John Doe",
   "amount": 5000.00,
   "service": "PRODUCT-123",
-  "webhook_url": "https://yourwebsite.com/webhook/checkout"
+  "webhook_url": "https://yourwebsite.com/webhook/checkout",
+  "developer_program_partner_business_id": 42
 }</code></pre>
                 </div>
                 <p class="text-xs text-gray-600 mt-2">You may send <code class="bg-gray-800 text-gray-100 px-1 rounded">payer_name</code> instead of <code class="bg-gray-800 text-gray-100 px-1 rounded">name</code>. <code class="bg-gray-800 text-gray-100 px-1 rounded">webhook_url</code> must be on a domain you have approved in the dashboard.</p>
+                <p class="text-xs text-gray-600 mt-2">Optional <code class="bg-gray-800 text-gray-100 px-1 rounded">developer_program_partner_business_id</code> (integer, your partner developer&rsquo;s CheckoutPay Business ID) attributes the payment to the developer program when present; omit when not used. The CheckoutPay WordPress plugin should use this same key from its settings. Alias: <code class="bg-gray-800 text-gray-100 px-1 rounded">devprogram</code>. The partner must have an approved developer program application and cannot be your own business.</p>
                 <p class="text-sm font-medium text-gray-700 mt-3 mb-1">Expected response (201 Created)</p>
                 <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
                     <pre class="text-xs text-gray-100"><code>{
@@ -187,10 +214,14 @@ Content-Type: application/json
   "mismatch_reason": null,
   "charges": { "percentage": 50, "fixed": 50, "total": 100, "business_receives": 4900 },
   "timestamp": "2024-01-15T10:30:00Z",
-  "email_data": {}
+  "email_data": {},
+  "developer_program_partner_business_id": 42,
+  "developer_program_partner_share_amount": 25.00,
+  "developer_program_partner_share_percent_effective": 25,
+  "developer_program_fee_share_base_description": "CheckoutPay's transaction fee revenue on qualifying attributed volume"
 }</code></pre>
                 </div>
-                <p class="text-xs text-gray-600 mt-2">Use <code>transaction_id</code> to identify the payment; use <code>external_reference</code> when present (e.g. your <code>order_reference</code> from WhatsApp wallet <code>pay/start</code>). Use <code>received_amount</code> and <code>charges.business_receives</code> for reconciliation.</p>
+                <p class="text-xs text-gray-600 mt-2">Use <code>transaction_id</code> to identify the payment; use <code>external_reference</code> when present (e.g. your <code>order_reference</code> from WhatsApp wallet <code>pay/start</code>). Use <code>received_amount</code> and <code>charges.business_receives</code> for reconciliation. When you use the developer program, also read <code>developer_program_partner_business_id</code> and <code>developer_program_partner_share_amount</code> (nullable).</p>
                 <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p class="text-xs text-green-800">
                         <i class="fas fa-check-circle mr-1"></i>
@@ -291,8 +322,9 @@ X-API-Key: {{ $business->api_key }}
             <p><strong>3. Wallet:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/wallet</code>, <code class="text-xs">POST …/wallet/ensure</code>, <code class="text-xs">GET …/wallet/transactions</code>, <code class="text-xs">POST …/wallet/topup/virtual-account</code></p>
             <p><strong>4. PIN:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/wallet/pin</code> (first-time), <code class="text-xs">PUT …/wallet/pin</code> (change). Debits require 4-digit <code class="text-xs">pin</code> on transfer/VTU routes.</p>
             <p><strong>5. Transfers:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/transfers/p2p</code> (<code class="text-xs">to_phone</code>, <code class="text-xs">amount</code>, <code class="text-xs">pin</code>), <code class="text-xs">POST …/transfers/bank</code> (account + bank + <code class="text-xs">pin</code>), <code class="text-xs">GET …/banks/name-enquiry</code></p>
-            <p><strong>6. VTU:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/vtu/networks</code>, <code class="text-xs">GET …/vtu/data-plans</code>, <code class="text-xs">POST …/vtu/airtime</code>, <code class="text-xs">POST …/vtu/data</code></p>
-            <p><strong>7. Tier 2 KYC:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/kyc/tier2</code>, <code class="text-xs">POST …/kyc/tier2/personal</code>, <code class="text-xs">POST …/kyc/tier2/business</code></p>
+            <p><strong>6. VTU:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/vtu/networks</code> (returns <code class="text-xs">networks</code>, <code class="text-xs">configured</code>, airtime limits), <code class="text-xs">GET …/vtu/data-plans</code>, <code class="text-xs">POST …/vtu/airtime</code>, <code class="text-xs">POST …/vtu/data</code>. Wallet <code class="text-xs">GET …/wallet</code> includes a <code class="text-xs">vtu</code> object for app gating.</p>
+            <p><strong>7. In-app wallet chat:</strong> Primary: <code class="text-xs bg-gray-100 px-1 rounded">POST …/wallet/conversation</code> JSON <code class="text-xs">{"text":"…"}</code> (same <code class="text-xs">WhatsappSession</code> as WhatsApp; optional <code class="text-xs">POST …/wallet/transfer/confirm-web-token</code> for staged debits). Legacy apps may still use <code class="text-xs bg-gray-100 px-1 rounded">GET …/chat/messages</code> / <code class="text-xs">POST …/chat/messages</code> with <code class="text-xs">{"body":"…"}</code> (thread + polling). Server-to-server support injection <code class="text-xs">POST {{ url('/api/v1/internal/consumer-chat/reply') }}</code> is retired (HTTP 410).</p>
+            <p><strong>8. Tier 2 KYC:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/kyc/tier2</code>, <code class="text-xs">POST …/kyc/tier2/personal</code>, <code class="text-xs">POST …/kyc/tier2/business</code></p>
             <p><strong>Errors:</strong> JSON <code class="text-xs">success: false</code> and <code class="text-xs">message</code>; HTTP 401 without/invalid token, 422 validation or business rules, 423 PIN locked, 502 provider failures where applicable.</p>
             <p class="text-xs text-gray-500">Logout: <code class="bg-gray-100 px-1 rounded">POST …/auth/logout</code> (Bearer).</p>
         </div>

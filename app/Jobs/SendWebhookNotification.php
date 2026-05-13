@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Payment;
+use App\Models\Setting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -286,7 +287,15 @@ class SendWebhookNotification implements ShouldQueue
     protected function buildWebhookPayload(): array
     {
         $emailData = $this->payment->email_data ?? [];
-        
+
+        $totalCharges = (float) ($this->payment->total_charges ?? 0);
+        $shareAmount = $this->payment->developer_program_partner_share_amount !== null
+            ? (float) $this->payment->developer_program_partner_share_amount
+            : null;
+        $sharePercentEffective = ($totalCharges > 0 && $shareAmount !== null && $shareAmount > 0)
+            ? round(100 * $shareAmount / $totalCharges, 4)
+            : null;
+
         return [
             'event' => 'payment.approved',
             'transaction_id' => $this->payment->transaction_id,
@@ -308,6 +317,12 @@ class SendWebhookNotification implements ShouldQueue
             ],
             'timestamp' => $this->payment->matched_at ? $this->payment->matched_at->toISOString() : now()->toISOString(),
             'email_data' => $emailData, // Include sanitized email data
+            'developer_program_partner_business_id' => $this->payment->developer_program_partner_business_id
+                ? (int) $this->payment->developer_program_partner_business_id
+                : null,
+            'developer_program_partner_share_amount' => $shareAmount,
+            'developer_program_partner_share_percent_effective' => $sharePercentEffective,
+            'developer_program_fee_share_base_description' => Setting::get('developer_program_fee_share_base_description'),
         ];
     }
 }

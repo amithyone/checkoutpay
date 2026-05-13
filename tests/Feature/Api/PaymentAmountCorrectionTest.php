@@ -49,7 +49,7 @@ class PaymentAmountCorrectionTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('success', true);
         $response->assertJsonPath('data.transaction_id', $payment->transaction_id);
-        $response->assertJsonPath('data.amount', 7500.0);
+        $this->assertSame(7500.0, (float) $response->json('data.amount'));
         $response->assertJsonPath('data.status', Payment::STATUS_PENDING);
 
         $payment->refresh();

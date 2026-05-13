@@ -265,12 +265,12 @@ class WhatsappWaWalletMenuHandler
             'transfer_beneficiary' => $this->handleTransferBeneficiary($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_amount' => $this->handleTransferAmount($session, $instance, $phone, $text, $ctx, $wallet),
             'transfer_otp' => $this->handleTransferOtp($session, $instance, $phone, $text, $ctx, $wallet),
-            'transfer_pin' => $this->handleTransferPinWebOnly($instance, $phone, $text, $ctx, $wallet),
+            'transfer_pin' => $this->handleTransferPinWebOnly($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_phone' => $this->handleP2pPhone($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_verify_recipient' => $this->handleP2pVerifyRecipient($session, $instance, $phone, $text, $cmd, $ctx, $wallet),
             'p2p_amount' => $this->handleP2pAmount($session, $instance, $phone, $text, $ctx, $wallet),
             'p2p_otp' => $this->handleP2pOtp($session, $instance, $phone, $text, $ctx, $wallet),
-            'p2p_pin' => $this->handleTransferPinWebOnly($instance, $phone, $text, $ctx, $wallet),
+            'p2p_pin' => $this->handleTransferPinWebOnly($session, $instance, $phone, $text, $ctx, $wallet),
             'wallet_tx_history' => $this->handleWalletTransactionHistory($session, $instance, $phone, $cmd, $wallet),
             default => $this->recoverSubmenu($session, $instance, $phone, $wallet),
         };
@@ -1725,6 +1725,7 @@ class WhatsappWaWalletMenuHandler
      * @param  array<string, mixed>  $ctx
      */
     private function handleTransferPinWebOnly(
+        WhatsappSession $session,
         string $instance,
         string $phone,
         string $text,

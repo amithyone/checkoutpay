@@ -120,6 +120,11 @@
                     <span>Overdraft queue</span>
                 </a>
 
+                <a href="{{ route('admin.developer-program.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.developer-program.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-handshake w-5 mr-3"></i>
+                    <span>Developer program</span>
+                </a>
+
                 @if(auth('admin')->user()->isSuperAdmin())
                 <a href="{{ route('admin.peer-lending.offers.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.peer-lending.offers.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-hand-holding-usd w-5 mr-3"></i>

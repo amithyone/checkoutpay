@@ -84,6 +84,7 @@
                             <a href="#authentication" class="block text-sm text-gray-700 hover:text-primary py-2">Authentication</a>
                             <a href="#endpoints" class="block text-sm text-gray-700 hover:text-primary py-2">API Endpoints</a>
                             <a href="#payments" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Payments</a>
+                            <a href="#developer-program" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Developer program</a>
                             <a href="#update-amount" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Update payment amount</a>
                             <a href="#whatsapp-wallet" class="block text-sm text-gray-700 hover:text-primary py-2">WhatsApp wallet API</a>
                             <a href="#webhooks" class="block text-sm text-gray-700 hover:text-primary py-2">Webhooks</a>
@@ -174,6 +175,7 @@
                                     <code class="text-lg font-mono text-gray-900">/payment-request</code>
                                 </div>
                                 <p class="text-gray-700 mb-4">Create a new payment request. Returns account details for the customer to make payment. <strong>POST only</strong>—do not use GET (e.g. pasting the URL into a browser).</p>
+                                <p class="text-gray-600 text-sm mb-4">Integrations such as the <strong>CheckoutPay WordPress plugin</strong> should send the same optional JSON key (<code class="bg-gray-100 px-1 rounded text-xs">developer_program_partner_business_id</code> or alias <code class="bg-gray-100 px-1 rounded text-xs">devprogram</code>) on this request when partner attribution is configured; omit the field when not used.</p>
 
                                 <div class="mb-4">
                                     <h4 class="font-semibold text-gray-900 mb-2">Request Body</h4>
@@ -186,7 +188,8 @@
   "service": "Product Purchase",
   "transaction_id": "TXN-1234567890",
   "business_website_id": 1,
-  "website_url": "https://yourwebsite.com"
+  "website_url": "https://yourwebsite.com",
+  "developer_program_partner_business_id": 42
 }</code></pre>
                                     </div>
                                 </div>
@@ -281,6 +284,18 @@
                                                     <td class="px-4 py-3 text-gray-700">string</td>
                                                     <td class="px-4 py-3 text-gray-700">No</td>
                                                     <td class="px-4 py-3 text-gray-700">Your website URL (for website identification)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">developer_program_partner_business_id</td>
+                                                    <td class="px-4 py-3 text-gray-700">integer</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Optional. CheckoutPay <strong>Business ID</strong> of the approved developer program partner to attribute this payment to (not your merchant ID from the API key). When omitted or null, behavior is unchanged. Must reference a business with an <strong>approved</strong> developer program application and cannot be the same business as the merchant.</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">devprogram</td>
+                                                    <td class="px-4 py-3 text-gray-700">integer</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Alias for <code class="bg-gray-100 px-1 rounded">developer_program_partner_business_id</code> when the long key is not sent.</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -539,6 +554,47 @@ X-API-Key: pk_your_api_key_here
                         </div>
                     </div>
 
+                    <!-- Developer program -->
+                    <div id="developer-program" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">
+                            <i class="fas fa-handshake text-primary mr-2"></i>Developer program (partner attribution)
+                        </h2>
+                        <p class="text-gray-700 mb-4">CheckoutPay can attribute a payment to an <strong>approved developer partner</strong> (another business on the platform) when you create the payment via the standard API. The partner&rsquo;s <strong>Business ID</strong> is the numeric primary key (<code>businesses.id</code>) shown in the dashboard—not your merchant ID from the API key.</p>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Create payment (<code>POST /api/v1/payment-request</code>)</h3>
+                        <p class="text-gray-700 mb-3">Optional body fields (see <a href="#payments" class="text-primary underline">Payments</a> for full parameter list):</p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-1 mb-4">
+                            <li><code class="bg-gray-100 px-1 rounded">developer_program_partner_business_id</code> (integer)—partner developer&rsquo;s Business ID.</li>
+                            <li><code class="bg-gray-100 px-1 rounded">devprogram</code> (integer)—alias for the same value when the long key is omitted.</li>
+                        </ul>
+                        <p class="text-gray-700 mb-4">Validation: partner must exist, must have an <strong>approved</strong> developer program application for that Business ID, and must <strong>not</strong> be the same business as the merchant authenticated by <code>X-API-Key</code>. Omitting the field leaves behavior unchanged.</p>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Partner fee share (on approval)</h3>
+                        <p class="text-gray-700 mb-4">When a attributed payment is <strong>approved</strong>, the platform may credit the partner&rsquo;s <strong>business balance</strong> with a percentage of <strong>platform transaction fees</strong> on that payment (<code>charges.total</code> / <code>total_charges</code> in the webhook—i.e. CheckoutPay&rsquo;s fee revenue, not the merchant&rsquo;s <code>business_receives</code>). The percentage comes from the admin developer program defaults and/or the partner&rsquo;s approved application override. If fees are zero (e.g. some exempt flows), the credited share is zero.</p>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2"><code>payment.approved</code> webhook (extra fields)</h3>
+                        <p class="text-gray-700 mb-3">In addition to the standard payload (see <a href="#webhooks" class="text-primary underline">Webhooks</a>), these nullable fields may appear:</p>
+                        <ul class="list-disc list-inside text-gray-700 space-y-1 mb-4">
+                            <li><code class="bg-gray-100 px-1 rounded">developer_program_partner_business_id</code>—set when the payment was attributed at creation.</li>
+                            <li><code class="bg-gray-100 px-1 rounded">developer_program_partner_share_amount</code>—amount credited to the partner&rsquo;s balance when a share applies; otherwise <code>null</code>.</li>
+                            <li><code class="bg-gray-100 px-1 rounded">developer_program_partner_share_percent_effective</code>—effective percentage implied by the credited amount vs. <code>charges.total</code>, when both are positive; otherwise <code>null</code>.</li>
+                            <li><code class="bg-gray-100 px-1 rounded">developer_program_fee_share_base_description</code>—short admin-configured phrase describing what the published percentage applies to (may be <code>null</code>).</li>
+                        </ul>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Where partner attribution is supported</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm border border-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left font-semibold text-gray-700">Flow</th>
+                                        <th class="px-4 py-2 text-left font-semibold text-gray-700">Partner fields on create</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 text-gray-700">
+                                    <tr><td class="px-4 py-2">Standard REST <code>POST /api/v1/payment-request</code></td><td class="px-4 py-2">Yes (optional)</td></tr>
+                                    <tr><td class="px-4 py-2">Hosted checkout, invoice pay links, tickets, membership, rentals, other internal flows</td><td class="px-4 py-2">Not exposed—use the standard API for attribution</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-4"><strong>WordPress / WooCommerce:</strong> configure the partner Business ID in plugin settings and send <code>developer_program_partner_business_id</code> (or <code>devprogram</code>) on <code>POST .../payment-request</code> only.</p>
+                    </div>
+
                     <!-- Webhooks Section -->
                     <div id="webhooks" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
                         <h2 class="text-3xl font-bold text-gray-900 mb-4">
@@ -587,10 +643,14 @@ X-API-Key: pk_your_api_key_here
     "business_receives": 4900.00
   },
   "timestamp": "2024-01-15T10:35:00Z",
-  "email_data": {}
+  "email_data": {},
+  "developer_program_partner_business_id": 42,
+  "developer_program_partner_share_amount": 25.00,
+  "developer_program_partner_share_percent_effective": 25,
+  "developer_program_fee_share_base_description": "CheckoutPay's transaction fee revenue on qualifying attributed volume"
 }</code></pre>
                                 </div>
-                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>email_data</code> (optional raw email info).</p>
+                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
                             </div>
 
                             <div>

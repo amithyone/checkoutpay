@@ -13,6 +13,7 @@ class EventServiceProvider extends ServiceProvider
      */
     protected $listen = [
         \App\Events\PaymentApproved::class => [
+            \App\Listeners\CreditDeveloperPartnerShareOnPaymentApproved::class,
             \App\Listeners\SendPaymentWebhook::class,
             \App\Listeners\MarkInvoicePaidOnPaymentApproved::class,
             \App\Listeners\MarkRentalPaidOnPaymentApproved::class,

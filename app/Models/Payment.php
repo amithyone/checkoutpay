@@ -24,6 +24,9 @@ class Payment extends Model
         'account_number',
         'payer_account_number',
         'business_id',
+        'developer_program_partner_business_id',
+        'developer_program_partner_share_amount',
+        'developer_program_partner_share_credited_at',
         'user_id',
         'renter_id',
         'business_website_id',
@@ -71,6 +74,8 @@ class Payment extends Model
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
         'is_mismatch' => 'boolean',
+        'developer_program_partner_share_amount' => 'decimal:2',
+        'developer_program_partner_share_credited_at' => 'datetime',
     ];
 
     /**

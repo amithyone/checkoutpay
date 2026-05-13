@@ -21,7 +21,7 @@ class PaymentService
     /**
      * Create a payment request.
      *
-     * @param array $data amount, payer_name, webhook_url?, service?, transaction_id?, business_website_id?, bank?, return_url?, website_url?
+     * @param array $data amount, payer_name, webhook_url?, service?, transaction_id?, business_website_id?, bank?, return_url?, website_url?, developer_program_partner_business_id?
      *                       If webhook_url omitted/empty and business_website_id resolves to an approved website row
      *                       with webhook_url, that stored URL is copied onto the payment row.
      * @param Business $business
@@ -204,6 +204,12 @@ class PaymentService
             $chargesPaidByCustomer = $charges['paid_by_customer'] ?? false;
         }
 
+        $partnerBusinessId = isset($data['developer_program_partner_business_id'])
+            && $data['developer_program_partner_business_id'] !== ''
+            && $data['developer_program_partner_business_id'] !== null
+            ? (int) $data['developer_program_partner_business_id']
+            : null;
+
         $isExternalAssigned = (bool) ($account->is_external ?? false);
 
         $payment = Payment::create([
@@ -218,12 +224,14 @@ class PaymentService
             'account_number' => $account->account_number,
             'business_id' => $business->id,
             'business_website_id' => $businessWebsiteId,
+            'developer_program_partner_business_id' => $partnerBusinessId,
             'status' => Payment::STATUS_PENDING,
             'email_data' => array_filter([
                 'service' => $data['service'] ?? null,
                 'return_url' => $data['return_url'] ?? null,
                 'website_url' => $data['website_url'] ?? null,
                 'skip_auto_match' => $isExternalAssigned ? true : null,
+                'developer_program_partner_business_id' => $partnerBusinessId,
             ]),
             'charge_percentage' => $chargePercentage,
             'charge_fixed' => $chargeFixed,

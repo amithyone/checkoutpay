@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\ConsumerChatController;
+use App\Http\Controllers\Api\ConsumerChatInternalController;
 use App\Http\Controllers\Api\ConsumerWalletApiController;
+use App\Http\Controllers\Api\ConsumerWalletConversationController;
 use App\Http\Controllers\Api\ConsumerWalletAuthController;
 use App\Http\Controllers\Api\LiveSyncReceiverController;
 use App\Http\Controllers\Api\MevonPayWebhookController;
@@ -80,7 +83,15 @@ Route::prefix('v1')->group(function () {
         Route::get('kyc/tier2', [ConsumerWalletApiController::class, 'kycTier2Status']);
         Route::post('kyc/tier2/personal', [ConsumerWalletApiController::class, 'kycTier2Personal']);
         Route::post('kyc/tier2/business', [ConsumerWalletApiController::class, 'kycTier2Business']);
+        /** @deprecated Prefer POST consumer/wallet/conversation; kept for older app bundles. */
+        Route::get('chat/messages', [ConsumerChatController::class, 'index']);
+        Route::post('chat/messages', [ConsumerChatController::class, 'store']);
+        Route::post('wallet/conversation', [ConsumerWalletConversationController::class, 'store']);
+        Route::post('wallet/transfer/confirm-web-token', [ConsumerWalletApiController::class, 'confirmTransferWebToken']);
     });
+
+    Route::post('internal/consumer-chat/reply', [ConsumerChatInternalController::class, 'reply'])
+        ->middleware('throttle:30,1');
 
     // Secure inbound sync receiver (live site -> this app)
     Route::post('sync/live', [LiveSyncReceiverController::class, 'receive'])

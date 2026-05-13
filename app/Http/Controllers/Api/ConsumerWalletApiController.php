@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
+use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletTransferService;
+use App\Services\Whatsapp\WhatsappWalletSecureTransferAuthService;
 use App\Services\MavonPayTransferService;
 use App\Services\VtuNg\VtuNgApiClient;
 use App\Services\Whatsapp\PhoneNormalizer;
@@ -36,6 +38,7 @@ class ConsumerWalletApiController extends Controller
         private WhatsappWalletVtuPurchaseService $vtuPurchase,
         private VtuNgApiClient $vtuApi,
         private WhatsappWalletPendingP2pService $pendingP2p,
+        private WhatsappWalletSecureTransferAuthService $waTransferAuth,
     ) {}
 
     private function walletFor(Request $request): WhatsappWallet
@@ -75,6 +78,64 @@ class ConsumerWalletApiController extends Controller
             'status' => $wallet->status,
         ];
 
+        $payIn = null;
+        if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA) {
+            $acct = trim((string) $wallet->mevon_virtual_account_number);
+            if ($acct !== '') {
+                $displayName = trim(trim((string) $wallet->kyc_fname).' '.trim((string) $wallet->kyc_lname));
+                if ($displayName === '' && (string) $wallet->rubies_account_type === 'business' && trim((string) $wallet->kyc_cac) !== '') {
+                    $displayName = 'Business · '.trim((string) $wallet->kyc_cac);
+                }
+                if ($displayName === '') {
+                    $displayName = trim((string) ($wallet->sender_name ?? ''));
+                }
+                if ($displayName === '') {
+                    $displayName = (string) ($wallet->mevon_reference ?? 'Wallet account');
+                }
+                $payIn = [
+                    'kind' => 'permanent',
+                    'account_number' => $acct,
+                    'account_name' => $displayName,
+                    'bank_name' => $wallet->mevon_bank_name ?? 'Rubies MFB',
+                    'bank_code' => $wallet->mevon_bank_code,
+                    'expires_at' => null,
+                ];
+            }
+        } elseif ((int) $wallet->tier === WhatsappWallet::TIER_WHATSAPP_ONLY) {
+            $pending = WhatsappWalletPendingTopup::query()
+                ->where('whatsapp_wallet_id', $wallet->id)
+                ->whereNull('fulfilled_at')
+                ->where('expires_at', '>', now())
+                ->orderByDesc('id')
+                ->first();
+            if ($pending) {
+                $expiresDisplay = null;
+                if ($pending->expires_at) {
+                    try {
+                        $expiresDisplay = Carbon::parse($pending->expires_at)
+                            ->timezone((string) config('app.timezone'))
+                            ->toIso8601String();
+                    } catch (\Throwable) {
+                        $expiresDisplay = $pending->expires_at->toIso8601String();
+                    }
+                }
+                $payIn = [
+                    'kind' => 'temporary',
+                    'account_number' => (string) $pending->account_number,
+                    'account_name' => trim((string) ($pending->account_name ?? '')) !== ''
+                        ? (string) $pending->account_name
+                        : $wallet->normalizedSenderName(),
+                    'bank_name' => (string) ($pending->bank_name ?? ''),
+                    'bank_code' => $pending->bank_code,
+                    'expires_at' => $expiresDisplay,
+                ];
+            }
+        }
+
+        $e164 = (string) $wallet->phone_e164;
+        $vtuEligible = $this->walletCountry->isNigeriaPayInWallet($e164);
+        $vtuConfigured = $this->vtuApi->isConfigured();
+
         return response()->json([
             'success' => true,
             'data' => array_merge($base, [
@@ -86,6 +147,14 @@ class ConsumerWalletApiController extends Controller
                 'mevon_bank_name' => $wallet->mevon_bank_name,
                 'mevon_bank_code' => $wallet->mevon_bank_code,
                 'rubies_account_type' => $wallet->rubies_account_type,
+                'pay_in' => $payIn,
+                'vtu' => [
+                    'eligible' => $vtuEligible,
+                    'configured' => $vtuConfigured,
+                    'available' => $vtuEligible && $vtuConfigured,
+                    'airtime_min' => (float) config('vtu.airtime_min', 50),
+                    'airtime_max' => (float) config('vtu.airtime_max', 50000),
+                ],
             ]),
         ]);
     }
@@ -361,6 +430,30 @@ class ConsumerWalletApiController extends Controller
         ], $code);
     }
 
+    /**
+     * Complete a pending WhatsApp-style bank/P2P debit that was staged with a web confirm token (same cache entry as the secure link).
+     */
+    public function confirmTransferWebToken(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token' => 'required|string|max:128',
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        $result = $this->waTransferAuth->confirmViaWebPinForConsumerApp(
+            $wallet,
+            (string) $request->input('token'),
+            (string) $request->input('pin')
+        );
+
+        return response()->json([
+            'success' => (bool) ($result['ok'] ?? false),
+            'message' => ($result['ok'] ?? false) ? 'Transfer completed.' : ($result['error'] ?? 'Could not confirm.'),
+            'data' => null,
+        ], ($result['ok'] ?? false) ? 200 : 422);
+    }
+
     public function bankNameEnquiry(Request $request): JsonResponse
     {
         $this->walletFor($request);
@@ -393,7 +486,12 @@ class ConsumerWalletApiController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => config('vtu.networks', []),
+            'data' => [
+                'networks' => config('vtu.networks', []),
+                'configured' => $this->vtuApi->isConfigured(),
+                'airtime_min' => (float) config('vtu.airtime_min', 50),
+                'airtime_max' => (float) config('vtu.airtime_max', 50000),
+            ],
         ]);
     }
 

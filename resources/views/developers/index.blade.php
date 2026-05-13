@@ -33,6 +33,15 @@
                 <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
                     Everything you need to integrate CheckoutPay into your application. API reference, webhooks, testing tools, and more.
                 </p>
+                <div class="flex flex-col sm:flex-row gap-3 justify-center items-center flex-wrap">
+                    <a href="{{ route('developers.program') }}" class="inline-flex items-center px-5 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium shadow-sm">
+                        <i class="fas fa-handshake mr-2"></i>
+                        Developer Program — earn on client integrations
+                    </a>
+                    <a href="{{ url('/developers/program/apply') }}" class="inline-flex items-center px-5 py-2.5 border-2 border-primary text-primary rounded-lg hover:bg-primary/5 text-sm font-medium touch-manipulation">
+                        Apply to the program
+                    </a>
+                </div>
             </div>
         </div>
     </section>

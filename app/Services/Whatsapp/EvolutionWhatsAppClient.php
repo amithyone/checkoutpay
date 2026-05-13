@@ -9,6 +9,12 @@ class EvolutionWhatsAppClient
 {
     public function sendText(string $instanceName, string $numberDigits, string $text): bool
     {
+        if (WalletConversationCapture::isActive()) {
+            WalletConversationCapture::append($text);
+
+            return true;
+        }
+
         $base = WhatsappEvolutionConfigResolver::baseUrl();
         $key = WhatsappEvolutionConfigResolver::apiKey();
         $instanceName = $instanceName !== '' ? $instanceName : WhatsappEvolutionConfigResolver::defaultInstance();
@@ -67,6 +73,13 @@ class EvolutionWhatsAppClient
         ?string $caption = null,
         ?string $fileName = null,
     ): bool {
+        if (WalletConversationCapture::isActive()) {
+            $hint = trim((string) $caption);
+            WalletConversationCapture::append($hint !== '' ? "[{$mediatype}] {$hint}" : '['.$mediatype.']');
+
+            return true;
+        }
+
         $base = WhatsappEvolutionConfigResolver::baseUrl();
         $key = WhatsappEvolutionConfigResolver::apiKey();
         $instanceName = $instanceName !== '' ? $instanceName : WhatsappEvolutionConfigResolver::defaultInstance();

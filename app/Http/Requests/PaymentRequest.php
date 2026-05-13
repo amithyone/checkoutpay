@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Models\DeveloperProgramApplication;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class PaymentRequest extends FormRequest
 {
@@ -37,6 +37,8 @@ class PaymentRequest extends FormRequest
             'transaction_id' => ['nullable', 'string', 'max:255', 'unique:payments,transaction_id'],
             'business_website_id' => ['nullable', 'integer', 'exists:business_websites,id'], // Allow explicit website ID
             'website_url' => ['nullable', 'url', 'max:500'], // Allow website URL for identification
+            'developer_program_partner_business_id' => ['nullable', 'integer', 'exists:businesses,id'],
+            'devprogram' => ['nullable', 'integer'],
         ];
     }
 
@@ -71,6 +73,40 @@ class PaymentRequest extends FormRequest
                     );
                 }
             }
+
+            $partnerId = $this->input('developer_program_partner_business_id');
+            if ($partnerId === null || $partnerId === '') {
+                return;
+            }
+            if ($validator->errors()->has('developer_program_partner_business_id')) {
+                return;
+            }
+
+            $merchant = $this->user();
+            if ($merchant && (int) $partnerId === (int) $merchant->id) {
+                $validator->errors()->add(
+                    'developer_program_partner_business_id',
+                    'Developer program partner must be a different business than the merchant creating the payment.'
+                );
+
+                return;
+            }
+
+            $partnerInt = (int) $partnerId;
+            $approved = DeveloperProgramApplication::query()
+                ->where('status', DeveloperProgramApplication::STATUS_APPROVED)
+                ->where(function ($q) use ($partnerInt) {
+                    $q->where('business_id', (string) $partnerInt)
+                        ->orWhere('business_id', $partnerInt);
+                })
+                ->exists();
+
+            if (! $approved) {
+                $validator->errors()->add(
+                    'developer_program_partner_business_id',
+                    'No approved developer program application exists for this partner business ID.'
+                );
+            }
         });
     }
 
@@ -88,6 +124,7 @@ class PaymentRequest extends FormRequest
             'payer_name.required' => 'The payer name is required to get an account number.',
             'webhook_url.url' => 'The webhook URL must be a valid URL.',
             'transaction_id.unique' => 'This transaction ID already exists.',
+            'developer_program_partner_business_id.exists' => 'The selected developer program partner business ID is invalid.',
         ];
     }
 
@@ -96,6 +133,18 @@ class PaymentRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        if ($this->filled('devprogram') && ! $this->filled('developer_program_partner_business_id')) {
+            $this->merge([
+                'developer_program_partner_business_id' => $this->input('devprogram'),
+            ]);
+        }
+
+        if ($this->has('developer_program_partner_business_id') && $this->input('developer_program_partner_business_id') === '') {
+            $this->merge([
+                'developer_program_partner_business_id' => null,
+            ]);
+        }
+
         // Map 'name' field to 'payer_name' if provided (API uses 'name', internal uses 'payer_name')
         if ($this->has('name') && $this->name) {
             $this->merge([
