@@ -155,6 +155,10 @@ class ConsumerWalletApiController extends Controller
                     'airtime_min' => (float) config('vtu.airtime_min', 50),
                     'airtime_max' => (float) config('vtu.airtime_max', 50000),
                 ],
+                'transfer_email_otp_enabled' => (bool) $wallet->transfer_email_otp_enabled,
+                'transfer_email_otp_eligible' => $wallet->isTier2(),
+                'transfer_email_otp_has_email' => $wallet->resolveOtpEmail() !== null,
+                'transfer_email_otp_effective' => $wallet->wantsTransferEmailOtp(),
             ]),
         ]);
     }
@@ -359,6 +363,63 @@ class ConsumerWalletApiController extends Controller
         $wallet->save();
 
         return response()->json(['success' => true, 'message' => 'Display name updated.']);
+    }
+
+    public function updateTransferEmailOtp(Request $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request)->fresh();
+        if (! $wallet->isTier2()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transfer email codes are only available on Tier 2 wallets.',
+            ], 422);
+        }
+
+        $request->validate([
+            'transfer_email_otp_enabled' => 'required|boolean',
+        ]);
+
+        $enabled = (bool) $request->boolean('transfer_email_otp_enabled');
+        if ($enabled && $wallet->resolveOtpEmail() === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Add a verified email on your wallet (Tier 2 KYC or linked account) before turning this on.',
+            ], 422);
+        }
+
+        $wallet->transfer_email_otp_enabled = $enabled;
+        $wallet->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => $enabled
+                ? 'Email confirmation codes are ON for transfers.'
+                : 'Email confirmation codes are OFF. Secure link only.',
+            'data' => [
+                'transfer_email_otp_enabled' => (bool) $wallet->transfer_email_otp_enabled,
+                'transfer_email_otp_effective' => $wallet->wantsTransferEmailOtp(),
+            ],
+        ]);
+    }
+
+    public function registerPushToken(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token' => 'required|string|max:512',
+            'platform' => 'required|string|in:android,ios,web',
+        ]);
+
+        $user = $request->user();
+        if (! $user instanceof ConsumerWalletApiAccount) {
+            return response()->json(['success' => false, 'message' => 'Invalid session.'], 401);
+        }
+
+        $user->fcm_token = (string) $request->input('token');
+        $user->fcm_platform = (string) $request->input('platform');
+        $user->fcm_token_updated_at = now();
+        $user->save();
+
+        return response()->json(['success' => true, 'message' => 'Push token saved.']);
     }
 
     public function transferP2p(Request $request): JsonResponse

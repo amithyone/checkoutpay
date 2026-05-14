@@ -19,6 +19,12 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
     protected $fillable = [
         'whatsapp_wallet_id',
         'phone_e164',
+        'fcm_token',
+        'fcm_platform',
+    ];
+
+    protected $casts = [
+        'fcm_token_updated_at' => 'datetime',
     ];
 
     public function wallet(): BelongsTo

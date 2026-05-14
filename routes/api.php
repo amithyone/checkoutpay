@@ -74,6 +74,8 @@ Route::prefix('v1')->group(function () {
         Route::post('wallet/pin', [ConsumerWalletApiController::class, 'setPin']);
         Route::put('wallet/pin', [ConsumerWalletApiController::class, 'changePin']);
         Route::patch('profile/sender-name', [ConsumerWalletApiController::class, 'updateSenderName']);
+        Route::patch('wallet/transfer-email-otp', [ConsumerWalletApiController::class, 'updateTransferEmailOtp']);
+        Route::post('wallet/push-token', [ConsumerWalletApiController::class, 'registerPushToken']);
         Route::post('transfers/p2p', [ConsumerWalletApiController::class, 'transferP2p']);
         Route::post('transfers/bank', [ConsumerWalletApiController::class, 'transferBank']);
         Route::get('banks/name-enquiry', [ConsumerWalletApiController::class, 'bankNameEnquiry']);
