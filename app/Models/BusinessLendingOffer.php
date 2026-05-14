@@ -122,4 +122,24 @@ class BusinessLendingOffer extends Model
             default => 'Weekly split collections',
         };
     }
+
+    /**
+     * One-line explanation for marketplace / dashboards (aligned with {@see BusinessPeerLoanService::buildScheduleDates}).
+     */
+    public function repaymentSummaryLine(): string
+    {
+        if ($this->repayment_type === self::REPAYMENT_LUMP) {
+            return 'Lump sum: one full repayment on the last day of the '.$this->term_days.'-day term.';
+        }
+
+        $n = $this->splitInstallmentCount();
+        $frequency = $this->repayment_frequency ?: self::FREQUENCY_WEEKLY;
+        $stepWord = match ($frequency) {
+            self::FREQUENCY_DAILY => 'each day',
+            self::FREQUENCY_MONTHLY => 'every 30 days',
+            default => 'about every 7 days',
+        };
+
+        return 'Split: '.$n.' equal installment'.($n === 1 ? '' : 's').' (total repayment ÷ '.$n.') over '.$this->term_days.' days, collected '.$stepWord.' until the term ends.';
+    }
 }

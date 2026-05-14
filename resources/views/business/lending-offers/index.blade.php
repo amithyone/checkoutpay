@@ -73,7 +73,7 @@
             <div class="p-4 flex flex-wrap justify-between gap-2 items-center">
                 <div>
                     <p class="font-semibold text-gray-900">₦{{ number_format($o->amount, 2) }} · {{ number_format($o->interest_rate_percent, 2) }}% of principal</p>
-                    <p class="text-xs text-gray-500 mt-1">{{ $o->term_days }} days (due dates only) · {{ $o->repayment_type === 'lump' ? 'One-time' : 'Split ('.$o->repayment_frequency.')' }} · {{ $o->status }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ $o->term_days }} days · {{ $o->repaymentSummaryLine() }}</p>
                     <p class="text-xs text-gray-400 mt-1">Public: /business-loans/{{ $o->public_slug }}</p>
                 </div>
                 <div class="flex gap-2 flex-wrap">

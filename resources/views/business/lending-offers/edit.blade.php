@@ -53,21 +53,23 @@
             @error('term_days')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Repayment</label>
+            <label class="block text-sm font-medium text-gray-700">How should the borrower repay?</label>
             <select name="repayment_type" id="repayment_type" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="toggleFrequencyField()">
-                <option value="lump" @selected(old('repayment_type', $offer->repayment_type)==='lump')>One-time at end</option>
-                <option value="split" @selected(old('repayment_type', $offer->repayment_type)==='split')>Split installments</option>
+                <option value="lump" @selected(old('repayment_type', $offer->repayment_type) === 'lump')>Lump sum at end of term — one full repayment on the last day</option>
+                <option value="split" @selected(old('repayment_type', $offer->repayment_type) === 'split')>Split — equal installments spread across the term (you choose how often)</option>
             </select>
+            <p class="text-xs text-gray-500 mt-1">Example: a 30-day term + <strong>daily split</strong> = 30 equal slices. <strong>Lump sum</strong> = one payment on the last day.</p>
         </div>
         <div id="repayment_frequency_wrap" class="{{ old('repayment_type', $offer->repayment_type) === 'split' ? '' : 'hidden' }}">
-            <label class="block text-sm font-medium text-gray-700">Repayment frequency</label>
-            <select name="repayment_frequency" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option value="daily" @selected(old('repayment_frequency', $offer->repayment_frequency)==='daily')>Daily</option>
-                <option value="weekly" @selected(old('repayment_frequency', $offer->repayment_frequency ?? 'weekly')==='weekly')>Weekly</option>
-                <option value="monthly" @selected(old('repayment_frequency', $offer->repayment_frequency)==='monthly')>Monthly (every 30 days)</option>
+            <label class="block text-sm font-medium text-gray-700">Installment rhythm (split offers only)</label>
+            <select name="repayment_frequency" id="repayment_frequency_select" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="daily" @selected(old('repayment_frequency', $offer->repayment_frequency) === 'daily')>Daily — one equal slice per day until the term ends</option>
+                <option value="weekly" @selected(old('repayment_frequency', $offer->repayment_frequency ?? 'weekly') === 'weekly')>Weekly — about every 7 days</option>
+                <option value="monthly" @selected(old('repayment_frequency', $offer->repayment_frequency) === 'monthly')>Monthly — every 30 days (same logic as collections)</option>
             </select>
-            <p class="text-xs text-gray-500 mt-1">Equal installments are auto-scheduled across the loan term.</p>
+            <p class="text-xs text-gray-500 mt-1">Amounts are computed automatically from principal + your interest %; each slice is as equal as rounding allows.</p>
         </div>
+        <p id="repayment_schedule_preview" class="text-xs text-blue-900 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mt-2 hidden" role="status"></p>
         <label class="inline-flex items-center gap-2 text-sm text-gray-700">
             <input type="hidden" name="list_publicly" value="0">
             <input type="checkbox" name="list_publicly" value="1" class="rounded border-gray-300" @checked(old('list_publicly', $offer->list_publicly ? '1' : '0') == '1')>
@@ -80,19 +82,65 @@
     </form>
 </div>
 <script>
+function installmentCount(termDays, repaymentType, freq) {
+    if (repaymentType !== 'split' || !Number.isFinite(termDays) || termDays < 1) return null;
+    let step = 7;
+    if (freq === 'daily') step = 1;
+    else if (freq === 'monthly') step = 30;
+    return Math.max(1, Math.ceil(termDays / step));
+}
+
+function updateRepaymentPreview() {
+    const typeEl = document.getElementById('repayment_type');
+    const termEl = document.querySelector('input[name="term_days"]');
+    const freqEl = document.getElementById('repayment_frequency_select');
+    const out = document.getElementById('repayment_schedule_preview');
+    if (!typeEl || !termEl || !out) return;
+    const term = parseInt(termEl.value, 10);
+    const type = typeEl.value;
+    const freq = freqEl && !freqEl.disabled ? freqEl.value : 'weekly';
+    if (type === 'lump') {
+        out.textContent = Number.isFinite(term) && term > 0
+            ? 'Borrower repays the full amount once on the last day of the term (day ' + term + ' after disbursement).'
+            : 'Enter the term length to see how repayment is scheduled.';
+        out.classList.remove('hidden');
+        return;
+    }
+    const n = installmentCount(term, type, freq);
+    if (!n) {
+        out.classList.add('hidden');
+        return;
+    }
+    const stepDesc = freq === 'daily' ? 'one per day' : freq === 'monthly' ? 'every 30 days' : 'about every 7 days';
+    out.textContent = 'Scheduled as ' + n + ' equal installment' + (n === 1 ? '' : 's') + ' (total repayment ÷ ' + n + '), due ' + stepDesc + ', ending on the last day of the term.';
+    out.classList.remove('hidden');
+}
+
 function toggleFrequencyField() {
     const sel = document.getElementById('repayment_type');
     const wrap = document.getElementById('repayment_frequency_wrap');
-    if (!sel || !wrap) return;
+    const freq = document.getElementById('repayment_frequency_select');
+    if (!sel || !wrap || !freq) return;
     if (sel.value === 'split') {
         wrap.classList.remove('hidden');
+        freq.disabled = false;
     } else {
         wrap.classList.add('hidden');
+        freq.disabled = true;
     }
+    updateRepaymentPreview();
 }
 
 (function () {
     toggleFrequencyField();
+    const termEl = document.querySelector('input[name="term_days"]');
+    const freqEl = document.getElementById('repayment_frequency_select');
+    if (termEl) {
+        termEl.addEventListener('input', updateRepaymentPreview);
+        termEl.addEventListener('change', updateRepaymentPreview);
+    }
+    if (freqEl) freqEl.addEventListener('change', updateRepaymentPreview);
+    updateRepaymentPreview();
     const form = document.getElementById('lendingOfferForm');
     const btn = document.getElementById('lendingOfferSubmit');
     if (!form || !btn) return;

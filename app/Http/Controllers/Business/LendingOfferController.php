@@ -69,7 +69,11 @@ class LendingOfferController extends Controller
             'interest_rate_percent' => ['required', 'numeric', 'min:0', 'max:'.$maxInterest],
             'term_days' => ['required', 'integer', 'min:'.$minTerm, 'max:'.$maxTerm],
             'repayment_type' => ['required', Rule::in([BusinessLendingOffer::REPAYMENT_LUMP, BusinessLendingOffer::REPAYMENT_SPLIT])],
-            'repayment_frequency' => ['nullable', Rule::in(BusinessLendingOffer::FREQUENCIES)],
+            'repayment_frequency' => [
+                'nullable',
+                Rule::requiredIf(($request->input('repayment_type') ?? '') === BusinessLendingOffer::REPAYMENT_SPLIT),
+                Rule::in(BusinessLendingOffer::FREQUENCIES),
+            ],
         ]);
 
         $repaymentFrequency = $validated['repayment_type'] === BusinessLendingOffer::REPAYMENT_SPLIT
@@ -163,7 +167,11 @@ class LendingOfferController extends Controller
             'interest_rate_percent' => ['required', 'numeric', 'min:0', 'max:'.$maxInterest],
             'term_days' => ['required', 'integer', 'min:'.$minTerm, 'max:'.$maxTerm],
             'repayment_type' => ['required', Rule::in([BusinessLendingOffer::REPAYMENT_LUMP, BusinessLendingOffer::REPAYMENT_SPLIT])],
-            'repayment_frequency' => ['nullable', Rule::in(BusinessLendingOffer::FREQUENCIES)],
+            'repayment_frequency' => [
+                'nullable',
+                Rule::requiredIf(($request->input('repayment_type') ?? '') === BusinessLendingOffer::REPAYMENT_SPLIT),
+                Rule::in(BusinessLendingOffer::FREQUENCIES),
+            ],
         ]);
 
         $repaymentFrequency = $validated['repayment_type'] === BusinessLendingOffer::REPAYMENT_SPLIT

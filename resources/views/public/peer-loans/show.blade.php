@@ -21,7 +21,7 @@
         <p class="text-sm text-gray-600">Lender: <span class="font-medium text-gray-900">{{ $offer->lender->name }}</span></p>
         @include('partials.peer-lending-interest-explainer', ['variant' => 'offer-detail', 'offer' => $offer])
         <p class="text-sm text-gray-600">Term: <span class="font-medium">{{ $offer->term_days }} days</span></p>
-        <p class="text-sm text-gray-600">Repayment: <span class="font-medium">{{ $offer->repayment_type === 'lump' ? 'One-time at end' : 'Split installments ('.ucfirst($offer->repayment_frequency ?? 'weekly').')' }}</span></p>
+        <p class="text-sm text-gray-600">Repayment: <span class="font-medium block mt-1">{{ $offer->repaymentSummaryLine() }}</span></p>
     </div>
 
     @if(session('error'))

@@ -22,7 +22,10 @@
                 <tr>
                     <td class="px-4 py-3">{{ $o->lender->name }}</td>
                     <td class="px-4 py-3">₦{{ number_format($o->amount, 2) }}</td>
-                    <td class="px-4 py-3">{{ number_format($o->interest_rate_percent, 2) }}% of principal · {{ $o->term_days }}d · {{ $o->repayment_type === 'lump' ? 'One-time' : 'Split ('.($o->repayment_frequency ?? 'weekly').')' }}</td>
+                    <td class="px-4 py-3 max-w-md">
+                        <span class="block">{{ number_format($o->interest_rate_percent, 2) }}% of principal · {{ $o->term_days }}d</span>
+                        <span class="block text-xs text-gray-600 mt-1 leading-snug">{{ $o->repaymentSummaryLine() }}</span>
+                    </td>
                     <td class="px-4 py-3 text-right space-x-2">
                         <form action="{{ route('admin.peer-lending.offers.approve', $o) }}" method="POST" class="inline">@csrf<button class="text-xs px-2 py-1 bg-green-600 text-white rounded">Approve</button></form>
                         <form action="{{ route('admin.peer-lending.offers.reject', $o) }}" method="POST" class="inline" onsubmit="return confirm('Reject?');">@csrf<button class="text-xs px-2 py-1 bg-red-100 text-red-800 rounded">Reject</button></form>
