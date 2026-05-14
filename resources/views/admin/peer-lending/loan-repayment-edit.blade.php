@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Edit loan repayment')
-@section('page-title', 'Peer lending — edit repayment schedule')
+@section('title', 'Edit loan')
+@section('page-title', 'Peer lending — edit loan')
 
 @section('content')
 @php
@@ -15,9 +15,15 @@
         <p class="text-sm text-gray-600 mb-1">Lender: <strong>{{ $loan->offer->lender->name }}</strong></p>
         <p class="text-sm text-gray-600 mb-4">Principal ₦{{ number_format($loan->principal, 2) }} → repay ₦{{ number_format($loan->total_repayment, 2) }} · Offer term {{ $loan->offer->term_days }} days</p>
         @if($loan->status === \App\Models\BusinessLoan::STATUS_ACTIVE)
-            <div class="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg">
-                This loan is already disbursed. Saving will <strong>delete all current schedule rows</strong> and recreate them from the settings below. Only use this when no repayments have been collected yet.
-            </div>
+            @if($loan->repaidAmount() >= 0.01)
+                <div class="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg">
+                    This loan already has repayments. Saving will replace schedule rows: amounts collected so far are rolled into <strong>one paid</strong> line, and the <strong>remaining balance</strong> is rescheduled with your new lump/split from today through the original contract end date. Ledger history is unchanged.
+                </div>
+            @else
+                <div class="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg">
+                    This loan is disbursed. Saving will <strong>replace all schedule rows</strong> using the settings below.
+                </div>
+            @endif
         @endif
         @include('partials.peer-lending-interest-explainer', ['variant' => 'panel'])
         <form method="POST" action="{{ route('admin.peer-lending.loans.repayment.update', $loan) }}" class="space-y-4">

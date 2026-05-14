@@ -102,6 +102,86 @@ class BusinessPeerLoanService
         }
     }
 
+    /**
+     * After deleting old schedule rows, recreate: one paid row for amounts already collected, then new
+     * pending rows for the remainder from today through the original contract maturity (offer term from disbursement).
+     */
+    public function createSchedulesPreservingPriorPaid(BusinessLoan $loan, float $priorPaidTotal): void
+    {
+        $loan->loadMissing('offer');
+        $offer = $loan->offer;
+        $cap = round(max(0.0, min((float) $priorPaidTotal, (float) $loan->total_repayment)), 2);
+        $remainder = round(max(0.0, (float) $loan->total_repayment - $cap), 2);
+
+        $seq = 1;
+        if ($cap >= 0.01) {
+            $disbursed = $loan->disbursed_at ?? now();
+            BusinessLoanSchedule::create([
+                'business_loan_id' => $loan->id,
+                'sequence' => $seq++,
+                'due_at' => $disbursed,
+                'amount_due' => $cap,
+                'amount_paid' => $cap,
+                'status' => 'paid',
+            ]);
+        }
+
+        if ($remainder < 0.01) {
+            $this->syncLoanRepaidStatusIfAllSchedulesPaid($loan->id);
+
+            return;
+        }
+
+        $disbursedAt = $loan->disbursed_at ?? now();
+        $asOf = now()->startOfDay();
+        $maturity = $disbursedAt->copy()->startOfDay()->addDays((int) $offer->term_days);
+        if ($asOf->gt($maturity)) {
+            $remainingSpanDays = 1;
+        } else {
+            $remainingSpanDays = max(1, $asOf->diffInDays($maturity) + 1);
+        }
+
+        $rows = $this->buildScheduleDatesFromParts(
+            $loan->effectiveRepaymentType(),
+            $loan->effectiveRepaymentFrequency(),
+            $remainingSpanDays,
+            $remainder,
+            $asOf
+        );
+
+        if ($loan->effectiveRepaymentType() === BusinessLendingOffer::REPAYMENT_LUMP && count($rows) === 1) {
+            $rows[0]['due_at'] = $disbursedAt->copy()->addDays((int) $offer->term_days);
+        }
+
+        foreach ($rows as $row) {
+            BusinessLoanSchedule::create([
+                'business_loan_id' => $loan->id,
+                'sequence' => $seq++,
+                'due_at' => $row['due_at'],
+                'amount_due' => $row['amount'],
+                'amount_paid' => 0,
+                'status' => 'pending',
+            ]);
+        }
+
+        $this->syncLoanRepaidStatusIfAllSchedulesPaid($loan->id);
+    }
+
+    private function syncLoanRepaidStatusIfAllSchedulesPaid(int $loanId): void
+    {
+        $loan = BusinessLoan::query()->with('schedules')->find($loanId);
+        if (! $loan || $loan->schedules->isEmpty()) {
+            return;
+        }
+        $allPaid = $loan->schedules->every(fn ($s) => $s->status === 'paid');
+        if ($allPaid) {
+            $loan->update([
+                'status' => BusinessLoan::STATUS_REPAID,
+                'repaid_at' => now(),
+            ]);
+        }
+    }
+
     public function disburse(BusinessLoan $loan): void
     {
         $loan->load(['offer.lender', 'borrower', 'schedules']);

@@ -125,7 +125,7 @@ class PeerLendingAdminController extends Controller
         }
         if (! $loan->canAdminEditRepaymentSchedule()) {
             return redirect()->route('admin.peer-lending.loans.index')
-                ->with('error', 'Repayment cannot be edited once collections have started, or for this loan status.');
+                ->with('error', 'Only pending or active loans can be edited.');
         }
 
         $loan->load(['offer.lender', 'borrower']);
@@ -141,7 +141,7 @@ class PeerLendingAdminController extends Controller
         }
         if (! $loan->canAdminEditRepaymentSchedule()) {
             return redirect()->route('admin.peer-lending.loans.index')
-                ->with('error', 'Repayment cannot be edited once collections have started, or for this loan status.');
+                ->with('error', 'Only pending or active loans can be edited.');
         }
 
         $validated = $request->validate([
@@ -163,9 +163,19 @@ class PeerLendingAdminController extends Controller
                 'admin_repayment_frequency' => $frequency,
             ]);
 
-            if ($loan->status === BusinessLoan::STATUS_ACTIVE) {
-                $loan->schedules()->delete();
-                $loanService->createSchedules($loan->fresh(['offer']));
+            if ($loan->status !== BusinessLoan::STATUS_ACTIVE) {
+                return;
+            }
+
+            $loan->refresh()->load(['offer', 'schedules']);
+            $paidSum = $loan->repaidAmount();
+            $loan->schedules()->delete();
+
+            $working = $loan->fresh(['offer']);
+            if ($paidSum < 0.01) {
+                $loanService->createSchedules($working);
+            } else {
+                $loanService->createSchedulesPreservingPriorPaid($working, $paidSum);
             }
         });
 

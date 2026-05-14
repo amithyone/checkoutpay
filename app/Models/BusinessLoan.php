@@ -71,19 +71,13 @@ class BusinessLoan extends Model
     }
 
     /**
-     * Admin may set repayment mode per loan (overrides the marketplace offer) before disbursement,
-     * or after disbursement only if no repayments have been collected yet.
+     * Super admins may set repayment mode per loan (overrides the marketplace offer) while pending
+     * or active. If repayments already started, schedules are rebuilt with prior collections preserved
+     * as one paid aggregate row (see {@see \App\Services\Credit\BusinessPeerLoanService::createSchedulesPreservingPriorPaid}).
      */
     public function canAdminEditRepaymentSchedule(): bool
     {
-        if ($this->status === self::STATUS_PENDING_ADMIN) {
-            return true;
-        }
-        if ($this->status === self::STATUS_ACTIVE) {
-            return $this->repaidAmount() < 0.01 && ! $this->hasCollectionLedgerActivity();
-        }
-
-        return false;
+        return in_array($this->status, [self::STATUS_PENDING_ADMIN, self::STATUS_ACTIVE], true);
     }
 
     public function effectiveRepaymentType(): string

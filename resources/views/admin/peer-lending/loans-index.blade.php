@@ -7,6 +7,9 @@
 @if(session('success'))<div class="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm">{{ session('success') }}</div>@endif
 @if(session('error'))<div class="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded text-sm">{{ session('error') }}</div>@endif
 @include('partials.peer-lending-interest-explainer', ['variant' => 'panel'])
+<div class="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800">
+    <strong>Edit loan</strong> sets lump sum or split (daily / weekly / monthly) for <strong>this borrower only</strong>. While a loan is <strong>pending</strong>, schedules are created on disburse. For <strong>active</strong> loans, saving replaces schedules; if repayments already started, prior collected amounts are kept as one paid row and the <strong>outstanding balance</strong> is rescheduled to the original contract end date.
+</div>
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
     <div class="px-4 py-3 border-b bg-gray-50">
         <h3 class="text-sm font-semibold text-gray-800">Active loans</h3>
@@ -18,7 +21,7 @@
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Lender</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Repayment progress</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Outstanding</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600 w-28"></th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">Actions</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
@@ -30,7 +33,8 @@
                 <tr>
                     <td class="px-4 py-3">
                         <span class="block">{{ $loan->borrower->name }}</span>
-                        <span class="text-xs text-gray-500">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d offer</span>
+                        <span class="text-xs text-gray-400">Loan #{{ $loan->id }}</span>
+                        <span class="block text-xs text-gray-500 mt-0.5">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d offer</span>
                     </td>
                     <td class="px-4 py-3">{{ $loan->offer->lender->name }}</td>
                     <td class="px-4 py-3 min-w-[16rem]">
@@ -48,11 +52,7 @@
                     </td>
                     <td class="px-4 py-3">₦{{ number_format($loan->outstandingAmount(), 2) }}</td>
                     <td class="px-4 py-3 align-top">
-                        @if($loan->canAdminEditRepaymentSchedule())
-                            <a href="{{ route('admin.peer-lending.loans.repayment.edit', $loan) }}" class="text-xs text-primary hover:underline">Edit repayment</a>
-                        @else
-                            <span class="text-xs text-gray-400">—</span>
-                        @endif
+                        <a href="{{ route('admin.peer-lending.loans.edit', $loan) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md border border-primary text-primary bg-white hover:bg-primary/5">Edit loan</a>
                     </td>
                 </tr>
             @empty
@@ -73,25 +73,30 @@
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Lender / Offer</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Principal → Total repay</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 max-w-xs">Repayment (this loan)</th>
-                <th class="px-4 py-3 text-right"></th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 whitespace-nowrap">Actions</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
             @forelse($pendingLoans as $loan)
                 <tr>
-                    <td class="px-4 py-3">{{ $loan->borrower->name }}</td>
+                    <td class="px-4 py-3">
+                        <span class="block">{{ $loan->borrower->name }}</span>
+                        <span class="text-xs text-gray-400">Loan #{{ $loan->id }}</span>
+                    </td>
                     <td class="px-4 py-3">{{ $loan->offer->lender->name }} <span class="text-gray-400">#{{ $loan->offer->id }}</span></td>
                     <td class="px-4 py-3">
                         <span class="block">₦{{ number_format($loan->principal, 2) }} → ₦{{ number_format($loan->total_repayment, 2) }}</span>
                         <span class="text-xs text-gray-500">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d</span>
                     </td>
                     <td class="px-4 py-3 text-xs text-gray-600 leading-snug max-w-xs">{{ $loan->repaymentScheduleSummaryLine() }}</td>
-                    <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                        @if($loan->canAdminEditRepaymentSchedule())
-                            <a href="{{ route('admin.peer-lending.loans.repayment.edit', $loan) }}" class="text-xs text-primary hover:underline">Edit repayment</a>
-                        @endif
-                        <form action="{{ route('admin.peer-lending.loans.approve', $loan) }}" method="POST" class="inline">@csrf<button class="text-xs px-2 py-1 bg-green-600 text-white rounded">Disburse</button></form>
-                        <form action="{{ route('admin.peer-lending.loans.reject', $loan) }}" method="POST" class="inline" onsubmit="return confirm('Reject?');">@csrf<button class="text-xs px-2 py-1 bg-red-100 text-red-800 rounded">Reject</button></form>
+                    <td class="px-4 py-3 text-right">
+                        <div class="inline-flex flex-col sm:flex-row sm:items-center gap-2 justify-end">
+                            <a href="{{ route('admin.peer-lending.loans.edit', $loan) }}" class="inline-flex items-center justify-center px-2.5 py-1.5 text-xs font-medium rounded-md border border-primary text-primary bg-white hover:bg-primary/5 order-first sm:order-none">Edit loan</a>
+                            <span class="inline-flex flex-wrap gap-2 justify-end">
+                                <form action="{{ route('admin.peer-lending.loans.approve', $loan) }}" method="POST" class="inline">@csrf<button type="submit" class="text-xs px-2 py-1 bg-green-600 text-white rounded">Disburse</button></form>
+                                <form action="{{ route('admin.peer-lending.loans.reject', $loan) }}" method="POST" class="inline" onsubmit="return confirm('Reject?');">@csrf<button type="submit" class="text-xs px-2 py-1 bg-red-100 text-red-800 rounded">Reject</button></form>
+                            </span>
+                        </div>
                     </td>
                 </tr>
             @empty
