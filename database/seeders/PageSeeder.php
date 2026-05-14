@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Page;
+use Illuminate\Database\Seeder;
 
 class PageSeeder extends Seeder
 {
@@ -38,31 +38,7 @@ class PageSeeder extends Seeder
             ]
         );
 
-        // Privacy Policy (placeholder)
-        Page::updateOrCreate(
-            ['slug' => 'privacy-policy'],
-            [
-                'title' => 'Privacy Policy',
-                'content' => '<h2>Privacy Policy</h2><p>This privacy policy will be updated with your actual privacy policy content.</p>',
-                'meta_title' => 'Privacy Policy - CheckoutPay',
-                'meta_description' => 'CheckoutPay privacy policy',
-                'is_published' => true,
-                'order' => 3,
-            ]
-        );
-
-        // Terms and Conditions (placeholder)
-        Page::updateOrCreate(
-            ['slug' => 'terms-and-conditions'],
-            [
-                'title' => 'Terms and Conditions',
-                'content' => '<h2>Terms and Conditions</h2><p>These terms and conditions will be updated with your actual terms content.</p>',
-                'meta_title' => 'Terms and Conditions - CheckoutPay',
-                'meta_description' => 'CheckoutPay terms and conditions',
-                'is_published' => true,
-                'order' => 4,
-            ]
-        );
+        LegalPagesDefinitions::syncToDatabase();
     }
 
     private function getHomeContent(): string
