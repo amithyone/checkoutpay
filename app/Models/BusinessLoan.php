@@ -111,4 +111,61 @@ class BusinessLoan extends Model
 
         return ['paid' => $paid, 'total' => $total];
     }
+
+    /**
+     * Next schedule slice that still has balance to collect (respects partial payments).
+     */
+    public function nextCollectibleSchedule(): ?BusinessLoanSchedule
+    {
+        $list = $this->relationLoaded('schedules')
+            ? $this->schedules->sortBy('sequence')->values()
+            : $this->schedules()->orderBy('sequence')->get();
+
+        foreach ($list as $schedule) {
+            if ($schedule->remaining() >= 0.01) {
+                return $schedule;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{
+     *     amount: float,
+     *     due_at: \Illuminate\Support\Carbon,
+     *     sequence: int,
+     *     total_schedules: int,
+     *     cadence_label: string,
+     *     term_days: int,
+     *     split_installments: int
+     * }|null
+     */
+    public function nextCollectionSummary(): ?array
+    {
+        $schedule = $this->nextCollectibleSchedule();
+        if ($schedule === null) {
+            return null;
+        }
+
+        $this->loadMissing('offer');
+        $offer = $this->offer;
+        if (! $offer) {
+            return null;
+        }
+
+        $totalSchedules = $this->relationLoaded('schedules')
+            ? $this->schedules->count()
+            : (int) $this->schedules()->count();
+
+        return [
+            'amount' => round($schedule->remaining(), 2),
+            'due_at' => $schedule->due_at,
+            'sequence' => (int) $schedule->sequence,
+            'total_schedules' => $totalSchedules,
+            'cadence_label' => $offer->repaymentCadenceLabel(),
+            'term_days' => (int) $offer->term_days,
+            'split_installments' => $offer->splitInstallmentCount(),
+        ];
+    }
 }

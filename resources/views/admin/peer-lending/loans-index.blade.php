@@ -42,6 +42,7 @@
                                 · {{ $sch['paid'] }}/{{ $sch['total'] }} schedules paid
                             @endif
                         </div>
+                        @include('partials.peer-loan-next-collection', ['loan' => $loan])
                     </td>
                     <td class="px-4 py-3">₦{{ number_format($loan->outstandingAmount(), 2) }}</td>
                 </tr>

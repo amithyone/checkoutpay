@@ -57,6 +57,7 @@
                         · {{ $sch['paid'] }}/{{ $sch['total'] }} schedules paid
                     @endif
                 </p>
+                @include('partials.peer-loan-next-collection', ['loan' => $loan])
             </div>
         @empty
             <p class="p-6 text-sm text-gray-600">No active disbursed loans yet.</p>
