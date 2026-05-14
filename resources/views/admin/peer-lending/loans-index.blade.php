@@ -18,6 +18,7 @@
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Lender</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Repayment progress</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Outstanding</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 w-28"></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
@@ -43,11 +44,19 @@
                             @endif
                         </div>
                         @include('partials.peer-loan-next-collection', ['loan' => $loan])
+                        <p class="text-xs text-gray-500 mt-1 leading-snug">{{ $loan->repaymentScheduleSummaryLine() }}</p>
                     </td>
                     <td class="px-4 py-3">₦{{ number_format($loan->outstandingAmount(), 2) }}</td>
+                    <td class="px-4 py-3 align-top">
+                        @if($loan->canAdminEditRepaymentSchedule())
+                            <a href="{{ route('admin.peer-lending.loans.repayment.edit', $loan) }}" class="text-xs text-primary hover:underline">Edit repayment</a>
+                        @else
+                            <span class="text-xs text-gray-400">—</span>
+                        @endif
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No active loans.</td></tr>
+                <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No active loans.</td></tr>
             @endforelse
         </tbody>
     </table>
@@ -63,7 +72,8 @@
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Borrower</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Lender / Offer</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Principal → Total repay</th>
-                <th class="px-4 py-3"></th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 max-w-xs">Repayment (this loan)</th>
+                <th class="px-4 py-3 text-right"></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
@@ -75,13 +85,17 @@
                         <span class="block">₦{{ number_format($loan->principal, 2) }} → ₦{{ number_format($loan->total_repayment, 2) }}</span>
                         <span class="text-xs text-gray-500">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d</span>
                     </td>
-                    <td class="px-4 py-3 text-right space-x-2">
+                    <td class="px-4 py-3 text-xs text-gray-600 leading-snug max-w-xs">{{ $loan->repaymentScheduleSummaryLine() }}</td>
+                    <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                        @if($loan->canAdminEditRepaymentSchedule())
+                            <a href="{{ route('admin.peer-lending.loans.repayment.edit', $loan) }}" class="text-xs text-primary hover:underline">Edit repayment</a>
+                        @endif
                         <form action="{{ route('admin.peer-lending.loans.approve', $loan) }}" method="POST" class="inline">@csrf<button class="text-xs px-2 py-1 bg-green-600 text-white rounded">Disburse</button></form>
                         <form action="{{ route('admin.peer-lending.loans.reject', $loan) }}" method="POST" class="inline" onsubmit="return confirm('Reject?');">@csrf<button class="text-xs px-2 py-1 bg-red-100 text-red-800 rounded">Reject</button></form>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No pending loans.</td></tr>
+                <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No pending loans.</td></tr>
             @endforelse
         </tbody>
     </table>

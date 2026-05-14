@@ -12,7 +12,7 @@
             · Installment {{ $next['sequence'] }} of {{ $next['total_schedules'] }}
             · {{ $next['cadence_label'] }}
             · {{ $next['term_days'] }}d offer term
-            @if($loan->offer && $loan->offer->repayment_type === \App\Models\BusinessLendingOffer::REPAYMENT_SPLIT)
+            @if($loan->offer && $loan->effectiveRepaymentType() === \App\Models\BusinessLendingOffer::REPAYMENT_SPLIT)
                 ({{ $next['split_installments'] }} equal split{{ $next['split_installments'] === 1 ? '' : 's' }})
             @endif
         </span>

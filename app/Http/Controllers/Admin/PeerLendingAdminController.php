@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessLendingOffer;
 use App\Models\BusinessLoan;
+use App\Models\BusinessLoanLedgerEntry;
 use App\Services\Credit\BusinessPeerLoanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PeerLendingAdminController extends Controller
@@ -60,11 +63,21 @@ class PeerLendingAdminController extends Controller
     public function loansIndex(): View
     {
         $pendingLoans = BusinessLoan::with(['offer.lender', 'borrower', 'schedules'])
+            ->withExists([
+                'ledgerEntries as has_peer_collection_activity' => function ($q) {
+                    $q->where('entry_type', BusinessLoanLedgerEntry::TYPE_COLLECTION);
+                },
+            ])
             ->where('status', BusinessLoan::STATUS_PENDING_ADMIN)
             ->latest()
             ->paginate(25);
 
         $activeLoans = BusinessLoan::with(['offer.lender', 'borrower', 'schedules'])
+            ->withExists([
+                'ledgerEntries as has_peer_collection_activity' => function ($q) {
+                    $q->where('entry_type', BusinessLoanLedgerEntry::TYPE_COLLECTION);
+                },
+            ])
             ->where('status', BusinessLoan::STATUS_ACTIVE)
             ->latest('disbursed_at')
             ->limit(200)
@@ -102,5 +115,61 @@ class PeerLendingAdminController extends Controller
 
         return redirect()->route('admin.peer-lending.loans.index')
             ->with('success', 'Loan application rejected.');
+    }
+
+    public function editLoanRepayment(BusinessLoan $loan): View|RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        if (! $admin->isSuperAdmin()) {
+            abort(403);
+        }
+        if (! $loan->canAdminEditRepaymentSchedule()) {
+            return redirect()->route('admin.peer-lending.loans.index')
+                ->with('error', 'Repayment cannot be edited once collections have started, or for this loan status.');
+        }
+
+        $loan->load(['offer.lender', 'borrower']);
+
+        return view('admin.peer-lending.loan-repayment-edit', compact('loan'));
+    }
+
+    public function updateLoanRepayment(Request $request, BusinessLoan $loan, BusinessPeerLoanService $loanService): RedirectResponse
+    {
+        $admin = auth('admin')->user();
+        if (! $admin->isSuperAdmin()) {
+            abort(403);
+        }
+        if (! $loan->canAdminEditRepaymentSchedule()) {
+            return redirect()->route('admin.peer-lending.loans.index')
+                ->with('error', 'Repayment cannot be edited once collections have started, or for this loan status.');
+        }
+
+        $validated = $request->validate([
+            'repayment_type' => ['required', Rule::in([BusinessLendingOffer::REPAYMENT_LUMP, BusinessLendingOffer::REPAYMENT_SPLIT])],
+            'repayment_frequency' => [
+                'nullable',
+                Rule::requiredIf(($request->input('repayment_type') ?? '') === BusinessLendingOffer::REPAYMENT_SPLIT),
+                Rule::in(BusinessLendingOffer::FREQUENCIES),
+            ],
+        ]);
+
+        $frequency = $validated['repayment_type'] === BusinessLendingOffer::REPAYMENT_SPLIT
+            ? ($validated['repayment_frequency'] ?? BusinessLendingOffer::FREQUENCY_WEEKLY)
+            : null;
+
+        DB::transaction(function () use ($loan, $validated, $frequency, $loanService) {
+            $loan->update([
+                'admin_repayment_type' => $validated['repayment_type'],
+                'admin_repayment_frequency' => $frequency,
+            ]);
+
+            if ($loan->status === BusinessLoan::STATUS_ACTIVE) {
+                $loan->schedules()->delete();
+                $loanService->createSchedules($loan->fresh(['offer']));
+            }
+        });
+
+        return redirect()->route('admin.peer-lending.loans.index')
+            ->with('success', 'Loan repayment schedule updated.');
     }
 }

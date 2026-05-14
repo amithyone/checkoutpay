@@ -47,6 +47,7 @@
                     <p class="text-xs text-gray-500">Principal ₦{{ number_format($loan->principal, 2) }} · Repay ₦{{ number_format($loan->total_repayment, 2) }}</p>
                     <p class="text-xs text-gray-400">{{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }}d offer</p>
                 </div>
+                <p class="text-xs text-gray-500 mt-1">{{ $loan->repaymentScheduleSummaryLine() }}</p>
                 <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
                     <div class="bg-green-600 h-2.5 rounded-full" style="width: {{ $p }}%"></div>
                 </div>

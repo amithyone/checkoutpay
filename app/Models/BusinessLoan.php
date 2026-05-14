@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -23,6 +24,8 @@ class BusinessLoan extends Model
         'borrower_business_id',
         'principal',
         'total_repayment',
+        'admin_repayment_type',
+        'admin_repayment_frequency',
         'status',
         'disbursed_at',
         'repaid_at',
@@ -54,6 +57,93 @@ class BusinessLoan extends Model
     public function ledgerEntries(): HasMany
     {
         return $this->hasMany(BusinessLoanLedgerEntry::class);
+    }
+
+    public function hasCollectionLedgerActivity(): bool
+    {
+        if (isset($this->has_peer_collection_activity)) {
+            return (bool) $this->has_peer_collection_activity;
+        }
+
+        return $this->ledgerEntries()
+            ->where('entry_type', BusinessLoanLedgerEntry::TYPE_COLLECTION)
+            ->exists();
+    }
+
+    /**
+     * Admin may set repayment mode per loan (overrides the marketplace offer) before disbursement,
+     * or after disbursement only if no repayments have been collected yet.
+     */
+    public function canAdminEditRepaymentSchedule(): bool
+    {
+        if ($this->status === self::STATUS_PENDING_ADMIN) {
+            return true;
+        }
+        if ($this->status === self::STATUS_ACTIVE) {
+            return $this->repaidAmount() < 0.01 && ! $this->hasCollectionLedgerActivity();
+        }
+
+        return false;
+    }
+
+    public function effectiveRepaymentType(): string
+    {
+        $this->loadMissing('offer');
+
+        return $this->admin_repayment_type ?? (string) $this->offer->repayment_type;
+    }
+
+    /**
+     * Meaningful only when {@see effectiveRepaymentType()} is split; otherwise null.
+     */
+    public function effectiveRepaymentFrequency(): ?string
+    {
+        if ($this->effectiveRepaymentType() === BusinessLendingOffer::REPAYMENT_LUMP) {
+            return null;
+        }
+        $this->loadMissing('offer');
+
+        return $this->admin_repayment_frequency
+            ?? ($this->offer->repayment_frequency ?: BusinessLendingOffer::FREQUENCY_WEEKLY);
+    }
+
+    public function repaymentScheduleSummaryLine(): string
+    {
+        $this->loadMissing('offer');
+
+        return BusinessLendingOffer::formatRepaymentSummaryLine(
+            $this->effectiveRepaymentType(),
+            $this->effectiveRepaymentFrequency(),
+            (int) $this->offer->term_days
+        );
+    }
+
+    /**
+     * Used by peer-loan collection cron: effective repayment (loan admin override or offer).
+     */
+    public function scopeMatchingCollectCadence(Builder $query, string $cadence): void
+    {
+        $query->where('business_loans.status', self::STATUS_ACTIVE);
+        $typeExpr = 'COALESCE(business_loans.admin_repayment_type, (SELECT o.repayment_type FROM business_lending_offers o WHERE o.id = business_loans.business_lending_offer_id))';
+        $freqExpr = 'COALESCE(business_loans.admin_repayment_frequency, (SELECT o.repayment_frequency FROM business_lending_offers o WHERE o.id = business_loans.business_lending_offer_id))';
+
+        match ($cadence) {
+            'daily' => $query->where(function (Builder $w) use ($typeExpr, $freqExpr) {
+                $w->whereRaw("{$typeExpr} = ?", [BusinessLendingOffer::REPAYMENT_LUMP])
+                    ->orWhere(function (Builder $w2) use ($typeExpr, $freqExpr) {
+                        $w2->whereRaw("{$typeExpr} = ?", [BusinessLendingOffer::REPAYMENT_SPLIT])
+                            ->whereRaw("{$freqExpr} = ?", [BusinessLendingOffer::FREQUENCY_DAILY]);
+                    });
+            }),
+            'weekly' => $query->whereRaw("{$typeExpr} = ?", [BusinessLendingOffer::REPAYMENT_SPLIT])
+                ->where(function (Builder $w) use ($freqExpr) {
+                    $w->whereRaw("{$freqExpr} IS NULL")
+                        ->orWhereRaw("{$freqExpr} = ?", [BusinessLendingOffer::FREQUENCY_WEEKLY]);
+                }),
+            'monthly' => $query->whereRaw("{$typeExpr} = ?", [BusinessLendingOffer::REPAYMENT_SPLIT])
+                ->whereRaw("{$freqExpr} = ?", [BusinessLendingOffer::FREQUENCY_MONTHLY]),
+            default => throw new \InvalidArgumentException("Unknown cadence: {$cadence}"),
+        };
     }
 
     public function totalScheduledAmount(): float
@@ -163,9 +253,16 @@ class BusinessLoan extends Model
             'due_at' => $schedule->due_at,
             'sequence' => (int) $schedule->sequence,
             'total_schedules' => $totalSchedules,
-            'cadence_label' => $offer->repaymentCadenceLabel(),
+            'cadence_label' => BusinessLendingOffer::repaymentCadenceLabelFor(
+                $this->effectiveRepaymentType(),
+                $this->effectiveRepaymentFrequency(),
+            ),
             'term_days' => (int) $offer->term_days,
-            'split_installments' => $offer->splitInstallmentCount(),
+            'split_installments' => BusinessLendingOffer::splitInstallmentCountFor(
+                $this->effectiveRepaymentType(),
+                $this->effectiveRepaymentFrequency(),
+                (int) $offer->term_days,
+            ),
         ];
     }
 }

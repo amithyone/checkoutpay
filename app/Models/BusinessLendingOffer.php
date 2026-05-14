@@ -90,31 +90,40 @@ class BusinessLendingOffer extends Model
     }
 
     /**
-     * Number of schedule slices for this offer (must stay aligned with {@see \App\Services\Credit\BusinessPeerLoanService::buildScheduleDates}).
+     * Number of schedule slices (must stay aligned with {@see \App\Services\Credit\BusinessPeerLoanService::buildScheduleDatesFromParts}).
      */
-    public function splitInstallmentCount(): int
+    public static function splitInstallmentCountFor(string $repaymentType, ?string $repaymentFrequency, int $termDays): int
     {
-        if ($this->repayment_type === self::REPAYMENT_LUMP) {
+        if ($repaymentType === self::REPAYMENT_LUMP) {
             return 1;
         }
 
-        $frequency = $this->repayment_frequency ?: self::FREQUENCY_WEEKLY;
+        $frequency = $repaymentFrequency ?: self::FREQUENCY_WEEKLY;
         $stepDays = match ($frequency) {
             self::FREQUENCY_DAILY => 1,
             self::FREQUENCY_MONTHLY => 30,
             default => 7,
         };
 
-        return max(1, (int) ceil($this->term_days / $stepDays));
+        return max(1, (int) ceil($termDays / $stepDays));
     }
 
-    public function repaymentCadenceLabel(): string
+    public function splitInstallmentCount(): int
     {
-        if ($this->repayment_type === self::REPAYMENT_LUMP) {
+        return self::splitInstallmentCountFor(
+            (string) $this->repayment_type,
+            $this->repayment_frequency,
+            (int) $this->term_days
+        );
+    }
+
+    public static function repaymentCadenceLabelFor(string $repaymentType, ?string $repaymentFrequency): string
+    {
+        if ($repaymentType === self::REPAYMENT_LUMP) {
             return 'Lump sum at end of term';
         }
 
-        $frequency = $this->repayment_frequency ?: self::FREQUENCY_WEEKLY;
+        $frequency = $repaymentFrequency ?: self::FREQUENCY_WEEKLY;
 
         return match ($frequency) {
             self::FREQUENCY_DAILY => 'Daily split collections',
@@ -123,23 +132,37 @@ class BusinessLendingOffer extends Model
         };
     }
 
-    /**
-     * One-line explanation for marketplace / dashboards (aligned with {@see BusinessPeerLoanService::buildScheduleDates}).
-     */
-    public function repaymentSummaryLine(): string
+    public function repaymentCadenceLabel(): string
     {
-        if ($this->repayment_type === self::REPAYMENT_LUMP) {
-            return 'Lump sum: one full repayment on the last day of the '.$this->term_days.'-day term.';
+        return self::repaymentCadenceLabelFor((string) $this->repayment_type, $this->repayment_frequency);
+    }
+
+    /**
+     * One-line explanation for marketplace / dashboards (aligned with {@see BusinessPeerLoanService::buildScheduleDatesFromParts}).
+     */
+    public static function formatRepaymentSummaryLine(string $repaymentType, ?string $repaymentFrequency, int $termDays): string
+    {
+        if ($repaymentType === self::REPAYMENT_LUMP) {
+            return 'Lump sum: one full repayment on the last day of the '.$termDays.'-day term.';
         }
 
-        $n = $this->splitInstallmentCount();
-        $frequency = $this->repayment_frequency ?: self::FREQUENCY_WEEKLY;
+        $n = self::splitInstallmentCountFor($repaymentType, $repaymentFrequency, $termDays);
+        $frequency = $repaymentFrequency ?: self::FREQUENCY_WEEKLY;
         $stepWord = match ($frequency) {
             self::FREQUENCY_DAILY => 'each day',
             self::FREQUENCY_MONTHLY => 'every 30 days',
             default => 'about every 7 days',
         };
 
-        return 'Split: '.$n.' equal installment'.($n === 1 ? '' : 's').' (total repayment ÷ '.$n.') over '.$this->term_days.' days, collected '.$stepWord.' until the term ends.';
+        return 'Split: '.$n.' equal installment'.($n === 1 ? '' : 's').' (total repayment ÷ '.$n.') over '.$termDays.' days, collected '.$stepWord.' until the term ends.';
+    }
+
+    public function repaymentSummaryLine(): string
+    {
+        return self::formatRepaymentSummaryLine(
+            (string) $this->repayment_type,
+            $this->repayment_frequency,
+            (int) $this->term_days
+        );
     }
 }

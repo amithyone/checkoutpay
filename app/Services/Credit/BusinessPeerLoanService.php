@@ -31,28 +31,42 @@ class BusinessPeerLoanService
      */
     public function buildScheduleDates(BusinessLendingOffer $offer, float $totalRepayment, ?Carbon $asOf = null): array
     {
+        return $this->buildScheduleDatesFromParts(
+            (string) $offer->repayment_type,
+            $offer->repayment_frequency,
+            (int) $offer->term_days,
+            $totalRepayment,
+            $asOf
+        );
+    }
+
+    /**
+     * @return list<array{due_at: Carbon, amount: float}>
+     */
+    public function buildScheduleDatesFromParts(string $repaymentType, ?string $repaymentFrequency, int $termDays, float $totalRepayment, ?Carbon $asOf = null): array
+    {
         $asOf = $asOf ?? now();
 
-        if ($offer->repayment_type === BusinessLendingOffer::REPAYMENT_LUMP) {
+        if ($repaymentType === BusinessLendingOffer::REPAYMENT_LUMP) {
             return [[
-                'due_at' => $asOf->copy()->addDays($offer->term_days),
+                'due_at' => $asOf->copy()->addDays($termDays),
                 'amount' => $totalRepayment,
             ]];
         }
 
-        $frequency = $offer->repayment_frequency ?: BusinessLendingOffer::FREQUENCY_WEEKLY;
+        $frequency = $repaymentFrequency ?: BusinessLendingOffer::FREQUENCY_WEEKLY;
         $stepDays = match ($frequency) {
             BusinessLendingOffer::FREQUENCY_DAILY => 1,
             BusinessLendingOffer::FREQUENCY_MONTHLY => 30,
             default => 7,
         };
-        $installments = max(1, (int) ceil($offer->term_days / $stepDays));
+        $installments = max(1, (int) ceil($termDays / $stepDays));
         $base = round($totalRepayment / $installments, 2);
         $out = [];
         for ($i = 1; $i <= $installments; $i++) {
             $amt = $i === $installments ? round($totalRepayment - $base * ($installments - 1), 2) : $base;
             $dueAt = $i === $installments
-                ? $asOf->copy()->addDays($offer->term_days)
+                ? $asOf->copy()->addDays($termDays)
                 : $asOf->copy()->addDays($stepDays * $i);
             $out[] = [
                 'due_at' => $dueAt,
@@ -65,9 +79,16 @@ class BusinessPeerLoanService
 
     public function createSchedules(BusinessLoan $loan): void
     {
+        $loan->loadMissing('offer');
         $offer = $loan->offer;
         $asOf = $loan->disbursed_at ?? now();
-        $rows = $this->buildScheduleDates($offer, (float) $loan->total_repayment, $asOf);
+        $rows = $this->buildScheduleDatesFromParts(
+            $loan->effectiveRepaymentType(),
+            $loan->effectiveRepaymentFrequency(),
+            (int) $offer->term_days,
+            (float) $loan->total_repayment,
+            $asOf
+        );
         $seq = 1;
         foreach ($rows as $row) {
             BusinessLoanSchedule::create([
@@ -140,7 +161,7 @@ class BusinessPeerLoanService
      * considered, so split schedules (e.g. daily = total/term_days per slice) are not
      * fully collected in one run just because the borrower has a high balance.
      *
-     * @param  'daily'|'weekly'|'monthly'|null  $cadence  When set (scheduler), only loans whose offer matches that repayment rhythm are processed. Null = all offers (manual runs).
+     * @param  'daily'|'weekly'|'monthly'|null  $cadence  When set (scheduler), only loans whose effective repayment (admin override or offer) matches that cadence are processed. Null = all active loans (manual runs).
      */
     public function collectDue(?string $cadence = null): int
     {
@@ -237,39 +258,13 @@ class BusinessPeerLoanService
      */
     private function filterSchedulesByOfferCadence(Builder $query, ?string $cadence): void
     {
-        $query->whereHas('loan', function ($loanQ) use ($cadence) {
-            $loanQ->where('status', BusinessLoan::STATUS_ACTIVE);
+        $query->whereHas('loan', function (Builder $loanQ) use ($cadence) {
+            $loanQ->where('business_loans.status', BusinessLoan::STATUS_ACTIVE);
             if ($cadence === null) {
                 return;
             }
-            $loanQ->whereHas('offer', function ($offerQ) use ($cadence) {
-                $this->applyOfferCollectCadenceFilter($offerQ, $cadence);
-            });
+            $loanQ->matchingCollectCadence($cadence);
         });
-    }
-
-    /**
-     * @param  Builder<\App\Models\BusinessLendingOffer>  $query
-     */
-    private function applyOfferCollectCadenceFilter(Builder $query, string $cadence): void
-    {
-        match ($cadence) {
-            'daily' => $query->where(function (Builder $w) {
-                $w->where('repayment_type', BusinessLendingOffer::REPAYMENT_LUMP)
-                    ->orWhere(function (Builder $w2) {
-                        $w2->where('repayment_type', BusinessLendingOffer::REPAYMENT_SPLIT)
-                            ->where('repayment_frequency', BusinessLendingOffer::FREQUENCY_DAILY);
-                    });
-            }),
-            'weekly' => $query->where('repayment_type', BusinessLendingOffer::REPAYMENT_SPLIT)
-                ->where(function (Builder $w) {
-                    $w->whereNull('repayment_frequency')
-                        ->orWhere('repayment_frequency', BusinessLendingOffer::FREQUENCY_WEEKLY);
-                }),
-            'monthly' => $query->where('repayment_type', BusinessLendingOffer::REPAYMENT_SPLIT)
-                ->where('repayment_frequency', BusinessLendingOffer::FREQUENCY_MONTHLY),
-            default => throw new \InvalidArgumentException("Unknown cadence: {$cadence}"),
-        };
     }
 
     private function notifyRepaymentCollected(BusinessLoan $loan, BusinessLoanSchedule $schedule, float $amountCollected): void

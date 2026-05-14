@@ -21,6 +21,7 @@
                         <p class="text-sm text-gray-600">Principal ₦{{ number_format($loan->principal, 2) }} → repay ₦{{ number_format($loan->total_repayment, 2) }}</p>
                         <p class="text-xs text-gray-500 mt-0.5">Offer: {{ number_format($loan->offer->interest_rate_percent, 2) }}% of principal · {{ $loan->offer->term_days }} days (not annualised)</p>
                         <p class="text-xs text-amber-700 mt-1">Status: {{ $loan->status }}</p>
+                        <p class="text-xs text-gray-600 mt-1 leading-snug">Repayment: {{ $loan->repaymentScheduleSummaryLine() }}</p>
                         @if($loan->status === \App\Models\BusinessLoan::STATUS_ACTIVE || $loan->status === \App\Models\BusinessLoan::STATUS_REPAID)
                             <div class="w-full max-w-md bg-gray-200 rounded-full h-2.5 mt-2">
                                 <div class="bg-green-600 h-2.5 rounded-full" style="width: {{ $p }}%"></div>

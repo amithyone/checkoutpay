@@ -131,6 +131,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('offers/{business_lending_offer}/approve', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'approveOffer'])->name('offers.approve');
             Route::post('offers/{business_lending_offer}/reject', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'rejectOffer'])->name('offers.reject');
             Route::get('loans', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'loansIndex'])->name('loans.index');
+            Route::get('loans/{loan}/repayment', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'editLoanRepayment'])->name('loans.repayment.edit');
+            Route::put('loans/{loan}/repayment', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'updateLoanRepayment'])->name('loans.repayment.update');
             Route::post('loans/{loan}/approve', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'approveLoan'])->name('loans.approve');
             Route::post('loans/{loan}/reject', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'rejectLoan'])->name('loans.reject');
             Route::post('collect-installments', [DashboardController::class, 'collectPeerLoanInstallments'])->name('collect-installments');
