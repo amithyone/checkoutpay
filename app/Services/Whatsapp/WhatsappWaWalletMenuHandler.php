@@ -2253,6 +2253,8 @@ class WhatsappWaWalletMenuHandler
             WhatsappWalletTransaction::TYPE_VTU_AIRTIME => $this->formatVtuHistoryLine('Airtime', $t, $amt, $when),
             WhatsappWalletTransaction::TYPE_VTU_DATA => $this->formatVtuHistoryLine('Data', $t, $amt, $when),
             WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY => $this->formatVtuHistoryLine('Electricity', $t, $amt, $when),
+            WhatsappWalletTransaction::TYPE_VTU_CABLE => $this->formatVtuHistoryLine('Cable TV', $t, $amt, $when),
+            WhatsappWalletTransaction::TYPE_VTU_BETTING => $this->formatVtuHistoryLine('Betting', $t, $amt, $when),
             WhatsappWalletTransaction::TYPE_ADJUSTMENT => "• Adjustment *₦{$amt}* · bal ₦{$balAfter} · {$when}",
             default => "• {$t->type} · *₦{$amt}* · {$when}",
         };

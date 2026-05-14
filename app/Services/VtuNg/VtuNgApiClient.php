@@ -155,16 +155,138 @@ class VtuNgApiClient
             return ['ok' => false, 'message' => 'Bill payments are not configured.'];
         }
 
-        $response = $this->requestPostJson('/electricity', [
+        $payload = [
             'request_id' => 'CP-EL-'.strtoupper(Str::random(14)),
             'service_id' => $serviceId,
-            'meter_number' => $meterNumber,
-            'phone' => $phone11,
+            'customer_id' => $meterNumber,
             'amount' => (int) round($amount, 0),
             'variation_id' => $variationId,
-        ]);
+        ];
+        // v1 field name; v2 uses customer_id only — send both for compatibility.
+        $payload['meter_number'] = $meterNumber;
+        $payload['phone'] = $phone11;
+
+        $response = $this->requestPostJson('/electricity', $payload);
 
         return $this->parseResponse($response, 'electricity');
+    }
+
+    /**
+     * Verify smartcard / betting user / meter (non-electricity omits variation_id).
+     *
+     * @return array{ok: bool, message: string, data?: array<string, mixed>|null, raw?: mixed}
+     */
+    public function verifyBillCustomer(string $serviceId, string $customerId, ?string $variationId = null): array
+    {
+        if (! $this->isConfigured()) {
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
+        }
+
+        $payload = [
+            'request_id' => 'CP-VC-'.strtoupper(Str::random(14)),
+            'service_id' => $serviceId,
+            'customer_id' => $customerId,
+        ];
+        if ($variationId !== null && $variationId !== '') {
+            $payload['variation_id'] = $variationId;
+        }
+
+        $response = $this->requestPostJson('/verify-customer', $payload);
+
+        return $this->parseResponse($response, 'verify_customer', [
+            'service_id' => $serviceId,
+        ]);
+    }
+
+    /**
+     * @return array{ok: bool, message: string, plans?: list<array{variation_id:int|string,label:string,price:float,available:bool,service_id?:string}>, raw?: mixed}
+     */
+    public function fetchTvPlans(?string $serviceId = null): array
+    {
+        $query = [];
+        if ($serviceId !== null && $serviceId !== '') {
+            $query['service_id'] = $serviceId;
+        }
+
+        $response = $this->requestGet('/variations/tv', $query);
+        $parsed = $this->parseResponse($response, 'variations.tv', $query);
+        if (! ($parsed['ok'] ?? false)) {
+            return $parsed;
+        }
+
+        $rows = $parsed['data'] ?? [];
+        if (! is_array($rows)) {
+            return ['ok' => false, 'message' => 'Unexpected TV plans format.', 'raw' => $parsed['raw'] ?? null];
+        }
+
+        $plans = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $vid = $row['variation_id'] ?? null;
+            if ($vid === null || $vid === '') {
+                continue;
+            }
+            $vidOut = is_numeric($vid) ? (int) $vid : (string) $vid;
+            $label = (string) ($row['package_bouquet'] ?? $row['name'] ?? 'Plan');
+            $priceRaw = $row['price'] ?? 0;
+            $price = round((float) $priceRaw, 2);
+            $avail = strtolower((string) ($row['availability'] ?? 'available')) === 'available';
+            $sid = isset($row['service_id']) ? (string) $row['service_id'] : null;
+            $plans[] = [
+                'variation_id' => $vidOut,
+                'label' => $label,
+                'price' => $price,
+                'available' => $avail,
+                'service_id' => $sid,
+            ];
+        }
+
+        return ['ok' => true, 'message' => 'OK', 'plans' => $plans, 'raw' => $parsed['raw']];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
+     */
+    public function purchaseTv(string $serviceId, string $smartcardNumber, string|int $variationId, ?float $amountOverride = null): array
+    {
+        if (! $this->isConfigured()) {
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
+        }
+
+        $payload = [
+            'request_id' => 'CP-TV-'.strtoupper(Str::random(14)),
+            'customer_id' => $smartcardNumber,
+            'service_id' => $serviceId,
+            'variation_id' => (string) $variationId,
+        ];
+        if ($amountOverride !== null && $amountOverride > 0) {
+            $payload['amount'] = (int) round($amountOverride, 0);
+        }
+
+        $response = $this->requestPostJson('/tv', $payload);
+
+        return $this->parseResponse($response, 'tv');
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
+     */
+    public function purchaseBetting(string $serviceId, string $customerId, float $amount): array
+    {
+        if (! $this->isConfigured()) {
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
+        }
+
+        $response = $this->requestPostJson('/betting', [
+            'request_id' => 'CP-BET-'.strtoupper(Str::random(14)),
+            'customer_id' => $customerId,
+            'service_id' => $serviceId,
+            'amount' => (int) round($amount, 0),
+        ]);
+
+        return $this->parseResponse($response, 'betting');
     }
 
     private function url(string $path): string

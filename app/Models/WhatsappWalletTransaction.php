@@ -23,6 +23,10 @@ class WhatsappWalletTransaction extends Model
 
     public const TYPE_VTU_ELECTRICITY = 'vtu_electricity';
 
+    public const TYPE_VTU_CABLE = 'vtu_cable';
+
+    public const TYPE_VTU_BETTING = 'vtu_betting';
+
     /** Merchant X-API-Key partner API: wallet debit to pay the authenticated business. */
     public const TYPE_PARTNER_MERCHANT_PAY = 'partner_merchant_pay';
 

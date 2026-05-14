@@ -29,6 +29,27 @@ return [
         ['id' => '9mobile', 'label' => '9mobile'],
     ],
 
+    /** Cable TV `service_id` for verify-customer + /tv purchase */
+    'cable_tv_services' => [
+        ['id' => 'dstv', 'label' => 'DStv'],
+        ['id' => 'gotv', 'label' => 'GOtv'],
+        ['id' => 'startimes', 'label' => 'StarTimes'],
+        ['id' => 'showmax', 'label' => 'Showmax'],
+    ],
+
+    /** Betting `service_id` for verify-customer + /betting (must match provider API spelling). */
+    'betting_services' => [
+        ['id' => 'Bet9ja', 'label' => 'Bet9ja'],
+        ['id' => 'BetKing', 'label' => 'BetKing'],
+        ['id' => '1xBet', 'label' => '1xBet'],
+        ['id' => 'BangBet', 'label' => 'BangBet'],
+        ['id' => 'BetWay', 'label' => 'BetWay'],
+        ['id' => 'MerryBet', 'label' => 'MerryBet'],
+        ['id' => 'NairaBet', 'label' => 'NairaBet'],
+        ['id' => 'NaijaBet', 'label' => 'NaijaBet'],
+        ['id' => 'SupaBet', 'label' => 'SupaBet'],
+    ],
+
     /** Disco `service_id` for verify-customer + electricity purchase; `variation_id` is prepaid|postpaid */
     'electricity_discos' => [
         ['id' => 'ikeja-electric', 'label' => 'Ikeja (IKEDC)'],

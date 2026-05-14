@@ -10,13 +10,13 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletTransferService;
-use App\Services\Whatsapp\WhatsappWalletSecureTransferAuthService;
 use App\Services\MavonPayTransferService;
 use App\Services\VtuNg\VtuNgApiClient;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use App\Services\Whatsapp\WhatsappWalletPartnerApiService;
 use App\Services\Whatsapp\WhatsappWalletPendingP2pService;
+use App\Services\Whatsapp\WhatsappWalletSecureTransferAuthService;
 use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
 use App\Services\Whatsapp\WhatsappWalletVtuPurchaseService;
 use App\Services\WhatsappWalletBankPayoutService;
@@ -585,6 +585,312 @@ class ConsumerWalletApiController extends Controller
             'message' => $out['message'],
             'data' => isset($out['balance_after']) ? ['balance_after' => $out['balance_after']] : null,
         ], $out['ok'] ? 200 : 422);
+    }
+
+    public function vtuBillCatalog(Request $request): JsonResponse
+    {
+        $this->walletFor($request);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'configured' => $this->vtuApi->isConfigured(),
+                'electricity_discos' => config('vtu.electricity_discos', []),
+                'cable_tv_services' => config('vtu.cable_tv_services', []),
+                'betting_services' => config('vtu.betting_services', []),
+                'electricity_min' => (float) config('vtu.electricity_min', 500),
+            ],
+        ]);
+    }
+
+    public function vtuElectricityVerify(Request $request): JsonResponse
+    {
+        $request->validate([
+            'service_id' => 'required|string|max:64',
+            'customer_id' => 'required|string|max:64',
+            'variation_id' => 'required|string|in:prepaid,postpaid',
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
+            return $block;
+        }
+        $serviceId = (string) $request->input('service_id');
+        if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.electricity_discos')) {
+            return response()->json(['success' => false, 'message' => 'Unknown electricity provider.'], 422);
+        }
+
+        $parsed = $this->vtuApi->verifyElectricityCustomer(
+            $serviceId,
+            (string) $request->input('customer_id'),
+            (string) $request->input('variation_id'),
+        );
+
+        return response()->json([
+            'success' => $parsed['ok'],
+            'message' => $parsed['message'] ?? ($parsed['ok'] ? 'OK' : 'Verification failed'),
+            'data' => $parsed['data'] ?? null,
+        ], $parsed['ok'] ? 200 : 422);
+    }
+
+    public function vtuElectricity(Request $request): JsonResponse
+    {
+        $request->validate([
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+            'service_id' => 'required|string|max:64',
+            'customer_id' => 'required|string|max:64',
+            'variation_id' => 'required|string|in:prepaid,postpaid',
+            'amount' => 'required|numeric|min:1',
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
+            return $block;
+        }
+        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
+            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        }
+
+        $serviceId = (string) $request->input('service_id');
+        if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.electricity_discos')) {
+            return response()->json(['success' => false, 'message' => 'Unknown electricity provider.'], 422);
+        }
+
+        $amount = (float) $request->input('amount');
+        $min = (float) config('vtu.electricity_min', 500);
+        if ($amount + 0.00001 < $min) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Amount is below the minimum for electricity purchases (₦'.number_format($min, 0).').',
+            ], 422);
+        }
+
+        $meter = (string) $request->input('customer_id');
+        $variation = (string) $request->input('variation_id');
+        $verify = $this->vtuApi->verifyElectricityCustomer($serviceId, $meter, $variation);
+        if (! ($verify['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => (string) ($verify['message'] ?? 'Could not verify meter details.'),
+            ], 422);
+        }
+
+        $data = is_array($verify['data'] ?? null) ? $verify['data'] : [];
+        $customerName = isset($data['customer_name']) ? (string) $data['customer_name'] : null;
+
+        $out = $this->vtuPurchase->purchaseElectricity(
+            $wallet,
+            $serviceId,
+            $meter,
+            $variation,
+            (string) $wallet->phone_e164,
+            $amount,
+            $customerName,
+        );
+
+        return response()->json([
+            'success' => $out['ok'],
+            'message' => $out['message'],
+            'data' => isset($out['balance_after']) ? ['balance_after' => $out['balance_after']] : null,
+        ], $out['ok'] ? 200 : 422);
+    }
+
+    public function vtuTvPlans(Request $request): JsonResponse
+    {
+        $this->walletFor($request);
+        $request->validate([
+            'service_id' => 'required|string|max:40',
+        ]);
+        $serviceId = (string) $request->input('service_id');
+        if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.cable_tv_services')) {
+            return response()->json(['success' => false, 'message' => 'Unknown cable TV provider.'], 422);
+        }
+        if (! $this->vtuApi->isConfigured()) {
+            return response()->json(['success' => false, 'message' => 'Bill payments are not configured.'], 503);
+        }
+
+        $parsed = $this->vtuApi->fetchTvPlans($serviceId);
+        if (! ($parsed['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $parsed['message'] ?? 'Could not load TV packages.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['plans' => $parsed['plans'] ?? []],
+        ]);
+    }
+
+    public function vtuTvVerify(Request $request): JsonResponse
+    {
+        $request->validate([
+            'service_id' => 'required|string|max:40',
+            'customer_id' => 'required|string|max:64',
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
+            return $block;
+        }
+        $serviceId = (string) $request->input('service_id');
+        if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.cable_tv_services')) {
+            return response()->json(['success' => false, 'message' => 'Unknown cable TV provider.'], 422);
+        }
+
+        $parsed = $this->vtuApi->verifyBillCustomer($serviceId, (string) $request->input('customer_id'));
+
+        return response()->json([
+            'success' => $parsed['ok'],
+            'message' => $parsed['message'] ?? ($parsed['ok'] ? 'OK' : 'Verification failed'),
+            'data' => $parsed['data'] ?? null,
+        ], $parsed['ok'] ? 200 : 422);
+    }
+
+    public function vtuTv(Request $request): JsonResponse
+    {
+        $request->validate([
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+            'service_id' => 'required|string|max:40',
+            'customer_id' => 'required|string|max:64',
+            'variation_id' => 'required',
+            'expected_price' => 'required|numeric|min:1',
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
+            return $block;
+        }
+        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
+            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        }
+
+        $serviceId = (string) $request->input('service_id');
+        if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.cable_tv_services')) {
+            return response()->json(['success' => false, 'message' => 'Unknown cable TV provider.'], 422);
+        }
+
+        $smart = (string) $request->input('customer_id');
+        $verify = $this->vtuApi->verifyBillCustomer($serviceId, $smart);
+        if (! ($verify['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => (string) ($verify['message'] ?? 'Could not verify smartcard.'),
+            ], 422);
+        }
+
+        $variationId = $request->input('variation_id');
+        $out = $this->vtuPurchase->purchaseCableTv(
+            $wallet,
+            $serviceId,
+            $smart,
+            is_numeric($variationId) ? (int) $variationId : (string) $variationId,
+            (float) $request->input('expected_price'),
+        );
+
+        return response()->json([
+            'success' => $out['ok'],
+            'message' => $out['message'],
+            'data' => isset($out['balance_after']) ? ['balance_after' => $out['balance_after']] : null,
+        ], $out['ok'] ? 200 : 422);
+    }
+
+    public function vtuBettingVerify(Request $request): JsonResponse
+    {
+        $request->validate([
+            'service_id' => 'required|string|max:64',
+            'customer_id' => 'required|string|max:128',
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
+            return $block;
+        }
+        $serviceId = (string) $request->input('service_id');
+        if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.betting_services')) {
+            return response()->json(['success' => false, 'message' => 'Unknown betting provider.'], 422);
+        }
+
+        $parsed = $this->vtuApi->verifyBillCustomer($serviceId, (string) $request->input('customer_id'));
+
+        return response()->json([
+            'success' => $parsed['ok'],
+            'message' => $parsed['message'] ?? ($parsed['ok'] ? 'OK' : 'Verification failed'),
+            'data' => $parsed['data'] ?? null,
+        ], $parsed['ok'] ? 200 : 422);
+    }
+
+    public function vtuBetting(Request $request): JsonResponse
+    {
+        $request->validate([
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+            'service_id' => 'required|string|max:64',
+            'customer_id' => 'required|string|max:128',
+            'amount' => 'required|numeric|between:100,100000',
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
+            return $block;
+        }
+        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
+            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        }
+
+        $serviceId = (string) $request->input('service_id');
+        if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.betting_services')) {
+            return response()->json(['success' => false, 'message' => 'Unknown betting provider.'], 422);
+        }
+
+        $customerId = (string) $request->input('customer_id');
+        $verify = $this->vtuApi->verifyBillCustomer($serviceId, $customerId);
+        if (! ($verify['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => (string) ($verify['message'] ?? 'Could not verify betting account.'),
+            ], 422);
+        }
+
+        $amount = (float) $request->input('amount');
+        $out = $this->vtuPurchase->purchaseBetting($wallet, $serviceId, $customerId, $amount);
+
+        return response()->json([
+            'success' => $out['ok'],
+            'message' => $out['message'],
+            'data' => isset($out['balance_after']) ? ['balance_after' => $out['balance_after']] : null,
+        ], $out['ok'] ? 200 : 422);
+    }
+
+    private function consumerVtuPreconditionResponse(WhatsappWallet $wallet): ?JsonResponse
+    {
+        $e164 = (string) $wallet->phone_e164;
+        if (! $this->walletCountry->isNigeriaPayInWallet($e164)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bill payments are only available for Nigeria wallet numbers (NGN).',
+            ], 422);
+        }
+        if (! $this->vtuApi->isConfigured()) {
+            return response()->json(['success' => false, 'message' => 'Bill payments are not configured.'], 503);
+        }
+
+        return null;
+    }
+
+    private function consumerVtuServiceAllowed(string $serviceId, string $configKey): bool
+    {
+        $rows = config($configKey, []);
+        if (! is_array($rows)) {
+            return false;
+        }
+        foreach ($rows as $row) {
+            if (is_array($row) && ($row['id'] ?? null) === $serviceId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function kycTier2Status(Request $request): JsonResponse

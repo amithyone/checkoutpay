@@ -3,8 +3,8 @@
 use App\Http\Controllers\Api\ConsumerChatController;
 use App\Http\Controllers\Api\ConsumerChatInternalController;
 use App\Http\Controllers\Api\ConsumerWalletApiController;
-use App\Http\Controllers\Api\ConsumerWalletConversationController;
 use App\Http\Controllers\Api\ConsumerWalletAuthController;
+use App\Http\Controllers\Api\ConsumerWalletConversationController;
 use App\Http\Controllers\Api\LiveSyncReceiverController;
 use App\Http\Controllers\Api\MevonPayWebhookController;
 use App\Http\Controllers\Api\PaymentController;
@@ -62,6 +62,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('consumer')->middleware('throttle:consumer_wallet_otp')->group(function () {
         Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
         Route::post('auth/otp/verify', [ConsumerWalletAuthController::class, 'verifyOtp']);
+        Route::post('auth/pin/verify', [ConsumerWalletAuthController::class, 'verifyPin']);
     });
 
     Route::prefix('consumer')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
@@ -77,7 +78,15 @@ Route::prefix('v1')->group(function () {
         Route::post('transfers/bank', [ConsumerWalletApiController::class, 'transferBank']);
         Route::get('banks/name-enquiry', [ConsumerWalletApiController::class, 'bankNameEnquiry']);
         Route::get('vtu/networks', [ConsumerWalletApiController::class, 'vtuNetworks']);
+        Route::get('vtu/bill-catalog', [ConsumerWalletApiController::class, 'vtuBillCatalog']);
         Route::get('vtu/data-plans', [ConsumerWalletApiController::class, 'vtuDataPlans']);
+        Route::get('vtu/tv-plans', [ConsumerWalletApiController::class, 'vtuTvPlans']);
+        Route::post('vtu/electricity/verify', [ConsumerWalletApiController::class, 'vtuElectricityVerify']);
+        Route::post('vtu/electricity', [ConsumerWalletApiController::class, 'vtuElectricity']);
+        Route::post('vtu/tv/verify', [ConsumerWalletApiController::class, 'vtuTvVerify']);
+        Route::post('vtu/tv', [ConsumerWalletApiController::class, 'vtuTv']);
+        Route::post('vtu/betting/verify', [ConsumerWalletApiController::class, 'vtuBettingVerify']);
+        Route::post('vtu/betting', [ConsumerWalletApiController::class, 'vtuBetting']);
         Route::post('vtu/airtime', [ConsumerWalletApiController::class, 'vtuAirtime']);
         Route::post('vtu/data', [ConsumerWalletApiController::class, 'vtuData']);
         Route::get('kyc/tier2', [ConsumerWalletApiController::class, 'kycTier2Status']);

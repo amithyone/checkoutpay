@@ -312,13 +312,14 @@ X-API-Key: {{ $business->api_key }}
             <i class="fas fa-mobile-alt mr-2 text-primary"></i> Consumer wallet API (Android / iOS)
         </h3>
         <p class="text-sm text-gray-600 mb-4">
-            End-user apps authenticate with <strong>WhatsApp OTP</strong> (code sent to the same number as the wallet) and a <code class="bg-gray-100 px-1 rounded text-xs">Bearer</code> token from Sanctum.
+            End-user apps authenticate with <strong>WhatsApp OTP</strong> or, once a wallet PIN exists, <strong>phone + PIN</strong> (<code class="bg-gray-100 px-1 rounded text-xs">POST …/auth/pin/verify</code>), then a <code class="bg-gray-100 px-1 rounded text-xs">Bearer</code> token from Sanctum.
             Base path: <code class="bg-gray-100 px-1 rounded text-xs">{{ url('/api/v1/consumer') }}</code>.
             This uses the same <code class="bg-gray-100 px-1 rounded text-xs">whatsapp_wallets</code> rows as the WhatsApp bot.
         </p>
         <div class="space-y-4 text-sm text-gray-700">
             <p><strong>1. Request OTP:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/auth/otp/request</code> JSON <code class="text-xs">{"phone":"080…"}</code></p>
             <p><strong>2. Verify &amp; token:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/auth/otp/verify</code> JSON <code class="text-xs">{"phone":"080…","code":"123456"}</code> → returns <code class="text-xs">token</code>; send <code class="text-xs">Authorization: Bearer &lt;token&gt;</code> on all following calls.</p>
+            <p><strong>2b. Sign in with PIN (optional):</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/auth/pin/verify</code> JSON <code class="text-xs">{"phone":"080…","pin":"1234"}</code> → same <code class="text-xs">token</code> shape as step 2 when the wallet already has a 4-digit PIN (first-time users must complete OTP and set PIN in-app first).</p>
             <p><strong>3. Wallet:</strong> <code class="text-xs bg-gray-100 px-1 rounded">GET …/wallet</code>, <code class="text-xs">POST …/wallet/ensure</code>, <code class="text-xs">GET …/wallet/transactions</code>, <code class="text-xs">POST …/wallet/topup/virtual-account</code></p>
             <p><strong>4. PIN:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/wallet/pin</code> (first-time), <code class="text-xs">PUT …/wallet/pin</code> (change). Debits require 4-digit <code class="text-xs">pin</code> on transfer/VTU routes.</p>
             <p><strong>5. Transfers:</strong> <code class="text-xs bg-gray-100 px-1 rounded">POST …/transfers/p2p</code> (<code class="text-xs">to_phone</code>, <code class="text-xs">amount</code>, <code class="text-xs">pin</code>), <code class="text-xs">POST …/transfers/bank</code> (account + bank + <code class="text-xs">pin</code>), <code class="text-xs">GET …/banks/name-enquiry</code></p>

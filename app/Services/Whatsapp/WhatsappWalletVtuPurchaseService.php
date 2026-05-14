@@ -171,6 +171,102 @@ class WhatsappWalletVtuPurchaseService
     }
 
     /**
+     * @return array{ok: bool, message: string, balance_after?: float}
+     */
+    public function purchaseCableTv(
+        WhatsappWallet $wallet,
+        string $serviceId,
+        string $smartcardNumber,
+        string|int $variationId,
+        float $expectedPrice
+    ): array {
+        $amount = round($expectedPrice, 2);
+        if ($amount < 1) {
+            return ['ok' => false, 'message' => 'Invalid package price.'];
+        }
+
+        $ref = 'VTU-TV-'.strtoupper(Str::random(14));
+        $debited = $this->debitWallet($wallet, $amount, WhatsappWalletTransaction::TYPE_VTU_CABLE, $ref, [
+            'vtu_kind' => 'cable_tv',
+            'service_id' => $serviceId,
+            'variation_id' => $variationId,
+            'smartcard' => $smartcardNumber,
+        ]);
+        if (! $debited['ok']) {
+            return $debited;
+        }
+
+        $api = $this->vtu->purchaseTv($serviceId, $smartcardNumber, $variationId, $amount);
+        if (! $api['ok']) {
+            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
+
+            return ['ok' => false, 'message' => (string) ($api['message'] ?? 'Purchase failed.')];
+        }
+
+        $this->finalizeTxnMeta($ref, [
+            'vtu_ok' => true,
+            'vtu_status' => 'success',
+            'vtu_message' => $api['message'] ?? null,
+            'vtu_data' => $api['data'] ?? null,
+            'vtu_provider_reference' => $this->extractProviderReference($api),
+        ]);
+        $w = $wallet->fresh();
+
+        return [
+            'ok' => true,
+            'message' => (string) ($api['message'] ?? 'Cable TV subscription submitted.'),
+            'balance_after' => $w ? (float) $w->balance : null,
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, balance_after?: float}
+     */
+    public function purchaseBetting(
+        WhatsappWallet $wallet,
+        string $serviceId,
+        string $customerId,
+        float $amount
+    ): array {
+        $amount = round($amount, 2);
+        if ($amount < 1) {
+            return ['ok' => false, 'message' => 'Invalid amount.'];
+        }
+
+        $ref = 'VTU-BET-'.strtoupper(Str::random(14));
+        $debited = $this->debitWallet($wallet, $amount, WhatsappWalletTransaction::TYPE_VTU_BETTING, $ref, [
+            'vtu_kind' => 'betting',
+            'service_id' => $serviceId,
+            'customer_id' => $customerId,
+        ]);
+        if (! $debited['ok']) {
+            return $debited;
+        }
+
+        $api = $this->vtu->purchaseBetting($serviceId, $customerId, $amount);
+        if (! $api['ok']) {
+            $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
+
+            return ['ok' => false, 'message' => (string) ($api['message'] ?? 'Purchase failed.')];
+        }
+
+        $this->finalizeTxnMeta($ref, [
+            'vtu_ok' => true,
+            'vtu_status' => 'success',
+            'vtu_message' => $api['message'] ?? null,
+            'vtu_data' => $api['data'] ?? null,
+            'vtu_provider_reference' => $this->extractProviderReference($api),
+        ]);
+        $w = $wallet->fresh();
+
+        return [
+            'ok' => true,
+            'message' => (string) ($api['message'] ?? 'Betting wallet funded.'),
+            'balance_after' => $w ? (float) $w->balance : null,
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $metaBase
      * @return array{ok: bool, message?: string}
      */
@@ -361,6 +457,8 @@ class WhatsappWalletVtuPurchaseService
                 WhatsappWalletTransaction::TYPE_VTU_AIRTIME,
                 WhatsappWalletTransaction::TYPE_VTU_DATA,
                 WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY,
+                WhatsappWalletTransaction::TYPE_VTU_CABLE,
+                WhatsappWalletTransaction::TYPE_VTU_BETTING,
             ])
             ->whereIn('external_reference', $references)
             ->latest('id')
@@ -376,6 +474,8 @@ class WhatsappWalletVtuPurchaseService
                 WhatsappWalletTransaction::TYPE_VTU_AIRTIME,
                 WhatsappWalletTransaction::TYPE_VTU_DATA,
                 WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY,
+                WhatsappWalletTransaction::TYPE_VTU_CABLE,
+                WhatsappWalletTransaction::TYPE_VTU_BETTING,
             ])
             ->latest('id')
             ->limit(300)
