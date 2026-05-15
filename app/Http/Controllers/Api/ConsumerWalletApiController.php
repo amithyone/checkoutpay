@@ -189,7 +189,7 @@ class ConsumerWalletApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $paginator->items(),
+            'data' => $this->enrichTransactionsWithCounterpartyNames($paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),
@@ -197,6 +197,84 @@ class ConsumerWalletApiController extends Controller
                 'total' => $paginator->total(),
             ],
         ]);
+    }
+
+    public function recipientLookup(Request $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request);
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+        ]);
+
+        $recipient = PhoneNormalizer::canonicalNgE164Digits((string) $request->input('phone'));
+        if ($recipient === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid phone number.',
+            ], 422);
+        }
+
+        if ($recipient === (string) $wallet->phone_e164) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot send to your own number.',
+            ], 422);
+        }
+
+        $recvWallet = WhatsappWallet::query()
+            ->where('phone_e164', $recipient)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'phone_e164' => $recipient,
+                'has_wallet' => $recvWallet !== null,
+                'display_name' => $recvWallet?->displayName(),
+            ],
+        ]);
+    }
+
+    /**
+     * @param  list<WhatsappWalletTransaction>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function enrichTransactionsWithCounterpartyNames(array $items): array
+    {
+        $phones = [];
+        foreach ($items as $tx) {
+            if ($tx->counterparty_account_name || ! $tx->counterparty_phone_e164) {
+                continue;
+            }
+            $phones[] = (string) $tx->counterparty_phone_e164;
+        }
+
+        $byPhone = [];
+        if ($phones !== []) {
+            $byPhone = WhatsappWallet::query()
+                ->whereIn('phone_e164', array_values(array_unique($phones)))
+                ->get()
+                ->keyBy('phone_e164')
+                ->all();
+        }
+
+        return array_map(function (WhatsappWalletTransaction $tx) use ($byPhone) {
+            $row = $tx->toArray();
+            if (! empty($row['counterparty_account_name']) || empty($row['counterparty_phone_e164'])) {
+                return $row;
+            }
+            $phone = (string) $row['counterparty_phone_e164'];
+            $w = $byPhone[$phone] ?? null;
+            if ($w instanceof WhatsappWallet) {
+                $name = $w->displayName();
+                if ($name !== null) {
+                    $row['counterparty_account_name'] = $name;
+                }
+            }
+
+            return $row;
+        }, $items);
     }
 
     public function issueTopupVirtualAccount(Request $request): JsonResponse

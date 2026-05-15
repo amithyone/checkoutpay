@@ -70,6 +70,7 @@ Route::prefix('v1')->group(function () {
         Route::get('wallet', [ConsumerWalletApiController::class, 'showWallet']);
         Route::post('wallet/ensure', [ConsumerWalletApiController::class, 'ensure']);
         Route::get('wallet/transactions', [ConsumerWalletApiController::class, 'transactions']);
+        Route::get('wallet/recipient-lookup', [ConsumerWalletApiController::class, 'recipientLookup']);
         Route::post('wallet/topup/virtual-account', [ConsumerWalletApiController::class, 'issueTopupVirtualAccount']);
         Route::post('wallet/pin', [ConsumerWalletApiController::class, 'setPin']);
         Route::put('wallet/pin', [ConsumerWalletApiController::class, 'changePin']);

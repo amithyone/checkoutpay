@@ -88,6 +88,19 @@ class WhatsappWallet extends Model
         return $n !== '' ? $n : null;
     }
 
+    /** Best display name for P2P / history (sender name, else Tier 2 KYC name). */
+    public function displayName(): ?string
+    {
+        $sender = $this->normalizedSenderName();
+        if ($sender !== null) {
+            return $sender;
+        }
+
+        $kyc = trim(trim((string) $this->kyc_fname).' '.trim((string) $this->kyc_lname));
+
+        return $kyc !== '' ? $kyc : null;
+    }
+
     /**
      * True until PIN and display name are set — show a short wallet menu and onboarding-style alerts.
      */

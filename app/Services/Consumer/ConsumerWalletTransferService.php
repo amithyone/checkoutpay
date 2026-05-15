@@ -141,6 +141,8 @@ class ConsumerWalletTransferService
                     'recipient_credit_amount' => $creditAmount,
                 ] : [];
 
+                $recipientDisplayName = $recv->displayName();
+
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $sender->id,
                     'sender_name' => $sender->normalizedSenderName(),
@@ -148,6 +150,7 @@ class ConsumerWalletTransferService
                     'amount' => $debitAmount,
                     'balance_after' => $newSenderBal,
                     'counterparty_phone_e164' => $recipient,
+                    'counterparty_account_name' => $recipientDisplayName,
                     'meta' => array_merge(['channel' => 'consumer_api'], $fxMeta),
                 ]);
 
@@ -158,6 +161,7 @@ class ConsumerWalletTransferService
                     'amount' => $creditAmount,
                     'balance_after' => $newRecvBal,
                     'counterparty_phone_e164' => $phone,
+                    'counterparty_account_name' => $sender->displayName(),
                     'meta' => array_merge(['channel' => 'consumer_api'], $fxMeta),
                 ]);
             });
