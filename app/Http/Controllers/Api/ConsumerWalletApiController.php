@@ -8,6 +8,8 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerWalletKycService;
+use App\Services\Consumer\ConsumerWalletPayCodeService;
+use App\Services\Consumer\ConsumerWalletPayQrService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletTransferService;
 use App\Services\MavonPayTransferService;
@@ -39,6 +41,8 @@ class ConsumerWalletApiController extends Controller
         private VtuNgApiClient $vtuApi,
         private WhatsappWalletPendingP2pService $pendingP2p,
         private WhatsappWalletSecureTransferAuthService $waTransferAuth,
+        private ConsumerWalletPayCodeService $payCodes,
+        private ConsumerWalletPayQrService $payQr,
     ) {}
 
     private function walletFor(Request $request): WhatsappWallet
@@ -59,6 +63,7 @@ class ConsumerWalletApiController extends Controller
     public function showWallet(Request $request): JsonResponse
     {
         $wallet = $this->walletFor($request)->fresh();
+        $payCode = $this->payCodes->ensureForWallet($wallet);
         $summary = $this->partnerApi->getWalletSummary((string) $wallet->phone_e164);
         $cur = $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);
 
@@ -159,7 +164,58 @@ class ConsumerWalletApiController extends Controller
                 'transfer_email_otp_eligible' => $wallet->isTier2(),
                 'transfer_email_otp_has_email' => $wallet->resolveOtpEmail() !== null,
                 'transfer_email_otp_effective' => $wallet->wantsTransferEmailOtp(),
+                'pay_code' => $payCode,
             ]),
+        ]);
+    }
+
+    public function receiveQr(Request $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request)->fresh();
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->payQr->buildReceiveQr($wallet),
+        ]);
+    }
+
+    public function scanResolve(Request $request): JsonResponse
+    {
+        $request->validate([
+            'payload' => 'required|string|min:1|max:4096',
+        ]);
+
+        $result = $this->payQr->resolveScanInput((string) $request->input('payload'));
+        if (! ($result['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not resolve scan.',
+            ], 422);
+        }
+
+        $phone = (string) $result['phone_e164'];
+        $self = $this->walletFor($request);
+        if ($phone === (string) $self->phone_e164) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot send to your own wallet.',
+            ], 422);
+        }
+
+        $recipientWallet = WhatsappWallet::query()
+            ->where('phone_e164', $phone)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'mode' => 'p2p',
+                'phone_e164' => $phone,
+                'display_name' => $result['display_name'] ?? ($recipientWallet?->normalizedSenderName() ?: null),
+                'pay_code' => $result['pay_code'] ?? null,
+                'has_wallet' => $recipientWallet !== null,
+            ],
         ]);
     }
 
@@ -244,10 +300,16 @@ class ConsumerWalletApiController extends Controller
     {
         $phones = [];
         foreach ($items as $tx) {
-            if ($tx->counterparty_account_name || ! $tx->counterparty_phone_e164) {
+            $phone = trim((string) $tx->counterparty_phone_e164);
+            if ($phone === '') {
                 continue;
             }
-            $phones[] = (string) $tx->counterparty_phone_e164;
+            $isP2pCredit = $tx->type === WhatsappWalletTransaction::TYPE_P2P_CREDIT;
+            $needsSender = $isP2pCredit && trim((string) $tx->sender_name) === '';
+            $needsCounterparty = trim((string) $tx->counterparty_account_name) === '';
+            if ($needsSender || $needsCounterparty) {
+                $phones[] = $phone;
+            }
         }
 
         $byPhone = [];
@@ -261,16 +323,28 @@ class ConsumerWalletApiController extends Controller
 
         return array_map(function (WhatsappWalletTransaction $tx) use ($byPhone) {
             $row = $tx->toArray();
-            if (! empty($row['counterparty_account_name']) || empty($row['counterparty_phone_e164'])) {
+            $phone = trim((string) ($row['counterparty_phone_e164'] ?? ''));
+            if ($phone === '') {
                 return $row;
             }
-            $phone = (string) $row['counterparty_phone_e164'];
+
             $w = $byPhone[$phone] ?? null;
-            if ($w instanceof WhatsappWallet) {
-                $name = $w->displayName();
-                if ($name !== null) {
-                    $row['counterparty_account_name'] = $name;
+            if (! $w instanceof WhatsappWallet) {
+                return $row;
+            }
+
+            $name = $w->displayName();
+            if ($name === null) {
+                return $row;
+            }
+
+            if ($tx->type === WhatsappWalletTransaction::TYPE_P2P_CREDIT) {
+                if (trim((string) ($row['sender_name'] ?? '')) === '') {
+                    $row['sender_name'] = $name;
                 }
+            }
+            if (trim((string) ($row['counterparty_account_name'] ?? '')) === '') {
+                $row['counterparty_account_name'] = $name;
             }
 
             return $row;

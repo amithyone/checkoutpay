@@ -83,6 +83,11 @@ class WhatsappWalletPendingP2pService
                     ],
                 ]);
 
+                $recipientDisplayName = WhatsappWallet::query()
+                    ->where('phone_e164', $recipientPhoneE164)
+                    ->first()
+                    ?->displayName();
+
                 $debitTxn = WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $sender->id,
                     'sender_name' => $sender->normalizedSenderName(),
@@ -90,6 +95,7 @@ class WhatsappWalletPendingP2pService
                     'amount' => $amount,
                     'balance_after' => $newSenderBal,
                     'counterparty_phone_e164' => $recipientPhoneE164,
+                    'counterparty_account_name' => $recipientDisplayName,
                     'meta' => [
                         'channel' => 'whatsapp_menu',
                         'awaiting_recipient_wallet' => true,
@@ -210,13 +216,16 @@ class WhatsappWalletPendingP2pService
                 $sender = $pending->senderWallet;
                 $senderName = $sender?->normalizedSenderName();
 
+                $senderDisplayName = $sender?->displayName();
+
                 $creditTxn = WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $recv->id,
-                    'sender_name' => $senderName,
+                    'sender_name' => $senderName ?? $senderDisplayName,
                     'type' => WhatsappWalletTransaction::TYPE_P2P_CREDIT,
                     'amount' => $amount,
                     'balance_after' => $newBal,
                     'counterparty_phone_e164' => $sender?->phone_e164 ?? '',
+                    'counterparty_account_name' => $senderDisplayName,
                     'meta' => [
                         'channel' => 'whatsapp_menu',
                         'from_pending_p2p_id' => $pending->id,

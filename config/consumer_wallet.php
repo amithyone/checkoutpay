@@ -8,4 +8,10 @@ return [
 
     /** Plain token prefix shown in logs only (never log full token). */
     'token_name' => 'consumer_mobile',
+
+    /** Base URL encoded in receive / pay QR codes (path: /pay/{token}). */
+    'pay_qr_base_url' => rtrim((string) env('CONSUMER_PAY_QR_BASE_URL', 'https://app.check-outnow.com'), '/'),
+
+    /** HMAC secret for pay QR tokens; falls back to APP_KEY when empty. */
+    'pay_qr_secret' => (string) env('CONSUMER_PAY_QR_SECRET', ''),
 ];

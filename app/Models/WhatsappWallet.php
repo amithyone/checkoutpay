@@ -19,6 +19,7 @@ class WhatsappWallet extends Model
 
     protected $fillable = [
         'phone_e164',
+        'pay_code',
         'renter_id',
         'tier',
         'balance',

@@ -405,7 +405,7 @@ class WhatsappWaWalletMenuHandler
             ($tier1VaNote !== '' ? $tier1VaNote."\n" : '').
             ($bankNote !== '' ? $bankNote."\n\n" : '').
             $casualLine.
-            WhatsappMenuInputNormalizer::navigationHelpFooter()
+            WhatsappWalletAppLinkCopy::menuFooter()
         );
     }
 

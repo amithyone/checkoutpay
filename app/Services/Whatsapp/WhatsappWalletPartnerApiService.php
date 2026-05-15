@@ -8,6 +8,7 @@ use App\Models\PartnerWalletSpend;
 use App\Models\Payment;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Consumer\ConsumerWalletPayCodeService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,10 @@ use Throwable;
  */
 final class WhatsappWalletPartnerApiService
 {
+    public function __construct(
+        private ConsumerWalletPayCodeService $payCodes,
+    ) {}
+
     public function getWalletSummary(string $phoneInput): array
     {
         $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
@@ -57,6 +62,8 @@ final class WhatsappWalletPartnerApiService
                 'status' => WhatsappWallet::STATUS_ACTIVE,
             ]
         );
+
+        $this->payCodes->ensureForWallet($wallet);
 
         return [
             'ok' => true,

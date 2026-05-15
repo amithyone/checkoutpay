@@ -69,7 +69,7 @@ class WhatsappWalletTransferCompletionService
 
     private function forwardableReceiptFooter(): string
     {
-        return "\n\n_Forward ok — no balance shown._";
+        return WhatsappWalletAppLinkCopy::receiptFooter();
     }
 
     /**
@@ -107,7 +107,7 @@ class WhatsappWalletTransferCompletionService
             'image',
             'image/png',
             base64_encode($png),
-            '✅ Receipt',
+            WhatsappWalletAppLinkCopy::imageReceiptCaption(),
             'transfer-receipt.png'
         );
 
@@ -138,7 +138,7 @@ class WhatsappWalletTransferCompletionService
             'image',
             'image/png',
             base64_encode($png),
-            '✅ Receipt',
+            WhatsappWalletAppLinkCopy::imageReceiptCaption(),
             'p2p-receipt.png'
         );
 
@@ -237,7 +237,7 @@ class WhatsappWalletTransferCompletionService
             ($tier1VaNote !== '' ? $tier1VaNote."\n" : '').
             ($bankNote !== '' ? $bankNote."\n\n" : '').
             $casualLine.
-            WhatsappMenuInputNormalizer::navigationHelpFooter()
+            WhatsappWalletAppLinkCopy::menuFooter()
         );
     }
 

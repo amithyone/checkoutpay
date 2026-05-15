@@ -41,9 +41,8 @@ return [
 
     /*
     | Web app where users create the WhatsApp Wallet, complete KYC, and view tx history.
-    | Falls back to public_url when empty.
     */
-    'wallet_app_url' => rtrim((string) env('WHATSAPP_WALLET_APP_URL', ''), '/'),
+    'wallet_app_url' => rtrim((string) env('WHATSAPP_WALLET_APP_URL', 'https://app.check-outnow.com'), '/'),
 
     /*
     | WhatsApp Wallet tiers: Tier 1 = WhatsApp identity only (caps). Tier 2 = Mevon Rubies VA + full KYC.

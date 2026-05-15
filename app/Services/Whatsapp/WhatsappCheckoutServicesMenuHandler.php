@@ -89,12 +89,7 @@ class WhatsappCheckoutServicesMenuHandler
 
     private function walletAppUrl(): string
     {
-        $u = rtrim((string) config('whatsapp.wallet_app_url', ''), '/');
-        if ($u !== '') {
-            return $u;
-        }
-
-        return rtrim((string) config('whatsapp.public_url', ''), '/') ?: rtrim((string) config('app.url'), '/');
+        return WhatsappWalletAppLinkCopy::url();
     }
 
     private function portalBusiness(): string

@@ -16,7 +16,7 @@ final class WhatsappWalletOnboardingCopy
         $resolver = app(WhatsappWalletCountryResolver::class);
         $cur = $resolver->currencyForPhoneE164((string) $wallet->phone_e164);
         $bal = WhatsappWalletMoneyFormatter::format((float) $wallet->balance, $cur);
-        $footer = WhatsappMenuInputNormalizer::navigationHelpFooter().' · *STOP* — pause';
+        $footer = WhatsappWalletAppLinkCopy::menuFooter().' · *STOP* — pause';
 
         $pendingLine = self::pendingIncomingCreditLine((string) $wallet->phone_e164);
 

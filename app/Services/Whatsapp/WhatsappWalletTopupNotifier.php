@@ -78,7 +78,8 @@ class WhatsappWalletTopupNotifier
                 "*Time:* {$when}\n".
                 "*From number:* {$masked}\n\n".
                 $setupLine.
-                '*MENU* — other services';
+                '*MENU* — other services'.
+                WhatsappWalletAppLinkCopy::downloadBlock();
         } else {
             $head = $isFx
                 ? $this->p2pReceivedHeadCrossBorder($fromWho, $crossBorderFx, $amountStr, $amount, $creditCur)
@@ -86,7 +87,8 @@ class WhatsappWalletTopupNotifier
             $text = $head.
                 "*Time:* {$when}\n".
                 "*From number:* {$masked}\n\n".
-                '*WALLET* — balance & sends · *MENU* — all services';
+                '*WALLET* — balance & sends · *MENU* — all services'.
+                WhatsappWalletAppLinkCopy::downloadBlock();
         }
 
         $this->client->sendText($instance, $recipientWallet->phone_e164, $text);
@@ -175,11 +177,13 @@ class WhatsappWalletTopupNotifier
             $text = "✅ *{$amountStr}* received\n".
                 "Balance: *{$balStr}*\n\n".
                 $setup.
-                '*MENU* — other services';
+                '*MENU* — other services'.
+                WhatsappWalletAppLinkCopy::downloadBlock();
         } else {
             $text = "✅ *{$amountStr}* received\n".
                 "Balance: *{$balStr}*\n\n".
-                '*WALLET* — your wallet · *MENU* — all services';
+                '*WALLET* — your wallet · *MENU* — all services'.
+                WhatsappWalletAppLinkCopy::downloadBlock();
         }
 
         $this->client->sendText($instance, $wallet->phone_e164, $text);

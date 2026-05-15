@@ -71,6 +71,8 @@ Route::prefix('v1')->group(function () {
         Route::post('wallet/ensure', [ConsumerWalletApiController::class, 'ensure']);
         Route::get('wallet/transactions', [ConsumerWalletApiController::class, 'transactions']);
         Route::get('wallet/recipient-lookup', [ConsumerWalletApiController::class, 'recipientLookup']);
+        Route::get('wallet/receive-qr', [ConsumerWalletApiController::class, 'receiveQr']);
+        Route::post('wallet/scan-resolve', [ConsumerWalletApiController::class, 'scanResolve']);
         Route::post('wallet/topup/virtual-account', [ConsumerWalletApiController::class, 'issueTopupVirtualAccount']);
         Route::post('wallet/pin', [ConsumerWalletApiController::class, 'setPin']);
         Route::put('wallet/pin', [ConsumerWalletApiController::class, 'changePin']);
