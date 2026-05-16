@@ -61,6 +61,67 @@ class WhatsappWaWalletMenuHandler
     }
 
     /**
+     * Airtime / data / power keywords or natural-language bill requests from wallet submenu or guest root.
+     */
+    public function tryHandleCasualBills(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        ?Renter $linkedRenter,
+        WhatsappWallet $wallet,
+    ): bool {
+        $norm = WhatsappWalletCasualSendParser::normalizeForCasualParse($text);
+        $cmd = WhatsappMenuInputNormalizer::commandToken($text);
+        $shortcut = WhatsappWalletCasualVtuParser::shortcutKind($cmd);
+        $billLike = $shortcut !== null || WhatsappWalletCasualVtuParser::looksLikeCasualBill($norm);
+        if (! $billLike) {
+            return false;
+        }
+
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Airtime, data, and electricity are only for *Nigeria* wallet numbers right now.'
+            );
+
+            return true;
+        }
+
+        if ($shortcut !== null) {
+            if (! $this->vtuFlow->isAvailable()) {
+                $this->client->sendText($instance, $phone, 'Airtime, data, and electricity payments are not available right now.');
+
+                return true;
+            }
+            $this->vtuFlow->enterFromCasualKeyword($session->fresh(), $instance, $phone, $linkedRenter, $shortcut);
+
+            return true;
+        }
+
+        if (! WhatsappWalletCasualVtuParser::looksLikeCasualBill($norm)) {
+            return false;
+        }
+
+        $parsed = WhatsappWalletCasualVtuParser::tryParse($text, $phone);
+        if ($parsed !== null) {
+            if (! $this->vtuFlow->isAvailable()) {
+                $this->client->sendText($instance, $phone, 'Airtime, data, and electricity payments are not available right now.');
+
+                return true;
+            }
+            $this->vtuFlow->enterFromCasualParse($session->fresh(), $instance, $phone, $linkedRenter, $parsed);
+
+            return true;
+        }
+
+        $this->vtuFlow->sendCasualBillParseHelp($instance, $phone);
+
+        return true;
+    }
+
+    /**
      * Start P2P when the user sends only an NG mobile (080…, 80…, +234…) from the main menu or similar.
      * Same readiness rules as *4* (PIN, send name, not locked).
      */
@@ -802,6 +863,10 @@ class WhatsappWaWalletMenuHandler
             ]);
             $this->sendWalletTransactionHistoryPage($instance, $phone, $wallet->fresh(), 0);
 
+            return;
+        }
+
+        if ($this->tryHandleCasualBills($session, $instance, $phone, $text, $linkedRenter, $wallet)) {
             return;
         }
 

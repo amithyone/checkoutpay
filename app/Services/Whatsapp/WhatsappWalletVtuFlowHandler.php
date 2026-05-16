@@ -543,10 +543,27 @@ class WhatsappWalletVtuFlowHandler
             return;
         }
         $row = $plans[$idx];
-        $ctx['step'] = 'vtu_dat_phone';
         $ctx['vtu_sel_variation_id'] = (int) ($row['variation_id'] ?? 0);
         $ctx['vtu_sel_label'] = (string) ($row['label'] ?? '');
         $ctx['vtu_sel_price'] = round((float) ($row['price'] ?? 0), 2);
+        $presetRecipient = trim((string) ($ctx['vtu_recipient_e164'] ?? ''));
+        if ($presetRecipient !== '') {
+            $ctx['vtu_recipient_e164'] = $presetRecipient;
+            $session->update(['chat_context' => $ctx]);
+            $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
+            $this->vtuWebPin->beginWebPinConfirmation(
+                $session->fresh(),
+                $instance,
+                $phone,
+                $wallet,
+                $ctx,
+                'data',
+                'vtu_dat_pin_web'
+            );
+
+            return;
+        }
+        $ctx['step'] = 'vtu_dat_phone';
         $session->update(['chat_context' => $ctx]);
         $this->client->sendText(
             $instance,
@@ -909,6 +926,383 @@ class WhatsappWalletVtuFlowHandler
         }
 
         return ['id' => (string) $row['id'], 'label' => (string) ($row['label'] ?? $row['id'])];
+    }
+
+    /**
+     * Keyword entry: AIRTIME, DATA, POWER, BILLS, or *5*.
+     *
+     * @param  'airtime'|'data'|'electricity'|'bills'  $kind
+     */
+    public function enterFromCasualKeyword(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        ?Renter $linkedRenter,
+        string $kind,
+    ): void {
+        if ($kind === 'bills') {
+            $this->start($session, $instance, $phone, $linkedRenter);
+
+            return;
+        }
+
+        $wallet = $this->ensureReadyForVtu($session, $instance, $phone, $linkedRenter);
+        if (! $wallet) {
+            return;
+        }
+
+        $session->update([
+            'chat_flow' => self::FLOW,
+            'chat_context' => match ($kind) {
+                'airtime' => ['step' => 'vtu_air_network'],
+                'data' => ['step' => 'vtu_dat_network'],
+                'electricity' => ['step' => 'vtu_el_disco'],
+                default => ['step' => 'vtu_menu'],
+            },
+        ]);
+
+        match ($kind) {
+            'airtime' => $this->sendNetworkPicker($instance, $phone, 'airtime'),
+            'data' => $this->sendNetworkPicker($instance, $phone, 'data'),
+            'electricity' => $this->sendDiscoPicker($instance, $phone),
+            default => $this->sendVtuRootMenu($instance, $phone),
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed  From {@see WhatsappWalletCasualVtuParser::tryParse()}
+     */
+    public function enterFromCasualParse(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        ?Renter $linkedRenter,
+        array $parsed,
+    ): void {
+        $wallet = $this->ensureReadyForVtu($session, $instance, $phone, $linkedRenter);
+        if (! $wallet) {
+            return;
+        }
+
+        $kind = (string) ($parsed['kind'] ?? '');
+        $session->update(['chat_flow' => self::FLOW]);
+
+        if ($kind === 'airtime') {
+            $this->enterCasualAirtime($session, $instance, $phone, $wallet, $parsed);
+
+            return;
+        }
+        if ($kind === 'data') {
+            $this->enterCasualData($session, $instance, $phone, $wallet, $parsed, $linkedRenter);
+
+            return;
+        }
+        if ($kind === 'electricity') {
+            $this->enterCasualElectricity($session, $instance, $phone, $wallet, $parsed, $linkedRenter);
+        }
+    }
+
+    public function sendCasualBillParseHelp(string $instance, string $phone): void
+    {
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "I couldn't work out that bill request. Please start again:\n\n".
+            "*5* — bills menu, or try:\n".
+            "• *buy airtime 500 to 08031234567 mtn*\n".
+            "• *buy 1gb data to 0803… glo*\n".
+            "• *pay electricity 5000 meter 12345678901 ikeja*\n\n".
+            "Shortcuts: *AIRTIME* · *DATA* · *POWER*\n\n".
+            WhatsappMenuInputNormalizer::navigationHelpFooter()
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function enterCasualAirtime(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $parsed,
+    ): void {
+        $networkId = isset($parsed['network_id']) ? (string) $parsed['network_id'] : '';
+        $recipient = isset($parsed['recipient_e164']) ? (string) $parsed['recipient_e164'] : '';
+        $amount = isset($parsed['amount']) && is_numeric($parsed['amount']) ? round((float) $parsed['amount'], 0) : null;
+
+        $ctx = [];
+        if ($networkId !== '') {
+            $ctx['vtu_network'] = $networkId;
+        }
+        if ($recipient !== '') {
+            $ctx['vtu_recipient_e164'] = $recipient;
+        }
+
+        if ($networkId !== '' && $recipient !== '' && $amount !== null) {
+            $min = (float) config('vtu.airtime_min', 50);
+            $max = (float) config('vtu.airtime_max', 50000);
+            if ($amount < $min || $amount > $max) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Amount must be between ₦'.number_format($min, 0).' and ₦'.number_format($max, 0).".\n\n*5* — try again."
+                );
+
+                return;
+            }
+            $ctx['vtu_amount'] = $amount;
+            $session->update(['chat_context' => $ctx]);
+            $this->vtuWebPin->beginWebPinConfirmation(
+                $session->fresh(),
+                $instance,
+                $phone,
+                $wallet,
+                $ctx,
+                'airtime',
+                'vtu_air_pin_web'
+            );
+
+            return;
+        }
+
+        if ($networkId !== '' && $recipient !== '') {
+            $ctx['step'] = 'vtu_air_amount';
+            $session->update(['chat_context' => $ctx]);
+            $min = number_format((float) config('vtu.airtime_min', 50), 0);
+            $max = number_format((float) config('vtu.airtime_max', 50000), 0);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*Airtime — amount*\n\nSend amount in *Naira* (₦{$min}–₦{$max}).\n\n*BACK* — change number"
+            );
+
+            return;
+        }
+
+        if ($networkId !== '' && $amount !== null) {
+            $ctx['step'] = 'vtu_air_phone';
+            $ctx['vtu_amount'] = $amount;
+            $session->update(['chat_context' => $ctx]);
+            $this->sendAirtimePhonePrompt($instance, $phone);
+
+            return;
+        }
+
+        if ($recipient !== '' && $amount !== null) {
+            $ctx['step'] = 'vtu_air_network';
+            $ctx['vtu_recipient_e164'] = $recipient;
+            $ctx['vtu_amount'] = $amount;
+            $session->update(['chat_context' => $ctx]);
+            $this->sendNetworkPicker($instance, $phone, 'airtime');
+
+            return;
+        }
+
+        $ctx['step'] = $networkId !== '' ? 'vtu_air_phone' : ($recipient !== '' ? 'vtu_air_network' : 'vtu_air_network');
+        if ($recipient !== '') {
+            $ctx['vtu_recipient_e164'] = $recipient;
+        }
+        $session->update(['chat_context' => $ctx]);
+        if ($networkId !== '') {
+            $this->sendAirtimePhonePrompt($instance, $phone);
+        } else {
+            $this->sendNetworkPicker($instance, $phone, 'airtime');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function enterCasualData(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $parsed,
+        ?Renter $linkedRenter,
+    ): void {
+        $networkId = isset($parsed['network_id']) ? (string) $parsed['network_id'] : '';
+        $recipient = isset($parsed['recipient_e164']) ? (string) $parsed['recipient_e164'] : '';
+
+        if ($networkId === '') {
+            $session->update(['chat_context' => ['step' => 'vtu_dat_network']]);
+            $this->sendNetworkPicker($instance, $phone, 'data');
+
+            return;
+        }
+
+        $cmdNum = $this->networkMenuIndexForId($networkId);
+        if ($cmdNum === null) {
+            $session->update(['chat_context' => ['step' => 'vtu_dat_network']]);
+            $this->sendNetworkPicker($instance, $phone, 'data');
+
+            return;
+        }
+        $ctx = $recipient !== '' ? ['vtu_recipient_e164' => $recipient] : [];
+        $this->handleDatNetwork($session, $instance, $phone, $cmdNum, $ctx);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function enterCasualElectricity(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $parsed,
+        ?Renter $linkedRenter,
+    ): void {
+        $meter = isset($parsed['meter']) ? (string) $parsed['meter'] : '';
+        $amount = isset($parsed['amount']) && is_numeric($parsed['amount']) ? round((float) $parsed['amount'], 0) : null;
+        $disco = isset($parsed['disco_service']) ? (string) $parsed['disco_service'] : '';
+        $meterType = (string) ($parsed['meter_type'] ?? 'prepaid');
+        $variation = $meterType === 'postpaid' ? 'postpaid' : 'prepaid';
+
+        $ctx = [];
+
+        if ($disco !== '') {
+            $ctx['vtu_el_service'] = $disco;
+        }
+        if ($meter !== '') {
+            $ctx['vtu_el_meter'] = $meter;
+        }
+        if ($amount !== null) {
+            $ctx['vtu_amount'] = $amount;
+        }
+        $ctx['vtu_el_variation'] = $variation;
+
+        if ($disco !== '' && $meter !== '') {
+            $this->client->sendText($instance, $phone, 'Verifying meter…');
+            $ver = $this->vtuApi->verifyElectricityCustomer($disco, $meter, $variation);
+            if (! $ver['ok']) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    'Verification failed: '.($ver['message'] ?? 'Error')."\n\nTry again or send *POWER* to start over."
+                );
+
+                return;
+            }
+            $data = $ver['data'] ?? [];
+            $name = 'Customer';
+            if (is_array($data)) {
+                $name = trim((string) ($data['customer_name'] ?? $data['name'] ?? $data['Customer_Name'] ?? ''));
+                if ($name === '') {
+                    $name = 'Customer';
+                }
+            }
+            $ctx['vtu_el_customer_name'] = $name;
+            if ($amount !== null) {
+                $min = (float) config('vtu.electricity_min', 500);
+                if ($amount < $min) {
+                    $this->client->sendText(
+                        $instance,
+                        $phone,
+                        'Minimum electricity amount is ₦'.number_format($min, 0).".\n\n*5* — try again."
+                    );
+
+                    return;
+                }
+                $ctx['vtu_amount'] = $amount;
+                $session->update(['chat_context' => $ctx]);
+                $this->vtuWebPin->beginWebPinConfirmation(
+                    $session->fresh(),
+                    $instance,
+                    $phone,
+                    $wallet,
+                    $ctx,
+                    'electricity',
+                    'vtu_el_pin_web'
+                );
+
+                return;
+            }
+            $ctx['step'] = 'vtu_el_amount';
+            $session->update(['chat_context' => $ctx]);
+            $min = number_format((float) config('vtu.electricity_min', 500), 0);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*Verified:* {$name}\n\n".
+                "Send *amount* in Naira (minimum ₦{$min}).\n\n".
+                '*BACK* — change meter'
+            );
+
+            return;
+        }
+
+        if ($disco !== '') {
+            $ctx['step'] = 'vtu_el_type';
+            $session->update(['chat_context' => $ctx]);
+            $this->sendMeterTypePrompt($instance, $phone, $disco);
+
+            return;
+        }
+
+        $session->update(['chat_context' => ['step' => 'vtu_el_disco']]);
+        $this->sendDiscoPicker($instance, $phone);
+    }
+
+    private function networkMenuIndexForId(string $networkId): ?string
+    {
+        $nets = config('vtu.networks', []);
+        if (! is_array($nets)) {
+            return null;
+        }
+        foreach ($nets as $i => $n) {
+            if (is_array($n) && (string) ($n['id'] ?? '') === $networkId) {
+                return (string) ($i + 1);
+            }
+        }
+
+        return null;
+    }
+
+    private function ensureReadyForVtu(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        ?Renter $linkedRenter,
+    ): ?WhatsappWallet {
+        if (! $this->isAvailable()) {
+            $this->client->sendText($instance, $phone, 'Airtime, data, and electricity payments are not available right now.');
+
+            return null;
+        }
+
+        $wallet = $this->findOrCreateWallet($phone, $linkedRenter);
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Airtime, data, and electricity (*VTU*) are only for *Nigeria* wallet numbers right now.'
+            );
+
+            return null;
+        }
+        if (! $wallet->hasPin()) {
+            $this->client->sendText($instance, $phone, 'Open *WALLET* and send *1* to register your PIN first.');
+
+            return null;
+        }
+        if ($wallet->isPinLocked()) {
+            $this->client->sendText($instance, $phone, 'Wallet PIN is temporarily locked. Try again later.');
+
+            return null;
+        }
+        if ($wallet->normalizedSenderName() === null) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Open *WALLET* and send *your full name* once (shown when you pay).'
+            );
+
+            return null;
+        }
+
+        return $wallet;
     }
 
     private function findOrCreateWallet(string $phone, ?Renter $renter): WhatsappWallet

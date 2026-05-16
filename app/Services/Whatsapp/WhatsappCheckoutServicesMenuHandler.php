@@ -2,7 +2,9 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Models\Renter;
 use App\Models\WhatsappSession;
+use App\Models\WhatsappWallet;
 
 /**
  * Guest hub: wallet-only mode.
@@ -47,6 +49,22 @@ class WhatsappCheckoutServicesMenuHandler
         if (in_array($cmd, ['WALLET', 'TOPUP', 'TOP UP', '1'], true)) {
             app(WhatsappWaWalletMenuHandler::class)->openMenu($session->fresh(), $instance, $phone, null);
 
+            return;
+        }
+
+        $linked = Renter::query()
+            ->where('whatsapp_phone_e164', $phone)
+            ->where('is_active', true)
+            ->first();
+        $wallet = WhatsappWallet::query()->firstOrCreate(
+            ['phone_e164' => $phone],
+            [
+                'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+                'balance' => 0,
+                'status' => WhatsappWallet::STATUS_ACTIVE,
+            ]
+        );
+        if (app(WhatsappWaWalletMenuHandler::class)->tryHandleCasualBills($session->fresh(), $instance, $phone, $rawText, $linked, $wallet->fresh())) {
             return;
         }
 
