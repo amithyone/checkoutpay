@@ -36,7 +36,8 @@
             btn.classList.add('is-loading');
             var label = btn.getAttribute('data-loading-label') || 'Please wait…';
             btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span>' + label;
-            form.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+            // Do not disable hidden inputs (e.g. _token) — disabled fields are omitted from POST and cause 419.
+            form.querySelectorAll('input:not([type="hidden"]), select, textarea, button').forEach(function (el) {
                 if (el !== btn) {
                     el.disabled = true;
                 }

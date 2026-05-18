@@ -14,5 +14,10 @@ class VerifyCsrfToken extends Middleware
     protected $except = [
         'api/*',
         'setup/*', // Allow setup routes without CSRF during installation
+        // One-time token in URL; session cookies are unreliable in WhatsApp in-app browsers.
+        'wallet/whatsapp/confirm/*',
+        'wallet/whatsapp/set-pin/*',
+        'wallet/whatsapp/vtu-confirm/*',
+        'wallet/partner-pay/*',
     ];
 }

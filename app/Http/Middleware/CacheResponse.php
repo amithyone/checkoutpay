@@ -41,6 +41,14 @@ class CacheResponse
             return $response;
         }
 
+        // Wallet PIN pages: never cache (form + session must be fresh per user)
+        if ($request->is('wallet/*')) {
+            $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate, max-age=0');
+            $response->headers->set('Pragma', 'no-cache');
+
+            return $response;
+        }
+
         // Homepage: avoid long-lived public HTML cache so shared nav/footer (e.g. mobile menu) stay current.
         if ($request->is('/')) {
             $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate, max-age=0');
