@@ -6,7 +6,9 @@ use App\Models\Payment;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
 use App\Services\MevonPayVirtualAccountService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -121,7 +123,7 @@ class WhatsappWalletTier1TopupVaService
     /**
      * MevonPay sent funding.success with no/zero amount: attach metadata to the linked admin Payment row only.
      */
-    public function tryLogZeroAmountWebhook(string $accountNumber, string $reference, array $payload): bool
+    public function tryLogZeroAmountWebhook(string $accountNumber, string $reference, array $payload, ?Request $request = null): bool
     {
         $accountNumber = trim($accountNumber);
         if ($accountNumber === '') {
@@ -153,6 +155,7 @@ class WhatsappWalletTier1TopupVaService
                     'email_data' => $merged,
                     'external_reference' => $reference !== '' ? $reference : $payment->external_reference,
                 ]);
+                MevonPayInboundWebhookRecorder::attach($payment, $payload, 'logged_no_amount', $request);
 
                 return true;
             }
@@ -179,11 +182,10 @@ class WhatsappWalletTier1TopupVaService
 
     /**
      * Match MevonPay funding.success webhook to a pending Tier 1 top-up and credit the wallet.
-     *
-     * @param  array{sender?: string, bank_name?: string}  $webhookMeta
      */
-    public function tryFulfillFromWebhook(string $accountNumber, float $amount, string $reference, array $webhookMeta = []): bool
+    public function tryFulfillFromWebhook(string $accountNumber, float $amount, string $reference, array $payload = [], ?Request $request = null): bool
     {
+        $webhookMeta = MevonPayInboundWebhookRecorder::metaFromPayload($payload);
         if ($amount <= 0) {
             return false;
         }
@@ -196,7 +198,7 @@ class WhatsappWalletTier1TopupVaService
         $handled = false;
         $notify = null;
 
-        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, &$handled, &$notify) {
+        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, $payload, $request, &$handled, &$notify) {
             $pending = WhatsappWalletPendingTopup::query()
                 ->where('account_number', $accountNumber)
                 ->whereNull('fulfilled_at')
@@ -221,17 +223,17 @@ class WhatsappWalletTier1TopupVaService
                 $wallet->balance = $newBal;
                 $wallet->save();
 
+                $payerName = trim((string) ($webhookMeta['sender'] ?? ''));
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $wallet->id,
                     'type' => WhatsappWalletTransaction::TYPE_TOPUP,
                     'amount' => $credited,
                     'balance_after' => $newBal,
+                    'counterparty_account_name' => $payerName !== '' ? $payerName : null,
                     'external_reference' => $reference !== '' ? $reference : null,
-                    'meta' => [
-                        'source' => 'mevonpay_funding',
-                        'reported_amount' => $amount,
+                    'meta' => $this->topupLedgerMeta($amount, $webhookMeta, $accountNumber, [
                         'pending_topup_id' => $pending->id,
-                    ],
+                    ]),
                 ]);
 
                 $notify = [
@@ -257,7 +259,7 @@ class WhatsappWalletTier1TopupVaService
                 ]);
             }
 
-            $this->syncLinkedWhatsappTopupPayment($pending, $amount, $credited, $reference, $webhookMeta);
+            $this->syncLinkedWhatsappTopupPayment($pending, $amount, $credited, $reference, $webhookMeta, $payload, $request);
 
             $handled = true;
         });
@@ -274,11 +276,10 @@ class WhatsappWalletTier1TopupVaService
 
     /**
      * Tier 2: credit wallet by permanent Mevon VA when there is no merchant Payment and no Tier 1 pending top-up.
-     *
-     * @param  array{sender?: string, bank_name?: string}  $webhookMeta
      */
-    public function tryFulfillPermanentVaFromWebhook(string $accountNumber, float $amount, string $reference, array $webhookMeta = []): bool
+    public function tryFulfillPermanentVaFromWebhook(string $accountNumber, float $amount, string $reference, array $payload = [], ?Request $request = null): bool
     {
+        $webhookMeta = MevonPayInboundWebhookRecorder::metaFromPayload($payload);
         if ($amount <= 0) {
             return false;
         }
@@ -291,7 +292,7 @@ class WhatsappWalletTier1TopupVaService
         $handled = false;
         $notify = null;
 
-        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, &$handled, &$notify) {
+        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, $payload, $request, &$handled, &$notify) {
             $wallet = WhatsappWallet::query()
                 ->where('mevon_virtual_account_number', $accountNumber)
                 ->where('tier', WhatsappWallet::TIER_RUBIES_VA)
@@ -322,17 +323,17 @@ class WhatsappWalletTier1TopupVaService
                 $wallet->balance = $newBal;
                 $wallet->save();
 
+                $payerName = trim((string) ($webhookMeta['sender'] ?? ''));
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $wallet->id,
                     'type' => WhatsappWalletTransaction::TYPE_TOPUP,
                     'amount' => $credited,
                     'balance_after' => $newBal,
+                    'counterparty_account_name' => $payerName !== '' ? $payerName : null,
                     'external_reference' => $reference !== '' ? $reference : null,
-                    'meta' => [
-                        'source' => 'mevonpay_funding',
-                        'reported_amount' => $amount,
+                    'meta' => $this->topupLedgerMeta($amount, $webhookMeta, $accountNumber, [
                         'permanent_va' => true,
-                    ],
+                    ]),
                 ]);
 
                 $notify = [
@@ -350,7 +351,7 @@ class WhatsappWalletTier1TopupVaService
                 ]);
             }
 
-            $this->recordPermanentVaAdminPayment($wallet, $amount, $credited, $reference, $webhookMeta);
+            $this->recordPermanentVaAdminPayment($wallet, $amount, $credited, $reference, $webhookMeta, $payload, $request);
 
             $handled = true;
         });
@@ -374,6 +375,8 @@ class WhatsappWalletTier1TopupVaService
         float $credited,
         string $reference,
         array $webhookMeta,
+        array $payload = [],
+        ?Request $request = null,
     ): void {
         if (! $pending->payment_id) {
             return;
@@ -417,6 +420,9 @@ class WhatsappWalletTier1TopupVaService
         }
 
         $pay->update($update);
+        if ($payload !== []) {
+            MevonPayInboundWebhookRecorder::attach($pay, $payload, 'whatsapp_tier1_topup', $request);
+        }
     }
 
     /**
@@ -428,6 +434,8 @@ class WhatsappWalletTier1TopupVaService
         float $credited,
         string $reference,
         array $webhookMeta,
+        array $payload = [],
+        ?Request $request = null,
     ): void {
         $baseUrl = rtrim((string) config('app.url'), '/');
         if ($baseUrl === '') {
@@ -442,7 +450,7 @@ class WhatsappWalletTier1TopupVaService
             ? strtolower($sender)
             : strtolower(trim('wa wallet '.(string) $wallet->phone_e164));
 
-        Payment::query()->create([
+        $payment = Payment::query()->create([
             'transaction_id' => $transactionId,
             'amount' => $credited > 0 ? $credited : ($reported > 0 ? $reported : 0),
             'payer_name' => $payerName,
@@ -468,6 +476,39 @@ class WhatsappWalletTier1TopupVaService
                 'mevonpay_reference' => $reference,
             ],
         ]);
+
+        if ($payload !== []) {
+            MevonPayInboundWebhookRecorder::attach($payment, $payload, 'whatsapp_permanent_va_topup', $request);
+        }
+    }
+
+    /**
+     * @param  array{sender?: string, bank_name?: string}  $webhookMeta
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    private function topupLedgerMeta(float $reportedAmount, array $webhookMeta, string $receiveAccount, array $extra = []): array
+    {
+        $payerName = trim((string) ($webhookMeta['sender'] ?? ''));
+        $payerBank = trim((string) ($webhookMeta['bank_name'] ?? ''));
+        $receiveAccount = trim($receiveAccount);
+
+        $meta = array_merge([
+            'source' => 'mevonpay_funding',
+            'reported_amount' => $reportedAmount,
+        ], $extra);
+
+        if ($payerName !== '') {
+            $meta['payer_name'] = $payerName;
+        }
+        if ($payerBank !== '') {
+            $meta['payer_bank'] = $payerBank;
+        }
+        if ($receiveAccount !== '') {
+            $meta['receive_account_number'] = $receiveAccount;
+        }
+
+        return $meta;
     }
 
     private function computeCreditAmount(WhatsappWallet $wallet, float $amount): float

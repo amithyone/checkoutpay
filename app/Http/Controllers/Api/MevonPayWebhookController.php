@@ -6,6 +6,7 @@ use App\Events\PaymentApproved;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\BusinessRubiesFundingWebhookService;
+use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
 use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -74,7 +75,7 @@ class MevonPayWebhookController extends Controller
         $waTopup = app(WhatsappWalletTier1TopupVaService::class);
 
         if ($amount <= 0) {
-            if ($waTopup->tryLogZeroAmountWebhook($accountNumber, $reference, $payload)) {
+            if ($waTopup->tryLogZeroAmountWebhook($accountNumber, $reference, $payload, $request)) {
                 $this->recordWebhookSource($request, 'whatsapp_wallet_topup_no_amount');
 
                 return response()->json(['success' => true, 'message' => 'WhatsApp wallet webhook logged (no amount)']);
@@ -84,11 +85,6 @@ class MevonPayWebhookController extends Controller
 
             return response()->json(['success' => false, 'message' => 'Invalid payload'], 422);
         }
-
-        $webhookMeta = [
-            'sender' => (string) data_get($payload, 'data.sender', ''),
-            'bank_name' => (string) data_get($payload, 'data.bank_name', ''),
-        ];
 
         $payment = Payment::where('status', Payment::STATUS_PENDING)
             ->whereIn('payment_source', [
@@ -104,19 +100,19 @@ class MevonPayWebhookController extends Controller
             ->first();
 
         if (! $payment) {
-            if (app(BusinessRubiesFundingWebhookService::class)->tryFulfillFromWebhook($accountNumber, $amount, $reference, $webhookMeta)) {
+            if (app(BusinessRubiesFundingWebhookService::class)->tryFulfillFromWebhook($accountNumber, $amount, $reference, $payload, $request)) {
                 $this->recordWebhookSource($request, 'business_rubies_va');
 
                 return response()->json(['success' => true, 'message' => 'Business Rubies funding applied']);
             }
 
-            if ($waTopup->tryFulfillFromWebhook($accountNumber, $amount, $reference, $webhookMeta)) {
+            if ($waTopup->tryFulfillFromWebhook($accountNumber, $amount, $reference, $payload, $request)) {
                 $this->recordWebhookSource($request, 'whatsapp_wallet_topup');
 
                 return response()->json(['success' => true, 'message' => 'WhatsApp wallet top-up applied']);
             }
 
-            if ($waTopup->tryFulfillPermanentVaFromWebhook($accountNumber, $amount, $reference, $webhookMeta)) {
+            if ($waTopup->tryFulfillPermanentVaFromWebhook($accountNumber, $amount, $reference, $payload, $request)) {
                 $this->recordWebhookSource($request, 'whatsapp_wallet_permanent_va_topup');
 
                 return response()->json(['success' => true, 'message' => 'WhatsApp wallet top-up applied (permanent VA)']);
@@ -154,6 +150,7 @@ class MevonPayWebhookController extends Controller
         }
 
         $payment->refresh();
+        MevonPayInboundWebhookRecorder::attach($payment, $payload, 'processed', $request);
         $payment->load(['business.websites', 'website']);
         event(new PaymentApproved($payment));
         $this->recordWebhookSource($request, 'processed');

@@ -342,6 +342,61 @@
         </div>
         @endif
 
+        @php
+            $mevonInbound = is_array($payment->email_data ?? null)
+                ? ($payment->email_data['mevonpay_inbound_webhook'] ?? null)
+                : null;
+            $mevonInboundHistory = is_array($payment->email_data ?? null)
+                ? ($payment->email_data['mevonpay_inbound_webhooks'] ?? [])
+                : [];
+        @endphp
+        @if(is_array($mevonInbound) && $mevonInbound !== [])
+        <div class="mt-6 pt-6 border-t border-gray-200">
+            <h4 class="text-sm sm:text-md font-semibold text-gray-900 mb-3">
+                <i class="fas fa-bolt text-purple-600 mr-2"></i>MevonPay inbound webhook
+            </h4>
+            <div class="text-xs text-gray-600 mb-3 space-y-1">
+                @if(!empty($mevonInbound['received_at']))
+                <p>
+                    Received
+                    {{ \Carbon\Carbon::parse($mevonInbound['received_at'])->format('M d, Y H:i:s') }}
+                </p>
+                @endif
+                @if(!empty($mevonInbound['handler_status']))
+                <p>
+                    <span class="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-medium">
+                        {{ $mevonInbound['handler_status'] }}
+                    </span>
+                    @if(!empty($mevonInbound['event']))
+                        <span class="text-gray-500 ml-1">· {{ $mevonInbound['event'] }}</span>
+                    @endif
+                </p>
+                @endif
+                @if(!empty($mevonInbound['request']['ip']))
+                <p class="text-gray-500">From {{ $mevonInbound['request']['ip'] }} · {{ $mevonInbound['request']['method'] ?? 'POST' }} {{ $mevonInbound['request']['path'] ?? '' }}</p>
+                @endif
+            </div>
+            <pre class="text-xs bg-gray-900 text-green-400 rounded-lg p-3 sm:p-4 overflow-x-auto max-h-[28rem] whitespace-pre-wrap break-words font-mono">{{ json_encode($mevonInbound['payload'] ?? $mevonInbound, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+            @if(is_array($mevonInboundHistory) && count($mevonInboundHistory) > 1)
+            <details class="mt-3">
+                <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-900">
+                    {{ count($mevonInboundHistory) - 1 }} earlier webhook {{ count($mevonInboundHistory) - 1 === 1 ? 'delivery' : 'deliveries' }}
+                </summary>
+                <div class="mt-2 space-y-3">
+                    @foreach(array_slice(array_reverse($mevonInboundHistory), 1) as $prior)
+                    <div class="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                        @if(!empty($prior['received_at']))
+                        <p class="text-xs text-gray-500 mb-2">{{ \Carbon\Carbon::parse($prior['received_at'])->format('M d, Y H:i:s') }} · {{ $prior['handler_status'] ?? 'unknown' }}</p>
+                        @endif
+                        <pre class="text-xs overflow-x-auto max-h-48 whitespace-pre-wrap break-words font-mono text-gray-800">{{ json_encode($prior['payload'] ?? $prior, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                    </div>
+                    @endforeach
+                </div>
+            </details>
+            @endif
+        </div>
+        @endif
+
         @if($payment->email_data)
         <div class="mt-6 pt-6 border-t border-gray-200">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">

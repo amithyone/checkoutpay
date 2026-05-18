@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Events\PaymentApproved;
 use App\Models\Business;
 use App\Models\Payment;
+use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -14,15 +16,14 @@ use Illuminate\Support\Str;
  */
 class BusinessRubiesFundingWebhookService
 {
-    /**
-     * @param  array{sender?: string, bank_name?: string}  $webhookMeta
-     */
     public function tryFulfillFromWebhook(
         string $accountNumber,
         float $amount,
         string $reference,
-        array $webhookMeta = [],
+        array $payload = [],
+        ?Request $request = null,
     ): bool {
+        $webhookMeta = MevonPayInboundWebhookRecorder::metaFromPayload($payload);
         if ($amount <= 0) {
             return false;
         }
@@ -34,7 +35,7 @@ class BusinessRubiesFundingWebhookService
 
         $handled = false;
 
-        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, &$handled) {
+        DB::transaction(function () use ($accountNumber, $amount, $reference, $webhookMeta, $payload, $request, &$handled) {
             $business = Business::query()
                 ->where('rubies_business_account_number', $accountNumber)
                 ->lockForUpdate()
@@ -68,7 +69,7 @@ class BusinessRubiesFundingWebhookService
 
                         return;
                     }
-                    $this->finalizeRubiesDeposit($existing, $business, $amount, $reference, $webhookMeta);
+                    $this->finalizeRubiesDeposit($existing, $business, $amount, $reference, $webhookMeta, $payload, $request);
                     $handled = true;
 
                     return;
@@ -102,7 +103,7 @@ class BusinessRubiesFundingWebhookService
                 ],
             ]);
 
-            $this->finalizeRubiesDeposit($payment, $business, $amount, $reference, $webhookMeta);
+            $this->finalizeRubiesDeposit($payment, $business, $amount, $reference, $webhookMeta, $payload, $request);
             $handled = true;
         });
 
@@ -118,6 +119,8 @@ class BusinessRubiesFundingWebhookService
         float $amount,
         string $reference,
         array $webhookMeta,
+        array $payload = [],
+        ?Request $request = null,
     ): void {
         $payment->approve([
             'source' => 'mevonpay_webhook',
@@ -145,6 +148,9 @@ class BusinessRubiesFundingWebhookService
         }
 
         $payment->refresh();
+        if ($payload !== []) {
+            MevonPayInboundWebhookRecorder::attach($payment, $payload, 'business_rubies_va', $request);
+        }
         $payment->load(['business.websites', 'website']);
         event(new PaymentApproved($payment));
 

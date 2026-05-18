@@ -249,6 +249,8 @@ class Payment extends Model
             'rubies_business_va',
             'mevonpay_reference',
             'reported_amount',
+            'mevonpay_inbound_webhook',
+            'mevonpay_inbound_webhooks',
         ];
     }
 

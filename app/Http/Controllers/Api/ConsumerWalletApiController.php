@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Bank;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
@@ -324,31 +325,62 @@ class ConsumerWalletApiController extends Controller
         return array_map(function (WhatsappWalletTransaction $tx) use ($byPhone) {
             $row = $tx->toArray();
             $phone = trim((string) ($row['counterparty_phone_e164'] ?? ''));
-            if ($phone === '') {
-                return $row;
-            }
-
-            $w = $byPhone[$phone] ?? null;
-            if (! $w instanceof WhatsappWallet) {
-                return $row;
-            }
-
-            $name = $w->displayName();
-            if ($name === null) {
-                return $row;
-            }
-
-            if ($tx->type === WhatsappWalletTransaction::TYPE_P2P_CREDIT) {
-                if (trim((string) ($row['sender_name'] ?? '')) === '') {
-                    $row['sender_name'] = $name;
+            if ($phone !== '') {
+                $w = $byPhone[$phone] ?? null;
+                if ($w instanceof WhatsappWallet) {
+                    $name = $w->displayName();
+                    if ($name !== null) {
+                        if ($tx->type === WhatsappWalletTransaction::TYPE_P2P_CREDIT) {
+                            if (trim((string) ($row['sender_name'] ?? '')) === '') {
+                                $row['sender_name'] = $name;
+                            }
+                        }
+                        if (trim((string) ($row['counterparty_account_name'] ?? '')) === '') {
+                            $row['counterparty_account_name'] = $name;
+                        }
+                    }
                 }
             }
-            if (trim((string) ($row['counterparty_account_name'] ?? '')) === '') {
-                $row['counterparty_account_name'] = $name;
-            }
 
-            return $row;
+            return $this->enrichTransactionRow($tx, $row);
         }, $items);
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function enrichTransactionRow(WhatsappWalletTransaction $tx, array $row): array
+    {
+        $meta = is_array($row['meta'] ?? null) ? $row['meta'] : [];
+
+        if ($tx->type === WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT) {
+            $bankName = trim((string) ($meta['bank_name'] ?? ''));
+            if ($bankName === '' && ! empty($row['counterparty_bank_code'])) {
+                $bankName = trim((string) (Bank::query()
+                    ->where('code', (string) $row['counterparty_bank_code'])
+                    ->value('name') ?? ''));
+            }
+            if ($bankName !== '') {
+                $row['counterparty_bank_name'] = $bankName;
+            }
+        }
+
+        if ($tx->type === WhatsappWalletTransaction::TYPE_TOPUP) {
+            $payerName = trim((string) ($row['counterparty_account_name'] ?? ''));
+            if ($payerName === '') {
+                $payerName = trim((string) ($meta['payer_name'] ?? ''));
+                if ($payerName !== '') {
+                    $row['counterparty_account_name'] = $payerName;
+                }
+            }
+            $payerBank = trim((string) ($meta['payer_bank'] ?? ''));
+            if ($payerBank !== '') {
+                $row['counterparty_bank_name'] = $payerBank;
+            }
+        }
+
+        return $row;
     }
 
     public function issueTopupVirtualAccount(Request $request): JsonResponse
