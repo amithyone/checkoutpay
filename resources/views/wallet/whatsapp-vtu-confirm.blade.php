@@ -18,14 +18,15 @@
     <p>{{ $summary }}</p>
     <p class="muted">Enter your 4-digit wallet PIN here only — do not send it in WhatsApp. This page is for this purchase.</p>
 
-    <form method="post" action="{{ url('/wallet/whatsapp/vtu-confirm/'.$token) }}">
+    <form method="post" action="{{ url('/wallet/whatsapp/vtu-confirm/'.$token) }}" data-wa-pin-once>
         @csrf
         <label for="wallet_pin">Wallet PIN</label>
         <input id="wallet_pin" name="wallet_pin" type="password" inputmode="numeric" pattern="\d{4}" maxlength="4" autocomplete="one-time-code" required>
         @error('wallet_pin')
             <p class="err">{{ $message }}</p>
         @enderror
-        <button type="submit">Pay now</button>
+        <button type="submit" data-loading-label="Processing…">Pay now</button>
     </form>
+    @include('wallet.partials.pin-submit-guard')
 </body>
 </html>

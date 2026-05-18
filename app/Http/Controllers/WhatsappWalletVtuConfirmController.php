@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HandlesWhatsappWalletWebPinSubmit;
 use App\Services\Whatsapp\WhatsappWalletVtuWebPinService;
 use Illuminate\Http\Request;
 
 class WhatsappWalletVtuConfirmController extends Controller
 {
+    use HandlesWhatsappWalletWebPinSubmit;
     public function show(string $token, WhatsappWalletVtuWebPinService $vtuPin)
     {
         $meta = $vtuPin->describePending($token);
@@ -28,7 +30,12 @@ class WhatsappWalletVtuConfirmController extends Controller
 
         $result = $vtuPin->confirmViaWebPin($token, (string) $request->input('wallet_pin'));
         if (! ($result['ok'] ?? false)) {
-            return back()->withErrors(['wallet_pin' => $result['error'] ?? 'Could not confirm.'])->withInput();
+            $error = (string) ($result['error'] ?? 'Could not confirm.');
+            if ($this->isConsumedWhatsappWalletWebLinkError($error)) {
+                return view('wallet.whatsapp-vtu-confirm-done');
+            }
+
+            return back()->withErrors(['wallet_pin' => $error])->withInput();
         }
 
         return view('wallet.whatsapp-vtu-confirm-done');

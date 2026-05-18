@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HandlesWhatsappWalletWebPinSubmit;
+use App\Models\WhatsappWalletPartnerPayIntent;
 use App\Services\Whatsapp\WhatsappWalletPartnerPayIntentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -9,6 +11,7 @@ use Illuminate\View\View;
 
 class WhatsappWalletPartnerPayWebController extends Controller
 {
+    use HandlesWhatsappWalletWebPinSubmit;
     public function show(string $token, WhatsappWalletPartnerPayIntentService $service): View
     {
         $desc = $service->describeForWeb($token);
@@ -36,8 +39,28 @@ class WhatsappWalletPartnerPayWebController extends Controller
 
         $result = $service->completeWithPin($token, (string) $request->input('wallet_pin'));
         if (! ($result['ok'] ?? false)) {
+            $message = (string) ($result['message'] ?? 'Payment failed.');
+            if ($this->isConsumedWhatsappWalletWebLinkError($message)) {
+                $intent = WhatsappWalletPartnerPayIntent::query()
+                    ->where('confirm_token', $token)
+                    ->first();
+                if ($intent && $intent->status === WhatsappWalletPartnerPayIntent::STATUS_COMPLETED) {
+                    $payment = $intent->payment;
+
+                    return view('wallet.whatsapp-partner-pay-done', [
+                        'amount' => (float) $intent->amount,
+                        'transaction_id' => $payment ? (string) $payment->transaction_id : '',
+                    ]);
+                }
+
+                return view('wallet.whatsapp-partner-pay-done', [
+                    'amount' => 0,
+                    'transaction_id' => '',
+                ]);
+            }
+
             return back()->withErrors([
-                'wallet_pin' => $result['message'] ?? 'Payment failed.',
+                'wallet_pin' => $message,
             ])->withInput();
         }
 

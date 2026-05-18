@@ -24,6 +24,50 @@ final class MevonPayInboundWebhookRecorder
     }
 
     /**
+     * Wallet ledger meta for a MevonPay funding.success top-up (stored on {@see \App\Models\WhatsappWalletTransaction}).
+     *
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    public static function ledgerMetaFromPayload(array $payload, float $reportedAmount, array $extra = []): array
+    {
+        $meta = array_merge([
+            'source' => 'mevonpay_funding',
+            'reported_amount' => $reportedAmount,
+        ], $extra);
+
+        $sender = trim((string) data_get($payload, 'data.sender', ''));
+        $bank = trim((string) data_get($payload, 'data.bank_name', ''));
+        $account = trim((string) data_get($payload, 'data.account_number', ''));
+        $reference = trim((string) data_get($payload, 'data.reference', ''));
+        $narration = trim((string) data_get($payload, 'data.narration', ''));
+        $timestamp = trim((string) data_get($payload, 'data.timestamp', ''));
+
+        if ($sender !== '') {
+            $meta['payer_name'] = $sender;
+            $meta['sender'] = $sender;
+        }
+        if ($bank !== '') {
+            $meta['payer_bank'] = $bank;
+            $meta['bank_name'] = $bank;
+        }
+        if ($account !== '') {
+            $meta['receive_account_number'] = $account;
+        }
+        if ($reference !== '') {
+            $meta['mevon_reference'] = $reference;
+        }
+        if ($narration !== '') {
+            $meta['narration'] = $narration;
+        }
+        if ($timestamp !== '') {
+            $meta['bank_timestamp'] = $timestamp;
+        }
+
+        return $meta;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function buildEntry(array $payload, string $handlerStatus, ?Request $request = null): array

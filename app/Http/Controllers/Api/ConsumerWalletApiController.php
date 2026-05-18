@@ -369,14 +369,40 @@ class ConsumerWalletApiController extends Controller
         if ($tx->type === WhatsappWalletTransaction::TYPE_TOPUP) {
             $payerName = trim((string) ($row['counterparty_account_name'] ?? ''));
             if ($payerName === '') {
-                $payerName = trim((string) ($meta['payer_name'] ?? ''));
+                $payerName = trim((string) ($meta['payer_name'] ?? $meta['sender'] ?? ''));
                 if ($payerName !== '') {
                     $row['counterparty_account_name'] = $payerName;
                 }
             }
-            $payerBank = trim((string) ($meta['payer_bank'] ?? ''));
+
+            $payerBank = trim((string) ($meta['payer_bank'] ?? $meta['bank_name'] ?? ''));
             if ($payerBank !== '') {
                 $row['counterparty_bank_name'] = $payerBank;
+            }
+
+            $receiveAcct = trim((string) ($meta['receive_account_number'] ?? ''));
+            if ($receiveAcct !== '') {
+                $row['receive_account_number'] = $receiveAcct;
+            }
+
+            $bankRef = trim((string) ($row['external_reference'] ?? $meta['mevon_reference'] ?? ''));
+            if ($bankRef !== '') {
+                $row['topup_bank_reference'] = $bankRef;
+            }
+
+            $narration = trim((string) ($meta['narration'] ?? ''));
+            if ($narration !== '') {
+                $row['topup_narration'] = $narration;
+            }
+
+            $bankTime = trim((string) ($meta['bank_timestamp'] ?? ''));
+            if ($bankTime !== '') {
+                $row['topup_bank_timestamp'] = $bankTime;
+            }
+
+            $reported = $meta['reported_amount'] ?? null;
+            if ($reported !== null && is_numeric($reported) && (float) $reported > 0) {
+                $row['topup_reported_amount'] = (float) $reported;
             }
         }
 

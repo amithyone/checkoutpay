@@ -25,14 +25,15 @@
     <div class="box">{{ $order_summary }}</div>
     <p class="muted">Enter your 4-digit WhatsApp wallet PIN below only on this page — do not send it in WhatsApp chat.</p>
 
-    <form method="post" action="{{ url('/wallet/partner-pay/'.$token) }}">
+    <form method="post" action="{{ url('/wallet/partner-pay/'.$token) }}" data-wa-pin-once>
         @csrf
         <label for="wallet_pin">Wallet PIN</label>
         <input id="wallet_pin" name="wallet_pin" type="password" inputmode="numeric" pattern="\d{4}" maxlength="4" autocomplete="one-time-code" required value="{{ old('wallet_pin') }}">
         @error('wallet_pin')
             <p class="err">{{ $message }}</p>
         @enderror
-        <button type="submit">Confirm payment</button>
+        <button type="submit" data-loading-label="Paying…">Confirm payment</button>
     </form>
+    @include('wallet.partials.pin-submit-guard')
 </body>
 </html>

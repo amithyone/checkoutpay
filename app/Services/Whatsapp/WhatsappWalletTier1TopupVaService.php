@@ -231,7 +231,7 @@ class WhatsappWalletTier1TopupVaService
                     'balance_after' => $newBal,
                     'counterparty_account_name' => $payerName !== '' ? $payerName : null,
                     'external_reference' => $reference !== '' ? $reference : null,
-                    'meta' => $this->topupLedgerMeta($amount, $webhookMeta, $accountNumber, [
+                    'meta' => $this->topupLedgerMeta($amount, $payload, $accountNumber, [
                         'pending_topup_id' => $pending->id,
                     ]),
                 ]);
@@ -331,7 +331,7 @@ class WhatsappWalletTier1TopupVaService
                     'balance_after' => $newBal,
                     'counterparty_account_name' => $payerName !== '' ? $payerName : null,
                     'external_reference' => $reference !== '' ? $reference : null,
-                    'meta' => $this->topupLedgerMeta($amount, $webhookMeta, $accountNumber, [
+                    'meta' => $this->topupLedgerMeta($amount, $payload, $accountNumber, [
                         'permanent_va' => true,
                     ]),
                 ]);
@@ -483,28 +483,16 @@ class WhatsappWalletTier1TopupVaService
     }
 
     /**
-     * @param  array{sender?: string, bank_name?: string}  $webhookMeta
+     * @param  array<string, mixed>  $payload  Full MevonPay funding.success webhook body
      * @param  array<string, mixed>  $extra
      * @return array<string, mixed>
      */
-    private function topupLedgerMeta(float $reportedAmount, array $webhookMeta, string $receiveAccount, array $extra = []): array
+    private function topupLedgerMeta(float $reportedAmount, array $payload, string $receiveAccount, array $extra = []): array
     {
-        $payerName = trim((string) ($webhookMeta['sender'] ?? ''));
-        $payerBank = trim((string) ($webhookMeta['bank_name'] ?? ''));
+        $meta = MevonPayInboundWebhookRecorder::ledgerMetaFromPayload($payload, $reportedAmount, $extra);
+
         $receiveAccount = trim($receiveAccount);
-
-        $meta = array_merge([
-            'source' => 'mevonpay_funding',
-            'reported_amount' => $reportedAmount,
-        ], $extra);
-
-        if ($payerName !== '') {
-            $meta['payer_name'] = $payerName;
-        }
-        if ($payerBank !== '') {
-            $meta['payer_bank'] = $payerBank;
-        }
-        if ($receiveAccount !== '') {
+        if ($receiveAccount !== '' && empty($meta['receive_account_number'])) {
             $meta['receive_account_number'] = $receiveAccount;
         }
 
