@@ -81,8 +81,28 @@ class IntegrationController extends Controller
                     'exempt' => (bool) ($sample['exempt'] ?? false),
                 ],
                 'dashboard_note' => 'Change fees, who pays charges, and split payment options in your CheckoutPay business website settings.',
-                'dashboard_websites_url' => url('/business/websites'),
+                'portal_url' => $this->checkoutPayPortalUrl(),
+                'dashboard_websites_url' => $this->checkoutPayDashboardWebsitesUrl(),
             ],
         ]);
+    }
+
+    protected function checkoutPayPortalUrl(): string
+    {
+        $configured = rtrim((string) config('app.url'), '/');
+        if ($configured !== '' && ! str_contains($configured, 'localhost') && ! str_contains($configured, '127.0.0.1')) {
+            return $configured;
+        }
+
+        return 'https://check-outpay.com';
+    }
+
+    protected function checkoutPayDashboardWebsitesUrl(): string
+    {
+        try {
+            return route('business.websites.index', [], true);
+        } catch (\Throwable) {
+            return $this->checkoutPayPortalUrl().'/dashboard/websites';
+        }
     }
 }

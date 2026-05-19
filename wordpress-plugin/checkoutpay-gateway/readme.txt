@@ -3,7 +3,7 @@ Contributors: checkoutpay
 Tags: woocommerce, payment, payment-gateway, checkoutpay
 Requires at least: 5.0
 Tested up to: 6.4
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -49,6 +49,10 @@ The plugin automatically sets up webhook endpoints. Make sure your CheckoutPay a
 Yes, enable test mode in the plugin settings to use test API credentials.
 
 == Changelog ==
+
+= 1.2.1 =
+* Fixed: CheckoutPay site URL (https://check-outpay.com) shown in plugin settings with link to dashboard website settings.
+* Fixed: API dashboard_websites_url now points to /dashboard/websites (was an invalid /business/websites path).
 
 = 1.2.0 =
 * New: Auto-complete orders option when CheckoutPay payment is approved.

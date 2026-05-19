@@ -36,6 +36,9 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         $this->enabled = $this->get_option('enabled');
         $this->api_key = $this->get_option('api_key');
         $this->api_url = $this->get_option('api_url');
+        if (empty($this->api_url)) {
+            $this->api_url = 'https://check-outpay.com/api/v1';
+        }
         $this->test_mode = $this->get_option('test_mode');
         $this->developer_program_partner_business_id = $this->get_option('developer_program_partner_business_id');
         $this->auto_complete_orders = $this->get_option('auto_complete_orders');
@@ -154,6 +157,26 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
     }
 
     /**
+     * CheckoutPay platform URL (merchant dashboard).
+     *
+     * @return string
+     */
+    public function get_checkoutpay_portal_url() {
+        $url = defined('CHECKOUTPAY_PORTAL_URL') ? CHECKOUTPAY_PORTAL_URL : 'https://check-outpay.com';
+
+        return untrailingslashit($url);
+    }
+
+    /**
+     * Business websites settings on CheckoutPay.
+     *
+     * @return string
+     */
+    public function get_checkoutpay_dashboard_websites_url() {
+        return $this->get_checkoutpay_portal_url() . '/dashboard/websites';
+    }
+
+    /**
      * Render read-only webhook URL with copy button (WooCommerce settings).
      *
      * @param string $key  Field key.
@@ -164,6 +187,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         $field_key = $this->get_field_key($key);
         $webhook_url = $this->get_webhook_url();
         $website_url = $this->get_store_website_url();
+        $portal_url = $this->get_checkoutpay_portal_url();
+        $dashboard_websites_url = $this->get_checkoutpay_dashboard_websites_url();
         $defaults = array(
             'title' => '',
             'description' => '',
@@ -180,6 +205,24 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                     <legend class="screen-reader-text"><span><?php echo wp_kses_post($data['title']); ?></span></legend>
                     <p class="description" style="margin-bottom: 8px;">
                         <?php echo wp_kses_post($data['description']); ?>
+                    </p>
+                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('CheckoutPay site URL', 'checkoutpay-gateway'); ?></strong></p>
+                    <p style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 42rem; margin-bottom: 12px;">
+                        <input
+                            type="text"
+                            readonly
+                            class="large-text code"
+                            id="checkoutpay-portal-url"
+                            value="<?php echo esc_attr($portal_url); ?>/"
+                            onclick="this.select();"
+                            style="flex: 1 1 280px;"
+                        />
+                        <a href="<?php echo esc_url($dashboard_websites_url); ?>" class="button" target="_blank" rel="noopener noreferrer">
+                            <?php esc_html_e('Open website settings', 'checkoutpay-gateway'); ?>
+                        </a>
+                    </p>
+                    <p class="description" style="margin: 0 0 12px;">
+                        <?php esc_html_e('Register your WooCommerce store URL below in CheckoutPay → Dashboard → Websites.', 'checkoutpay-gateway'); ?>
                     </p>
                     <p style="margin: 0 0 6px;"><strong><?php esc_html_e('Webhook URL', 'checkoutpay-gateway'); ?></strong></p>
                     <p style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 42rem;">
@@ -289,6 +332,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         $data = wp_parse_args($data, $defaults);
         $website_url = $this->get_store_website_url();
         $webhook_url = $this->get_webhook_url();
+        $portal_url = $this->get_checkoutpay_portal_url();
+        $dashboard_websites_url = $this->get_checkoutpay_dashboard_websites_url();
         $sample_amount = 10000;
         ob_start();
         ?>
@@ -326,6 +371,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
 
                         var websiteUrl = <?php echo wp_json_encode($website_url); ?>;
                         var webhookUrl = <?php echo wp_json_encode($webhook_url); ?>;
+                        var portalUrl = <?php echo wp_json_encode($portal_url); ?>;
+                        var dashboardWebsitesUrl = <?php echo wp_json_encode($dashboard_websites_url); ?>;
                         var sampleAmount = <?php echo (int) $sample_amount; ?>;
 
                         function getSettingInput(suffix) {
@@ -374,9 +421,10 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                             if (d.dashboard_note) {
                                 html += '<p class="description" style="margin:10px 0 0;">' + escapeHtml(d.dashboard_note) + '</p>';
                             }
-                            if (d.dashboard_websites_url) {
-                                html += '<p style="margin:8px 0 0;"><a href="' + escapeHtml(d.dashboard_websites_url) + '" target="_blank" rel="noopener noreferrer"><?php echo esc_js(__('Open CheckoutPay website settings', 'checkoutpay-gateway')); ?></a></p>';
-                            }
+                            var settingsUrl = (d.dashboard_websites_url && String(d.dashboard_websites_url).indexOf('http') === 0)
+                                ? d.dashboard_websites_url
+                                : dashboardWebsitesUrl;
+                            html += '<p style="margin:8px 0 0;"><a href="' + escapeHtml(settingsUrl) + '" target="_blank" rel="noopener noreferrer"><?php echo esc_js(__('Open CheckoutPay website settings', 'checkoutpay-gateway')); ?></a> · <a href="' + escapeHtml((d.portal_url && String(d.portal_url).indexOf('http') === 0) ? d.portal_url : portalUrl) + '" target="_blank" rel="noopener noreferrer"><?php echo esc_js(__('CheckoutPay home', 'checkoutpay-gateway')); ?></a></p>';
                             panel.innerHTML = html;
                         }
 
