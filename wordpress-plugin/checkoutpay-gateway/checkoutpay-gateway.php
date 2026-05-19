@@ -2,85 +2,157 @@
 /**
  * Plugin Name: CheckoutPay Payment Gateway
  * Plugin URI: https://checkoutpay.com
- * Description: Accept payments via CheckoutPay payment gateway in WooCommerce
- * Version: 1.0.0
+ * Description: Accept bank-transfer payments via CheckoutPay in WooCommerce (classic and block checkout).
+ * Version: 1.1.1
  * Author: CheckoutPay
  * Author URI: https://checkoutpay.com
  * Text Domain: checkoutpay-gateway
  * Domain Path: /languages
- * Requires at least: 5.0
+ * Requires at least: 5.8
  * Requires PHP: 7.4
- * WC requires at least: 5.0
- * WC tested up to: 8.0
+ * WC requires at least: 7.0
+ * WC tested up to: 9.6
+ *
+ * @package CheckoutPay
  */
 
 if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly
+    exit;
 }
 
-// Define plugin constants
-define('CHECKOUTPAY_VERSION', '1.0.0');
+define('CHECKOUTPAY_VERSION', '1.1.1');
 define('CHECKOUTPAY_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CHECKOUTPAY_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CHECKOUTPAY_PLUGIN_FILE', __FILE__);
 
 /**
- * Check if WooCommerce is active
+ * Declare compatibility with WooCommerce features (HPOS, block checkout).
  */
-function checkoutpay_check_woocommerce() {
-    if (!class_exists('WooCommerce')) {
-        add_action('admin_notices', 'checkoutpay_woocommerce_missing_notice');
-        return false;
+add_action('before_woocommerce_init', function () {
+    if (!class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        return;
     }
-    return true;
+
+    \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', CHECKOUTPAY_PLUGIN_FILE, true);
+    \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('cart_checkout_blocks', CHECKOUTPAY_PLUGIN_FILE, true);
+});
+
+/**
+ * @return bool
+ */
+function checkoutpay_is_woocommerce_active()
+{
+    return class_exists('WooCommerce');
 }
 
 /**
- * WooCommerce missing notice
+ * Admin notice when WooCommerce is missing.
  */
-function checkoutpay_woocommerce_missing_notice() {
+function checkoutpay_woocommerce_missing_notice()
+{
     ?>
-    <div class="error">
-        <p><?php _e('CheckoutPay Payment Gateway requires WooCommerce to be installed and active.', 'checkoutpay-gateway'); ?></p>
+    <div class="notice notice-error">
+        <p><?php esc_html_e('CheckoutPay Payment Gateway requires WooCommerce to be installed and active.', 'checkoutpay-gateway'); ?></p>
     </div>
     <?php
 }
 
+add_action('admin_notices', function () {
+    if (!checkoutpay_is_woocommerce_active()) {
+        checkoutpay_woocommerce_missing_notice();
+        return;
+    }
+
+    $settings = get_option('woocommerce_checkoutpay_settings', array());
+    if (($settings['enabled'] ?? 'no') !== 'yes') {
+        return;
+    }
+
+    if (!empty($settings['api_key']) && !empty($settings['api_url'])) {
+        return;
+    }
+
+    $settings_url = admin_url('admin.php?page=wc-settings&tab=checkout&section=checkoutpay');
+    ?>
+    <div class="notice notice-warning">
+        <p>
+            <?php
+            echo wp_kses_post(
+                sprintf(
+                    /* translators: %s: WooCommerce CheckoutPay settings URL */
+                    __('CheckoutPay is enabled but missing API URL or API Key, so it will not appear at checkout. <a href="%s">Configure CheckoutPay</a>.', 'checkoutpay-gateway'),
+                    esc_url($settings_url)
+                )
+            );
+            ?>
+        </p>
+    </div>
+    <?php
+});
+
 /**
- * Initialize the gateway
+ * Load gateway class after WooCommerce payment gateway base is available.
  */
-function checkoutpay_init_gateway() {
-    if (!checkoutpay_check_woocommerce()) {
+function checkoutpay_init_gateway()
+{
+    if (!checkoutpay_is_woocommerce_active() || !class_exists('WC_Payment_Gateway')) {
         return;
     }
 
     require_once CHECKOUTPAY_PLUGIN_DIR . 'includes/class-checkoutpay-gateway.php';
-    
+
     add_filter('woocommerce_payment_gateways', 'checkoutpay_add_gateway');
 }
-add_action('plugins_loaded', 'checkoutpay_init_gateway', 0);
+add_action('plugins_loaded', 'checkoutpay_init_gateway', 20);
 
 /**
- * Add the gateway to WooCommerce
+ * @param array $gateways
+ * @return array
  */
-function checkoutpay_add_gateway($gateways) {
+function checkoutpay_add_gateway($gateways)
+{
     $gateways[] = 'WC_CheckoutPay_Gateway';
     return $gateways;
 }
 
 /**
- * Plugin activation hook
+ * Register CheckoutPay for WooCommerce block-based checkout.
  */
-function checkoutpay_activate() {
-    // Create necessary database tables or options if needed
+function checkoutpay_init_blocks_support()
+{
+    if (!checkoutpay_is_woocommerce_active()) {
+        return;
+    }
+
+    if (!class_exists('Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType')) {
+        return;
+    }
+
+    require_once CHECKOUTPAY_PLUGIN_DIR . 'includes/class-checkoutpay-blocks.php';
+
+    add_action(
+        'woocommerce_blocks_payment_method_type_registration',
+        function ($payment_method_registry) {
+            $payment_method_registry->register(new WC_CheckoutPay_Blocks());
+        }
+    );
+}
+add_action('woocommerce_blocks_loaded', 'checkoutpay_init_blocks_support');
+
+/**
+ * Plugin activation.
+ */
+function checkoutpay_activate()
+{
     flush_rewrite_rules();
 }
 register_activation_hook(__FILE__, 'checkoutpay_activate');
 
 /**
- * Plugin deactivation hook
+ * Plugin deactivation.
  */
-function checkoutpay_deactivate() {
+function checkoutpay_deactivate()
+{
     flush_rewrite_rules();
 }
 register_deactivation_hook(__FILE__, 'checkoutpay_deactivate');

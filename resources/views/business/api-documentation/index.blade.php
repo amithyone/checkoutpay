@@ -56,7 +56,7 @@
                 <div class="mt-3 p-2 bg-white/50 rounded-lg">
                     <p class="text-xs text-purple-800">
                         <i class="fas fa-info-circle mr-1"></i>
-                        <strong>Version:</strong> 1.0.0 | <strong>Requires:</strong> WordPress 5.0+, WooCommerce 5.0+
+                        <strong>Version:</strong> 1.1.0 | <strong>Requires:</strong> WordPress 5.8+, WooCommerce 7.0+
                     </p>
                 </div>
             </div>

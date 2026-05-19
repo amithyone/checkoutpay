@@ -20,8 +20,10 @@ A WordPress plugin that integrates CheckoutPay payment gateway with WooCommerce,
 4. Ensure WooCommerce is installed and activated
 5. Go to **WooCommerce > Settings > Payments**
 6. Enable **CheckoutPay** payment gateway
-7. Configure your API URL and API Key
+7. Configure your API URL and API Key (required for the method to appear at checkout)
 8. Save changes
+
+Works with both **classic** checkout and **WooCommerce block** checkout (Cart/Checkout blocks).
 
 ## Configuration
 

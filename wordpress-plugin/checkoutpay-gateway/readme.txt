@@ -3,7 +3,7 @@ Contributors: checkoutpay
 Tags: woocommerce, payment, payment-gateway, checkoutpay
 Requires at least: 5.0
 Tested up to: 6.4
-Stable tag: 1.0.1
+Stable tag: 1.1.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -50,6 +50,18 @@ Yes, enable test mode in the plugin settings to use test API credentials.
 
 == Changelog ==
 
+= 1.1.1 =
+* New: Webhook URL and website URL shown on WooCommerce CheckoutPay settings with one-click copy (for CheckoutPay business website setup).
+
+= 1.1.0 =
+* Fixed: CheckoutPay now appears on WooCommerce block-based checkout (Cart/Checkout blocks).
+* Fixed: Gateway loads after WooCommerce payment classes are available (avoids silent registration failure).
+* Fixed: Thank-you page JavaScript syntax error for payment status buttons.
+* New: HPOS and block checkout compatibility declarations for WooCommerce 8+.
+* New: Optional developer program partner Business ID setting.
+* New: Sends website_url on payment-request for website matching.
+* Improved: Admin warning when the gateway is enabled but API URL or API Key is missing.
+
 = 1.0.1 =
 * Fixed: Check payment status now uses transaction_id and GET /api/v1/payment/{transactionId} (was incorrectly using payment_id and /payments/).
 * Fixed: Webhook handler now accepts API payload (event, transaction_id, status) and no longer requires deprecated "reference" field.
@@ -66,6 +78,9 @@ Yes, enable test mode in the plugin settings to use test API credentials.
 * Payment status checking
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Required if CheckoutPay does not show on checkout (especially with WooCommerce block checkout). Enable the gateway under WooCommerce > Settings > Payments and set your API URL and API Key.
 
 = 1.0.1 =
 Fixes payment status check and webhook handling to match current CheckoutPay API. Upgrade if you use the "Check Payment Status" button or webhooks.

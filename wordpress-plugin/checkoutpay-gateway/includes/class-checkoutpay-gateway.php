@@ -19,15 +19,17 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
      */
     public function __construct() {
         $this->id = 'checkoutpay';
-        $this->icon = CHECKOUTPAY_PLUGIN_URL . 'assets/images/checkoutpay-logo.png';
+        $icon_path = CHECKOUTPAY_PLUGIN_DIR . 'assets/images/checkoutpay-logo.png';
+        $this->icon = file_exists($icon_path) ? CHECKOUTPAY_PLUGIN_URL . 'assets/images/checkoutpay-logo.png' : '';
         $this->has_fields = false;
         $this->method_title = __('CheckoutPay', 'checkoutpay-gateway');
-        $this->method_description = __('Accept payments via CheckoutPay payment gateway. Payments are processed securely through email-based payment verification.', 'checkoutpay-gateway');
-        
+        $this->method_description = __('Accept bank-transfer payments via CheckoutPay. Customers pay to a virtual account; orders update automatically when payment is confirmed.', 'checkoutpay-gateway');
+        $this->supports = array('products');
+
         // Load the settings
         $this->init_form_fields();
         $this->init_settings();
-        
+
         // Define user set variables
         $this->title = $this->get_option('title');
         $this->description = $this->get_option('description');
@@ -35,6 +37,7 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         $this->api_key = $this->get_option('api_key');
         $this->api_url = $this->get_option('api_url');
         $this->test_mode = $this->get_option('test_mode');
+        $this->developer_program_partner_business_id = $this->get_option('developer_program_partner_business_id');
         
         // Actions
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
@@ -85,12 +88,24 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                 'default' => '',
                 'desc_tip' => true,
             ),
+            'checkoutpay_webhook_url' => array(
+                'title' => __('Webhook URL (for CheckoutPay)', 'checkoutpay-gateway'),
+                'type' => 'checkoutpay_webhook_url',
+                'description' => __('Copy this exact URL into your CheckoutPay business website webhook settings. The plugin sends it automatically on each order; it must match what you save in CheckoutPay.', 'checkoutpay-gateway'),
+            ),
             'test_mode' => array(
                 'title' => __('Test Mode', 'checkoutpay-gateway'),
                 'type' => 'checkbox',
                 'label' => __('Enable Test Mode', 'checkoutpay-gateway'),
                 'default' => 'no',
                 'description' => __('Enable test mode to use test API credentials.', 'checkoutpay-gateway'),
+            ),
+            'developer_program_partner_business_id' => array(
+                'title' => __('Developer program partner ID', 'checkoutpay-gateway'),
+                'type' => 'text',
+                'description' => __('Optional. CheckoutPay Business ID of an approved developer partner (sent as developer_program_partner_business_id on payment-request).', 'checkoutpay-gateway'),
+                'default' => '',
+                'desc_tip' => true,
             ),
             'instructions' => array(
                 'title' => __('Instructions', 'checkoutpay-gateway'),
@@ -100,6 +115,165 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                 'desc_tip' => true,
             ),
         );
+    }
+
+    /**
+     * Webhook URL CheckoutPay should POST to when a payment is approved.
+     *
+     * @return string
+     */
+    public function get_webhook_url() {
+        return add_query_arg('wc-api', 'wc_checkoutpay_webhook', home_url('/'));
+    }
+
+    /**
+     * Store URL sent to CheckoutPay for website matching.
+     *
+     * @return string
+     */
+    public function get_store_website_url() {
+        return home_url('/');
+    }
+
+    /**
+     * Render read-only webhook URL with copy button (WooCommerce settings).
+     *
+     * @param string $key  Field key.
+     * @param array  $data Field definition.
+     * @return string
+     */
+    public function generate_checkoutpay_webhook_url_html($key, $data) {
+        $field_key = $this->get_field_key($key);
+        $webhook_url = $this->get_webhook_url();
+        $website_url = $this->get_store_website_url();
+        $defaults = array(
+            'title' => '',
+            'description' => '',
+        );
+        $data = wp_parse_args($data, $defaults);
+        ob_start();
+        ?>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></label>
+            </th>
+            <td class="forminp" id="<?php echo esc_attr($field_key); ?>">
+                <fieldset>
+                    <legend class="screen-reader-text"><span><?php echo wp_kses_post($data['title']); ?></span></legend>
+                    <p class="description" style="margin-bottom: 8px;">
+                        <?php echo wp_kses_post($data['description']); ?>
+                    </p>
+                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('Webhook URL', 'checkoutpay-gateway'); ?></strong></p>
+                    <p style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 42rem;">
+                        <input
+                            type="text"
+                            readonly
+                            class="large-text code"
+                            id="checkoutpay-webhook-url"
+                            value="<?php echo esc_attr($webhook_url); ?>"
+                            onclick="this.select();"
+                            style="flex: 1 1 280px;"
+                        />
+                        <button type="button" class="button" id="checkoutpay-copy-webhook-url">
+                            <?php esc_html_e('Copy webhook URL', 'checkoutpay-gateway'); ?>
+                        </button>
+                    </p>
+                    <p class="description" style="margin: 8px 0 12px;">
+                        <?php esc_html_e('CheckoutPay → Business websites → paste into Webhook URL for this store domain.', 'checkoutpay-gateway'); ?>
+                    </p>
+                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('Website URL (also sent to CheckoutPay)', 'checkoutpay-gateway'); ?></strong></p>
+                    <p style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 42rem;">
+                        <input
+                            type="text"
+                            readonly
+                            class="large-text code"
+                            id="checkoutpay-website-url"
+                            value="<?php echo esc_attr($website_url); ?>"
+                            onclick="this.select();"
+                            style="flex: 1 1 280px;"
+                        />
+                        <button type="button" class="button" id="checkoutpay-copy-website-url">
+                            <?php esc_html_e('Copy website URL', 'checkoutpay-gateway'); ?>
+                        </button>
+                    </p>
+                    <p class="description">
+                        <?php esc_html_e('Use the same domain in CheckoutPay when you register or approve this WooCommerce site.', 'checkoutpay-gateway'); ?>
+                    </p>
+                    <script>
+                    (function () {
+                        function copyInputValue(inputId, buttonId, copiedLabel) {
+                            var input = document.getElementById(inputId);
+                            var button = document.getElementById(buttonId);
+                            if (!input || !button) {
+                                return;
+                            }
+                            var originalText = button.textContent;
+                            function showCopied() {
+                                button.textContent = copiedLabel;
+                                setTimeout(function () {
+                                    button.textContent = originalText;
+                                }, 2000);
+                            }
+                            button.addEventListener('click', function () {
+                                input.select();
+                                input.setSelectionRange(0, 99999);
+                                if (navigator.clipboard && navigator.clipboard.writeText) {
+                                    navigator.clipboard.writeText(input.value).then(showCopied).catch(function () {
+                                        try {
+                                            document.execCommand('copy');
+                                            showCopied();
+                                        } catch (e) {
+                                            alert(input.value);
+                                        }
+                                    });
+                                } else {
+                                    try {
+                                        document.execCommand('copy');
+                                        showCopied();
+                                    } catch (e) {
+                                        alert(input.value);
+                                    }
+                                }
+                            });
+                        }
+                        copyInputValue(
+                            'checkoutpay-webhook-url',
+                            'checkoutpay-copy-webhook-url',
+                            <?php echo wp_json_encode(__('Copied!', 'checkoutpay-gateway')); ?>
+                        );
+                        copyInputValue(
+                            'checkoutpay-website-url',
+                            'checkoutpay-copy-website-url',
+                            <?php echo wp_json_encode(__('Copied!', 'checkoutpay-gateway')); ?>
+                        );
+                    })();
+                    </script>
+                </fieldset>
+            </td>
+        </tr>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Whether this gateway is available at checkout.
+     *
+     * @return bool
+     */
+    public function is_available() {
+        if ('yes' !== $this->enabled) {
+            return false;
+        }
+
+        if (is_admin() && !wp_doing_ajax()) {
+            return parent::is_available();
+        }
+
+        if (empty($this->api_key) || empty($this->api_url)) {
+            return false;
+        }
+
+        return parent::is_available();
     }
 
     /**
@@ -132,8 +306,14 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             'name' => $customer_name,
             'amount' => $original_amount,
             'service' => 'WC-' . $order_id,
-            'webhook_url' => add_query_arg('wc-api', 'wc_checkoutpay_webhook', home_url('/')),
+            'webhook_url' => $this->get_webhook_url(),
+            'website_url' => $this->get_store_website_url(),
         );
+
+        $partner_id = absint($this->developer_program_partner_business_id);
+        if ($partner_id > 0) {
+            $payment_data['developer_program_partner_business_id'] = $partner_id;
+        }
 
         // Make API request
         $response = $this->make_api_request('payment-request', $payment_data);
@@ -560,10 +740,10 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                             button.prop('disabled', false).text('<?php _e('Check Payment Status', 'checkoutpay-gateway'); ?>');
                             alert('<?php _e('Unable to check payment status. Please try again later.', 'checkoutpay-gateway'); ?>');
                         }
+                    });
                 });
-            });
-            
-            $('#checkoutpay-update-amount-btn').on('click', function() {
+
+                $('#checkoutpay-update-amount-btn').on('click', function() {
                 var button = $(this);
                 var amountInput = $('#checkoutpay-actual-amount');
                 var amount = parseFloat(amountInput.val());
@@ -598,7 +778,7 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                         alert(msg);
                     }
                 });
-            });
+                });
             });
             </script>
             <?php
