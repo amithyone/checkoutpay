@@ -86,10 +86,10 @@
                     <div class="inline-flex items-center bg-white border border-gray-200 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 shadow-sm hover:shadow-md transition-shadow">
                         <i class="fab fa-wordpress text-gray-600 text-lg sm:text-xl mr-2 sm:mr-3"></i>
                         <span class="text-xs sm:text-sm text-gray-700 font-medium mr-2 sm:mr-3">WordPress Plugin</span>
-                        <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="text-gray-600 hover:text-gray-700 font-medium text-xs sm:text-sm flex items-center">
+                        <x-checkoutpay-plugin-download :icon="false" class="text-gray-600 hover:text-gray-700 font-medium text-xs sm:text-sm flex items-center">
                             Download
                             <i class="fas fa-arrow-right ml-1.5 text-xs"></i>
-                        </a>
+                        </x-checkoutpay-plugin-download>
                     </div>
                     <p class="mt-2 text-xs text-gray-500">
                         Works with WooCommerce
@@ -297,7 +297,7 @@
                                 <i class="fas fa-check-circle text-gray-400 mt-1 mr-3 flex-shrink-0"></i>
                                 <div>
                                     <h3 class="font-semibold text-gray-900 mb-1">Installation</h3>
-                                    <p class="text-sm text-gray-600">Upload and activate. Works with WordPress 5.0+ and WooCommerce 5.0+</p>
+                                    <p class="text-sm text-gray-600">Upload and activate. Works with {{ \App\Support\CheckoutPayWordPressPlugin::requirementsLabel() }}</p>
                                 </div>
                             </div>
                             <div class="flex items-start">
@@ -316,16 +316,14 @@
                             </div>
                         </div>
                         <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                            <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                                Download
-                            </a>
+                            <x-checkoutpay-plugin-download label="Download" :icon="false" class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-base sm:text-lg transition-colors shadow-lg" />
                             <a href="{{ route('business.register') }}" class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 border-2 border-purple-300 rounded-lg hover:bg-purple-50 font-medium text-base sm:text-lg transition-colors">
                                 Get API Key
                             </a>
                         </div>
                         <div class="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
                             <p class="text-xs sm:text-sm text-gray-600">
-                                Version 1.0.0 | Requires WordPress 5.0+ and WooCommerce 5.0+
+                                {{ \App\Support\CheckoutPayWordPressPlugin::versionLine() }}
                             </p>
                         </div>
                     </div>

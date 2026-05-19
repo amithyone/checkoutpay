@@ -122,12 +122,12 @@
                         </li>
                         <li class="flex items-start">
                             <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Compatible with WordPress 5.0+</span>
+                            <span>Compatible with {{ \App\Support\CheckoutPayWordPressPlugin::requirementsLabel() }}</span>
                         </li>
                     </ul>
-                    <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
+                    <x-checkoutpay-plugin-download :icon="false" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
                         Download Plugin <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
+                    </x-checkoutpay-plugin-download>
                 </div>
             </div>
         </div>

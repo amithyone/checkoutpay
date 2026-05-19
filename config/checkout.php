@@ -15,4 +15,20 @@ return [
     */
     'global_match_max_emails' => max(1, (int) env('GLOBAL_MATCH_MAX_EMAILS', 200)),
 
+    /*
+    |--------------------------------------------------------------------------
+    | WooCommerce WordPress plugin (download + version labels)
+    |--------------------------------------------------------------------------
+    |
+    | Bump version when wordpress-plugin/checkoutpay-gateway is released so
+    | all site download links and cache-busting stay in sync.
+    |
+    */
+    'wordpress_plugin' => [
+        'version' => '1.1.1',
+        'zip' => 'downloads/checkoutpay-gateway.zip',
+        'requires_wordpress' => '5.8',
+        'requires_woocommerce' => '7.0',
+    ],
+
 ];

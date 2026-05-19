@@ -173,9 +173,7 @@
                     </div>
                     <p class="text-gray-700 mb-4">Seamlessly integrate CheckoutPay with your WooCommerce store. One-click installation with automatic charge calculation.</p>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <a href="{{ asset('downloads/checkoutpay-gateway.zip') }}" download class="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium">
-                            <i class="fas fa-download mr-2"></i> Download
-                        </a>
+                        <x-checkoutpay-plugin-download label="Download" class="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium" />
                         <a href="{{ route('products.index') }}#wordpress-plugin" class="inline-flex items-center justify-center px-4 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-medium">
                             Documentation
                         </a>
