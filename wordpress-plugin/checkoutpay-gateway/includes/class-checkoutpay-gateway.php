@@ -38,7 +38,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         $this->api_url = $this->get_option('api_url');
         $this->test_mode = $this->get_option('test_mode');
         $this->developer_program_partner_business_id = $this->get_option('developer_program_partner_business_id');
-        
+        $this->auto_complete_orders = $this->get_option('auto_complete_orders');
+
         // Actions
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         add_action('woocommerce_api_wc_checkoutpay_gateway', array($this, 'check_payment_status'));
@@ -92,6 +93,23 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                 'title' => __('Webhook URL (for CheckoutPay)', 'checkoutpay-gateway'),
                 'type' => 'checkoutpay_webhook_url',
                 'description' => __('Copy this exact URL into your CheckoutPay business website webhook settings. The plugin sends it automatically on each order; it must match what you save in CheckoutPay.', 'checkoutpay-gateway'),
+            ),
+            'checkoutpay_charges_info' => array(
+                'title' => __('Charges (from CheckoutPay)', 'checkoutpay-gateway'),
+                'type' => 'checkoutpay_charges_info',
+                'description' => __('Live fee rules for this store, as configured on your CheckoutPay business website. Refresh after changing settings in CheckoutPay.', 'checkoutpay-gateway'),
+            ),
+            'auto_complete_orders' => array(
+                'title' => __('Order status on payment', 'checkoutpay-gateway'),
+                'type' => 'checkbox',
+                'label' => __('Mark orders as Completed when payment is approved', 'checkoutpay-gateway'),
+                'default' => 'no',
+                'description' => __('Default WooCommerce behavior is Processing for physical goods. Enable to set Completed immediately when CheckoutPay confirms payment.', 'checkoutpay-gateway'),
+            ),
+            'split_payment_notice' => array(
+                'title' => __('Split payment', 'checkoutpay-gateway'),
+                'type' => 'title',
+                'description' => __('Installment and split payments are configured in your CheckoutPay dashboard (business websites and invoices), not in this plugin. WooCommerce orders use a single bank transfer per checkout.', 'checkoutpay-gateway'),
             ),
             'test_mode' => array(
                 'title' => __('Test Mode', 'checkoutpay-gateway'),
@@ -253,6 +271,192 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         </tr>
         <?php
         return ob_get_clean();
+    }
+
+    /**
+     * Render read-only charge settings loaded from CheckoutPay API.
+     *
+     * @param string $key  Field key.
+     * @param array  $data Field definition.
+     * @return string
+     */
+    public function generate_checkoutpay_charges_info_html($key, $data) {
+        $field_key = $this->get_field_key($key);
+        $defaults = array(
+            'title' => '',
+            'description' => '',
+        );
+        $data = wp_parse_args($data, $defaults);
+        $website_url = $this->get_store_website_url();
+        $webhook_url = $this->get_webhook_url();
+        $sample_amount = 10000;
+        ob_start();
+        ?>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr($field_key); ?>"><?php echo wp_kses_post($data['title']); ?></label>
+            </th>
+            <td class="forminp" id="<?php echo esc_attr($field_key); ?>">
+                <fieldset>
+                    <legend class="screen-reader-text"><span><?php echo wp_kses_post($data['title']); ?></span></legend>
+                    <p class="description" style="margin-bottom: 10px;">
+                        <?php echo wp_kses_post($data['description']); ?>
+                    </p>
+                    <p>
+                        <button type="button" class="button" id="checkoutpay-refresh-charges">
+                            <?php esc_html_e('Refresh charges', 'checkoutpay-gateway'); ?>
+                        </button>
+                        <span id="checkoutpay-charges-loading" style="display:none; margin-left: 8px;">
+                            <?php esc_html_e('Loading…', 'checkoutpay-gateway'); ?>
+                        </span>
+                    </p>
+                    <div id="checkoutpay-charges-panel" style="margin-top: 12px; max-width: 40rem; padding: 12px 14px; background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 4px;">
+                        <p class="description" style="margin: 0;">
+                            <?php esc_html_e('Save your API URL and API Key above, then click Refresh charges.', 'checkoutpay-gateway'); ?>
+                        </p>
+                    </div>
+                    <script>
+                    (function () {
+                        var panel = document.getElementById('checkoutpay-charges-panel');
+                        var loading = document.getElementById('checkoutpay-charges-loading');
+                        var refreshBtn = document.getElementById('checkoutpay-refresh-charges');
+                        if (!panel || !refreshBtn) {
+                            return;
+                        }
+
+                        var websiteUrl = <?php echo wp_json_encode($website_url); ?>;
+                        var webhookUrl = <?php echo wp_json_encode($webhook_url); ?>;
+                        var sampleAmount = <?php echo (int) $sample_amount; ?>;
+
+                        function getSettingInput(suffix) {
+                            return document.getElementById('woocommerce_checkoutpay_' + suffix)
+                                || document.querySelector('[name="woocommerce_checkoutpay_' + suffix + '"]');
+                        }
+
+                        function escapeHtml(text) {
+                            var div = document.createElement('div');
+                            div.textContent = text == null ? '' : String(text);
+                            return div.innerHTML;
+                        }
+
+                        function formatMoney(amount) {
+                            var n = parseFloat(amount);
+                            if (isNaN(n)) {
+                                return '—';
+                            }
+                            return '₦' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        }
+
+                        function renderError(message) {
+                            panel.innerHTML = '<p style="margin:0;color:#b32d2e;"><strong><?php echo esc_js(__('Unable to load charges', 'checkoutpay-gateway')); ?></strong> ' + escapeHtml(message) + '</p>';
+                        }
+
+                        function renderData(payload) {
+                            var d = payload.data || {};
+                            var sample = d.sample || {};
+                            var feeLine = '';
+                            if (!d.charges_enabled || d.charge_exempt) {
+                                feeLine = '<?php echo esc_js(__('No charges apply (disabled or exempt)', 'checkoutpay-gateway')); ?>';
+                            } else {
+                                feeLine = escapeHtml(d.charge_percentage) + '% + ' + formatMoney(d.charge_fixed);
+                            }
+
+                            var html = '';
+                            html += '<table class="widefat striped" style="margin:0;background:#fff;"><tbody>';
+                            html += '<tr><th style="width:40%;"><?php echo esc_js(__('Matched website', 'checkoutpay-gateway')); ?></th><td>' + escapeHtml((d.website && d.website.url) ? d.website.url : '—') + '</td></tr>';
+                            html += '<tr><th><?php echo esc_js(__('Fee structure', 'checkoutpay-gateway')); ?></th><td>' + feeLine + '</td></tr>';
+                            html += '<tr><th><?php echo esc_js(__('Who pays fees', 'checkoutpay-gateway')); ?></th><td>' + escapeHtml(d.paid_by_label || '—') + '</td></tr>';
+                            html += '<tr><th><?php echo esc_js(__('Sample order', 'checkoutpay-gateway')); ?></th><td>' + formatMoney(d.sample_amount) + '</td></tr>';
+                            html += '<tr><th><?php echo esc_js(__('Fees on sample', 'checkoutpay-gateway')); ?></th><td>' + formatMoney(sample.total_charges) + '</td></tr>';
+                            html += '<tr><th><?php echo esc_js(__('Customer transfers', 'checkoutpay-gateway')); ?></th><td><strong>' + formatMoney(sample.amount_to_pay) + '</strong></td></tr>';
+                            html += '<tr><th><?php echo esc_js(__('You receive', 'checkoutpay-gateway')); ?></th><td><strong>' + formatMoney(sample.business_receives) + '</strong></td></tr>';
+                            html += '</tbody></table>';
+                            if (d.dashboard_note) {
+                                html += '<p class="description" style="margin:10px 0 0;">' + escapeHtml(d.dashboard_note) + '</p>';
+                            }
+                            if (d.dashboard_websites_url) {
+                                html += '<p style="margin:8px 0 0;"><a href="' + escapeHtml(d.dashboard_websites_url) + '" target="_blank" rel="noopener noreferrer"><?php echo esc_js(__('Open CheckoutPay website settings', 'checkoutpay-gateway')); ?></a></p>';
+                            }
+                            panel.innerHTML = html;
+                        }
+
+                        function loadCharges() {
+                            var apiUrlInput = getSettingInput('api_url');
+                            var apiKeyInput = getSettingInput('api_key');
+                            var apiUrl = apiUrlInput ? String(apiUrlInput.value || '').replace(/\/+$/, '') : '';
+                            var apiKey = apiKeyInput ? String(apiKeyInput.value || '') : '';
+
+                            if (!apiUrl || !apiKey) {
+                                renderError('<?php echo esc_js(__('API URL and API Key are required.', 'checkoutpay-gateway')); ?>');
+                                return;
+                            }
+
+                            if (loading) {
+                                loading.style.display = 'inline';
+                            }
+                            refreshBtn.disabled = true;
+
+                            var url = apiUrl + '/integration/charge-settings?website_url=' + encodeURIComponent(websiteUrl)
+                                + '&webhook_url=' + encodeURIComponent(webhookUrl)
+                                + '&sample_amount=' + encodeURIComponent(String(sampleAmount));
+
+                            fetch(url, {
+                                method: 'GET',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-API-Key': apiKey
+                                }
+                            })
+                                .then(function (res) { return res.json().then(function (body) { return { ok: res.ok, status: res.status, body: body }; }); })
+                                .then(function (result) {
+                                    if (result.ok && result.body && result.body.success) {
+                                        renderData(result.body);
+                                    } else {
+                                        var msg = (result.body && result.body.message) ? result.body.message : ('HTTP ' + result.status);
+                                        renderError(msg);
+                                    }
+                                })
+                                .catch(function (err) {
+                                    renderError(err && err.message ? err.message : '<?php echo esc_js(__('Network error', 'checkoutpay-gateway')); ?>');
+                                })
+                                .finally(function () {
+                                    if (loading) {
+                                        loading.style.display = 'none';
+                                    }
+                                    refreshBtn.disabled = false;
+                                });
+                        }
+
+                        refreshBtn.addEventListener('click', loadCharges);
+                    })();
+                    </script>
+                </fieldset>
+            </td>
+        </tr>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Mark a WooCommerce order paid after CheckoutPay approval.
+     *
+     * @param WC_Order $order Order.
+     * @param string   $note  Order note.
+     * @param string   $transaction_id Optional transaction id for payment_complete.
+     */
+    private function mark_order_paid($order, $note, $transaction_id = '') {
+        $txn = $transaction_id !== '' ? $transaction_id : (string) $order->get_meta('_checkoutpay_transaction_id');
+
+        if ('yes' === $this->get_option('auto_complete_orders')) {
+            $order->payment_complete($txn !== '' ? $txn : null);
+            $order->update_status('completed', $note);
+        } else {
+            $order->payment_complete($txn !== '' ? $txn : null);
+            $order->add_order_note($note);
+        }
+
+        $order->update_meta_data('_checkoutpay_status', 'approved');
+        $order->save();
     }
 
     /**
@@ -445,10 +649,7 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             $status = $response_data['data']['status'];
 
             if ($status === 'approved') {
-                $order->payment_complete();
-                $order->add_order_note(__('Payment confirmed via CheckoutPay', 'checkoutpay-gateway'));
-                $order->update_meta_data('_checkoutpay_status', 'approved');
-                $order->save();
+                $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay', 'checkoutpay-gateway'), $transaction_id);
                 wp_send_json_success(array('status' => 'completed'));
             } else {
                 wp_send_json_success(array('status' => $status));
@@ -536,10 +737,7 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             if (isset($get_data['success']) && $get_data['success'] && isset($get_data['data']['status'])) {
                 $status = $get_data['data']['status'];
                 if ($status === 'approved') {
-                    $order->payment_complete();
-                    $order->add_order_note(__('Payment confirmed via CheckoutPay (after amount correction)', 'checkoutpay-gateway'));
-                    $order->update_meta_data('_checkoutpay_status', 'approved');
-                    $order->save();
+                    $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay (after amount correction)', 'checkoutpay-gateway'), $transaction_id);
                     wp_send_json_success(array('status' => 'completed', 'message' => __('Amount updated and payment confirmed!', 'checkoutpay-gateway')));
                 }
                 wp_send_json_success(array('status' => $status, 'message' => __('Amount updated. Payment is still pending.', 'checkoutpay-gateway')));
@@ -597,16 +795,13 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
 
         // Update order status based on webhook event
         if ($status === 'approved' || $event === 'payment.approved') {
-            $order->payment_complete();
-            $order->add_order_note(__('Payment confirmed via CheckoutPay webhook', 'checkoutpay-gateway'));
-            $order->update_meta_data('_checkoutpay_status', 'approved');
             if (isset($data['received_amount'])) {
                 $order->update_meta_data('_checkoutpay_received_amount', $data['received_amount']);
             }
             if (isset($data['charges']) && is_array($data['charges'])) {
                 $order->update_meta_data('_checkoutpay_charges', $data['charges']);
             }
-            $order->save();
+            $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay webhook', 'checkoutpay-gateway'), $transaction_id);
             status_header(200);
             echo json_encode(array('success' => true));
         } elseif ($status === 'rejected' || $status === 'failed' || $event === 'payment.rejected') {

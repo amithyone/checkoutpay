@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ConsumerWalletAuthController;
 use App\Http\Controllers\Api\ConsumerWalletConversationController;
 use App\Http\Controllers\Api\LiveSyncReceiverController;
 use App\Http\Controllers\Api\MevonPayWebhookController;
+use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\TagineBridgeController;
 use App\Http\Controllers\Api\V1StatusController;
@@ -28,6 +29,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)->group(function () {
     // Payment routes (require API key)
+    Route::get('/integration/charge-settings', [IntegrationController::class, 'chargeSettings']);
     Route::post('/payment-request', [PaymentController::class, 'store']);
     Route::get('/payment/{transactionId}', [PaymentController::class, 'show']);
     // Correct wrong amount: updates payment, recalculates charges, dispatches CheckPaymentEmails to re-scan

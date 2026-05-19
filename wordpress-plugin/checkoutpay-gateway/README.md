@@ -25,6 +25,12 @@ A WordPress plugin that integrates CheckoutPay payment gateway with WooCommerce,
 
 Works with both **classic** checkout and **WooCommerce block** checkout (Cart/Checkout blocks).
 
+### WooCommerce settings (v1.2+)
+
+- **Charges panel** — Refresh to load fee rules from `GET /api/v1/integration/charge-settings` (mirrors your CheckoutPay business website).
+- **Auto-complete orders** — Optionally mark orders `Completed` when payment is approved (default: WooCommerce `processing`).
+- **Split payment** — Configure installments in CheckoutPay dashboard only (not in the plugin).
+
 ## Configuration
 
 ### API Settings

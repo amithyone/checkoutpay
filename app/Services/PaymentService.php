@@ -332,6 +332,22 @@ class PaymentService
     }
 
     /**
+     * Resolve approved business website for integration UIs (e.g. WooCommerce plugin settings).
+     */
+    public function resolveWebsiteForIntegration(Business $business, ?string $websiteUrl = null, ?string $webhookUrl = null): ?BusinessWebsite
+    {
+        $data = [];
+        if ($websiteUrl !== null && trim($websiteUrl) !== '') {
+            $data['website_url'] = trim($websiteUrl);
+        }
+        if ($webhookUrl !== null && trim($webhookUrl) !== '') {
+            $data['webhook_url'] = trim($webhookUrl);
+        }
+
+        return $this->resolveWebsiteFromIncomingData($business, $data);
+    }
+
+    /**
      * Best-effort website resolver for API callers that do not pass business_website_id.
      * Priority:
      * 1) Exact webhook_url match with approved website webhook_url

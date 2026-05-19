@@ -3,7 +3,7 @@ Contributors: checkoutpay
 Tags: woocommerce, payment, payment-gateway, checkoutpay
 Requires at least: 5.0
 Tested up to: 6.4
-Stable tag: 1.1.1
+Stable tag: 1.2.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -50,6 +50,11 @@ Yes, enable test mode in the plugin settings to use test API credentials.
 
 == Changelog ==
 
+= 1.2.0 =
+* New: Auto-complete orders option when CheckoutPay payment is approved.
+* New: Charges panel in settings (loads live fee rules from GET /api/v1/integration/charge-settings).
+* New: Split payment notice — configure installments in CheckoutPay dashboard, not in WooCommerce plugin.
+
 = 1.1.1 =
 * New: Webhook URL and website URL shown on WooCommerce CheckoutPay settings with one-click copy (for CheckoutPay business website setup).
 
@@ -78,6 +83,9 @@ Yes, enable test mode in the plugin settings to use test API credentials.
 * Payment status checking
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Adds auto-complete orders and a charges preview synced from your CheckoutPay website settings.
 
 = 1.1.0 =
 Required if CheckoutPay does not show on checkout (especially with WooCommerce block checkout). Enable the gateway under WooCommerce > Settings > Payments and set your API URL and API Key.

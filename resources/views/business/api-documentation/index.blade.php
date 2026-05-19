@@ -54,6 +54,9 @@
                 <div class="mt-3 p-2 bg-white/50 rounded-lg">
                     <x-checkoutpay-plugin-version class="text-xs text-purple-800" />
                 </div>
+                <p class="text-xs text-purple-800 mt-3">
+                    <strong>WooCommerce plugin settings</strong> call <code class="bg-white/70 px-1 rounded">GET {{ url('/api/v1/integration/charge-settings') }}</code> with <code class="bg-white/70 px-1 rounded">website_url</code> (and optional <code class="bg-white/70 px-1 rounded">webhook_url</code>, <code class="bg-white/70 px-1 rounded">sample_amount</code>) to display your fee structure and who pays charges. Change fees and split/installment rules under <a href="{{ route('business.websites.index') }}" class="underline font-medium">Business websites</a>, not in WordPress.
+                </p>
             </div>
         </div>
     </div>
