@@ -71,6 +71,20 @@ return [
         'receipt_font_path' => (string) env('WHATSAPP_RECEIPT_FONT_PATH', ''),
     ],
 
+    /*
+    | Self bank transfer fee: when user sends to their own account (name match or fintech acct = WhatsApp phone).
+    | Admin overrides via /admin/whatsapp-wallet (settings group whatsapp). P2P and other people's accounts stay free.
+    */
+    'self_bank_transfer_fee_enabled' => filter_var(env('WHATSAPP_SELF_BANK_TRANSFER_FEE_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'self_bank_transfer_fee_percent' => (float) env('WHATSAPP_SELF_BANK_TRANSFER_FEE_PERCENT', 1.5),
+    'self_bank_transfer_name_min_score' => max(50, min(100, (int) env('WHATSAPP_SELF_BANK_TRANSFER_NAME_MIN_SCORE', 68))),
+    'self_bank_transfer_fintech_bank_codes' => [
+        '100004', // Opay
+        '100033', // PalmPay
+        '090405', // Moniepoint MFB
+        '090267', // Kuda
+    ],
+
     'evolution' => [
         'base_url' => rtrim((string) env('WHATSAPP_EVOLUTION_BASE_URL', ''), '/'),
         'api_key' => (string) env('WHATSAPP_EVOLUTION_API_KEY', ''),

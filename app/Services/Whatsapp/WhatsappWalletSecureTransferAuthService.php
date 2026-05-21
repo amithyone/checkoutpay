@@ -251,8 +251,21 @@ class WhatsappWalletSecureTransferAuthService
         $name = isset($execCtx['dest_acct_name']) && is_string($execCtx['dest_acct_name']) ? trim($execCtx['dest_acct_name']) : '';
         $tail = strlen($acct) >= 4 ? '****'.substr($acct, -4) : $acct;
         $nameLine = $name !== '' ? $name.' · ' : '';
+        $line = 'Bank transfer: ₦'.number_format($amount, 2).' → '.$nameLine.$bank.' / '.$tail;
 
-        return 'Bank transfer: ₦'.number_format($amount, 2).' → '.$nameLine.$bank.' / '.$tail;
+        if (! empty($execCtx['is_self_transfer']) && isset($execCtx['self_transfer_fee']) && (float) $execCtx['self_transfer_fee'] > 0) {
+            $fee = (float) $execCtx['self_transfer_fee'];
+            $payout = isset($execCtx['payout_amount']) && is_numeric($execCtx['payout_amount'])
+                ? (float) $execCtx['payout_amount']
+                : round($amount - $fee, 2);
+            $pct = isset($execCtx['self_transfer_fee_percent']) && is_numeric($execCtx['self_transfer_fee_percent'])
+                ? (float) $execCtx['self_transfer_fee_percent']
+                : 0.0;
+            $pctLabel = rtrim(rtrim(number_format($pct, 2, '.', ''), '0'), '.').'%';
+            $line .= "\nOwn-account fee ({$pctLabel}): ₦".number_format($fee, 2).' · Recipient receives ₦'.number_format($payout, 2);
+        }
+
+        return $line;
     }
 
     /**

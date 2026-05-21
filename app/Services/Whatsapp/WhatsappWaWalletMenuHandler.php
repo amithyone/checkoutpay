@@ -47,6 +47,7 @@ class WhatsappWaWalletMenuHandler
         private WhatsappWalletPendingP2pService $pendingP2p,
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
+        private WhatsappWalletSelfBankTransferService $selfBankTransfer,
     ) {}
 
     public function openMenu(WhatsappSession $session, string $instance, string $phone, ?Renter $renter): void
@@ -1114,6 +1115,7 @@ class WhatsappWaWalletMenuHandler
                     return;
                 }
                 $casual['ctx']['dest_acct_name'] = trim($verified);
+                $casual['ctx']['dest_acct_name_verified'] = true;
             }
 
             $wallet->refresh();
@@ -1123,15 +1125,8 @@ class WhatsappWaWalletMenuHandler
 
                 return;
             }
-            $ctx = array_merge($casual['ctx'], ['step' => 'transfer_amount']);
-            $session->update(['chat_context' => $ctx]);
-            $this->secureTransferAuth->beginBankTransferConfirmation(
-                $session->fresh(),
-                $instance,
-                $phone,
-                $wallet->fresh(),
-                $ctx
-            );
+            $ctx = array_merge($casual['ctx'], ['step' => 'transfer_amount', 'amount' => $casual['amount']]);
+            $this->beginBankTransferWithSelfFeeQuote($session, $instance, $phone, $wallet->fresh(), $ctx);
 
             return;
         }
@@ -1502,6 +1497,11 @@ class WhatsappWaWalletMenuHandler
 
         if ($accountName !== '') {
             $ctx['dest_acct_name'] = $accountName;
+            $verified = $this->bankPayout->isNameEnquiryAvailable()
+                && ! $this->bankPayout->isWeakVerifiedName($accountName);
+            if ($verified) {
+                $ctx['dest_acct_name_verified'] = true;
+            }
             $ctx['step'] = 'transfer_amount';
             $session->update(['chat_context' => $ctx]);
             $this->client->sendText(
@@ -1690,13 +1690,22 @@ class WhatsappWaWalletMenuHandler
 
         if ($accountName !== null) {
             $ctx['dest_acct_name'] = $accountName;
+            $ctx['dest_acct_name_verified'] = true;
             $ctx['step'] = 'transfer_amount';
             $session->update(['chat_context' => $ctx]);
+            $feeHint = '';
+            if ($this->selfBankTransfer->isEnabled()
+                && $this->selfBankTransfer->isSelfTransfer($wallet, $acct, $resolved['code'], $accountName, true)) {
+                $feeHint = "\n\n_This looks like your account — a ".$this->selfBankTransfer->formatPercent($this->selfBankTransfer->feePercent())
+                    .' fee applies (recipient gets amount minus fee)._';
+            }
             $this->client->sendText(
                 $instance,
                 $phone,
                 "*Verified:* {$accountName}\n\n".
-                "Send the *amount* in Naira (numbers only), minimum ₦1.\n\n".
+                "Send the *amount* in Naira (numbers only), minimum ₦1.".
+                $feeHint.
+                "\n\n".
                 '*BACK* — cancel'
             );
 
@@ -1781,7 +1790,33 @@ class WhatsappWaWalletMenuHandler
         }
 
         $ctx['amount'] = $amount;
-        $this->secureTransferAuth->beginBankTransferConfirmation($session, $instance, $phone, $wallet, $ctx);
+        $this->beginBankTransferWithSelfFeeQuote($session, $instance, $phone, $wallet, $ctx);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    private function beginBankTransferWithSelfFeeQuote(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $ctx,
+    ): void {
+        $enriched = $this->selfBankTransfer->enrichTransferContext($wallet, $ctx);
+        if (! ($enriched['ok'] ?? false)) {
+            $this->client->sendText($instance, $phone, ($enriched['message'] ?? 'Cannot start transfer.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
+
+            return;
+        }
+        $session->update(['chat_context' => $enriched['ctx']]);
+        $this->secureTransferAuth->beginBankTransferConfirmation(
+            $session->fresh(),
+            $instance,
+            $phone,
+            $wallet->fresh(),
+            $enriched['ctx']
+        );
     }
 
     /**

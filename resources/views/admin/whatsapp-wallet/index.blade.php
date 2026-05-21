@@ -358,6 +358,26 @@
             </div>
 
             <div class="border-t border-gray-200 pt-4">
+                <h4 class="text-sm font-semibold text-gray-800 mb-2">Self bank transfer fee</h4>
+                <p class="text-xs text-gray-600 mb-3">
+                    Applies when a user sends to <strong>their own</strong> bank account: name enquiry matches their wallet name, or on Opay / PalmPay / Moniepoint / Kuda when the account number matches their WhatsApp number.
+                    WhatsApp-to-WhatsApp sends and transfers to other people’s names stay <strong>free</strong>. Fee is taken from the transfer amount (recipient receives amount minus fee).
+                </p>
+                <label class="inline-flex items-center gap-2 mb-3">
+                    <input type="checkbox" name="whatsapp_self_bank_transfer_fee_enabled" value="1" class="rounded border-gray-300"
+                        @checked(old('whatsapp_self_bank_transfer_fee_enabled', $wa['whatsapp_self_bank_transfer_fee_enabled'] ?? config('whatsapp.self_bank_transfer_fee_enabled', true)))>
+                    <span class="text-sm text-gray-700">Enable self bank transfer fee</span>
+                </label>
+                <div class="max-w-xs">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Fee percent (%)</label>
+                    <input type="number" step="0.01" min="0" max="25" name="whatsapp_self_bank_transfer_fee_percent"
+                        value="{{ old('whatsapp_self_bank_transfer_fee_percent', $wa['whatsapp_self_bank_transfer_fee_percent'] ?? config('whatsapp.self_bank_transfer_fee_percent', 1.5)) }}"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <p class="text-xs text-gray-500 mt-1">Example: 1.5 on ₦10,000 → recipient gets ₦9,850.</p>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-200 pt-4">
                 <h4 class="text-sm font-semibold text-gray-800 mb-2">Cross-border P2P (messaging)</h4>
                 <label class="inline-flex items-center gap-2 mb-3">
                     <input type="checkbox" name="whatsapp_cross_border_p2p_enabled" value="1" class="rounded border-gray-300" @checked(old('whatsapp_cross_border_p2p_enabled', $wa['whatsapp_cross_border_p2p_enabled'] ?? false))>

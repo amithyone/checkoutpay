@@ -25,6 +25,7 @@ class ConsumerWalletTransferService
         private WhatsappWalletTopupNotifier $walletNotifier,
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
+        private WhatsappWalletSelfBankTransferService $selfBankTransfer,
     ) {}
 
     private function evolutionInstance(): string
@@ -222,14 +223,33 @@ class ConsumerWalletTransferService
             return ['ok' => false, 'message' => 'Invalid transfer details.'];
         }
 
+        $beneficiaryForMatch = trim($beneficiaryName);
+        $fromEnquiry = false;
+        if ($this->bankPayout->isNameEnquiryAvailable()) {
+            $ne = $this->bankPayout->nameEnquiry($bankCode, $acct);
+            if ($ne && ! $this->bankPayout->isWeakVerifiedName($ne['account_name'] ?? null)) {
+                $beneficiaryForMatch = trim((string) $ne['account_name']);
+                $fromEnquiry = true;
+            }
+        }
+
+        $isSelf = $this->selfBankTransfer->isSelfTransfer($wallet, $acct, $bankCode, $beneficiaryForMatch, $fromEnquiry);
+        $quoted = $this->selfBankTransfer->quote($amount, $isSelf);
+        if (! ($quoted['ok'] ?? false)) {
+            return ['ok' => false, 'message' => (string) ($quoted['message'] ?? 'Invalid transfer amount.')];
+        }
+
+        $payoutAmount = (float) ($quoted['payout_amount'] ?? $amount);
+        $selfFee = (float) ($quoted['fee'] ?? 0);
+
         if (! $this->bankPayout->isConfigured()) {
-            return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName);
+            return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $isSelf, $selfFee, $payoutAmount);
         }
 
         $reference = $this->bankPayout->makeWalletPayoutReference();
 
         try {
-            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $reference) {
+            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiaryName, $reference, $isSelf, $selfFee) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -256,11 +276,14 @@ class ConsumerWalletTransferService
                     'counterparty_bank_code' => $bankCode,
                     'counterparty_account_name' => $beneficiaryName,
                     'external_reference' => $reference,
-                    'meta' => [
+                    'meta' => array_filter([
                         'bank_name' => $bankName,
                         'channel' => 'consumer_api',
                         'payout_pending' => true,
-                    ],
+                        'self_transfer' => $isSelf ? true : null,
+                        'self_transfer_fee' => $isSelf ? $selfFee : null,
+                        'payout_amount' => $isSelf ? $payoutAmount : null,
+                    ], static fn ($v) => $v !== null),
                 ]);
             });
         } catch (\Throwable $e) {
@@ -269,7 +292,7 @@ class ConsumerWalletTransferService
             return ['ok' => false, 'message' => 'Could not complete transfer. Check balance and limits.'];
         }
 
-        $result = $this->bankPayout->sendTransfer($amount, $bankCode, $bankName, $acct, $beneficiaryName, $reference);
+        $result = $this->bankPayout->sendTransfer($payoutAmount, $bankCode, $bankName, $acct, $beneficiaryName, $reference);
         $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
         DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result) {
@@ -316,6 +339,10 @@ class ConsumerWalletTransferService
                 'data' => [
                     'reference' => (string) ($result['reference'] ?? $reference),
                     'balance_after' => (float) $wallet->balance,
+                    'amount_debited' => $amount,
+                    'payout_amount' => $payoutAmount,
+                    'self_transfer' => $isSelf,
+                    'self_transfer_fee' => $selfFee,
                 ],
             ];
         }
@@ -340,9 +367,12 @@ class ConsumerWalletTransferService
         string $bankName,
         string $bankCode,
         string $beneficiary,
+        bool $isSelf = false,
+        float $selfFee = 0.0,
+        float $payoutAmount = 0.0,
     ): array {
         try {
-            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary) {
+            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary, $isSelf, $selfFee, $payoutAmount) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -368,11 +398,14 @@ class ConsumerWalletTransferService
                     'counterparty_account_number' => $acct,
                     'counterparty_bank_code' => $bankCode,
                     'counterparty_account_name' => $beneficiary,
-                    'meta' => [
+                    'meta' => array_filter([
                         'bank_name' => $bankName,
                         'channel' => 'consumer_api',
                         'payout_mode' => 'ledger_only',
-                    ],
+                        'self_transfer' => $isSelf ? true : null,
+                        'self_transfer_fee' => $isSelf ? $selfFee : null,
+                        'payout_amount' => $isSelf ? $payoutAmount : null,
+                    ], static fn ($v) => $v !== null),
                 ]);
             });
         } catch (\Throwable $e) {
@@ -382,7 +415,13 @@ class ConsumerWalletTransferService
         return [
             'ok' => true,
             'message' => 'Transfer recorded (ledger-only until live payouts are enabled).',
-            'data' => ['balance_after' => (float) $wallet->fresh()->balance],
+            'data' => [
+                'balance_after' => (float) $wallet->fresh()->balance,
+                'amount_debited' => $amount,
+                'payout_amount' => $isSelf ? $payoutAmount : $amount,
+                'self_transfer' => $isSelf,
+                'self_transfer_fee' => $selfFee,
+            ],
         ];
     }
 }

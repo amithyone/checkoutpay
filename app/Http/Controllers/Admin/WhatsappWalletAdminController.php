@@ -182,6 +182,8 @@ class WhatsappWalletAdminController extends Controller
             'whatsapp_cross_border_prompt_template' => 'nullable|string|max:5000',
             'whatsapp_cross_border_disabled_message' => 'nullable|string|max:2000',
             'whatsapp_cross_border_missing_rate_message' => 'nullable|string|max:2000',
+            'whatsapp_self_bank_transfer_fee_enabled' => 'nullable|boolean',
+            'whatsapp_self_bank_transfer_fee_percent' => 'nullable|numeric|min:0|max:25',
         ]);
 
         Setting::set('whatsapp_app_url', $validated['whatsapp_app_url'] ?: null, 'string', 'whatsapp', 'Public app URL (WHATSAPP_APP_URL override)');
@@ -208,6 +210,20 @@ class WhatsappWalletAdminController extends Controller
         Setting::set('whatsapp_cross_border_prompt_template', $validated['whatsapp_cross_border_prompt_template'] ?: null, 'string', 'whatsapp', 'Cross-border prompt template');
         Setting::set('whatsapp_cross_border_disabled_message', $validated['whatsapp_cross_border_disabled_message'] ?: null, 'string', 'whatsapp', 'Message when cross-border off');
         Setting::set('whatsapp_cross_border_missing_rate_message', $validated['whatsapp_cross_border_missing_rate_message'] ?: null, 'string', 'whatsapp', 'Message when FX pair missing');
+        Setting::set(
+            'whatsapp_self_bank_transfer_fee_enabled',
+            $request->boolean('whatsapp_self_bank_transfer_fee_enabled'),
+            'boolean',
+            'whatsapp',
+            'Charge fee when user sends to their own bank account (name or fintech phone match)'
+        );
+        Setting::set(
+            'whatsapp_self_bank_transfer_fee_percent',
+            $validated['whatsapp_self_bank_transfer_fee_percent'] ?? config('whatsapp.self_bank_transfer_fee_percent', 1.5),
+            'float',
+            'whatsapp',
+            'Self bank transfer fee percent (deducted from amount sent; recipient gets remainder)'
+        );
 
         $this->saveWhatsappRegionOverrides($request);
 

@@ -257,6 +257,13 @@ class WhatsappWalletTransferCompletionService
         $bankName = isset($ctx['dest_bank']) && is_string($ctx['dest_bank']) ? $ctx['dest_bank'] : '';
         $bankCode = isset($ctx['dest_bank_code']) && is_string($ctx['dest_bank_code']) ? $ctx['dest_bank_code'] : '';
         $beneficiary = isset($ctx['dest_acct_name']) && is_string($ctx['dest_acct_name']) ? trim($ctx['dest_acct_name']) : '';
+        $payoutAmount = isset($ctx['payout_amount']) && is_numeric($ctx['payout_amount'])
+            ? round((float) $ctx['payout_amount'], 2)
+            : $amount;
+        $selfFee = isset($ctx['self_transfer_fee']) && is_numeric($ctx['self_transfer_fee'])
+            ? round((float) $ctx['self_transfer_fee'], 2)
+            : 0.0;
+        $isSelf = ! empty($ctx['is_self_transfer']);
 
         if ($amount < 1 || strlen($acct) !== 10 || $bankCode === '' || $beneficiary === '') {
             $session->update(['chat_context' => ['step' => 'submenu']]);
@@ -284,18 +291,21 @@ class WhatsappWalletTransferCompletionService
                 $phone,
                 $wallet,
                 $amount,
+                $payoutAmount,
                 $acct,
                 $bankName,
                 $bankCode,
                 $beneficiary,
-                $userTypedPinInChat
+                $userTypedPinInChat,
+                $isSelf,
+                $selfFee
             );
 
             return;
         }
 
         try {
-            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary) {
+            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary, $isSelf, $selfFee, $payoutAmount) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -321,11 +331,7 @@ class WhatsappWalletTransferCompletionService
                     'counterparty_account_number' => $acct,
                     'counterparty_bank_code' => $bankCode,
                     'counterparty_account_name' => $beneficiary,
-                    'meta' => [
-                        'bank_name' => $bankName,
-                        'channel' => 'whatsapp_menu',
-                        'payout_mode' => 'ledger_only',
-                    ],
+                    'meta' => $this->bankTransferMeta($bankName, 'whatsapp_menu', 'ledger_only', $isSelf, $selfFee, $payoutAmount),
                 ]);
             });
         } catch (\Throwable $e) {
@@ -352,11 +358,14 @@ class WhatsappWalletTransferCompletionService
             $beneficiary,
             $bankName,
             $acct,
-            $amount,
+            $payoutAmount,
             'ledger-'.now()->format('Ymd-His'),
             $when
         );
         $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
+        $amountLine = $isSelf && $selfFee > 0
+            ? '*You pay:* ₦'.number_format($amount, 2)."\n*Recipient gets:* ₦".number_format($payoutAmount, 2)."\n*Fee:* ₦".number_format($selfFee, 2)."\n"
+            : '*Amount:* ₦'.number_format($amount, 2)."\n";
         if (! $receiptOk) {
             $this->client->sendText(
                 $instance,
@@ -365,7 +374,7 @@ class WhatsappWalletTransferCompletionService
                 "*To:* {$beneficiary}\n".
                 "*Bank:* {$bankName}\n".
                 "*Account:* ****{$tail}\n".
-                '*Amount:* ₦'.number_format($amount, 2)."\n".
+                $amountLine.
                 "*Time:* {$when}\n\n".
                 "🏦 *{$brand}* bank payouts are not on yet — this is *ledger-only* until support enables live sends.".
                 $this->forwardableReceiptFooter().
@@ -377,22 +386,52 @@ class WhatsappWalletTransferCompletionService
         $this->sendWalletSubmenu($instance, $phone, $wallet);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function bankTransferMeta(
+        string $bankName,
+        string $channel,
+        ?string $payoutMode,
+        bool $isSelf,
+        float $selfFee,
+        float $payoutAmount,
+    ): array {
+        $meta = [
+            'bank_name' => $bankName,
+            'channel' => $channel,
+        ];
+        if ($payoutMode !== null) {
+            $meta['payout_mode'] = $payoutMode;
+        }
+        if ($isSelf) {
+            $meta['self_transfer'] = true;
+            $meta['self_transfer_fee'] = $selfFee;
+            $meta['payout_amount'] = $payoutAmount;
+        }
+
+        return $meta;
+    }
+
     private function completeBankTransferWithMavon(
         WhatsappSession $session,
         string $instance,
         string $phone,
         WhatsappWallet $wallet,
         float $amount,
+        float $payoutAmount,
         string $acct,
         string $bankName,
         string $bankCode,
         string $beneficiary,
-        bool $userTypedPinInChat
+        bool $userTypedPinInChat,
+        bool $isSelf = false,
+        float $selfFee = 0.0,
     ): void {
         $reference = $this->bankPayout->makeWalletPayoutReference();
 
         try {
-            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary, $reference) {
+            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiary, $reference, $isSelf, $selfFee) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -409,6 +448,9 @@ class WhatsappWalletTransferCompletionService
                 $w->pin_failed_attempts = 0;
                 $w->save();
 
+                $meta = $this->bankTransferMeta($bankName, 'whatsapp_menu', null, $isSelf, $selfFee, $payoutAmount);
+                $meta['payout_pending'] = true;
+
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $w->id,
                     'sender_name' => $w->normalizedSenderName(),
@@ -419,11 +461,7 @@ class WhatsappWalletTransferCompletionService
                     'counterparty_bank_code' => $bankCode,
                     'counterparty_account_name' => $beneficiary,
                     'external_reference' => $reference,
-                    'meta' => [
-                        'bank_name' => $bankName,
-                        'channel' => 'whatsapp_menu',
-                        'payout_pending' => true,
-                    ],
+                    'meta' => $meta,
                 ]);
             });
         } catch (\Throwable $e) {
@@ -438,7 +476,7 @@ class WhatsappWalletTransferCompletionService
             return;
         }
 
-        $result = $this->bankPayout->sendTransfer($amount, $bankCode, $bankName, $acct, $beneficiary, $reference);
+        $result = $this->bankPayout->sendTransfer($payoutAmount, $bankCode, $bankName, $acct, $beneficiary, $reference);
         $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
         DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result) {
@@ -499,11 +537,14 @@ class WhatsappWalletTransferCompletionService
                 $beneficiary,
                 $bankName,
                 $acct,
-                $amount,
+                $payoutAmount,
                 $refShown,
                 $when
             );
             $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
+            $amountLine = $isSelf && $selfFee > 0
+                ? '*You paid:* ₦'.number_format($amount, 2)."\n*Recipient got:* ₦".number_format($payoutAmount, 2)."\n*Fee:* ₦".number_format($selfFee, 2)."\n"
+                : '*Amount:* ₦'.number_format($amount, 2)."\n";
             if (! $receiptOk) {
                 $this->client->sendText(
                     $instance,
@@ -512,7 +553,7 @@ class WhatsappWalletTransferCompletionService
                     "*To:* {$beneficiary}\n".
                     "*Bank:* {$bankName}\n".
                     "*Account:* ****{$acctTail}\n".
-                    '*Amount:* ₦'.number_format($amount, 2)."\n".
+                    $amountLine.
                     "*Time:* {$when}\n".
                     'Ref: *'.$refShown.'*'.
                     $this->forwardableReceiptFooter().
