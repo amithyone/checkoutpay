@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\ProcessedEmailController;
 use App\Http\Controllers\Admin\RenterController;
 use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
+use App\Http\Controllers\Admin\VirtualCardAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletAdminController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
@@ -242,6 +243,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('whatsapp-wallet', [WhatsappWalletAdminController::class, 'index'])->name('whatsapp-wallet.index');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
+
+            Route::get('virtual-cards', [VirtualCardAdminController::class, 'index'])->name('virtual-cards.index');
+            Route::get('virtual-cards/{virtualCardRequest}', [VirtualCardAdminController::class, 'show'])->name('virtual-cards.show');
+            Route::post('virtual-cards/{virtualCardRequest}/notes', [VirtualCardAdminController::class, 'updateNotes'])->name('virtual-cards.update-notes');
+            Route::post('virtual-cards/{virtualCardRequest}/mark-active', [VirtualCardAdminController::class, 'markActive'])->name('virtual-cards.mark-active');
+            Route::post('virtual-cards/{virtualCardRequest}/mark-failed', [VirtualCardAdminController::class, 'markFailed'])->name('virtual-cards.mark-failed');
+            Route::post('virtual-cards/{virtualCardRequest}/retry', [VirtualCardAdminController::class, 'retry'])->name('virtual-cards.retry');
+            Route::post('virtual-cards/{virtualCardRequest}/refund-fee', [VirtualCardAdminController::class, 'refundFee'])->name('virtual-cards.refund-fee');
 
             // Email Templates
             Route::get('email-templates', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'index'])->name('email-templates.index');

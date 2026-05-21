@@ -694,6 +694,7 @@
     </div>
 
     <!-- VTU & Virtual Card -->
+    <div id="vtu-virtual-card"></div>
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
             <i class="fas fa-bolt mr-2 text-primary"></i>VTU &amp; Virtual Card (MevonPay)

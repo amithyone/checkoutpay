@@ -19,6 +19,8 @@ final class ConsumerVirtualCardService
         private MevonPayCardApiClient $cardApi,
         private WhatsappCrossBorderP2pFxService $fx,
         private ConsumerWalletPinVerifier $pinVerifier,
+        private VirtualCardFeeRefundService $refunds,
+        private VirtualCardProviderResponseService $providerResponse,
     ) {}
 
     public function isEnabled(): bool
@@ -220,11 +222,7 @@ final class ConsumerVirtualCardService
         $wallet->save();
 
         if ($api['ok'] ?? false) {
-            $row->update([
-                'status' => VirtualCardRequest::STATUS_SUBMITTED,
-                'response_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
-                'card_external_id' => $this->extractCardId($api['data'] ?? null),
-            ]);
+            $this->providerResponse->applySuccess($row, $api);
 
             return [
                 'ok' => true,
@@ -236,12 +234,8 @@ final class ConsumerVirtualCardService
             ];
         }
 
-        $this->refundFee($wallet->id, $reference, $feeNgn, (string) ($api['message'] ?? 'Card provider error'));
-        $row->update([
-            'status' => VirtualCardRequest::STATUS_FAILED,
-            'failure_reason' => (string) ($api['message'] ?? 'Failed'),
-            'response_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : null,
-        ]);
+        $this->refunds->refundFee($wallet->id, $reference, $feeNgn, (string) ($api['message'] ?? 'Card provider error'));
+        $this->providerResponse->applyFailure($row, $api, (string) ($api['message'] ?? 'Failed'));
 
         return [
             'ok' => false,
@@ -271,34 +265,6 @@ final class ConsumerVirtualCardService
         return $this->fx->convertCurrency($from, $to, $feeUsd);
     }
 
-    private function refundFee(int $walletId, string $reference, float $amount, string $reason): void
-    {
-        try {
-            DB::transaction(function () use ($walletId, $reference, $amount, $reason) {
-                $w = WhatsappWallet::query()->lockForUpdate()->find($walletId);
-                $txn = WhatsappWalletTransaction::query()
-                    ->where('external_reference', $reference)
-                    ->where('whatsapp_wallet_id', $walletId)
-                    ->first();
-                if (! $w || ! $txn) {
-                    return;
-                }
-                $meta = is_array($txn->meta) ? $txn->meta : [];
-                if ($meta['refunded'] ?? false) {
-                    return;
-                }
-                $w->balance = round((float) $w->balance + $amount, 2);
-                $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
-                $w->save();
-                $meta['refunded'] = true;
-                $meta['refund_reason'] = $reason;
-                $txn->update(['meta' => $meta]);
-            });
-        } catch (\Throwable $e) {
-            Log::error('consumer.virtual_card.refund_failed', ['wallet_id' => $walletId, 'error' => $e->getMessage()]);
-        }
-    }
-
     /**
      * @return array<string, mixed>
      */
@@ -317,13 +283,4 @@ final class ConsumerVirtualCardService
         ];
     }
 
-    private function extractCardId(mixed $data): ?string
-    {
-        if (! is_array($data)) {
-            return null;
-        }
-        $id = (string) ($data['card_id'] ?? $data['cardId'] ?? $data['id'] ?? '');
-
-        return trim($id) !== '' ? $id : null;
-    }
 }

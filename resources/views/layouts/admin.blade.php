@@ -186,6 +186,22 @@
                     <span>Withdrawals</span>
                 </a>
 
+                @if(auth('admin')->user()->canManageSettings())
+                <a href="{{ route('admin.virtual-cards.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.virtual-cards.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-credit-card w-5 mr-3 text-indigo-600"></i>
+                    <span>Card Management</span>
+                    @php
+                        $pendingCardRequests = \App\Models\VirtualCardRequest::whereIn('status', [
+                            \App\Models\VirtualCardRequest::STATUS_PENDING,
+                            \App\Models\VirtualCardRequest::STATUS_SUBMITTED,
+                        ])->count();
+                    @endphp
+                    @if($pendingCardRequests > 0)
+                        <span class="ml-auto bg-indigo-500 text-white text-xs rounded-full px-2 py-0.5">{{ $pendingCardRequests }}</span>
+                    @endif
+                </a>
+                @endif
+
                 <a href="{{ route('admin.renters.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.renters.index') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-users w-5 mr-3"></i>
                     <span>Rental users</span>
@@ -449,6 +465,7 @@
             }
         });
     </script>
+    @include('partials.admin-support-sound')
     @stack('scripts')
     @include('partials.pwa-sw')
     @includeIf('components.beta-badge')

@@ -29,6 +29,9 @@ class VirtualCardRequest extends Model
         'request_payload',
         'response_payload',
         'failure_reason',
+        'admin_notes',
+        'activated_at',
+        'handled_by_admin_id',
     ];
 
     protected $casts = [
@@ -37,10 +40,16 @@ class VirtualCardRequest extends Model
         'fx_rate_used' => 'float',
         'request_payload' => 'array',
         'response_payload' => 'array',
+        'activated_at' => 'datetime',
     ];
 
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(WhatsappWallet::class, 'whatsapp_wallet_id');
+    }
+
+    public function handledBy(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'handled_by_admin_id');
     }
 }

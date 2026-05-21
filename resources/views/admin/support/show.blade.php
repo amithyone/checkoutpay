@@ -212,6 +212,9 @@
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         lastId = Math.max(lastId, msg.id);
+        if (!isAdmin && window.AdminSupportNotify && typeof window.AdminSupportNotify.play === 'function') {
+            window.AdminSupportNotify.play();
+        }
     }
 
     async function poll() {
