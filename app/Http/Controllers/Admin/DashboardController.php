@@ -12,6 +12,7 @@ use App\Models\Payment;
 use App\Models\ProcessedEmail;
 use App\Models\WithdrawalRequest;
 use App\Services\Credit\BusinessPeerLoanService;
+use App\Services\MevonPay\MevonPayBalanceSnapshotService;
 use App\Services\NigtaxRevenueStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -174,7 +175,22 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails'));
+        $mevonBalance = [
+            'configured' => false,
+            'ok' => false,
+            'message' => '',
+            'naira_balance' => null,
+            'usd_balance' => null,
+            'naira_ledger' => null,
+            'usd_ledger' => null,
+            'fetched_at' => null,
+        ];
+        $admin = auth('admin')->user();
+        if ($admin && ($admin->isSuperAdmin() || $admin->role === 'admin')) {
+            $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard();
+        }
+
+        return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails', 'mevonBalance'));
     }
 
     /**

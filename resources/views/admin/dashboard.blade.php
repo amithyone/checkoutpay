@@ -438,6 +438,81 @@
                 </div>
             </div>
         </div>
+
+        <!-- MevonPay live balances -->
+        <div class="col-span-full bg-gradient-to-br from-slate-50 to-indigo-50 rounded-lg shadow-sm p-6 border-2 border-indigo-200">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                        <i class="fas fa-wallet text-indigo-600 mr-2"></i>
+                        MevonPay live balances
+                    </h3>
+                    <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot from MevonPay API (refreshed on each dashboard load).</p>
+                </div>
+                @if(($mevonBalance['fetched_at'] ?? null))
+                    <span class="text-xs text-gray-500">
+                        Updated {{ \Carbon\Carbon::parse($mevonBalance['fetched_at'])->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                    </span>
+                @endif
+            </div>
+
+            @if(!($mevonBalance['configured'] ?? false))
+                <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                    {{ $mevonBalance['message'] ?? 'MevonPay is not configured.' }}
+                </p>
+            @elseif(!($mevonBalance['ok'] ?? false))
+                <p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                    {{ $mevonBalance['message'] ?? 'Could not load balance.' }}
+                </p>
+            @else
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Naira balance</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            @if($mevonBalance['naira_balance'] !== null)
+                                ₦{{ number_format($mevonBalance['naira_balance'], 2) }}
+                            @else
+                                —
+                            @endif
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">Available NGN (bal)</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 border border-emerald-100 shadow-sm">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Dollar balance</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            @if($mevonBalance['usd_balance'] !== null)
+                                ${{ number_format($mevonBalance['usd_balance'], 2) }}
+                            @else
+                                —
+                            @endif
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">Available USD</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 border border-violet-100 shadow-sm">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Naira ledger</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            @if($mevonBalance['naira_ledger'] !== null)
+                                ₦{{ number_format($mevonBalance['naira_ledger'], 2) }}
+                            @else
+                                —
+                            @endif
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">Ledger NGN (ledger_bal)</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 border border-sky-100 shadow-sm">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Dollar ledger</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            @if($mevonBalance['usd_ledger'] !== null)
+                                ${{ number_format($mevonBalance['usd_ledger'], 2) }}
+                            @else
+                                —
+                            @endif
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">Ledger USD (usd_ledger_bal)</p>
+                    </div>
+                </div>
+            @endif
+        </div>
         @endif
     </div>
 
