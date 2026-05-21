@@ -97,3 +97,6 @@
         </div>
     </div>
 </footer>
+@if(!request()->routeIs('admin.*') && !request()->routeIs('business.*'))
+    @include('partials.support-widget')
+@endif

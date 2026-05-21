@@ -56,11 +56,13 @@ class SupportController extends Controller
         ]);
 
         $ticket = SupportTicket::create([
+            'channel' => SupportTicket::CHANNEL_BUSINESS_DASHBOARD,
             'business_id' => $business->id,
             'subject' => $validated['subject'],
             'message' => $validated['message'],
             'priority' => $validated['priority'],
             'status' => SupportTicket::STATUS_OPEN,
+            'last_message_at' => now(),
         ]);
 
         return redirect()->route('business.support.show', $ticket)

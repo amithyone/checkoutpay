@@ -1,0 +1,236 @@
+#cp-support-widget-root {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    z-index: 9999;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+#cp-support-launcher {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: #3C50E0;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(60, 80, 224, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+#cp-support-panel {
+    display: none;
+    position: absolute;
+    bottom: 4.25rem;
+    right: 0;
+    width: min(22rem, calc(100vw - 2rem));
+    height: min(32rem, calc(100vh - 6rem));
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+    border: 1px solid #e5e7eb;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#cp-support-panel.cp-open {
+    display: flex;
+}
+
+.cp-support-header {
+    background: #3C50E0;
+    color: #fff;
+    padding: 0.875rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cp-support-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.cp-support-onboarding label {
+    display: block;
+    font-size: 0.75rem;
+    color: #374151;
+    margin-bottom: 0.25rem;
+}
+
+.cp-mode-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.cp-mode-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.cp-whatsapp-step {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.cp-whatsapp-wait-hint {
+    font-size: 0.75rem;
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    margin-bottom: 0.5rem;
+}
+
+.cp-whatsapp-step-pending .cp-mode-choice,
+.cp-whatsapp-step-pending #cp-wallet-block,
+.cp-whatsapp-step-pending #cp-anon-block {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.cp-payment-block {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.5rem;
+}
+
+.cp-payment-preview {
+    font-size: 0.75rem;
+    color: #92400e;
+    margin-top: 0.5rem;
+}
+
+.cp-btn-secondary {
+    width: 100%;
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.8125rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #fff;
+    cursor: pointer;
+}
+
+.cp-btn-secondary:hover {
+    background: #f9fafb;
+}
+
+.cp-country-select {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.cp-support-onboarding input[type="text"],
+.cp-support-onboarding input[type="tel"] {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.cp-consent-box {
+    font-size: 0.7rem;
+    color: #4b5563;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    max-height: 8rem;
+    overflow-y: auto;
+}
+
+.cp-msg {
+    max-width: 85%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.cp-msg-visitor {
+    align-self: flex-end;
+    background: #3C50E0;
+    color: #fff;
+}
+
+.cp-msg-staff {
+    align-self: flex-start;
+    background: #f3f4f6;
+    color: #111827;
+}
+
+.cp-support-footer {
+    border-top: 1px solid #e5e7eb;
+    padding: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.cp-support-footer textarea {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    font-size: 0.8125rem;
+    resize: none;
+    min-height: 2.5rem;
+}
+
+.cp-support-footer button {
+    background: #3C50E0;
+    color: #fff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cp-btn-primary {
+    width: 100%;
+    background: #3C50E0;
+    color: #fff;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.625rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.25rem;
+}
+
+.cp-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cp-onboard-error {
+    color: #dc2626;
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+}

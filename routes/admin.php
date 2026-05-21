@@ -255,7 +255,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Support Tickets (Live Chat Style)
         Route::get('support', [\App\Http\Controllers\Admin\SupportController::class, 'index'])->name('support.index');
+        Route::get('support/inbox', [\App\Http\Controllers\Admin\SupportController::class, 'inbox'])->name('support.inbox');
         Route::get('support/{ticket}', [\App\Http\Controllers\Admin\SupportController::class, 'show'])->name('support.show');
+        Route::get('support/{ticket}/messages', [\App\Http\Controllers\Admin\SupportController::class, 'messages'])->name('support.messages');
         Route::post('support/{ticket}/reply', [\App\Http\Controllers\Admin\SupportController::class, 'reply'])->name('support.reply');
         Route::post('support/{ticket}/update-status', [\App\Http\Controllers\Admin\SupportController::class, 'updateStatus'])->name('support.update-status');
         Route::post('support/{ticket}/assign', [\App\Http\Controllers\Admin\SupportController::class, 'assign'])->name('support.assign');

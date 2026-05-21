@@ -6,7 +6,18 @@
 @section('content')
 <div class="space-y-6">
     <!-- Stats -->
-    <div class="grid grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Unread</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ $stats['unread'] ?? 0 }}</p>
+                </div>
+                <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-bell text-red-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div class="flex items-center justify-between">
                 <div>
@@ -63,6 +74,12 @@
                 <option value="resolved" {{ request('status') === 'resolved' ? 'selected' : '' }}>Resolved</option>
                 <option value="closed" {{ request('status') === 'closed' ? 'selected' : '' }}>Closed</option>
             </select>
+            <select name="channel" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">All Channels</option>
+                <option value="checkout_web" {{ request('channel') === 'checkout_web' ? 'selected' : '' }}>Website</option>
+                <option value="checkoutnow_app" {{ request('channel') === 'checkoutnow_app' ? 'selected' : '' }}>CheckoutNow</option>
+                <option value="business_dashboard" {{ request('channel') === 'business_dashboard' ? 'selected' : '' }}>Business</option>
+            </select>
             <select name="priority" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All Priorities</option>
                 <option value="low" {{ request('priority') === 'low' ? 'selected' : '' }}>Low</option>
@@ -81,7 +98,8 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ticket #</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Channel</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -92,10 +110,31 @@
             </thead>
             <tbody class="divide-y divide-gray-200">
                 @forelse($tickets as $ticket)
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-mono text-gray-900">{{ $ticket->ticket_number }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">{{ $ticket->business->name ?? 'N/A' }}</td>
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ Str::limit($ticket->subject, 50) }}</td>
+                <tr class="hover:bg-gray-50 {{ $ticket->admin_unread_count > 0 ? 'bg-primary/5' : '' }}">
+                    <td class="px-6 py-4 text-sm font-mono text-gray-900">
+                        {{ $ticket->ticket_number }}
+                        @if($ticket->admin_unread_count > 0)
+                            <span class="ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-xs font-bold text-white bg-red-500 rounded-full">{{ $ticket->admin_unread_count }}</span>
+                        @endif
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        {{ $ticket->displayName() }}
+                        @if($ticket->isWalletLinked())
+                            <span class="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">WhatsApp linked</span>
+                        @elseif($ticket->isPublicChannel())
+                            <span class="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">Anonymous</span>
+                        @endif
+                        @if($ticket->visitor_phone)
+                            <span class="block text-xs text-gray-400">{{ $ticket->visitor_phone }}@if($ticket->visitor_country) · {{ $ticket->visitor_country }}@endif</span>
+                        @endif
+                    </td>
+                    <td class="px-6 py-4 text-xs text-gray-500">{{ str_replace('_', ' ', $ticket->channel ?? 'business_dashboard') }}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                        {{ \Illuminate\Support\Str::limit($ticket->subject, 50) }}
+                        @if($ticket->payment_transaction_id)
+                            <span class="block text-xs font-mono text-amber-700 mt-0.5">{{ $ticket->payment_transaction_id }}</span>
+                        @endif
+                    </td>
                     <td class="px-6 py-4">
                         @php
                             $priorityColors = [
@@ -134,7 +173,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">No tickets found</td>
+                    <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">No tickets found</td>
                 </tr>
                 @endforelse
             </tbody>

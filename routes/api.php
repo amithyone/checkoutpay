@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\ConsumerSupportController;
 use App\Http\Controllers\Api\ConsumerChatController;
+use App\Http\Controllers\Api\PublicSupportController;
 use App\Http\Controllers\Api\ConsumerChatInternalController;
 use App\Http\Controllers\Api\ConsumerWalletApiController;
 use App\Http\Controllers\Api\ConsumerWalletAuthController;
@@ -61,6 +63,14 @@ Route::prefix('v1')->group(function () {
      * Consumer mobile wallet API (Android/iOS): WhatsApp OTP login + Sanctum Bearer token.
      * Same whatsapp_wallets / transactions as the WhatsApp bot.
      */
+    Route::prefix('public/support')->middleware('throttle:'.max(5, (int) config('support.rate_limit_per_minute', 20)).',1')->group(function () {
+        Route::get('options', [PublicSupportController::class, 'options']);
+        Route::get('payment-lookup', [PublicSupportController::class, 'lookupPayment']);
+        Route::post('conversations', [PublicSupportController::class, 'start']);
+        Route::get('conversations/{token}/messages', [PublicSupportController::class, 'messages']);
+        Route::post('conversations/{token}/messages', [PublicSupportController::class, 'sendMessage']);
+    });
+
     Route::prefix('consumer')->middleware('throttle:consumer_wallet_otp')->group(function () {
         Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
         Route::post('auth/otp/verify', [ConsumerWalletAuthController::class, 'verifyOtp']);
@@ -104,6 +114,13 @@ Route::prefix('v1')->group(function () {
         Route::post('chat/messages', [ConsumerChatController::class, 'store']);
         Route::post('wallet/conversation', [ConsumerWalletConversationController::class, 'store']);
         Route::post('wallet/transfer/confirm-web-token', [ConsumerWalletApiController::class, 'confirmTransferWebToken']);
+
+        Route::prefix('support')->middleware('throttle:'.max(5, (int) config('support.rate_limit_per_minute', 20)).',1')->group(function () {
+            Route::get('options', [ConsumerSupportController::class, 'options']);
+            Route::post('conversations', [ConsumerSupportController::class, 'start']);
+            Route::get('conversations/{token}/messages', [ConsumerSupportController::class, 'messages']);
+            Route::post('conversations/{token}/messages', [ConsumerSupportController::class, 'sendMessage']);
+        });
     });
 
     Route::post('internal/consumer-chat/reply', [ConsumerChatInternalController::class, 'reply'])

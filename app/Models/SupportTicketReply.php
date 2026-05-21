@@ -56,6 +56,7 @@ class SupportTicketReply extends Model
     protected $casts = [
         'attachments' => 'array',
         'is_internal_note' => 'boolean',
+        'read_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -76,6 +77,20 @@ class SupportTicketReply extends Model
         if ($this->user_type === 'business') {
             return $this->belongsTo(Business::class, 'user_id');
         }
-        return $this->belongsTo(Admin::class, 'user_id');
+        if ($this->user_type === 'admin') {
+            return $this->belongsTo(Admin::class, 'user_id');
+        }
+
+        return null;
+    }
+
+    public function authorLabel(): string
+    {
+        return match ($this->user_type) {
+            'admin' => $this->user?->name ?? 'Admin',
+            'business' => $this->user?->name ?? 'Business',
+            'visitor' => 'Visitor',
+            default => 'User',
+        };
     }
 }
