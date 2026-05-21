@@ -342,8 +342,12 @@ class WhatsappWalletBankPayoutService
         return array_slice($out, 0, 8);
     }
 
-    public function isWeakVerifiedName(string $accountName): bool
+    public function isWeakVerifiedName(?string $accountName): bool
     {
+        if ($accountName === null || trim($accountName) === '') {
+            return true;
+        }
+
         $l = strtolower($accountName);
 
         return str_contains($l, 'timeout fallback')
