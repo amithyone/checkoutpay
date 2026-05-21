@@ -9,6 +9,7 @@ use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use App\Services\Whatsapp\WhatsappWalletPendingP2pService;
+use App\Services\Whatsapp\WhatsappWalletSelfBankTransferService;
 use App\Services\Whatsapp\WhatsappWalletTopupNotifier;
 use App\Services\WhatsappWalletBankPayoutService;
 use Illuminate\Support\Facades\DB;
