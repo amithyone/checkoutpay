@@ -63,12 +63,17 @@ Route::prefix('v1')->group(function () {
      * Consumer mobile wallet API (Android/iOS): WhatsApp OTP login + Sanctum Bearer token.
      * Same whatsapp_wallets / transactions as the WhatsApp bot.
      */
-    Route::prefix('public/support')->middleware('throttle:'.max(5, (int) config('support.rate_limit_per_minute', 20)).',1')->group(function () {
-        Route::get('options', [PublicSupportController::class, 'options']);
-        Route::get('payment-lookup', [PublicSupportController::class, 'lookupPayment']);
-        Route::post('conversations', [PublicSupportController::class, 'start']);
-        Route::get('conversations/{token}/messages', [PublicSupportController::class, 'messages']);
-        Route::post('conversations/{token}/messages', [PublicSupportController::class, 'sendMessage']);
+    Route::prefix('public/support')->group(function () {
+        Route::middleware('throttle:support-options')->group(function () {
+            Route::get('options', [PublicSupportController::class, 'options']);
+            Route::get('payment-lookup', [PublicSupportController::class, 'lookupPayment']);
+        });
+        Route::post('conversations', [PublicSupportController::class, 'start'])
+            ->middleware('throttle:support-start');
+        Route::get('conversations/{token}/messages', [PublicSupportController::class, 'messages'])
+            ->middleware('throttle:support-poll');
+        Route::post('conversations/{token}/messages', [PublicSupportController::class, 'sendMessage'])
+            ->middleware('throttle:support-write');
     });
 
     Route::prefix('consumer')->middleware('throttle:consumer_wallet_otp')->group(function () {
@@ -115,11 +120,15 @@ Route::prefix('v1')->group(function () {
         Route::post('wallet/conversation', [ConsumerWalletConversationController::class, 'store']);
         Route::post('wallet/transfer/confirm-web-token', [ConsumerWalletApiController::class, 'confirmTransferWebToken']);
 
-        Route::prefix('support')->middleware('throttle:'.max(5, (int) config('support.rate_limit_per_minute', 20)).',1')->group(function () {
-            Route::get('options', [ConsumerSupportController::class, 'options']);
-            Route::post('conversations', [ConsumerSupportController::class, 'start']);
-            Route::get('conversations/{token}/messages', [ConsumerSupportController::class, 'messages']);
-            Route::post('conversations/{token}/messages', [ConsumerSupportController::class, 'sendMessage']);
+        Route::prefix('support')->group(function () {
+            Route::get('options', [ConsumerSupportController::class, 'options'])
+                ->middleware('throttle:support-options');
+            Route::post('conversations', [ConsumerSupportController::class, 'start'])
+                ->middleware('throttle:support-start');
+            Route::get('conversations/{token}/messages', [ConsumerSupportController::class, 'messages'])
+                ->middleware('throttle:support-poll');
+            Route::post('conversations/{token}/messages', [ConsumerSupportController::class, 'sendMessage'])
+                ->middleware('throttle:support-write');
         });
     });
 

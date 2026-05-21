@@ -63,6 +63,7 @@ class PublicSupportTest extends TestCase
                 $table->unsignedTinyInteger('tier')->default(1);
                 $table->decimal('balance', 14, 2)->default(0);
                 $table->string('status', 32)->default('active');
+                $table->timestamp('support_whatsapp_welcome_sent_at')->nullable();
                 $table->timestamps();
             });
         }
@@ -388,5 +389,47 @@ class PublicSupportTest extends TestCase
 
         $wallet = WhatsappWallet::query()->where('phone_e164', '2348011112222')->first();
         $this->assertNotNull($wallet);
+    }
+
+    /** @test */
+    public function whatsapp_welcome_is_sent_only_once_per_wallet_across_tickets(): void
+    {
+        $mock = Mockery::mock(EvolutionWhatsAppClient::class);
+        $mock->shouldReceive('sendText')->once()->andReturn(true);
+        $this->app->instance(EvolutionWhatsAppClient::class, $mock);
+
+        $payload = [
+            'link_whatsapp_wallet' => true,
+            'phone' => '08033334444',
+            'country_iso' => 'NG',
+            'consent_accepted' => true,
+            'wallet_consent_accepted' => true,
+            'channel' => 'checkout_web',
+        ];
+
+        $this->postJson('/api/v1/public/support/conversations', $payload)->assertOk();
+        $this->postJson('/api/v1/public/support/conversations', $payload)->assertOk();
+
+        $wallet = WhatsappWallet::query()->where('phone_e164', '2348033334444')->first();
+        $this->assertNotNull($wallet);
+        $this->assertNotNull($wallet->support_whatsapp_welcome_sent_at);
+        $this->assertSame(2, SupportTicket::query()->where('whatsapp_wallet_id', $wallet->id)->count());
+    }
+
+    /** @test */
+    public function visitor_can_poll_messages_without_hitting_rate_limit(): void
+    {
+        $start = $this->postJson('/api/v1/public/support/conversations', [
+            'link_whatsapp_wallet' => false,
+            'consent_accepted' => true,
+            'channel' => 'checkout_web',
+        ])->assertOk();
+
+        $token = (string) $start->json('data.public_token');
+
+        for ($i = 0; $i < 25; $i++) {
+            $this->getJson('/api/v1/public/support/conversations/'.$token.'/messages?after_id=0')
+                ->assertOk();
+        }
     }
 }

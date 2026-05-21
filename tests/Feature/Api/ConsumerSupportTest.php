@@ -23,7 +23,7 @@ class ConsumerSupportTest extends TestCase
         $this->ensureSchema();
 
         $mock = Mockery::mock(EvolutionWhatsAppClient::class);
-        $mock->shouldReceive('sendText')->andReturn(true);
+        $mock->shouldReceive('sendText')->never();
         $this->app->instance(EvolutionWhatsAppClient::class, $mock);
     }
 

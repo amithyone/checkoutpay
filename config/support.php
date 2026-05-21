@@ -8,9 +8,17 @@ return [
         "*:brand* support\n\nWe saved your support chat. Reply here on WhatsApp or continue on our website.\n\nRefunds, when approved, are credited to your WhatsApp wallet — you can transfer to any Nigerian bank from the app or wallet menu."
     ),
 
-    'poll_interval_seconds' => (int) env('SUPPORT_POLL_INTERVAL_SECONDS', 4),
+    'poll_interval_seconds' => (int) env('SUPPORT_POLL_INTERVAL_SECONDS', 5),
 
+    /** @deprecated Use rate_limit_poll_per_minute / rate_limit_write_per_minute */
     'rate_limit_per_minute' => (int) env('SUPPORT_RATE_LIMIT_PER_MINUTE', 20),
+
+    'rate_limit_poll_per_minute' => (int) env('SUPPORT_RATE_LIMIT_POLL_PER_MINUTE', 120),
+    'rate_limit_write_per_minute' => (int) env('SUPPORT_RATE_LIMIT_WRITE_PER_MINUTE', 40),
+    'rate_limit_start_per_minute' => (int) env('SUPPORT_RATE_LIMIT_START_PER_MINUTE', 15),
+
+    /** Send WhatsApp welcome when linking wallet on web widget (not CheckoutNow in-app). */
+    'send_whatsapp_welcome_on_web' => (bool) env('SUPPORT_SEND_WHATSAPP_WELCOME_ON_WEB', true),
 
     'copy' => [
         'anonymous_consent' => 'I agree to chat with CheckoutPay support. This session stays in the browser on this device unless I link WhatsApp.',

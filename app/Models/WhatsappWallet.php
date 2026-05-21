@@ -46,6 +46,7 @@ class WhatsappWallet extends Model
         'kyc_cac',
         'transfer_email_otp_enabled',
         'status',
+        'support_whatsapp_welcome_sent_at',
     ];
 
     protected $casts = [
@@ -60,6 +61,7 @@ class WhatsappWallet extends Model
         'kyc_dob' => 'date',
         'tier' => 'integer',
         'transfer_email_otp_enabled' => 'boolean',
+        'support_whatsapp_welcome_sent_at' => 'datetime',
     ];
 
     public function renter(): BelongsTo

@@ -2,6 +2,7 @@
 
 namespace App\Services\Support;
 
+use App\Models\SupportTicket;
 use App\Models\WhatsappWallet;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
 use App\Services\Whatsapp\EvolutionWhatsAppClient;
@@ -43,8 +44,24 @@ final class SupportWalletOnboardingService
         return ['ok' => true, 'wallet' => $wallet];
     }
 
+    public function alreadySentSupportWelcome(WhatsappWallet $wallet): bool
+    {
+        if ($wallet->support_whatsapp_welcome_sent_at !== null) {
+            return true;
+        }
+
+        return SupportTicket::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->whereNotNull('wallet_onboarding_sent_at')
+            ->exists();
+    }
+
     public function sendWelcomeMessage(WhatsappWallet $wallet): bool
     {
+        if ($this->alreadySentSupportWelcome($wallet)) {
+            return true;
+        }
+
         $instance = WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance === '') {
             Log::warning('support.wallet_onboarding: no evolution instance');
@@ -57,7 +74,9 @@ final class SupportWalletOnboardingService
         $text = str_replace(':brand', $brand, $template);
 
         $sent = $this->whatsapp->sendText($instance, $wallet->phone_e164, $text);
-        if (! $sent) {
+        if ($sent) {
+            $wallet->forceFill(['support_whatsapp_welcome_sent_at' => now()])->save();
+        } else {
             Log::warning('support.wallet_onboarding: welcome send failed', [
                 'wallet_id' => $wallet->id,
             ]);

@@ -35,6 +35,37 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(6)->by($key);
         });
 
+        RateLimiter::for('support-poll', function (Request $request) {
+            $token = (string) $request->route('token', '');
+            $userKey = $request->user()?->id ? 'u:'.$request->user()->id : null;
+            $key = $userKey ?? ($token !== '' ? 't:'.$token : 'ip:'.($request->ip() ?? '0'));
+
+            return Limit::perMinute(max(30, (int) config('support.rate_limit_poll_per_minute', 120)))
+                ->by('support-poll:'.$key);
+        });
+
+        RateLimiter::for('support-write', function (Request $request) {
+            $token = (string) $request->route('token', '');
+            $userKey = $request->user()?->id ? 'u:'.$request->user()->id : null;
+            $key = $userKey ?? ($token !== '' ? 't:'.$token : 'ip:'.($request->ip() ?? '0'));
+
+            return Limit::perMinute(max(10, (int) config('support.rate_limit_write_per_minute', 40)))
+                ->by('support-write:'.$key);
+        });
+
+        RateLimiter::for('support-start', function (Request $request) {
+            $userKey = $request->user()?->id ? 'u:'.$request->user()->id : 'ip:'.($request->ip() ?? '0');
+
+            return Limit::perMinute(max(3, (int) config('support.rate_limit_start_per_minute', 15)))
+                ->by('support-start:'.$userKey);
+        });
+
+        RateLimiter::for('support-options', function (Request $request) {
+            $key = $request->user()?->id ? 'u:'.$request->user()->id : 'ip:'.($request->ip() ?? '0');
+
+            return Limit::perMinute(60)->by('support-options:'.$key);
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

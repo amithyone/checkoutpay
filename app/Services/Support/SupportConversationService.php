@@ -182,7 +182,12 @@ final class SupportConversationService
             }
 
             if ($wallet && $ticket->wallet_onboarding_sent_at === null) {
-                if ($this->onboarding->sendWelcomeMessage($wallet)) {
+                $sendWelcome = $channel !== SupportTicket::CHANNEL_CHECKOUTNOW_APP
+                    && config('support.send_whatsapp_welcome_on_web', true);
+
+                if ($sendWelcome && $this->onboarding->sendWelcomeMessage($wallet)) {
+                    $ticket->update(['wallet_onboarding_sent_at' => now()]);
+                } elseif (! $sendWelcome || $this->onboarding->alreadySentSupportWelcome($wallet)) {
                     $ticket->update(['wallet_onboarding_sent_at' => now()]);
                 }
             }
