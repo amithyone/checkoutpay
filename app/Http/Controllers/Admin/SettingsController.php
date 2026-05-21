@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\WhitelistedEmailAddress;
+use App\Services\MevonPay\MevonPayHttpClient;
+use App\Services\Vtu\VtuProviderResolver;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
@@ -20,6 +22,7 @@ class SettingsController extends Controller
             'general' => 'General Settings',
             'security' => 'Security Settings',
             'charges' => 'Charge Settings',
+            'vtu' => 'VTU & Virtual Card',
         ];
 
         $settings = [];
@@ -30,7 +33,14 @@ class SettingsController extends Controller
         // Get whitelisted emails for display
         $whitelistedEmails = WhitelistedEmailAddress::orderBy('created_at', 'desc')->get();
 
-        return view('admin.settings.index', compact('settings', 'groups', 'whitelistedEmails'));
+        $mevonBalance = null;
+        if (app(MevonPayHttpClient::class)->isConfigured()) {
+            $mevonBalance = app(MevonPayHttpClient::class)->getBalance();
+        }
+
+        $vtuProvider = (string) Setting::get('vtu_provider', VtuProviderResolver::PROVIDER_VTU_NG);
+
+        return view('admin.settings.index', compact('settings', 'groups', 'whitelistedEmails', 'mevonBalance', 'vtuProvider'));
     }
 
     /**
@@ -194,6 +204,48 @@ class SettingsController extends Controller
                     'string',
                     'notifications',
                     'Telegram chat ID for admin withdrawal alerts'
+                );
+            }
+        }
+
+        if ($request->has('vtu_provider')) {
+            $validated = $request->validate([
+                'vtu_provider' => 'required|in:vtu_ng,mevonpay',
+                'vtu_ng_enabled' => 'nullable|boolean',
+                'mevonpay_vtu_enabled' => 'nullable|boolean',
+                'virtual_card_enabled' => 'nullable|boolean',
+                'virtual_card_request_fee_usd' => 'nullable|numeric|min:0|max:500',
+            ]);
+
+            Setting::set('vtu_provider', $validated['vtu_provider'], 'string', 'vtu', 'Active VTU bill payment provider');
+            Setting::set(
+                'vtu_ng_enabled',
+                $request->boolean('vtu_ng_enabled') ? 1 : 0,
+                'boolean',
+                'vtu',
+                'Allow VTU.ng when selected or as fallback'
+            );
+            Setting::set(
+                'mevonpay_vtu_enabled',
+                $request->boolean('mevonpay_vtu_enabled') ? 1 : 0,
+                'boolean',
+                'vtu',
+                'Allow MevonPay VTU when selected'
+            );
+            Setting::set(
+                'virtual_card_enabled',
+                $request->boolean('virtual_card_enabled') ? 1 : 0,
+                'boolean',
+                'vtu',
+                'Enable Dollar Virtual Card requests in CheckoutNow app'
+            );
+            if (array_key_exists('virtual_card_request_fee_usd', $validated) && $validated['virtual_card_request_fee_usd'] !== null) {
+                Setting::set(
+                    'virtual_card_request_fee_usd',
+                    $validated['virtual_card_request_fee_usd'],
+                    'float',
+                    'vtu',
+                    'One-time card request fee in USD (debited from NGN wallet at FX rate)'
                 );
             }
         }

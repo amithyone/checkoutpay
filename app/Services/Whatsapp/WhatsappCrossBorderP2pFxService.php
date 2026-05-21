@@ -131,6 +131,28 @@ final class WhatsappCrossBorderP2pFxService
     }
 
     /**
+     * Convert amount using admin FX table (units of TO per 1 FROM).
+     */
+    public function convertCurrency(string $from, string $to, float $amount): ?float
+    {
+        $from = strtoupper(trim($from));
+        $to = strtoupper(trim($to));
+        if ($from === '' || $to === '') {
+            return null;
+        }
+        if ($from === $to) {
+            return round($amount, 2);
+        }
+
+        $mult = $this->fxMultiplier($from, $to);
+        if ($mult === null || $mult <= 0) {
+            return null;
+        }
+
+        return round($amount * $mult, 2);
+    }
+
+    /**
      * Units of TO per 1 FROM (e.g. NGN_NAD = NAD per 1 NGN).
      */
     private function fxMultiplier(string $from, string $to): ?float

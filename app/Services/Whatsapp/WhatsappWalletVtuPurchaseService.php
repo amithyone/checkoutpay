@@ -4,7 +4,8 @@ namespace App\Services\Whatsapp;
 
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
-use App\Services\VtuNg\VtuNgApiClient;
+use App\Contracts\Vtu\VtuProviderContract;
+use App\Services\Vtu\VtuProviderResolver;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -13,8 +14,13 @@ use Illuminate\Support\Str;
 class WhatsappWalletVtuPurchaseService
 {
     public function __construct(
-        private VtuNgApiClient $vtu,
+        private VtuProviderResolver $vtuResolver,
     ) {}
+
+    private function vtu(): VtuProviderContract
+    {
+        return $this->vtuResolver->active();
+    }
 
     /**
      * @return array{ok: bool, message: string, balance_after?: float}
@@ -40,7 +46,7 @@ class WhatsappWalletVtuPurchaseService
             return $debited;
         }
 
-        $api = $this->vtu->purchaseAirtime($networkId, $phone11, $amount);
+        $api = $this->vtu()->purchaseAirtime($networkId, $phone11, $amount);
         if (! $api['ok']) {
             $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 
@@ -94,7 +100,7 @@ class WhatsappWalletVtuPurchaseService
             return $debited;
         }
 
-        $api = $this->vtu->purchaseData($networkId, $phone11, $variationId);
+        $api = $this->vtu()->purchaseData($networkId, $phone11, $variationId, $amount);
         if (! $api['ok']) {
             $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 
@@ -147,7 +153,7 @@ class WhatsappWalletVtuPurchaseService
             return $debited;
         }
 
-        $api = $this->vtu->purchaseElectricity($serviceId, $meterNumber, $phone11, $amount, $variationId);
+        $api = $this->vtu()->purchaseElectricity($serviceId, $meterNumber, $phone11, $amount, $variationId, $customerName);
         if (! $api['ok']) {
             $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 
@@ -196,7 +202,9 @@ class WhatsappWalletVtuPurchaseService
             return $debited;
         }
 
-        $api = $this->vtu->purchaseTv($serviceId, $smartcardNumber, $variationId, $amount);
+        $phone11 = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164) ?? '';
+        $verifyName = null;
+        $api = $this->vtu()->purchaseTv($serviceId, $smartcardNumber, $variationId, $amount, $verifyName, $phone11);
         if (! $api['ok']) {
             $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 
@@ -243,7 +251,12 @@ class WhatsappWalletVtuPurchaseService
             return $debited;
         }
 
-        $api = $this->vtu->purchaseBetting($serviceId, $customerId, $amount);
+        $phone11 = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164);
+        if ($phone11 === null) {
+            return ['ok' => false, 'message' => 'Invalid payer phone on wallet.'];
+        }
+
+        $api = $this->vtu()->purchaseBetting($serviceId, $customerId, $amount, $phone11);
         if (! $api['ok']) {
             $this->refundDebit($wallet->id, $ref, $amount, (string) ($api['message'] ?? 'Provider error'));
 

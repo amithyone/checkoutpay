@@ -34,6 +34,7 @@ class ConsumerWalletKycService
                 'kyc_fname' => $wallet->kyc_fname,
                 'kyc_lname' => $wallet->kyc_lname,
                 'kyc_email' => $wallet->kyc_email,
+                'kyc_dob' => $wallet->kyc_dob?->format('Y-m-d'),
                 'kyc_cac' => $wallet->kyc_cac,
             ],
         ];

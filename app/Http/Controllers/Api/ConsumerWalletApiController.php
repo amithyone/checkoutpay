@@ -14,7 +14,8 @@ use App\Services\Consumer\ConsumerWalletPayQrService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletTransferService;
 use App\Services\MavonPayTransferService;
-use App\Services\VtuNg\VtuNgApiClient;
+use App\Contracts\Vtu\VtuProviderContract;
+use App\Services\Vtu\VtuProviderResolver;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use App\Services\Whatsapp\WhatsappWalletPartnerApiService;
@@ -39,12 +40,17 @@ class ConsumerWalletApiController extends Controller
         private ConsumerWalletKycService $kyc,
         private WhatsappWalletBankPayoutService $bankPayout,
         private WhatsappWalletVtuPurchaseService $vtuPurchase,
-        private VtuNgApiClient $vtuApi,
+        private VtuProviderResolver $vtuResolver,
         private WhatsappWalletPendingP2pService $pendingP2p,
         private WhatsappWalletSecureTransferAuthService $waTransferAuth,
         private ConsumerWalletPayCodeService $payCodes,
         private ConsumerWalletPayQrService $payQr,
     ) {}
+
+    private function vtu(): VtuProviderContract
+    {
+        return $this->vtuResolver->active();
+    }
 
     private function walletFor(Request $request): WhatsappWallet
     {
@@ -140,7 +146,7 @@ class ConsumerWalletApiController extends Controller
 
         $e164 = (string) $wallet->phone_e164;
         $vtuEligible = $this->walletCountry->isNigeriaPayInWallet($e164);
-        $vtuConfigured = $this->vtuApi->isConfigured();
+        $vtuConfigured = $this->vtu()->isConfigured();
 
         return response()->json([
             'success' => true,
@@ -755,13 +761,16 @@ class ConsumerWalletApiController extends Controller
 
     public function vtuNetworks(): JsonResponse
     {
+        $catalog = $this->vtu()->networksCatalog();
+
         return response()->json([
             'success' => true,
             'data' => [
-                'networks' => config('vtu.networks', []),
-                'configured' => $this->vtuApi->isConfigured(),
-                'airtime_min' => (float) config('vtu.airtime_min', 50),
-                'airtime_max' => (float) config('vtu.airtime_max', 50000),
+                'networks' => $catalog['networks'] ?? [],
+                'configured' => $this->vtu()->isConfigured(),
+                'provider' => $this->vtu()->providerKey(),
+                'airtime_min' => (float) ($catalog['airtime_min'] ?? 50),
+                'airtime_max' => (float) ($catalog['airtime_max'] ?? 50000),
             ],
         ]);
     }
@@ -772,11 +781,11 @@ class ConsumerWalletApiController extends Controller
             'network_id' => 'required|string|max:40',
         ]);
 
-        if (! $this->vtuApi->isConfigured()) {
+        if (! $this->vtu()->isConfigured()) {
             return response()->json(['success' => false, 'message' => 'VTU not configured.'], 503);
         }
 
-        $parsed = $this->vtuApi->fetchDataPlans((string) $request->input('network_id'));
+        $parsed = $this->vtu()->fetchDataPlans((string) $request->input('network_id'));
         if (! ($parsed['ok'] ?? false)) {
             return response()->json([
                 'success' => false,
@@ -861,16 +870,14 @@ class ConsumerWalletApiController extends Controller
     public function vtuBillCatalog(Request $request): JsonResponse
     {
         $this->walletFor($request);
+        $catalog = $this->vtu()->billCatalog();
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'configured' => $this->vtuApi->isConfigured(),
-                'electricity_discos' => config('vtu.electricity_discos', []),
-                'cable_tv_services' => config('vtu.cable_tv_services', []),
-                'betting_services' => config('vtu.betting_services', []),
-                'electricity_min' => (float) config('vtu.electricity_min', 500),
-            ],
+            'data' => array_merge($catalog, [
+                'configured' => $this->vtu()->isConfigured(),
+                'provider' => $this->vtu()->providerKey(),
+            ]),
         ]);
     }
 
@@ -891,7 +898,7 @@ class ConsumerWalletApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unknown electricity provider.'], 422);
         }
 
-        $parsed = $this->vtuApi->verifyElectricityCustomer(
+        $parsed = $this->vtu()->verifyElectricityCustomer(
             $serviceId,
             (string) $request->input('customer_id'),
             (string) $request->input('variation_id'),
@@ -928,7 +935,7 @@ class ConsumerWalletApiController extends Controller
         }
 
         $amount = (float) $request->input('amount');
-        $min = (float) config('vtu.electricity_min', 500);
+        $min = (float) ($this->vtu()->billCatalog()['electricity_min'] ?? 500);
         if ($amount + 0.00001 < $min) {
             return response()->json([
                 'success' => false,
@@ -938,7 +945,7 @@ class ConsumerWalletApiController extends Controller
 
         $meter = (string) $request->input('customer_id');
         $variation = (string) $request->input('variation_id');
-        $verify = $this->vtuApi->verifyElectricityCustomer($serviceId, $meter, $variation);
+        $verify = $this->vtu()->verifyElectricityCustomer($serviceId, $meter, $variation);
         if (! ($verify['ok'] ?? false)) {
             return response()->json([
                 'success' => false,
@@ -976,11 +983,11 @@ class ConsumerWalletApiController extends Controller
         if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.cable_tv_services')) {
             return response()->json(['success' => false, 'message' => 'Unknown cable TV provider.'], 422);
         }
-        if (! $this->vtuApi->isConfigured()) {
+        if (! $this->vtu()->isConfigured()) {
             return response()->json(['success' => false, 'message' => 'Bill payments are not configured.'], 503);
         }
 
-        $parsed = $this->vtuApi->fetchTvPlans($serviceId);
+        $parsed = $this->vtu()->fetchTvPlans($serviceId);
         if (! ($parsed['ok'] ?? false)) {
             return response()->json([
                 'success' => false,
@@ -1010,7 +1017,7 @@ class ConsumerWalletApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unknown cable TV provider.'], 422);
         }
 
-        $parsed = $this->vtuApi->verifyBillCustomer($serviceId, (string) $request->input('customer_id'));
+        $parsed = $this->vtu()->verifyBillCustomer($serviceId, (string) $request->input('customer_id'));
 
         return response()->json([
             'success' => $parsed['ok'],
@@ -1043,7 +1050,7 @@ class ConsumerWalletApiController extends Controller
         }
 
         $smart = (string) $request->input('customer_id');
-        $verify = $this->vtuApi->verifyBillCustomer($serviceId, $smart);
+        $verify = $this->vtu()->verifyBillCustomer($serviceId, $smart);
         if (! ($verify['ok'] ?? false)) {
             return response()->json([
                 'success' => false,
@@ -1083,7 +1090,7 @@ class ConsumerWalletApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unknown betting provider.'], 422);
         }
 
-        $parsed = $this->vtuApi->verifyBillCustomer($serviceId, (string) $request->input('customer_id'));
+        $parsed = $this->vtu()->verifyBillCustomer($serviceId, (string) $request->input('customer_id'));
 
         return response()->json([
             'success' => $parsed['ok'],
@@ -1115,7 +1122,7 @@ class ConsumerWalletApiController extends Controller
         }
 
         $customerId = (string) $request->input('customer_id');
-        $verify = $this->vtuApi->verifyBillCustomer($serviceId, $customerId);
+        $verify = $this->vtu()->verifyBillCustomer($serviceId, $customerId);
         if (! ($verify['ok'] ?? false)) {
             return response()->json([
                 'success' => false,
@@ -1142,7 +1149,7 @@ class ConsumerWalletApiController extends Controller
                 'message' => 'Bill payments are only available for Nigeria wallet numbers (NGN).',
             ], 422);
         }
-        if (! $this->vtuApi->isConfigured()) {
+        if (! $this->vtu()->isConfigured()) {
             return response()->json(['success' => false, 'message' => 'Bill payments are not configured.'], 503);
         }
 
@@ -1151,17 +1158,7 @@ class ConsumerWalletApiController extends Controller
 
     private function consumerVtuServiceAllowed(string $serviceId, string $configKey): bool
     {
-        $rows = config($configKey, []);
-        if (! is_array($rows)) {
-            return false;
-        }
-        foreach ($rows as $row) {
-            if (is_array($row) && ($row['id'] ?? null) === $serviceId) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->vtu()->serviceAllowed($serviceId, $configKey);
     }
 
     public function kycTier2Status(Request $request): JsonResponse

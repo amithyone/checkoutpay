@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ConsumerSupportController;
 use App\Http\Controllers\Api\ConsumerChatController;
 use App\Http\Controllers\Api\PublicSupportController;
 use App\Http\Controllers\Api\ConsumerChatInternalController;
+use App\Http\Controllers\Api\ConsumerVirtualCardController;
 use App\Http\Controllers\Api\ConsumerWalletApiController;
 use App\Http\Controllers\Api\ConsumerWalletAuthController;
 use App\Http\Controllers\Api\ConsumerWalletConversationController;
@@ -111,6 +112,10 @@ Route::prefix('v1')->group(function () {
         Route::post('vtu/betting', [ConsumerWalletApiController::class, 'vtuBetting']);
         Route::post('vtu/airtime', [ConsumerWalletApiController::class, 'vtuAirtime']);
         Route::post('vtu/data', [ConsumerWalletApiController::class, 'vtuData']);
+        Route::get('cards', [ConsumerVirtualCardController::class, 'index']);
+        Route::get('cards/prefill', [ConsumerVirtualCardController::class, 'prefill']);
+        Route::post('cards/request', [ConsumerVirtualCardController::class, 'request']);
+        Route::post('cards/topup', [ConsumerVirtualCardController::class, 'topup']);
         Route::get('kyc/tier2', [ConsumerWalletApiController::class, 'kycTier2Status']);
         Route::post('kyc/tier2/personal', [ConsumerWalletApiController::class, 'kycTier2Personal']);
         Route::post('kyc/tier2/business', [ConsumerWalletApiController::class, 'kycTier2Business']);

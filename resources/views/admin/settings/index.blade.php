@@ -692,5 +692,82 @@
             </div>
         </form>
     </div>
+
+    <!-- VTU & Virtual Card -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-bolt mr-2 text-primary"></i>VTU &amp; Virtual Card (MevonPay)
+        </h3>
+
+        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Active VTU provider</label>
+                <div class="flex flex-wrap gap-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="vtu_provider" value="vtu_ng" class="mr-2"
+                            {{ ($vtuProvider ?? 'vtu_ng') === 'vtu_ng' ? 'checked' : '' }}>
+                        VTU.ng
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="vtu_provider" value="mevonpay" class="mr-2"
+                            {{ ($vtuProvider ?? '') === 'mevonpay' ? 'checked' : '' }}>
+                        MevonPay
+                    </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">WhatsApp wallet and CheckoutNow Pay Bills use this provider. Requires env credentials for the chosen provider.</p>
+            </div>
+
+            <div class="flex flex-wrap gap-6">
+                <label class="inline-flex items-center text-sm">
+                    <input type="hidden" name="vtu_ng_enabled" value="0">
+                    <input type="checkbox" name="vtu_ng_enabled" value="1" class="mr-2 rounded"
+                        {{ \App\Models\Setting::get('vtu_ng_enabled', true) ? 'checked' : '' }}>
+                    VTU.ng enabled
+                </label>
+                <label class="inline-flex items-center text-sm">
+                    <input type="hidden" name="mevonpay_vtu_enabled" value="0">
+                    <input type="checkbox" name="mevonpay_vtu_enabled" value="1" class="mr-2 rounded"
+                        {{ \App\Models\Setting::get('mevonpay_vtu_enabled', true) ? 'checked' : '' }}>
+                    MevonPay VTU enabled
+                </label>
+                <label class="inline-flex items-center text-sm">
+                    <input type="hidden" name="virtual_card_enabled" value="0">
+                    <input type="checkbox" name="virtual_card_enabled" value="1" class="mr-2 rounded"
+                        {{ \App\Models\Setting::get('virtual_card_enabled', config('virtual_card.enabled', true)) ? 'checked' : '' }}>
+                    Dollar Virtual Card (CheckoutNow app)
+                </label>
+            </div>
+
+            <div>
+                <label for="virtual_card_request_fee_usd" class="block text-sm font-medium text-gray-700 mb-2">
+                    Dollar Virtual Card request fee (USD)
+                </label>
+                <input type="number" step="0.01" min="0" max="500" id="virtual_card_request_fee_usd" name="virtual_card_request_fee_usd"
+                    value="{{ \App\Models\Setting::get('virtual_card_request_fee_usd', config('virtual_card.request_fee_usd', 5)) }}"
+                    class="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg">
+                <p class="mt-1 text-xs text-gray-500">Debited from the user NGN wallet at the USD→NGN rate in <a href="{{ route('admin.whatsapp-wallet.index') }}" class="text-indigo-600 underline">WhatsApp wallet FX</a>.</p>
+            </div>
+
+            @if(isset($mevonBalance) && is_array($mevonBalance))
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm">
+                <p class="font-medium text-gray-800 mb-1">MevonPay balance (live)</p>
+                @if($mevonBalance['ok'] ?? false)
+                    <pre class="text-xs overflow-auto">{{ json_encode($mevonBalance['data'] ?? $mevonBalance['raw'] ?? [], JSON_PRETTY_PRINT) }}</pre>
+                @else
+                    <p class="text-red-600">{{ $mevonBalance['message'] ?? 'Unavailable' }}</p>
+                @endif
+            </div>
+            @endif
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save VTU &amp; Card Settings
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

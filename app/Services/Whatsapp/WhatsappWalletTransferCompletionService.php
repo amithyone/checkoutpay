@@ -6,7 +6,7 @@ use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MavonPayTransferService;
-use App\Services\VtuNg\VtuNgApiClient;
+use App\Services\Vtu\VtuProviderResolver;
 use App\Services\WhatsappWalletBankPayoutService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +23,7 @@ class WhatsappWalletTransferCompletionService
         private WhatsappWalletTier1TopupVaService $tier1TopupVa,
         private WhatsappWalletTopupNotifier $walletNotifier,
         private WhatsappWalletPendingP2pService $pendingP2p,
-        private VtuNgApiClient $vtuApi,
+        private VtuProviderResolver $vtuResolver,
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
     ) {}
@@ -199,7 +199,7 @@ class WhatsappWalletTransferCompletionService
                 : "*2* bank: ledger until {$brand} live.";
         }
 
-        $vtuLine = ($ngRails && $this->vtuApi->isConfigured())
+        $vtuLine = ($ngRails && $this->vtuResolver->active()->isConfigured())
             ? "*5* Bills (airtime / data / power)\n"
             : '';
 

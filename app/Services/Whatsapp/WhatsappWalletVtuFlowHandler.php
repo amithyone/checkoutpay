@@ -5,7 +5,7 @@ namespace App\Services\Whatsapp;
 use App\Models\Renter;
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
-use App\Services\VtuNg\VtuNgApiClient;
+use App\Services\Vtu\VtuProviderResolver;
 
 /**
  * WhatsApp wallet airtime, data, and electricity. Debits wallet; refunds on provider failure.
@@ -18,7 +18,7 @@ class WhatsappWalletVtuFlowHandler
 
     public function __construct(
         private EvolutionWhatsAppClient $client,
-        private VtuNgApiClient $vtuApi,
+        private VtuProviderResolver $vtuResolver,
         private WhatsappWalletVtuPurchaseService $purchase,
         private WhatsappWalletVtuWebPinService $vtuWebPin,
         private WhatsappWalletTransferCompletionService $transferCompletion,
@@ -29,7 +29,7 @@ class WhatsappWalletVtuFlowHandler
 
     public function isAvailable(): bool
     {
-        return $this->vtuApi->isConfigured();
+        return $this->vtuResolver->active()->isConfigured();
     }
 
     public function start(WhatsappSession $session, string $instance, string $phone, ?Renter $linkedRenter): void
@@ -412,7 +412,7 @@ class WhatsappWalletVtuFlowHandler
             return;
         }
         $this->client->sendText($instance, $phone, 'Loading data plans…');
-        $plansRes = $this->vtuApi->fetchDataPlans($net['id']);
+        $plansRes = $this->vtuResolver->active()->fetchDataPlans($net['id']);
         if (! $plansRes['ok']) {
             $this->client->sendText(
                 $instance,
@@ -721,7 +721,7 @@ class WhatsappWalletVtuFlowHandler
             return;
         }
         $this->client->sendText($instance, $phone, 'Verifying meter…');
-        $ver = $this->vtuApi->verifyElectricityCustomer($service, $meter, $variation);
+        $ver = $this->vtuResolver->active()->verifyElectricityCustomer($service, $meter, $variation);
         if (! $ver['ok']) {
             $this->client->sendText(
                 $instance,
@@ -1175,7 +1175,7 @@ class WhatsappWalletVtuFlowHandler
 
         if ($disco !== '' && $meter !== '') {
             $this->client->sendText($instance, $phone, 'Verifying meter…');
-            $ver = $this->vtuApi->verifyElectricityCustomer($disco, $meter, $variation);
+            $ver = $this->vtuResolver->active()->verifyElectricityCustomer($disco, $meter, $variation);
             if (! $ver['ok']) {
                 $this->client->sendText(
                     $instance,
