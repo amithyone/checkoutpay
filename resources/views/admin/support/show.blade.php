@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Support Ticket')
-@section('page-title', 'Support Ticket: ' . $ticket->ticket_number)
+@section('page-title', 'Ticket ' . $ticket->ticket_number)
 
 @section('content')
 @php
@@ -21,20 +21,20 @@
     ];
     $lastReplyId = $ticket->replies->max('id') ?? 0;
 @endphp
-<div class="space-y-6">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div class="flex items-start justify-between mb-4 flex-wrap gap-3">
-            <div>
-                <h3 class="text-lg font-semibold text-gray-900">{{ $ticket->subject }}</h3>
+<div class="space-y-4 sm:space-y-6 pb-4">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+            <div class="min-w-0 flex-1">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 break-words">{{ $ticket->subject }}</h3>
                 <p class="text-sm text-gray-600 mt-1 flex flex-wrap items-center gap-2">
-                    From: <strong>{{ $displayName }}</strong>
+                    From: <strong class="break-all">{{ $displayName }}</strong>
                     @if($ticket->isWalletLinked())
                         <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">WhatsApp linked</span>
                     @elseif($ticket->isPublicChannel())
                         <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">Anonymous</span>
                     @endif
                     @if($ticket->visitor_phone)
-                        · WhatsApp: <span class="font-mono">{{ $ticket->visitor_phone }}</span>
+                        · WhatsApp: <span class="font-mono break-all">{{ $ticket->visitor_phone }}</span>
                         @if($ticket->visitor_country)
                             · {{ $ticket->visitor_country }}
                         @endif
@@ -50,9 +50,9 @@
                     </p>
                 @endif
                 @if($ticket->payment_transaction_id || $ticket->payment)
-                    <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                    <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm overflow-hidden">
                         <p class="font-semibold text-amber-900 mb-1">Payment context</p>
-                        <p class="text-amber-900">
+                        <p class="text-amber-900 break-all">
                             Bank session ID: <span class="font-mono">{{ $ticket->payment_transaction_id ?? $ticket->payment?->transaction_id }}</span>
                             @if($ticket->payment_amount_reported)
                                 · Reported: ₦{{ number_format((float) $ticket->payment_amount_reported, 2) }}
@@ -75,7 +75,7 @@
                     </div>
                 @endif
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
                 <span class="px-3 py-1 text-sm font-medium rounded-full {{ $priorityColors[$ticket->priority] ?? 'bg-gray-100' }}">
                     {{ ucfirst($ticket->priority) }}
                 </span>
@@ -87,10 +87,10 @@
 
         <form action="{{ route('admin.support.update-status', $ticket) }}" method="POST" class="mb-4 p-4 bg-gray-50 rounded-lg">
             @csrf
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Update Status</label>
-                    <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base">
                         <option value="open" {{ $ticket->status === 'open' ? 'selected' : '' }}>Open</option>
                         <option value="in_progress" {{ $ticket->status === 'in_progress' ? 'selected' : '' }}>In Progress</option>
                         <option value="resolved" {{ $ticket->status === 'resolved' ? 'selected' : '' }}>Resolved</option>
@@ -99,7 +99,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
-                    <select name="assigned_to" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <select name="assigned_to" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base">
                         <option value="">Unassigned</option>
                         @foreach(\App\Models\Admin::all() as $admin)
                             <option value="{{ $admin->id }}" {{ $ticket->assigned_to === $admin->id ? 'selected' : '' }}>
@@ -109,67 +109,67 @@
                     </select>
                 </div>
             </div>
-            <button type="submit" class="mt-3 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm">
+            <button type="submit" class="mt-3 w-full sm:w-auto px-4 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium">
                 Update
             </button>
         </form>
 
-        <div class="bg-gray-50 rounded-lg p-4 mb-4" data-message-id="0">
-            <div class="flex items-start space-x-3">
-                <div class="w-10 h-10 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center">
+        <div class="bg-gray-50 rounded-lg p-4 mb-4 min-w-0" data-message-id="0">
+            <div class="flex items-start gap-3">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-sm">
                     {{ substr($displayName, 0, 1) }}
                 </div>
-                <div class="flex-1">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="font-medium text-gray-900">{{ $displayName }}</span>
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center justify-between gap-1 mb-1">
+                        <span class="font-medium text-gray-900 text-sm">{{ $displayName }}</span>
                         <span class="text-xs text-gray-500">{{ $ticket->created_at->format('M d, Y H:i') }}</span>
                     </div>
-                    <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ $ticket->message }}</p>
+                    <p class="text-sm text-gray-700 whitespace-pre-wrap break-words">{{ $ticket->message }}</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 flex flex-col min-h-0">
         <h4 class="text-md font-semibold text-gray-900 mb-4">Conversation</h4>
-        <div id="chat-messages" class="space-y-4 mb-4" style="max-height: 500px; overflow-y: auto;">
+        <div id="chat-messages" class="space-y-4 mb-4 min-h-[12rem] max-h-[min(50vh,28rem)] sm:max-h-[500px] overflow-y-auto overflow-x-hidden -mx-1 px-1">
             @foreach($ticket->replies as $reply)
                 @if($reply->is_internal_note)
                     @continue
                 @endif
-            <div class="flex items-start space-x-3 {{ $reply->user_type === 'admin' ? 'flex-row-reverse space-x-reverse' : '' }}" data-message-id="{{ $reply->id }}">
-                <div class="w-10 h-10 rounded-full {{ $reply->user_type === 'admin' ? 'bg-primary text-white' : 'bg-gray-300 text-gray-700' }} flex items-center justify-center">
+            <div class="flex items-start gap-2 sm:gap-3 min-w-0 {{ $reply->user_type === 'admin' ? 'flex-row-reverse' : '' }}" data-message-id="{{ $reply->id }}">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full {{ $reply->user_type === 'admin' ? 'bg-primary text-white' : 'bg-gray-300 text-gray-700' }} flex items-center justify-center text-sm">
                     {{ substr($reply->authorLabel(), 0, 1) }}
                 </div>
-                <div class="flex-1 {{ $reply->user_type === 'admin' ? 'text-right' : '' }}">
-                    <div class="inline-block bg-gray-100 rounded-lg p-3 max-w-md">
-                        <div class="flex items-center justify-between mb-1 {{ $reply->user_type === 'admin' ? 'flex-row-reverse' : '' }}">
+                <div class="flex-1 min-w-0 {{ $reply->user_type === 'admin' ? 'flex flex-col items-end' : '' }}">
+                    <div class="inline-block bg-gray-100 rounded-lg p-3 max-w-[min(100%,20rem)] break-words text-left">
+                        <div class="flex flex-wrap items-center justify-between gap-1 mb-1 {{ $reply->user_type === 'admin' ? 'flex-row-reverse' : '' }}">
                             <span class="text-xs font-medium text-gray-700">{{ $reply->authorLabel() }}</span>
                             <span class="text-xs text-gray-500">{{ $reply->created_at->format('H:i') }}</span>
                         </div>
-                        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ $reply->message }}</p>
+                        <p class="text-sm text-gray-800 whitespace-pre-wrap break-words">{{ $reply->message }}</p>
                     </div>
                 </div>
             </div>
             @endforeach
         </div>
 
-        <form id="reply-form" class="border-t border-gray-200 pt-4">
+        <form id="reply-form" class="border-t border-gray-200 pt-4 mt-auto">
             @csrf
-            <div class="flex items-start space-x-3">
-                <div class="flex-1">
+            <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+                <div class="flex-1 min-w-0 w-full">
                     <textarea id="reply-message" rows="3"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-base"
                         placeholder="Type your reply..."></textarea>
-                    <div class="mt-2 flex items-center space-x-4">
-                        <label class="flex items-center space-x-2">
+                    <div class="mt-2">
+                        <label class="flex items-start gap-2">
                             <input type="checkbox" id="is-internal-note"
-                                class="rounded border-gray-300 text-primary focus:ring-primary">
+                                class="mt-1 rounded border-gray-300 text-primary focus:ring-primary shrink-0">
                             <span class="text-sm text-gray-700">Internal note (not visible to {{ $isPublic ? 'visitor' : 'business' }})</span>
                         </label>
                     </div>
                 </div>
-                <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                <button type="submit" class="w-full sm:w-auto shrink-0 px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">
                     <i class="fas fa-paper-plane mr-2"></i> Send
                 </button>
             </div>
@@ -185,27 +185,29 @@
     const replyUrl = @json(route('admin.support.reply', $ticket));
     const adminName = @json(auth('admin')->user()->name);
     const chatMessages = document.getElementById('chat-messages');
+    const displayName = @json($displayName);
 
     function appendMessage(msg) {
         if (document.querySelector('[data-message-id="' + msg.id + '"]')) {
             return;
         }
         const isAdmin = msg.user_type === 'admin';
-        const label = isAdmin ? adminName : @json($displayName);
+        const label = isAdmin ? adminName : displayName;
         const div = document.createElement('div');
-        div.className = 'flex items-start space-x-3' + (isAdmin ? ' flex-row-reverse space-x-reverse' : '');
+        div.className = 'flex items-start gap-2 sm:gap-3 min-w-0' + (isAdmin ? ' flex-row-reverse' : '');
         div.dataset.messageId = msg.id;
+        const wrapAlign = isAdmin ? ' flex flex-col items-end' : '';
         div.innerHTML = `
-            <div class="w-10 h-10 rounded-full ${isAdmin ? 'bg-primary text-white' : 'bg-gray-300 text-gray-700'} flex items-center justify-center">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full ${isAdmin ? 'bg-primary text-white' : 'bg-gray-300 text-gray-700'} flex items-center justify-center text-sm">
                 ${label.charAt(0)}
             </div>
-            <div class="flex-1 ${isAdmin ? 'text-right' : ''}">
-                <div class="inline-block bg-gray-100 rounded-lg p-3 max-w-md">
-                    <div class="flex items-center justify-between mb-1 ${isAdmin ? 'flex-row-reverse' : ''}">
+            <div class="flex-1 min-w-0${wrapAlign}">
+                <div class="inline-block bg-gray-100 rounded-lg p-3 max-w-[min(100%,20rem)] break-words text-left">
+                    <div class="flex flex-wrap items-center justify-between gap-1 mb-1 ${isAdmin ? 'flex-row-reverse' : ''}">
                         <span class="text-xs font-medium text-gray-700">${label}</span>
                         <span class="text-xs text-gray-500">${msg.created_at_human || ''}</span>
                     </div>
-                    <p class="text-sm text-gray-800 whitespace-pre-wrap"></p>
+                    <p class="text-sm text-gray-800 whitespace-pre-wrap break-words"></p>
                 </div>
             </div>`;
         div.querySelector('p').textContent = msg.message;

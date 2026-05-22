@@ -18,6 +18,10 @@ foreach (
     });
 }
 
+Route::get('/robots.txt', [\App\Http\Controllers\Public\SeoController::class, 'robots'])->name('seo.robots');
+Route::get('/sitemap.xml', [\App\Http\Controllers\Public\SeoController::class, 'sitemap'])->name('seo.sitemap');
+Route::get('/llms.txt', [\App\Http\Controllers\Public\SeoController::class, 'llmsTxt'])->name('seo.llms');
+
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::get('/whatsapp/link', [\App\Http\Controllers\WhatsappMagicLinkController::class, 'confirm'])

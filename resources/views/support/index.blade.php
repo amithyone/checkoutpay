@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Support - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
+    <title>Support — CheckoutPay Payment Gateway Nigeria</title>
+    @include('partials.seo-head', ['seoOverrides' => [
+        'title' => 'Support — CheckoutPay Payment Gateway Nigeria',
+        'description' => 'Get help with CheckoutPay — Nigeria\'s affordable, reliable payment gateway. Contact support for payments, WooCommerce, API, and wallet issues.',
+        'path' => '/support',
+    ]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif

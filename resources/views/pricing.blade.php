@@ -3,8 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $page->meta_title ?? 'Pricing - CheckoutPay' }}</title>
-    <meta name="description" content="{{ $page->meta_description ?? 'The finest payment gateway rates in Nigeria. Just 1% + ₦50 per transaction. No hidden fees, no monthly charges.' }}">
+    <title>{{ $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay' }}</title>
+    @include('partials.seo-head', ['seoOverrides' => [
+        'title' => $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay',
+        'description' => $page->meta_description ?? 'Transparent low fees for Nigerian merchants: competitive rates, no hidden charges. Compare CheckoutPay — a reliable, cost-effective payment gateway.',
+        'path' => '/pricing',
+    ]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">

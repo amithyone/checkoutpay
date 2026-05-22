@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Products - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
+    <title>Products — Payment Tools for Nigerian Businesses | CheckoutPay</title>
+    @include('partials.seo-head', ['seoOverrides' => [
+        'title' => 'Products — Payment Tools for Nigerian Businesses | CheckoutPay',
+        'description' => 'Invoices, memberships, tickets, rentals, payouts, and collections — all powered by CheckoutPay, an affordable and reliable Nigerian payment gateway.',
+        'path' => '/products',
+    ]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif

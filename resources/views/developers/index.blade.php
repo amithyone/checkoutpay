@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Developers - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
+    <title>Developers — CheckoutPay API & Integrations Nigeria</title>
+    @include('partials.seo-head', ['seoOverrides' => [
+        'title' => 'Developers — CheckoutPay API & Integrations Nigeria',
+        'description' => 'Build on CheckoutPay: REST API, webhooks, WooCommerce, and wallet integrations for affordable, reliable payments in Nigeria.',
+        'path' => '/developers',
+    ]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif

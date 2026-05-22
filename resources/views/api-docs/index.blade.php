@@ -3,8 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Documentation - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    <meta name="description" content="Complete API integration guide for CheckoutPay payment gateway. Learn how to integrate payments, webhooks, and manage transactions with our RESTful API.">
+    <title>API Documentation — CheckoutPay Payment Gateway Nigeria</title>
+    @include('partials.seo-head', ['seoOverrides' => [
+        'title' => 'API Documentation — CheckoutPay Payment Gateway Nigeria',
+        'description' => 'Complete API guide for CheckoutPay — integrate affordable, reliable bank-transfer and virtual-account payments in Nigeria with webhooks and REST endpoints.',
+        'path' => '/api-docs',
+    ]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif

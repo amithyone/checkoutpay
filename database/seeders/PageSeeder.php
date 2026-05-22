@@ -18,8 +18,8 @@ class PageSeeder extends Seeder
             [
                 'title' => 'CheckoutPay',
                 'content' => $this->getHomeContent(),
-                'meta_title' => 'CheckoutPay',
-                'meta_description' => 'Payments for Nigerian businesses.',
+                'meta_title' => 'CheckoutPay — Affordable & Reliable Payment Gateway in Nigeria',
+                'meta_description' => 'Low-cost, reliable payment gateway for Nigerian businesses. Bank transfer matching, virtual accounts, WooCommerce plugin, and transparent fees.',
                 'is_published' => true,
                 'order' => 1,
             ]
@@ -31,8 +31,8 @@ class PageSeeder extends Seeder
             [
                 'title' => 'Pricing - CheckoutPay | Finest Payment Gateway in Nigeria',
                 'content' => $this->getPricingContent(),
-                'meta_title' => 'Pricing - CheckoutPay | Finest Payment Gateway in Nigeria',
-                'meta_description' => 'The finest payment gateway rates in Nigeria. Just 1% + ₦50 per transaction. No hidden fees, no monthly charges.',
+                'meta_title' => 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay',
+                'meta_description' => 'Transparent low fees for Nigerian merchants: competitive rates, no hidden charges. Reliable payment gateway built for Naira and local bank transfers.',
                 'is_published' => true,
                 'order' => 2,
             ]
