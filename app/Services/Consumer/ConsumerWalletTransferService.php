@@ -302,6 +302,14 @@ class ConsumerWalletTransferService
                 ->where('whatsapp_wallet_id', $wallet->id)
                 ->first();
             if (! $txn) {
+                Log::error('consumer_wallet.payout_txn_missing', ['reference' => $reference, 'wallet_id' => $wallet->id]);
+                $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
+                if ($w) {
+                    $w->balance = round((float) $w->balance + $amount, 2);
+                    $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
+                    $w->save();
+                }
+
                 return;
             }
 
@@ -311,8 +319,7 @@ class ConsumerWalletTransferService
                 'payout_response_message' => $result['response_message'] ?? null,
             ]);
 
-            $refund = $bucket === MavonPayTransferService::BUCKET_FAILED
-                || $bucket === MavonPayTransferService::BUCKET_PENDING;
+            $refund = $bucket === MavonPayTransferService::BUCKET_FAILED;
 
             if ($refund) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
@@ -324,6 +331,9 @@ class ConsumerWalletTransferService
                 $meta['reversed_at'] = now()->toIso8601String();
                 $meta['payout_pending'] = false;
                 $meta['payout_failed'] = true;
+            } elseif ($bucket === MavonPayTransferService::BUCKET_PENDING) {
+                $meta['payout_pending'] = true;
+                $meta['whatsapp_payout_processing'] = true;
             } else {
                 $meta['payout_pending'] = false;
                 $meta['payout_reference'] = $result['reference'] ?? $reference;
@@ -333,10 +343,12 @@ class ConsumerWalletTransferService
         });
 
         $wallet = $wallet->fresh();
-        if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+        if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL || $bucket === MavonPayTransferService::BUCKET_PENDING) {
             return [
                 'ok' => true,
-                'message' => 'Bank transfer sent.',
+                'message' => $bucket === MavonPayTransferService::BUCKET_PENDING
+                    ? 'Bank transfer is processing. Your wallet has been debited.'
+                    : 'Bank transfer sent.',
                 'data' => [
                     'reference' => (string) ($result['reference'] ?? $reference),
                     'balance_after' => (float) $wallet->balance,
@@ -344,6 +356,7 @@ class ConsumerWalletTransferService
                     'payout_amount' => $payoutAmount,
                     'self_transfer' => $isSelf,
                     'self_transfer_fee' => $selfFee,
+                    'bucket' => $bucket,
                 ],
             ];
         }

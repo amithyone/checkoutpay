@@ -724,11 +724,17 @@ class ConsumerWalletApiController extends Controller
             (string) $request->input('pin')
         );
 
+        $ok = (bool) ($result['ok'] ?? false);
+
         return response()->json([
-            'success' => (bool) ($result['ok'] ?? false),
-            'message' => ($result['ok'] ?? false) ? 'Transfer completed.' : ($result['error'] ?? 'Could not confirm.'),
-            'data' => null,
-        ], ($result['ok'] ?? false) ? 200 : 422);
+            'success' => $ok,
+            'message' => $ok
+                ? (string) ($result['message'] ?? 'Transfer completed.')
+                : (string) ($result['error'] ?? 'Could not confirm.'),
+            'data' => $ok ? [
+                'balance_after' => isset($result['balance_after']) ? (float) $result['balance_after'] : (float) $wallet->fresh()->balance,
+            ] : null,
+        ], $ok ? 200 : 422);
     }
 
     public function bankNameEnquiry(Request $request): JsonResponse

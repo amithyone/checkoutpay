@@ -251,7 +251,7 @@ class WhatsappWalletTransferCompletionService
         WhatsappWallet $wallet,
         array $ctx,
         bool $userTypedPinInChat
-    ): void {
+    ): WalletTransferCompletionResult {
         $amount = isset($ctx['amount']) && is_numeric($ctx['amount']) ? (float) $ctx['amount'] : 0.0;
         $acct = isset($ctx['dest_acct']) && is_string($ctx['dest_acct']) ? $ctx['dest_acct'] : '';
         $bankName = isset($ctx['dest_bank']) && is_string($ctx['dest_bank']) ? $ctx['dest_bank'] : '';
@@ -269,7 +269,7 @@ class WhatsappWalletTransferCompletionService
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
 
-            return;
+            return WalletTransferCompletionResult::failed('Invalid transfer details.');
         }
 
         if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
@@ -281,11 +281,11 @@ class WhatsappWalletTransferCompletionService
             );
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
 
-            return;
+            return WalletTransferCompletionResult::failed('Bank transfers are only for Nigeria wallet numbers.');
         }
 
         if ($this->bankPayout->isConfigured()) {
-            $this->completeBankTransferWithMavon(
+            return $this->completeBankTransferWithMavon(
                 $session,
                 $instance,
                 $phone,
@@ -300,8 +300,6 @@ class WhatsappWalletTransferCompletionService
                 $isSelf,
                 $selfFee
             );
-
-            return;
         }
 
         try {
@@ -343,7 +341,7 @@ class WhatsappWalletTransferCompletionService
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
 
-            return;
+            return WalletTransferCompletionResult::failed('Transfer could not be completed.');
         }
 
         $session->update(['chat_context' => ['step' => 'submenu']]);
@@ -384,6 +382,8 @@ class WhatsappWalletTransferCompletionService
             $this->client->sendText($instance, $phone, ltrim($pin, "\n\n"));
         }
         $this->sendWalletSubmenu($instance, $phone, $wallet);
+
+        return WalletTransferCompletionResult::success((float) $wallet->balance, 'Transfer recorded.');
     }
 
     /**
@@ -427,7 +427,7 @@ class WhatsappWalletTransferCompletionService
         bool $userTypedPinInChat,
         bool $isSelf = false,
         float $selfFee = 0.0,
-    ): void {
+    ): WalletTransferCompletionResult {
         $reference = $this->bankPayout->makeWalletPayoutReference();
 
         try {
@@ -473,7 +473,7 @@ class WhatsappWalletTransferCompletionService
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
 
-            return;
+            return WalletTransferCompletionResult::failed('Transfer could not be completed.');
         }
 
         $result = $this->bankPayout->sendTransfer($payoutAmount, $bankCode, $bankName, $acct, $beneficiary, $reference);
@@ -485,7 +485,13 @@ class WhatsappWalletTransferCompletionService
                 ->where('whatsapp_wallet_id', $wallet->id)
                 ->first();
             if (! $txn) {
-                Log::error('whatsapp.wallet.payout_txn_missing', ['reference' => $reference]);
+                Log::error('whatsapp.wallet.payout_txn_missing', ['reference' => $reference, 'wallet_id' => $wallet->id]);
+                $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
+                if ($w) {
+                    $w->balance = round((float) $w->balance + $amount, 2);
+                    $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
+                    $w->save();
+                }
 
                 return;
             }
@@ -496,8 +502,7 @@ class WhatsappWalletTransferCompletionService
                 'payout_response_message' => $result['response_message'] ?? null,
             ]);
 
-            $refund = $bucket === MavonPayTransferService::BUCKET_FAILED
-                || $bucket === MavonPayTransferService::BUCKET_PENDING;
+            $refund = $bucket === MavonPayTransferService::BUCKET_FAILED;
 
             if ($refund) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
@@ -509,9 +514,9 @@ class WhatsappWalletTransferCompletionService
                 $meta['reversed_at'] = now()->toIso8601String();
                 $meta['payout_pending'] = false;
                 $meta['payout_failed'] = true;
-                if ($bucket === MavonPayTransferService::BUCKET_PENDING) {
-                    $meta['whatsapp_refund_reason'] = 'provider_pending_not_confirmed';
-                }
+            } elseif ($bucket === MavonPayTransferService::BUCKET_PENDING) {
+                $meta['payout_pending'] = true;
+                $meta['whatsapp_payout_processing'] = true;
             } else {
                 $meta['payout_pending'] = false;
                 $meta['payout_reference'] = $result['reference'] ?? $reference;
@@ -562,25 +567,44 @@ class WhatsappWalletTransferCompletionService
             } elseif ($pin !== '') {
                 $this->client->sendText($instance, $phone, ltrim($pin, "\n\n"));
             }
-        } else {
-            $detail = $bucket === MavonPayTransferService::BUCKET_PENDING
-                ? '*'.$this->waBrand().'* returned *pending* (not a final success). Transfers only complete when the bank confirms — your wallet has been *refunded*.'
-                : ($result['response_message'] ?? 'The bank could not accept this transfer.');
+
+            $this->sendWalletSubmenu($instance, $phone, $wallet);
+
+            return WalletTransferCompletionResult::success((float) $wallet->balance, 'Bank transfer sent.');
+        }
+
+        if ($bucket === MavonPayTransferService::BUCKET_PENDING) {
             $this->client->sendText(
                 $instance,
                 $phone,
-                "⚠️ *Bank transfer not completed*\n\n".
-                "Attempted to: *{$beneficiary}*\n".
+                "⏳ *Bank transfer processing*\n\n".
+                "To: *{$beneficiary}*\n".
                 "{$bankName} / ****{$acctTail} · ₦".number_format($amount, 2)."\n".
                 "*Time:* {$when}\n\n".
-                $detail."\n\n".
-                "Your wallet was *refunded*.\n\n".
-                '💰 Balance now: *₦'.number_format((float) $wallet->balance, 2).'*'.
+                'Your wallet has been *debited*. We are waiting for the bank to confirm — contact support if it stays pending.'.
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
+            $this->sendWalletSubmenu($instance, $phone, $wallet);
+
+            return WalletTransferCompletionResult::success((float) $wallet->balance, 'Bank transfer is processing.');
         }
 
+        $detail = $result['response_message'] ?? 'The bank could not accept this transfer.';
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "⚠️ *Bank transfer not completed*\n\n".
+            "Attempted to: *{$beneficiary}*\n".
+            "{$bankName} / ****{$acctTail} · ₦".number_format($amount, 2)."\n".
+            "*Time:* {$when}\n\n".
+            $detail."\n\n".
+            "Your wallet was *refunded*.\n\n".
+            '💰 Balance now: *₦'.number_format((float) $wallet->balance, 2).'*'.
+            $this->pinDeleteReminderSuffix($userTypedPinInChat)
+        );
         $this->sendWalletSubmenu($instance, $phone, $wallet);
+
+        return WalletTransferCompletionResult::failed('Bank transfer not completed.');
     }
 
     /**
@@ -593,7 +617,7 @@ class WhatsappWalletTransferCompletionService
         WhatsappWallet $wallet,
         array $ctx,
         bool $userTypedPinInChat
-    ): void {
+    ): WalletTransferCompletionResult {
         $recipient = isset($ctx['p2p_recipient_e164']) && is_string($ctx['p2p_recipient_e164'])
             ? $ctx['p2p_recipient_e164']
             : '';
@@ -603,7 +627,7 @@ class WhatsappWalletTransferCompletionService
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
 
-            return;
+            return WalletTransferCompletionResult::failed('Invalid send details.');
         }
 
         $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount, (string) $wallet->phone_e164);
@@ -617,7 +641,7 @@ class WhatsappWalletTransferCompletionService
             );
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
 
-            return;
+            return WalletTransferCompletionResult::failed((string) ($eval['message'] ?? 'This send is not available.'));
         }
 
         $debitAmount = (float) $eval['debit'];
@@ -641,7 +665,7 @@ class WhatsappWalletTransferCompletionService
                     $this->pinDeleteReminderSuffix($userTypedPinInChat)
                 );
 
-                return;
+                return WalletTransferCompletionResult::failed((string) ($hold['message'] ?? 'Send failed.'));
             }
 
             $session->update(['chat_context' => ['step' => 'submenu']]);
@@ -665,7 +689,7 @@ class WhatsappWalletTransferCompletionService
             );
             $this->sendWalletSubmenu($instance, $phone, $wallet);
 
-            return;
+            return WalletTransferCompletionResult::success((float) $wallet->balance, 'Sent — waiting for recipient.');
         }
 
         try {
@@ -753,7 +777,7 @@ class WhatsappWalletTransferCompletionService
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
 
-            return;
+            return WalletTransferCompletionResult::failed('Send failed.');
         }
 
         $sentAt = now();
@@ -826,5 +850,7 @@ class WhatsappWalletTransferCompletionService
             $this->client->sendText($instance, $phone, ltrim($pin, "\n\n"));
         }
         $this->sendWalletSubmenu($instance, $phone, $wallet);
+
+        return WalletTransferCompletionResult::success((float) $wallet->balance, 'Transfer sent.');
     }
 }

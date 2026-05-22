@@ -98,14 +98,18 @@ class MavonPayTransferService
                 $bucket = self::BUCKET_PENDING;
             }
 
+            $looksSuccessful = $this->responseLooksSuccessful($message, $statusFlag);
+
+            // MevonPay often returns pending codes (09/90/99) or omits responseCode while the transfer still succeeds.
+            if ($looksSuccessful && $bucket !== self::BUCKET_SUCCESSFUL) {
+                $bucket = self::BUCKET_SUCCESSFUL;
+                $code = $code !== '' ? $code : '00';
+            }
+
             // MevonPay sometimes omits responseCode on successful transfers but still returns a success message.
-            if ($code === '') {
-                $looksSuccessful = str_contains(strtolower($message), 'transfer successful')
-                    || ($statusFlag === true && str_contains(strtolower($message), 'successful'));
-                if ($looksSuccessful) {
-                    $bucket = self::BUCKET_SUCCESSFUL;
-                    $code = '00';
-                }
+            if ($code === '' && $looksSuccessful) {
+                $bucket = self::BUCKET_SUCCESSFUL;
+                $code = '00';
             }
 
             // Some successful MevonPay transfers return empty body/JSON; treat 2xx + empty payload as success fallback.
@@ -158,6 +162,27 @@ class MavonPayTransferService
                 'http_status' => null,
             ];
         }
+    }
+
+    /**
+     * @param  mixed  $statusFlag
+     */
+    private function responseLooksSuccessful(string $message, mixed $statusFlag): bool
+    {
+        $lower = strtolower(trim($message));
+        if ($lower === '') {
+            return $statusFlag === true;
+        }
+
+        if (str_contains($lower, 'transfer successful') || str_contains($lower, 'successfully')) {
+            return true;
+        }
+
+        if ($statusFlag === true && str_contains($lower, 'successful')) {
+            return true;
+        }
+
+        return false;
     }
 }
 

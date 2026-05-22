@@ -457,13 +457,19 @@ class WhatsappWalletSecureTransferAuthService
         $session = $session->fresh();
         $wallet = $wallet->fresh();
 
-        if ($kind === 'bank') {
-            $this->completion->completeBankTransfer($session, $instance, $phone, $wallet, $execCtx, false);
-        } else {
-            $this->completion->completeP2pTransfer($session, $instance, $phone, $wallet, $execCtx, false);
+        $out = $kind === 'bank'
+            ? $this->completion->completeBankTransfer($session, $instance, $phone, $wallet, $execCtx, false)
+            : $this->completion->completeP2pTransfer($session, $instance, $phone, $wallet, $execCtx, false);
+
+        if (! $out->ok) {
+            return ['ok' => false, 'error' => $out->message !== '' ? $out->message : 'Transfer could not be completed.'];
         }
 
-        return ['ok' => true];
+        return [
+            'ok' => true,
+            'balance_after' => $out->balanceAfter,
+            'message' => $out->message,
+        ];
     }
 
     /**
