@@ -25,7 +25,7 @@ return [
     |
     */
     'wordpress_plugin' => [
-        'version' => '1.2.2',
+        'version' => '1.2.3',
         'zip' => 'downloads/checkoutpay-gateway.zip',
         'requires_wordpress' => '5.8',
         'requires_woocommerce' => '7.0',

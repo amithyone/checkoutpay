@@ -3,7 +3,7 @@
  * Plugin Name:       CheckoutPay Payment Gateway
  * Plugin URI:        https://check-outpay.com/
  * Description:       Accept bank-transfer payments in WooCommerce via CheckoutPay (classic and block checkout).
- * Version:           1.2.2
+ * Version:           1.2.3
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHECKOUTPAY_VERSION', '1.2.2');
+define('CHECKOUTPAY_VERSION', '1.2.3');
 define('CHECKOUTPAY_PORTAL_URL', 'https://check-outpay.com');
 define('CHECKOUTPAY_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CHECKOUTPAY_PLUGIN_URL', plugin_dir_url(__FILE__));

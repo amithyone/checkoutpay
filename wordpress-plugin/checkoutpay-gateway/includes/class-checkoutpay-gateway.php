@@ -692,8 +692,8 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
      * Check payment status
      */
     public function check_payment_status() {
-        $order_id = isset($_GET['order_id']) ? absint($_GET['order_id']) : 0;
-        $nonce = isset($_GET['nonce']) ? sanitize_text_field(wp_unslash($_GET['nonce'])) : '';
+        $order_id = absint(filter_input(INPUT_GET, 'order_id', FILTER_SANITIZE_NUMBER_INT));
+        $nonce = sanitize_text_field((string) filter_input(INPUT_GET, 'nonce', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
 
         $order = $this->verify_thankyou_request($order_id, $nonce);
         if (is_wp_error($order)) {
@@ -745,9 +745,9 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
      * Called via AJAX when customer says they paid a different amount.
      */
     public function update_payment_amount() {
-        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
-        $new_amount = isset($_POST['amount']) ? floatval($_POST['amount']) : 0;
-        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+        $order_id = absint(filter_input(INPUT_POST, 'order_id', FILTER_SANITIZE_NUMBER_INT));
+        $new_amount = (float) filter_input(INPUT_POST, 'amount', FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
+        $nonce = sanitize_text_field((string) filter_input(INPUT_POST, 'nonce', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
 
         if ($new_amount <= 0) {
             wp_send_json_error(array('message' => __('Invalid order or amount.', 'checkoutpay-gateway')));
@@ -854,10 +854,12 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             $status = 'approved';
         }
 
+        // Single order lookup by payment meta (webhook payload is server-to-server).
+        // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value
         $orders = wc_get_orders(array(
+            'limit' => 1,
             'meta_key' => '_checkoutpay_transaction_id',
             'meta_value' => $transaction_id,
-            'limit' => 1,
         ));
 
         if (empty($orders)) {
@@ -885,22 +887,20 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             }
             $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay webhook', 'checkoutpay-gateway'), $transaction_id);
             status_header(200);
-            echo json_encode(array('success' => true));
+            wp_send_json(array('success' => true));
         } elseif ($status === 'rejected' || $status === 'failed' || $event === 'payment.rejected') {
             $reason = isset($data['mismatch_reason']) ? sanitize_text_field($data['mismatch_reason']) : (isset($data['reason']) ? sanitize_text_field($data['reason']) : __('Payment rejected', 'checkoutpay-gateway'));
             $order->update_status('failed', __('Payment rejected via CheckoutPay: ', 'checkoutpay-gateway') . $reason);
             $order->update_meta_data('_checkoutpay_status', 'rejected');
             $order->save();
             status_header(200);
-            echo json_encode(array('success' => true));
+            wp_send_json(array('success' => true));
         } else {
             $order->update_meta_data('_checkoutpay_status', $status);
             $order->save();
             status_header(200);
-            echo json_encode(array('success' => true));
+            wp_send_json(array('success' => true));
         }
-
-        exit;
     }
 
     /**
@@ -945,50 +945,51 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         $status = $order->get_meta('_checkoutpay_status');
 
         if ($order->get_status() === 'processing' || $order->get_status() === 'completed') {
-            echo '<div class="woocommerce-message">' . __('Payment confirmed. Thank you for your order!', 'checkoutpay-gateway') . '</div>';
+            echo '<div class="woocommerce-message">' . esc_html__('Payment confirmed. Thank you for your order!', 'checkoutpay-gateway') . '</div>';
         } else {
             $charges = $order->get_meta('_checkoutpay_charges');
             $original_amount = $order->get_meta('_checkoutpay_original_amount');
-            
+            $display_amount = $original_amount ? $original_amount : $order->get_total();
+
             echo '<div class="woocommerce-info">';
             echo '<p>' . esc_html($this->get_option('instructions')) . '</p>';
-            
+
             if ($transaction_id) {
-                echo '<p><strong>' . __('Transaction ID:', 'checkoutpay-gateway') . '</strong> ' . esc_html($transaction_id) . '</p>';
+                echo '<p><strong>' . esc_html__('Transaction ID:', 'checkoutpay-gateway') . '</strong> ' . esc_html($transaction_id) . '</p>';
             }
-            
+
             if ($account_number && $account_name && $bank_name) {
                 echo '<div class="checkoutpay-account-details" style="margin-top: 15px; padding: 15px; background: #e8f4f8; border-left: 4px solid #0073aa; border-radius: 5px;">';
-                echo '<p><strong>' . __('Payment Instructions:', 'checkoutpay-gateway') . '</strong></p>';
-                echo '<p><strong>' . __('Account Number:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_number) . '</p>';
-                echo '<p><strong>' . __('Account Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_name) . '</p>';
-                echo '<p><strong>' . __('Bank Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($bank_name) . '</p>';
+                echo '<p><strong>' . esc_html__('Payment Instructions:', 'checkoutpay-gateway') . '</strong></p>';
+                echo '<p><strong>' . esc_html__('Account Number:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_number) . '</p>';
+                echo '<p><strong>' . esc_html__('Account Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_name) . '</p>';
+                echo '<p><strong>' . esc_html__('Bank Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($bank_name) . '</p>';
                 echo '</div>';
             }
-            
+
             if ($charges && is_array($charges)) {
                 echo '<div class="checkoutpay-charges-info" style="margin-top: 15px; padding: 15px; background: #f0f0f0; border-radius: 5px;">';
-                echo '<p><strong>' . __('Payment Details:', 'checkoutpay-gateway') . '</strong></p>';
-                echo '<p>' . __('Order Amount:', 'checkoutpay-gateway') . ' ' . wc_price($original_amount ?: $order->get_total()) . '</p>';
+                echo '<p><strong>' . esc_html__('Payment Details:', 'checkoutpay-gateway') . '</strong></p>';
+                echo '<p>' . esc_html__('Order Amount:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($display_amount)) . '</p>';
                 if (isset($charges['total']) && $charges['total'] > 0) {
-                    echo '<p>' . __('Charges:', 'checkoutpay-gateway') . ' ' . wc_price($charges['total']) . '</p>';
+                    echo '<p>' . esc_html__('Charges:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($charges['total'])) . '</p>';
                     if (isset($charges['amount_to_pay'])) {
-                        echo '<p><strong>' . __('Total to Pay:', 'checkoutpay-gateway') . ' ' . wc_price($charges['amount_to_pay']) . '</strong></p>';
+                        echo '<p><strong>' . esc_html__('Total to Pay:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($charges['amount_to_pay'])) . '</strong></p>';
                     } elseif (isset($charges['business_receives'])) {
-                        echo '<p><strong>' . __('You will receive:', 'checkoutpay-gateway') . ' ' . wc_price($charges['business_receives']) . '</strong></p>';
+                        echo '<p><strong>' . esc_html__('You will receive:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($charges['business_receives'])) . '</strong></p>';
                     }
                 }
                 echo '</div>';
             }
-            
-            echo '<p><button type="button" id="checkoutpay-check-status" class="button">' . __('Check Payment Status', 'checkoutpay-gateway') . '</button></p>';
-            
+
+            echo '<p><button type="button" id="checkoutpay-check-status" class="button">' . esc_html__('Check Payment Status', 'checkoutpay-gateway') . '</button></p>';
+
             echo '<div class="checkoutpay-update-amount" style="margin-top: 15px; padding: 15px; background: #fff8e5; border: 1px solid #e5d48a; border-radius: 5px;">';
-            echo '<p><strong>' . __('Paid a different amount?', 'checkoutpay-gateway') . '</strong></p>';
-            echo '<p class="description">' . __('If you transferred a different sum than shown above, enter the actual amount you paid and we will update the transaction and re-check for your payment.', 'checkoutpay-gateway') . '</p>';
-            echo '<p style="margin-bottom: 8px;"><label for="checkoutpay-actual-amount">' . __('Amount paid:', 'checkoutpay-gateway') . ' </label>';
+            echo '<p><strong>' . esc_html__('Paid a different amount?', 'checkoutpay-gateway') . '</strong></p>';
+            echo '<p class="description">' . esc_html__('If you transferred a different sum than shown above, enter the actual amount you paid and we will update the transaction and re-check for your payment.', 'checkoutpay-gateway') . '</p>';
+            echo '<p style="margin-bottom: 8px;"><label for="checkoutpay-actual-amount">' . esc_html__('Amount paid:', 'checkoutpay-gateway') . ' </label>';
             echo '<input type="number" id="checkoutpay-actual-amount" name="checkoutpay_actual_amount" min="0.01" step="0.01" placeholder="0.00" style="width: 120px; padding: 6px;"> ';
-            echo '<button type="button" id="checkoutpay-update-amount-btn" class="button">' . __('Update amount & check status', 'checkoutpay-gateway') . '</button></p>';
+            echo '<button type="button" id="checkoutpay-update-amount-btn" class="button">' . esc_html__('Update amount & check status', 'checkoutpay-gateway') . '</button></p>';
             echo '</div>';
             
             echo '</div>';
@@ -1013,13 +1014,13 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                             if (response.success && response.data.status === 'completed') {
                                 location.reload();
                             } else {
-                                button.prop('disabled', false).text('<?php _e('Check Payment Status', 'checkoutpay-gateway'); ?>');
-                                alert('<?php _e('Payment is still pending. Please check your email for payment instructions.', 'checkoutpay-gateway'); ?>');
+                                button.prop('disabled', false).text('<?php echo esc_js(__('Check Payment Status', 'checkoutpay-gateway')); ?>');
+                                alert('<?php echo esc_js(__('Payment is still pending. Please check your email for payment instructions.', 'checkoutpay-gateway')); ?>');
                             }
                         },
                         error: function() {
-                            button.prop('disabled', false).text('<?php _e('Check Payment Status', 'checkoutpay-gateway'); ?>');
-                            alert('<?php _e('Unable to check payment status. Please try again later.', 'checkoutpay-gateway'); ?>');
+                            button.prop('disabled', false).text('<?php echo esc_js(__('Check Payment Status', 'checkoutpay-gateway')); ?>');
+                            alert('<?php echo esc_js(__('Unable to check payment status. Please try again later.', 'checkoutpay-gateway')); ?>');
                         }
                     });
                 });

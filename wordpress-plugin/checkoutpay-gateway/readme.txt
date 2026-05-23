@@ -2,10 +2,10 @@
 Contributors: checkoutpay
 Tags: woocommerce, payment, payment gateway, bank transfer, nigeria
 Requires at least: 5.8
-Tested up to: 6.7
+Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.2.2
+Stable tag: 1.2.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -102,6 +102,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 
 == Changelog ==
 
+= 1.2.3 =
+* Plugin Check: escaped thank-you page output, filter_input for AJAX params, languages folder, Tested up to 7.0.
+
 = 1.2.2 =
 * WordPress.org readiness: GPL license file, standard readme, external services disclosure, directory index files.
 * Security: nonce verification on thank-you page AJAX (status check and amount update).
@@ -138,6 +141,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.3 =
+Fixes Plugin Check compliance (escaping, Tested up to 7.0, languages folder).
 
 = 1.2.2 =
 Recommended for WordPress.org directory compliance and thank-you page security (nonces).
