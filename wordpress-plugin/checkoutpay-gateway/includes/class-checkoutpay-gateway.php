@@ -855,12 +855,13 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
         }
 
         // Single order lookup by payment meta (webhook payload is server-to-server).
-        // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+        // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value
         $orders = wc_get_orders(array(
             'limit' => 1,
             'meta_key' => '_checkoutpay_transaction_id',
             'meta_value' => $transaction_id,
         ));
+        // phpcs:enable WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 
         if (empty($orders)) {
             status_header(404);

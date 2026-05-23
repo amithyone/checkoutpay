@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.2.3
+Stable tag: 1.2.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -101,6 +101,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * You are responsible for informing customers how payment data is processed under your privacy policy.
 
 == Changelog ==
+
+= 1.2.4 =
+* Plugin Check: phpcs disable block for webhook order meta lookup (slow query warnings).
 
 = 1.2.3 =
 * Plugin Check: escaped thank-you page output, filter_input for AJAX params, languages folder, Tested up to 7.0.
