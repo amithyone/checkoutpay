@@ -48,4 +48,12 @@ class CheckoutPayWordPressPlugin
     {
         return 'Version '.static::version().' | Requires '.static::requirementsLabel();
     }
+
+    /**
+     * Public plugin documentation page (Plugin URI for WordPress.org headers).
+     */
+    public static function pageUrl(): string
+    {
+        return rtrim((string) config('app.url'), '/').'/wordpress-plugin';
+    }
 }

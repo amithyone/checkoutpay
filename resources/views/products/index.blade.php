@@ -130,9 +130,14 @@
                             <span>Compatible with {{ \App\Support\CheckoutPayWordPressPlugin::requirementsLabel() }}</span>
                         </li>
                     </ul>
-                    <x-checkoutpay-plugin-download :icon="false" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Download Plugin <i class="fas fa-arrow-right ml-2"></i>
-                    </x-checkoutpay-plugin-download>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <a href="{{ route('wordpress-plugin.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
+                            Plugin page <i class="fas fa-arrow-right ml-2"></i>
+                        </a>
+                        <x-checkoutpay-plugin-download :icon="false" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
+                            Download <i class="fas fa-download ml-2"></i>
+                        </x-checkoutpay-plugin-download>
+                    </div>
                 </div>
             </div>
         </div>

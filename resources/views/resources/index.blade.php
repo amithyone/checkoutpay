@@ -147,7 +147,7 @@
                     </div>
                     <h3 class="text-lg font-bold text-gray-900 mb-2">WordPress Plugin</h3>
                     <p class="text-gray-600 text-sm mb-4">Install our WooCommerce plugin and start accepting payments in minutes.</p>
-                    <a href="{{ route('products.index') }}#wordpress-plugin" class="text-primary hover:text-primary/80 text-sm font-medium">
+                    <a href="{{ route('wordpress-plugin.index') }}" class="text-primary hover:text-primary/80 text-sm font-medium">
                         View Guide <i class="fas fa-arrow-right ml-1"></i>
                     </a>
                 </div>
@@ -174,7 +174,7 @@
                     <p class="text-gray-700 mb-4">Seamlessly integrate CheckoutPay with your WooCommerce store. One-click installation with automatic charge calculation.</p>
                     <div class="flex flex-col sm:flex-row gap-3">
                         <x-checkoutpay-plugin-download label="Download" class="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium" />
-                        <a href="{{ route('products.index') }}#wordpress-plugin" class="inline-flex items-center justify-center px-4 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-medium">
+                        <a href="{{ route('wordpress-plugin.index') }}" class="inline-flex items-center justify-center px-4 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-medium">
                             Documentation
                         </a>
                     </div>

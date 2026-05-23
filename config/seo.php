@@ -22,6 +22,7 @@ return [
         '/products',
         '/products/invoices',
         '/about-us',
+        '/wordpress-plugin',
         '/developers',
         '/developers/program',
         '/api-docs',

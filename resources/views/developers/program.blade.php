@@ -321,7 +321,7 @@
                         Where do I get API keys and documentation?
                         <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
                     </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Start at the <a href="{{ route('developers.index') }}" class="text-primary font-medium hover:underline">Developer hub</a> and <a href="{{ route('business.api-documentation.index') }}" class="text-primary font-medium hover:underline">API documentation</a>. Product downloads and plugin details are linked from <a href="{{ route('products.index') }}#wordpress-plugin" class="text-primary font-medium hover:underline">Products</a>.</p>
+                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Start at the <a href="{{ route('developers.index') }}" class="text-primary font-medium hover:underline">Developer hub</a> and <a href="{{ route('business.api-documentation.index') }}" class="text-primary font-medium hover:underline">API documentation</a>. Product downloads and plugin details are on the <a href="{{ route('wordpress-plugin.index') }}" class="text-primary font-medium hover:underline">WordPress plugin page</a>.</p>
                 </details>
             </div>
         </section>

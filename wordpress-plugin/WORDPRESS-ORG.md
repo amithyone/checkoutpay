@@ -32,7 +32,7 @@ Use when submitting at [Add your plugin](https://wordpress.org/plugins/developer
 |-------|------|
 | **Plugin name** | CheckoutPay – Bank Transfer Gateway for WooCommerce |
 | **Short description** | Official CheckoutPay extension for WooCommerce: Nigerian bank-transfer checkout with virtual account details, webhooks, and automatic order updates. |
-| **Plugin URL** | https://check-outpay.com/ |
+| **Plugin URL** | https://check-outpay.com/wordpress-plugin |
 | **Author** | CheckoutPay |
 | **Support** | https://check-outpay.com/support |
 | **Notes to reviewer** | Official CheckoutPay plugin from the service operator at check-outpay.com. Submitted by WordPress.org user **amithyone** with verified email **notify@check-outpay.com**. WooCommerce payment gateway; merchants configure their own API key. No data is sent until API URL and key are saved. No “powered by” links on the storefront. |

@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.2.5
+Stable tag: 1.2.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -139,6 +139,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 
 == Changelog ==
 
+= 1.2.6 =
+* Plugin URI points to https://check-outpay.com/wordpress-plugin (distinct from Author URI).
+
 = 1.2.5 =
 * WordPress.org: brand-first display name, contributor amithyone, expanded description and installation guide, INSTALLATION.md.
 
@@ -167,6 +170,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.6 =
+Plugin URI updated for WordPress.org (dedicated plugin page).
 
 = 1.2.5 =
 Updated display name and documentation for WordPress.org directory submission.

@@ -103,6 +103,7 @@ Route::get('/fraud-awareness', function () {
     return view('page', compact('page'));
 })->name('fraud-awareness');
 Route::get('/resources', [\App\Http\Controllers\ResourcesController::class, 'index'])->name('resources.index');
+Route::get('/wordpress-plugin', [\App\Http\Controllers\WordPressPluginController::class, 'index'])->name('wordpress-plugin.index');
 Route::get('/developers', [\App\Http\Controllers\DevelopersController::class, 'index'])->name('developers.index');
 Route::get('/developers/program/apply/thanks', [\App\Http\Controllers\DevelopersController::class, 'applyThanks'])->name('developers.program.apply.thanks');
 Route::get('/developers/program/apply', [\App\Http\Controllers\DevelopersController::class, 'apply'])->name('developers.program.apply');

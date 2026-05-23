@@ -89,7 +89,7 @@
                 <div class="mt-6 sm:mt-8 flex flex-col items-center">
                     <div class="inline-flex items-center bg-white border border-gray-200 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 shadow-sm hover:shadow-md transition-shadow">
                         <i class="fab fa-wordpress text-gray-600 text-lg sm:text-xl mr-2 sm:mr-3"></i>
-                        <span class="text-xs sm:text-sm text-gray-700 font-medium mr-2 sm:mr-3">WordPress Plugin</span>
+                        <a href="{{ route('wordpress-plugin.index') }}" class="text-xs sm:text-sm text-gray-700 font-medium mr-2 sm:mr-3 hover:text-purple-700">WordPress Plugin</a>
                         <x-checkoutpay-plugin-download :icon="false" class="text-gray-600 hover:text-gray-700 font-medium text-xs sm:text-sm flex items-center">
                             Download
                             <i class="fas fa-arrow-right ml-1.5 text-xs"></i>
@@ -321,6 +321,9 @@
                         </div>
                         <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
                             <x-checkoutpay-plugin-download label="Download" :icon="false" class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-base sm:text-lg transition-colors shadow-lg" />
+                            <a href="{{ route('wordpress-plugin.index') }}" class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 border-2 border-purple-300 rounded-lg hover:bg-purple-50 font-medium text-base sm:text-lg transition-colors">
+                                Plugin details
+                            </a>
                             <a href="{{ route('business.register') }}" class="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-purple-600 border-2 border-purple-300 rounded-lg hover:bg-purple-50 font-medium text-base sm:text-lg transition-colors">
                                 Get API Key
                             </a>
