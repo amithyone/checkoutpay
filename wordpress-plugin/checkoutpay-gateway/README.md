@@ -134,8 +134,12 @@ checkoutpay-gateway/
 
 ## Support
 
-For support, please contact CheckoutPay support or visit https://checkoutpay.com
+For support, visit [https://check-outpay.com/](https://check-outpay.com/).
+
+## WordPress.org
+
+See [../WORDPRESS-ORG.md](../WORDPRESS-ORG.md) for directory submission steps and compliance notes.
 
 ## License
 
-GPL v2 or later
+GPL-2.0-or-later — see [LICENSE.txt](LICENSE.txt).

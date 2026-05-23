@@ -1,17 +1,20 @@
 <?php
 /**
- * Plugin Name: CheckoutPay Payment Gateway
- * Plugin URI: https://check-outpay.com/
- * Description: Accept bank-transfer payments via CheckoutPay in WooCommerce (classic and block checkout).
- * Version: 1.2.1
- * Author: CheckoutPay
- * Author URI: https://check-outpay.com/
- * Text Domain: checkoutpay-gateway
- * Domain Path: /languages
+ * Plugin Name:       CheckoutPay Payment Gateway
+ * Plugin URI:        https://check-outpay.com/
+ * Description:       Accept bank-transfer payments in WooCommerce via CheckoutPay (classic and block checkout).
+ * Version:           1.2.2
  * Requires at least: 5.8
- * Requires PHP: 7.4
+ * Requires PHP:      7.4
+ * Requires Plugins:  woocommerce
+ * Author:            CheckoutPay
+ * Author URI:        https://check-outpay.com/
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       checkoutpay-gateway
+ * Domain Path:        /languages
  * WC requires at least: 7.0
- * WC tested up to: 9.6
+ * WC tested up to:      9.6
  *
  * @package CheckoutPay
  */
@@ -20,11 +23,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHECKOUTPAY_VERSION', '1.2.1');
+define('CHECKOUTPAY_VERSION', '1.2.2');
 define('CHECKOUTPAY_PORTAL_URL', 'https://check-outpay.com');
 define('CHECKOUTPAY_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CHECKOUTPAY_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('CHECKOUTPAY_PLUGIN_FILE', __FILE__);
+define('CHECKOUTPAY_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 /**
  * Declare compatibility with WooCommerce features (HPOS, block checkout).
@@ -57,6 +61,25 @@ function checkoutpay_woocommerce_missing_notice()
     </div>
     <?php
 }
+
+/**
+ * Plugin action links (Settings only — admin screen).
+ *
+ * @param array<string> $links Existing links.
+ * @return array<string>
+ */
+function checkoutpay_plugin_action_links($links)
+{
+    if (!checkoutpay_is_woocommerce_active()) {
+        return $links;
+    }
+
+    $settings_url = admin_url('admin.php?page=wc-settings&tab=checkout&section=checkoutpay');
+    $settings_link = '<a href="' . esc_url($settings_url) . '">' . esc_html__('Settings', 'checkoutpay-gateway') . '</a>';
+
+    return array_merge(array($settings_link), $links);
+}
+add_filter('plugin_action_links_' . CHECKOUTPAY_PLUGIN_BASENAME, 'checkoutpay_plugin_action_links');
 
 add_action('admin_notices', function () {
     if (!checkoutpay_is_woocommerce_active()) {
@@ -107,12 +130,13 @@ function checkoutpay_init_gateway()
 add_action('plugins_loaded', 'checkoutpay_init_gateway', 20);
 
 /**
- * @param array $gateways
- * @return array
+ * @param array<int, string> $gateways Gateway class names.
+ * @return array<int, string>
  */
 function checkoutpay_add_gateway($gateways)
 {
     $gateways[] = 'WC_CheckoutPay_Gateway';
+
     return $gateways;
 }
 
@@ -145,6 +169,15 @@ add_action('woocommerce_blocks_loaded', 'checkoutpay_init_blocks_support');
  */
 function checkoutpay_activate()
 {
+    if (!checkoutpay_is_woocommerce_active()) {
+        deactivate_plugins(CHECKOUTPAY_PLUGIN_BASENAME);
+        wp_die(
+            esc_html__('CheckoutPay Payment Gateway requires WooCommerce. Please install and activate WooCommerce first.', 'checkoutpay-gateway'),
+            esc_html__('Plugin Activation Error', 'checkoutpay-gateway'),
+            array('back_link' => true)
+        );
+    }
+
     flush_rewrite_rules();
 }
 register_activation_hook(__FILE__, 'checkoutpay_activate');

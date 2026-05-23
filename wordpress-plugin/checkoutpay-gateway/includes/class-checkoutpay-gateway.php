@@ -651,20 +651,53 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
     }
 
     /**
+     * Nonce action for thank-you page AJAX (status check / amount update).
+     *
+     * @param int $order_id Order ID.
+     * @return string
+     */
+    private function thankyou_nonce_action($order_id) {
+        return 'checkoutpay_thankyou_' . absint($order_id);
+    }
+
+    /**
+     * Verify thank-you page request nonce and that the order uses CheckoutPay.
+     *
+     * @param int    $order_id Order ID.
+     * @param string $nonce    Nonce value.
+     * @return WC_Order|WP_Error
+     */
+    private function verify_thankyou_request($order_id, $nonce) {
+        if ($order_id < 1) {
+            return new WP_Error('invalid_order', __('Invalid order ID.', 'checkoutpay-gateway'));
+        }
+
+        if (!wp_verify_nonce($nonce, $this->thankyou_nonce_action($order_id))) {
+            return new WP_Error('invalid_nonce', __('Security check failed. Please refresh the page and try again.', 'checkoutpay-gateway'));
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return new WP_Error('order_not_found', __('Order not found.', 'checkoutpay-gateway'));
+        }
+
+        if ($order->get_payment_method() !== $this->id) {
+            return new WP_Error('invalid_gateway', __('Invalid payment method for this order.', 'checkoutpay-gateway'));
+        }
+
+        return $order;
+    }
+
+    /**
      * Check payment status
      */
     public function check_payment_status() {
         $order_id = isset($_GET['order_id']) ? absint($_GET['order_id']) : 0;
+        $nonce = isset($_GET['nonce']) ? sanitize_text_field(wp_unslash($_GET['nonce'])) : '';
 
-        if (!$order_id) {
-            wp_send_json_error(array('message' => 'Invalid order ID'));
-            return;
-        }
-
-        $order = wc_get_order($order_id);
-
-        if (!$order) {
-            wp_send_json_error(array('message' => 'Order not found'));
+        $order = $this->verify_thankyou_request($order_id, $nonce);
+        if (is_wp_error($order)) {
+            wp_send_json_error(array('message' => $order->get_error_message()));
             return;
         }
 
@@ -714,15 +747,16 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
     public function update_payment_amount() {
         $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
         $new_amount = isset($_POST['amount']) ? floatval($_POST['amount']) : 0;
+        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
 
-        if (!$order_id || $new_amount <= 0) {
+        if ($new_amount <= 0) {
             wp_send_json_error(array('message' => __('Invalid order or amount.', 'checkoutpay-gateway')));
             return;
         }
 
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_send_json_error(array('message' => __('Order not found.', 'checkoutpay-gateway')));
+        $order = $this->verify_thankyou_request($order_id, $nonce);
+        if (is_wp_error($order)) {
+            wp_send_json_error(array('message' => $order->get_error_message()));
             return;
         }
 
@@ -958,18 +992,22 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             echo '</div>';
             
             echo '</div>';
+            $thankyou_nonce = wp_create_nonce($this->thankyou_nonce_action($order_id));
             ?>
             <script>
             jQuery(document).ready(function($) {
+                var checkoutpayNonce = <?php echo wp_json_encode($thankyou_nonce); ?>;
+
                 $('#checkoutpay-check-status').on('click', function() {
                     var button = $(this);
-                    button.prop('disabled', true).text('<?php _e('Checking...', 'checkoutpay-gateway'); ?>');
+                    button.prop('disabled', true).text('<?php echo esc_js(__('Checking...', 'checkoutpay-gateway')); ?>');
                     
                     $.ajax({
                         url: '<?php echo esc_url(add_query_arg('wc-api', 'wc_checkoutpay_gateway', home_url('/'))); ?>',
                         type: 'GET',
                         data: {
-                            order_id: <?php echo $order_id; ?>
+                            order_id: <?php echo (int) $order_id; ?>,
+                            nonce: checkoutpayNonce
                         },
                         success: function(response) {
                             if (response.success && response.data.status === 'completed') {
@@ -999,8 +1037,9 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
                     url: '<?php echo esc_url(add_query_arg('wc-api', 'wc_checkoutpay_update_amount', home_url('/'))); ?>',
                     type: 'POST',
                     data: {
-                        order_id: <?php echo $order_id; ?>,
-                        amount: amount
+                        order_id: <?php echo (int) $order_id; ?>,
+                        amount: amount,
+                        nonce: checkoutpayNonce
                     },
                     success: function(response) {
                         if (response.success) {
