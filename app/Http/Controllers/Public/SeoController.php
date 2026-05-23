@@ -69,6 +69,7 @@ class SeoController extends Controller
 ## What we do
 - Payment gateway for Nigerian merchants (bank transfer matching, virtual accounts, webhooks)
 - Transparent low fees (see /pricing)
+- WhatsApp Wallet (send money on WhatsApp): {$base}/whatsapp-wallet
 - WooCommerce plugin for WordPress stores: {$base}/wordpress-plugin
 - WhatsApp wallet and CheckoutNow mobile app for consumers
 - Business payouts, invoices, memberships, tickets, and developer APIs
@@ -83,6 +84,7 @@ class SeoController extends Controller
 - Home: {$base}/
 - Pricing: {$base}/pricing
 - Products: {$base}/products
+- WhatsApp Wallet: {$base}/whatsapp-wallet
 - WordPress plugin: {$base}/wordpress-plugin
 - Developers: {$base}/developers
 - API docs: {$base}/api-docs

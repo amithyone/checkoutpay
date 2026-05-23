@@ -85,8 +85,27 @@
                     </a>
                 </div>
                 
+                <!-- WhatsApp Wallet — flagship -->
+                <div class="mt-6 sm:mt-8 w-full max-w-xl mx-auto">
+                    <a href="{{ route('whatsapp-wallet.index') }}" class="block bg-gradient-to-r from-green-600 to-green-500 text-white rounded-2xl px-5 py-4 sm:px-6 sm:py-5 shadow-lg hover:shadow-xl transition-shadow text-left group">
+                        <div class="flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                                <i class="fab fa-whatsapp text-2xl"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-green-100 mb-1">Flagship</p>
+                                <p class="text-lg sm:text-xl font-bold leading-snug">WhatsApp Wallet — send money to anyone</p>
+                                <p class="text-sm text-green-50 mt-1 opacity-95">Bank accounts, WhatsApp-to-WhatsApp, airtime &amp; more — from the app you already use.</p>
+                                <span class="inline-flex items-center mt-3 text-sm font-semibold text-white group-hover:underline">
+                                    Learn more <i class="fas fa-arrow-right ml-2 text-xs"></i>
+                                </span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+
                 <!-- WordPress Plugin Badge -->
-                <div class="mt-6 sm:mt-8 flex flex-col items-center">
+                <div class="mt-4 sm:mt-6 flex flex-col items-center">
                     <div class="inline-flex items-center bg-white border border-gray-200 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 shadow-sm hover:shadow-md transition-shadow">
                         <i class="fab fa-wordpress text-gray-600 text-lg sm:text-xl mr-2 sm:mr-3"></i>
                         <a href="{{ route('wordpress-plugin.index') }}" class="text-xs sm:text-sm text-gray-700 font-medium mr-2 sm:mr-3 hover:text-purple-700">WordPress Plugin</a>

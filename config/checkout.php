@@ -31,4 +31,16 @@ return [
         'requires_woocommerce' => '7.0',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Wallet (public marketing)
+    |--------------------------------------------------------------------------
+    |
+    | contact_url: optional https://wa.me/234... for "Chat on WhatsApp" CTAs.
+    |
+    */
+    'whatsapp_wallet' => [
+        'contact_url' => env('WHATSAPP_WALLET_CONTACT_URL', ''),
+    ],
+
 ];

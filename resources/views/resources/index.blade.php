@@ -141,6 +141,16 @@
                         View Guide <i class="fas fa-arrow-right ml-1"></i>
                     </a>
                 </div>
+                <div id="whatsapp-wallet" class="bg-white rounded-lg p-6 shadow-sm border border-green-200">
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fab fa-whatsapp text-green-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">WhatsApp Wallet</h3>
+                    <p class="text-gray-600 text-sm mb-4">Send money to any bank or WhatsApp contact — P2P, airtime, and merchant pay links.</p>
+                    <a href="{{ route('whatsapp-wallet.index') }}" class="text-primary hover:text-primary/80 text-sm font-medium">
+                        Learn more <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
                 <div id="wordpress" class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                     <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
                         <i class="fab fa-wordpress text-purple-600 text-xl"></i>

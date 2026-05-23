@@ -75,11 +75,12 @@
                     <h3 class="font-bold text-gray-900">Checkout demo</h3>
                     <p class="text-sm text-gray-600 mt-2">See the customer payment experience.</p>
                 </a>
-                <div class="bg-primary/5 rounded-xl border border-primary/20 p-6">
+                <a href="{{ route('whatsapp-wallet.index') }}" class="block bg-green-50 rounded-xl border border-green-200 p-6 hover:border-green-400 transition">
                     <i class="fab fa-whatsapp text-green-600 text-2xl mb-3"></i>
-                    <h3 class="font-bold text-gray-900">WhatsApp wallet</h3>
-                    <p class="text-sm text-gray-600 mt-2">Support chats link to your WhatsApp wallet. Approved refunds can be credited there and transferred to any Nigerian bank.</p>
-                </div>
+                    <h3 class="font-bold text-gray-900">WhatsApp Wallet</h3>
+                    <p class="text-sm text-gray-600 mt-2">Send money on WhatsApp or to any bank. Support refunds may credit your wallet — transfer out to any Nigerian bank.</p>
+                    <span class="inline-flex items-center mt-3 text-sm font-medium text-green-700">Full guide <i class="fas fa-arrow-right ml-1 text-xs"></i></span>
+                </a>
             </div>
         </div>
     </section>

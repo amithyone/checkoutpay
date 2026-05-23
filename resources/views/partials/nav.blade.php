@@ -31,10 +31,13 @@
             </div>
             <div class="hidden md:flex items-center space-x-3">
                 <div class="relative group">
-                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('products.*') || request()->routeIs('rentals.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') || request()->routeIs('charity.*') ? 'text-primary border-b-2 border-primary' : '' }}">
+                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('products.*') || request()->routeIs('whatsapp-wallet.*') || request()->routeIs('rentals.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') || request()->routeIs('charity.*') ? 'text-primary border-b-2 border-primary' : '' }}">
                         Products <i class="fas fa-chevron-down ml-1 text-xs"></i>
                     </a>
-                    <div class="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div class="absolute left-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                        <a href="{{ route('whatsapp-wallet.index') }}" class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50 font-semibold border-b border-gray-100">
+                            <i class="fab fa-whatsapp mr-2"></i>WhatsApp Wallet
+                        </a>
                         <a href="{{ route('products.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Products</a>
                         <a href="{{ route('products.invoices') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Invoices</a>
                         <a href="{{ route('rentals.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Rentals</a>
@@ -100,6 +103,7 @@
         <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 mt-2 relative z-[60] bg-white" role="menu" aria-label="Mobile navigation">
             <div class="pt-3 pb-4 px-2">
                 <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                    <a href="{{ route('whatsapp-wallet.index') }}" class="text-green-700 hover:text-green-800 hover:bg-green-50 px-2.5 py-2 rounded-lg font-semibold">WhatsApp Wallet</a>
                     <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Products</a>
                     <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Pricing</a>
                     <a href="{{ route('products.invoices') }}" class="text-gray-700 hover:text-primary hover:bg-gray-50 px-2.5 py-2 rounded-lg font-medium">Invoices</a>

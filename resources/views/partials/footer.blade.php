@@ -9,6 +9,7 @@
             <div>
                 <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Products</h4>
                 <ul class="space-y-2 text-xs sm:text-sm">
+                    <li><a href="{{ route('whatsapp-wallet.index') }}" class="hover:text-white transition-colors font-semibold text-green-300">WhatsApp Wallet</a></li>
                     <li><a href="{{ route('products.index') }}" class="hover:text-white transition-colors">Products</a></li>
                     <li><a href="{{ route('products.invoices') }}" class="hover:text-white transition-colors">Invoices</a></li>
                     <li><a href="{{ route('rentals.index') }}" class="hover:text-white transition-colors">Rentals</a></li>
