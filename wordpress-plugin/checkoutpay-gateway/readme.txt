@@ -1,74 +1,111 @@
-=== CheckoutPay Payment Gateway ===
-Contributors: checkoutpay
-Tags: woocommerce, payment, payment gateway, bank transfer, nigeria
+=== CheckoutPay – Bank Transfer Gateway for WooCommerce ===
+Contributors: amithyone
+Tags: woocommerce, payment, payment gateway, bank transfer, nigeria, checkoutpay
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.2.4
+Stable tag: 1.2.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Accept bank-transfer payments in WooCommerce via CheckoutPay — virtual account details, webhooks, and order status updates.
+Official CheckoutPay extension for WooCommerce: Nigerian bank-transfer checkout with virtual account details, webhooks, and automatic order updates.
 
 == Description ==
 
-**CheckoutPay Payment Gateway** adds a WooCommerce payment method for Nigerian bank-transfer checkout. When a customer places an order, the plugin creates a payment request on your CheckoutPay business account and shows transfer instructions on the order thank-you page. Orders update automatically when CheckoutPay confirms the transfer (webhook or manual status check).
+**CheckoutPay – Bank Transfer Gateway for WooCommerce** is the official extension that connects your WooCommerce store to [CheckoutPay](https://check-outpay.com/) for Nigerian bank-transfer payments.
 
-**Requirements**
+= How it works =
+
+1. Your customer selects **CheckoutPay** at checkout and places the order.
+2. The plugin creates a payment request on your CheckoutPay business account and shows **bank transfer instructions** on the order thank-you page (account number, bank name, amount).
+3. When CheckoutPay confirms the incoming transfer, the order updates automatically via **webhook**, or the customer can use **Check payment status** on the thank-you page.
+
+= Who it is for =
+
+Store owners in Nigeria who want reliable bank-transfer checkout with virtual account details, fee transparency, and automatic order status updates — without custom code.
+
+= Requirements =
 
 * WordPress 5.8 or later
 * WooCommerce 7.0 or later
-* A [CheckoutPay](https://check-outpay.com/) merchant account with an API key and approved website
+* A [CheckoutPay](https://check-outpay.com/) merchant account with an API key and an approved website URL
 
-**Features**
+= Features =
 
-* WooCommerce classic checkout and Cart/Checkout blocks
-* High-Performance Order Storage (HPOS) compatible
+* WooCommerce **classic checkout** and **Cart/Checkout blocks**
+* **HPOS** (High-Performance Order Storage) compatible
 * Virtual account / bank details on the thank-you page
-* Webhook endpoint for automatic order status updates
-* Optional “mark order completed” when payment is approved
-* Thank-you page: check payment status and correct paid amount
-* Test mode toggle for development
-* Admin settings: webhook URL copy, website URL, live fee preview from CheckoutPay
+* **Webhook** endpoint for automatic order status updates
+* Optional **mark order completed** when payment is approved
+* Thank-you page: check payment status and correct paid amount if the customer transferred a different sum
+* **Test mode** for development
+* Admin settings: copy webhook URL and website URL, live **fee preview** from CheckoutPay
 
-This plugin does **not** add “powered by” links or promotional banners on your storefront. Links to CheckoutPay appear only in the WordPress admin settings screen (where you configure API credentials).
+This plugin does **not** add “powered by” links or promotional banners on your storefront. Links to CheckoutPay appear only in the WordPress **admin** settings screen where you configure API credentials.
+
+= Ownership =
+
+Developed and maintained by **CheckoutPay** ([check-outpay.com](https://check-outpay.com/)). This plugin integrates with WooCommerce as a payment method; it is not affiliated with WooCommerce or Automattic beyond that standard integration.
 
 == Installation ==
 
-1. Upload the `checkoutpay-gateway` folder to `/wp-content/plugins/` or install the ZIP from Plugins → Add New.
-2. Activate the plugin through the **Plugins** screen in WordPress.
-3. Install and activate **WooCommerce** if it is not already active.
-4. Go to **WooCommerce → Settings → Payments**, enable **CheckoutPay**, and open **Manage**.
-5. Enter your **API URL** (e.g. `https://check-outpay.com/api/v1`) and **API Key** from your CheckoutPay dashboard.
-6. In CheckoutPay, register your store URL and webhook URL (shown in the plugin settings).
-7. Save changes and place a test order.
+= Phase 1 — Install in WordPress =
+
+1. Upload the `checkoutpay-gateway` folder to `/wp-content/plugins/`, or install the plugin ZIP via **Plugins → Add New → Upload Plugin**.
+2. **Activate** the plugin through the **Plugins** screen. WooCommerce must be installed and active (the plugin will not activate without it).
+3. Go to **WooCommerce → Settings → Payments**, find **CheckoutPay**, toggle **Enable**, then click **Manage**.
+
+= Phase 2 — Configure CheckoutPay =
+
+1. Sign up or log in at [CheckoutPay](https://check-outpay.com/).
+2. In your CheckoutPay dashboard, create or copy your **API key** (Settings / API).
+3. In WooCommerce **CheckoutPay** settings, set:
+   * **API URL:** `https://check-outpay.com/api/v1`
+   * **API Key:** your key from CheckoutPay
+4. Copy the **Website URL** shown in the plugin settings and register the same URL in CheckoutPay under **Dashboard → Websites**.
+5. Copy the **Webhook URL** from the plugin settings (format: `https://your-store.com/?wc-api=wc_checkoutpay_webhook`) and paste it into CheckoutPay for that website.
+6. Click **Refresh charges** in the gateway settings to confirm the API connection and view your fee rules.
+7. Enable **Test mode** if you are testing; use test credentials from CheckoutPay.
+
+= Phase 3 — Test and go live =
+
+1. Place a **test order** on your store and select CheckoutPay at checkout.
+2. On the thank-you page, confirm bank details are shown.
+3. Complete or simulate payment in CheckoutPay; confirm the order moves to **Processing** or **Completed** (depending on your settings).
+4. Disable **Test mode** when ready for live sales.
+
+For a longer guide with troubleshooting, see `INSTALLATION.md` in the plugin folder or the [CheckoutPay support](https://check-outpay.com/support) page.
 
 == Frequently Asked Questions ==
 
 = Where do I get an API key? =
 
-Sign up at [CheckoutPay](https://check-outpay.com/), complete business setup, then create an API key under your dashboard settings.
+Sign up at [CheckoutPay](https://check-outpay.com/), complete business setup, then create an API key in your CheckoutPay dashboard under API / Settings.
 
 = What is the webhook URL? =
 
-The plugin displays your webhook URL on the CheckoutPay payment settings screen. It looks like:
+The plugin shows your webhook URL on the CheckoutPay payment settings screen. It looks like:
 
 `https://your-store.com/?wc-api=wc_checkoutpay_webhook`
 
-Paste the same URL into your CheckoutPay business website settings.
+Paste the exact URL into CheckoutPay under **Dashboard → Websites** for your store domain.
 
 = Does this work with WooCommerce blocks checkout? =
 
-Yes. The plugin registers support for Cart/Checkout blocks as well as classic checkout.
+Yes. The plugin supports Cart/Checkout blocks as well as classic checkout.
 
 = Does the plugin work without WooCommerce? =
 
-No. WooCommerce must be installed and active. The plugin will not activate without WooCommerce.
+No. WooCommerce must be installed and active.
 
 = Is test mode supported? =
 
 Yes. Enable **Test mode** in the gateway settings and use test API credentials from CheckoutPay.
+
+= Why is CheckoutPay missing at checkout? =
+
+Ensure the gateway is **enabled**, and that **API URL** and **API Key** are both saved. An admin warning appears if the gateway is enabled but credentials are missing.
 
 == Screenshots ==
 
@@ -97,10 +134,13 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 
 **Terms and privacy**
 
-* CheckoutPay terms and privacy: https://check-outpay.com/
-* You are responsible for informing customers how payment data is processed under your privacy policy.
+* CheckoutPay: https://check-outpay.com/
+* You are responsible for informing customers how payment data is processed under your store privacy policy.
 
 == Changelog ==
+
+= 1.2.5 =
+* WordPress.org: brand-first display name, contributor amithyone, expanded description and installation guide, INSTALLATION.md.
 
 = 1.2.4 =
 * Plugin Check: phpcs disable block for webhook order meta lookup (slow query warnings).
@@ -112,47 +152,24 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * WordPress.org readiness: GPL license file, standard readme, external services disclosure, directory index files.
 * Security: nonce verification on thank-you page AJAX (status check and amount update).
 * Activation requires WooCommerce; uninstall removes gateway settings option.
-* Plugin headers: Requires Plugins (woocommerce), License GPL-2.0-or-later.
 
 = 1.2.1 =
-* Fixed: CheckoutPay site URL (https://check-outpay.com) shown in plugin settings with link to dashboard website settings.
-* Fixed: API dashboard_websites_url now points to /dashboard/websites (was an invalid /business/websites path).
+* Fixed: CheckoutPay site URL shown in plugin settings with link to dashboard website settings.
 
 = 1.2.0 =
 * New: Auto-complete orders option when CheckoutPay payment is approved.
-* New: Charges panel in settings (loads live fee rules from GET /api/v1/integration/charge-settings).
-* New: Split payment notice — configure installments in CheckoutPay dashboard, not in WooCommerce plugin.
-
-= 1.1.1 =
-* New: Webhook URL and website URL shown on WooCommerce CheckoutPay settings with one-click copy (for CheckoutPay business website setup).
+* New: Charges panel in settings (loads live fee rules from CheckoutPay API).
 
 = 1.1.0 =
-* Fixed: CheckoutPay now appears on WooCommerce block-based checkout (Cart/Checkout blocks).
-* Fixed: Gateway loads after WooCommerce payment classes are available (avoids silent registration failure).
-* Fixed: Thank-you page JavaScript syntax error for payment status buttons.
-* New: HPOS and block checkout compatibility declarations for WooCommerce 8+.
-* New: Optional developer program partner Business ID setting.
-* New: Sends website_url on payment-request for website matching.
-* Improved: Admin warning when the gateway is enabled but API URL or API Key is missing.
-
-= 1.0.1 =
-* Fixed: Check payment status now uses transaction_id and GET /api/v1/payment/{transactionId}.
-* Fixed: Webhook handler accepts API payload (event, transaction_id, status).
-* New: “Paid a different amount?” on the thank-you page with amount-correction API.
+* Fixed: CheckoutPay on WooCommerce block checkout; HPOS and block compatibility.
 
 = 1.0.0 =
 * Initial release.
 
 == Upgrade Notice ==
 
-= 1.2.3 =
-Fixes Plugin Check compliance (escaping, Tested up to 7.0, languages folder).
+= 1.2.5 =
+Updated display name and documentation for WordPress.org directory submission.
 
-= 1.2.2 =
-Recommended for WordPress.org directory compliance and thank-you page security (nonces).
-
-= 1.2.0 =
-Adds auto-complete orders and a charges preview synced from your CheckoutPay website settings.
-
-= 1.1.0 =
-Required if CheckoutPay does not show on checkout (especially with WooCommerce block checkout).
+= 1.2.4 =
+Fixes Plugin Check slow meta query warnings on webhook lookup.

@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       CheckoutPay Payment Gateway
+ * Plugin Name:       CheckoutPay – Bank Transfer Gateway for WooCommerce
  * Plugin URI:        https://check-outpay.com/
- * Description:       Accept bank-transfer payments in WooCommerce via CheckoutPay (classic and block checkout).
- * Version:           1.2.4
+ * Description:       Official CheckoutPay extension for WooCommerce: Nigerian bank-transfer checkout with virtual account details, webhooks, and automatic order updates.
+ * Version:           1.2.5
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHECKOUTPAY_VERSION', '1.2.4');
+define('CHECKOUTPAY_VERSION', '1.2.5');
 define('CHECKOUTPAY_PORTAL_URL', 'https://check-outpay.com');
 define('CHECKOUTPAY_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CHECKOUTPAY_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -57,7 +57,7 @@ function checkoutpay_woocommerce_missing_notice()
 {
     ?>
     <div class="notice notice-error">
-        <p><?php esc_html_e('CheckoutPay Payment Gateway requires WooCommerce to be installed and active.', 'checkoutpay-gateway'); ?></p>
+        <p><?php esc_html_e('CheckoutPay – Bank Transfer Gateway for WooCommerce requires WooCommerce to be installed and active.', 'checkoutpay-gateway'); ?></p>
     </div>
     <?php
 }
@@ -172,7 +172,7 @@ function checkoutpay_activate()
     if (!checkoutpay_is_woocommerce_active()) {
         deactivate_plugins(CHECKOUTPAY_PLUGIN_BASENAME);
         wp_die(
-            esc_html__('CheckoutPay Payment Gateway requires WooCommerce. Please install and activate WooCommerce first.', 'checkoutpay-gateway'),
+            esc_html__('CheckoutPay – Bank Transfer Gateway for WooCommerce requires WooCommerce. Please install and activate WooCommerce first.', 'checkoutpay-gateway'),
             esc_html__('Plugin Activation Error', 'checkoutpay-gateway'),
             array('back_link' => true)
         );

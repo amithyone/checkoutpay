@@ -1,4 +1,4 @@
-# CheckoutPay Payment Gateway for WooCommerce
+# CheckoutPay – Bank Transfer Gateway for WooCommerce
 
 A WordPress plugin that integrates CheckoutPay payment gateway with WooCommerce, allowing store owners to accept payments through email-based payment verification.
 

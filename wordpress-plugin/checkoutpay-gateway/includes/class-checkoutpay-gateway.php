@@ -1,6 +1,6 @@
 <?php
 /**
- * CheckoutPay Payment Gateway
+ * CheckoutPay – Bank Transfer Gateway for WooCommerce
  *
  * @package CheckoutPay
  */
@@ -61,7 +61,7 @@ class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
             'enabled' => array(
                 'title' => __('Enable/Disable', 'checkoutpay-gateway'),
                 'type' => 'checkbox',
-                'label' => __('Enable CheckoutPay Payment Gateway', 'checkoutpay-gateway'),
+                'label' => __('Enable CheckoutPay', 'checkoutpay-gateway'),
                 'default' => 'no'
             ),
             'title' => array(
