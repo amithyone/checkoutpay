@@ -1,10 +1,15 @@
 @extends('layouts.admin')
 
-@section('title', 'MevonPay audit')
-@section('page-title', 'MevonPay audit & reconciliation')
+@section('title', 'Mevon Pay audit')
+@section('page-title', 'Mevon Pay audit')
 
 @section('content')
 <div class="space-y-6">
+    <nav class="text-sm text-gray-500">
+        <a href="{{ route('admin.audits.index') }}" class="text-indigo-600 hover:underline">Audits</a>
+        <span class="mx-1">/</span>
+        <span class="text-gray-700">Mevon Pay</span>
+    </nav>
     <form method="get" class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm flex flex-wrap gap-3 items-end">
         <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">From</label>
@@ -36,7 +41,7 @@
             </select>
         </div>
         <button type="submit" class="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium">Apply</button>
-        <a href="{{ route('admin.mevonpay-audit.export', request()->query()) }}" class="px-4 py-2 border border-gray-300 rounded-md text-sm">Export CSV</a>
+        <a href="{{ route('admin.audits.mevonpay.export', request()->query()) }}" class="px-4 py-2 border border-gray-300 rounded-md text-sm">Export CSV</a>
     </form>
 
     @php $r = $report; @endphp

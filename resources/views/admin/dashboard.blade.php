@@ -448,7 +448,7 @@
                         MevonPay live balances
                     </h3>
                     <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot from MevonPay API (refreshed on each dashboard load).
-                        <a href="{{ route('admin.mevonpay-audit.index') }}" class="text-indigo-600 hover:underline ml-1">Open fee audit &amp; reconciliation</a>
+                        <a href="{{ route('admin.audits.index') }}" class="text-indigo-600 hover:underline ml-1">Open audits</a>
                     </p>
                 </div>
                 @if(($mevonBalance['fetched_at'] ?? null))

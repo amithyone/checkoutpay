@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\Admin\AdminSidebarMenu;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Notifications\ChannelManager;
 use App\Notifications\Channels\TelegramChannel;
@@ -30,6 +32,14 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->registerSqlQueryFirewall();
+
+        View::composer('layouts.admin', function ($view): void {
+            $admin = auth('admin')->user();
+            $view->with(
+                'adminSidebarMenu',
+                $admin ? app(AdminSidebarMenu::class)->itemsFor($admin) : []
+            );
+        });
 
         // Warm up critical caches on application boot (for fast server)
         // This ensures caches are populated immediately, reducing first-request latency

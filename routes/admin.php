@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminSidebarMenuController;
+use App\Http\Controllers\Admin\AuditsController;
 use App\Http\Controllers\Admin\MevonPayAuditController;
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
@@ -29,6 +31,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Protected admin routes (tax-role admins use NigTax /admin only)
     Route::middleware(['auth:admin', 'tax_admin_redirect'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::put('sidebar-menu-order', [AdminSidebarMenuController::class, 'update'])->name('sidebar-menu-order.update');
+        Route::delete('sidebar-menu-order', [AdminSidebarMenuController::class, 'reset'])->name('sidebar-menu-order.reset');
         Route::post('/extract-missing-names', [DashboardController::class, 'extractMissingNames'])->name('extract-missing-names');
         Route::post('/test-sender-extraction', [DashboardController::class, 'testSenderExtraction'])->name('test-sender-extraction');
 
@@ -223,6 +227,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('transaction-logs', [\App\Http\Controllers\Admin\TransactionLogController::class, 'index'])->name('transaction-logs.index');
         Route::get('transaction-logs/{transactionId}', [\App\Http\Controllers\Admin\TransactionLogController::class, 'show'])->name('transaction-logs.show');
 
+        // Payment provider audits (Admin/Super Admin only)
+        Route::middleware('admin_or_super')->group(function () {
+            Route::get('audits', [AuditsController::class, 'index'])->name('audits.index');
+            Route::get('audits/mevonpay', [MevonPayAuditController::class, 'index'])->name('audits.mevonpay.index');
+            Route::get('audits/mevonpay/export', [MevonPayAuditController::class, 'exportCsv'])->name('audits.mevonpay.export');
+            Route::redirect('mevonpay-audit', '/admin/audits/mevonpay')->name('mevonpay-audit.index');
+            Route::get('mevonpay-audit/export', fn () => redirect()->route('admin.audits.mevonpay.export', request()->query()));
+        });
+
         // Test Transaction (Live Testing)
         Route::get('test-transaction', [\App\Http\Controllers\Admin\TestTransactionController::class, 'index'])->name('test-transaction.index');
         Route::post('test-transaction/create', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createPayment'])->name('test-transaction.create');
@@ -244,9 +257,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('whatsapp-wallet', [WhatsappWalletAdminController::class, 'index'])->name('whatsapp-wallet.index');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
-
-            Route::get('mevonpay-audit', [MevonPayAuditController::class, 'index'])->name('mevonpay-audit.index');
-            Route::get('mevonpay-audit/export', [MevonPayAuditController::class, 'exportCsv'])->name('mevonpay-audit.export');
 
             Route::get('virtual-cards', [VirtualCardAdminController::class, 'index'])->name('virtual-cards.index');
             Route::get('virtual-cards/{virtualCardRequest}', [VirtualCardAdminController::class, 'show'])->name('virtual-cards.show');

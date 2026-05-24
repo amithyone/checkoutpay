@@ -36,6 +36,17 @@
                 transform: translateX(0);
             }
         }
+        #admin-sidebar-menu.sidebar-editing .sidebar-drag-handle {
+            display: inline-block !important;
+        }
+        #admin-sidebar-menu.sidebar-editing .sidebar-menu-link {
+            cursor: default;
+        }
+        #admin-sidebar-menu .sortable-ghost {
+            opacity: 0.45;
+            background: #eef2ff;
+            border-radius: 0.5rem;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -75,233 +86,10 @@
                 </button>
             </div>
 
-            <!-- Navigation -->
-            <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-                <a href="{{ route('admin.dashboard') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.dashboard') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-chart-line w-5 mr-3"></i>
-                    <span>Dashboard</span>
-                </a>
-
-                <a href="{{ route('admin.processed-emails.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.processed-emails.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-inbox w-5 mr-3"></i>
-                    <span>Inbox</span>
-                </a>
-
-                @if(auth('admin')->user()->canManageEmailAccounts())
-                <a href="{{ route('admin.email-accounts.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.email-accounts.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-envelope w-5 mr-3"></i>
-                    <span>Email Accounts</span>
-                </a>
-                @endif
-
-                @if(auth('admin')->user()->canManageAccountNumbers())
-                <a href="{{ route('admin.account-numbers.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.account-numbers.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-credit-card w-5 mr-3"></i>
-                    <span>Account Numbers</span>
-                </a>
-                <a href="{{ route('admin.external-apis.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.external-apis.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-plug w-5 mr-3"></i>
-                    <span>External APIs</span>
-                </a>
-                @endif
-
-                <a href="{{ route('admin.businesses.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.businesses.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-building w-5 mr-3"></i>
-                    <span>Businesses</span>
-                </a>
-
-                <a href="{{ route('admin.businesses-kyc.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.businesses-kyc.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-id-card w-5 mr-3"></i>
-                    <span>Business KYC</span>
-                </a>
-
-                <a href="{{ route('admin.overdraft-applications.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.overdraft-applications.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-file-invoice-dollar w-5 mr-3"></i>
-                    <span>Overdraft queue</span>
-                </a>
-
-                <a href="{{ route('admin.developer-program.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.developer-program.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-handshake w-5 mr-3"></i>
-                    <span>Developer program</span>
-                </a>
-
-                @if(auth('admin')->user()->isSuperAdmin())
-                <a href="{{ route('admin.peer-lending.offers.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.peer-lending.offers.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-hand-holding-usd w-5 mr-3"></i>
-                    <span>Peer lending offers</span>
-                </a>
-                <a href="{{ route('admin.peer-lending.loans.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.peer-lending.loans.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-money-check-alt w-5 mr-3"></i>
-                    <span>Peer loan queue</span>
-                </a>
-                <a href="{{ route('admin.desktop-telemetry.events.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.desktop-telemetry.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-laptop-code w-5 mr-3"></i>
-                    <span>Desktop DRM</span>
-                </a>
-                @endif
-
-                <a href="{{ route('admin.payments.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.payments.*') && !request()->routeIs('admin.payments.needs-review') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-money-bill-wave w-5 mr-3"></i>
-                    <span>Payments</span>
-                </a>
-
-                <a href="{{ route('admin.payments.needs-review') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.payments.needs-review') ? 'bg-red-50 text-red-700 border-l-4 border-red-600' : '' }}">
-                    <i class="fas fa-exclamation-triangle w-5 mr-3"></i>
-                    <span>Needs Review</span>
-                    @php
-                        $needsReviewCount = \App\Models\Payment::withCount('statusChecks')
-                        ->where('status', \App\Models\Payment::STATUS_PENDING)
-                        ->where(function ($q) {
-                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                        })
-                        ->having('status_checks_count', '>=', 3)
-                        ->count();
-                    @endphp
-                    @if($needsReviewCount > 0)
-                        <span class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">{{ $needsReviewCount }}</span>
-                    @endif
-                </a>
-
-                <a href="{{ route('admin.invoices.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.invoices.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-file-invoice w-5 mr-3"></i>
-                    <span>Invoices</span>
-                </a>
-
-                <a href="{{ route('admin.charity.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.charity.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-hand-holding-heart w-5 mr-3"></i>
-                    <span>Go Fund</span>
-                </a>
-
-                <a href="{{ route('admin.rentals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.rentals.*') || request()->routeIs('admin.rental-categories.*') || request()->routeIs('admin.rental-items.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-camera w-5 mr-3"></i>
-                    <span>Rentals</span>
-                </a>
-                <a href="{{ route('admin.memberships.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.memberships.*') || request()->routeIs('admin.membership-categories.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-id-card w-5 mr-3"></i>
-                    <span>Memberships</span>
-                </a>
-
-                <a href="{{ route('admin.withdrawals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.withdrawals.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-hand-holding-usd w-5 mr-3"></i>
-                    <span>Withdrawals</span>
-                </a>
-
-                @if(auth('admin')->user()->canManageSettings())
-                <a href="{{ route('admin.virtual-cards.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.virtual-cards.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-credit-card w-5 mr-3 text-indigo-600"></i>
-                    <span>Card Management</span>
-                    @php
-                        $pendingCardRequests = \App\Models\VirtualCardRequest::whereIn('status', [
-                            \App\Models\VirtualCardRequest::STATUS_PENDING,
-                            \App\Models\VirtualCardRequest::STATUS_SUBMITTED,
-                        ])->count();
-                    @endphp
-                    @if($pendingCardRequests > 0)
-                        <span class="ml-auto bg-indigo-500 text-white text-xs rounded-full px-2 py-0.5">{{ $pendingCardRequests }}</span>
-                    @endif
-                </a>
-                @endif
-
-                <a href="{{ route('admin.renters.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.renters.index') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-users w-5 mr-3"></i>
-                    <span>Rental users</span>
-                </a>
-
-                <a href="{{ route('admin.renters-kyc.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.renters-kyc.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-id-card w-5 mr-3"></i>
-                    <span>Renters KYC</span>
-                    @php
-                        $pendingRenterKycCount = \App\Models\Renter::query()
-                            ->whereNotNull('kyc_id_card_path')
-                            ->where(function ($q) {
-                                $q->whereNull('kyc_id_status')->orWhere('kyc_id_status', 'pending');
-                            })
-                            ->count();
-                    @endphp
-                    @if($pendingRenterKycCount > 0)
-                        <span class="ml-auto bg-yellow-500 text-white text-xs rounded-full px-2 py-0.5">{{ $pendingRenterKycCount }}</span>
-                    @endif
-                </a>
-
-                <a href="{{ route('admin.transaction-logs.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.transaction-logs.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-history w-5 mr-3"></i>
-                    <span>Transaction Logs</span>
-                </a>
-
-                <a href="{{ route('admin.tickets.events.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.tickets.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-ticket-alt w-5 mr-3"></i>
-                    <span>Tickets</span>
-                </a>
-                <a href="{{ route('admin.tickets.scanner') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.tickets.scanner*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-qrcode w-5 mr-3"></i>
-                    <span>QR Scanner</span>
-                </a>
-
-                <a href="{{ route('admin.test-transaction.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.test-transaction.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-flask w-5 mr-3"></i>
-                    <span>Test Transaction</span>
-                </a>
-
-                <a href="{{ route('admin.bank-email-templates.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.bank-email-templates.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-university w-5 mr-3"></i>
-                    <span>Bank Templates</span>
-                </a>
-
-                <a href="{{ route('admin.match-attempts.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.match-attempts.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-search-dollar w-5 mr-3"></i>
-                    <span>Match Logs</span>
-                </a>
-
-                @if(auth('admin')->user()->canManageSettings())
-                <a href="{{ route('admin.whitelisted-emails.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.whitelisted-emails.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-shield-alt w-5 mr-3"></i>
-                    <span>Whitelisted Emails</span>
-                </a>
-                @endif
-
-                @if(auth('admin')->user()->canManageSettings())
-                <a href="{{ route('admin.pages.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.pages.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-file-alt w-5 mr-3"></i>
-                    <span>Pages</span>
-                </a>
-                @endif
-
-                @if(auth('admin')->user()->canManageSupportTickets())
-                <a href="{{ route('admin.support.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.support.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-comments w-5 mr-3"></i>
-                    <span>Support Tickets</span>
-                    @php
-                        $openTickets = \App\Models\SupportTicket::where('status', \App\Models\SupportTicket::STATUS_OPEN)->count();
-                    @endphp
-                    @if($openTickets > 0)
-                        <span class="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-0.5">{{ $openTickets }}</span>
-                    @endif
-                </a>
-                @endif
-
-                @if(auth('admin')->user()->canManageSettings())
-                <a href="{{ route('admin.whatsapp-wallet.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.whatsapp-wallet.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fab fa-whatsapp w-5 mr-3 text-green-600"></i>
-                    <span>WhatsApp wallet</span>
-                </a>
-                <a href="{{ route('admin.settings.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.settings.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-cog w-5 mr-3"></i>
-                    <span>Settings</span>
-                </a>
-                
-                <a href="{{ route('admin.email-templates.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.email-templates.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-envelope-open-text w-5 mr-3"></i>
-                    <span>Email Templates</span>
-                </a>
-                @endif
-
-                @if(auth('admin')->user()->canManageAdmins())
-                <a href="{{ route('admin.staff.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('admin.staff.*') ? 'bg-primary/10 text-primary' : '' }}">
-                    <i class="fas fa-users-cog w-5 mr-3"></i>
-                    <span>Staff Management</span>
-                </a>
-                @endif
-            </nav>
+            <!-- Navigation (order customizable per admin) -->
+            <div class="flex flex-col flex-1 min-h-0">
+                @include('admin.partials.sidebar-menu')
+            </div>
 
             <!-- User Section -->
             <div class="p-4 border-t border-gray-200">
@@ -464,6 +252,128 @@
                 }
             }
         });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script>
+        (function () {
+            const menu = document.getElementById('admin-sidebar-menu');
+            const toggleBtn = document.getElementById('sidebar-toggle-edit');
+            const saveBtn = document.getElementById('sidebar-save-order');
+            const resetBtn = document.getElementById('sidebar-reset-order');
+            const cancelBtn = document.getElementById('sidebar-cancel-edit');
+            const editActions = document.getElementById('sidebar-edit-actions');
+            const editHint = document.getElementById('sidebar-edit-hint');
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+            if (!menu || !toggleBtn || typeof Sortable === 'undefined') {
+                return;
+            }
+
+            let sortable = null;
+            let initialOrder = [];
+
+            function collectOrder() {
+                return Array.from(menu.querySelectorAll('.admin-sidebar-item[data-menu-key]'))
+                    .map(function (li) { return li.getAttribute('data-menu-key'); });
+            }
+
+            function restoreOrder(order) {
+                const nodes = {};
+                menu.querySelectorAll('.admin-sidebar-item').forEach(function (li) {
+                    nodes[li.getAttribute('data-menu-key')] = li;
+                });
+                order.forEach(function (key) {
+                    if (nodes[key]) {
+                        menu.appendChild(nodes[key]);
+                    }
+                });
+            }
+
+            function enterEditMode() {
+                initialOrder = collectOrder();
+                menu.classList.add('sidebar-editing');
+                editActions.classList.remove('hidden');
+                editActions.classList.add('flex');
+                editHint.classList.remove('hidden');
+                toggleBtn.classList.add('hidden');
+                sortable = Sortable.create(menu, {
+                    animation: 150,
+                    handle: '.sidebar-drag-handle',
+                    draggable: '.admin-sidebar-item',
+                    ghostClass: 'sortable-ghost',
+                });
+            }
+
+            function exitEditMode() {
+                menu.classList.remove('sidebar-editing');
+                editActions.classList.add('hidden');
+                editActions.classList.remove('flex');
+                editHint.classList.add('hidden');
+                toggleBtn.classList.remove('hidden');
+                if (sortable) {
+                    sortable.destroy();
+                    sortable = null;
+                }
+            }
+
+            toggleBtn.addEventListener('click', enterEditMode);
+
+            cancelBtn?.addEventListener('click', function () {
+                restoreOrder(initialOrder);
+                exitEditMode();
+            });
+
+            saveBtn?.addEventListener('click', function () {
+                saveBtn.disabled = true;
+                fetch('{{ route('admin.sidebar-menu-order.update') }}', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify({ order: collectOrder() }),
+                })
+                    .then(function (res) {
+                        if (!res.ok) {
+                            throw new Error('Save failed');
+                        }
+                        return res.json();
+                    })
+                    .then(function () {
+                        exitEditMode();
+                        saveBtn.disabled = false;
+                    })
+                    .catch(function () {
+                        alert('Could not save menu order. Please try again.');
+                        saveBtn.disabled = false;
+                    });
+            });
+
+            resetBtn?.addEventListener('click', function () {
+                if (!confirm('Reset sidebar menu to the default order?')) {
+                    return;
+                }
+                resetBtn.disabled = true;
+                fetch('{{ route('admin.sidebar-menu-order.reset') }}', {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                })
+                    .then(function (res) {
+                        if (!res.ok) {
+                            throw new Error('Reset failed');
+                        }
+                        window.location.reload();
+                    })
+                    .catch(function () {
+                        alert('Could not reset menu order.');
+                        resetBtn.disabled = false;
+                    });
+            });
+        })();
     </script>
     @include('partials.admin-support-sound')
     @stack('scripts')

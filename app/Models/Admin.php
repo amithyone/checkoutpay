@@ -18,6 +18,7 @@ class Admin extends Authenticatable
         'password',
         'role',
         'is_active',
+        'sidebar_menu_order',
     ];
 
     protected $hidden = [
@@ -29,6 +30,7 @@ class Admin extends Authenticatable
         'email_verified_at' => 'datetime',
         'is_active' => 'boolean',
         'password' => 'hashed',
+        'sidebar_menu_order' => 'array',
     ];
 
     const ROLE_SUPER_ADMIN = 'super_admin';
