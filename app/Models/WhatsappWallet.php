@@ -32,6 +32,7 @@ class WhatsappWallet extends Model
         'sender_name',
         'kyc_verified_at',
         'mevon_virtual_account_number',
+        'mevon_account_name',
         'mevon_bank_name',
         'mevon_bank_code',
         'mevon_reference',
@@ -117,6 +118,22 @@ class WhatsappWallet extends Model
     public function isTier2(): bool
     {
         return (int) $this->tier >= self::TIER_RUBIES_VA;
+    }
+
+    public function mevonDebitAccountName(): string
+    {
+        $stored = trim((string) $this->mevon_account_name);
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        return (string) ($this->displayName() ?? 'Wallet User');
+    }
+
+    public function canUseMevonPayoutApi(): bool
+    {
+        return $this->isTier2()
+            && trim((string) $this->mevon_virtual_account_number) !== '';
     }
 
     /**

@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Events\PaymentApproved;
 use App\Models\Business;
 use App\Models\Payment;
+use App\Models\MevonPayLedgerEntry;
 use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
+use App\Services\MevonPay\MevonPayLedgerRecorder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -151,6 +153,14 @@ class BusinessRubiesFundingWebhookService
         if ($payload !== []) {
             MevonPayInboundWebhookRecorder::attach($payment, $payload, 'business_rubies_va', $request);
         }
+        app(MevonPayLedgerRecorder::class)->recordInbound(
+            MevonPayLedgerEntry::FLOW_BUSINESS_RUBIES_VA,
+            $amount,
+            $reference !== '' ? $reference : null,
+            (string) $payment->account_number,
+            $payment,
+            ['payment_id' => $payment->id, 'business_id' => $business->id],
+        );
         $payment->load(['business.websites', 'website']);
         event(new PaymentApproved($payment));
 

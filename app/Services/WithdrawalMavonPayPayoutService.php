@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Bank;
+use App\Models\MevonPayLedgerEntry;
+use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Models\Business;
 use App\Models\WithdrawalRequest;
 use Illuminate\Support\Str;
@@ -14,7 +16,8 @@ use Illuminate\Support\Str;
 class WithdrawalMavonPayPayoutService
 {
     public function __construct(
-        protected MavonPayTransferService $mavon
+        protected MavonPayTransferService $mavon,
+        protected MevonPayLedgerRecorder $ledger,
     ) {}
 
     public function isMavonConfigured(): bool
@@ -107,6 +110,17 @@ class WithdrawalMavonPayPayoutService
             $update['processed_at'] = now();
         }
         $withdrawal->update($update);
+
+        $this->ledger->recordOutbound(
+            MevonPayLedgerEntry::FLOW_BUSINESS_WITHDRAWAL,
+            (float) $withdrawal->amount,
+            $reference,
+            MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER,
+            $bucket,
+            (string) config('services.mevonpay.debit_account_number', ''),
+            $withdrawal,
+            ['business_id' => $business->id, 'withdrawal_id' => $withdrawal->id, 'response_code' => $result['response_code'] ?? null],
+        );
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
             $business->decrement('balance', $withdrawal->amount);

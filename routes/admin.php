@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\MevonPayAuditController;
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
 use App\Http\Controllers\Admin\BusinessController;
@@ -243,6 +244,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('whatsapp-wallet', [WhatsappWalletAdminController::class, 'index'])->name('whatsapp-wallet.index');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
+
+            Route::get('mevonpay-audit', [MevonPayAuditController::class, 'index'])->name('mevonpay-audit.index');
+            Route::get('mevonpay-audit/export', [MevonPayAuditController::class, 'exportCsv'])->name('mevonpay-audit.export');
 
             Route::get('virtual-cards', [VirtualCardAdminController::class, 'index'])->name('virtual-cards.index');
             Route::get('virtual-cards/{virtualCardRequest}', [VirtualCardAdminController::class, 'show'])->name('virtual-cards.show');

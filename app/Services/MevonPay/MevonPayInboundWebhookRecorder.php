@@ -31,9 +31,14 @@ final class MevonPayInboundWebhookRecorder
      */
     public static function ledgerMetaFromPayload(array $payload, float $reportedAmount, array $extra = []): array
     {
+        $feeCalc = new MevonPayFeeCalculator;
+        $inboundFee = $feeCalc->inboundFee($reportedAmount);
+
         $meta = array_merge([
             'source' => 'mevonpay_funding',
             'reported_amount' => $reportedAmount,
+            'mevon_reported_gross' => $reportedAmount,
+            'mevon_inbound_fee' => $inboundFee,
         ], $extra);
 
         $sender = trim((string) data_get($payload, 'data.sender', ''));

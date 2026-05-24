@@ -6,7 +6,9 @@ use App\Events\PaymentApproved;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\BusinessRubiesFundingWebhookService;
+use App\Models\MevonPayLedgerEntry;
 use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
+use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -151,6 +153,14 @@ class MevonPayWebhookController extends Controller
 
         $payment->refresh();
         MevonPayInboundWebhookRecorder::attach($payment, $payload, 'processed', $request);
+        app(MevonPayLedgerRecorder::class)->recordInbound(
+            MevonPayLedgerEntry::FLOW_MERCHANT_CHECKOUT,
+            $amount,
+            $reference !== '' ? $reference : null,
+            $accountNumber,
+            $payment,
+            ['payment_id' => $payment->id, 'business_id' => $payment->business_id],
+        );
         $payment->load(['business.websites', 'website']);
         event(new PaymentApproved($payment));
         $this->recordWebhookSource($request, 'processed');

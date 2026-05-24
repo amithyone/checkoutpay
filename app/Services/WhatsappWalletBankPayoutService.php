@@ -3,10 +3,15 @@
 namespace App\Services;
 
 use App\Models\Bank;
+use App\Models\MevonPayLedgerEntry;
+use App\Models\WhatsappWallet;
+use App\Models\WhatsappWalletTransaction;
+use App\Services\MevonPay\MevonPayLedgerRecorder;
+use App\Services\MevonPay\MevonPayPayoutService;
 use Illuminate\Support\Str;
 
 /**
- * Resolve Nigerian banks, name-enquiry, and send MavonPay createtransfer for WhatsApp wallet bank payouts.
+ * Resolve Nigerian banks, name-enquiry, and send MavonPay createtransfer or /V1/payout for WhatsApp wallet bank payouts.
  */
 class WhatsappWalletBankPayoutService
 {
@@ -14,8 +19,10 @@ class WhatsappWalletBankPayoutService
 
     public function __construct(
         private MavonPayTransferService $mavon,
+        private MevonPayPayoutService $payout,
         private MevonPayBankService $bankService,
         private NubanValidationService $nuban,
+        private MevonPayLedgerRecorder $ledger,
     ) {}
 
     public function isConfigured(): bool
@@ -358,7 +365,7 @@ class WhatsappWalletBankPayoutService
     }
 
     /**
-     * @return array{bucket: string, response_code: ?string, response_message: ?string, reference: ?string, raw: mixed}
+     * @return array{bucket: string, response_code: ?string, response_message: ?string, reference: ?string, raw: mixed, payout_api?: string}
      */
     public function sendTransfer(
         float $amount,
@@ -366,13 +373,33 @@ class WhatsappWalletBankPayoutService
         string $bankName,
         string $accountNumber,
         string $accountName,
-        string $reference
+        string $reference,
+        ?WhatsappWallet $wallet = null,
+        ?int $walletTransactionId = null,
     ): array {
         $bankCode = NigerianBankCodeNormalizer::toNipTransferCode($bankCode);
 
+        if ($wallet !== null && $wallet->canUseMevonPayoutApi()) {
+            $result = $this->payout->createPayout([
+                'amount' => $amount,
+                'bankCode' => $bankCode,
+                'bankName' => $bankName,
+                'creditAccountName' => $accountName,
+                'creditAccountNumber' => $accountNumber,
+                'debitAccountNumber' => (string) $wallet->mevon_virtual_account_number,
+                'debitAccountName' => $wallet->mevonDebitAccountName(),
+                'narration' => 'WhatsApp wallet bank transfer',
+                'reference' => $reference,
+            ]);
+            $result['payout_api'] = MevonPayLedgerEntry::PAYOUT_API_PAYOUT;
+            $this->recordOutboundLedger($result, $amount, $reference, $wallet, $walletTransactionId);
+
+            return $result;
+        }
+
         $sessionId = 'WAW'.now()->format('YmdHis').Str::upper(Str::random(4));
 
-        return $this->mavon->createTransfer([
+        $result = $this->mavon->createTransfer([
             'amount' => $amount,
             'bankCode' => $bankCode,
             'bankName' => $bankName,
@@ -382,6 +409,36 @@ class WhatsappWalletBankPayoutService
             'reference' => $reference,
             'sessionId' => $sessionId,
         ]);
+        $result['payout_api'] = MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER;
+        $this->recordOutboundLedger($result, $amount, $reference, $wallet, $walletTransactionId);
+
+        return $result;
+    }
+
+    /**
+     * @param  array{bucket: string, response_code?: ?string, payout_api?: string}  $result
+     */
+    private function recordOutboundLedger(
+        array $result,
+        float $amount,
+        string $reference,
+        ?WhatsappWallet $wallet,
+        ?int $walletTransactionId,
+    ): void {
+        $source = $walletTransactionId !== null
+            ? WhatsappWalletTransaction::query()->find($walletTransactionId)
+            : null;
+
+        $this->ledger->recordOutbound(
+            MevonPayLedgerEntry::FLOW_WHATSAPP_BANK_TRANSFER,
+            $amount,
+            $reference,
+            (string) ($result['payout_api'] ?? MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER),
+            (string) ($result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED),
+            $wallet?->mevon_virtual_account_number,
+            $source,
+            ['whatsapp_wallet_id' => $wallet?->id, 'response_code' => $result['response_code'] ?? null],
+        );
     }
 
     public function makeWalletPayoutReference(): string

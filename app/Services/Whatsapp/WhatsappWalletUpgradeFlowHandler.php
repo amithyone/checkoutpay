@@ -546,6 +546,7 @@ class WhatsappWalletUpgradeFlowHandler
             'kyc_email' => (string) ($ctx['email'] ?? ''),
             'kyc_verified_at' => now(),
             'mevon_virtual_account_number' => $va['account_number'],
+            'mevon_account_name' => trim((string) ($va['account_name'] ?? '')) ?: null,
             'mevon_bank_name' => $va['bank_name'],
             'mevon_bank_code' => $va['bank_code'],
             'mevon_reference' => $va['reference'] !== '' ? $va['reference'] : $wallet->mevon_reference,

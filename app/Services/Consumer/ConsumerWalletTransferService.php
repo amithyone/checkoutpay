@@ -293,7 +293,22 @@ class ConsumerWalletTransferService
             return ['ok' => false, 'message' => 'Could not complete transfer. Check balance and limits.'];
         }
 
-        $result = $this->bankPayout->sendTransfer($payoutAmount, $bankCode, $bankName, $acct, $beneficiaryName, $reference);
+        $walletFresh = $wallet->fresh();
+        $txnRow = WhatsappWalletTransaction::query()
+            ->where('external_reference', $reference)
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->first();
+
+        $result = $this->bankPayout->sendTransfer(
+            $payoutAmount,
+            $bankCode,
+            $bankName,
+            $acct,
+            $beneficiaryName,
+            $reference,
+            $walletFresh,
+            $txnRow?->id,
+        );
         $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
         DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result) {

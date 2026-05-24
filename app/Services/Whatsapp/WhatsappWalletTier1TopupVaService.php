@@ -6,7 +6,9 @@ use App\Models\Payment;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
+use App\Models\MevonPayLedgerEntry;
 use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
+use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\MevonPayVirtualAccountService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -224,7 +226,7 @@ class WhatsappWalletTier1TopupVaService
                 $wallet->save();
 
                 $payerName = trim((string) ($webhookMeta['sender'] ?? ''));
-                WhatsappWalletTransaction::query()->create([
+                $txn = WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $wallet->id,
                     'type' => WhatsappWalletTransaction::TYPE_TOPUP,
                     'amount' => $credited,
@@ -235,6 +237,15 @@ class WhatsappWalletTier1TopupVaService
                         'pending_topup_id' => $pending->id,
                     ]),
                 ]);
+
+                app(MevonPayLedgerRecorder::class)->recordInbound(
+                    MevonPayLedgerEntry::FLOW_WHATSAPP_TOPUP,
+                    $amount,
+                    $reference !== '' ? $reference : null,
+                    $accountNumber,
+                    $txn,
+                    ['whatsapp_wallet_id' => $wallet->id, 'tier' => 1, 'amount_credited' => $credited],
+                );
 
                 $notify = [
                     'wallet_id' => (int) $wallet->id,
@@ -324,7 +335,7 @@ class WhatsappWalletTier1TopupVaService
                 $wallet->save();
 
                 $payerName = trim((string) ($webhookMeta['sender'] ?? ''));
-                WhatsappWalletTransaction::query()->create([
+                $txn = WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $wallet->id,
                     'type' => WhatsappWalletTransaction::TYPE_TOPUP,
                     'amount' => $credited,
@@ -335,6 +346,15 @@ class WhatsappWalletTier1TopupVaService
                         'permanent_va' => true,
                     ]),
                 ]);
+
+                app(MevonPayLedgerRecorder::class)->recordInbound(
+                    MevonPayLedgerEntry::FLOW_WHATSAPP_TOPUP,
+                    $amount,
+                    $reference !== '' ? $reference : null,
+                    $accountNumber,
+                    $txn,
+                    ['whatsapp_wallet_id' => $wallet->id, 'tier' => 2, 'amount_credited' => $credited],
+                );
 
                 $notify = [
                     'wallet_id' => (int) $wallet->id,

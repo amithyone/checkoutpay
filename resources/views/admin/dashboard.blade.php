@@ -447,7 +447,9 @@
                         <i class="fas fa-wallet text-indigo-600 mr-2"></i>
                         MevonPay live balances
                     </h3>
-                    <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot from MevonPay API (refreshed on each dashboard load).</p>
+                    <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot from MevonPay API (refreshed on each dashboard load).
+                        <a href="{{ route('admin.mevonpay-audit.index') }}" class="text-indigo-600 hover:underline ml-1">Open fee audit &amp; reconciliation</a>
+                    </p>
                 </div>
                 @if(($mevonBalance['fetched_at'] ?? null))
                     <span class="text-xs text-gray-500">
