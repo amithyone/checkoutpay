@@ -13,7 +13,10 @@ use Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodTyp
 
 /**
  * Registers CheckoutPay on block-based checkout pages.
+ *
+ * WooCommerce Blocks integrations use the WC_ prefix by convention.
  */
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 final class WC_CheckoutPay_Blocks extends AbstractPaymentMethodType
 {
     /**

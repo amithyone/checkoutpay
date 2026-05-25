@@ -11,7 +11,10 @@ if (!defined('ABSPATH')) {
 
 /**
  * WC_CheckoutPay_Gateway Class
+ *
+ * WooCommerce requires payment gateway classes to use the WC_ prefix.
  */
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 class WC_CheckoutPay_Gateway extends WC_Payment_Gateway {
 
     /**

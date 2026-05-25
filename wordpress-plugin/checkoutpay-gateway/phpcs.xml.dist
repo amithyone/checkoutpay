@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<ruleset name="CheckoutPay Gateway">
+	<description>PHPCS rules for the CheckoutPay WooCommerce gateway plugin (directory slug: checkoutpay-gateway).</description>
+
+	<file>.</file>
+
+	<exclude-pattern>/vendor/*</exclude-pattern>
+
+	<rule ref="WordPress">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="checkoutpay-gateway"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- WooCommerce payment gateways use the WC_* class prefix by convention. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound">
+		<exclude-pattern>includes/class-checkoutpay-gateway.php</exclude-pattern>
+		<exclude-pattern>includes/class-checkoutpay-blocks.php</exclude-pattern>
+	</rule>
+</ruleset>
