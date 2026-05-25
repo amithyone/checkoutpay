@@ -2,7 +2,7 @@
 
 This folder contains the **WordPress.org–ready** plugin source at `checkoutpay-gateway/`. The live site also ships a ZIP from `public/downloads/checkoutpay-gateway.zip`.
 
-Merchant setup guide: [checkoutpay-gateway/INSTALLATION.md](checkoutpay-gateway/INSTALLATION.md).
+Merchant setup guide: [INSTALLATION.md](INSTALLATION.md) (repo folder `wordpress-plugin/`, not shipped inside the plugin ZIP).
 
 ## Plugin naming and ownership
 

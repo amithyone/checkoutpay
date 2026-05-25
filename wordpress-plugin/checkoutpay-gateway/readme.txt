@@ -1,11 +1,11 @@
 === CheckoutPay – Bank Transfer Gateway for WooCommerce ===
 Contributors: amithyone
-Tags: woocommerce, payment, payment gateway, bank transfer, nigeria, checkoutpay
+Tags: woocommerce, payment, payment gateway, bank transfer, nigeria
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.2.7
+Stable tag: 1.2.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -75,7 +75,7 @@ Developed and maintained by **CheckoutPay** ([check-outpay.com](https://check-ou
 3. Complete or simulate payment in CheckoutPay; confirm the order moves to **Processing** or **Completed** (depending on your settings).
 4. Disable **Test mode** when ready for live sales.
 
-For a longer guide with troubleshooting, see `INSTALLATION.md` in the plugin folder or the [CheckoutPay support](https://check-outpay.com/support) page.
+For troubleshooting, see the [CheckoutPay support](https://check-outpay.com/support) page.
 
 == Frequently Asked Questions ==
 
@@ -139,6 +139,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 
 == Changelog ==
 
+= 1.2.8 =
+* Plugin Check: removed extra markdown files from plugin root; limited readme tags to five.
+
 = 1.2.7 =
 * Author URI updated to https://profile.amithyone.com/
 
@@ -173,6 +176,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.8 =
+WordPress.org Plugin Check compliance (readme tags, plugin file layout).
 
 = 1.2.7 =
 Author link updated.
