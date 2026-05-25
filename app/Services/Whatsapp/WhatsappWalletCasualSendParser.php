@@ -10,7 +10,8 @@ use App\Services\WhatsappWalletBankPayoutService;
  *
  * Text is normalized (strip *bold*, full-width digits) before matching. Supports
  * "send 5k to Name Bank", "pay 2000 for name opay", "transfer 5k name opay" (no "to"),
- * "send 20000 to 0210085995 gtbank" (direct acct+bank), and "send 5k to 080…" for P2P.
+ * "send 20000 to 0210085995 gtbank" (direct acct+bank), "send mon 8148790554 1000" (any order),
+ * and "send 5k to 080…" for P2P.
  * Bank repeat uses recent outbound transfers.
  */
 final class WhatsappWalletCasualSendParser
@@ -65,7 +66,7 @@ final class WhatsappWalletCasualSendParser
 
     /**
      * @param  list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>  $recentBank
-     * @return array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_direct', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_disambiguate', amount: float, candidates: list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>}|array{flow: 'p2p', amount: float, recipient_e164: string}|null
+     * @return array{flow: 'bank', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_direct', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_disambiguate', amount: float, candidates: list<array{acct: string, bank_code: string, bank_name: string, account_name: string}>}|array{flow: 'bank_prefix_disambiguate', amount: float, acct: string, candidates: list<array{code: string, name: string, label: string}>}|array{flow: 'p2p', amount: float, recipient_e164: string}|null
      */
     public static function tryParse(
         string $text,
@@ -83,6 +84,11 @@ final class WhatsappWalletCasualSendParser
             return null;
         }
 
+        $unordered = self::tryUnorderedBankSend($normalized, $bankPayout, $amount);
+        if ($unordered !== null) {
+            return $unordered;
+        }
+
         $directBank = self::extractDirectBankAccountAndBank($normalized, $bankPayout);
         if ($directBank !== null) {
             return [
@@ -97,11 +103,14 @@ final class WhatsappWalletCasualSendParser
             ];
         }
 
+        $bankHint = self::extractBankHintFromText($normalized);
         $senderDigits = PhoneNormalizer::digitsOnly($wallet->phone_e164) ?? $wallet->phone_e164;
         $senderE164 = PhoneNormalizer::canonicalInternationalWalletRecipientDigits($senderDigits) ?? $senderDigits;
-        $recipientPhone = self::extractWalletP2pPhoneE164($normalized, $senderE164);
-        if ($recipientPhone !== null && $recipientPhone !== $senderE164) {
-            return ['flow' => 'p2p', 'amount' => $amount, 'recipient_e164' => $recipientPhone];
+        if (self::shouldAttemptP2pParse($normalized, $bankHint)) {
+            $recipientPhone = self::extractWalletP2pPhoneE164($normalized, $senderE164);
+            if ($recipientPhone !== null && $recipientPhone !== $senderE164) {
+                return ['flow' => 'p2p', 'amount' => $amount, 'recipient_e164' => $recipientPhone];
+            }
         }
 
         $bankMatch = self::extractBankAndNameClause($normalized, $bankPayout);
@@ -154,6 +163,130 @@ final class WhatsappWalletCasualSendParser
         ];
 
         return ['flow' => 'bank', 'amount' => $amount, 'ctx' => $ctx];
+    }
+
+    /**
+     * @return array{flow: 'bank_direct', amount: float, ctx: array<string, mixed>}|array{flow: 'bank_prefix_disambiguate', amount: float, acct: string, candidates: list<array{code: string, name: string, label: string}>}|null
+     */
+    private static function tryUnorderedBankSend(
+        string $text,
+        WhatsappWalletBankPayoutService $bankPayout,
+        float $amount,
+    ): ?array {
+        if (preg_match_all('/\b(\d{10})\b/', $text, $m) !== 1 || count($m[1]) !== 1) {
+            return null;
+        }
+
+        $acct = trim((string) $m[1][0]);
+        if (strlen($acct) !== 10) {
+            return null;
+        }
+
+        $bankHint = self::extractBankHintFromText($text, $acct, $amount);
+        if ($bankHint === '') {
+            return null;
+        }
+
+        $prefixMatches = $bankPayout->resolveBanksByPrefix($bankHint);
+        if (count($prefixMatches) >= 2) {
+            return [
+                'flow' => 'bank_prefix_disambiguate',
+                'amount' => $amount,
+                'acct' => $acct,
+                'candidates' => $prefixMatches,
+            ];
+        }
+
+        $bank = null;
+        if (count($prefixMatches) === 1) {
+            $bank = [
+                'code' => $prefixMatches[0]['code'],
+                'name' => $prefixMatches[0]['name'],
+            ];
+        } else {
+            $resolved = $bankPayout->resolveBankFromUserInput($bankHint);
+            if ($resolved !== null) {
+                $bank = $resolved;
+            }
+        }
+
+        if ($bank === null) {
+            return null;
+        }
+
+        return [
+            'flow' => 'bank_direct',
+            'amount' => $amount,
+            'ctx' => [
+                'dest_acct' => $acct,
+                'dest_bank_code' => $bank['code'],
+                'dest_bank' => $bank['name'],
+                'amount' => $amount,
+            ],
+        ];
+    }
+
+    private static function extractBankHintFromText(string $text, ?string $acct = null, ?float $amount = null): string
+    {
+        $work = $text;
+        $work = preg_replace('/\b(send|transfer|pay|move|give|sending|p2p|whatsapp)\b/iu', ' ', $work) ?? $work;
+        if ($acct !== null && $acct !== '') {
+            $work = preg_replace('/\b'.preg_quote($acct, '/').'\b/', ' ', $work) ?? $work;
+        }
+        if ($amount !== null && $amount >= self::MIN_AMOUNT) {
+            $amtInt = (string) (int) round($amount);
+            $work = preg_replace('/\b'.preg_quote($amtInt, '/').'\b/', ' ', $work) ?? $work;
+            if (abs($amount - round($amount)) < 0.01 && $amount >= 1000 && fmod($amount, 1000) < 0.01) {
+                $k = (string) (int) ($amount / 1000);
+                $work = preg_replace('/\b'.preg_quote($k, '/').'\s*k\b/iu', ' ', $work) ?? $work;
+            }
+        }
+        $work = preg_replace('/\b(?:to|for|naira|ngn)\b/iu', ' ', $work) ?? $work;
+        $work = preg_replace('/₦\s*\d+(?:[,\s]\d{3})*(?:\.\d{1,2})?/u', ' ', $work) ?? $work;
+        $work = preg_replace('/\b\d+(?:[,\s]\d{3})*(?:\.\d{1,2})?\s*[km]\b/iu', ' ', $work) ?? $work;
+        $work = preg_replace('/\b\d{2,}(?:\.\d{1,2})?\b/', ' ', $work) ?? $work;
+        $work = preg_replace('/[^a-z\s]/iu', ' ', $work) ?? $work;
+        $work = preg_replace('/\s+/u', ' ', $work) ?? $work;
+        $work = trim($work);
+
+        $words = preg_split('/\s+/u', $work, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $keep = [];
+        foreach ($words as $w) {
+            $w = strtolower(trim($w));
+            if (strlen($w) >= 3) {
+                $keep[] = $w;
+            }
+        }
+
+        return trim(implode(' ', $keep));
+    }
+
+    private static function shouldAttemptP2pParse(string $text, string $bankHint): bool
+    {
+        if (preg_match('/\b(p2p|whatsapp)\b/i', $text)) {
+            return true;
+        }
+        if ($bankHint !== '') {
+            return false;
+        }
+        if (preg_match('/(?:\+?\s*234[\s\-]?|0)\d[\d\s\-()]{8,16}\d/u', $text)) {
+            return true;
+        }
+        if (preg_match_all('/\b(\d{10})\b/', $text, $m) === 1 && isset($m[1][0])) {
+            return self::digitsLookLikeClassicMobileLine($m[1][0]);
+        }
+
+        return false;
+    }
+
+    private static function digitsLookLikeClassicMobileLine(string $digits): bool
+    {
+        if (strlen($digits) !== 10) {
+            return false;
+        }
+        $prefix3 = substr($digits, 0, 3);
+
+        return in_array($prefix3, ['070', '071', '080', '081', '090', '091'], true);
     }
 
     private static function pickLargestAmount(string $text): ?float

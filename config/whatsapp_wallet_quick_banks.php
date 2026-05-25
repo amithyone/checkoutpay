@@ -20,7 +20,7 @@ return [
     ['code' => '000017', 'label' => 'Wema Bank (ALAT)', 'aliases' => ['wema', 'alat']],
     ['code' => '000010', 'label' => 'Ecobank Nigeria', 'aliases' => ['ecobank', 'eco bank']],
     ['code' => '000001', 'label' => 'Sterling Bank', 'aliases' => ['sterling']],
-    ['code' => '090405', 'label' => 'Moniepoint MFB', 'aliases' => ['moniepoint', 'monie point']],
+    ['code' => '090405', 'label' => 'Moniepoint MFB', 'aliases' => ['moniepoint', 'monie point'], 'prefixes' => ['mon']],
 
     ['code' => '100033', 'label' => 'PalmPay', 'aliases' => ['palmpay', 'palm pay']],
     ['code' => '000021', 'label' => 'Standard Chartered Bank', 'aliases' => ['standard chartered', 'scb']],

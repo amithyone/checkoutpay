@@ -8,6 +8,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\MevonPay\MevonPayPayoutService;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -16,6 +17,10 @@ use Illuminate\Support\Str;
 class WhatsappWalletBankPayoutService
 {
     private const QUICK_BANK_MIN_SCORE = 4;
+
+    private const BANK_PREFIX_MIN_LENGTH = 3;
+
+    private const BANK_PREFIX_DB_LIMIT = 10;
 
     public function __construct(
         private MavonPayTransferService $mavon,
@@ -228,6 +233,103 @@ class WhatsappWalletBankPayoutService
         $like = Bank::query()->where('name', 'like', '%'.$t.'%')->orderByRaw('LENGTH(name) asc')->first();
 
         return $like ? $this->resolvedBankPair((string) $like->code, (string) $like->name) : null;
+    }
+
+    /**
+     * Banks whose label or alias starts with the given prefix (min 3 chars).
+     *
+     * @return list<array{code: string, name: string, label: string}>
+     */
+    public function resolveBanksByPrefix(string $prefix): array
+    {
+        $prefix = $this->normalizeBankSearchText($prefix);
+        if (strlen($prefix) < self::BANK_PREFIX_MIN_LENGTH) {
+            return [];
+        }
+
+        $seen = [];
+        $out = [];
+
+        $add = function (string $code, string $name, string $label) use (&$seen, &$out): void {
+            $nip = NigerianBankCodeNormalizer::toNipTransferCode($code);
+            if ($nip === '' || isset($seen[$nip])) {
+                return;
+            }
+            $seen[$nip] = true;
+            $out[] = [
+                'code' => $nip,
+                'name' => $name,
+                'label' => $label,
+            ];
+        };
+
+        $explicitOnly = [];
+
+        foreach ($this->quickBanks() as $row) {
+            $label = (string) ($row['label'] ?? '');
+            $configuredPrefixes = isset($row['prefixes']) && is_array($row['prefixes']) ? $row['prefixes'] : [];
+            foreach ($configuredPrefixes as $configured) {
+                if ($this->normalizeBankSearchText((string) $configured) === $prefix) {
+                    $nip = NigerianBankCodeNormalizer::toNipTransferCode((string) $row['code']);
+                    if ($nip !== '') {
+                        $explicitOnly[] = [
+                            'code' => $nip,
+                            'name' => $label,
+                            'label' => $label,
+                        ];
+                    }
+                }
+            }
+        }
+
+        if (count($explicitOnly) === 1) {
+            return $explicitOnly;
+        }
+
+        foreach ($this->quickBanks() as $row) {
+            $label = (string) ($row['label'] ?? '');
+            $aliases = isset($row['aliases']) && is_array($row['aliases']) ? $row['aliases'] : [];
+            $haystacks = array_filter(array_merge([$label], $aliases));
+            foreach ($haystacks as $hay) {
+                if ($this->bankTextStartsWithPrefix($this->normalizeBankSearchText($hay), $prefix)) {
+                    $add((string) $row['code'], $label, $label);
+                    break;
+                }
+            }
+        }
+
+        if (Schema::hasTable('banks')) {
+            $needle = str_replace(' ', '%', $prefix);
+            if ($needle !== '') {
+                $dbHits = Bank::query()
+                    ->where('name', 'like', $needle.'%')
+                    ->orderByRaw('LENGTH(name) asc')
+                    ->limit(self::BANK_PREFIX_DB_LIMIT)
+                    ->get();
+                foreach ($dbHits as $bank) {
+                    $name = (string) $bank->name;
+                    if ($this->bankTextStartsWithPrefix($this->normalizeBankSearchText($name), $prefix)) {
+                        $add((string) $bank->code, $name, $name);
+                    }
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    private function bankTextStartsWithPrefix(string $normalizedHaystack, string $prefix): bool
+    {
+        if ($normalizedHaystack === '' || $prefix === '') {
+            return false;
+        }
+        if (str_starts_with($normalizedHaystack, $prefix)) {
+            return true;
+        }
+        $words = preg_split('/\s+/', $normalizedHaystack) ?: [];
+        $first = $words[0] ?? '';
+
+        return $first !== '' && str_starts_with($first, $prefix);
     }
 
     /**
