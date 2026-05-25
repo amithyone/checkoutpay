@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.2.9
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -139,6 +139,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 
 == Changelog ==
 
+= 1.3.0 =
+* WordPress.org review: enqueue admin and thank-you scripts; sanitize webhook charges and received_amount; rename gateway classes to Checkoutpay_* prefix.
+
 = 1.2.9 =
 * Plugin Check: align Plugin Name with directory slug for text domain; add phpcs.xml.dist; document WC_ gateway class naming.
 
@@ -179,6 +182,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.3.0 =
+WordPress.org review compliance (script enqueue, sanitization, class prefixes).
 
 = 1.2.9 =
 Plugin Check text domain and PHPCS alignment.

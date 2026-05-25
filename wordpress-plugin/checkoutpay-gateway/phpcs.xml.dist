@@ -13,10 +13,4 @@
 			</property>
 		</properties>
 	</rule>
-
-	<!-- WooCommerce payment gateways use the WC_* class prefix by convention. -->
-	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound">
-		<exclude-pattern>includes/class-checkoutpay-gateway.php</exclude-pattern>
-		<exclude-pattern>includes/class-checkoutpay-blocks.php</exclude-pattern>
-	</rule>
 </ruleset>

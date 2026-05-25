@@ -13,21 +13,18 @@ use Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodTyp
 
 /**
  * Registers CheckoutPay on block-based checkout pages.
- *
- * WooCommerce Blocks integrations use the WC_ prefix by convention.
  */
-// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
-final class WC_CheckoutPay_Blocks extends AbstractPaymentMethodType
+final class Checkoutpay_Blocks extends AbstractPaymentMethodType
 {
     /**
-     * Payment method ID (must match WC_CheckoutPay_Gateway::$id).
+     * Payment method ID (must match Checkoutpay_Gateway::$id).
      *
      * @var string
      */
     protected $name = 'checkoutpay';
 
     /**
-     * @var WC_CheckoutPay_Gateway|null
+     * @var Checkoutpay_Gateway|null
      */
     private $gateway;
 
@@ -49,7 +46,7 @@ final class WC_CheckoutPay_Blocks extends AbstractPaymentMethodType
      */
     public function is_active()
     {
-        return $this->gateway instanceof WC_CheckoutPay_Gateway && $this->gateway->is_available();
+        return $this->gateway instanceof Checkoutpay_Gateway && $this->gateway->is_available();
     }
 
     /**
@@ -61,7 +58,7 @@ final class WC_CheckoutPay_Blocks extends AbstractPaymentMethodType
         $script_url = CHECKOUTPAY_PLUGIN_URL . 'assets/js/checkout-blocks.js';
 
         wp_register_script(
-            'wc-checkoutpay-blocks',
+            'checkoutpay-blocks',
             $script_url,
             array(
                 'wc-blocks-registry',
@@ -73,7 +70,7 @@ final class WC_CheckoutPay_Blocks extends AbstractPaymentMethodType
             true
         );
 
-        return array('wc-checkoutpay-blocks');
+        return array('checkoutpay-blocks');
     }
 
     /**

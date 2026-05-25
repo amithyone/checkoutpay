@@ -50,6 +50,10 @@ Use when submitting at [Add your plugin](https://wordpress.org/plugins/developer
 | WooCommerce dependency | `Requires Plugins: woocommerce` + activation check |
 | Plugin Check | Run on test site before submit |
 
+## WordPress.org review reply
+
+After uploading v1.3.0+, send the email in [REVIEW-REPLY.md](REVIEW-REPLY.md) (verify profile email first).
+
 ## Before you submit
 
 1. Verify **notify@check-outpay.com** on your WordPress.org profile.

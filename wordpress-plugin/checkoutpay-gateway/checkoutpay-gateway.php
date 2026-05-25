@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       CheckoutPay Gateway
+ * Plugin Name:       CheckoutPay – Bank Transfer Gateway for WooCommerce
  * Plugin URI:        https://check-outpay.com/wordpress-plugin
  * Description:       Official CheckoutPay extension for WooCommerce: Nigerian bank-transfer checkout with virtual account details, webhooks, and automatic order updates.
- * Version:           1.2.9
+ * Version:           1.3.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHECKOUTPAY_VERSION', '1.2.9');
+define('CHECKOUTPAY_VERSION', '1.3.0');
 define('CHECKOUTPAY_TEXT_DOMAIN', 'checkoutpay-gateway');
 define('CHECKOUTPAY_PORTAL_URL', 'https://check-outpay.com');
 define('CHECKOUTPAY_PLUGIN_DIR', plugin_dir_path(__FILE__));
@@ -136,7 +136,7 @@ add_action('plugins_loaded', 'checkoutpay_init_gateway', 20);
  */
 function checkoutpay_add_gateway($gateways)
 {
-    $gateways[] = 'WC_CheckoutPay_Gateway';
+    $gateways[] = 'Checkoutpay_Gateway';
 
     return $gateways;
 }
@@ -159,7 +159,7 @@ function checkoutpay_init_blocks_support()
     add_action(
         'woocommerce_blocks_payment_method_type_registration',
         function ($payment_method_registry) {
-            $payment_method_registry->register(new WC_CheckoutPay_Blocks());
+            $payment_method_registry->register(new Checkoutpay_Blocks());
         }
     );
 }
