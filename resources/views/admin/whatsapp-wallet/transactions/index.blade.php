@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', $pageTitle ?? 'WhatsApp transactions')
-@section('page-title', $pageTitle ?? 'WhatsApp transactions')
+@section('title', $pageTitle ?? 'Wallet transactions')
+@section('page-title', $pageTitle ?? 'Wallet transactions')
 
 @section('content')
 @php

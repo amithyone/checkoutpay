@@ -160,9 +160,9 @@ class WhatsappWalletTransactionAdminController extends Controller
             ->withQueryString();
 
         $titles = match ($viewMode) {
-            'failed' => ['title' => 'Failed WhatsApp payouts', 'subtitle' => 'Bank transfers marked failed or reversed after provider rejection.'],
-            'pending' => ['title' => 'Pending WhatsApp payouts', 'subtitle' => 'Bank transfers still awaiting final confirmation from MevonPay.'],
-            default => ['title' => 'WhatsApp transactions', 'subtitle' => 'Wallet ledger entries — filter by payout status, type, or reference.'],
+            'failed' => ['title' => 'Failed wallet payouts', 'subtitle' => 'Bank transfers marked failed or reversed after provider rejection.'],
+            'pending' => ['title' => 'Pending wallet payouts', 'subtitle' => 'Bank transfers still awaiting final confirmation from MevonPay.'],
+            default => ['title' => 'Wallet transactions', 'subtitle' => 'Universal wallet ledger — filter by payout status, type, or reference.'],
         };
 
         return view('admin.whatsapp-wallet.transactions.index', [

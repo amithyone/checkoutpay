@@ -83,7 +83,7 @@ class WhatsappWalletTransactionAdminTest extends TestCase
         $this->actingAs($admin, 'admin')
             ->get(route('admin.whatsapp-wallet.transactions.failed'))
             ->assertOk()
-            ->assertSee('Failed WhatsApp payouts');
+            ->assertSee('Failed wallet payouts');
     }
 
     public function test_check_status_returns_unavailable_when_path_not_configured(): void

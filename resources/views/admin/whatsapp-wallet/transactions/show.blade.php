@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Transaction #' . $transaction->id)
-@section('page-title', 'WhatsApp transaction #' . $transaction->id)
+@section('page-title', 'Wallet transaction #' . $transaction->id)
 
 @section('content')
 @php
@@ -140,16 +140,20 @@
                         <th class="px-3 py-2 text-right text-gray-600">Gross</th>
                         <th class="px-3 py-2 text-left text-gray-600">Bucket</th>
                         <th class="px-3 py-2 text-left text-gray-600">Reference</th>
+                        <th class="px-3 py-2 text-left text-gray-600"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @foreach($transaction->mevonLedgerEntries as $entry)
                         <tr>
                             <td class="px-3 py-2">{{ $entry->occurred_at?->format('M j, Y H:i') }}</td>
-                            <td class="px-3 py-2">{{ $entry->flow_type }}</td>
+                            <td class="px-3 py-2">{{ $entry->flowTypeLabel() }}</td>
                             <td class="px-3 py-2 text-right">₦{{ number_format((float) $entry->gross_amount, 2) }}</td>
                             <td class="px-3 py-2">{{ $entry->payout_bucket ?? '—' }}</td>
-                            <td class="px-3 py-2 font-mono text-xs">{{ $entry->payout_reference ?? $entry->external_reference }}</td>
+                            <td class="px-3 py-2 font-mono text-xs">{{ $entry->payout_reference ?? $entry->external_reference ?? '—' }}</td>
+                            <td class="px-3 py-2 text-xs">
+                                <a href="{{ $entry->adminMevonAuditUrl() }}" class="text-primary hover:underline">MevonPay audit</a>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

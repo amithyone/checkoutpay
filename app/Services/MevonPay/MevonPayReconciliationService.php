@@ -124,6 +124,7 @@ final class MevonPayReconciliationService
     public function paginateLedger(Carbon $from, Carbon $to, ?string $direction = null, ?string $flowType = null, int $perPage = 50)
     {
         $q = MevonPayLedgerEntry::query()
+            ->with('source')
             ->whereBetween('occurred_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
             ->orderByDesc('occurred_at');
 

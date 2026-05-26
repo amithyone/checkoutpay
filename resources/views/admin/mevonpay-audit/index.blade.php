@@ -92,21 +92,33 @@
                     <th class="px-3 py-2">Fees</th>
                     <th class="px-3 py-2">Net</th>
                     <th class="px-3 py-2">Reference</th>
+                    <th class="px-3 py-2">Source</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 @forelse($ledger as $entry)
+                @php
+                    $walletTxnUrl = $entry->adminWalletTransactionUrl();
+                    $walletTxnLabel = $entry->adminWalletTransactionLabel();
+                @endphp
                 <tr>
                     <td class="px-3 py-2 whitespace-nowrap">{{ $entry->occurred_at?->format('Y-m-d H:i') }}</td>
                     <td class="px-3 py-2">{{ $entry->direction }}</td>
-                    <td class="px-3 py-2">{{ str_replace('_', ' ', $entry->flow_type) }}</td>
+                    <td class="px-3 py-2">{{ $entry->flowTypeLabel() }}</td>
                     <td class="px-3 py-2">₦{{ number_format((float) $entry->gross_amount, 2) }}</td>
                     <td class="px-3 py-2">@if($entry->mevon_inbound_fee)₦{{ $entry->mevon_inbound_fee }}@endif @if($entry->mevon_outbound_fee)₦{{ $entry->mevon_outbound_fee }}@endif</td>
                     <td class="px-3 py-2">₦{{ number_format((float) $entry->net_mevon_impact, 2) }}</td>
-                    <td class="px-3 py-2 text-xs font-mono">{{ $entry->external_reference ?: $entry->payout_reference }}</td>
+                    <td class="px-3 py-2 text-xs font-mono">{{ $entry->external_reference ?: $entry->payout_reference ?: '—' }}</td>
+                    <td class="px-3 py-2 text-xs">
+                        @if($walletTxnUrl)
+                            <a href="{{ $walletTxnUrl }}" class="text-primary hover:underline font-medium">{{ $walletTxnLabel }}</a>
+                        @else
+                            <span class="text-gray-400">—</span>
+                        @endif
+                    </td>
                 </tr>
                 @empty
-                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No ledger entries in this range.</td></tr>
+                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No ledger entries in this range.</td></tr>
                 @endforelse
             </tbody>
         </table>

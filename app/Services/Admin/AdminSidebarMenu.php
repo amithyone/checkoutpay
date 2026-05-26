@@ -149,7 +149,7 @@ class AdminSidebarMenu
                 ['visible' => $admin->canManageSettings()]
             ),
             'whatsapp_wallet_transactions' => array_merge(
-                $this->link('WhatsApp transactions', 'admin.whatsapp-wallet.transactions.index', 'fas fa-exchange-alt text-green-600', ['admin.whatsapp-wallet.transactions.*']),
+                $this->link('Wallet transactions', 'admin.whatsapp-wallet.transactions.index', 'fas fa-exchange-alt text-green-600', ['admin.whatsapp-wallet.transactions.*']),
                 [
                     'visible' => $admin->canManageSettings(),
                     'badge_count' => WhatsappWalletTransaction::countFailedBankPayoutsRecent(),
