@@ -77,6 +77,32 @@ class WhatsappWallet extends Model
         return $this->hasMany(WhatsappWalletTransaction::class, 'whatsapp_wallet_id');
     }
 
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
+     */
+    public function scopeSearch($query, string $term)
+    {
+        $term = trim($term);
+        if ($term === '') {
+            return $query;
+        }
+
+        $like = '%'.$term.'%';
+
+        return $query->where(function ($q) use ($like, $term): void {
+            $q->where('phone_e164', 'like', $like)
+                ->orWhere('pay_code', 'like', $like)
+                ->orWhere('sender_name', 'like', $like)
+                ->orWhere('mevon_virtual_account_number', 'like', $like)
+                ->orWhere('kyc_email', 'like', $like);
+
+            if (is_numeric($term)) {
+                $q->orWhere('id', (int) $term);
+            }
+        });
+    }
+
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;

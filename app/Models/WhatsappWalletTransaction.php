@@ -145,6 +145,15 @@ class WhatsappWalletTransaction extends Model
      * @param  Builder<self>  $query
      * @return Builder<self>
      */
+    public function scopeP2p(Builder $query): Builder
+    {
+        return $query->whereIn('type', [self::TYPE_P2P_DEBIT, self::TYPE_P2P_CREDIT]);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopePayoutFailed(Builder $query): Builder
     {
         return $query->where(function (Builder $q): void {

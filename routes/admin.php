@@ -256,10 +256,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::delete('settings/whitelisted-emails/{whitelistedEmail}', [\App\Http\Controllers\Admin\SettingsController::class, 'removeWhitelistedEmail'])->name('settings.remove-whitelisted-email');
 
             Route::get('whatsapp-wallet', [WhatsappWalletAdminController::class, 'index'])->name('whatsapp-wallet.index');
+            Route::get('whatsapp-wallet/settings', [WhatsappWalletAdminController::class, 'settings'])->name('whatsapp-wallet.settings');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
+            Route::get('whatsapp-wallet/wallets', [WhatsappWalletAdminController::class, 'wallets'])->name('whatsapp-wallet.wallets.index');
+            Route::get('whatsapp-wallet/wallets/{wallet}', [WhatsappWalletAdminController::class, 'showWallet'])->name('whatsapp-wallet.wallets.show');
+            Route::put('whatsapp-wallet/wallets/{wallet}/status', [WhatsappWalletAdminController::class, 'updateWalletStatus'])->name('whatsapp-wallet.wallets.status');
 
             Route::get('whatsapp-wallet/transactions', [WhatsappWalletTransactionAdminController::class, 'index'])->name('whatsapp-wallet.transactions.index');
+            Route::get('whatsapp-wallet/transactions/p2p', [WhatsappWalletTransactionAdminController::class, 'p2p'])->name('whatsapp-wallet.transactions.p2p');
             Route::get('whatsapp-wallet/transactions/failed', [WhatsappWalletTransactionAdminController::class, 'failed'])->name('whatsapp-wallet.transactions.failed');
             Route::get('whatsapp-wallet/transactions/pending', [WhatsappWalletTransactionAdminController::class, 'pending'])->name('whatsapp-wallet.transactions.pending');
             Route::get('whatsapp-wallet/transactions/{transaction}', [WhatsappWalletTransactionAdminController::class, 'show'])->name('whatsapp-wallet.transactions.show');

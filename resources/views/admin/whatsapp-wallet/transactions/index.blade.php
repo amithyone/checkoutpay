@@ -16,10 +16,16 @@
     $listRoute = match ($viewMode ?? 'index') {
         'failed' => route('admin.whatsapp-wallet.transactions.failed'),
         'pending' => route('admin.whatsapp-wallet.transactions.pending'),
+        'p2p' => route('admin.whatsapp-wallet.transactions.p2p'),
         default => route('admin.whatsapp-wallet.transactions.index'),
+    };
+    $defaultType = match ($viewMode ?? 'index') {
+        'p2p' => 'p2p',
+        default => request('type', 'all'),
     };
 @endphp
 <div class="space-y-6">
+    @include('admin.whatsapp-wallet.partials.nav')
     @if(session('success'))
         <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">{{ session('success') }}</div>
     @endif
@@ -47,6 +53,10 @@
                     <span class="ml-2 bg-white text-amber-700 rounded-full px-2 py-0.5 text-xs font-bold">{{ $pendingCount }}</span>
                 @endif
             </a>
+            <a href="{{ route('admin.whatsapp-wallet.transactions.p2p') }}"
+               class="bg-green-700 text-white px-3 py-2 rounded-lg hover:bg-green-800 text-sm inline-flex items-center">
+                <i class="fas fa-paper-plane mr-2"></i> P2P
+            </a>
             <a href="{{ route('admin.whatsapp-wallet.transactions.index') }}"
                class="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg hover:bg-gray-200 text-sm">
                 All
@@ -56,6 +66,9 @@
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <form method="GET" action="{{ $listRoute }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            @if(request('wallet_id'))
+                <input type="hidden" name="wallet_id" value="{{ request('wallet_id') }}">
+            @endif
             <div class="sm:col-span-2">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Search</label>
                 <input type="text" name="search" value="{{ request('search') }}"
@@ -75,7 +88,7 @@
                 <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
                 <select name="type" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                     @foreach($typeOptions as $value => $label)
-                        <option value="{{ $value }}" {{ request('type', 'bank_transfer_out') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                        <option value="{{ $value }}" {{ $defaultType === $value ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
                 </select>
             </div>

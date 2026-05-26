@@ -14,6 +14,7 @@ return [
         'renters_kyc',
         'rentals',
         'whatsapp_wallet',
+        'whatsapp_wallet_users',
         'whatsapp_wallet_transactions',
         'withdrawals',
         'overdraft',

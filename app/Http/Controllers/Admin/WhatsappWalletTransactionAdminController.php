@@ -43,6 +43,13 @@ class WhatsappWalletTransactionAdminController extends Controller
         return $this->renderList($request, 'pending');
     }
 
+    public function p2p(Request $request): View
+    {
+        $request->merge(['type' => 'p2p']);
+
+        return $this->renderList($request, 'p2p');
+    }
+
     public function show(WhatsappWalletTransaction $transaction): View
     {
         $transaction->load([
@@ -110,6 +117,7 @@ class WhatsappWalletTransactionAdminController extends Controller
         $titles = match ($viewMode) {
             'failed' => ['title' => 'Failed wallet payouts', 'subtitle' => 'Bank transfers marked failed or reversed after provider rejection.'],
             'pending' => ['title' => 'Pending wallet payouts', 'subtitle' => 'Bank transfers still awaiting final confirmation from MevonPay.'],
+            'p2p' => ['title' => 'P2P transfers', 'subtitle' => 'WhatsApp wallet-to-wallet sends (debit and credit legs).'],
             default => ['title' => 'Wallet transactions', 'subtitle' => 'Universal wallet ledger — filter by payout status, type, or reference.'],
         };
 
@@ -133,8 +141,14 @@ class WhatsappWalletTransactionAdminController extends Controller
             ->with(['wallet:id,phone_e164,tier,mevon_virtual_account_number'])
             ->orderByDesc('id');
 
-        $type = (string) $request->query('type', WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT);
-        if ($type !== 'all') {
+        if ($request->filled('wallet_id') && is_numeric($request->query('wallet_id'))) {
+            $query->where('whatsapp_wallet_id', (int) $request->query('wallet_id'));
+        }
+
+        $type = (string) $request->query('type', 'all');
+        if ($type === 'p2p') {
+            $query->p2p();
+        } elseif ($type !== 'all') {
             $query->where('type', $type);
         }
 
@@ -164,11 +178,12 @@ class WhatsappWalletTransactionAdminController extends Controller
     private function typeOptions(): array
     {
         return [
-            WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT => 'Bank transfer out',
             'all' => 'All types',
+            'p2p' => 'P2P (send & receive)',
+            WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT => 'Bank transfer out',
             WhatsappWalletTransaction::TYPE_TOPUP => 'Top-up',
-            WhatsappWalletTransaction::TYPE_P2P_DEBIT => 'P2P debit',
-            WhatsappWalletTransaction::TYPE_P2P_CREDIT => 'P2P credit',
+            WhatsappWalletTransaction::TYPE_P2P_DEBIT => 'P2P debit only',
+            WhatsappWalletTransaction::TYPE_P2P_CREDIT => 'P2P credit only',
             WhatsappWalletTransaction::TYPE_VTU_AIRTIME => 'VTU airtime',
             WhatsappWalletTransaction::TYPE_VTU_DATA => 'VTU data',
             WhatsappWalletTransaction::TYPE_PARTNER_MERCHANT_PAY => 'Partner pay',

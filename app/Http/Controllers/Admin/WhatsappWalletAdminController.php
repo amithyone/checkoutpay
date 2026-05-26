@@ -18,6 +18,95 @@ class WhatsappWalletAdminController extends Controller
 {
     public function index(): View
     {
+        return view('admin.whatsapp-wallet.index', $this->dashboardMetrics());
+    }
+
+    public function settings(): View
+    {
+        return view('admin.whatsapp-wallet.settings', $this->settingsFormData());
+    }
+
+    public function wallets(Request $request): View
+    {
+        $query = WhatsappWallet::query()->orderByDesc('id');
+
+        if ($request->filled('search')) {
+            $query->search((string) $request->query('search'));
+        }
+
+        $status = (string) $request->query('status', '');
+        if ($status === WhatsappWallet::STATUS_ACTIVE || $status === WhatsappWallet::STATUS_SUSPENDED) {
+            $query->where('status', $status);
+        }
+
+        $tier = $request->query('tier');
+        if ($tier !== null && $tier !== '' && is_numeric($tier)) {
+            $query->where('tier', (int) $tier);
+        }
+
+        if ($request->boolean('needs_setup')) {
+            $query->where(function ($q): void {
+                $q->where(function ($q2): void {
+                    $q2->whereNull('pin_hash')->orWhere('pin_hash', '');
+                })->orWhere(function ($q2): void {
+                    $q2->whereNull('sender_name')->orWhere('sender_name', '');
+                });
+            });
+        }
+
+        $wallets = $query->paginate(25)->withQueryString();
+
+        return view('admin.whatsapp-wallet.wallets.index', [
+            'wallets' => $wallets,
+        ]);
+    }
+
+    public function showWallet(WhatsappWallet $wallet): View
+    {
+        $wallet->loadCount([
+            'transactions as bank_transfers_count' => fn ($q) => $q->where('type', WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT),
+            'transactions as p2p_count' => fn ($q) => $q->p2p(),
+            'transactions as topups_count' => fn ($q) => $q->where('type', WhatsappWalletTransaction::TYPE_TOPUP),
+        ]);
+
+        $recentTx = $wallet->transactions()
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get();
+
+        $pendingPayouts = $wallet->transactions()
+            ->bankTransferOut()
+            ->payoutPending()
+            ->where('created_at', '>=', now()->subHours(48))
+            ->count();
+
+        return view('admin.whatsapp-wallet.wallets.show', [
+            'wallet' => $wallet,
+            'recentTx' => $recentTx,
+            'pendingPayouts' => $pendingPayouts,
+        ]);
+    }
+
+    public function updateWalletStatus(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => 'required|string|in:'.WhatsappWallet::STATUS_ACTIVE.','.WhatsappWallet::STATUS_SUSPENDED,
+        ]);
+
+        $wallet->update(['status' => $validated['status']]);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', $validated['status'] === WhatsappWallet::STATUS_ACTIVE
+                ? 'Wallet reactivated.'
+                : 'Wallet suspended.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dashboardMetrics(): array
+    {
         $walletTotal = WhatsappWallet::query()->count();
         $walletsWithPin = WhatsappWallet::query()->whereNotNull('pin_hash')->where('pin_hash', '!=', '')->count();
         $txTotal = WhatsappWalletTransaction::query()->count();
@@ -48,12 +137,7 @@ class WhatsappWalletAdminController extends Controller
         $regions = WhatsappWalletRegionConfig::instances();
         $dialMap = WhatsappWalletRegionConfig::countryByDial();
 
-        $wa = Setting::getByGroup('whatsapp');
-        $fxRates = WhatsappCrossBorderFxRate::query()->orderBy('from_currency')->orderBy('to_currency')->get();
-        $legacyFx = $wa['whatsapp_cross_border_fx_rates_json'] ?? null;
-        $legacyFxPairCount = is_array($legacyFx) ? count($legacyFx) : 0;
-
-        return view('admin.whatsapp-wallet.index', [
+        return [
             'walletTotal' => $walletTotal,
             'walletsWithPin' => $walletsWithPin,
             'txTotal' => $txTotal,
@@ -64,11 +148,32 @@ class WhatsappWalletAdminController extends Controller
             'recentTx' => $recentTx,
             'regions' => is_array($regions) ? $regions : [],
             'dialMap' => is_array($dialMap) ? $dialMap : [],
+            'failedPayoutCount' => WhatsappWalletTransaction::countFailedBankPayoutsRecent(),
+            'pendingPayoutCount' => WhatsappWalletTransaction::countPendingBankPayoutsRecent(),
+            'p2pCount7d' => WhatsappWalletTransaction::query()->p2p()->where('created_at', '>=', now()->subDays(7))->count(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function settingsFormData(): array
+    {
+        $regions = WhatsappWalletRegionConfig::instances();
+        $dialMap = WhatsappWalletRegionConfig::countryByDial();
+        $wa = Setting::getByGroup('whatsapp');
+        $fxRates = WhatsappCrossBorderFxRate::query()->orderBy('from_currency')->orderBy('to_currency')->get();
+        $legacyFx = $wa['whatsapp_cross_border_fx_rates_json'] ?? null;
+        $legacyFxPairCount = is_array($legacyFx) ? count($legacyFx) : 0;
+
+        return [
+            'regions' => is_array($regions) ? $regions : [],
+            'dialMap' => is_array($dialMap) ? $dialMap : [],
             'wa' => $wa,
             'fxRates' => $fxRates,
             'fxCurrencyCodes' => $this->fxCurrencyCodesForAdmin(),
             'legacyFxPairCount' => $legacyFxPairCount,
-        ]);
+        ];
     }
 
     public function updateFxRates(Request $request): RedirectResponse
@@ -90,23 +195,23 @@ class WhatsappWalletAdminController extends Controller
                 continue;
             }
             if (strlen($from) !== 3 || strlen($to) !== 3 || ! preg_match('/^[A-Z]{3}$/', $from) || ! preg_match('/^[A-Z]{3}$/', $to)) {
-                return redirect()->route('admin.whatsapp-wallet.index')
+                return redirect()->route('admin.whatsapp-wallet.settings')
                     ->withErrors(['fx_rates' => 'Row #'.((int) $i + 1).': use 3-letter currency codes (A–Z only), e.g. NGN, USD.'])
                     ->withInput();
             }
             if ($from === $to) {
-                return redirect()->route('admin.whatsapp-wallet.index')
+                return redirect()->route('admin.whatsapp-wallet.settings')
                     ->withErrors(['fx_rates' => 'Row #'.((int) $i + 1).": From and To must be different (got {$from})."])
                     ->withInput();
             }
             if (! is_numeric($rateRaw) || (float) $rateRaw <= 0) {
-                return redirect()->route('admin.whatsapp-wallet.index')
+                return redirect()->route('admin.whatsapp-wallet.settings')
                     ->withErrors(['fx_rates' => 'Row #'.((int) $i + 1).': Rate must be a positive number.'])
                     ->withInput();
             }
             $key = $from.'_'.$to;
             if (isset($normalized[$key])) {
-                return redirect()->route('admin.whatsapp-wallet.index')
+                return redirect()->route('admin.whatsapp-wallet.settings')
                     ->withErrors(['fx_rates' => "Duplicate pair: {$from} → {$to}."])
                     ->withInput();
             }
@@ -130,7 +235,7 @@ class WhatsappWalletAdminController extends Controller
 
         WhatsappCrossBorderP2pFxService::forgetRatesCache();
 
-        return redirect()->route('admin.whatsapp-wallet.index')
+        return redirect()->route('admin.whatsapp-wallet.settings')
             ->with('success', 'Cross-border FX rates saved ('.count($normalized).' pair'.(count($normalized) === 1 ? '' : 's').').');
     }
 
@@ -229,7 +334,7 @@ class WhatsappWalletAdminController extends Controller
 
         WhatsappCrossBorderP2pFxService::forgetRatesCache();
 
-        return redirect()->route('admin.whatsapp-wallet.index')
+        return redirect()->route('admin.whatsapp-wallet.settings')
             ->with('success', 'WhatsApp wallet settings saved.');
     }
 

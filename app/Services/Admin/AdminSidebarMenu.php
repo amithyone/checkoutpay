@@ -145,7 +145,16 @@ class AdminSidebarMenu
             ),
             'rentals' => $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', ['admin.rentals.*', 'admin.rental-categories.*', 'admin.rental-items.*']),
             'whatsapp_wallet' => array_merge(
-                $this->link('WhatsApp wallet', 'admin.whatsapp-wallet.index', 'fab fa-whatsapp text-green-600', ['admin.whatsapp-wallet.index', 'admin.whatsapp-wallet.update', 'admin.whatsapp-wallet.fx-rates.update']),
+                $this->link('WhatsApp wallet', 'admin.whatsapp-wallet.index', 'fab fa-whatsapp text-green-600', [
+                    'admin.whatsapp-wallet.index',
+                    'admin.whatsapp-wallet.settings',
+                    'admin.whatsapp-wallet.update',
+                    'admin.whatsapp-wallet.fx-rates.update',
+                ]),
+                ['visible' => $admin->canManageSettings()]
+            ),
+            'whatsapp_wallet_users' => array_merge(
+                $this->link('Wallet users', 'admin.whatsapp-wallet.wallets.index', 'fas fa-users text-green-600', ['admin.whatsapp-wallet.wallets.*']),
                 ['visible' => $admin->canManageSettings()]
             ),
             'whatsapp_wallet_transactions' => array_merge(

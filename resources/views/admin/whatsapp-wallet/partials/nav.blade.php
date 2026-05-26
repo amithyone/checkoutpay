@@ -1,0 +1,43 @@
+@php
+    $failedCount = $failedCount ?? \App\Models\WhatsappWalletTransaction::countFailedBankPayoutsRecent();
+    $pendingCount = $pendingCount ?? \App\Models\WhatsappWalletTransaction::countPendingBankPayoutsRecent();
+    $navClass = fn (array $patterns): string => collect($patterns)->contains(fn ($p) => request()->routeIs($p))
+        ? 'bg-green-50 text-green-800 border-green-200 font-semibold'
+        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50';
+@endphp
+<nav class="bg-white border border-gray-200 rounded-lg shadow-sm p-2 flex flex-wrap gap-2" aria-label="WhatsApp wallet admin">
+    <a href="{{ route('admin.whatsapp-wallet.index') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.index']) }}">
+        <i class="fas fa-chart-pie mr-2 text-green-600"></i> Overview
+    </a>
+    <a href="{{ route('admin.whatsapp-wallet.wallets.index') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.wallets.*']) }}">
+        <i class="fas fa-users mr-2 text-green-600"></i> Wallet users
+    </a>
+    <a href="{{ route('admin.whatsapp-wallet.transactions.index') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.index', 'admin.whatsapp-wallet.transactions.show']) }}">
+        <i class="fas fa-list mr-2 text-green-600"></i> All transactions
+    </a>
+    <a href="{{ route('admin.whatsapp-wallet.transactions.p2p') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.p2p']) }}">
+        <i class="fas fa-paper-plane mr-2 text-green-600"></i> P2P transfers
+    </a>
+    <a href="{{ route('admin.whatsapp-wallet.transactions.pending') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.pending']) }}">
+        <i class="fas fa-clock mr-2 text-amber-600"></i> Pending payouts
+        @if($pendingCount > 0)
+            <span class="ml-2 bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 text-xs font-bold">{{ $pendingCount }}</span>
+        @endif
+    </a>
+    <a href="{{ route('admin.whatsapp-wallet.transactions.failed') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.failed']) }}">
+        <i class="fas fa-times-circle mr-2 text-red-600"></i> Failed payouts
+        @if($failedCount > 0)
+            <span class="ml-2 bg-red-100 text-red-800 rounded-full px-2 py-0.5 text-xs font-bold">{{ $failedCount }}</span>
+        @endif
+    </a>
+    <a href="{{ route('admin.whatsapp-wallet.settings') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.settings', 'admin.whatsapp-wallet.update', 'admin.whatsapp-wallet.fx-rates.update']) }}">
+        <i class="fas fa-cog mr-2 text-gray-600"></i> Settings &amp; FX
+    </a>
+</nav>

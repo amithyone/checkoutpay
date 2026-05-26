@@ -16,6 +16,8 @@
     };
 @endphp
 <div class="space-y-6">
+    @include('admin.whatsapp-wallet.partials.nav')
+
     @if(session('success'))
         <div class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">{{ session('success') }}</div>
     @endif
@@ -24,6 +26,11 @@
     @endif
 
     <div class="flex flex-wrap items-center gap-3">
+        @if($transaction->wallet)
+            <a href="{{ route('admin.whatsapp-wallet.wallets.show', $transaction->wallet) }}" class="text-sm text-primary hover:underline">
+                Wallet {{ $transaction->wallet->phone_e164 }}
+            </a>
+        @endif
         <a href="{{ route('admin.whatsapp-wallet.transactions.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
             <i class="fas fa-arrow-left mr-1"></i> Back to list
         </a>
