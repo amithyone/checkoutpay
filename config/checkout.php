@@ -25,9 +25,9 @@ return [
     |
     */
     'wordpress_plugin' => [
-        'version' => '1.4.0',
-        'zip' => 'downloads/copn-payment-gateway.zip',
-        'slug' => 'copn-payment-gateway',
+        'version' => '1.4.1',
+        'zip' => 'downloads/checkoutpay-gateway.zip',
+        'slug' => 'checkoutpay-gateway',
         'requires_wordpress' => '5.8',
         'requires_woocommerce' => '7.0',
     ],

@@ -3,7 +3,7 @@
  * Plugin Name:       COPN Payment Gateway for Nigerian Businesses
  * Plugin URI:        https://check-outpay.com/wordpress-plugin
  * Description:       COPN (CheckoutPay Nigeria) — official bank-transfer payment gateway for Nigerian businesses. Connects your store to CheckoutPay for virtual account checkout, webhooks, and order updates. Requires WooCommerce.
- * Version:           1.4.0
+ * Version:           1.4.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -11,7 +11,7 @@
  * Author URI:        https://check-outpay.com/
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       copn-payment-gateway
+ * Text Domain:       checkoutpay-gateway
  * Domain Path:        /languages
  * WC requires at least: 7.0
  * WC tested up to:      9.6
@@ -23,8 +23,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('COPN_VERSION', '1.4.0');
-define('COPN_TEXT_DOMAIN', 'copn-payment-gateway');
+define('COPN_VERSION', '1.4.1');
 define('COPN_PORTAL_URL', 'https://check-outpay.com');
 define('COPN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('COPN_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -33,7 +32,6 @@ define('COPN_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
 /** @deprecated 1.4.0 Use COPN_* constants. */
 define('CHECKOUTPAY_VERSION', COPN_VERSION);
-define('CHECKOUTPAY_TEXT_DOMAIN', COPN_TEXT_DOMAIN);
 define('CHECKOUTPAY_PORTAL_URL', COPN_PORTAL_URL);
 define('CHECKOUTPAY_PLUGIN_DIR', COPN_PLUGIN_DIR);
 define('CHECKOUTPAY_PLUGIN_URL', COPN_PLUGIN_URL);
@@ -73,7 +71,7 @@ function copn_woocommerce_missing_notice()
 {
     ?>
     <div class="notice notice-error">
-        <p><?php esc_html_e('COPN Payment Gateway for Nigerian Businesses requires WooCommerce to be installed and active.', COPN_TEXT_DOMAIN); ?></p>
+        <p><?php esc_html_e('COPN Payment Gateway for Nigerian Businesses requires WooCommerce to be installed and active.', 'checkoutpay-gateway'); ?></p>
     </div>
     <?php
 }
@@ -91,7 +89,7 @@ function copn_plugin_action_links($links)
     }
 
     $settings_url = admin_url('admin.php?page=wc-settings&tab=checkout&section=checkoutpay');
-    $settings_link = '<a href="' . esc_url($settings_url) . '">' . esc_html__('Settings', COPN_TEXT_DOMAIN) . '</a>';
+    $settings_link = '<a href="' . esc_url($settings_url) . '">' . esc_html__('Settings', 'checkoutpay-gateway') . '</a>';
 
     return array_merge(array($settings_link), $links);
 }
@@ -120,7 +118,7 @@ add_action('admin_notices', function () {
             echo wp_kses_post(
                 sprintf(
                     /* translators: %s: WooCommerce CheckoutPay settings URL */
-                    __('CheckoutPay (COPN) is enabled but missing API URL or API Key. <a href="%s">Configure settings</a>.', COPN_TEXT_DOMAIN),
+                    __('CheckoutPay (COPN) is enabled but missing API URL or API Key. <a href="%s">Configure settings</a>.', 'checkoutpay-gateway'),
                     esc_url($settings_url)
                 )
             );
@@ -188,8 +186,8 @@ function copn_activate()
     if (!copn_is_woocommerce_active()) {
         deactivate_plugins(COPN_PLUGIN_BASENAME);
         wp_die(
-            esc_html__('COPN Payment Gateway for Nigerian Businesses requires WooCommerce. Please install and activate WooCommerce first.', COPN_TEXT_DOMAIN),
-            esc_html__('Plugin Activation Error', COPN_TEXT_DOMAIN),
+            esc_html__('COPN Payment Gateway for Nigerian Businesses requires WooCommerce. Please install and activate WooCommerce first.', 'checkoutpay-gateway'),
+            esc_html__('Plugin Activation Error', 'checkoutpay-gateway'),
             array('back_link' => true)
         );
     }
