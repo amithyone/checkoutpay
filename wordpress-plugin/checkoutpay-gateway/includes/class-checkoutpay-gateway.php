@@ -72,7 +72,7 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
             return;
         }
 
-        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.0';
+        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.1';
         $base_url = defined('CHECKOUTPAY_PLUGIN_URL') ? CHECKOUTPAY_PLUGIN_URL : '';
 
         wp_enqueue_script(
@@ -160,7 +160,7 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
             return;
         }
 
-        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.0';
+        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.1';
         $base_url = defined('CHECKOUTPAY_PLUGIN_URL') ? CHECKOUTPAY_PLUGIN_URL : '';
 
         wp_enqueue_script('jquery');
