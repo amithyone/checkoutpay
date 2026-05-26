@@ -8,6 +8,7 @@ return [
     'default_keywords' => 'payment gateway Nigeria, cheapest payment gateway Nigeria, reliable payment gateway, bank transfer payments Nigeria, WooCommerce payment Nigeria, virtual account checkout, WordPress payment plugin Nigeria, payment gateway API Nigeria, developer payment gateway program Nigeria, CheckoutPay, check-outpay',
     'locale' => 'en_NG',
     'twitter_handle' => '@CheckoutPayNG',
+    'google_site_verification' => 'gDWop-gnIIBUlNGs0xdQRs47Rwi5wIm3Tg-eQ9kissk',
     'og_image' => '/checkout-logo.png',
     'organization' => [
         'legal_name' => 'CheckoutPay',
