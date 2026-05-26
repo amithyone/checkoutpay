@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       Bank Transfer Gateway for CheckoutPay and WooCommerce
+ * Plugin Name:       Bank Transfer Gateway for CheckoutPay
  * Plugin URI:        https://check-outpay.com/wordpress-plugin
- * Description:       Official CheckoutPay payment integration for WooCommerce (third-party; not affiliated with WooCommerce). Nigerian bank-transfer checkout with virtual account details, webhooks, and automatic order updates.
- * Version:           1.3.3
+ * Description:       Official CheckoutPay bank-transfer payment gateway for online stores using WooCommerce. Nigerian virtual account checkout, webhooks, and automatic order updates.
+ * Version:           1.3.4
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHECKOUTPAY_VERSION', '1.3.3');
+define('CHECKOUTPAY_VERSION', '1.3.4');
 define('CHECKOUTPAY_TEXT_DOMAIN', 'checkoutpay-gateway');
 define('CHECKOUTPAY_PORTAL_URL', 'https://check-outpay.com');
 define('CHECKOUTPAY_PLUGIN_DIR', plugin_dir_path(__FILE__));
@@ -58,7 +58,7 @@ function checkoutpay_woocommerce_missing_notice()
 {
     ?>
     <div class="notice notice-error">
-        <p><?php esc_html_e('CheckoutPay – Bank Transfer Gateway for WooCommerce requires WooCommerce to be installed and active.', 'checkoutpay-gateway'); ?></p>
+        <p><?php esc_html_e('Bank Transfer Gateway for CheckoutPay requires WooCommerce to be installed and active.', 'checkoutpay-gateway'); ?></p>
     </div>
     <?php
 }
@@ -173,7 +173,7 @@ function checkoutpay_activate()
     if (!checkoutpay_is_woocommerce_active()) {
         deactivate_plugins(CHECKOUTPAY_PLUGIN_BASENAME);
         wp_die(
-            esc_html__('CheckoutPay – Bank Transfer Gateway for WooCommerce requires WooCommerce. Please install and activate WooCommerce first.', 'checkoutpay-gateway'),
+            esc_html__('Bank Transfer Gateway for CheckoutPay requires WooCommerce. Please install and activate WooCommerce first.', 'checkoutpay-gateway'),
             esc_html__('Plugin Activation Error', 'checkoutpay-gateway'),
             array('back_link' => true)
         );

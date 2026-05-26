@@ -1,4 +1,4 @@
-# WordPress.org review — reply template (v1.3.3)
+# WordPress.org review — reply template (v1.3.4)
 
 **Before sending:** Add and verify **`notify@check-outpay.com`** on your [WordPress.org profile](https://profiles.wordpress.org/) (Profile → Email). The review team will not accept Gmail for ownership proof.
 
@@ -8,7 +8,7 @@ Copy the text below into your reply to the Plugins Team email thread. Keep it sh
 
 ---
 
-**Subject:** Re: CheckoutPay plugin review — ownership + v1.3.3 update
+**Subject:** Re: CheckoutPay plugin review — ownership + v1.3.4 update
 
 Hello,
 
@@ -18,9 +18,9 @@ This is the **official CheckoutPay** integration from https://check-outpay.com/ 
 
 **Slug:** Please reserve **checkoutpay-gateway** as the plugin permalink (folder name and text domain already use `checkoutpay-gateway`). If a different slug was auto-assigned on submit, please move us to **checkoutpay-gateway** — I will not resubmit under a second account.
 
-**Display name (v1.3.3):** **Bank Transfer Gateway for CheckoutPay and WooCommerce** — trademarks appear after “for” to show this is a third-party WooCommerce integration, not a WooCommerce product.
+**Display name (v1.3.4):** **Bank Transfer Gateway for CheckoutPay** — “WooCommerce” removed from the Plugin Name line and readme title per your restricted-term notice. WooCommerce is still required via `Requires Plugins: woocommerce` and documented in the description.
 
-**Technical (v1.3.3):**
+**Technical (v1.3.4):**
 - Admin and thank-you JavaScript use `wp_enqueue_script` / `wp_localize_script` (no inline `<script>` blocks).
 - Webhook JSON is validated as an array, then `received_amount`, `charges`, and other fields are sanitized before order meta.
 - Gateway classes use the `Checkoutpay_` prefix (`Checkoutpay_Gateway`, `Checkoutpay_Blocks`); they extend WooCommerce core classes only as required by the payment gateway API.
