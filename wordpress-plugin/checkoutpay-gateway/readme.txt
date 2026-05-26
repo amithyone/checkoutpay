@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -138,6 +138,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * You are responsible for informing customers how payment data is processed under your store privacy policy.
 
 == Changelog ==
+
+= 1.3.2 =
+* Plugin Check: remove .distignore and phpcs.xml.dist from plugin package (dev files stay in git repo only, not in upload ZIP).
 
 = 1.3.1 =
 * Plugin Check: remove phpcs.xml.dist from plugin package (dev config lives in repo only); add .distignore for WordPress.org distribution.

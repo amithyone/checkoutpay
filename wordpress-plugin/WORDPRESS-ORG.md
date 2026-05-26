@@ -83,8 +83,17 @@ svn commit -m "Release 1.2.5"
 
 ```bash
 cd wordpress-plugin
-zip -r ../public/downloads/checkoutpay-gateway.zip checkoutpay-gateway -x "*.DS_Store"
+rm -f ../public/downloads/checkoutpay-gateway.zip
+zip -r ../public/downloads/checkoutpay-gateway.zip checkoutpay-gateway \
+  -x "*.DS_Store" \
+  -x "*/.distignore" \
+  -x "*/phpcs.xml.dist" \
+  -x "*/.git*" \
+  -x "*/tests/*" \
+  -x "*/vendor/*"
 ```
+
+Do **not** put `.distignore` or `phpcs.xml.dist` inside `checkoutpay-gateway/` — Plugin Check rejects hidden and application files. PHPCS config lives at `wordpress-plugin/phpcs.xml.dist` in this repo only.
 
 Bump version in: `checkoutpay-gateway.php`, `readme.txt` Stable tag, `config/checkout.php` → `wordpress_plugin.version`.
 
