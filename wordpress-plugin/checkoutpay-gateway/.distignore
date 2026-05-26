@@ -1,0 +1,11 @@
+# Excluded from WordPress.org plugin distribution (SVN deploy / Plugin Check zip).
+.git
+.github
+.distignore
+phpcs.xml.dist
+composer.json
+composer.lock
+phpunit.xml.dist
+tests
+node_modules
+vendor

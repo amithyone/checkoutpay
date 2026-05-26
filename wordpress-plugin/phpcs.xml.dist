@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <ruleset name="CheckoutPay Gateway">
-	<description>PHPCS rules for the CheckoutPay WooCommerce gateway plugin (directory slug: checkoutpay-gateway).</description>
+	<description>PHPCS rules for the CheckoutPay WooCommerce gateway plugin (directory slug: checkoutpay-gateway). Run from wordpress-plugin/: vendor/bin/phpcs -p</description>
 
-	<file>.</file>
+	<file>checkoutpay-gateway</file>
 
 	<exclude-pattern>/vendor/*</exclude-pattern>
 

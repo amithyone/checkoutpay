@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -138,6 +138,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * You are responsible for informing customers how payment data is processed under your store privacy policy.
 
 == Changelog ==
+
+= 1.3.1 =
+* Plugin Check: remove phpcs.xml.dist from plugin package (dev config lives in repo only); add .distignore for WordPress.org distribution.
 
 = 1.3.0 =
 * WordPress.org review: enqueue admin and thank-you scripts; sanitize webhook charges and received_amount; rename gateway classes to Checkoutpay_* prefix.
