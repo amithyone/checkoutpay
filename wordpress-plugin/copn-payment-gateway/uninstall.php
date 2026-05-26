@@ -2,7 +2,7 @@
 /**
  * Fired when the plugin is uninstalled.
  *
- * @package CheckoutPay
+ * @package COPN
  */
 
 if (!defined('WP_UNINSTALL_PLUGIN')) {

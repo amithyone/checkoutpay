@@ -8,7 +8,7 @@
 @endphp
 <a
     href="{{ CheckoutPayWordPressPlugin::downloadUrl() }}"
-    download="checkoutpay-gateway-{{ CheckoutPayWordPressPlugin::version() }}.zip"
+    download="{{ CheckoutPayWordPressPlugin::slug() }}-{{ CheckoutPayWordPressPlugin::version() }}.zip"
     {{ $attributes }}
 >
     @if ($icon)

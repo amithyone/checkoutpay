@@ -14,7 +14,12 @@ class CheckoutPayWordPressPlugin
 
     public static function zipPath(): string
     {
-        return (string) config('checkout.wordpress_plugin.zip', 'downloads/checkoutpay-gateway.zip');
+        return (string) config('checkout.wordpress_plugin.zip', 'downloads/copn-payment-gateway.zip');
+    }
+
+    public static function slug(): string
+    {
+        return (string) config('checkout.wordpress_plugin.slug', 'copn-payment-gateway');
     }
 
     /**

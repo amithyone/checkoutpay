@@ -1,4 +1,4 @@
-Bank Transfer Gateway for CheckoutPay
+COPN Payment Gateway for Nigerian Businesses
 Copyright (C) CheckoutPay
 
 This program is free software; you can redistribute it and/or modify

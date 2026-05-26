@@ -2,7 +2,7 @@
 /**
  * WooCommerce Blocks checkout integration for CheckoutPay.
  *
- * @package CheckoutPay
+ * @package COPN
  */
 
 if (!defined('ABSPATH')) {
@@ -14,17 +14,17 @@ use Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodTyp
 /**
  * Registers CheckoutPay on block-based checkout pages.
  */
-final class Checkoutpay_Blocks extends AbstractPaymentMethodType
+final class Copn_Blocks extends AbstractPaymentMethodType
 {
     /**
-     * Payment method ID (must match Checkoutpay_Gateway::$id).
+     * Payment method ID (must match Copn_Gateway::$id).
      *
      * @var string
      */
     protected $name = 'checkoutpay';
 
     /**
-     * @var Checkoutpay_Gateway|null
+     * @var Copn_Gateway|null
      */
     private $gateway;
 
@@ -46,7 +46,7 @@ final class Checkoutpay_Blocks extends AbstractPaymentMethodType
      */
     public function is_active()
     {
-        return $this->gateway instanceof Checkoutpay_Gateway && $this->gateway->is_available();
+        return $this->gateway instanceof Copn_Gateway && $this->gateway->is_available();
     }
 
     /**
@@ -54,8 +54,8 @@ final class Checkoutpay_Blocks extends AbstractPaymentMethodType
      */
     public function get_payment_method_script_handles()
     {
-        $script_path = CHECKOUTPAY_PLUGIN_DIR . 'assets/js/checkout-blocks.js';
-        $script_url = CHECKOUTPAY_PLUGIN_URL . 'assets/js/checkout-blocks.js';
+        $script_path = COPN_PLUGIN_DIR . 'assets/js/checkout-blocks.js';
+        $script_url = COPN_PLUGIN_URL . 'assets/js/checkout-blocks.js';
 
         wp_register_script(
             'checkoutpay-blocks',
@@ -66,7 +66,7 @@ final class Checkoutpay_Blocks extends AbstractPaymentMethodType
                 'wp-element',
                 'wp-html-entities',
             ),
-            file_exists($script_path) ? (string) filemtime($script_path) : CHECKOUTPAY_VERSION,
+            file_exists($script_path) ? (string) filemtime($script_path) : COPN_VERSION,
             true
         );
 
@@ -80,12 +80,12 @@ final class Checkoutpay_Blocks extends AbstractPaymentMethodType
     {
         $title = $this->get_setting('title');
         if ($title === '') {
-            $title = __('CheckoutPay', 'checkoutpay-gateway');
+            $title = __('CheckoutPay', 'copn-payment-gateway');
         }
 
         $description = $this->get_setting('description');
         if ($description === '') {
-            $description = __('Pay securely via bank transfer using CheckoutPay.', 'checkoutpay-gateway');
+            $description = __('Pay securely via bank transfer using CheckoutPay.', 'copn-payment-gateway');
         }
 
         return array(

@@ -1,6 +1,6 @@
 # Submitting CheckoutPay Gateway to WordPress.org
 
-This folder contains the **WordPress.org–ready** plugin source at `checkoutpay-gateway/`. The live site also ships a ZIP from `public/downloads/checkoutpay-gateway.zip`.
+This folder contains the **WordPress.org–ready** plugin source at `copn-payment-gateway/` (COPN = CheckoutPay Nigeria). The live site ships a ZIP from `public/downloads/copn-payment-gateway.zip`.
 
 Merchant setup guide: [INSTALLATION.md](INSTALLATION.md) (repo folder `wordpress-plugin/`, not shipped inside the plugin ZIP).
 
@@ -10,8 +10,8 @@ WordPress.org requires a **brand-first** name (not generic titles like “Paymen
 
 | Item | Value |
 |------|--------|
-| **Directory display name** | CheckoutPay – Bank Transfer Gateway for WooCommerce |
-| **Slug** (do not change after approval) | `checkoutpay-gateway` |
+| **Directory display name** | COPN Payment Gateway for Nigerian Businesses |
+| **Slug** (request on submit; do not change after approval) | `copn-payment-gateway` |
 | **WordPress.org username** | `amithyone` |
 | **Verified email** | `notify@check-outpay.com` (must be on your [wordpress.org profile](https://profiles.wordpress.org/) before submit) |
 | **Brand / service** | CheckoutPay — https://check-outpay.com/ |
@@ -30,7 +30,7 @@ Use when submitting at [Add your plugin](https://wordpress.org/plugins/developer
 
 | Field | Text |
 |-------|------|
-| **Plugin name** | CheckoutPay – Bank Transfer Gateway for WooCommerce |
+| **Plugin name** | COPN Payment Gateway for Nigerian Businesses |
 | **Short description** | Official CheckoutPay extension for WooCommerce: Nigerian bank-transfer checkout with virtual account details, webhooks, and automatic order updates. |
 | **Plugin URL** | https://check-outpay.com/wordpress-plugin |
 | **Author** | CheckoutPay |
@@ -58,8 +58,8 @@ After uploading v1.3.0+, send the email in [REVIEW-REPLY.md](REVIEW-REPLY.md) (v
 
 1. Verify **notify@check-outpay.com** on your WordPress.org profile.
 2. Paste `readme.txt` into the [readme validator](https://wordpress.org/plugins/developers/readme-validator/).
-3. Run [Plugin Check](https://wordpress.org/plugins/plugin-check/) on the `checkoutpay-gateway` folder.
-4. Upload a **ZIP** of the `checkoutpay-gateway` folder only (slug must match folder name).
+3. Run [Plugin Check](https://wordpress.org/plugins/plugin-check/) on the `copn-payment-gateway` folder.
+4. Upload a **ZIP** of the `copn-payment-gateway` folder only (slug must match folder name).
 5. Prepare screenshots for SVN `assets/` after approval (see readme `== Screenshots ==`).
 
 ## Submission steps
@@ -84,7 +84,7 @@ svn commit -m "Release 1.2.5"
 ```bash
 cd wordpress-plugin
 rm -f ../public/downloads/checkoutpay-gateway.zip
-zip -r ../public/downloads/checkoutpay-gateway.zip checkoutpay-gateway \
+zip -r ../public/downloads/copn-payment-gateway.zip copn-payment-gateway \
   -x "*.DS_Store" \
   -x "*/.distignore" \
   -x "*/phpcs.xml.dist" \
@@ -93,9 +93,9 @@ zip -r ../public/downloads/checkoutpay-gateway.zip checkoutpay-gateway \
   -x "*/vendor/*"
 ```
 
-Do **not** put `.distignore` or `phpcs.xml.dist` inside `checkoutpay-gateway/` — Plugin Check rejects hidden and application files. PHPCS config lives at `wordpress-plugin/phpcs.xml.dist` in this repo only.
+Do **not** put `.distignore` or `phpcs.xml.dist` inside `copn-payment-gateway/` — Plugin Check rejects hidden and application files. PHPCS config lives at `wordpress-plugin/phpcs.xml.dist` in this repo only.
 
-Bump version in: `checkoutpay-gateway.php`, `readme.txt` Stable tag, `config/checkout.php` → `wordpress_plugin.version`.
+Bump version in: `copn-payment-gateway.php`, `readme.txt` Stable tag, `config/checkout.php` → `wordpress_plugin.version`.
 
 ## Notes for reviewers
 

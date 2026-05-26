@@ -20,13 +20,14 @@ return [
     | WooCommerce WordPress plugin (download + version labels)
     |--------------------------------------------------------------------------
     |
-    | Bump version when wordpress-plugin/checkoutpay-gateway is released so
+    | Bump version when wordpress-plugin/copn-payment-gateway is released so
     | all site download links and cache-busting stay in sync.
     |
     */
     'wordpress_plugin' => [
-        'version' => '1.3.4',
-        'zip' => 'downloads/checkoutpay-gateway.zip',
+        'version' => '1.4.0',
+        'zip' => 'downloads/copn-payment-gateway.zip',
+        'slug' => 'copn-payment-gateway',
         'requires_wordpress' => '5.8',
         'requires_woocommerce' => '7.0',
     ],
