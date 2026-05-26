@@ -201,6 +201,12 @@
                 if (data.available && data.bucket) {
                     text += ' Bucket: ' + data.bucket + '.';
                 }
+                if (data.transaction_status) {
+                    text += ' Provider status: ' + data.transaction_status + '.';
+                }
+                if (data.response_code) {
+                    text += ' Code: ' + data.response_code + '.';
+                }
                 if (data.auto_refund && data.auto_refund.message) {
                     text += ' ' + data.auto_refund.message;
                 }

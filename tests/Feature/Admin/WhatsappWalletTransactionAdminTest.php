@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\Admin;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use Illuminate\Support\Facades\Http;
 use App\Services\MavonPayTransferService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -84,6 +85,47 @@ class WhatsappWalletTransactionAdminTest extends TestCase
             ->get(route('admin.whatsapp-wallet.transactions.failed'))
             ->assertOk()
             ->assertSee('Failed wallet payouts');
+    }
+
+    public function test_check_status_updates_meta_from_tsk_response(): void
+    {
+        config([
+            'services.mevonpay.base_url' => 'https://mevonpay.com.ng',
+            'services.mevonpay.secret_key' => 'secret_test',
+            'services.mevonpay.transfer_status_path' => '/V1/tsk',
+        ]);
+
+        Http::fake([
+            'mevonpay.com.ng/V1/tsk' => Http::response([
+                'status' => 'success',
+                'message' => 'Transaction status verification complete.',
+                'reference' => 'waw_testref',
+                'details' => [
+                    'transactionStatus' => 'Success',
+                    'responseCode' => '00',
+                    'responseMessage' => 'Success',
+                    'sessionId' => 'waw_testref',
+                ],
+            ], 200),
+        ]);
+
+        $admin = $this->regularAdmin();
+        $txn = $this->walletWithTransaction([
+            'external_reference' => 'waw_testref',
+            'payout_bucket' => MavonPayTransferService::BUCKET_PENDING,
+            'payout_pending' => true,
+        ]);
+
+        $this->actingAs($admin, 'admin')
+            ->postJson(route('admin.whatsapp-wallet.transactions.check-status', $txn))
+            ->assertOk()
+            ->assertJsonPath('available', true)
+            ->assertJsonPath('bucket', MavonPayTransferService::BUCKET_SUCCESSFUL);
+
+        $txn->refresh();
+        $meta = is_array($txn->meta) ? $txn->meta : [];
+        $this->assertSame(MavonPayTransferService::BUCKET_SUCCESSFUL, $meta['payout_bucket'] ?? null);
+        $this->assertSame('00', $meta['mevonpay']['api_response']['responseCode'] ?? null);
     }
 
     public function test_check_status_returns_unavailable_when_path_not_configured(): void

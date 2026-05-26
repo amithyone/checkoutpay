@@ -49,8 +49,10 @@ return [
         'connect_timeout_seconds' => (int) env('MEVONPAY_CONNECT_TIMEOUT_SECONDS', 3),
         'temp_va_registration_number' => env('MEVONPAY_TEMP_VA_REGISTRATION_NUMBER', ''),
         'account_logs_enabled' => (bool) env('MEVONPAY_ACCOUNT_LOGS_ENABLED', false),
-        /** Optional TSQ path, e.g. /V1/transferstatus — leave empty until MevonPay documents it. */
-        'transfer_status_path' => env('MEVONPAY_TRANSFER_STATUS_PATH', ''),
+        /** TSQ (transaction status) path — POST with { "reference": "..." }. */
+        'transfer_status_path' => env('MEVONPAY_TRANSFER_STATUS_PATH', '/V1/tsk'),
+        /** bearer (default for /V1/tsk), token (same as payout), or raw */
+        'transfer_status_auth' => env('MEVONPAY_TRANSFER_STATUS_AUTH', 'bearer'),
     ],
 
     'mevonrubies' => [

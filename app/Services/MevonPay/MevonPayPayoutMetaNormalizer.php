@@ -78,6 +78,8 @@ final class MevonPayPayoutMetaNormalizer
         if (is_array($raw)) {
             if (isset($raw['api_response']) && is_array($raw['api_response'])) {
                 $base = $raw['api_response'];
+            } elseif (isset($raw['details']) && is_array($raw['details'])) {
+                $base = $raw['details'];
             } else {
                 $base = $raw;
             }
@@ -89,6 +91,10 @@ final class MevonPayPayoutMetaNormalizer
         $message = trim((string) ($payoutResult['response_message'] ?? ''));
 
         $mapped = self::mapApiResponseFields($base);
+
+        if (is_array($raw) && isset($raw['details']) && is_array($raw['details'])) {
+            $mapped = array_merge(self::mapApiResponseFields($raw['details']), $mapped);
+        }
 
         if ($sessionId !== '' && empty($mapped['sessionId'])) {
             $mapped['sessionId'] = $sessionId;
@@ -123,6 +129,11 @@ final class MevonPayPayoutMetaNormalizer
             'reference' => ['reference', 'Reference', 'payout_reference'],
             'responseMessage' => ['responseMessage', 'response_message', 'message', 'Message'],
             'responseCode' => ['responseCode', 'response_code', 'code', 'Code'],
+            'transactionStatus' => ['transactionStatus', 'transaction_status', 'TransactionStatus'],
+            'bankCode' => ['bankCode', 'bank_code', 'BankCode'],
+            'bankName' => ['bankName', 'bank_name', 'BankName'],
+            'paymentReference' => ['paymentReference', 'payment_reference', 'PaymentReference'],
+            'debitAccountName' => ['debitAccountName', 'debit_account_name', 'DebitAccountName'],
         ];
 
         $out = [];
