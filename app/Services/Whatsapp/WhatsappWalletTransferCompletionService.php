@@ -85,6 +85,8 @@ class WhatsappWalletTransferCompletionService
         float $amount,
         string $reference,
         string $whenLine,
+        ?string $sessionId = null,
+        ?string $responseMessage = null,
     ): bool {
         if (! config('whatsapp.wallet.send_transfer_receipt_image', true)) {
             return false;
@@ -97,6 +99,8 @@ class WhatsappWalletTransferCompletionService
             $amount,
             $reference,
             $whenLine,
+            $sessionId,
+            $responseMessage,
         );
         if ($png === null) {
             return false;
@@ -349,6 +353,8 @@ class WhatsappWalletTransferCompletionService
         $when = $this->transferNoticeTimeLine();
         $tail = $this->accountLast4($acct);
         $brand = $this->waBrand();
+        $ledgerRef = 'ledger-'.now()->format('Ymd-His');
+        $ledgerStatus = 'Ledger-only (live bank payout not enabled)';
         $receiptOk = $this->maybeSendBankTransferReceiptImage(
             $instance,
             $phone,
@@ -357,9 +363,12 @@ class WhatsappWalletTransferCompletionService
             $bankName,
             $acct,
             $payoutAmount,
-            'ledger-'.now()->format('Ymd-His'),
-            $when
+            $ledgerRef,
+            $when,
+            null,
+            $ledgerStatus,
         );
+        $receiptBlock = WhatsappBankTransferReceiptDetails::whatsappBlock(null, $ledgerStatus);
         $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
         $amountLine = $isSelf && $selfFee > 0
             ? '*You pay:* ₦'.number_format($amount, 2)."\n*Recipient gets:* ₦".number_format($payoutAmount, 2)."\n*Fee:* ₦".number_format($selfFee, 2)."\n"
@@ -373,8 +382,9 @@ class WhatsappWalletTransferCompletionService
                 "*Bank:* {$bankName}\n".
                 "*Account:* ****{$tail}\n".
                 $amountLine.
-                "*Time:* {$when}\n\n".
-                "🏦 *{$brand}* bank payouts are not on yet — this is *ledger-only* until support enables live sends.".
+                "*Time:* {$when}\n".
+                $receiptBlock.
+                "\n\n🏦 *{$brand}* bank payouts are not on yet — this is *ledger-only* until support enables live sends.".
                 $this->forwardableReceiptFooter().
                 $pin
             );
@@ -383,7 +393,13 @@ class WhatsappWalletTransferCompletionService
         }
         $this->sendWalletSubmenu($instance, $phone, $wallet);
 
-        return WalletTransferCompletionResult::success((float) $wallet->balance, 'Transfer recorded.');
+        $receipt = [
+            'session_id' => '',
+            'response_message' => $ledgerStatus,
+            'reference' => $ledgerRef,
+        ];
+
+        return WalletTransferCompletionResult::success((float) $wallet->balance, 'Transfer recorded.', $receipt);
     }
 
     /**
@@ -511,11 +527,13 @@ class WhatsappWalletTransferCompletionService
                 return;
             }
 
-            $meta = array_merge(is_array($txn->meta) ? $txn->meta : [], [
-                'payout_bucket' => $bucket,
-                'payout_response_code' => $result['response_code'] ?? null,
-                'payout_response_message' => $result['response_message'] ?? null,
-            ]);
+            $meta = WhatsappBankTransferReceiptDetails::mergeIntoMeta(
+                array_merge(is_array($txn->meta) ? $txn->meta : [], [
+                    'payout_bucket' => $bucket,
+                    'payout_response_code' => $result['response_code'] ?? null,
+                ]),
+                $result,
+            );
 
             $refund = $bucket === MavonPayTransferService::BUCKET_FAILED;
 
@@ -548,6 +566,11 @@ class WhatsappWalletTransferCompletionService
         $brand = $this->waBrand();
         $refShown = (string) ($result['reference'] ?? $reference);
         $acctTail = $this->accountLast4($acct);
+        $receipt = $this->bankReceiptFromPayout($result, $refShown);
+        $receiptBlock = WhatsappBankTransferReceiptDetails::whatsappBlock(
+            $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
+            $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
+        );
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
             $receiptOk = $this->maybeSendBankTransferReceiptImage(
@@ -559,7 +582,9 @@ class WhatsappWalletTransferCompletionService
                 $acct,
                 $payoutAmount,
                 $refShown,
-                $when
+                $when,
+                $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
+                $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
             );
             $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
             $amountLine = $isSelf && $selfFee > 0
@@ -576,6 +601,7 @@ class WhatsappWalletTransferCompletionService
                     $amountLine.
                     "*Time:* {$when}\n".
                     'Ref: *'.$refShown.'*'.
+                    $receiptBlock.
                     $this->forwardableReceiptFooter().
                     $pin
                 );
@@ -585,7 +611,7 @@ class WhatsappWalletTransferCompletionService
 
             $this->sendWalletSubmenu($instance, $phone, $wallet);
 
-            return WalletTransferCompletionResult::success((float) $wallet->balance, 'Bank transfer sent.');
+            return WalletTransferCompletionResult::success((float) $wallet->balance, 'Bank transfer sent.', $receipt);
         }
 
         if ($bucket === MavonPayTransferService::BUCKET_PENDING) {
@@ -595,13 +621,14 @@ class WhatsappWalletTransferCompletionService
                 "⏳ *Bank transfer processing*\n\n".
                 "To: *{$beneficiary}*\n".
                 "{$bankName} / ****{$acctTail} · ₦".number_format($amount, 2)."\n".
-                "*Time:* {$when}\n\n".
-                'Your wallet has been *debited*. We are waiting for the bank to confirm — contact support if it stays pending.'.
+                "*Time:* {$when}\n".
+                $receiptBlock.
+                "\n\nYour wallet has been *debited*. We are waiting for the bank to confirm — contact support if it stays pending.".
                 $this->pinDeleteReminderSuffix($userTypedPinInChat)
             );
             $this->sendWalletSubmenu($instance, $phone, $wallet);
 
-            return WalletTransferCompletionResult::success((float) $wallet->balance, 'Bank transfer is processing.');
+            return WalletTransferCompletionResult::success((float) $wallet->balance, 'Bank transfer is processing.', $receipt);
         }
 
         $detail = $result['response_message'] ?? 'The bank could not accept this transfer.';
@@ -611,7 +638,9 @@ class WhatsappWalletTransferCompletionService
             "⚠️ *Bank transfer not completed*\n\n".
             "Attempted to: *{$beneficiary}*\n".
             "{$bankName} / ****{$acctTail} · ₦".number_format($amount, 2)."\n".
-            "*Time:* {$when}\n\n".
+            "*Time:* {$when}\n".
+            $receiptBlock.
+            "\n\n".
             $detail."\n\n".
             "Your wallet was *refunded*.\n\n".
             '💰 Balance now: *₦'.number_format((float) $wallet->balance, 2).'*'.
@@ -867,5 +896,19 @@ class WhatsappWalletTransferCompletionService
         $this->sendWalletSubmenu($instance, $phone, $wallet);
 
         return WalletTransferCompletionResult::success((float) $wallet->balance, 'Transfer sent.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array{session_id: string, response_message: string, reference: string}
+     */
+    private function bankReceiptFromPayout(array $result, ?string $referenceFallback = null): array
+    {
+        $receipt = WhatsappBankTransferReceiptDetails::fromPayoutResult($result);
+        if ($receipt['reference'] === '' && $referenceFallback !== null && $referenceFallback !== '') {
+            $receipt['reference'] = $referenceFallback;
+        }
+
+        return $receipt;
     }
 }

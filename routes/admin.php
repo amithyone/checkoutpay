@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\VirtualCardAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletAdminController;
+use App\Http\Controllers\Admin\WhatsappWalletTransactionAdminController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
@@ -257,6 +258,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('whatsapp-wallet', [WhatsappWalletAdminController::class, 'index'])->name('whatsapp-wallet.index');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
+
+            Route::get('whatsapp-wallet/transactions', [WhatsappWalletTransactionAdminController::class, 'index'])->name('whatsapp-wallet.transactions.index');
+            Route::get('whatsapp-wallet/transactions/failed', [WhatsappWalletTransactionAdminController::class, 'failed'])->name('whatsapp-wallet.transactions.failed');
+            Route::get('whatsapp-wallet/transactions/pending', [WhatsappWalletTransactionAdminController::class, 'pending'])->name('whatsapp-wallet.transactions.pending');
+            Route::get('whatsapp-wallet/transactions/{transaction}', [WhatsappWalletTransactionAdminController::class, 'show'])->name('whatsapp-wallet.transactions.show');
+            Route::post('whatsapp-wallet/transactions/{transaction}/check-status', [WhatsappWalletTransactionAdminController::class, 'checkStatus'])->name('whatsapp-wallet.transactions.check-status');
+            Route::post('whatsapp-wallet/transactions/{transaction}/manual-refund', [WhatsappWalletTransactionAdminController::class, 'manualRefund'])->name('whatsapp-wallet.transactions.manual-refund');
 
             Route::get('virtual-cards', [VirtualCardAdminController::class, 'index'])->name('virtual-cards.index');
             Route::get('virtual-cards/{virtualCardRequest}', [VirtualCardAdminController::class, 'show'])->name('virtual-cards.show');

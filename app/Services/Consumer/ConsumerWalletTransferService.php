@@ -5,6 +5,7 @@ namespace App\Services\Consumer;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MavonPayTransferService;
+use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
@@ -328,11 +329,13 @@ class ConsumerWalletTransferService
                 return;
             }
 
-            $meta = array_merge(is_array($txn->meta) ? $txn->meta : [], [
-                'payout_bucket' => $bucket,
-                'payout_response_code' => $result['response_code'] ?? null,
-                'payout_response_message' => $result['response_message'] ?? null,
-            ]);
+            $meta = WhatsappBankTransferReceiptDetails::mergeIntoMeta(
+                array_merge(is_array($txn->meta) ? $txn->meta : [], [
+                    'payout_bucket' => $bucket,
+                    'payout_response_code' => $result['response_code'] ?? null,
+                ]),
+                $result,
+            );
 
             $refund = $bucket === MavonPayTransferService::BUCKET_FAILED;
 
@@ -358,6 +361,11 @@ class ConsumerWalletTransferService
         });
 
         $wallet = $wallet->fresh();
+        $receipt = WhatsappBankTransferReceiptDetails::fromPayoutResult($result, null);
+        if ($receipt['reference'] === '') {
+            $receipt['reference'] = (string) ($result['reference'] ?? $reference);
+        }
+
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL || $bucket === MavonPayTransferService::BUCKET_PENDING) {
             return [
                 'ok' => true,
@@ -365,7 +373,9 @@ class ConsumerWalletTransferService
                     ? 'Bank transfer is processing. Your wallet has been debited.'
                     : 'Bank transfer sent.',
                 'data' => [
-                    'reference' => (string) ($result['reference'] ?? $reference),
+                    'reference' => $receipt['reference'],
+                    'session_id' => $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
+                    'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
                     'balance_after' => (float) $wallet->balance,
                     'amount_debited' => $amount,
                     'payout_amount' => $payoutAmount,
@@ -382,6 +392,9 @@ class ConsumerWalletTransferService
             'data' => [
                 'balance_after' => (float) $wallet->balance,
                 'bucket' => $bucket,
+                'session_id' => $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
+                'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
+                'reference' => $receipt['reference'] !== '' ? $receipt['reference'] : null,
             ],
         ];
     }

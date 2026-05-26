@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -138,11 +139,17 @@ class MavonPayTransferService
                 'http_status' => $resp->status(),
             ]);
 
+            $sessionId = WhatsappBankTransferReceiptDetails::resolveSessionId(
+                ['raw' => $raw],
+                isset($payload['sessionId']) ? (string) $payload['sessionId'] : null,
+            );
+
             return [
                 'bucket' => $bucket,
                 'response_code' => $code !== '' ? $code : null,
                 'response_message' => $message !== '' ? $message : null,
                 'reference' => $payload['reference'],
+                'session_id' => $sessionId !== '' ? $sessionId : null,
                 'raw' => $raw,
                 'http_status' => $resp->status(),
             ];
@@ -153,11 +160,17 @@ class MavonPayTransferService
                 'message' => $message,
             ]);
 
+            $sessionId = WhatsappBankTransferReceiptDetails::resolveSessionId(
+                [],
+                isset($payload['sessionId']) ? (string) $payload['sessionId'] : null,
+            );
+
             return [
                 'bucket' => self::BUCKET_FAILED,
                 'response_code' => null,
                 'response_message' => $message,
                 'reference' => $payload['reference'],
+                'session_id' => $sessionId !== '' ? $sessionId : null,
                 'raw' => null,
                 'http_status' => null,
             ];

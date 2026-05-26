@@ -8,6 +8,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\MevonPay\MevonPayPayoutService;
+use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -482,6 +483,7 @@ class WhatsappWalletBankPayoutService
         $bankCode = NigerianBankCodeNormalizer::toNipTransferCode($bankCode);
 
         if ($wallet !== null && $wallet->canUseMevonPayoutApi()) {
+            $sessionId = 'WAW'.now()->format('YmdHis').Str::upper(Str::random(4));
             $result = $this->payout->createPayout([
                 'amount' => $amount,
                 'bankCode' => $bankCode,
@@ -494,6 +496,7 @@ class WhatsappWalletBankPayoutService
                 'reference' => $reference,
             ]);
             $result['payout_api'] = MevonPayLedgerEntry::PAYOUT_API_PAYOUT;
+            $result['session_id'] = WhatsappBankTransferReceiptDetails::resolveSessionId($result, $sessionId);
             $this->recordOutboundLedger($result, $amount, $reference, $wallet, $walletTransactionId);
 
             return $result;
@@ -512,6 +515,7 @@ class WhatsappWalletBankPayoutService
             'sessionId' => $sessionId,
         ]);
         $result['payout_api'] = MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER;
+        $result['session_id'] = WhatsappBankTransferReceiptDetails::resolveSessionId($result, $sessionId);
         $this->recordOutboundLedger($result, $amount, $reference, $wallet, $walletTransactionId);
 
         return $result;

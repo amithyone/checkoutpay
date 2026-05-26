@@ -3,6 +3,7 @@
 namespace App\Services\MevonPay;
 
 use App\Services\MavonPayTransferService;
+use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -170,11 +171,17 @@ class MevonPayPayoutService
             'http_status' => $httpStatus,
         ]);
 
+        $sessionId = WhatsappBankTransferReceiptDetails::resolveSessionId(
+            ['raw' => $json],
+            null,
+        );
+
         return [
             'bucket' => $bucket,
             'response_code' => $code !== '' ? $code : null,
             'response_message' => $message !== '' ? $message : null,
             'reference' => $reference,
+            'session_id' => $sessionId !== '' ? $sessionId : null,
             'raw' => $json !== [] ? $json : null,
             'http_status' => $httpStatus,
         ];

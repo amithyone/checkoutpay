@@ -192,12 +192,12 @@
                 <i class="fas fa-exclamation-triangle text-lg mb-1"></i>
                 <span class="text-xs">Review</span>
                 @php
-                    $needsReviewCount = \App\Models\Payment::withCount('statusChecks')
+                    $needsReviewCount = \App\Models\Payment::query()
                     ->where('status', \App\Models\Payment::STATUS_PENDING)
                     ->where(function ($q) {
                         $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                     })
-                    ->having('status_checks_count', '>=', 3)
+                    ->has('statusChecks', '>=', 3)
                     ->count();
                 @endphp
                 @if($needsReviewCount > 0)

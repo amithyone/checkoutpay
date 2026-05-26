@@ -469,6 +469,7 @@ class WhatsappWalletSecureTransferAuthService
             'ok' => true,
             'balance_after' => $out->balanceAfter,
             'message' => $out->message,
+            'receipt' => $out->receipt,
         ];
     }
 

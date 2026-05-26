@@ -49,6 +49,8 @@ return [
         'connect_timeout_seconds' => (int) env('MEVONPAY_CONNECT_TIMEOUT_SECONDS', 3),
         'temp_va_registration_number' => env('MEVONPAY_TEMP_VA_REGISTRATION_NUMBER', ''),
         'account_logs_enabled' => (bool) env('MEVONPAY_ACCOUNT_LOGS_ENABLED', false),
+        /** Optional TSQ path, e.g. /V1/transferstatus — leave empty until MevonPay documents it. */
+        'transfer_status_path' => env('MEVONPAY_TRANSFER_STATUS_PATH', ''),
     ],
 
     'mevonrubies' => [

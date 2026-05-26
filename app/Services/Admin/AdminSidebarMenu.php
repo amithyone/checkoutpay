@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\Admin;
 use App\Models\Payment;
+use App\Models\WhatsappWalletTransaction;
 use App\Models\Renter;
 use App\Models\SupportTicket;
 use App\Models\VirtualCardRequest;
@@ -95,12 +96,12 @@ class AdminSidebarMenu
     /** @return array<string, array<string, mixed>> */
     private function registry(Admin $admin): array
     {
-        $needsReviewCount = Payment::withCount('statusChecks')
+        $needsReviewCount = Payment::query()
             ->where('status', Payment::STATUS_PENDING)
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
-            ->having('status_checks_count', '>=', 3)
+            ->has('statusChecks', '>=', 3)
             ->count();
 
         $openTickets = SupportTicket::where('status', SupportTicket::STATUS_OPEN)->count();
@@ -144,8 +145,16 @@ class AdminSidebarMenu
             ),
             'rentals' => $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', ['admin.rentals.*', 'admin.rental-categories.*', 'admin.rental-items.*']),
             'whatsapp_wallet' => array_merge(
-                $this->link('WhatsApp wallet', 'admin.whatsapp-wallet.index', 'fab fa-whatsapp text-green-600', ['admin.whatsapp-wallet.*']),
+                $this->link('WhatsApp wallet', 'admin.whatsapp-wallet.index', 'fab fa-whatsapp text-green-600', ['admin.whatsapp-wallet.index', 'admin.whatsapp-wallet.update', 'admin.whatsapp-wallet.fx-rates.update']),
                 ['visible' => $admin->canManageSettings()]
+            ),
+            'whatsapp_wallet_transactions' => array_merge(
+                $this->link('WhatsApp transactions', 'admin.whatsapp-wallet.transactions.index', 'fas fa-exchange-alt text-green-600', ['admin.whatsapp-wallet.transactions.*']),
+                [
+                    'visible' => $admin->canManageSettings(),
+                    'badge_count' => WhatsappWalletTransaction::countFailedBankPayoutsRecent(),
+                    'badge_color' => 'red',
+                ]
             ),
             'withdrawals' => $this->link('Withdrawals', 'admin.withdrawals.index', 'fas fa-hand-holding-usd', ['admin.withdrawals.*']),
             'overdraft' => $this->link('Overdraft queue', 'admin.overdraft-applications.index', 'fas fa-file-invoice-dollar', ['admin.overdraft-applications.*']),

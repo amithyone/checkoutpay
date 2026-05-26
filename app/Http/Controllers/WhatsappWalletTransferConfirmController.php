@@ -39,6 +39,10 @@ class WhatsappWalletTransferConfirmController extends Controller
             return back()->withErrors(['wallet_pin' => $error])->withInput();
         }
 
-        return view('wallet.whatsapp-transfer-confirm-done');
+        return view('wallet.whatsapp-transfer-confirm-done', [
+            'receipt' => $result['receipt'] ?? null,
+            'balance_after' => $result['balance_after'] ?? null,
+            'message' => $result['message'] ?? null,
+        ]);
     }
 }

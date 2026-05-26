@@ -727,6 +727,16 @@ Initiates bank transfer to a beneficiary account.
 - `09`, `90`, `99` -> Pending (client should reconcile)
 - Other codes -> Failed
 
+### Transfer status (TSQ) — optional
+
+When MevonPay documents a status/requery endpoint, set in `.env`:
+
+```env
+MEVONPAY_TRANSFER_STATUS_PATH=/V1/your-transfer-status-path
+```
+
+CheckoutPay uses this from **Admin → WhatsApp transactions** (Check MevonPay status). If unset, admins rely on stored payout meta and the MevonPay audit ledger.
+
 ---
 
 ## 5) Webhooks

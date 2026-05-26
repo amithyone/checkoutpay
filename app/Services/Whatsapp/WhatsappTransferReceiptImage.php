@@ -22,6 +22,8 @@ final class WhatsappTransferReceiptImage
         float $amount,
         string $reference,
         string $whenLine,
+        ?string $sessionId = null,
+        ?string $responseMessage = null,
     ): ?string {
         $lines = [
             'BANK TRANSFER — SUCCESS',
@@ -30,6 +32,7 @@ final class WhatsappTransferReceiptImage
             'Bank: '.self::foldForReceipt($bankName, 44),
             'Account: ****'.$accountLast4,
             'Ref: '.self::foldForReceipt($reference, 44),
+            ...WhatsappBankTransferReceiptDetails::plainLines($sessionId, $responseMessage),
             'Time: '.self::foldForReceipt($whenLine, 44),
             '',
             self::foldForReceipt($brand, 44),
