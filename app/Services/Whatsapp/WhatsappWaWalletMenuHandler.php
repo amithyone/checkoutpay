@@ -48,6 +48,7 @@ class WhatsappWaWalletMenuHandler
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
         private WhatsappWalletSelfBankTransferService $selfBankTransfer,
+        private WhatsappWalletPendingPayoutReconciliationService $pendingPayoutReconcile,
     ) {}
 
     public function openMenu(WhatsappSession $session, string $instance, string $phone, ?Renter $renter): void
@@ -384,6 +385,16 @@ class WhatsappWaWalletMenuHandler
 
     private function sendSubmenu(string $instance, string $phone, WhatsappWallet $wallet): void
     {
+        $refunds = [];
+        try {
+            $refunds = $this->pendingPayoutReconcile->reconcileWallet($wallet)['refunds'] ?? [];
+        } catch (\Throwable $e) {
+            Log::warning('whatsapp.wallet.pending_payout_reconcile_failed', [
+                'wallet_id' => $wallet->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $wallet = $wallet->fresh();
         if ($wallet->needsQuickWalletSetup()) {
             $this->client->sendText(
@@ -470,6 +481,18 @@ class WhatsappWaWalletMenuHandler
             $casualLine.
             WhatsappWalletAppLinkCopy::menuFooter()
         );
+
+        foreach ($refunds as $refund) {
+            $amount = (float) ($refund['amount'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'ℹ️ A pending transfer could not be completed; *₦'.number_format($amount, 2).'* was returned to your wallet.'
+            );
+        }
     }
 
     /**

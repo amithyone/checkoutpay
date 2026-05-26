@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\MevonPayLedgerEntry;
 use App\Models\WhatsappWalletTransaction;
-use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
 use App\Services\MevonPay\MevonPayTransferStatusService;
 use App\Services\MavonPayTransferService;
 use App\Services\Whatsapp\WhatsappWalletBankPayoutRefundService;
+use App\Services\Whatsapp\WhatsappWalletPendingPayoutReconciliationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +20,7 @@ class WhatsappWalletTransactionAdminController extends Controller
 {
     public function __construct(
         private MevonPayTransferStatusService $transferStatus,
+        private WhatsappWalletPendingPayoutReconciliationService $payoutReconciliation,
         private WhatsappWalletBankPayoutRefundService $refundService,
     ) {}
 
@@ -66,65 +67,12 @@ class WhatsappWalletTransactionAdminController extends Controller
 
     public function checkStatus(WhatsappWalletTransaction $transaction): JsonResponse
     {
-        $meta = is_array($transaction->meta) ? $transaction->meta : [];
-        $reference = (string) ($transaction->external_reference ?? $meta['payout_reference'] ?? '');
-        $payoutApi = isset($meta['payout_api']) ? (string) $meta['payout_api'] : null;
-
-        $result = $this->transferStatus->checkStatus($reference, $payoutApi);
-
-        if (! ($result['available'] ?? false)) {
-            return response()->json($result);
-        }
-
-        $previousBucket = $transaction->payoutBucketLabel();
-        $newBucket = (string) ($result['bucket'] ?? $previousBucket);
-
-        $meta['provider_status_checked_at'] = now()->toIso8601String();
-        $meta['provider_status_bucket'] = $newBucket;
-        $meta['provider_status_response_code'] = $result['response_code'] ?? null;
-        $meta['provider_status_response_message'] = $result['response_message'] ?? null;
-        $meta['provider_status_http_status'] = $result['http_status'] ?? null;
-
-        if ($newBucket !== '') {
-            $meta['payout_bucket'] = $newBucket;
-            $meta['payout_pending'] = $newBucket === MavonPayTransferService::BUCKET_PENDING;
-            $meta['payout_failed'] = $newBucket === MavonPayTransferService::BUCKET_FAILED;
-        }
-
-        $bucketForPayload = $newBucket !== '' ? $newBucket : $transaction->payoutBucketLabel();
-        $refunded = $transaction->isReversed()
-            || $bucketForPayload === MavonPayTransferService::BUCKET_FAILED;
-
-        $existingMevon = is_array($meta['mevonpay'] ?? null) ? $meta['mevonpay'] : null;
-        $meta['mevonpay'] = MevonPayPayoutMetaNormalizer::buildPayload(
-            array_merge($result, ['bucket' => $bucketForPayload]),
-            $bucketForPayload,
-            $refunded,
+        $adminId = Auth::guard('admin')->id();
+        $result = $this->payoutReconciliation->reconcileTransaction(
+            $transaction,
+            is_int($adminId) ? $adminId : null,
+            onlyIfPending: false,
         );
-        if (is_array($existingMevon)) {
-            $meta['mevonpay']['initial_payout'] = $existingMevon['initial_payout'] ?? $existingMevon;
-        }
-        $meta['mevonpay']['last_provider_check'] = array_merge(
-            MevonPayPayoutMetaNormalizer::buildPayload($result, $bucketForPayload, $refunded),
-            ['checked_at' => now()->toIso8601String(), 'source' => 'provider_status_api'],
-        );
-
-        $transaction->update(['meta' => $meta]);
-
-        if (
-            $previousBucket === MavonPayTransferService::BUCKET_PENDING
-            && $newBucket === MavonPayTransferService::BUCKET_FAILED
-            && ! $transaction->fresh()->isReversed()
-        ) {
-            $refund = $this->refundService->refundTransaction(
-                $transaction->fresh(),
-                Auth::guard('admin')->id(),
-                'provider_status_failed',
-            );
-            $result['auto_refund'] = $refund;
-        }
-
-        $result['payout_bucket'] = $transaction->fresh()->payoutBucketLabel();
 
         return response()->json($result);
     }

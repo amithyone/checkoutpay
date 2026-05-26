@@ -20,6 +20,7 @@ use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use App\Services\Whatsapp\WhatsappWalletPartnerApiService;
 use App\Services\Whatsapp\WhatsappWalletPendingP2pService;
+use App\Services\Whatsapp\WhatsappWalletPendingPayoutReconciliationService;
 use App\Services\Whatsapp\WhatsappWalletSecureTransferAuthService;
 use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
 use App\Services\Whatsapp\WhatsappWalletVtuPurchaseService;
@@ -45,6 +46,7 @@ class ConsumerWalletApiController extends Controller
         private WhatsappWalletSecureTransferAuthService $waTransferAuth,
         private ConsumerWalletPayCodeService $payCodes,
         private ConsumerWalletPayQrService $payQr,
+        private WhatsappWalletPendingPayoutReconciliationService $pendingPayoutReconcile,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -70,6 +72,14 @@ class ConsumerWalletApiController extends Controller
     public function showWallet(Request $request): JsonResponse
     {
         $wallet = $this->walletFor($request)->fresh();
+
+        try {
+            $this->pendingPayoutReconcile->reconcileWallet($wallet);
+        } catch (\Throwable) {
+            // Best-effort; do not block wallet summary.
+        }
+
+        $wallet = $wallet->fresh();
         $payCode = $this->payCodes->ensureForWallet($wallet);
         $summary = $this->partnerApi->getWalletSummary((string) $wallet->phone_e164);
         $cur = $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);

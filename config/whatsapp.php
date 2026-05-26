@@ -63,6 +63,12 @@ return [
         'transfer_confirm_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_TRANSFER_CONFIRM_TTL_MINUTES', 15))),
         /** One-time web link TTL for *REGISTER* wallet PIN setup (defaults to transfer_confirm TTL if unset). */
         'pin_setup_web_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_PIN_SETUP_WEB_TTL_MINUTES', 15))),
+        /** Lazy MevonPay TSQ for pending bank payouts when user opens wallet (hours window). */
+        'payout_reconcile_hours' => max(1, (int) env('WHATSAPP_WALLET_PAYOUT_RECONCILE_HOURS', 48)),
+        /** Minimum minutes between TSQ calls per pending payout (lazy reconcile only). */
+        'payout_reconcile_min_interval_minutes' => max(1, (int) env('WHATSAPP_WALLET_PAYOUT_RECONCILE_MIN_INTERVAL', 5)),
+        /** Max pending payouts to check per wallet menu / balance refresh. */
+        'payout_reconcile_max_per_trigger' => max(1, (int) env('WHATSAPP_WALLET_PAYOUT_RECONCILE_MAX', 3)),
         /** Legacy: only rows created before no-expiry P2P used this TTL. New pending P2P credits use no auto-expiry. */
         'p2p_pending_claim_minutes' => max(5, min(120, (int) env('WHATSAPP_WALLET_P2P_PENDING_CLAIM_MINUTES', 30))),
         /** After bank / instant P2P success, send a small PNG receipt (requires GD). Safe to forward — no balance. */

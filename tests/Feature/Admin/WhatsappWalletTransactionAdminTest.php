@@ -128,6 +128,45 @@ class WhatsappWalletTransactionAdminTest extends TestCase
         $this->assertSame('00', $meta['mevonpay']['api_response']['responseCode'] ?? null);
     }
 
+    public function test_check_status_auto_refunds_pending_to_failed(): void
+    {
+        config([
+            'services.mevonpay.base_url' => 'https://mevonpay.com.ng',
+            'services.mevonpay.secret_key' => 'secret_test',
+            'services.mevonpay.transfer_status_path' => '/V1/tsk',
+        ]);
+
+        Http::fake([
+            'mevonpay.com.ng/V1/tsk' => Http::response([
+                'status' => 'success',
+                'reference' => 'waw_failref',
+                'details' => [
+                    'transactionStatus' => 'Failed',
+                    'responseCode' => '91',
+                    'responseMessage' => 'Failed',
+                ],
+            ], 200),
+        ]);
+
+        $admin = $this->regularAdmin();
+        $txn = $this->walletWithTransaction([
+            'external_reference' => 'waw_failref',
+            'payout_bucket' => MavonPayTransferService::BUCKET_PENDING,
+            'payout_pending' => true,
+        ]);
+        $walletId = $txn->whatsapp_wallet_id;
+        WhatsappWallet::query()->whereKey($walletId)->update(['balance' => 4000]);
+
+        $this->actingAs($admin, 'admin')
+            ->postJson(route('admin.whatsapp-wallet.transactions.check-status', $txn))
+            ->assertOk()
+            ->assertJsonPath('auto_refund.ok', true);
+
+        $txn->refresh();
+        $this->assertTrue($txn->isReversed());
+        $this->assertSame(5000.0, (float) WhatsappWallet::query()->find($walletId)->balance);
+    }
+
     public function test_check_status_returns_unavailable_when_path_not_configured(): void
     {
         config(['services.mevonpay.transfer_status_path' => '']);
