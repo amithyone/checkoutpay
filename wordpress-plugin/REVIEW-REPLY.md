@@ -1,35 +1,40 @@
-# WordPress.org review — reply template
+# WordPress.org review — reply template (v1.3.3)
 
-**Before sending:** Add and verify `notify@check-outpay.com` on your [WordPress.org profile](https://profiles.wordpress.org/amithyone/edit/group/1/?screen=email) (Profile → Email). The review team matches ownership to `check-outpay.com`.
+**Before sending:** Add and verify **`notify@check-outpay.com`** on your [WordPress.org profile](https://profiles.wordpress.org/) (Profile → Email). The review team will not accept Gmail for ownership proof.
 
-Copy the text below into your reply to the Plugins Team email thread (keep it short).
+**Do not** rename the plugin to include your personal WordPress username unless you are a third-party developer — this is the **official CheckoutPay** plugin. Ownership is proven by the **check-outpay.com** email domain.
+
+Copy the text below into your reply to the Plugins Team email thread. Keep it short; do not paste a long AI essay.
 
 ---
 
-Subject: Re: CheckoutPay plugin review — ownership + v1.3.0 update
+**Subject:** Re: CheckoutPay plugin review — ownership + v1.3.3 update
 
 Hello,
 
-This is the official CheckoutPay integration from the service at https://check-outpay.com/. I submit as WordPress.org user **amithyone** with verified email **notify@check-outpay.com** on my profile (domain matches the plugin Author URI and Plugin URI).
+This is the **official CheckoutPay** integration from https://check-outpay.com/ (not a personal or third-party developer plugin).
 
-**Slug:** Please reserve and use **checkoutpay-gateway** as the plugin permalink (folder name and text domain already use this). If you have already reserved a different slug, I am happy to align to what you allocated — please confirm in your reply.
+**Ownership:** I have added and verified **notify@check-outpay.com** on my WordPress.org profile. Author is **CheckoutPay**; Author URI and Plugin URI use **check-outpay.com**. My WP.org login is only the account used to submit; it is not part of the plugin brand.
 
-**v1.3.0** addresses the technical items from your checklist:
-- Inline admin and thank-you scripts moved to `wp_enqueue_script` / `wp_localize_script`
-- Webhook `received_amount` and `charges` sanitized before order meta
-- Gateway classes renamed from `WC_CheckoutPay_*` to `Checkoutpay_*` with a distinct plugin prefix
+**Slug:** Please reserve **checkoutpay-gateway** as the plugin permalink (folder name and text domain already use `checkoutpay-gateway`). If a different slug was auto-assigned on submit, please move us to **checkoutpay-gateway** — I will not resubmit under a second account.
 
-Display name in `readme.txt` and the main plugin header: **CheckoutPay – Bank Transfer Gateway for WooCommerce**.
+**Display name (v1.3.3):** **Bank Transfer Gateway for CheckoutPay and WooCommerce** — trademarks appear after “for” to show this is a third-party WooCommerce integration, not a WooCommerce product.
 
-I have uploaded the updated ZIP via Add your plugin while logged in as amithyone.
+**Technical (v1.3.3):**
+- Admin and thank-you JavaScript use `wp_enqueue_script` / `wp_localize_script` (no inline `<script>` blocks).
+- Webhook JSON is validated as an array, then `received_amount`, `charges`, and other fields are sanitized before order meta.
+- Gateway classes use the `Checkoutpay_` prefix (`Checkoutpay_Gateway`, `Checkoutpay_Blocks`); they extend WooCommerce core classes only as required by the payment gateway API.
+
+I uploaded the updated ZIP via **Add your plugin** while logged in to my WordPress.org account.
 
 Thank you for reviewing.
 
 ---
 
-## Checklist (you)
+## Your checklist
 
-- [ ] `notify@check-outpay.com` verified on wordpress.org profile
-- [ ] ZIP uploaded (see build command in [WORDPRESS-ORG.md](WORDPRESS-ORG.md))
-- [ ] Plugin Check + readme validator run on test site
-- [ ] Reply sent (do not resubmit under a second account)
+- [ ] **notify@check-outpay.com** verified on wordpress.org profile (not Gmail)
+- [ ] Upload ZIP built from `checkoutpay-gateway/` only (see [WORDPRESS-ORG.md](WORDPRESS-ORG.md))
+- [ ] Plugin Check on a test site
+- [ ] Reply sent in the **same** email thread (do not open a second submission)
+- [ ] Do **not** resubmit under another account — ask them to transfer ownership if needed

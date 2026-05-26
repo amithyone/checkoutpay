@@ -55,4 +55,13 @@
 	pairs.forEach(function (pair) {
 		copyInputValue(pair.inputId, pair.buttonId, copiedLabel);
 	});
+
+	['checkoutpay-portal-url', 'checkoutpay-webhook-url', 'checkoutpay-website-url'].forEach(function (inputId) {
+		var input = document.getElementById(inputId);
+		if (input) {
+			input.addEventListener('focus', function () {
+				input.select();
+			});
+		}
+	});
 })();

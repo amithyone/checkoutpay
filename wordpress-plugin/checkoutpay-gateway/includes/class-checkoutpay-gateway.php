@@ -72,7 +72,7 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
             return;
         }
 
-        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.2';
+        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.3';
         $base_url = defined('CHECKOUTPAY_PLUGIN_URL') ? CHECKOUTPAY_PLUGIN_URL : '';
 
         wp_enqueue_script(
@@ -160,7 +160,7 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
             return;
         }
 
-        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.2';
+        $version = defined('CHECKOUTPAY_VERSION') ? CHECKOUTPAY_VERSION : '1.3.3';
         $base_url = defined('CHECKOUTPAY_PLUGIN_URL') ? CHECKOUTPAY_PLUGIN_URL : '';
 
         wp_enqueue_script('jquery');
@@ -257,6 +257,46 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
         }
 
         return $sanitized;
+    }
+
+    /**
+     * Sanitize webhook JSON body after json_decode (whitelist known keys).
+     *
+     * @param array<string, mixed> $data Decoded webhook payload.
+     * @return array<string, mixed>
+     */
+    private function sanitize_webhook_payload(array $data) {
+        $out = array();
+
+        if (isset($data['transaction_id'])) {
+            $out['transaction_id'] = sanitize_text_field((string) $data['transaction_id']);
+        }
+        if (isset($data['status'])) {
+            $out['status'] = sanitize_text_field((string) $data['status']);
+        }
+        if (isset($data['event'])) {
+            $out['event'] = sanitize_text_field((string) $data['event']);
+        }
+        if (isset($data['signature'])) {
+            $out['signature'] = sanitize_text_field((string) $data['signature']);
+        }
+        if (isset($data['mismatch_reason'])) {
+            $out['mismatch_reason'] = sanitize_text_field((string) $data['mismatch_reason']);
+        }
+        if (isset($data['reason'])) {
+            $out['reason'] = sanitize_text_field((string) $data['reason']);
+        }
+        if (isset($data['amount']) && is_numeric($data['amount'])) {
+            $out['amount'] = $this->sanitize_received_amount($data['amount']);
+        }
+        if (isset($data['received_amount'])) {
+            $out['received_amount'] = $this->sanitize_received_amount($data['received_amount']);
+        }
+        if (isset($data['charges'])) {
+            $out['charges'] = $this->sanitize_charges_array($data['charges']);
+        }
+
+        return $out;
     }
 
     /**
@@ -420,7 +460,6 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
                             class="large-text code"
                             id="checkoutpay-portal-url"
                             value="<?php echo esc_attr($portal_url); ?>/"
-                            onclick="this.select();"
                             style="flex: 1 1 280px;"
                         />
                         <a href="<?php echo esc_url($dashboard_websites_url); ?>" class="button" target="_blank" rel="noopener noreferrer">
@@ -438,7 +477,6 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
                             class="large-text code"
                             id="checkoutpay-webhook-url"
                             value="<?php echo esc_attr($webhook_url); ?>"
-                            onclick="this.select();"
                             style="flex: 1 1 280px;"
                         />
                         <button type="button" class="button" id="checkoutpay-copy-webhook-url">
@@ -456,7 +494,6 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
                             class="large-text code"
                             id="checkoutpay-website-url"
                             value="<?php echo esc_attr($website_url); ?>"
-                            onclick="this.select();"
                             style="flex: 1 1 280px;"
                         />
                         <button type="button" class="button" id="checkoutpay-copy-website-url">
@@ -883,12 +920,19 @@ class Checkoutpay_Gateway extends WC_Payment_Gateway {
      */
     public function handle_webhook() {
         $payload = file_get_contents('php://input');
-        $data = json_decode($payload, true);
+        $decoded = json_decode($payload, true);
+
+        if (!is_array($decoded)) {
+            status_header(400);
+            exit;
+        }
+
+        $data = $this->sanitize_webhook_payload($decoded);
 
         // Accept transaction_id and either status or event (API sends event + transaction_id + status)
-        $transaction_id = isset($data['transaction_id']) ? sanitize_text_field($data['transaction_id']) : '';
-        $status = isset($data['status']) ? sanitize_text_field($data['status']) : '';
-        $event = isset($data['event']) ? sanitize_text_field($data['event']) : '';
+        $transaction_id = isset($data['transaction_id']) ? $data['transaction_id'] : '';
+        $status = isset($data['status']) ? $data['status'] : '';
+        $event = isset($data['event']) ? $data['event'] : '';
 
         if (empty($transaction_id)) {
             status_header(400);

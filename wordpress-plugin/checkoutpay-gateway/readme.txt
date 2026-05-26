@@ -1,11 +1,11 @@
-=== CheckoutPay – Bank Transfer Gateway for WooCommerce ===
+=== Bank Transfer Gateway for CheckoutPay and WooCommerce ===
 Contributors: amithyone
 Tags: woocommerce, payment, payment gateway, bank transfer, nigeria
 Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.3.2
+Stable tag: 1.3.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,7 +13,7 @@ Official CheckoutPay extension for WooCommerce: Nigerian bank-transfer checkout 
 
 == Description ==
 
-**CheckoutPay – Bank Transfer Gateway for WooCommerce** is the official extension that connects your WooCommerce store to [CheckoutPay](https://check-outpay.com/) for Nigerian bank-transfer payments.
+**Bank Transfer Gateway for CheckoutPay and WooCommerce** is the official CheckoutPay extension that connects your WooCommerce store to [CheckoutPay](https://check-outpay.com/) for Nigerian bank-transfer payments. This plugin is a third-party integration for WooCommerce and is not affiliated with WooCommerce or Automattic.
 
 = How it works =
 
@@ -138,6 +138,9 @@ This plugin connects to **CheckoutPay** (`https://check-outpay.com`) to create a
 * You are responsible for informing customers how payment data is processed under your store privacy policy.
 
 == Changelog ==
+
+= 1.3.3 =
+* WordPress.org review: display name clarifies third-party WooCommerce integration; Author URI on check-outpay.com; webhook payload sanitization; admin fields use enqueued JS only (no inline handlers).
 
 = 1.3.2 =
 * Plugin Check: remove .distignore and phpcs.xml.dist from plugin package (dev files stay in git repo only, not in upload ZIP).
