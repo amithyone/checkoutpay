@@ -7,6 +7,7 @@ use App\Models\MevonPayLedgerEntry;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
+use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
 use App\Services\MevonPay\MevonPayPayoutService;
 use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use Illuminate\Support\Facades\Schema;
@@ -543,7 +544,10 @@ class WhatsappWalletBankPayoutService
             (string) ($result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED),
             $wallet?->mevon_virtual_account_number,
             $source,
-            ['whatsapp_wallet_id' => $wallet?->id, 'response_code' => $result['response_code'] ?? null],
+            array_filter([
+                'whatsapp_wallet_id' => $wallet?->id,
+                'mevonpay' => MevonPayPayoutMetaNormalizer::buildPayload($result),
+            ], static fn ($v) => $v !== null),
         );
     }
 

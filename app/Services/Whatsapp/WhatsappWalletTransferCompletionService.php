@@ -5,6 +5,7 @@ namespace App\Services\Whatsapp;
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
 use App\Services\MavonPayTransferService;
 use App\Services\Vtu\VtuProviderResolver;
 use App\Services\WhatsappWalletBankPayoutService;
@@ -527,10 +528,9 @@ class WhatsappWalletTransferCompletionService
                 return;
             }
 
-            $meta = WhatsappBankTransferReceiptDetails::mergeIntoMeta(
+            $meta = MevonPayPayoutMetaNormalizer::mergeIntoMeta(
                 array_merge(is_array($txn->meta) ? $txn->meta : [], [
                     'payout_bucket' => $bucket,
-                    'payout_response_code' => $result['response_code'] ?? null,
                 ]),
                 $result,
             );

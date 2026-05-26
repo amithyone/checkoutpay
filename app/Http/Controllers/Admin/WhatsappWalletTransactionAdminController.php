@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\MevonPayLedgerEntry;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
 use App\Services\MevonPay\MevonPayTransferStatusService;
 use App\Services\MavonPayTransferService;
 use App\Services\Whatsapp\WhatsappWalletBankPayoutRefundService;
@@ -89,6 +90,24 @@ class WhatsappWalletTransactionAdminController extends Controller
             $meta['payout_pending'] = $newBucket === MavonPayTransferService::BUCKET_PENDING;
             $meta['payout_failed'] = $newBucket === MavonPayTransferService::BUCKET_FAILED;
         }
+
+        $bucketForPayload = $newBucket !== '' ? $newBucket : $transaction->payoutBucketLabel();
+        $refunded = $transaction->isReversed()
+            || $bucketForPayload === MavonPayTransferService::BUCKET_FAILED;
+
+        $existingMevon = is_array($meta['mevonpay'] ?? null) ? $meta['mevonpay'] : null;
+        $meta['mevonpay'] = MevonPayPayoutMetaNormalizer::buildPayload(
+            array_merge($result, ['bucket' => $bucketForPayload]),
+            $bucketForPayload,
+            $refunded,
+        );
+        if (is_array($existingMevon)) {
+            $meta['mevonpay']['initial_payout'] = $existingMevon['initial_payout'] ?? $existingMevon;
+        }
+        $meta['mevonpay']['last_provider_check'] = array_merge(
+            MevonPayPayoutMetaNormalizer::buildPayload($result, $bucketForPayload, $refunded),
+            ['checked_at' => now()->toIso8601String(), 'source' => 'provider_status_api'],
+        );
 
         $transaction->update(['meta' => $meta]);
 

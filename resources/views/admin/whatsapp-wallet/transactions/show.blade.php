@@ -6,6 +6,8 @@
 @section('content')
 @php
     $meta = is_array($transaction->meta) ? $transaction->meta : [];
+    $mevonpayPayload = is_array($meta['mevonpay'] ?? null) ? $meta['mevonpay'] : null;
+    $mevonApi = is_array($mevonpayPayload['api_response'] ?? null) ? $mevonpayPayload['api_response'] : [];
     $bucketClass = match ($payoutBucket) {
         'failed' => 'bg-red-100 text-red-800',
         'pending' => 'bg-amber-100 text-amber-800',
@@ -67,12 +69,22 @@
             </div>
             <div>
                 <dt class="text-gray-500">Session ID</dt>
-                <dd class="font-mono text-gray-900 break-all">{{ $meta['payout_session_id'] ?? '—' }}</dd>
+                <dd class="font-mono text-gray-900 break-all">{{ $mevonApi['sessionId'] ?? $meta['payout_session_id'] ?? '—' }}</dd>
             </div>
             <div>
                 <dt class="text-gray-500">Mevon response</dt>
-                <dd class="text-gray-900">{{ ($meta['payout_response_code'] ?? '—') }} — {{ $meta['payout_response_message'] ?? '—' }}</dd>
+                <dd class="text-gray-900">
+                    {{ $mevonApi['responseCode'] ?? $meta['payout_response_code'] ?? '—' }}
+                    —
+                    {{ $mevonApi['responseMessage'] ?? $meta['payout_response_message'] ?? '—' }}
+                </dd>
             </div>
+            @if(!empty($mevonApi['contractReference']))
+            <div>
+                <dt class="text-gray-500">Contract reference</dt>
+                <dd class="font-mono text-gray-900 break-all">{{ $mevonApi['contractReference'] }}</dd>
+            </div>
+            @endif
             <div>
                 <dt class="text-gray-500">Beneficiary</dt>
                 <dd class="text-gray-900">{{ $transaction->counterparty_account_name ?: '—' }}</dd>
@@ -142,6 +154,14 @@
                     @endforeach
                 </tbody>
             </table>
+        </div>
+    @endif
+
+    @if($mevonpayPayload)
+        <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">MevonPay payout response</h3>
+            <p class="text-xs text-gray-500 mb-3">Full provider payload (session ID, response codes, and transfer fields).</p>
+            <pre class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-4 overflow-x-auto">{{ json_encode($mevonpayPayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
         </div>
     @endif
 
