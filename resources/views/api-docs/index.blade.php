@@ -3,15 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Documentation — CheckoutPay Payment Gateway Nigeria</title>
-    @include('partials.seo-head', ['seoOverrides' => [
-        'title' => 'API Documentation — CheckoutPay Payment Gateway Nigeria',
-        'description' => 'Complete API guide for CheckoutPay — integrate affordable, reliable bank-transfer and virtual-account payments in Nigeria with webhooks and REST endpoints.',
-        'path' => '/api-docs',
-    ]])
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
+    @include('partials.marketing-head', [
+        'seoPath' => '/api-docs',
+        'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('api'))],
+    ])
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -70,6 +65,14 @@
                 </h1>
                 <p class="text-xl text-gray-600 max-w-3xl mx-auto">
                     Complete integration guide for CheckoutPay Payment Gateway API. Build powerful payment solutions with our RESTful API.
+                </p>
+                <p class="mt-6 text-sm text-gray-600 max-w-2xl mx-auto">
+                    Building for clients?
+                    <a href="{{ route('developers.program') }}" class="text-primary font-medium hover:underline">Developer Program (revenue share)</a>
+                    ·
+                    <a href="{{ route('wordpress-plugin.index') }}" class="text-primary font-medium hover:underline">WordPress plugin</a>
+                    ·
+                    <a href="{{ route('faqs.index') }}#api" class="text-primary font-medium hover:underline">API FAQs</a>
                 </p>
             </div>
         </div>
@@ -1065,6 +1068,11 @@ if ($payload['event'] === 'payment.approved') {
             </div>
         </div>
     </section>
+
+    @include('partials.faq-section', [
+        'category' => 'api',
+        'title' => 'Payment gateway API FAQs',
+    ])
 
     @include('partials.footer')
 

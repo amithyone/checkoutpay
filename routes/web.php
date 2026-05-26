@@ -77,6 +77,7 @@ Route::get('/charity/{slug}', [\App\Http\Controllers\Public\CharityController::c
 Route::get('/about-us', [\App\Http\Controllers\AboutController::class, 'index'])->name('about.index');
 Route::get('/blog', [\App\Http\Controllers\BlogController::class, 'index'])->name('blog.index');
 Route::get('/faqs', [\App\Http\Controllers\FaqsController::class, 'index'])->name('faqs.index');
+Route::get('/site-map', [\App\Http\Controllers\SiteMapController::class, 'index'])->name('site-map.index');
 Route::get('/status', [\App\Http\Controllers\StatusController::class, 'index'])->name('status.index');
 Route::get('/security', function () {
     $page = \App\Models\Page::getBySlug('security');

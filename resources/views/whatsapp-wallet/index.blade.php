@@ -8,16 +8,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Wallet — Send Money to Anyone on WhatsApp | CheckoutPay</title>
-    @include('partials.seo-head', ['seoOverrides' => [
-        'title' => 'WhatsApp Wallet — Send Money to Anyone on WhatsApp | CheckoutPay',
-        'description' => 'CheckoutPay WhatsApp Wallet: send money to any Nigerian bank account or another WhatsApp number from the chat app you already use. P2P transfers, airtime, bills, and cross-border conversion with secure PIN confirmation.',
-        'path' => '/whatsapp-wallet',
-        'keywords' => 'WhatsApp wallet Nigeria, send money on WhatsApp, P2P transfer WhatsApp, WhatsApp bank transfer, CheckoutPay wallet, CheckoutNow wallet',
-    ]])
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
+    @include('partials.marketing-head', [
+        'seoPath' => '/whatsapp-wallet',
+        'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('whatsapp-wallet'))],
+    ])
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -269,42 +263,10 @@ X-API-Key: pk_your_key
         </div>
     </section>
 
-    {{-- FAQ --}}
-    <section class="py-14 sm:py-16 bg-white">
-        <div class="max-w-3xl mx-auto px-4 sm:px-6">
-            <h2 class="text-2xl font-bold text-gray-900 text-center mb-8">Common questions</h2>
-            <div class="space-y-4">
-                <details class="group border border-gray-200 rounded-lg p-4">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Is this the same as CheckoutNow?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition"></i>
-                    </summary>
-                    <p class="mt-3 text-sm text-gray-600">{{ $waBrand }} is the consumer wallet experience powered by the same CheckoutPay WhatsApp Wallet backend. Business tools live on check-outpay.com.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Can I send to someone who does not have a wallet yet?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition"></i>
-                    </summary>
-                    <p class="mt-3 text-sm text-gray-600">Yes — use bank transfer to their account details. For P2P, they need to open WALLET on WhatsApp once to receive wallet-to-wallet credits.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Is it safe?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition"></i>
-                    </summary>
-                    <p class="mt-3 text-sm text-gray-600">Outgoing transfers require your wallet PIN on a secure Checkout HTTPS page. Merchant charges use the same pattern — we do not offer silent debits without customer confirmation.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        How do merchants enable WhatsApp payments?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition"></i>
-                    </summary>
-                    <p class="mt-3 text-sm text-gray-600">Register a CheckoutPay business, get an API key, and ask us to enable the WhatsApp wallet API on your account. Then integrate <code class="bg-gray-100 px-1 rounded text-xs">pay/start</code> from your server.</p>
-                </details>
-            </div>
-        </div>
-    </section>
+    @include('partials.faq-section', [
+        'category' => 'whatsapp-wallet',
+        'title' => 'WhatsApp Wallet FAQs',
+    ])
 
     {{-- CTA --}}
     <section class="py-14 bg-gradient-to-r from-wa-dark to-wa text-white">

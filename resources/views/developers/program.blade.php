@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Developer Program — {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    <meta name="description" content="Built by a developer who integrated Paystack, Flutterwave, and more—without ever earning a share. {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }} pays partners via Business ID attribution, including our WordPress plugin.">
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
+    @include('partials.marketing-head', [
+        'seoPath' => '/developers/program',
+        'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('developer-program'))],
+    ])
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -208,123 +207,12 @@
             </p>
         </section>
 
-        <section class="mb-14" id="faq">
-            <h2 class="text-2xl font-bold text-gray-900 mb-8">Frequently asked questions</h2>
-            <div class="space-y-3">
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Do I have to apply before I can receive revenue share?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Yes. You must <a href="{{ url('/developers/program/apply') }}" class="text-primary font-medium hover:underline">submit the Developer Program application</a> and be <strong class="text-gray-800">approved</strong>. Until you are in the program, we do not accrue or pay developer revenue share—even if you already use our API or plugin.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        I integrated Paystack, Flutterwave, and others for years and never got a share—is this different?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Many gateways treat developers as implementation help while the brand captures all long-term value from processing. Our program is meant to fix that gap: when you are approved and attribution is valid (for example your <strong class="text-gray-800">Business ID</strong> on a qualifying integration), you can earn a defined share on eligible volume—not just a one-off project fee.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Why do I need my own {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }} business account if I only build for clients?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Your share is credited to <strong class="text-gray-800">your</strong> business account—the same place your Business ID lives—so you have statements, tax identity, and withdrawals in one profile. You are not “becoming the merchant”; you are claiming the developer attribution channel we use to pay you.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Where do I find my Business ID?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">After you <a href="{{ route('business.register') }}" class="text-primary font-medium hover:underline">create a business account</a>, use the Business ID shown in your dashboard (alongside API keys and business settings). That is the value you paste into the WordPress plugin’s developer / partner field.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Does the merchant’s Business ID replace mine?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">No. The merchant connects their store with their own API credentials. Your Business ID is a separate field used only to attribute the developer share to your account.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Is it safe to put my Business ID on a client’s WordPress site? What does the store owner see?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">The field is for <strong class="text-gray-800">attribution</strong>, not for sharing secret keys. Merchants should know you are listed as the integrating developer and that the ID is how we route your revenue share. Treat it like any other admin setting: only people who should manage payments should have wp-admin access.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Does my client pay extra so I get paid?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Your share comes from the program’s agreed economics on <strong class="text-gray-800">eligible</strong> processing—not from sneaking a hidden surcharge onto the shopper. The headline rate on our Developer Program page is kept in sync with admin configuration; your partner agreement may include additional detail.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Can my agency use one Business ID for every client site?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Usually yes: one partner business account, one Business ID, many stores—each installs the plugin with the same developer field so volume rolls up to you. If you need separate entities for tax or accounting, create separate business accounts and use the matching IDs.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        I only do custom code / Laravel / mobile apps—no WordPress. How do I get paid?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">The WordPress field is the first simple pattern we ship; the <strong class="text-gray-800">same principle</strong> applies elsewhere: an explicit partner or developer identifier we agree at onboarding (metadata, referral codes, or documented API patterns). <a href="{{ route('contact') }}" class="text-primary font-medium hover:underline">Contact us</a> with your stack so we can align attribution before go-live.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Can I get paid on stores I built before the plugin had a developer field?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Retroactive credit is <strong class="text-gray-800">not guaranteed</strong>. Once the field is available, add your Business ID and apply to the program; we will confirm what history—if any—can be attributed fairly.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        What if someone removes my Business ID from the plugin after launch?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Attribution follows what is configured in production. If the ID is removed or overwritten, new volume may no longer map to you until it is restored. Disputes between you and a merchant are a commercial relationship; we can only pay against valid, current attribution and program rules.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Do test or sandbox transactions count toward my share?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">No. Revenue share applies to <strong class="text-gray-800">qualifying production</strong> volume under the program. Test keys and sandbox traffic are for integration quality, not payouts.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Does every integration automatically qualify?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">No. You should apply to the program, meet technical and compliance rules, and use production traffic with a valid Business ID (or approved equivalent). We may decline or pause partners if attribution is unclear or terms are breached.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Can I stack this with another referral or affiliate program?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Stacking is governed by your <strong class="text-gray-800">partner agreement</strong>. Default assumption is one primary developer attribution per merchant integration unless we document an exception.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        What if my client already has an account?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">You can often still add your Developer Business ID in the plugin when the program allows it for that merchant. Migrations and legacy setups vary—<a href="{{ route('contact') }}" class="text-primary font-medium hover:underline">contact us</a> during application so we can confirm the cleanest path.</p>
-                </details>
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center">
-                        Where do I get API keys and documentation?
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm"></i>
-                    </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">Start at the <a href="{{ route('developers.index') }}" class="text-primary font-medium hover:underline">Developer hub</a> and <a href="{{ route('business.api-documentation.index') }}" class="text-primary font-medium hover:underline">API documentation</a>. Product downloads and plugin details are on the <a href="{{ route('wordpress-plugin.index') }}" class="text-primary font-medium hover:underline">WordPress plugin page</a>.</p>
-                </details>
-            </div>
-        </section>
+        @include('partials.faq-section', [
+            'category' => 'developer-program',
+            'title' => 'Developer program FAQs',
+            'showAllLink' => true,
+            'sectionId' => 'faq',
+        ])
 
         <section class="bg-primary/5 border border-primary/20 rounded-xl p-8 text-center">
             <h2 class="text-xl font-bold text-gray-900 mb-2">Ready to stop working for free?</h2>

@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CheckoutPay WordPress Plugin — WooCommerce Bank Transfer Gateway</title>
-    @include('partials.seo-head', ['seoOverrides' => [
-        'title' => 'CheckoutPay WordPress Plugin — WooCommerce Bank Transfer Gateway',
-        'description' => 'Official CheckoutPay WooCommerce plugin for Nigerian bank-transfer checkout. Download, install, configure API key and webhooks, and go live on your WordPress store.',
-        'path' => '/wordpress-plugin',
+    @include('partials.seo-head', ['seoOverrides' => \App\Support\Seo::forPath('/wordpress-plugin'), 'jsonLdExtra' => [
+        \App\Support\Seo::softwareApplicationJsonLd(),
+        \App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('wordpress-plugin')),
     ]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
@@ -42,6 +41,10 @@
                     Accept Nigerian bank-transfer payments in WooCommerce. Customers pay to a virtual account; orders update automatically when CheckoutPay confirms the transfer.
                 </p>
                 <p class="text-sm text-gray-500 mb-8">{{ \App\Support\CheckoutPayWordPressPlugin::versionLine() }}</p>
+                <p class="text-sm text-gray-500 mb-4">
+                    Agencies: earn revenue share — <a href="{{ route('developers.program') }}" class="text-primary font-medium hover:underline">Developer Program</a>
+                    · <a href="{{ route('faqs.index') }}#wordpress-plugin" class="text-primary font-medium hover:underline">Plugin FAQs</a>
+                </p>
                 <div class="flex flex-col sm:flex-row gap-3">
                     <x-checkoutpay-plugin-download label="Download plugin" class="inline-flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium shadow-lg" />
                     <a href="{{ route('business.register') }}" class="inline-flex items-center justify-center px-6 py-3 bg-white text-purple-700 border-2 border-purple-200 rounded-lg hover:bg-purple-50 font-medium">
@@ -144,29 +147,11 @@
         </div>
     </section>
 
-    <section class="py-12 bg-gray-50 border-t border-gray-100">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6">Troubleshooting</h2>
-            <div class="space-y-4 max-w-3xl">
-                <details class="bg-white rounded-lg border border-gray-200 p-4">
-                    <summary class="font-medium text-gray-900 cursor-pointer">CheckoutPay missing at checkout</summary>
-                    <p class="mt-3 text-sm text-gray-600">Enable the gateway under WooCommerce → Payments and save both API URL and API key.</p>
-                </details>
-                <details class="bg-white rounded-lg border border-gray-200 p-4">
-                    <summary class="font-medium text-gray-900 cursor-pointer">Webhook not updating orders</summary>
-                    <p class="mt-3 text-sm text-gray-600">Ensure the webhook URL in CheckoutPay exactly matches the URL shown in plugin settings and your site is publicly reachable.</p>
-                </details>
-                <details class="bg-white rounded-lg border border-gray-200 p-4">
-                    <summary class="font-medium text-gray-900 cursor-pointer">Block checkout</summary>
-                    <p class="mt-3 text-sm text-gray-600">The plugin supports WooCommerce Cart/Checkout blocks. Update WooCommerce and clear cache after enabling the gateway.</p>
-                </details>
-            </div>
-            <p class="mt-8 text-sm text-gray-600">
-                Need help? <a href="{{ route('support.index') }}" class="text-primary font-medium hover:underline">Support center</a>
-                or email <a href="mailto:notify@check-outpay.com" class="text-primary font-medium hover:underline">notify@check-outpay.com</a>.
-            </p>
-        </div>
-    </section>
+    @include('partials.faq-section', [
+        'category' => 'wordpress-plugin',
+        'title' => 'WordPress & WooCommerce FAQs',
+        'showAllLink' => true,
+    ])
 
     <section class="py-12 bg-purple-600 text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

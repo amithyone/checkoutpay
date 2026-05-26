@@ -38,6 +38,18 @@ class PageSeeder extends Seeder
             ]
         );
 
+        Page::updateOrCreate(
+            ['slug' => 'faqs'],
+            [
+                'title' => 'Frequently Asked Questions',
+                'content' => 'Searchable FAQs for CheckoutPay — payment gateway, API, WordPress plugin, developer program, and WhatsApp Wallet in Nigeria.',
+                'meta_title' => 'FAQs — Payment Gateway, API, WordPress Plugin & Developer Program | CheckoutPay Nigeria',
+                'meta_description' => 'Answers about CheckoutPay payment gateway fees, WooCommerce plugin, REST API, developer revenue share, WhatsApp Wallet, and security for Nigerian businesses.',
+                'is_published' => true,
+                'order' => 3,
+            ]
+        );
+
         LegalPagesDefinitions::syncToDatabase();
     }
 

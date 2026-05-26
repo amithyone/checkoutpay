@@ -8,7 +8,7 @@
         'title' => $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay',
         'description' => $page->meta_description ?? 'Transparent low fees for Nigerian merchants: competitive rates, no hidden charges. Compare CheckoutPay — a reliable, cost-effective payment gateway.',
         'path' => '/pricing',
-    ]])
+    ], 'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('payment-gateway'))]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
@@ -230,6 +230,11 @@
         </div>
     </section>
     @endif
+
+    @include('partials.faq-section', [
+        'category' => 'payment-gateway',
+        'title' => 'Payment gateway & pricing FAQs',
+    ])
 
     @include('partials.footer')
 

@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Developers — CheckoutPay API & Integrations Nigeria</title>
-    @include('partials.seo-head', ['seoOverrides' => [
-        'title' => 'Developers — CheckoutPay API & Integrations Nigeria',
-        'description' => 'Build on CheckoutPay: REST API, webhooks, WooCommerce, and wallet integrations for affordable, reliable payments in Nigeria.',
-        'path' => '/developers',
-    ]])
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
+    @include('partials.marketing-head', [
+        'seoPath' => '/developers',
+        'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(array_merge(
+            \App\Support\FaqCatalog::forCategory('api'),
+            \App\Support\FaqCatalog::forCategory('developer-program')
+        ))],
+    ])
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -140,6 +138,8 @@
             </div>
         </div>
     </section>
+
+    @include('partials.faq-section', ['categories' => ['api', 'developer-program'], 'title' => 'Developer & API FAQs'])
 
     @include('partials.footer')
 </body>

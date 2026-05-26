@@ -4,7 +4,7 @@
 @endphp
 <footer class="bg-gray-900 text-gray-300 py-8 sm:py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-6 sm:gap-8">
+        <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-6 gap-6 sm:gap-8">
             <!-- Products Column -->
             <div>
                 <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Products</h4>
@@ -36,18 +36,28 @@
                 </ul>
             </div>
 
+            <!-- Integrate Column -->
+            <div>
+                <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Integrate</h4>
+                <ul class="space-y-2 text-xs sm:text-sm">
+                    <li><a href="{{ route('api-docs') }}" class="hover:text-white transition-colors font-semibold">API Documentation</a></li>
+                    <li><a href="{{ route('wordpress-plugin.index') }}" class="hover:text-white transition-colors">WordPress / WooCommerce plugin</a></li>
+                    <li><a href="{{ route('developers.index') }}" class="hover:text-white transition-colors">Developers</a></li>
+                    <li><a href="{{ route('developers.program') }}" class="hover:text-white transition-colors font-semibold text-primary-200">Developer Program (revenue share)</a></li>
+                    <li><a href="{{ route('pricing') }}" class="hover:text-white transition-colors">Pricing</a></li>
+                </ul>
+            </div>
+
             <!-- Learn & Resources Column -->
             <div>
                 <h4 class="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Learn & Resources</h4>
                 <ul class="space-y-2 text-xs sm:text-sm">
-                    <li><a href="{{ route('api-docs') }}" class="hover:text-white transition-colors font-semibold">API Documentation</a></li>
+                    <li><a href="{{ route('faqs.index') }}" class="hover:text-white transition-colors font-semibold">FAQs</a></li>
                     <li><a href="{{ route('support.index') }}" class="hover:text-white transition-colors">Support</a></li>
                     <li><a href="{{ route('blog.index') }}" class="hover:text-white transition-colors">Blog</a></li>
-                    <li><a href="{{ route('developers.index') }}" class="hover:text-white transition-colors">Developers</a></li>
-                    <li><a href="{{ route('developers.program') }}" class="hover:text-white transition-colors">Developer Program</a></li>
-                    <li><a href="{{ url('/developers/program/apply') }}" class="hover:text-white transition-colors">Apply to Developer Program</a></li>
+                    <li><a href="{{ route('resources.index') }}" class="hover:text-white transition-colors">Resources</a></li>
                     <li><a href="{{ route('status.index') }}" class="hover:text-white transition-colors">Status</a></li>
-                    <li><a href="{{ route('faqs.index') }}" class="hover:text-white transition-colors">FAQs</a></li>
+                    <li><a href="{{ route('site-map.index') }}" class="hover:text-white transition-colors">Site map</a></li>
                 </ul>
             </div>
 

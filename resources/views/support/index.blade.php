@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Support — CheckoutPay Payment Gateway Nigeria</title>
-    @include('partials.seo-head', ['seoOverrides' => [
-        'title' => 'Support — CheckoutPay Payment Gateway Nigeria',
-        'description' => 'Get help with CheckoutPay — Nigeria\'s affordable, reliable payment gateway. Contact support for payments, WooCommerce, API, and wallet issues.',
-        'path' => '/support',
-    ]])
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
+    @include('partials.marketing-head', [
+        'seoPath' => '/support',
+        'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(array_merge(
+            \App\Support\FaqCatalog::forCategory('support'),
+            \App\Support\FaqCatalog::forCategory('security-compliance')
+        ))],
+    ])
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
@@ -97,29 +95,7 @@
         </div>
     </section>
 
-    <section class="py-12 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-xl font-bold text-gray-900 mb-6">Common questions</h2>
-            <div class="grid md:grid-cols-2 gap-6 text-sm text-gray-600">
-                <div>
-                    <h4 class="font-semibold text-gray-900 mb-1">How do I get started?</h4>
-                    <p>Sign up, verify your business, and get API keys from the dashboard.</p>
-                </div>
-                <div>
-                    <h4 class="font-semibold text-gray-900 mb-1">WooCommerce plugin?</h4>
-                    <p>Download the latest CheckoutPay gateway from our integrations page.</p>
-                </div>
-                <div>
-                    <h4 class="font-semibold text-gray-900 mb-1">Charges?</h4>
-                    <p>Default 1% + ₦100 per transaction; configurable per website.</p>
-                </div>
-                <div>
-                    <h4 class="font-semibold text-gray-900 mb-1">Still need email?</h4>
-                    <p><a href="{{ route('contact') }}" class="text-primary font-medium">Contact form</a> for non-urgent requests.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+    @include('partials.faq-section', ['categories' => ['support', 'security-compliance'], 'title' => 'Support & security FAQs'])
 
     @include('partials.footer')
 </body>

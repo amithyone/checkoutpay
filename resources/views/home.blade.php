@@ -9,11 +9,14 @@
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . $settings['site_favicon']) }}">
     @endif
     @include('partials.pwa-meta')
+    @php
+        $jsonLdExtra = [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('payment-gateway'))];
+    @endphp
     @include('partials.seo-head', ['seoOverrides' => [
         'title' => $page->meta_title ?? config('seo.default_title'),
         'description' => $page->meta_description ?? config('seo.default_description'),
         'path' => '/',
-    ]])
+    ], 'jsonLdExtra' => $jsonLdExtra])
     <!-- OPTIMIZED: Preconnect to CDN domains for faster loading -->
     <link rel="preconnect" href="https://cdn.tailwindcss.com">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
@@ -461,6 +464,12 @@
         </div>
     </section>
     @endif
+
+    @include('partials.faq-section', [
+        'category' => 'payment-gateway',
+        'title' => 'Payment gateway FAQs',
+        'showAllLink' => true,
+    ])
 
     @include('partials.footer')
 
