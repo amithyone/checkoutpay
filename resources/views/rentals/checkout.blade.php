@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.tailwind-assets')
-    <title>Checkout - Rentals</title>@if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+    <title>Checkout - Rentals</title>
+    
+@if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
     <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}" async defer></script>
     @endif
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-50">
     @php $rentalsColor = \App\Models\Setting::get('rentals_accent_color', '#000000'); @endphp

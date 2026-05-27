@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Setup - Email Payment Gateway</title>
-    @include('partials.tailwind-assets')
-    <meta name="csrf-token" content="{{ csrf_token() }}"><style>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+<style>
         .fade-in {
             animation: fadeIn 0.5s;
         }
@@ -14,6 +14,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
     </style>
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
     <div class="max-w-2xl w-full">

@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.tailwind-assets')
-    <title>{{ $item->name }} - Rentals</title></head>
+    <title>{{ $item->name }} - Rentals</title>
+    
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50">
     @php $rentalsColor = \App\Models\Setting::get('rentals_accent_color', '#000000'); @endphp
     @include('partials.nav')

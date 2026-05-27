@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('partials.marketing-head', [
-    @include('partials.tailwind-assets')
         'seoPath' => '/api-docs',
         'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('api'))],
-    ])<style>
+    ])
+<style>
         pre {
             white-space: pre-wrap;
             word-wrap: break-word;
@@ -39,6 +39,7 @@
         .badge-put { background: #f59e0b; color: white; }
         .badge-delete { background: #ef4444; color: white; }
     </style>
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-50">
     @include('partials.nav')

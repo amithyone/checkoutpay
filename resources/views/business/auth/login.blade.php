@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Login - Payment Gateway</title>
-    @include('partials.tailwind-assets')
     <meta name="theme-color" content="#ffffff">
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
@@ -13,7 +12,10 @@
     <style>
         #pwa-splash { position: fixed; inset: 0; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; transition: opacity 0.3s ease; }
         #pwa-splash.pwa-splash-hidden { opacity: 0; pointer-events: none; }
-    </style></head>
+    </style>
+    
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50">
     {{-- PWA splash: white screen with logo centered (shown first when app opens) --}}
     <div id="pwa-splash" aria-hidden="true">

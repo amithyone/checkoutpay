@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business loans marketplace — {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    @include('partials.tailwind-assets')
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif</head>
+    @endif
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50">
 @include('partials.nav')
 <main class="max-w-5xl mx-auto px-4 py-10">

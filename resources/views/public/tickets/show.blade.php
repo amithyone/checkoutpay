@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.tailwind-assets')
-    <title>{{ $event->title }} - Tickets</title><style>
+    <title>{{ $event->title }} - Tickets</title>
+<style>
         :root {
             --primary: #14b8a6;
             --primary-dark: #0d9488;
@@ -98,6 +98,7 @@
             }
         }
     </style>
+    @include('partials.tailwind-assets')
 </head>
 @php
     // Normalize background color (remove spaces, ensure lowercase for comparison)

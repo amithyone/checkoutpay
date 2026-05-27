@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay' }}</title>
     @include('partials.seo-head', ['seoOverrides' => [
-    @include('partials.tailwind-assets')
         'title' => $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay',
         'description' => $page->meta_description ?? 'Transparent low fees for Nigerian merchants: competitive rates, no hidden charges. Compare CheckoutPay — a reliable, cost-effective payment gateway.',
         'path' => '/pricing',
@@ -13,7 +12,9 @@
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif</head>
+    @endif
+    @include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50">
     @include('partials.nav')
 

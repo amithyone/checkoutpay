@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'My Account') - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    @include('partials.tailwind-assets')
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif<style>
+    @endif
+<style>
         @media (max-width: 1023px) {
             #account-sidebar.sidebar-closed { transform: translateX(-100%); }
             #account-sidebar.sidebar-open { transform: translateX(0); }
         }
         .dashboard-card { border-radius: 1.25rem; min-height: 7.5rem; }
     </style>
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-100 text-gray-800">
     <div class="flex min-h-screen">

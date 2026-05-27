@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.marketing-head', ['seoPath' => '/about-us'])</head>
-    @include('partials.tailwind-assets')
+    @include('partials.marketing-head', ['seoPath' => '/about-us'])
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-white">
     @include('partials.nav')
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-br from-primary/10 via-white to-primary/5">

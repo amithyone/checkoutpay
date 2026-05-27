@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Error - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    @include('partials.tailwind-assets')
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif</head>
+    @endif
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-2xl">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

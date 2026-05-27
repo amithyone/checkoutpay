@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.tailwind-assets')
-    <title>@yield('title') - CheckoutPay</title><link rel="preconnect" href="https://cdnjs.cloudflare.com"></head>
+    <title>@yield('title') - CheckoutPay</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
     <header class="bg-white border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">

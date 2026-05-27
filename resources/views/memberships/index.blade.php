@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memberships - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    @include('partials.tailwind-assets')
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif<style>
+    @endif
+    
+<style>
         .group:hover .memberships-card-btn { background-color: var(--memberships-accent) !important; color: white !important; }
     </style>
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-50">
     @php $membershipsColor = \App\Models\Setting::get('rentals_accent_color', '#000000'); @endphp

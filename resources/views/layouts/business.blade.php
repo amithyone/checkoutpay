@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') - Payment Gateway</title>
-    @include('partials.tailwind-assets')
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif
-    @include('partials.pwa-meta')<style>
+    @include('partials.pwa-meta')
+<style>
         @media (max-width: 1023px) {
             #sidebar.sidebar-closed {
                 transform: translateX(-100%);
@@ -20,6 +20,7 @@
             }
         }
     </style>
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-50">
     @if(session()->has('admin_impersonating_business_id') && auth('business')->check())

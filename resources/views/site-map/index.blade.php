@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('partials.marketing-head', ['seoPath' => '/site-map', 'seo' => $seo])
-    @include('partials.tailwind-assets')
+@include('partials.tailwind-assets')
 </head>
 <body class="bg-white">
     @include('partials.nav')

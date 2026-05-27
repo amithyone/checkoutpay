@@ -25,8 +25,7 @@
         }
     @endphp
     @include('partials.marketing-head', ['seoPath' => $seoPath, 'seo' => $seo])
-    @include('partials.tailwind-assets')
-    <style>
+<style>
         .legal-document h2 { scroll-margin-top: 5.5rem; }
         .legal-document h3 { margin-top: 1.25rem; margin-bottom: 0.5rem; }
         .legal-document a { text-decoration-thickness: 1px; }
@@ -62,6 +61,7 @@
             }
         }
     </style>
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-white">
     @include('partials.nav')

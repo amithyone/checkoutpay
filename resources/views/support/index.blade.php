@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('partials.marketing-head', [
-    @include('partials.tailwind-assets')
         'seoPath' => '/support',
         'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(array_merge(
             \App\Support\FaqCatalog::forCategory('support'),
             \App\Support\FaqCatalog::forCategory('security-compliance')
         ))],
-    ])</head>
+    ])
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-white">
     @include('partials.nav')
 

@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.tailwind-assets')
-    <title>{{ $title }} - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title></head>
+    <title>{{ $title }} - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
+    
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50 min-h-screen flex items-center justify-center py-8 px-4">
     <div class="max-w-md w-full">
         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">

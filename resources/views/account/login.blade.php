@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.tailwind-assets')
-    <title>Login - My Account</title>@if(\App\Models\Setting::get('site_favicon'))
+    <title>Login - My Account</title>
+    
+@if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-50 min-h-screen flex items-center justify-center py-10 px-4">
     <div class="max-w-md w-full">

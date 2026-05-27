@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CheckoutPay WordPress Plugin — WooCommerce Bank Transfer Gateway</title>
     @include('partials.seo-head', ['seoOverrides' => \App\Support\Seo::forPath('/wordpress-plugin'), 'jsonLdExtra' => [
-    @include('partials.tailwind-assets')
         \App\Support\Seo::softwareApplicationJsonLd(),
         \App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('wordpress-plugin')),
     ]])
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif</head>
+    @endif
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-white">
     @include('partials.nav')
 

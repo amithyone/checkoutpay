@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('partials.marketing-head', [
-    @include('partials.tailwind-assets')
         'seoPath' => '/products/invoices',
         'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('invoices-billing'))],
-    ])</head>
+    ])
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-white">
     @include('partials.nav')
 

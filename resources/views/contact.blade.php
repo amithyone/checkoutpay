@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.marketing-head', ['seoPath' => '/contact'])</head>
-    @include('partials.tailwind-assets')
+    @include('partials.marketing-head', ['seoPath' => '/contact'])
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-gray-50">
     @include('partials.nav')
 

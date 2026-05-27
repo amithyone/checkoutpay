@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('partials.marketing-head', [
-    @include('partials.tailwind-assets')
         'seoPath' => '/payout',
         'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('payouts-collections'))],
-    ])</head>
+    ])
+@include('partials.tailwind-assets')
+</head>
 <body class="bg-white">
     @include('partials.nav')
     <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-br from-primary/10 via-white to-primary/5">
