@@ -5,15 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'My Account') - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
+    @include('partials.tailwind-assets')
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { primary: { DEFAULT: '#3C50E0' }, nude: { 100: '#f5f5f4', 200: '#e7e5e4' } } } } }
-    </script>
-    <style>
+    @endif<style>
         @media (max-width: 1023px) {
             #account-sidebar.sidebar-closed { transform: translateX(-100%); }
             #account-sidebar.sidebar-open { transform: translateX(0); }

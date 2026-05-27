@@ -4,19 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @include('partials.marketing-head', ['seoPath' => '/faqs', 'seo' => $seo, 'jsonLdExtra' => $jsonLdExtra])
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: { DEFAULT: '#3C50E0' },
-                    }
-                }
-            }
-        }
-    </script>
+    @include('partials.tailwind-assets')
 </head>
 <body class="bg-white">
     @include('partials.nav')

@@ -25,8 +25,7 @@
         }
     @endphp
     @include('partials.marketing-head', ['seoPath' => $seoPath, 'seo' => $seo])
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    @include('partials.tailwind-assets')
     <style>
         .legal-document h2 { scroll-margin-top: 5.5rem; }
         .legal-document h3 { margin-top: 1.25rem; margin-bottom: 0.5rem; }
@@ -63,17 +62,6 @@
             }
         }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: { DEFAULT: '#3C50E0' },
-                    }
-                }
-            }
-        }
-    </script>
 </head>
 <body class="bg-white">
     @include('partials.nav')
