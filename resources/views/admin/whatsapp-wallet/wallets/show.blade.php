@@ -56,6 +56,15 @@
                         @endif
                     </dd>
                 </div>
+                <div><dt class="text-gray-500">Bot replies</dt>
+                    <dd>
+                        @if($wallet->isAdminBotPaused())
+                            <span class="text-amber-800 font-medium">Manual chat (paused)</span>
+                        @else
+                            <span class="text-green-700">Automated</span>
+                        @endif
+                    </dd>
+                </div>
                 <div><dt class="text-gray-500">PIN</dt><dd>{{ $wallet->hasPin() ? 'Configured' : 'Not set' }}</dd></div>
                 <div><dt class="text-gray-500">Daily transfer today</dt><dd>₦{{ number_format((float) $wallet->daily_transfer_total, 2) }}</dd></div>
                 <div><dt class="text-gray-500">Created</dt><dd>{{ $wallet->created_at?->format('M j, Y H:i') ?? '—' }}</dd></div>
@@ -108,6 +117,36 @@
                         <input type="hidden" name="status" value="active">
                         <button type="submit" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
                             Reactivate wallet
+                        </button>
+                    @endif
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+                <h3 class="font-semibold text-gray-900 mb-2">Manual chat mode</h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    Pause automated bot replies so you can message this user directly on WhatsApp.
+                    The bot stays silent until the user sends <span class="font-mono font-medium">START BOT</span>
+                    or you resume it here.
+                </p>
+                @if($wallet->isAdminBotPaused())
+                    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                        Bot is paused for this user. You can chat manually from your WhatsApp inbox.
+                    </p>
+                @endif
+                <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.bot-pause', $wallet) }}">
+                    @csrf
+                    @method('PUT')
+                    @if($wallet->isAdminBotPaused())
+                        <input type="hidden" name="admin_bot_paused" value="0">
+                        <button type="submit" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
+                            Resume automated bot
+                        </button>
+                    @else
+                        <input type="hidden" name="admin_bot_paused" value="1">
+                        <button type="submit" class="w-full bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700"
+                            onclick="return confirm('Pause bot auto-replies for this user? You can chat manually until they send START BOT or you resume here.')">
+                            Pause bot (manual chat)
                         </button>
                     @endif
                 </form>

@@ -5,6 +5,7 @@ namespace App\Services\Whatsapp;
 use App\Mail\WhatsappLoginOtpMail;
 use App\Models\Renter;
 use App\Models\WhatsappSession;
+use App\Models\WhatsappWallet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -87,6 +88,24 @@ class WhatsappInboundHandler
         $session = WhatsappSession::query()->firstOrNew(['phone_e164' => $phone]);
         $session->remote_jid = $remoteJid;
         $session->evolution_instance = $instance;
+
+        $wallet = WhatsappWallet::query()->where('phone_e164', $phone)->first();
+        if ($wallet && $wallet->isAdminBotPaused()) {
+            if (WhatsappWallet::isAdminBotResumeCommand($cmd)) {
+                $wallet->update(['admin_bot_paused' => false]);
+                $session->save();
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    "*Bot resumed*\n\nAutomated replies are on again.\nSend *MENU* or *000* for the main menu."
+                );
+
+                return;
+            }
+            $session->save();
+
+            return;
+        }
 
         if (in_array($cmd, ['RESTART', 'MAIN'], true)) {
             $this->applyGlobalConversationRestart($session);

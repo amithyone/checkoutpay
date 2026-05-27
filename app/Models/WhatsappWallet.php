@@ -49,6 +49,7 @@ class WhatsappWallet extends Model
         'kyc_cac',
         'transfer_email_otp_enabled',
         'status',
+        'admin_bot_paused',
         'support_whatsapp_welcome_sent_at',
     ];
 
@@ -64,6 +65,7 @@ class WhatsappWallet extends Model
         'kyc_dob' => 'date',
         'tier' => 'integer',
         'transfer_email_otp_enabled' => 'boolean',
+        'admin_bot_paused' => 'boolean',
         'support_whatsapp_welcome_sent_at' => 'datetime',
     ];
 
@@ -106,6 +108,17 @@ class WhatsappWallet extends Model
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    /** Admin manual-chat mode: bot stays silent until user sends START BOT. */
+    public function isAdminBotPaused(): bool
+    {
+        return (bool) ($this->admin_bot_paused ?? false);
+    }
+
+    public static function isAdminBotResumeCommand(string $commandToken): bool
+    {
+        return in_array($commandToken, ['START BOT', 'STARTBOT'], true);
     }
 
     public function hasPin(): bool

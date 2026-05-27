@@ -54,6 +54,10 @@ class WhatsappWalletAdminController extends Controller
             });
         }
 
+        if ($request->boolean('manual_chat')) {
+            $query->where('admin_bot_paused', true);
+        }
+
         $wallets = $query->paginate(25)->withQueryString();
 
         return view('admin.whatsapp-wallet.wallets.index', [
@@ -100,6 +104,21 @@ class WhatsappWalletAdminController extends Controller
             ->with('success', $validated['status'] === WhatsappWallet::STATUS_ACTIVE
                 ? 'Wallet reactivated.'
                 : 'Wallet suspended.');
+    }
+
+    public function updateWalletBotPause(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        $validated = $request->validate([
+            'admin_bot_paused' => 'required|boolean',
+        ]);
+
+        $wallet->update(['admin_bot_paused' => (bool) $validated['admin_bot_paused']]);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', $wallet->admin_bot_paused
+                ? 'Manual chat mode enabled — the bot will not auto-reply until the user sends START BOT or you resume it here.'
+                : 'Automated bot replies resumed for this user.');
     }
 
     /**

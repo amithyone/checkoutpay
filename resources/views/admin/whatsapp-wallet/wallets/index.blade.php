@@ -47,6 +47,10 @@
                     <input type="checkbox" name="needs_setup" value="1" class="rounded border-gray-300" @checked(request()->boolean('needs_setup'))>
                     Needs PIN/name
                 </label>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700 pb-2">
+                    <input type="checkbox" name="manual_chat" value="1" class="rounded border-gray-300" @checked(request()->boolean('manual_chat'))>
+                    Manual chat
+                </label>
             </div>
             <div class="flex items-end gap-2 lg:col-span-5">
                 <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm">Filter</button>
@@ -89,6 +93,9 @@
                                     <span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Active</span>
                                 @else
                                     <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">Suspended</span>
+                                @endif
+                                @if($w->isAdminBotPaused())
+                                    <span class="text-xs bg-amber-100 text-amber-900 px-2 py-0.5 rounded ml-1">Manual chat</span>
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-xs text-gray-600">{{ $w->hasPin() ? 'Set' : 'Missing' }}</td>
