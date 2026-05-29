@@ -24,14 +24,18 @@ class ConsumerSupportIntakeController extends Controller
 
         $result = $this->intake->start(
             SupportTicket::CHANNEL_CHECKOUTNOW_APP,
-            (int) $account->id
+            (int) $account->id,
+            $request
         );
 
         if (! $result['ok']) {
+            $status = isset($result['locked_until']) ? 429 : 422;
+
             return response()->json([
                 'success' => false,
                 'message' => $result['message'] ?? 'Could not start intake.',
-            ], 422);
+                'locked_until' => $result['locked_until'] ?? null,
+            ], $status);
         }
 
         return response()->json([
@@ -60,10 +64,13 @@ class ConsumerSupportIntakeController extends Controller
         );
 
         if (! $result['ok']) {
+            $status = isset($result['locked_until']) ? 429 : 422;
+
             return response()->json([
                 'success' => false,
                 'message' => $result['message'] ?? 'Could not advance intake.',
-            ], 422);
+                'locked_until' => $result['locked_until'] ?? null,
+            ], $status);
         }
 
         return response()->json([
@@ -83,7 +90,7 @@ class ConsumerSupportIntakeController extends Controller
             'receipt' => 'required|file|mimes:jpg,jpeg,png,pdf|max:8192',
         ]);
 
-        $result = $this->intake->storeReceipt($session, $validated['receipt']);
+        $result = $this->intake->storeReceipt($session, $validated['receipt'], $request);
 
         if (! $result['ok']) {
             return response()->json([
@@ -127,7 +134,7 @@ class ConsumerSupportIntakeController extends Controller
             return $session;
         }
 
-        $payload = $this->intake->sessionPayload($session);
+        $payload = $this->intake->sessionPayload($session, $request);
         $payload['countries'] = $this->countries->supportedCountries();
 
         return response()->json([

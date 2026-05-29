@@ -8,6 +8,7 @@ use App\Models\SupportTicket;
 use App\Models\WhatsappWallet;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -35,6 +36,8 @@ final class SupportIntakeService
 
     public const STEP_DONE = 'done';
 
+    public const STEP_RESTART = 'restart';
+
     public function __construct(
         private SupportPayeeAccountService $payeeAccounts,
         private SupportConversationService $conversations,
@@ -42,12 +45,24 @@ final class SupportIntakeService
         private SupportCountryOptionsService $countries,
         private SupportIssueOptionsService $issues,
         private SupportPaymentLookupService $payments,
+        private SupportIntakeLockoutService $lockout,
     ) {}
 
-    public function start(string $channel, ?int $consumerWalletApiAccountId = null): array
+    public function start(string $channel, ?int $consumerWalletApiAccountId = null, ?Request $request = null): array
     {
         if (! in_array($channel, SupportTicket::publicChannels(), true)) {
             return ['ok' => false, 'message' => 'Invalid support channel.'];
+        }
+
+        if ($request) {
+            $lock = $this->lockout->status($request);
+            if ($lock['locked']) {
+                return [
+                    'ok' => false,
+                    'message' => $this->lockoutMessage($lock['locked_until'] ?? null),
+                    'locked_until' => $lock['locked_until'] ?? null,
+                ];
+            }
         }
 
         $token = (string) Str::uuid();
@@ -59,6 +74,7 @@ final class SupportIntakeService
             'intake_status' => SupportIntakeSession::STATUS_IN_PROGRESS,
             'current_step' => self::STEP_PAYMENT_ISSUE,
             'consumer_wallet_api_account_id' => $consumerWalletApiAccountId,
+            'last_visitor_ip' => $request?->ip(),
             'bot_messages' => [
                 $this->botLine($disclaimer),
                 $this->botLine((string) config('support.intake_messages.ask_payment_issue', '')),
@@ -68,7 +84,7 @@ final class SupportIntakeService
         return [
             'ok' => true,
             'session' => $session,
-            'payload' => $this->sessionPayload($session),
+            'payload' => $this->sessionPayload($session, $request),
         ];
     }
 
@@ -84,12 +100,33 @@ final class SupportIntakeService
      */
     public function advance(SupportIntakeSession $session, string $step, mixed $value, Request $request): array
     {
+        $lock = $this->lockout->status($request);
+        if ($lock['locked']) {
+            return [
+                'ok' => false,
+                'message' => $this->lockoutMessage($lock['locked_until'] ?? null),
+                'locked_until' => $lock['locked_until'] ?? null,
+            ];
+        }
+
+        if ($session->isLockedOut()) {
+            return [
+                'ok' => false,
+                'message' => $this->lockoutMessage($session->locked_until?->toIso8601String()),
+                'locked_until' => $session->locked_until?->toIso8601String(),
+            ];
+        }
+
         if ($session->isTerminal()) {
             return ['ok' => false, 'message' => 'This intake session is already finished.'];
         }
 
         $step = trim($step);
         $messages = is_array($session->bot_messages) ? $session->bot_messages : [];
+
+        if ($step === self::STEP_RESTART) {
+            return $this->restartIntake($session, $request, $messages);
+        }
 
         if ($step === self::STEP_PAYMENT_ISSUE) {
             $isPayment = filter_var($value, FILTER_VALIDATE_BOOLEAN);
@@ -105,7 +142,7 @@ final class SupportIntakeService
                     'bot_messages' => $messages,
                 ])->save();
 
-                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
             }
 
             $session->issue_type = 'payment_pending_transfer';
@@ -115,7 +152,7 @@ final class SupportIntakeService
                 'bot_messages' => $messages,
             ])->save();
 
-            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
         }
 
         if ($step === self::STEP_DESTINATION_ACCOUNT) {
@@ -126,18 +163,7 @@ final class SupportIntakeService
 
             $inPlatform = $this->payeeAccounts->isAccountInPlatform($account);
             if (! $inPlatform) {
-                $reject = (string) config('support.intake_messages.not_our_account', '');
-                $messages[] = $this->userLine($account);
-                $messages[] = $this->botLine($reject);
-                $session->fill([
-                    'reported_destination_account' => $account,
-                    'account_in_platform' => false,
-                    'intake_status' => SupportIntakeSession::STATUS_REJECTED_NOT_OUR_ACCOUNT,
-                    'current_step' => self::STEP_DONE,
-                    'bot_messages' => $messages,
-                ])->save();
-
-                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+                return $this->handleWrongAccount($session, $request, $messages, $account);
             }
 
             $messages[] = $this->userLine($account);
@@ -149,7 +175,7 @@ final class SupportIntakeService
                 'bot_messages' => $messages,
             ])->save();
 
-            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
         }
 
         if ($step === self::STEP_SESSION_ID) {
@@ -198,7 +224,7 @@ final class SupportIntakeService
                 'bot_messages' => $messages,
             ])->save();
 
-            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
         }
 
         if ($step === self::STEP_NAME) {
@@ -214,7 +240,7 @@ final class SupportIntakeService
                 'bot_messages' => $messages,
             ])->save();
 
-            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
         }
 
         if ($step === self::STEP_AMOUNT) {
@@ -230,7 +256,7 @@ final class SupportIntakeService
                 'bot_messages' => $messages,
             ])->save();
 
-            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
         }
 
         if ($step === self::STEP_BANK_FROM) {
@@ -246,7 +272,7 @@ final class SupportIntakeService
                 'bot_messages' => $messages,
             ])->save();
 
-            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
         }
 
         if ($step === self::STEP_RECEIPT) {
@@ -255,7 +281,7 @@ final class SupportIntakeService
                 return ['ok' => false, 'message' => 'Upload a receipt image or type "skip".'];
             }
             $messages[] = $this->userLine('Skip receipt');
-            return $this->advanceToContactMode($session, $messages);
+            return $this->advanceToContactMode($session, $messages, $request);
         }
 
         if ($step === self::STEP_CONTACT_MODE) {
@@ -278,7 +304,7 @@ final class SupportIntakeService
                     'bot_messages' => $messages,
                 ])->save();
 
-                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
             }
 
             return $this->complete($session, $request, $messages);
@@ -321,7 +347,7 @@ final class SupportIntakeService
     /**
      * @return array{ok: bool, message?: string, session?: SupportIntakeSession, payload?: array<string, mixed>}
      */
-    public function storeReceipt(SupportIntakeSession $session, UploadedFile $file): array
+    public function storeReceipt(SupportIntakeSession $session, UploadedFile $file, Request $request): array
     {
         if ($session->isTerminal()) {
             return ['ok' => false, 'message' => 'This intake session is already finished.'];
@@ -336,14 +362,14 @@ final class SupportIntakeService
         $messages[] = $this->userLine('Receipt uploaded');
         $session->payment_receipt_path = $path;
 
-        return $this->advanceToContactMode($session, $messages);
+        return $this->advanceToContactMode($session, $messages, $request);
     }
 
     /**
      * @param  array<int, array{role: string, body: string}>  $messages
      * @return array{ok: bool, message?: string, session?: SupportIntakeSession, payload?: array<string, mixed>}
      */
-    private function advanceToContactMode(SupportIntakeSession $session, array $messages): array
+    private function advanceToContactMode(SupportIntakeSession $session, array $messages, Request $request): array
     {
         $ask = (string) config('support.intake_messages.ask_contact_mode', '');
         $messages[] = $this->botLine($ask);
@@ -352,7 +378,7 @@ final class SupportIntakeService
             'bot_messages' => $messages,
         ])->save();
 
-        return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session)];
+        return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
     }
 
     /**
@@ -365,7 +391,7 @@ final class SupportIntakeService
             return [
                 'ok' => true,
                 'session' => $session,
-                'payload' => $this->sessionPayload($session),
+                'payload' => $this->sessionPayload($session, $request),
             ];
         }
 
@@ -434,7 +460,7 @@ final class SupportIntakeService
             return [
                 'ok' => true,
                 'session' => $session->fresh(),
-                'payload' => array_merge($this->sessionPayload($session), [
+                'payload' => array_merge($this->sessionPayload($session, $request), [
                     'public_token' => $publicToken,
                     'ticket_id' => $ticket->id,
                     'ticket_number' => $ticket->ticket_number,
@@ -483,8 +509,118 @@ final class SupportIntakeService
     /**
      * @return array<string, mixed>
      */
-    public function sessionPayload(SupportIntakeSession $session): array
+    /**
+     * @param  array<int, array{role: string, body: string}>  $messages
+     * @return array{ok: bool, session?: SupportIntakeSession, payload?: array<string, mixed>}
+     */
+    private function handleWrongAccount(
+        SupportIntakeSession $session,
+        Request $request,
+        array $messages,
+        string $account
+    ): array {
+        $record = $this->lockout->recordWrongAccount($request);
+        $sessionAttempts = (int) $session->wrong_account_attempts + 1;
+
+        $messages[] = $this->userLine($account);
+        $messages[] = $this->botLine((string) config('support.intake_messages.not_our_account', ''));
+
+        if ($record['locked'] || $record['just_locked']) {
+            $lockedUntil = isset($record['locked_until'])
+                ? Carbon::parse($record['locked_until'])
+                : now()->addMinutes($this->lockout->lockoutMinutes());
+
+            $messages[] = $this->botLine($this->lockoutMessage($lockedUntil->toIso8601String()));
+
+            $session->fill([
+                'reported_destination_account' => $account,
+                'account_in_platform' => false,
+                'wrong_account_attempts' => max($sessionAttempts, $record['attempts']),
+                'locked_until' => $lockedUntil,
+                'intake_status' => SupportIntakeSession::STATUS_LOCKED_OUT,
+                'current_step' => self::STEP_DONE,
+                'last_visitor_ip' => $request->ip(),
+                'bot_messages' => $messages,
+            ])->save();
+
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+        }
+
+        $remaining = $this->lockout->remainingAttempts($record['attempts']);
+        $retry = (string) config('support.intake_messages.not_our_account_retry', '');
+        if ($remaining > 0 && $retry !== '') {
+            $attemptLabel = $remaining === 1 ? 'attempt' : 'attempts';
+            $messages[] = $this->botLine($retry.' ('.$remaining.' '.$attemptLabel.' left).');
+        }
+
+        $session->fill([
+            'reported_destination_account' => null,
+            'account_in_platform' => false,
+            'wrong_account_attempts' => $sessionAttempts,
+            'intake_status' => SupportIntakeSession::STATUS_IN_PROGRESS,
+            'current_step' => self::STEP_DESTINATION_ACCOUNT,
+            'last_visitor_ip' => $request->ip(),
+            'bot_messages' => $messages,
+        ])->save();
+
+        return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+    }
+
+    /**
+     * @param  array<int, array{role: string, body: string}>  $messages
+     * @return array{ok: bool, session?: SupportIntakeSession, payload?: array<string, mixed>}
+     */
+    private function restartIntake(SupportIntakeSession $session, Request $request, array $messages): array
     {
+        $messages[] = $this->userLine('Restart');
+        $messages[] = $this->botLine((string) config('support.intake_messages.ask_payment_issue', ''));
+
+        $session->fill([
+            'intake_status' => SupportIntakeSession::STATUS_IN_PROGRESS,
+            'current_step' => self::STEP_PAYMENT_ISSUE,
+            'is_payment_issue' => null,
+            'issue_type' => null,
+            'reported_destination_account' => null,
+            'reported_destination_bank' => null,
+            'payment_session_id' => null,
+            'payment_amount_reported' => null,
+            'visitor_name' => null,
+            'payment_id' => null,
+            'account_on_session' => false,
+            'account_in_platform' => false,
+            'whatsapp_eligible_at' => null,
+            'payment_receipt_path' => null,
+            'link_whatsapp_wallet' => false,
+            'last_visitor_ip' => $request->ip(),
+            'bot_messages' => $messages,
+        ])->save();
+
+        return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+    }
+
+    private function lockoutMessage(?string $lockedUntilIso): string
+    {
+        $template = (string) config('support.intake_messages.locked_out', 'Please wait :minutes minutes.');
+        $minutes = (string) $this->lockout->lockoutMinutes();
+
+        if ($lockedUntilIso) {
+            $until = Carbon::parse($lockedUntilIso);
+            $mins = max(1, (int) now()->diffInMinutes($until, false));
+
+            return str_replace(':minutes', (string) $mins, $template);
+        }
+
+        return str_replace(':minutes', $minutes, $template);
+    }
+
+    public function sessionPayload(SupportIntakeSession $session, ?Request $request = null): array
+    {
+        $max = $this->lockout->maxWrongAccountAttempts();
+        $attempts = (int) $session->wrong_account_attempts;
+        $clientLock = $request ? $this->lockout->status($request) : ['locked' => false, 'attempts' => 0];
+        $isLocked = $session->isLockedOut() || ($clientLock['locked'] ?? false);
+        $lockedUntil = $session->locked_until?->toIso8601String() ?? ($clientLock['locked_until'] ?? null);
+
         return [
             'intake_token' => $session->intake_token,
             'channel' => $session->channel,
@@ -494,7 +630,16 @@ final class SupportIntakeService
             'whatsapp_eligible_at' => $session->whatsapp_eligible_at?->toIso8601String(),
             'account_on_session' => (bool) $session->account_on_session,
             'account_in_platform' => (bool) $session->account_in_platform,
-            'is_terminal' => $session->isTerminal(),
+            'is_terminal' => $session->isTerminal() || $isLocked,
+            'is_locked' => $isLocked,
+            'locked_until' => $lockedUntil,
+            'wrong_account_attempts' => $attempts,
+            'wrong_account_attempts_remaining' => $this->lockout->remainingAttempts(
+                max($attempts, (int) ($clientLock['attempts'] ?? 0))
+            ),
+            'can_retry_account' => $session->canRetryDestinationAccount(),
+            'can_restart' => $session->intake_status === SupportIntakeSession::STATUS_IN_PROGRESS
+                && $session->current_step === self::STEP_DESTINATION_ACCOUNT,
             'messages' => $session->bot_messages ?? [],
             'public_token' => $session->public_token,
             'ticket_id' => $session->support_ticket_id,
@@ -502,6 +647,7 @@ final class SupportIntakeService
             'allowed_contact_modes' => $session->isWhatsappEligible()
                 ? ['browser', 'whatsapp']
                 : ['browser'],
+            'max_wrong_account_attempts' => $max,
         ];
     }
 }

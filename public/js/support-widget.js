@@ -14,6 +14,7 @@
     const STEP_CONTACT_MODE = 'contact_mode';
     const STEP_PHONE = 'phone';
     const STEP_DONE = 'done';
+    const STEP_RESTART = 'restart';
 
     let publicToken = '';
     let intakeToken = '';
@@ -149,12 +150,29 @@
         }
         actions.innerHTML = '';
 
-        if (intakeState.is_terminal) {
+        if (intakeState.is_terminal || intakeState.is_locked) {
+            if (intakeState.is_locked && intakeState.locked_until) {
+                const lockMsg = document.createElement('p');
+                lockMsg.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 mb-2';
+                lockMsg.textContent = formatLockoutMessage(intakeState.locked_until);
+                actions.appendChild(lockMsg);
+            }
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'cp-btn-primary';
             btn.textContent = 'Close';
-            btn.addEventListener('click', closePanel);
+            btn.addEventListener('click', function () {
+                if (intakeState.is_locked) {
+                    intakeToken = '';
+                    intakeState = null;
+                    try {
+                        localStorage.removeItem(INTAKE_STORAGE_KEY);
+                    } catch (e) {
+                        /* ignore */
+                    }
+                }
+                closePanel();
+            });
             actions.appendChild(btn);
             return;
         }
@@ -178,6 +196,13 @@
             step === STEP_BANK_FROM
         ) {
             actions.appendChild(textInputAction(step, getPlaceholder(step)));
+            if (intakeState.can_restart) {
+                actions.appendChild(
+                    actionButton('Start over', function () {
+                        advanceIntake(STEP_RESTART, true);
+                    })
+                );
+            }
             return;
         }
 
@@ -358,6 +383,42 @@
         }
     }
 
+    function formatLockoutMessage(iso) {
+        if (!iso) {
+            return 'Please wait before trying support again.';
+        }
+        const until = new Date(iso);
+        const mins = Math.max(1, Math.ceil((until.getTime() - Date.now()) / 60000));
+        return (
+            'Too many account numbers that are not ours were entered. Please wait about ' +
+            mins +
+            ' minute' +
+            (mins === 1 ? '' : 's') +
+            ', then open support again.'
+        );
+    }
+
+    function handleIntakeHttpError(e, data, res) {
+        if (res && res.status === 429) {
+            intakeToken = '';
+            intakeState = { is_terminal: true, is_locked: true, locked_until: data.locked_until, messages: [] };
+            try {
+                localStorage.removeItem(INTAKE_STORAGE_KEY);
+            } catch (err) {
+                /* ignore */
+            }
+            if (body) {
+                body.innerHTML = '';
+            }
+            renderIntakeMessages([
+                { role: 'bot', body: formatLockoutMessage(data.locked_until) || e.message },
+            ]);
+            renderIntakeActions();
+            return true;
+        }
+        return false;
+    }
+
     function applyIntakePayload(data) {
         intakeState = data;
         intakeToken = data.intake_token || intakeToken;
@@ -378,12 +439,26 @@
         if (footer) {
             footer.style.display = 'none';
         }
-        const data = await api('/public/support/intake/start', {
-            method: 'POST',
-            body: JSON.stringify({ channel: 'checkout_web' }),
-        });
-        intakeToken = data.data.intake_token;
-        applyIntakePayload(data.data);
+        try {
+            const res = await fetch(API_BASE + '/public/support/intake/start', {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel: 'checkout_web' }),
+            });
+            const data = await res.json().catch(function () {
+                return {};
+            });
+            if (!res.ok) {
+                if (handleIntakeHttpError(new Error(data.message || 'Request failed'), data, res)) {
+                    return;
+                }
+                throw new Error(data.message || 'Request failed');
+            }
+            intakeToken = data.data.intake_token;
+            applyIntakePayload(data.data);
+        } catch (e) {
+            showIntakeError(e.message || 'Could not start support');
+        }
     }
 
     async function resumeIntake() {
@@ -410,10 +485,23 @@
             errEl.style.display = 'none';
         }
         try {
-            const data = await api('/public/support/intake/' + encodeURIComponent(intakeToken) + '/advance', {
-                method: 'POST',
-                body: JSON.stringify({ step: step, value: value }),
+            const res = await fetch(
+                API_BASE + '/public/support/intake/' + encodeURIComponent(intakeToken) + '/advance',
+                {
+                    method: 'POST',
+                    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ step: step, value: value }),
+                }
+            );
+            const data = await res.json().catch(function () {
+                return {};
             });
+            if (!res.ok) {
+                if (handleIntakeHttpError(new Error(data.message || 'Request failed'), data, res)) {
+                    return;
+                }
+                throw new Error(data.message || 'Request failed');
+            }
             applyIntakePayload(data.data);
         } catch (e) {
             showIntakeError(e.message || 'Could not continue');

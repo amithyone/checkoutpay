@@ -15,6 +15,8 @@ class SupportIntakeSession extends Model
 
     public const STATUS_REJECTED_NOT_OUR_ACCOUNT = 'rejected_not_our_account';
 
+    public const STATUS_LOCKED_OUT = 'locked_out';
+
     public const STATUS_COMPLETED = 'completed';
 
     protected $fillable = [
@@ -43,6 +45,9 @@ class SupportIntakeSession extends Model
         'support_ticket_id',
         'public_token',
         'bot_messages',
+        'wrong_account_attempts',
+        'locked_until',
+        'last_visitor_ip',
     ];
 
     protected $casts = [
@@ -53,6 +58,8 @@ class SupportIntakeSession extends Model
         'whatsapp_eligible_at' => 'datetime',
         'link_whatsapp_wallet' => 'boolean',
         'bot_messages' => 'array',
+        'wrong_account_attempts' => 'integer',
+        'locked_until' => 'datetime',
     ];
 
     public function supportTicket(): BelongsTo
@@ -75,12 +82,27 @@ class SupportIntakeSession extends Model
         return $this->whatsapp_eligible_at !== null;
     }
 
+    public function isLockedOut(): bool
+    {
+        return $this->locked_until !== null && $this->locked_until->isFuture();
+    }
+
     public function isTerminal(): bool
     {
+        if ($this->intake_status === self::STATUS_LOCKED_OUT && $this->isLockedOut()) {
+            return true;
+        }
+
         return in_array($this->intake_status, [
             self::STATUS_REJECTED_NON_PAYMENT,
-            self::STATUS_REJECTED_NOT_OUR_ACCOUNT,
             self::STATUS_COMPLETED,
         ], true);
+    }
+
+    public function canRetryDestinationAccount(): bool
+    {
+        return $this->current_step === 'destination_account'
+            && $this->intake_status === self::STATUS_IN_PROGRESS
+            && ! $this->isLockedOut();
     }
 }

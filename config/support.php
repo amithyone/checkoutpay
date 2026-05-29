@@ -20,6 +20,12 @@ return [
     /** Send WhatsApp welcome when linking wallet on web widget (not CheckoutNow in-app). */
     'send_whatsapp_welcome_on_web' => (bool) env('SUPPORT_SEND_WHATSAPP_WELCOME_ON_WEB', true),
 
+    /** Wrong payee account tries before temporary lockout (per IP). */
+    'intake_wrong_account_max_attempts' => (int) env('SUPPORT_INTAKE_WRONG_ACCOUNT_MAX_ATTEMPTS', 5),
+
+    /** Minutes to wait after max wrong accounts before starting intake again. */
+    'intake_lockout_minutes' => (int) env('SUPPORT_INTAKE_LOCKOUT_MINUTES', 10),
+
     'payee_name_patterns' => [
         'checkout now',
         'checkout now ltd',
@@ -33,7 +39,9 @@ return [
         'ask_destination_account' => 'What is the account number you sent money TO? (From your bank receipt.)',
         'ask_session_id' => 'What is the bank session ID on your transfer receipt or SMS? (Not the website URL.)',
         'account_mismatch' => "That account number doesn't match the account on this payment session. Check your receipt and try again.",
-        'not_our_account' => 'This account number is not one we operate. Please go back to the website or app where you started payment — they can help with transfers to other accounts.',
+        'not_our_account' => 'This account number is not one we operate. If you paid a different website, contact them directly — we only handle transfers to CheckoutPay / Checkout Now accounts.',
+        'not_our_account_retry' => 'If you have another receipt, enter the account number you sent money TO on that transfer. You can also tap Restart to begin again.',
+        'locked_out' => 'Too many account numbers that are not ours were entered. Please wait :minutes minutes, then you can start support again.',
         'session_not_found' => "We couldn't find this session ID yet. You can continue in this chat and our team will try to match your transfer.",
         'payment_pending' => 'Your payment is still pending. We will ask our banking partner to trace it. Keep your bank session ID handy.',
         'payment_approved' => 'This payment shows as approved in our system. If the merchant site did not update, tell us below and our team will help.',

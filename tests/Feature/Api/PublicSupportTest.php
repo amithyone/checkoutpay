@@ -12,6 +12,7 @@ use App\Services\Support\SupportConversationService;
 use App\Services\Whatsapp\EvolutionWhatsAppClient;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -32,6 +33,7 @@ class PublicSupportTest extends TestCase
         foreach (['support-start', 'support-write', 'support-poll', 'support-options', 'api'] as $name) {
             RateLimiter::clear($name);
         }
+        Cache::flush();
 
         $mock = Mockery::mock(EvolutionWhatsAppClient::class);
         $mock->shouldReceive('sendText')->andReturn(true);
@@ -198,6 +200,9 @@ class PublicSupportTest extends TestCase
                 $table->unsignedBigInteger('payment_id')->nullable();
                 $table->boolean('account_on_session')->default(false);
                 $table->boolean('account_in_platform')->default(false);
+                $table->unsignedTinyInteger('wrong_account_attempts')->default(0);
+                $table->timestamp('locked_until')->nullable();
+                $table->string('last_visitor_ip', 45)->nullable();
                 $table->timestamp('whatsapp_eligible_at')->nullable();
                 $table->string('payment_receipt_path')->nullable();
                 $table->boolean('link_whatsapp_wallet')->default(false);
@@ -613,7 +618,7 @@ class PublicSupportTest extends TestCase
     }
 
     /** @test */
-    public function intake_unknown_account_is_rejected(): void
+    public function intake_unknown_account_allows_retry_then_locks_out_after_max_attempts(): void
     {
         $start = $this->postJson('/api/v1/public/support/intake/start', [
             'channel' => 'checkout_web',
@@ -626,11 +631,51 @@ class PublicSupportTest extends TestCase
             'value' => true,
         ])->assertOk();
 
+        $max = (int) config('support.intake_wrong_account_max_attempts', 5);
+
+        for ($i = 1; $i < $max; $i++) {
+            $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+                'step' => 'destination_account',
+                'value' => '000000000'.$i,
+            ])->assertOk()
+                ->assertJsonPath('data.can_retry_account', true)
+                ->assertJsonPath('data.current_step', 'destination_account')
+                ->assertJsonPath('data.intake_status', SupportIntakeSession::STATUS_IN_PROGRESS);
+        }
+
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
-            'value' => '0000000000',
+            'value' => '0000000009',
         ])->assertOk()
-            ->assertJsonPath('data.intake_status', SupportIntakeSession::STATUS_REJECTED_NOT_OUR_ACCOUNT);
+            ->assertJsonPath('data.intake_status', SupportIntakeSession::STATUS_LOCKED_OUT)
+            ->assertJsonPath('data.is_locked', true);
+
+        $this->postJson('/api/v1/public/support/intake/start', [
+            'channel' => 'checkout_web',
+        ])->assertStatus(429);
+    }
+
+    /** @test */
+    public function intake_restart_resets_flow_after_wrong_account(): void
+    {
+        $start = $this->postJson('/api/v1/public/support/intake/start')->assertOk();
+        $intakeToken = (string) $start->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => '0000000001',
+        ])->assertOk()
+            ->assertJsonPath('data.can_restart', true);
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'restart',
+            'value' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'payment_issue');
     }
 
     /** @test */

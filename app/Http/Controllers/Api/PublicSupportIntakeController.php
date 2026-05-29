@@ -23,13 +23,16 @@ class PublicSupportIntakeController extends Controller
         ]);
 
         $channel = $validated['channel'] ?? SupportTicket::CHANNEL_CHECKOUT_WEB;
-        $result = $this->intake->start($channel);
+        $result = $this->intake->start($channel, null, $request);
 
         if (! $result['ok']) {
+            $status = isset($result['locked_until']) ? 429 : 422;
+
             return response()->json([
                 'success' => false,
                 'message' => $result['message'] ?? 'Could not start intake.',
-            ], 422);
+                'locked_until' => $result['locked_until'] ?? null,
+            ], $status);
         }
 
         return response()->json([
@@ -58,10 +61,13 @@ class PublicSupportIntakeController extends Controller
         );
 
         if (! $result['ok']) {
+            $status = isset($result['locked_until']) ? 429 : 422;
+
             return response()->json([
                 'success' => false,
                 'message' => $result['message'] ?? 'Could not advance intake.',
-            ], 422);
+                'locked_until' => $result['locked_until'] ?? null,
+            ], $status);
         }
 
         return response()->json([
@@ -81,7 +87,7 @@ class PublicSupportIntakeController extends Controller
             'receipt' => 'required|file|mimes:jpg,jpeg,png,pdf|max:8192',
         ]);
 
-        $result = $this->intake->storeReceipt($session, $validated['receipt']);
+        $result = $this->intake->storeReceipt($session, $validated['receipt'], $request);
 
         if (! $result['ok']) {
             return response()->json([
@@ -130,7 +136,7 @@ class PublicSupportIntakeController extends Controller
             return response()->json(['success' => false, 'message' => 'Intake session not found.'], 404);
         }
 
-        $payload = $this->intake->sessionPayload($session);
+        $payload = $this->intake->sessionPayload($session, $request);
         $payload['countries'] = $this->countries->supportedCountries();
 
         return response()->json([
