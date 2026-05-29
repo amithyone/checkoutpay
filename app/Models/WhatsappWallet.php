@@ -210,12 +210,58 @@ class WhatsappWallet extends Model
 
     public function tier1MaxBalance(): float
     {
+        $fromSetting = Setting::get('whatsapp_wallet_tier1_max_balance');
+        if ($fromSetting !== null && is_numeric($fromSetting)) {
+            return (float) $fromSetting;
+        }
+
         return (float) config('whatsapp.wallet.tier1_max_balance', 50000);
     }
 
+    /** Tier 1 daily cap on money sent out (P2P, bank, VTU, etc.). Incoming top-ups do not count. */
     public function tier1DailyOutLimit(): float
     {
+        $fromSetting = Setting::get('whatsapp_wallet_tier1_daily_transfer');
+        if ($fromSetting !== null && is_numeric($fromSetting)) {
+            return (float) $fromSetting;
+        }
+
         return (float) config('whatsapp.wallet.tier1_daily_transfer_limit', 50000);
+    }
+
+    public function isTier1(): bool
+    {
+        return (int) $this->tier === self::TIER_WHATSAPP_ONLY;
+    }
+
+    /** Outbound send total for today (resets at calendar day). Not affected by received funds. */
+    public function tier1DailyOutUsed(): float
+    {
+        if (! $this->isTier1()) {
+            return 0.0;
+        }
+
+        $this->resetDailyTransferIfNeeded();
+
+        return (float) $this->daily_transfer_total;
+    }
+
+    public function tier1DailyOutRemaining(): float
+    {
+        if (! $this->isTier1()) {
+            return 0.0;
+        }
+
+        return max(0.0, $this->tier1DailyOutLimit() - $this->tier1DailyOutUsed());
+    }
+
+    public function tier1BalanceHeadroom(): float
+    {
+        if (! $this->isTier1()) {
+            return 0.0;
+        }
+
+        return max(0.0, $this->tier1MaxBalance() - (float) $this->balance);
     }
 
     public function resetDailyTransferIfNeeded(): void
@@ -273,13 +319,16 @@ class WhatsappWallet extends Model
             return ['ok' => false, 'message' => 'Insufficient balance.'];
         }
 
-        if ((int) $this->tier === self::TIER_WHATSAPP_ONLY) {
+        if ($this->isTier1()) {
             $this->resetDailyTransferIfNeeded();
             if ($this->daily_transfer_total + $amount > $this->tier1DailyOutLimit() + 0.0001) {
+                $remaining = max(0.0, $this->tier1DailyOutLimit() - (float) $this->daily_transfer_total);
+
                 return [
                     'ok' => false,
-                    'message' => 'Tier 1 daily send limit is ₦'.number_format($this->tier1DailyOutLimit(), 2).
-                        '. Try tomorrow or upgrade (*UPGRADE*).',
+                    'message' => 'Tier 1 daily *send* limit is ₦'.number_format($this->tier1DailyOutLimit(), 2).
+                        ' (₦'.number_format($remaining, 2).' left today; received money does not count).'.
+                        ' Try tomorrow or upgrade (*UPGRADE*).',
                 ];
             }
         }

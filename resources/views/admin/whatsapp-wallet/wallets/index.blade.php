@@ -68,6 +68,7 @@
                         <th class="px-4 py-3 text-left font-medium text-gray-600">Phone</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                         <th class="px-4 py-3 text-right font-medium text-gray-600">Balance</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-600" title="Tier 1 outbound send today / daily cap (incoming not counted)">T1 send today</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-600">Tier</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-600">PIN</th>
@@ -81,6 +82,14 @@
                             <td class="px-4 py-3 font-mono text-gray-900">{{ $w->phone_e164 }}</td>
                             <td class="px-4 py-3 text-gray-700">{{ $w->displayName() ?? '—' }}</td>
                             <td class="px-4 py-3 text-right font-semibold">₦{{ number_format((float) $w->balance, 2) }}</td>
+                            <td class="px-4 py-3 text-right text-xs whitespace-nowrap">
+                                @if($w->isTier1())
+                                    <span class="font-medium text-gray-900">₦{{ number_format($w->tier1DailyOutUsed(), 0) }}</span>
+                                    <span class="text-gray-500">/ ₦{{ number_format($w->tier1DailyOutLimit(), 0) }}</span>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3">
                                 @if($w->isTier2())
                                     <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">Tier 2</span>
@@ -105,7 +114,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-4 py-10 text-center text-gray-500">No wallets match your filters.</td>
+                            <td colspan="9" class="px-4 py-10 text-center text-gray-500">No wallets match your filters.</td>
                         </tr>
                     @endforelse
                 </tbody>

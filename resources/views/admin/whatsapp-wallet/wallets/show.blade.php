@@ -66,8 +66,40 @@
                     </dd>
                 </div>
                 <div><dt class="text-gray-500">PIN</dt><dd>{{ $wallet->hasPin() ? 'Configured' : 'Not set' }}</dd></div>
-                <div><dt class="text-gray-500">Daily transfer today</dt><dd>₦{{ number_format((float) $wallet->daily_transfer_total, 2) }}</dd></div>
                 <div><dt class="text-gray-500">Created</dt><dd>{{ $wallet->created_at?->format('M j, Y H:i') ?? '—' }}</dd></div>
+                @if($wallet->isTier1())
+                    <div class="sm:col-span-2 border-t border-gray-100 pt-3 mt-1">
+                        <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Tier 1 limits (today)</p>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Max wallet balance</dt>
+                        <dd>₦{{ number_format($wallet->tier1MaxBalance(), 2) }}
+                            <span class="text-gray-500">(₦{{ number_format($wallet->tier1BalanceHeadroom(), 2) }} headroom)</span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Daily send limit (out only)</dt>
+                        <dd class="font-medium">₦{{ number_format($wallet->tier1DailyOutLimit(), 2) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Sent out today</dt>
+                        <dd>₦{{ number_format($wallet->tier1DailyOutUsed(), 2) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Send remaining today</dt>
+                        <dd class="{{ $wallet->tier1DailyOutRemaining() < 1 ? 'text-red-700 font-semibold' : 'text-green-700 font-semibold' }}">
+                            ₦{{ number_format($wallet->tier1DailyOutRemaining(), 2) }}
+                        </dd>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <p class="text-xs text-gray-500">Top-ups and money received do not count toward the daily send limit — only outbound transfers (P2P, bank, airtime/VTU, partner debits).</p>
+                    </div>
+                @else
+                    <div class="sm:col-span-2">
+                        <dt class="text-gray-500">Tier 1 daily send tracking</dt>
+                        <dd class="text-gray-600">Not applicable — Tier 2 has no Tier 1 send cap.</dd>
+                    </div>
+                @endif
                 @if($wallet->mevon_virtual_account_number)
                     <div class="sm:col-span-2">
                         <dt class="text-gray-500">Pay-in VA</dt>

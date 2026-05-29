@@ -220,10 +220,12 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 max balance</label>
+                    <p class="text-xs text-gray-500 mb-1">Cap on total wallet balance (includes money received).</p>
                     <input type="number" step="0.01" name="whatsapp_wallet_tier1_max_balance" value="{{ old('whatsapp_wallet_tier1_max_balance', $wa['whatsapp_wallet_tier1_max_balance'] ?? env('WHATSAPP_WALLET_TIER1_MAX_BALANCE', 50000)) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 daily transfer</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 daily send limit (outbound only)</label>
+                    <p class="text-xs text-gray-500 mb-1">Max sent out per day (P2P, bank, VTU, etc.). Incoming top-ups do not count.</p>
                     <input type="number" step="0.01" name="whatsapp_wallet_tier1_daily_transfer" value="{{ old('whatsapp_wallet_tier1_daily_transfer', $wa['whatsapp_wallet_tier1_daily_transfer'] ?? env('WHATSAPP_WALLET_TIER1_DAILY_TRANSFER', 50000)) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 </div>
                 <div>

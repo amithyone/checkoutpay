@@ -67,6 +67,8 @@ class WhatsappWalletAdminController extends Controller
 
     public function showWallet(WhatsappWallet $wallet): View
     {
+        $wallet->resetDailyTransferIfNeeded();
+
         $wallet->loadCount([
             'transactions as bank_transfers_count' => fn ($q) => $q->where('type', WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT),
             'transactions as p2p_count' => fn ($q) => $q->p2p(),
