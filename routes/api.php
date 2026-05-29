@@ -69,6 +69,16 @@ Route::prefix('v1')->group(function () {
             Route::get('options', [PublicSupportController::class, 'options']);
             Route::get('payment-lookup', [PublicSupportController::class, 'lookupPayment']);
         });
+        Route::post('intake/start', [\App\Http\Controllers\Api\PublicSupportIntakeController::class, 'start'])
+            ->middleware('throttle:support-start');
+        Route::get('intake/{token}', [\App\Http\Controllers\Api\PublicSupportIntakeController::class, 'show'])
+            ->middleware('throttle:support-poll');
+        Route::post('intake/{token}/advance', [\App\Http\Controllers\Api\PublicSupportIntakeController::class, 'advance'])
+            ->middleware('throttle:support-write');
+        Route::post('intake/{token}/receipt', [\App\Http\Controllers\Api\PublicSupportIntakeController::class, 'receipt'])
+            ->middleware('throttle:support-write');
+        Route::post('intake/{token}/complete', [\App\Http\Controllers\Api\PublicSupportIntakeController::class, 'complete'])
+            ->middleware('throttle:support-start');
         Route::post('conversations', [PublicSupportController::class, 'start'])
             ->middleware('throttle:support-start');
         Route::get('conversations/{token}/messages', [PublicSupportController::class, 'messages'])
@@ -128,6 +138,16 @@ Route::prefix('v1')->group(function () {
         Route::prefix('support')->group(function () {
             Route::get('options', [ConsumerSupportController::class, 'options'])
                 ->middleware('throttle:support-options');
+            Route::post('intake/start', [\App\Http\Controllers\Api\ConsumerSupportIntakeController::class, 'start'])
+                ->middleware('throttle:support-start');
+            Route::get('intake/{token}', [\App\Http\Controllers\Api\ConsumerSupportIntakeController::class, 'show'])
+                ->middleware('throttle:support-poll');
+            Route::post('intake/{token}/advance', [\App\Http\Controllers\Api\ConsumerSupportIntakeController::class, 'advance'])
+                ->middleware('throttle:support-write');
+            Route::post('intake/{token}/receipt', [\App\Http\Controllers\Api\ConsumerSupportIntakeController::class, 'receipt'])
+                ->middleware('throttle:support-write');
+            Route::post('intake/{token}/complete', [\App\Http\Controllers\Api\ConsumerSupportIntakeController::class, 'complete'])
+                ->middleware('throttle:support-start');
             Route::post('conversations', [ConsumerSupportController::class, 'start'])
                 ->middleware('throttle:support-start');
             Route::get('conversations/{token}/messages', [ConsumerSupportController::class, 'messages'])

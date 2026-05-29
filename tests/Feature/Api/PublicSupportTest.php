@@ -2,16 +2,20 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\AccountNumber;
 use App\Models\Admin;
 use App\Models\Payment;
+use App\Models\SupportIntakeSession;
 use App\Models\SupportTicket;
 use App\Models\WhatsappWallet;
 use App\Services\Support\SupportConversationService;
 use App\Services\Whatsapp\EvolutionWhatsAppClient;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Tests\TestCase;
@@ -23,6 +27,11 @@ class PublicSupportTest extends TestCase
         parent::setUp();
 
         $this->ensureSupportSchema();
+
+        $this->withoutMiddleware(ThrottleRequests::class);
+        foreach (['support-start', 'support-write', 'support-poll', 'support-options', 'api'] as $name) {
+            RateLimiter::clear($name);
+        }
 
         $mock = Mockery::mock(EvolutionWhatsAppClient::class);
         $mock->shouldReceive('sendText')->andReturn(true);
@@ -49,6 +58,24 @@ class PublicSupportTest extends TestCase
                 $table->timestamp('matched_at')->nullable();
                 $table->decimal('received_amount', 14, 2)->nullable();
                 $table->string('payer_name')->nullable();
+                $table->string('account_number', 32)->nullable();
+                $table->string('payment_source', 64)->nullable();
+                $table->string('external_reference', 128)->nullable();
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
+
+        if (! $schema->hasTable('account_numbers')) {
+            $schema->create('account_numbers', function (Blueprint $table) {
+                $table->id();
+                $table->string('account_number', 32)->unique();
+                $table->string('account_name')->nullable();
+                $table->string('bank_name')->nullable();
+                $table->unsignedBigInteger('business_id')->nullable();
+                $table->boolean('is_pool')->default(false);
+                $table->boolean('is_external')->default(false);
+                $table->boolean('is_active')->default(true);
                 $table->timestamps();
                 $table->softDeletes();
             });
@@ -101,6 +128,12 @@ class PublicSupportTest extends TestCase
                 $table->string('visitor_phone', 20)->nullable();
                 $table->uuid('public_token')->nullable()->unique();
                 $table->timestamp('wallet_onboarding_sent_at')->nullable();
+                $table->string('intake_status', 32)->nullable();
+                $table->string('reported_destination_account', 32)->nullable();
+                $table->string('reported_destination_bank', 120)->nullable();
+                $table->timestamp('whatsapp_eligible_at')->nullable();
+                $table->string('payment_receipt_path')->nullable();
+                $table->boolean('account_on_session')->default(false);
                 $table->timestamp('last_message_at')->nullable();
                 $table->unsignedInteger('admin_unread_count')->default(0);
                 $table->unsignedInteger('visitor_unread_count')->default(0);
@@ -132,6 +165,52 @@ class PublicSupportTest extends TestCase
             'whatsapp.evolution.base_url' => 'http://localhost',
             'whatsapp.evolution.api_key' => 'test-key',
         ]);
+
+        if (! $schema->hasTable('whatsapp_wallet_pending_topups')) {
+            $schema->create('whatsapp_wallet_pending_topups', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('whatsapp_wallet_id');
+                $table->unsignedBigInteger('payment_id')->nullable();
+                $table->string('account_number', 32);
+                $table->string('account_name')->nullable();
+                $table->string('bank_name')->nullable();
+                $table->string('bank_code', 16)->nullable();
+                $table->timestamp('expires_at')->nullable();
+                $table->timestamp('fulfilled_at')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (! $schema->hasTable('support_intake_sessions')) {
+            $schema->create('support_intake_sessions', function (Blueprint $table) {
+                $table->id();
+                $table->uuid('intake_token')->unique();
+                $table->string('channel', 32);
+                $table->string('intake_status', 32);
+                $table->string('current_step', 64);
+                $table->string('issue_type', 64)->nullable();
+                $table->boolean('is_payment_issue')->nullable();
+                $table->string('reported_destination_account', 32)->nullable();
+                $table->string('reported_destination_bank', 120)->nullable();
+                $table->string('payment_session_id', 64)->nullable();
+                $table->decimal('payment_amount_reported', 14, 2)->nullable();
+                $table->string('visitor_name', 120)->nullable();
+                $table->unsignedBigInteger('payment_id')->nullable();
+                $table->boolean('account_on_session')->default(false);
+                $table->boolean('account_in_platform')->default(false);
+                $table->timestamp('whatsapp_eligible_at')->nullable();
+                $table->string('payment_receipt_path')->nullable();
+                $table->boolean('link_whatsapp_wallet')->default(false);
+                $table->string('visitor_phone', 20)->nullable();
+                $table->char('visitor_country', 2)->nullable();
+                $table->unsignedBigInteger('whatsapp_wallet_id')->nullable();
+                $table->unsignedBigInteger('consumer_wallet_api_account_id')->nullable();
+                $table->unsignedBigInteger('support_ticket_id')->nullable();
+                $table->uuid('public_token')->nullable();
+                $table->json('bot_messages')->nullable();
+                $table->timestamps();
+            });
+        }
 
         if (! $schema->hasTable('support_ticket_replies')) {
             $schema->create('support_ticket_replies', function (Blueprint $table) {
@@ -392,28 +471,244 @@ class PublicSupportTest extends TestCase
     }
 
     /** @test */
-    public function whatsapp_welcome_is_sent_only_once_per_wallet_across_tickets(): void
+    public function intake_start_does_not_send_whatsapp(): void
     {
+        $mock = Mockery::mock(EvolutionWhatsAppClient::class);
+        $mock->shouldReceive('sendText')->never();
+        $this->app->instance(EvolutionWhatsAppClient::class, $mock);
+
+        $this->postJson('/api/v1/public/support/intake/start', [
+            'channel' => 'checkout_web',
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'payment_issue');
+    }
+
+    /** @test */
+    public function intake_rejects_non_payment_issue_without_ticket(): void
+    {
+        $start = $this->postJson('/api/v1/public/support/intake/start', [
+            'channel' => 'checkout_web',
+        ])->assertOk();
+
+        $token = (string) $start->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$token.'/advance', [
+            'step' => 'payment_issue',
+            'value' => false,
+        ])->assertOk()
+            ->assertJsonPath('data.intake_status', SupportIntakeSession::STATUS_REJECTED_NON_PAYMENT)
+            ->assertJsonPath('data.is_terminal', true);
+
+        $this->assertDatabaseCount('support_tickets', 0);
+    }
+
+    /** @test */
+    public function intake_whatsapp_welcome_only_after_session_and_account_match(): void
+    {
+        $account = '0123456789';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Test Bank',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        $payment = Payment::create([
+            'transaction_id' => 'TXN-WA-GATE-1',
+            'amount' => 7500,
+            'status' => Payment::STATUS_PENDING,
+            'account_number' => $account,
+            'expires_at' => now()->addHour(),
+        ]);
+
         $mock = Mockery::mock(EvolutionWhatsAppClient::class);
         $mock->shouldReceive('sendText')->once()->andReturn(true);
         $this->app->instance(EvolutionWhatsAppClient::class, $mock);
 
-        $payload = [
-            'link_whatsapp_wallet' => true,
-            'phone' => '08033334444',
-            'country_iso' => 'NG',
-            'consent_accepted' => true,
-            'wallet_consent_accepted' => true,
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start', [
             'channel' => 'checkout_web',
+        ])->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'session_id',
+            'value' => 'TXN-WA-GATE-1',
+        ])->assertOk()
+            ->assertJsonPath('data.whatsapp_eligible', true);
+
+        $steps = [
+            ['step' => 'name', 'value' => 'Test User'],
+            ['step' => 'amount', 'value' => 7500],
+            ['step' => 'bank_from', 'value' => 'GTBank'],
+            ['step' => 'receipt', 'value' => 'skip'],
+            ['step' => 'contact_mode', 'value' => 'whatsapp'],
+            ['step' => 'phone', 'value' => ['phone' => '08033334444', 'country_iso' => 'NG']],
         ];
 
-        $this->postJson('/api/v1/public/support/conversations', $payload)->assertOk();
-        $this->postJson('/api/v1/public/support/conversations', $payload)->assertOk();
+        foreach ($steps as $row) {
+            $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', $row)->assertOk();
+        }
+
+        $ticket = SupportTicket::query()->where('payment_id', $payment->id)->first();
+        $this->assertNotNull($ticket);
+        $this->assertNotNull($ticket->whatsapp_eligible_at);
+        $this->assertTrue($ticket->account_on_session);
 
         $wallet = WhatsappWallet::query()->where('phone_e164', '2348033334444')->first();
         $this->assertNotNull($wallet);
         $this->assertNotNull($wallet->support_whatsapp_welcome_sent_at);
-        $this->assertSame(2, SupportTicket::query()->where('whatsapp_wallet_id', $wallet->id)->count());
+    }
+
+    /** @test */
+    public function intake_session_account_mismatch_returns_error(): void
+    {
+        $account = '0123456789';
+        $other = '0999888777';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+        AccountNumber::create([
+            'account_number' => $other,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        Payment::create([
+            'transaction_id' => 'TXN-MISMATCH-1',
+            'amount' => 5000,
+            'status' => Payment::STATUS_PENDING,
+            'account_number' => $account,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $other,
+        ]);
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'session_id',
+            'value' => 'TXN-MISMATCH-1',
+        ])->assertStatus(422);
+    }
+
+    /** @test */
+    public function intake_unknown_account_is_rejected(): void
+    {
+        $start = $this->postJson('/api/v1/public/support/intake/start', [
+            'channel' => 'checkout_web',
+        ])->assertOk();
+
+        $intakeToken = (string) $start->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => '0000000000',
+        ])->assertOk()
+            ->assertJsonPath('data.intake_status', SupportIntakeSession::STATUS_REJECTED_NOT_OUR_ACCOUNT);
+    }
+
+    /** @test */
+    public function whatsapp_welcome_is_sent_only_once_per_wallet_across_qualified_intakes(): void
+    {
+        $account = '0111222333';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        Payment::create([
+            'transaction_id' => 'TXN-WA-ONCE',
+            'amount' => 1000,
+            'status' => Payment::STATUS_PENDING,
+            'account_number' => $account,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $mock = Mockery::mock(EvolutionWhatsAppClient::class);
+        $mock->shouldReceive('sendText')->once()->andReturn(true);
+        $this->app->instance(EvolutionWhatsAppClient::class, $mock);
+
+        foreach ([1, 2] as $run) {
+            $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+            $this->runQualifiedIntakeToWhatsapp($intakeToken, $account, 'TXN-WA-ONCE', '08044445555');
+        }
+
+        $this->assertSame(2, SupportTicket::query()->count());
+        $wallet = WhatsappWallet::query()->where('phone_e164', '2348044445555')->first();
+        $this->assertNotNull($wallet->support_whatsapp_welcome_sent_at);
+    }
+
+    /**
+     * @return array{public_token: string}
+     */
+    private function runQualifiedIntakeToWhatsapp(string $intakeToken, string $account, string $sessionId, string $phone): array
+    {
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'session_id',
+            'value' => $sessionId,
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'name',
+            'value' => 'User',
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'amount',
+            'value' => 1000,
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'bank_from',
+            'value' => 'UBA',
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'receipt',
+            'value' => 'skip',
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'contact_mode',
+            'value' => 'whatsapp',
+        ]);
+        $done = $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'phone',
+            'value' => ['phone' => $phone, 'country_iso' => 'NG'],
+        ])->assertOk();
+
+        return ['public_token' => (string) $done->json('data.public_token')];
     }
 
     /** @test */

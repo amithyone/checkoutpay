@@ -185,6 +185,49 @@
     color: #111827;
 }
 
+.cp-msg-bot {
+    align-self: flex-start;
+    background: #eff6ff;
+    color: #1e3a5f;
+    border: 1px solid #bfdbfe;
+}
+
+.cp-intake-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.cp-intake-input-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.cp-intake-input {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.cp-btn-block {
+    margin-top: 0.5rem;
+}
+
+.cp-intake-phone-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.cp-intake-consent {
+    font-size: 0.75rem;
+    color: #374151;
+}
+
 .cp-support-footer {
     border-top: 1px solid #e5e7eb;
     padding: 0.75rem;

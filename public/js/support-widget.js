@@ -1,13 +1,26 @@
 (function () {
     const API_BASE = (window.CP_SUPPORT_API_BASE || '/api/v1').replace(/\/$/, '');
     const STORAGE_KEY = 'cp_support_public_token';
+    const INTAKE_STORAGE_KEY = 'cp_support_intake_token';
     const POLL_MS = window.CP_SUPPORT_POLL_MS || 4000;
 
+    const STEP_PAYMENT_ISSUE = 'payment_issue';
+    const STEP_DESTINATION_ACCOUNT = 'destination_account';
+    const STEP_SESSION_ID = 'session_id';
+    const STEP_NAME = 'name';
+    const STEP_AMOUNT = 'amount';
+    const STEP_BANK_FROM = 'bank_from';
+    const STEP_RECEIPT = 'receipt';
+    const STEP_CONTACT_MODE = 'contact_mode';
+    const STEP_PHONE = 'phone';
+    const STEP_DONE = 'done';
+
     let publicToken = '';
+    let intakeToken = '';
+    let intakeState = null;
     let lastMessageId = 0;
     let pollTimer = null;
     let supportOptions = null;
-    let optionsLoaded = false;
 
     let launcher = null;
     let panel = null;
@@ -33,12 +46,11 @@
     }
 
     async function loadOptions() {
-        if (optionsLoaded && supportOptions) {
+        if (supportOptions) {
             return supportOptions;
         }
         const data = await api('/public/support/options');
         supportOptions = data.data;
-        optionsLoaded = true;
         return supportOptions;
     }
 
@@ -51,15 +63,17 @@
             showChat();
             pollMessages(true);
             startPoll();
+        } else if (intakeToken) {
+            resumeIntake();
         } else {
             loadOptions()
                 .then(function () {
-                    showOnboarding();
+                    return startIntake();
                 })
                 .catch(function (e) {
                     if (body) {
                         body.innerHTML =
-                            '<p class="cp-onboard-error">' + (e.message || 'Could not load support options') + '</p>';
+                            '<p class="cp-onboard-error">' + escapeHtml(e.message || 'Could not load support') + '</p>';
                     }
                 });
         }
@@ -101,233 +115,361 @@
         }, POLL_MS);
     }
 
-    function issueTypeSelectHtml() {
-        const types = (supportOptions && supportOptions.issue_types) || [];
-        const sessionLabel = (supportOptions && supportOptions.payment_session_label) || 'Bank session ID';
-        const sessionHint = (supportOptions && supportOptions.payment_session_hint) || '';
-        let html = '<label>What do you need help with?</label>';
-        html += '<select id="cp-issue-type" class="cp-country-select">';
-        types.forEach(function (t, i) {
-            const sel = i === 0 ? ' selected' : '';
-            html += '<option value="' + t.key + '" data-requires-payment="' + (t.requires_payment ? '1' : '0') + '"' + sel + '>' + t.label + '</option>';
-        });
-        if (types.length === 0) {
-            html += '<option value="general">Other question</option>';
-        }
-        html += '</select>';
-        html +=
-            '<div id="cp-payment-block" class="cp-payment-block" style="display:none">' +
-            '<p id="cp-issue-hint" class="text-xs text-gray-500 mb-2"></p>' +
-            '<label>' + sessionLabel + '</label>' +
-            (sessionHint ? '<p class="text-xs text-gray-500 mb-1">' + sessionHint + '</p>' : '') +
-            '<input type="text" id="cp-session-id" placeholder="From bank transfer receipt" autocomplete="off">' +
-            '<label>Amount you transferred (₦)</label>' +
-            '<input type="number" id="cp-amount-paid" min="1" step="0.01" placeholder="5000">' +
-            '</div>';
-        return html;
+    function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
     }
 
-    function whatsappStepHtml(suggested) {
-        return (
-            '<div id="cp-whatsapp-step" class="cp-whatsapp-step">' +
-            '<p id="cp-whatsapp-wait-hint" class="cp-whatsapp-wait-hint" style="display:none">' +
-            'Enter your bank session ID and amount above, then choose WhatsApp or browser chat below.' +
-            '</p>' +
-            '<p class="text-xs font-medium text-gray-700 mb-2">How should we reach you?</p>' +
-            '<div class="cp-mode-choice">' +
-            '<label class="cp-mode-option"><input type="radio" name="cp-mode" value="wallet" checked> Link WhatsApp &amp; wallet</label>' +
-            '<label class="cp-mode-option"><input type="radio" name="cp-mode" value="anonymous"> Quick chat (no WhatsApp)</label>' +
-            '</div>' +
-            '<div id="cp-anon-block" style="display:none">' +
-            '<div class="cp-consent-box"><p>Chat in this browser only. We will not create a wallet or send WhatsApp messages.</p></div>' +
-            '<label><input type="checkbox" id="cp-consent-anon"> I agree to chat with support</label>' +
-            '</div>' +
-            '<div id="cp-wallet-block">' +
-            '<div class="cp-consent-box">' +
-            '<p>Your WhatsApp number saves this chat and links a CheckoutPay wallet.</p>' +
-            '<p class="mt-1">You will receive a prompt on WhatsApp. Approved refunds can be credited to your wallet.</p>' +
-            '</div>' +
-            '<label>Country</label>' +
-            countrySelectHtml(suggested) +
-            '<label>WhatsApp number</label>' +
-            '<input type="tel" id="cp-phone" placeholder="Mobile number" autocomplete="tel">' +
-            '<label><input type="checkbox" id="cp-consent-wallet"> I agree to link WhatsApp and create or use a wallet</label>' +
-            '</div>' +
-            '</div>'
-        );
-    }
-
-    function selectedIssueRequiresPayment() {
-        const sel = document.getElementById('cp-issue-type');
-        if (!sel) {
-            return false;
-        }
-        const opt = sel.options[sel.selectedIndex];
-        return opt && opt.getAttribute('data-requires-payment') === '1';
-    }
-
-    function paymentFieldsComplete() {
-        const sessionInput = document.getElementById('cp-session-id');
-        const amountInput = document.getElementById('cp-amount-paid');
-        return (
-            sessionInput &&
-            sessionInput.value.trim().length >= 4 &&
-            amountInput &&
-            parseFloat(amountInput.value) > 0
-        );
-    }
-
-    function countrySelectHtml(selectedIso) {
-        const countries = (supportOptions && supportOptions.countries) || [];
-        let html = '<select id="cp-country" class="cp-country-select">';
-        countries.forEach(function (c) {
-            const sel = c.iso === selectedIso ? ' selected' : '';
-            html += '<option value="' + c.iso + '"' + sel + '>' + c.label + ' (+' + c.dial + ')</option>';
-        });
-        html += '</select>';
-        return html;
-    }
-
-    function showOnboarding() {
-        if (!footer || !body) {
+    function renderIntakeMessages(messages) {
+        if (!body) {
             return;
         }
-        footer.style.display = 'none';
-        const suggested = (supportOptions && supportOptions.suggested_country) || 'NG';
+        let html = '<div class="cp-intake-chat">';
+        (messages || []).forEach(function (m, idx) {
+            const role = m.role === 'user' ? 'cp-msg-visitor' : 'cp-msg-bot';
+            html +=
+                '<div class="cp-msg ' +
+                role +
+                '" data-intake-idx="' +
+                idx +
+                '">' +
+                escapeHtml(m.body || '') +
+                '</div>';
+        });
+        html += '</div><div id="cp-intake-actions"></div><p id="cp-intake-error" class="cp-onboard-error" style="display:none"></p>';
+        body.innerHTML = html;
+        body.scrollTop = body.scrollHeight;
+    }
 
-        body.innerHTML =
-            '<div class="cp-support-onboarding">' +
-            '<p class="text-sm font-semibold text-gray-900 mb-2">Start live support</p>' +
-            '<p class="text-xs text-gray-600 mb-3">Payment issue? Add the session ID from your bank transfer receipt, then choose how we should contact you.</p>' +
-            issueTypeSelectHtml() +
-            whatsappStepHtml(suggested) +
-            '<label>Your name (optional)</label>' +
-            '<input type="text" id="cp-name" placeholder="Your name">' +
-            '<label>Extra details (optional)</label>' +
-            '<input type="text" id="cp-first-msg" placeholder="Anything else we should know?">' +
-            '<button type="button" class="cp-btn-primary" id="cp-start-chat" disabled>Start chat</button>' +
-            '<p id="cp-onboard-error" class="cp-onboard-error" style="display:none"></p>' +
-            '</div>';
+    function renderIntakeActions() {
+        const actions = document.getElementById('cp-intake-actions');
+        if (!actions || !intakeState) {
+            return;
+        }
+        actions.innerHTML = '';
 
-        const issueSelect = document.getElementById('cp-issue-type');
-        const paymentBlock = document.getElementById('cp-payment-block');
-        const issueHint = document.getElementById('cp-issue-hint');
-        const sessionInput = document.getElementById('cp-session-id');
-        const amountInput = document.getElementById('cp-amount-paid');
-        const whatsappStep = document.getElementById('cp-whatsapp-step');
-        const modeRadios = body.querySelectorAll('input[name="cp-mode"]');
-        const anonBlock = document.getElementById('cp-anon-block');
-        const walletBlock = document.getElementById('cp-wallet-block');
-        const consentAnon = document.getElementById('cp-consent-anon');
-        const consentWallet = document.getElementById('cp-consent-wallet');
-        const phone = document.getElementById('cp-phone');
-        const startBtn = document.getElementById('cp-start-chat');
-
-        function isWalletMode() {
-            const checked = body.querySelector('input[name="cp-mode"]:checked');
-            return checked && checked.value === 'wallet';
+        if (intakeState.is_terminal) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cp-btn-primary';
+            btn.textContent = 'Close';
+            btn.addEventListener('click', closePanel);
+            actions.appendChild(btn);
+            return;
         }
 
-        function applyWalletModeUi() {
-            const wallet = isWalletMode();
-            if (anonBlock) {
-                anonBlock.style.display = wallet ? 'none' : 'block';
-            }
-            if (walletBlock) {
-                walletBlock.style.display = wallet ? 'block' : 'none';
-            }
+        const step = intakeState.current_step;
+
+        if (step === STEP_PAYMENT_ISSUE) {
+            actions.appendChild(actionButton('Yes — bank transfer issue', function () {
+                advanceIntake(STEP_PAYMENT_ISSUE, true);
+            }));
+            actions.appendChild(actionButton('No — something else', function () {
+                advanceIntake(STEP_PAYMENT_ISSUE, false);
+            }));
+            return;
         }
 
-        function paymentStepComplete() {
-            if (!selectedIssueRequiresPayment()) {
-                return true;
-            }
-            return paymentFieldsComplete();
+        if (
+            step === STEP_DESTINATION_ACCOUNT ||
+            step === STEP_SESSION_ID ||
+            step === STEP_NAME ||
+            step === STEP_BANK_FROM
+        ) {
+            actions.appendChild(textInputAction(step, getPlaceholder(step)));
+            return;
         }
 
-        function updateWhatsappStepVisibility() {
-            const ready = paymentStepComplete();
-            const waitHint = document.getElementById('cp-whatsapp-wait-hint');
-            if (whatsappStep) {
-                whatsappStep.classList.toggle('cp-whatsapp-step-pending', !ready);
-            }
-            if (waitHint) {
-                waitHint.style.display =
-                    selectedIssueRequiresPayment() && !ready ? 'block' : 'none';
-            }
-            applyWalletModeUi();
-            validate();
+        if (step === STEP_AMOUNT) {
+            actions.appendChild(numberInputAction());
+            return;
         }
 
-        function updateIssueUi() {
-            const needsPayment = selectedIssueRequiresPayment();
-            if (paymentBlock) {
-                paymentBlock.style.display = needsPayment ? 'block' : 'none';
-            }
-            if (issueSelect && issueHint) {
-                const types = (supportOptions && supportOptions.issue_types) || [];
-                const row = types.find(function (t) {
-                    return t.key === issueSelect.value;
-                });
-                issueHint.textContent = row && row.hint ? row.hint : '';
-            }
-            updateWhatsappStepVisibility();
+        if (step === STEP_RECEIPT) {
+            actions.appendChild(receiptUploadAction());
+            actions.appendChild(actionButton('Skip receipt', function () {
+                advanceIntake(STEP_RECEIPT, 'skip');
+            }));
+            return;
         }
 
-        function validate() {
-            if (!startBtn) {
-                return;
+        if (step === STEP_CONTACT_MODE) {
+            const modes = intakeState.allowed_contact_modes || ['browser'];
+            if (modes.indexOf('browser') !== -1) {
+                actions.appendChild(actionButton('Continue in this chat', function () {
+                    advanceIntake(STEP_CONTACT_MODE, 'browser');
+                }));
             }
-            if (!paymentStepComplete()) {
-                startBtn.disabled = true;
-                return;
-            }
-            let ok = false;
-            if (isWalletMode()) {
-                ok =
-                    consentWallet &&
-                    consentWallet.checked &&
-                    phone &&
-                    phone.value.trim().length >= 8;
+            if (modes.indexOf('whatsapp') !== -1) {
+                actions.appendChild(actionButton('Link WhatsApp (verified)', function () {
+                    advanceIntake(STEP_CONTACT_MODE, 'whatsapp');
+                }));
             } else {
-                ok = consentAnon && consentAnon.checked;
+                const hint = document.createElement('p');
+                hint.className = 'text-xs text-gray-500 mt-2';
+                hint.textContent =
+                    'WhatsApp is available after we confirm your bank session ID matches the account you paid to.';
+                actions.appendChild(hint);
             }
-            if (selectedIssueRequiresPayment()) {
-                ok = ok && paymentFieldsComplete();
-            }
-            startBtn.disabled = !ok;
+            return;
         }
 
-        if (issueSelect) {
-            issueSelect.addEventListener('change', updateIssueUi);
+        if (step === STEP_PHONE) {
+            actions.appendChild(phoneAction());
+            return;
         }
-        if (sessionInput) {
-            sessionInput.addEventListener('input', updateWhatsappStepVisibility);
-        }
-        if (amountInput) {
-            amountInput.addEventListener('input', updateWhatsappStepVisibility);
-        }
+    }
 
-        modeRadios.forEach(function (r) {
-            r.addEventListener('change', function () {
-                applyWalletModeUi();
-                validate();
+    function getPlaceholder(step) {
+        const map = {
+            destination_account: 'Account number you paid TO',
+            session_id: 'Bank session ID from receipt',
+            name: 'Your name',
+            bank_from: 'Bank you sent from',
+        };
+        return map[step] || '';
+    }
+
+    function actionButton(label, onClick) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cp-btn-primary cp-btn-block';
+        btn.textContent = label;
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    function textInputAction(step, placeholder) {
+        const wrap = document.createElement('div');
+        wrap.className = 'cp-intake-input-row';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = placeholder;
+        input.className = 'cp-intake-input';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cp-btn-primary';
+        btn.textContent = 'Send';
+        btn.addEventListener('click', function () {
+            const v = input.value.trim();
+            if (!v) {
+                return;
+            }
+            advanceIntake(step, v);
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                btn.click();
+            }
+        });
+        wrap.appendChild(input);
+        wrap.appendChild(btn);
+        return wrap;
+    }
+
+    function numberInputAction() {
+        const wrap = document.createElement('div');
+        wrap.className = 'cp-intake-input-row';
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '1';
+        input.step = '0.01';
+        input.placeholder = 'Amount in ₦';
+        input.className = 'cp-intake-input';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cp-btn-primary';
+        btn.textContent = 'Send';
+        btn.addEventListener('click', function () {
+            advanceIntake(STEP_AMOUNT, input.value);
+        });
+        wrap.appendChild(input);
+        wrap.appendChild(btn);
+        return wrap;
+    }
+
+    function receiptUploadAction() {
+        const wrap = document.createElement('div');
+        wrap.className = 'cp-intake-input-row';
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,application/pdf';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cp-btn-primary';
+        btn.textContent = 'Upload receipt';
+        btn.addEventListener('click', function () {
+            if (!input.files || !input.files[0]) {
+                showIntakeError('Choose a file first.');
+                return;
+            }
+            uploadReceipt(input.files[0]);
+        });
+        wrap.appendChild(input);
+        wrap.appendChild(btn);
+        return wrap;
+    }
+
+    function phoneAction() {
+        const wrap = document.createElement('div');
+        wrap.className = 'cp-intake-phone-block';
+        const suggested = (supportOptions && supportOptions.suggested_country) || 'NG';
+        const countries = (supportOptions && supportOptions.countries) || [];
+
+        let countryHtml = '<select id="cp-intake-country" class="cp-country-select">';
+        countries.forEach(function (c) {
+            const sel = c.iso === suggested ? ' selected' : '';
+            countryHtml += '<option value="' + c.iso + '"' + sel + '>' + escapeHtml(c.label) + '</option>';
+        });
+        countryHtml += '</select>';
+
+        wrap.innerHTML =
+            countryHtml +
+            '<input type="tel" id="cp-intake-phone" class="cp-intake-input" placeholder="WhatsApp number">' +
+            '<label class="cp-intake-consent"><input type="checkbox" id="cp-intake-wallet-consent"> I agree to link WhatsApp after my payment details are verified</label>';
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cp-btn-primary cp-btn-block';
+        btn.textContent = 'Start chat';
+        btn.addEventListener('click', function () {
+            const phone = document.getElementById('cp-intake-phone');
+            const country = document.getElementById('cp-intake-country');
+            const consent = document.getElementById('cp-intake-wallet-consent');
+            if (!consent || !consent.checked) {
+                showIntakeError('Please accept the WhatsApp terms.');
+                return;
+            }
+            advanceIntake(STEP_PHONE, {
+                phone: phone ? phone.value.trim() : '',
+                country_iso: country ? country.value : '',
             });
         });
+        wrap.appendChild(btn);
+        return wrap;
+    }
 
-        if (consentAnon) {
-            consentAnon.addEventListener('change', validate);
+    function showIntakeError(msg) {
+        const el = document.getElementById('cp-intake-error');
+        if (el) {
+            el.textContent = msg;
+            el.style.display = 'block';
         }
-        if (consentWallet) {
-            consentWallet.addEventListener('change', validate);
+    }
+
+    function applyIntakePayload(data) {
+        intakeState = data;
+        intakeToken = data.intake_token || intakeToken;
+        try {
+            localStorage.setItem(INTAKE_STORAGE_KEY, intakeToken);
+        } catch (e) {
+            /* ignore */
         }
-        if (phone) {
-            phone.addEventListener('input', validate);
+        renderIntakeMessages(data.messages || []);
+        renderIntakeActions();
+
+        if (data.public_token) {
+            finishToTicket(data.public_token);
         }
-        if (startBtn) {
-            startBtn.addEventListener('click', startConversation);
+    }
+
+    async function startIntake() {
+        if (footer) {
+            footer.style.display = 'none';
         }
-        updateIssueUi();
+        const data = await api('/public/support/intake/start', {
+            method: 'POST',
+            body: JSON.stringify({ channel: 'checkout_web' }),
+        });
+        intakeToken = data.data.intake_token;
+        applyIntakePayload(data.data);
+    }
+
+    async function resumeIntake() {
+        if (footer) {
+            footer.style.display = 'none';
+        }
+        try {
+            const data = await api('/public/support/intake/' + encodeURIComponent(intakeToken));
+            if (data.data.public_token) {
+                finishToTicket(data.data.public_token);
+                return;
+            }
+            applyIntakePayload(data.data);
+        } catch (e) {
+            intakeToken = '';
+            localStorage.removeItem(INTAKE_STORAGE_KEY);
+            await startIntake();
+        }
+    }
+
+    async function advanceIntake(step, value) {
+        const errEl = document.getElementById('cp-intake-error');
+        if (errEl) {
+            errEl.style.display = 'none';
+        }
+        try {
+            const data = await api('/public/support/intake/' + encodeURIComponent(intakeToken) + '/advance', {
+                method: 'POST',
+                body: JSON.stringify({ step: step, value: value }),
+            });
+            applyIntakePayload(data.data);
+        } catch (e) {
+            showIntakeError(e.message || 'Could not continue');
+        }
+    }
+
+    async function uploadReceipt(file) {
+        const form = new FormData();
+        form.append('receipt', file);
+        try {
+            const res = await fetch(
+                API_BASE + '/public/support/intake/' + encodeURIComponent(intakeToken) + '/receipt',
+                {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' },
+                    body: form,
+                }
+            );
+            const data = await res.json().catch(function () {
+                return {};
+            });
+            if (!res.ok) {
+                throw new Error(data.message || 'Upload failed');
+            }
+            applyIntakePayload(data.data);
+        } catch (e) {
+            showIntakeError(e.message || 'Upload failed');
+        }
+    }
+
+    async function completeIntake() {
+        const data = await api('/public/support/intake/' + encodeURIComponent(intakeToken) + '/complete', {
+            method: 'POST',
+            body: JSON.stringify({ consent_accepted: true }),
+        });
+        if (data.data.public_token) {
+            finishToTicket(data.data.public_token);
+        }
+    }
+
+    function finishToTicket(token) {
+        publicToken = token;
+        intakeToken = '';
+        try {
+            localStorage.setItem(STORAGE_KEY, publicToken);
+            localStorage.removeItem(INTAKE_STORAGE_KEY);
+        } catch (e) {
+            /* ignore */
+        }
+        lastMessageId = 0;
+        if (body) {
+            body.innerHTML = '';
+        }
+        showChat();
+        pollMessages(true);
+        startPoll();
     }
 
     function showChat() {
@@ -354,8 +496,13 @@
         }
 
         const el = document.createElement('div');
-        const isVisitor = msg.user_type === 'visitor';
-        el.className = 'cp-msg ' + (isVisitor ? 'cp-msg-visitor' : 'cp-msg-staff');
+        let className = 'cp-msg-staff';
+        if (msg.user_type === 'visitor') {
+            className = 'cp-msg-visitor';
+        } else if (msg.user_type === 'bot') {
+            className = 'cp-msg-bot';
+        }
+        el.className = 'cp-msg ' + className;
         el.dataset.id = String(msg.id);
         el.textContent = msg.message;
         body.appendChild(el);
@@ -383,69 +530,6 @@
         return data;
     }
 
-    async function startConversation() {
-        const errEl = document.getElementById('cp-onboard-error');
-        if (errEl) {
-            errEl.style.display = 'none';
-        }
-        const modeChecked = body.querySelector('input[name="cp-mode"]:checked');
-        const walletMode = modeChecked && modeChecked.value === 'wallet';
-        const nameEl = document.getElementById('cp-name');
-        const firstEl = document.getElementById('cp-first-msg');
-        const name = nameEl ? nameEl.value.trim() : '';
-        const first = firstEl ? firstEl.value.trim() : '';
-
-        const issueEl = document.getElementById('cp-issue-type');
-        const sessionEl = document.getElementById('cp-session-id');
-        const amountEl = document.getElementById('cp-amount-paid');
-
-        const payload = {
-            link_whatsapp_wallet: walletMode,
-            issue_type: issueEl ? issueEl.value : undefined,
-            name: name || undefined,
-            channel: 'checkout_web',
-            consent_accepted: true,
-            first_message: first || undefined,
-        };
-
-        if (issueEl && issueEl.options[issueEl.selectedIndex].getAttribute('data-requires-payment') === '1') {
-            payload.payment_transaction_id = sessionEl ? sessionEl.value.trim() : '';
-            payload.payment_amount_reported = amountEl ? parseFloat(amountEl.value) : undefined;
-        }
-
-        if (walletMode) {
-            const phoneEl = document.getElementById('cp-phone');
-            const countryEl = document.getElementById('cp-country');
-            payload.phone = phoneEl ? phoneEl.value.trim() : '';
-            payload.country_iso = countryEl ? countryEl.value : '';
-            payload.wallet_consent_accepted = true;
-        }
-
-        try {
-            const data = await api('/public/support/conversations', {
-                method: 'POST',
-                body: JSON.stringify(payload),
-            });
-            publicToken = data.data.public_token;
-            localStorage.setItem(STORAGE_KEY, publicToken);
-            lastMessageId = 0;
-            if (body) {
-                body.innerHTML = '';
-            }
-            showChat();
-            if (first) {
-                appendMessage({ id: 1, user_type: 'visitor', message: first });
-            }
-            await pollMessages(true);
-            startPoll();
-        } catch (e) {
-            if (errEl) {
-                errEl.textContent = e.message || 'Could not start chat';
-                errEl.style.display = 'block';
-            }
-        }
-    }
-
     async function pollMessages(reset) {
         if (!publicToken) {
             return;
@@ -462,7 +546,7 @@
             if (e.message && e.message.indexOf('not found') !== -1) {
                 localStorage.removeItem(STORAGE_KEY);
                 publicToken = '';
-                showOnboarding();
+                startIntake();
                 stopPoll();
             }
         }
@@ -530,8 +614,10 @@
     function init() {
         try {
             publicToken = localStorage.getItem(STORAGE_KEY) || '';
+            intakeToken = localStorage.getItem(INTAKE_STORAGE_KEY) || '';
         } catch (e) {
             publicToken = '';
+            intakeToken = '';
         }
 
         if (!bindDom()) {

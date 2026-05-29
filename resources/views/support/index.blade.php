@@ -22,7 +22,7 @@
                 Live help from our team, product guides, and answers — all in one place.
             </p>
             <p class="text-sm text-gray-500 mb-8 max-w-2xl mx-auto">
-                For payment problems, enter the <strong>session ID from your bank transfer</strong> (receipt or transfer details) and the amount you sent — then choose WhatsApp or in-browser chat. Linking WhatsApp is recommended so we can update you faster.
+                We are a <strong>payment gateway</strong> (not the shop you bought from). For transfer issues, our chat will ask for the account you paid to and your <strong>bank session ID</strong> before connecting you to our team. WhatsApp messages are only sent after we verify those details.
             </p>
             <button type="button" id="cp-support-hero-open" data-cp-support-open
                 class="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 shadow-lg">
@@ -75,10 +75,10 @@
         <div class="max-w-3xl mx-auto px-4 sm:px-6">
             <h2 class="text-xl font-bold text-gray-900 mb-4">Before you chat</h2>
             <ul class="space-y-3 text-sm text-gray-700 list-disc pl-5">
-                <li>We ask for your <strong>WhatsApp number</strong> to save and track your support conversation.</li>
-                <li>Your number creates or links a <strong>CheckoutPay WhatsApp wallet</strong> (same as CheckoutNow).</li>
-                <li>You will get a <strong>message on WhatsApp</strong> when support starts.</li>
-                <li><strong>Refunds</strong>, when approved, may be sent to that wallet; you can transfer out to any bank you choose.</li>
+                <li>We only help with <strong>instant bank transfer</strong> problems to our checkout accounts — not product or delivery issues from merchants.</li>
+                <li>You will answer a few questions in the chat (account paid to, bank session ID, amount).</li>
+                <li><strong>WhatsApp</strong> is optional and only offered after we confirm your session matches the account on your receipt.</li>
+                <li><strong>Refunds</strong>, when approved, may be credited to your WhatsApp wallet if you link it.</li>
             </ul>
         </div>
     </section>

@@ -3,6 +3,7 @@
 namespace App\Services\Support;
 
 use App\Models\ConsumerWalletApiAccount;
+use App\Models\Payment;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketReply;
 use App\Models\WhatsappWallet;
@@ -135,6 +136,16 @@ final class SupportConversationService
         }
         $subject = Str::limit($subject, 120);
 
+        $intakePaymentId = isset($input['payment_id']) ? (int) $input['payment_id'] : null;
+        if ($intakePaymentId && ! $payment) {
+            $payment = Payment::query()->find($intakePaymentId);
+        }
+
+        $whatsappEligibleAt = $input['whatsapp_eligible_at'] ?? null;
+        if ($whatsappEligibleAt === null && ! empty($input['whatsapp_eligible'])) {
+            $whatsappEligibleAt = now();
+        }
+
         return DB::transaction(function () use (
             $channel,
             $wallet,
@@ -150,16 +161,29 @@ final class SupportConversationService
             $paymentTransactionId,
             $paymentAmountReported,
             $priority,
-            $userNote
+            $userNote,
+            $whatsappEligibleAt
         ) {
             $token = (string) Str::uuid();
 
             $ticket = SupportTicket::create([
                 'channel' => $channel,
                 'issue_type' => $issueType,
+                'intake_status' => isset($input['intake_status']) ? (string) $input['intake_status'] : null,
                 'payment_id' => $payment?->id,
                 'payment_transaction_id' => $paymentTransactionId,
                 'payment_amount_reported' => $paymentAmountReported,
+                'reported_destination_account' => isset($input['reported_destination_account'])
+                    ? (string) $input['reported_destination_account']
+                    : null,
+                'reported_destination_bank' => isset($input['reported_destination_bank'])
+                    ? (string) $input['reported_destination_bank']
+                    : null,
+                'payment_receipt_path' => isset($input['payment_receipt_path'])
+                    ? (string) $input['payment_receipt_path']
+                    : null,
+                'account_on_session' => (bool) ($input['account_on_session'] ?? false),
+                'whatsapp_eligible_at' => $whatsappEligibleAt,
                 'business_id' => $payment?->business_id,
                 'whatsapp_wallet_id' => $wallet?->id,
                 'wallet_linked' => $linkWallet && $wallet !== null,
@@ -181,7 +205,13 @@ final class SupportConversationService
                 $this->createVisitorReply($ticket, $firstMessage);
             }
 
-            if ($wallet && $ticket->wallet_onboarding_sent_at === null) {
+            $skipWhatsappWelcome = ! empty($input['skip_whatsapp_welcome']);
+            $maySendWhatsapp = $wallet
+                && $linkWallet
+                && $ticket->whatsapp_eligible_at !== null
+                && ! $skipWhatsappWelcome;
+
+            if ($maySendWhatsapp && $ticket->wallet_onboarding_sent_at === null) {
                 $sendWelcome = $channel !== SupportTicket::CHANNEL_CHECKOUTNOW_APP
                     && config('support.send_whatsapp_welcome_on_web', true);
 
@@ -190,6 +220,8 @@ final class SupportConversationService
                 } elseif (! $sendWelcome || $this->onboarding->alreadySentSupportWelcome($wallet)) {
                     $ticket->update(['wallet_onboarding_sent_at' => now()]);
                 }
+            } elseif ($wallet && $ticket->wallet_onboarding_sent_at === null && ! $maySendWhatsapp) {
+                // Wallet linked for refunds but WhatsApp welcome deferred until eligible.
             }
 
             return [
@@ -327,6 +359,27 @@ final class SupportConversationService
         $this->touchTicketAfterMessage($ticket, 'admin');
 
         return ['ok' => true, 'reply' => $reply];
+    }
+
+    public function addBotReply(SupportTicket $ticket, string $message): SupportTicketReply
+    {
+        $reply = SupportTicketReply::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => null,
+            'user_type' => 'bot',
+            'message' => trim($message),
+            'is_internal_note' => false,
+        ]);
+
+        $ticket->increment('visitor_unread_count');
+        $this->touchTicketAfterMessage($ticket, 'admin');
+
+        return $reply;
+    }
+
+    public function addSystemVisitorFacingNote(SupportTicket $ticket, string $message): SupportTicketReply
+    {
+        return $this->addBotReply($ticket, $message);
     }
 
     private function createVisitorReply(SupportTicket $ticket, string $message): SupportTicketReply

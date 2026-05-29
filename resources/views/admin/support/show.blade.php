@@ -49,6 +49,30 @@
                         <span class="font-medium">Issue:</span> {{ $ticket->issueTypeLabel() }}
                     </p>
                 @endif
+                @if($ticket->intake_status || $ticket->reported_destination_account)
+                    <div class="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm overflow-hidden">
+                        <p class="font-semibold text-slate-900 mb-1">Intake</p>
+                        @if($ticket->intake_status)
+                            <p class="text-slate-800">Status: <strong>{{ str_replace('_', ' ', $ticket->intake_status) }}</strong></p>
+                        @endif
+                        @if($ticket->reported_destination_account)
+                            <p class="text-slate-800 break-all">Paid to account: <span class="font-mono">{{ $ticket->reported_destination_account }}</span></p>
+                        @endif
+                        @if($ticket->reported_destination_bank)
+                            <p class="text-slate-800">Bank sent from: {{ $ticket->reported_destination_bank }}</p>
+                        @endif
+                        <p class="text-xs text-slate-600 mt-1">
+                            Session matched account:
+                            <strong>{{ $ticket->account_on_session ? 'yes' : 'no' }}</strong>
+                            @if($ticket->whatsapp_eligible_at)
+                                · WhatsApp eligible {{ $ticket->whatsapp_eligible_at->diffForHumans() }}
+                            @endif
+                        </p>
+                        @if($ticket->payment_receipt_path)
+                            <p class="text-xs text-slate-600 mt-1">Receipt on file (storage)</p>
+                        @endif
+                    </div>
+                @endif
                 @if($ticket->payment_transaction_id || $ticket->payment)
                     <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm overflow-hidden">
                         <p class="font-semibold text-amber-900 mb-1">Payment context</p>
