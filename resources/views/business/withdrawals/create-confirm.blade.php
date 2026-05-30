@@ -48,10 +48,22 @@
                 </div>
 
                 <div>
+                    <label for="bank_narration" class="block text-sm font-medium text-gray-700 mb-1">Bank narration (optional)</label>
+                    <input type="text" name="bank_narration" id="bank_narration" maxlength="255"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        placeholder="Shown on the recipient's bank statement"
+                        value="{{ old('bank_narration') }}">
+                    <p class="mt-1 text-xs text-gray-500">Leave blank to use your business name: {{ $business->name }}</p>
+                    @error('bank_narration')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
                     <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
                     <textarea name="notes" id="notes" rows="2"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Any additional notes..."></textarea>
+                        placeholder="Internal notes for your records (not sent to the bank)..."></textarea>
                 </div>
 
                 @if(empty($account['saved_account_id']))

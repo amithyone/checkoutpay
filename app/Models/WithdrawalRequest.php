@@ -22,6 +22,7 @@ class WithdrawalRequest extends Model
         'account_name',
         'bank_name',
         'notes',
+        'bank_narration',
         'status',
         'payout_provider',
         'payout_status',

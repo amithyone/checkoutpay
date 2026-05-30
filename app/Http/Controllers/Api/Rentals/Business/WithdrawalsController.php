@@ -69,6 +69,7 @@ class WithdrawalsController extends Controller
             'account_name' => 'required|string|max:255',
             'bank_code' => 'nullable|string|max:20',
             'notes' => 'nullable|string|max:1000',
+            'bank_narration' => 'nullable|string|max:255',
         ]);
 
         $bankCode = $validated['bank_code'] ?? null;
@@ -91,6 +92,9 @@ class WithdrawalsController extends Controller
             'account_number' => $validated['account_number'],
             'account_name' => $validated['account_name'],
             'notes' => $validated['notes'] ?? null,
+            'bank_narration' => isset($validated['bank_narration']) && trim((string) $validated['bank_narration']) !== ''
+                ? trim((string) $validated['bank_narration'])
+                : null,
             'status' => WithdrawalRequest::STATUS_PENDING,
         ]);
 

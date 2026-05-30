@@ -478,6 +478,7 @@ class WhatsappWalletBankPayoutService
         string $accountNumber,
         string $accountName,
         string $reference,
+        string $narration,
         ?WhatsappWallet $wallet = null,
         ?int $walletTransactionId = null,
     ): array {
@@ -493,7 +494,7 @@ class WhatsappWalletBankPayoutService
                 'creditAccountNumber' => $accountNumber,
                 'debitAccountNumber' => (string) $wallet->mevon_virtual_account_number,
                 'debitAccountName' => $wallet->mevonDebitAccountName(),
-                'narration' => 'WhatsApp wallet bank transfer',
+                'narration' => $narration,
                 'reference' => $reference,
             ]);
             $result['payout_api'] = MevonPayLedgerEntry::PAYOUT_API_PAYOUT;
@@ -511,7 +512,7 @@ class WhatsappWalletBankPayoutService
             'bankName' => $bankName,
             'creditAccountName' => $accountName,
             'creditAccountNumber' => $accountNumber,
-            'narration' => 'WhatsApp wallet bank transfer',
+            'narration' => $narration,
             'reference' => $reference,
             'sessionId' => $sessionId,
         ]);

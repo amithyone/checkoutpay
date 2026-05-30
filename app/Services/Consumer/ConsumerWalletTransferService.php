@@ -6,6 +6,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MavonPayTransferService;
 use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
+use App\Services\Payout\BankPayoutNarration;
 use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
@@ -216,6 +217,7 @@ class ConsumerWalletTransferService
         string $bankCode,
         string $bankName,
         string $beneficiaryName,
+        ?string $remark = null,
     ): array {
         if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
             return ['ok' => false, 'message' => 'Bank transfers are only available for Nigeria wallet numbers.'];
@@ -244,6 +246,7 @@ class ConsumerWalletTransferService
 
         $payoutAmount = (float) ($quoted['payout_amount'] ?? $amount);
         $selfFee = (float) ($quoted['fee'] ?? 0);
+        $narration = BankPayoutNarration::forConsumerApp($remark);
 
         if (! $this->bankPayout->isConfigured()) {
             return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $isSelf, $selfFee, $payoutAmount);
@@ -252,7 +255,7 @@ class ConsumerWalletTransferService
         $reference = $this->bankPayout->makeWalletPayoutReference();
 
         try {
-            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiaryName, $reference, $isSelf, $selfFee) {
+            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiaryName, $reference, $isSelf, $selfFee, $narration) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -282,6 +285,7 @@ class ConsumerWalletTransferService
                     'meta' => array_filter([
                         'bank_name' => $bankName,
                         'channel' => 'consumer_api',
+                        'narration' => $narration,
                         'payout_pending' => true,
                         'self_transfer' => $isSelf ? true : null,
                         'self_transfer_fee' => $isSelf ? $selfFee : null,
@@ -308,6 +312,7 @@ class ConsumerWalletTransferService
             $acct,
             $beneficiaryName,
             $reference,
+            $narration,
             $walletFresh,
             $txnRow?->id,
         );

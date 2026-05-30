@@ -7,6 +7,7 @@ use App\Models\MevonPayLedgerEntry;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Models\Business;
 use App\Models\WithdrawalRequest;
+use App\Services\Payout\BankPayoutNarration;
 use Illuminate\Support\Str;
 
 /**
@@ -79,6 +80,7 @@ class WithdrawalMavonPayPayoutService
 
         $reference = 'wd_'.$withdrawal->id.'_'.Str::lower(Str::random(10));
         $sessionId = 'WD'.$withdrawal->id.'_'.now()->format('YmdHis');
+        $narration = BankPayoutNarration::forBusinessWithdrawal($business, $withdrawal->bank_narration);
 
         $result = $this->mavon->createTransfer([
             'amount' => (float) $withdrawal->amount,
@@ -86,7 +88,7 @@ class WithdrawalMavonPayPayoutService
             'bankName' => $withdrawal->bank_name,
             'creditAccountName' => $withdrawal->account_name,
             'creditAccountNumber' => $withdrawal->account_number,
-            'narration' => 'Business withdrawal',
+            'narration' => $narration,
             'reference' => $reference,
             'sessionId' => $sessionId,
         ]);
@@ -119,7 +121,12 @@ class WithdrawalMavonPayPayoutService
             $bucket,
             (string) config('services.mevonpay.debit_account_number', ''),
             $withdrawal,
-            ['business_id' => $business->id, 'withdrawal_id' => $withdrawal->id, 'response_code' => $result['response_code'] ?? null],
+            [
+                'business_id' => $business->id,
+                'withdrawal_id' => $withdrawal->id,
+                'narration' => $narration,
+                'response_code' => $result['response_code'] ?? null,
+            ],
         );
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {

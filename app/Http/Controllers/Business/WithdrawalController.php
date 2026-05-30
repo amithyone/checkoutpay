@@ -248,6 +248,7 @@ class WithdrawalController extends Controller
             'amount' => 'required|numeric|min:1|max:' . max(0, $maxWithdraw),
             'password' => 'required',
             'notes' => 'nullable|string|max:1000',
+            'bank_narration' => 'nullable|string|max:255',
             'save_account' => 'boolean',
             'is_default' => 'boolean',
         ];
@@ -367,6 +368,9 @@ class WithdrawalController extends Controller
             'account_number' => $accountNumber,
             'account_name' => $accountName,
             'notes' => $validated['notes'] ?? null,
+            'bank_narration' => isset($validated['bank_narration']) && trim((string) $validated['bank_narration']) !== ''
+                ? trim((string) $validated['bank_narration'])
+                : null,
             'status' => WithdrawalRequest::STATUS_PENDING,
         ]);
 

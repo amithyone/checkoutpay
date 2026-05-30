@@ -85,10 +85,22 @@
                 </div>
 
                 <div>
-                    <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                    <label for="bank_narration" class="block text-sm font-medium text-gray-700 mb-1">Bank narration (optional)</label>
+                    <input type="text" name="bank_narration" id="bank_narration" maxlength="255"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        placeholder="Shown on the recipient's bank statement"
+                        value="{{ old('bank_narration') }}">
+                    <p class="mt-1 text-xs text-gray-500">Leave blank to use the selected business name.</p>
+                    @error('bank_narration')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
                     <textarea name="notes" id="notes" rows="3"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Any additional notes..."></textarea>
+                        placeholder="Internal notes (not sent to the bank)..."></textarea>
                     @error('notes')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror

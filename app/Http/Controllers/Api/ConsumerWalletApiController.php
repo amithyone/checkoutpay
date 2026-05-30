@@ -686,6 +686,7 @@ class ConsumerWalletApiController extends Controller
             'bank_code' => 'required|string|max:20',
             'bank_name' => 'required|string|max:120',
             'account_name' => 'required|string|max:120',
+            'remark' => 'nullable|string|max:255',
         ]);
 
         $wallet = $this->walletFor($request)->fresh();
@@ -703,6 +704,7 @@ class ConsumerWalletApiController extends Controller
             (string) $request->input('bank_code'),
             (string) $request->input('bank_name'),
             (string) $request->input('account_name'),
+            $request->filled('remark') ? (string) $request->input('remark') : null,
         );
 
         $code = $result['ok'] ? 200 : 422;

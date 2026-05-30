@@ -7,6 +7,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
 use App\Services\MavonPayTransferService;
+use App\Services\Payout\BankPayoutNarration;
 use App\Services\Vtu\VtuProviderResolver;
 use App\Services\WhatsappWalletBankPayoutService;
 use Carbon\Carbon;
@@ -506,6 +507,7 @@ class WhatsappWalletTransferCompletionService
             $acct,
             $beneficiary,
             $reference,
+            BankPayoutNarration::forWhatsapp(),
             $walletFresh,
             $txnRow?->id,
         );
