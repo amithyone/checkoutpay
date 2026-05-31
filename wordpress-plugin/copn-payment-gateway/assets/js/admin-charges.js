@@ -4,15 +4,15 @@
 (function () {
 	'use strict';
 
-	if (typeof window.checkoutpayAdminCharges === 'undefined') {
+	if (typeof window.copnAdminCharges === 'undefined') {
 		return;
 	}
 
-	var config = window.checkoutpayAdminCharges;
+	var config = window.copnAdminCharges;
 	var i18n = config.i18n || {};
-	var panel = document.getElementById('checkoutpay-charges-panel');
-	var loading = document.getElementById('checkoutpay-charges-loading');
-	var refreshBtn = document.getElementById('checkoutpay-refresh-charges');
+	var panel = document.getElementById('copn-charges-panel');
+	var loading = document.getElementById('copn-charges-loading');
+	var refreshBtn = document.getElementById('copn-refresh-charges');
 
 	if (!panel || !refreshBtn) {
 		return;

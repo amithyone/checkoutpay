@@ -4,14 +4,14 @@
 (function ($) {
 	'use strict';
 
-	if (typeof window.checkoutpayThankyou === 'undefined') {
+	if (typeof window.copnThankyou === 'undefined') {
 		return;
 	}
 
-	var config = window.checkoutpayThankyou;
+	var config = window.copnThankyou;
 	var i18n = config.i18n || {};
 
-	$('#checkoutpay-check-status').on('click', function () {
+	$('#copn-check-status').on('click', function () {
 		var button = $(this);
 		button.prop('disabled', true).text(i18n.checking || 'Checking...');
 
@@ -37,9 +37,9 @@
 		});
 	});
 
-	$('#checkoutpay-update-amount-btn').on('click', function () {
+	$('#copn-update-amount-btn').on('click', function () {
 		var button = $(this);
-		var amountInput = $('#checkoutpay-actual-amount');
+		var amountInput = $('#copn-actual-amount');
 		var amount = parseFloat(amountInput.val());
 
 		if (!amount || amount <= 0) {

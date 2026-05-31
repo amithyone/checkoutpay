@@ -44,11 +44,11 @@
 		});
 	}
 
-	if (typeof window.checkoutpayAdminSettings === 'undefined') {
+	if (typeof window.copnAdminSettings === 'undefined') {
 		return;
 	}
 
-	var config = window.checkoutpayAdminSettings;
+	var config = window.copnAdminSettings;
 	var copiedLabel = config.copiedLabel || 'Copied!';
 	var pairs = config.pairs || [];
 
@@ -56,7 +56,7 @@
 		copyInputValue(pair.inputId, pair.buttonId, copiedLabel);
 	});
 
-	['checkoutpay-portal-url', 'checkoutpay-webhook-url', 'checkoutpay-website-url'].forEach(function (inputId) {
+	['copn-portal-url', 'copn-webhook-url', 'copn-website-url'].forEach(function (inputId) {
 		var input = document.getElementById(inputId);
 		if (input) {
 			input.addEventListener('focus', function () {

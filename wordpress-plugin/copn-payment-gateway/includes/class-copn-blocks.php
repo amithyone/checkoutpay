@@ -80,12 +80,12 @@ final class Copn_Blocks extends AbstractPaymentMethodType
     {
         $title = $this->get_setting('title');
         if ($title === '') {
-            $title = __('CheckoutPay', 'checkoutpay-gateway');
+            $title = __('CheckoutPay', 'copn-payment-gateway');
         }
 
         $description = $this->get_setting('description');
         if ($description === '') {
-            $description = __('Pay securely via bank transfer using CheckoutPay.', 'checkoutpay-gateway');
+            $description = __('Pay securely via bank transfer using CheckoutPay.', 'copn-payment-gateway');
         }
 
         return array(

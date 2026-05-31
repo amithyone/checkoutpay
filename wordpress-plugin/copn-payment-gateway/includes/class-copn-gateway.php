@@ -22,8 +22,8 @@ class Copn_Gateway extends WC_Payment_Gateway {
         $icon_path = COPN_PLUGIN_DIR . 'assets/images/checkoutpay-logo.png';
         $this->icon = file_exists($icon_path) ? COPN_PLUGIN_URL . 'assets/images/checkoutpay-logo.png' : '';
         $this->has_fields = false;
-        $this->method_title = __('CheckoutPay', 'checkoutpay-gateway');
-        $this->method_description = __('Accept bank-transfer payments via CheckoutPay. Customers pay to a virtual account; orders update automatically when payment is confirmed.', 'checkoutpay-gateway');
+        $this->method_title = __('CheckoutPay', 'copn-payment-gateway');
+        $this->method_description = __('Accept bank-transfer payments via CheckoutPay. Customers pay to a virtual account; orders update automatically when payment is confirmed.', 'copn-payment-gateway');
         $this->supports = array('products');
 
         // Load the settings
@@ -76,7 +76,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
         $base_url = defined('COPN_PLUGIN_URL') ? COPN_PLUGIN_URL : '';
 
         wp_enqueue_script(
-            'checkoutpay-admin-settings',
+            'copn-admin-settings',
             $base_url . 'assets/js/admin-settings.js',
             array(),
             $version,
@@ -84,25 +84,25 @@ class Copn_Gateway extends WC_Payment_Gateway {
         );
 
         wp_localize_script(
-            'checkoutpay-admin-settings',
-            'checkoutpayAdminSettings',
+            'copn-admin-settings',
+            'copnAdminSettings',
             array(
-                'copiedLabel' => __('Copied!', 'checkoutpay-gateway'),
+                'copiedLabel' => __('Copied!', 'copn-payment-gateway'),
                 'pairs' => array(
                     array(
-                        'inputId' => 'checkoutpay-webhook-url',
-                        'buttonId' => 'checkoutpay-copy-webhook-url',
+                        'inputId' => 'copn-webhook-url',
+                        'buttonId' => 'copn-copy-webhook-url',
                     ),
                     array(
-                        'inputId' => 'checkoutpay-website-url',
-                        'buttonId' => 'checkoutpay-copy-website-url',
+                        'inputId' => 'copn-website-url',
+                        'buttonId' => 'copn-copy-website-url',
                     ),
                 ),
             )
         );
 
         wp_enqueue_script(
-            'checkoutpay-admin-charges',
+            'copn-admin-charges',
             $base_url . 'assets/js/admin-charges.js',
             array(),
             $version,
@@ -110,28 +110,28 @@ class Copn_Gateway extends WC_Payment_Gateway {
         );
 
         wp_localize_script(
-            'checkoutpay-admin-charges',
-            'checkoutpayAdminCharges',
+            'copn-admin-charges',
+            'copnAdminCharges',
             array(
                 'websiteUrl' => $this->get_store_website_url(),
                 'webhookUrl' => $this->get_webhook_url(),
-                'portalUrl' => $this->get_checkoutpay_portal_url(),
-                'dashboardWebsitesUrl' => $this->get_checkoutpay_dashboard_websites_url(),
+                'portalUrl' => $this->get_copn_portal_url(),
+                'dashboardWebsitesUrl' => $this->get_copn_dashboard_websites_url(),
                 'sampleAmount' => 10000,
                 'i18n' => array(
-                    'unableToLoad' => __('Unable to load charges', 'checkoutpay-gateway'),
-                    'noCharges' => __('No charges apply (disabled or exempt)', 'checkoutpay-gateway'),
-                    'matchedWebsite' => __('Matched website', 'checkoutpay-gateway'),
-                    'feeStructure' => __('Fee structure', 'checkoutpay-gateway'),
-                    'whoPaysFees' => __('Who pays fees', 'checkoutpay-gateway'),
-                    'sampleOrder' => __('Sample order', 'checkoutpay-gateway'),
-                    'feesOnSample' => __('Fees on sample', 'checkoutpay-gateway'),
-                    'customerTransfers' => __('Customer transfers', 'checkoutpay-gateway'),
-                    'youReceive' => __('You receive', 'checkoutpay-gateway'),
-                    'openSettings' => __('Open CheckoutPay website settings', 'checkoutpay-gateway'),
-                    'checkoutpayHome' => __('CheckoutPay home', 'checkoutpay-gateway'),
-                    'apiRequired' => __('API URL and API Key are required.', 'checkoutpay-gateway'),
-                    'networkError' => __('Network error', 'checkoutpay-gateway'),
+                    'unableToLoad' => __('Unable to load charges', 'copn-payment-gateway'),
+                    'noCharges' => __('No charges apply (disabled or exempt)', 'copn-payment-gateway'),
+                    'matchedWebsite' => __('Matched website', 'copn-payment-gateway'),
+                    'feeStructure' => __('Fee structure', 'copn-payment-gateway'),
+                    'whoPaysFees' => __('Who pays fees', 'copn-payment-gateway'),
+                    'sampleOrder' => __('Sample order', 'copn-payment-gateway'),
+                    'feesOnSample' => __('Fees on sample', 'copn-payment-gateway'),
+                    'customerTransfers' => __('Customer transfers', 'copn-payment-gateway'),
+                    'youReceive' => __('You receive', 'copn-payment-gateway'),
+                    'openSettings' => __('Open CheckoutPay website settings', 'copn-payment-gateway'),
+                    'checkoutpayHome' => __('CheckoutPay home', 'copn-payment-gateway'),
+                    'apiRequired' => __('API URL and API Key are required.', 'copn-payment-gateway'),
+                    'networkError' => __('Network error', 'copn-payment-gateway'),
                 ),
             )
         );
@@ -165,7 +165,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
 
         wp_enqueue_script('jquery');
         wp_enqueue_script(
-            'checkoutpay-thankyou-payment',
+            'copn-thankyou-payment',
             $base_url . 'assets/js/thankyou-payment.js',
             array('jquery'),
             $version,
@@ -173,24 +173,24 @@ class Copn_Gateway extends WC_Payment_Gateway {
         );
 
         wp_localize_script(
-            'checkoutpay-thankyou-payment',
-            'checkoutpayThankyou',
+            'copn-thankyou-payment',
+            'copnThankyou',
             array(
                 'orderId' => $order_id,
                 'nonce' => wp_create_nonce($this->thankyou_nonce_action($order_id)),
                 'checkStatusUrl' => esc_url(add_query_arg('wc-api', 'wc_checkoutpay_gateway', home_url('/'))),
                 'updateAmountUrl' => esc_url(add_query_arg('wc-api', 'wc_checkoutpay_update_amount', home_url('/'))),
                 'i18n' => array(
-                    'checking' => __('Checking...', 'checkoutpay-gateway'),
-                    'checkStatus' => __('Check Payment Status', 'checkoutpay-gateway'),
-                    'stillPending' => __('Payment is still pending. Please check your email for payment instructions.', 'checkoutpay-gateway'),
-                    'checkError' => __('Unable to check payment status. Please try again later.', 'checkoutpay-gateway'),
-                    'enterAmount' => __('Please enter the amount you paid.', 'checkoutpay-gateway'),
-                    'updating' => __('Updating...', 'checkoutpay-gateway'),
-                    'updateAmount' => __('Update amount & check status', 'checkoutpay-gateway'),
-                    'amountUpdated' => __('Amount updated. You can check status again.', 'checkoutpay-gateway'),
-                    'updateFailed' => __('Update failed. Please try again.', 'checkoutpay-gateway'),
-                    'updateError' => __('Unable to update. Please try again.', 'checkoutpay-gateway'),
+                    'checking' => __('Checking...', 'copn-payment-gateway'),
+                    'checkStatus' => __('Check Payment Status', 'copn-payment-gateway'),
+                    'stillPending' => __('Payment is still pending. Please check your email for payment instructions.', 'copn-payment-gateway'),
+                    'checkError' => __('Unable to check payment status. Please try again later.', 'copn-payment-gateway'),
+                    'enterAmount' => __('Please enter the amount you paid.', 'copn-payment-gateway'),
+                    'updating' => __('Updating...', 'copn-payment-gateway'),
+                    'updateAmount' => __('Update amount & check status', 'copn-payment-gateway'),
+                    'amountUpdated' => __('Amount updated. You can check status again.', 'copn-payment-gateway'),
+                    'updateFailed' => __('Update failed. Please try again.', 'copn-payment-gateway'),
+                    'updateError' => __('Unable to update. Please try again.', 'copn-payment-gateway'),
                 ),
             )
         );
@@ -305,80 +305,80 @@ class Copn_Gateway extends WC_Payment_Gateway {
     public function init_form_fields() {
         $this->form_fields = array(
             'enabled' => array(
-                'title' => __('Enable/Disable', 'checkoutpay-gateway'),
+                'title' => __('Enable/Disable', 'copn-payment-gateway'),
                 'type' => 'checkbox',
-                'label' => __('Enable CheckoutPay', 'checkoutpay-gateway'),
+                'label' => __('Enable CheckoutPay', 'copn-payment-gateway'),
                 'default' => 'no'
             ),
             'title' => array(
-                'title' => __('Title', 'checkoutpay-gateway'),
+                'title' => __('Title', 'copn-payment-gateway'),
                 'type' => 'text',
-                'description' => __('This controls the title which the user sees during checkout.', 'checkoutpay-gateway'),
-                'default' => __('CheckoutPay', 'checkoutpay-gateway'),
+                'description' => __('This controls the title which the user sees during checkout.', 'copn-payment-gateway'),
+                'default' => __('CheckoutPay', 'copn-payment-gateway'),
                 'desc_tip' => true,
             ),
             'description' => array(
-                'title' => __('Description', 'checkoutpay-gateway'),
+                'title' => __('Description', 'copn-payment-gateway'),
                 'type' => 'textarea',
-                'description' => __('Payment method description that the customer will see on your checkout.', 'checkoutpay-gateway'),
-                'default' => __('Pay securely via CheckoutPay. You will receive payment instructions via email.', 'checkoutpay-gateway'),
+                'description' => __('Payment method description that the customer will see on your checkout.', 'copn-payment-gateway'),
+                'default' => __('Pay securely via CheckoutPay. You will receive payment instructions via email.', 'copn-payment-gateway'),
                 'desc_tip' => true,
             ),
             'api_url' => array(
-                'title' => __('API URL', 'checkoutpay-gateway'),
+                'title' => __('API URL', 'copn-payment-gateway'),
                 'type' => 'text',
-                'description' => __('Enter your CheckoutPay API URL (e.g., https://check-outpay.com/api/v1)', 'checkoutpay-gateway'),
+                'description' => __('Enter your CheckoutPay API URL (e.g., https://check-outpay.com/api/v1)', 'copn-payment-gateway'),
                 'default' => 'https://check-outpay.com/api/v1',
                 'desc_tip' => true,
             ),
             'api_key' => array(
-                'title' => __('API Key', 'checkoutpay-gateway'),
+                'title' => __('API Key', 'copn-payment-gateway'),
                 'type' => 'password',
-                'description' => __('Enter your CheckoutPay API Key. You can find this in your CheckoutPay dashboard.', 'checkoutpay-gateway'),
+                'description' => __('Enter your CheckoutPay API Key. You can find this in your CheckoutPay dashboard.', 'copn-payment-gateway'),
                 'default' => '',
                 'desc_tip' => true,
             ),
-            'checkoutpay_webhook_url' => array(
-                'title' => __('Webhook URL (for CheckoutPay)', 'checkoutpay-gateway'),
-                'type' => 'checkoutpay_webhook_url',
-                'description' => __('Copy this exact URL into your CheckoutPay business website webhook settings. The plugin sends it automatically on each order; it must match what you save in CheckoutPay.', 'checkoutpay-gateway'),
+            'copn_webhook_url' => array(
+                'title' => __('Webhook URL (for CheckoutPay)', 'copn-payment-gateway'),
+                'type' => 'copn_webhook_url',
+                'description' => __('Copy this exact URL into your CheckoutPay business website webhook settings. The plugin sends it automatically on each order; it must match what you save in CheckoutPay.', 'copn-payment-gateway'),
             ),
-            'checkoutpay_charges_info' => array(
-                'title' => __('Charges (from CheckoutPay)', 'checkoutpay-gateway'),
-                'type' => 'checkoutpay_charges_info',
-                'description' => __('Live fee rules for this store, as configured on your CheckoutPay business website. Refresh after changing settings in CheckoutPay.', 'checkoutpay-gateway'),
+            'copn_charges_info' => array(
+                'title' => __('Charges (from CheckoutPay)', 'copn-payment-gateway'),
+                'type' => 'copn_charges_info',
+                'description' => __('Live fee rules for this store, as configured on your CheckoutPay business website. Refresh after changing settings in CheckoutPay.', 'copn-payment-gateway'),
             ),
             'auto_complete_orders' => array(
-                'title' => __('Order status on payment', 'checkoutpay-gateway'),
+                'title' => __('Order status on payment', 'copn-payment-gateway'),
                 'type' => 'checkbox',
-                'label' => __('Mark orders as Completed when payment is approved', 'checkoutpay-gateway'),
+                'label' => __('Mark orders as Completed when payment is approved', 'copn-payment-gateway'),
                 'default' => 'no',
-                'description' => __('Default WooCommerce behavior is Processing for physical goods. Enable to set Completed immediately when CheckoutPay confirms payment.', 'checkoutpay-gateway'),
+                'description' => __('Default WooCommerce behavior is Processing for physical goods. Enable to set Completed immediately when CheckoutPay confirms payment.', 'copn-payment-gateway'),
             ),
             'split_payment_notice' => array(
-                'title' => __('Split payment', 'checkoutpay-gateway'),
+                'title' => __('Split payment', 'copn-payment-gateway'),
                 'type' => 'title',
-                'description' => __('Installment and split payments are configured in your CheckoutPay dashboard (business websites and invoices), not in this plugin. WooCommerce orders use a single bank transfer per checkout.', 'checkoutpay-gateway'),
+                'description' => __('Installment and split payments are configured in your CheckoutPay dashboard (business websites and invoices), not in this plugin. WooCommerce orders use a single bank transfer per checkout.', 'copn-payment-gateway'),
             ),
             'test_mode' => array(
-                'title' => __('Test Mode', 'checkoutpay-gateway'),
+                'title' => __('Test Mode', 'copn-payment-gateway'),
                 'type' => 'checkbox',
-                'label' => __('Enable Test Mode', 'checkoutpay-gateway'),
+                'label' => __('Enable Test Mode', 'copn-payment-gateway'),
                 'default' => 'no',
-                'description' => __('Enable test mode to use test API credentials.', 'checkoutpay-gateway'),
+                'description' => __('Enable test mode to use test API credentials.', 'copn-payment-gateway'),
             ),
             'developer_program_partner_business_id' => array(
-                'title' => __('Developer program partner ID', 'checkoutpay-gateway'),
+                'title' => __('Developer program partner ID', 'copn-payment-gateway'),
                 'type' => 'text',
-                'description' => __('Optional. CheckoutPay Business ID of an approved developer partner (sent as developer_program_partner_business_id on payment-request).', 'checkoutpay-gateway'),
+                'description' => __('Optional. CheckoutPay Business ID of an approved developer partner (sent as developer_program_partner_business_id on payment-request).', 'copn-payment-gateway'),
                 'default' => '',
                 'desc_tip' => true,
             ),
             'instructions' => array(
-                'title' => __('Instructions', 'checkoutpay-gateway'),
+                'title' => __('Instructions', 'copn-payment-gateway'),
                 'type' => 'textarea',
-                'description' => __('Instructions that will be added to the thank you page.', 'checkoutpay-gateway'),
-                'default' => __('Please check your email for payment instructions. Complete the payment to confirm your order.', 'checkoutpay-gateway'),
+                'description' => __('Instructions that will be added to the thank you page.', 'copn-payment-gateway'),
+                'default' => __('Please check your email for payment instructions. Complete the payment to confirm your order.', 'copn-payment-gateway'),
                 'desc_tip' => true,
             ),
         );
@@ -407,7 +407,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
      *
      * @return string
      */
-    public function get_checkoutpay_portal_url() {
+    public function get_copn_portal_url() {
         $url = defined('COPN_PORTAL_URL') ? COPN_PORTAL_URL : 'https://check-outpay.com';
 
         return untrailingslashit($url);
@@ -418,8 +418,8 @@ class Copn_Gateway extends WC_Payment_Gateway {
      *
      * @return string
      */
-    public function get_checkoutpay_dashboard_websites_url() {
-        return $this->get_checkoutpay_portal_url() . '/dashboard/websites';
+    public function get_copn_dashboard_websites_url() {
+        return $this->get_copn_portal_url() . '/dashboard/websites';
     }
 
     /**
@@ -429,12 +429,12 @@ class Copn_Gateway extends WC_Payment_Gateway {
      * @param array  $data Field definition.
      * @return string
      */
-    public function generate_checkoutpay_webhook_url_html($key, $data) {
+    public function generate_copn_webhook_url_html($key, $data) {
         $field_key = $this->get_field_key($key);
         $webhook_url = $this->get_webhook_url();
         $website_url = $this->get_store_website_url();
-        $portal_url = $this->get_checkoutpay_portal_url();
-        $dashboard_websites_url = $this->get_checkoutpay_dashboard_websites_url();
+        $portal_url = $this->get_copn_portal_url();
+        $dashboard_websites_url = $this->get_copn_dashboard_websites_url();
         $defaults = array(
             'title' => '',
             'description' => '',
@@ -452,56 +452,56 @@ class Copn_Gateway extends WC_Payment_Gateway {
                     <p class="description" style="margin-bottom: 8px;">
                         <?php echo wp_kses_post($data['description']); ?>
                     </p>
-                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('CheckoutPay site URL', 'checkoutpay-gateway'); ?></strong></p>
+                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('CheckoutPay site URL', 'copn-payment-gateway'); ?></strong></p>
                     <p style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 42rem; margin-bottom: 12px;">
                         <input
                             type="text"
                             readonly
                             class="large-text code"
-                            id="checkoutpay-portal-url"
+                            id="copn-portal-url"
                             value="<?php echo esc_attr($portal_url); ?>/"
                             style="flex: 1 1 280px;"
                         />
                         <a href="<?php echo esc_url($dashboard_websites_url); ?>" class="button" target="_blank" rel="noopener noreferrer">
-                            <?php esc_html_e('Open website settings', 'checkoutpay-gateway'); ?>
+                            <?php esc_html_e('Open website settings', 'copn-payment-gateway'); ?>
                         </a>
                     </p>
                     <p class="description" style="margin: 0 0 12px;">
-                        <?php esc_html_e('Register your WooCommerce store URL below in CheckoutPay → Dashboard → Websites.', 'checkoutpay-gateway'); ?>
+                        <?php esc_html_e('Register your WooCommerce store URL below in CheckoutPay → Dashboard → Websites.', 'copn-payment-gateway'); ?>
                     </p>
-                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('Webhook URL', 'checkoutpay-gateway'); ?></strong></p>
+                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('Webhook URL', 'copn-payment-gateway'); ?></strong></p>
                     <p style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 42rem;">
                         <input
                             type="text"
                             readonly
                             class="large-text code"
-                            id="checkoutpay-webhook-url"
+                            id="copn-webhook-url"
                             value="<?php echo esc_attr($webhook_url); ?>"
                             style="flex: 1 1 280px;"
                         />
-                        <button type="button" class="button" id="checkoutpay-copy-webhook-url">
-                            <?php esc_html_e('Copy webhook URL', 'checkoutpay-gateway'); ?>
+                        <button type="button" class="button" id="copn-copy-webhook-url">
+                            <?php esc_html_e('Copy webhook URL', 'copn-payment-gateway'); ?>
                         </button>
                     </p>
                     <p class="description" style="margin: 8px 0 12px;">
-                        <?php esc_html_e('CheckoutPay → Business websites → paste into Webhook URL for this store domain.', 'checkoutpay-gateway'); ?>
+                        <?php esc_html_e('CheckoutPay → Business websites → paste into Webhook URL for this store domain.', 'copn-payment-gateway'); ?>
                     </p>
-                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('Website URL (also sent to CheckoutPay)', 'checkoutpay-gateway'); ?></strong></p>
+                    <p style="margin: 0 0 6px;"><strong><?php esc_html_e('Website URL (also sent to CheckoutPay)', 'copn-payment-gateway'); ?></strong></p>
                     <p style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 42rem;">
                         <input
                             type="text"
                             readonly
                             class="large-text code"
-                            id="checkoutpay-website-url"
+                            id="copn-website-url"
                             value="<?php echo esc_attr($website_url); ?>"
                             style="flex: 1 1 280px;"
                         />
-                        <button type="button" class="button" id="checkoutpay-copy-website-url">
-                            <?php esc_html_e('Copy website URL', 'checkoutpay-gateway'); ?>
+                        <button type="button" class="button" id="copn-copy-website-url">
+                            <?php esc_html_e('Copy website URL', 'copn-payment-gateway'); ?>
                         </button>
                     </p>
                     <p class="description">
-                        <?php esc_html_e('Use the same domain in CheckoutPay when you register or approve this WooCommerce site.', 'checkoutpay-gateway'); ?>
+                        <?php esc_html_e('Use the same domain in CheckoutPay when you register or approve this WooCommerce site.', 'copn-payment-gateway'); ?>
                     </p>
                 </fieldset>
             </td>
@@ -517,7 +517,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
      * @param array  $data Field definition.
      * @return string
      */
-    public function generate_checkoutpay_charges_info_html($key, $data) {
+    public function generate_copn_charges_info_html($key, $data) {
         $field_key = $this->get_field_key($key);
         $defaults = array(
             'title' => '',
@@ -537,16 +537,16 @@ class Copn_Gateway extends WC_Payment_Gateway {
                         <?php echo wp_kses_post($data['description']); ?>
                     </p>
                     <p>
-                        <button type="button" class="button" id="checkoutpay-refresh-charges">
-                            <?php esc_html_e('Refresh charges', 'checkoutpay-gateway'); ?>
+                        <button type="button" class="button" id="copn-refresh-charges">
+                            <?php esc_html_e('Refresh charges', 'copn-payment-gateway'); ?>
                         </button>
-                        <span id="checkoutpay-charges-loading" style="display:none; margin-left: 8px;">
-                            <?php esc_html_e('Loading…', 'checkoutpay-gateway'); ?>
+                        <span id="copn-charges-loading" style="display:none; margin-left: 8px;">
+                            <?php esc_html_e('Loading…', 'copn-payment-gateway'); ?>
                         </span>
                     </p>
-                    <div id="checkoutpay-charges-panel" style="margin-top: 12px; max-width: 40rem; padding: 12px 14px; background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 4px;">
+                    <div id="copn-charges-panel" style="margin-top: 12px; max-width: 40rem; padding: 12px 14px; background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 4px;">
                         <p class="description" style="margin: 0;">
-                            <?php esc_html_e('Save your API URL and API Key above, then click Refresh charges.', 'checkoutpay-gateway'); ?>
+                            <?php esc_html_e('Save your API URL and API Key above, then click Refresh charges.', 'copn-payment-gateway'); ?>
                         </p>
                     </div>
                 </fieldset>
@@ -642,7 +642,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
         $response = $this->make_api_request('payment-request', $payment_data);
 
         if (is_wp_error($response)) {
-            wc_add_notice(__('Payment error: ', 'checkoutpay-gateway') . $response->get_error_message(), 'error');
+            wc_add_notice(__('Payment error: ', 'copn-payment-gateway') . $response->get_error_message(), 'error');
             return array(
                 'result' => 'fail',
                 'redirect' => ''
@@ -691,7 +691,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
             $order->save();
 
             // Mark order as pending payment
-            $order->update_status('pending', __('Awaiting CheckoutPay payment', 'checkoutpay-gateway'));
+            $order->update_status('pending', __('Awaiting CheckoutPay payment', 'copn-payment-gateway'));
 
             // Return success
             return array(
@@ -699,8 +699,8 @@ class Copn_Gateway extends WC_Payment_Gateway {
                 'redirect' => $this->get_return_url($order)
             );
         } else {
-            $error_message = isset($response_data['message']) ? $response_data['message'] : __('Payment request failed. Please try again.', 'checkoutpay-gateway');
-            wc_add_notice(__('Payment error: ', 'checkoutpay-gateway') . $error_message, 'error');
+            $error_message = isset($response_data['message']) ? $response_data['message'] : __('Payment request failed. Please try again.', 'copn-payment-gateway');
+            wc_add_notice(__('Payment error: ', 'copn-payment-gateway') . $error_message, 'error');
             return array(
                 'result' => 'fail',
                 'redirect' => ''
@@ -754,20 +754,20 @@ class Copn_Gateway extends WC_Payment_Gateway {
      */
     private function verify_thankyou_request($order_id, $nonce) {
         if ($order_id < 1) {
-            return new WP_Error('invalid_order', __('Invalid order ID.', 'checkoutpay-gateway'));
+            return new WP_Error('invalid_order', __('Invalid order ID.', 'copn-payment-gateway'));
         }
 
         if (!wp_verify_nonce($nonce, $this->thankyou_nonce_action($order_id))) {
-            return new WP_Error('invalid_nonce', __('Security check failed. Please refresh the page and try again.', 'checkoutpay-gateway'));
+            return new WP_Error('invalid_nonce', __('Security check failed. Please refresh the page and try again.', 'copn-payment-gateway'));
         }
 
         $order = wc_get_order($order_id);
         if (!$order) {
-            return new WP_Error('order_not_found', __('Order not found.', 'checkoutpay-gateway'));
+            return new WP_Error('order_not_found', __('Order not found.', 'copn-payment-gateway'));
         }
 
         if ($order->get_payment_method() !== $this->id) {
-            return new WP_Error('invalid_gateway', __('Invalid payment method for this order.', 'checkoutpay-gateway'));
+            return new WP_Error('invalid_gateway', __('Invalid payment method for this order.', 'copn-payment-gateway'));
         }
 
         return $order;
@@ -815,13 +815,13 @@ class Copn_Gateway extends WC_Payment_Gateway {
             $status = $response_data['data']['status'];
 
             if ($status === 'approved') {
-                $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay', 'checkoutpay-gateway'), $transaction_id);
+                $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay', 'copn-payment-gateway'), $transaction_id);
                 wp_send_json_success(array('status' => 'completed'));
             } else {
                 wp_send_json_success(array('status' => $status));
             }
         } else {
-            wp_send_json_error(array('message' => isset($response_data['message']) ? $response_data['message'] : __('Unable to retrieve payment status', 'checkoutpay-gateway')));
+            wp_send_json_error(array('message' => isset($response_data['message']) ? $response_data['message'] : __('Unable to retrieve payment status', 'copn-payment-gateway')));
         }
     }
 
@@ -835,7 +835,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
         $nonce = sanitize_text_field((string) filter_input(INPUT_POST, 'nonce', FILTER_SANITIZE_FULL_SPECIAL_CHARS));
 
         if ($new_amount <= 0) {
-            wp_send_json_error(array('message' => __('Invalid order or amount.', 'checkoutpay-gateway')));
+            wp_send_json_error(array('message' => __('Invalid order or amount.', 'copn-payment-gateway')));
             return;
         }
 
@@ -847,7 +847,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
 
         $transaction_id = $order->get_meta('_checkoutpay_transaction_id');
         if (!$transaction_id) {
-            wp_send_json_error(array('message' => __('Transaction ID not found.', 'checkoutpay-gateway')));
+            wp_send_json_error(array('message' => __('Transaction ID not found.', 'copn-payment-gateway')));
             return;
         }
 
@@ -872,7 +872,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
         $body = json_decode(wp_remote_retrieve_body($response), true);
 
         if ($code !== 200 || empty($body['success'])) {
-            $msg = isset($body['message']) ? $body['message'] : __('Failed to update amount.', 'checkoutpay-gateway');
+            $msg = isset($body['message']) ? $body['message'] : __('Failed to update amount.', 'copn-payment-gateway');
             wp_send_json_error(array('message' => $msg));
             return;
         }
@@ -904,14 +904,14 @@ class Copn_Gateway extends WC_Payment_Gateway {
             if (isset($get_data['success']) && $get_data['success'] && isset($get_data['data']['status'])) {
                 $status = $get_data['data']['status'];
                 if ($status === 'approved') {
-                    $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay (after amount correction)', 'checkoutpay-gateway'), $transaction_id);
-                    wp_send_json_success(array('status' => 'completed', 'message' => __('Amount updated and payment confirmed!', 'checkoutpay-gateway')));
+                    $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay (after amount correction)', 'copn-payment-gateway'), $transaction_id);
+                    wp_send_json_success(array('status' => 'completed', 'message' => __('Amount updated and payment confirmed!', 'copn-payment-gateway')));
                 }
-                wp_send_json_success(array('status' => $status, 'message' => __('Amount updated. Payment is still pending.', 'checkoutpay-gateway')));
+                wp_send_json_success(array('status' => $status, 'message' => __('Amount updated. Payment is still pending.', 'copn-payment-gateway')));
             }
         }
 
-        wp_send_json_success(array('status' => 'pending', 'message' => __('Amount updated. You can check status again in a moment.', 'checkoutpay-gateway')));
+        wp_send_json_success(array('status' => 'pending', 'message' => __('Amount updated. You can check status again in a moment.', 'copn-payment-gateway')));
     }
 
     /**
@@ -978,12 +978,12 @@ class Copn_Gateway extends WC_Payment_Gateway {
             if (isset($data['charges'])) {
                 $order->update_meta_data('_checkoutpay_charges', $this->sanitize_charges_array($data['charges']));
             }
-            $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay webhook', 'checkoutpay-gateway'), $transaction_id);
+            $this->mark_order_paid($order, __('Payment confirmed via CheckoutPay webhook', 'copn-payment-gateway'), $transaction_id);
             status_header(200);
             wp_send_json(array('success' => true));
         } elseif ($status === 'rejected' || $status === 'failed' || $event === 'payment.rejected') {
-            $reason = isset($data['mismatch_reason']) ? sanitize_text_field($data['mismatch_reason']) : (isset($data['reason']) ? sanitize_text_field($data['reason']) : __('Payment rejected', 'checkoutpay-gateway'));
-            $order->update_status('failed', __('Payment rejected via CheckoutPay: ', 'checkoutpay-gateway') . $reason);
+            $reason = isset($data['mismatch_reason']) ? sanitize_text_field($data['mismatch_reason']) : (isset($data['reason']) ? sanitize_text_field($data['reason']) : __('Payment rejected', 'copn-payment-gateway'));
+            $order->update_status('failed', __('Payment rejected via CheckoutPay: ', 'copn-payment-gateway') . $reason);
             $order->update_meta_data('_checkoutpay_status', 'rejected');
             $order->save();
             status_header(200);
@@ -1038,7 +1038,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
         $status = $order->get_meta('_checkoutpay_status');
 
         if ($order->get_status() === 'processing' || $order->get_status() === 'completed') {
-            echo '<div class="woocommerce-message">' . esc_html__('Payment confirmed. Thank you for your order!', 'checkoutpay-gateway') . '</div>';
+            echo '<div class="woocommerce-message">' . esc_html__('Payment confirmed. Thank you for your order!', 'copn-payment-gateway') . '</div>';
         } else {
             $charges = $order->get_meta('_checkoutpay_charges');
             $original_amount = $order->get_meta('_checkoutpay_original_amount');
@@ -1048,41 +1048,41 @@ class Copn_Gateway extends WC_Payment_Gateway {
             echo '<p>' . esc_html($this->get_option('instructions')) . '</p>';
 
             if ($transaction_id) {
-                echo '<p><strong>' . esc_html__('Transaction ID:', 'checkoutpay-gateway') . '</strong> ' . esc_html($transaction_id) . '</p>';
+                echo '<p><strong>' . esc_html__('Transaction ID:', 'copn-payment-gateway') . '</strong> ' . esc_html($transaction_id) . '</p>';
             }
 
             if ($account_number && $account_name && $bank_name) {
                 echo '<div class="checkoutpay-account-details" style="margin-top: 15px; padding: 15px; background: #e8f4f8; border-left: 4px solid #0073aa; border-radius: 5px;">';
-                echo '<p><strong>' . esc_html__('Payment Instructions:', 'checkoutpay-gateway') . '</strong></p>';
-                echo '<p><strong>' . esc_html__('Account Number:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_number) . '</p>';
-                echo '<p><strong>' . esc_html__('Account Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($account_name) . '</p>';
-                echo '<p><strong>' . esc_html__('Bank Name:', 'checkoutpay-gateway') . '</strong> ' . esc_html($bank_name) . '</p>';
+                echo '<p><strong>' . esc_html__('Payment Instructions:', 'copn-payment-gateway') . '</strong></p>';
+                echo '<p><strong>' . esc_html__('Account Number:', 'copn-payment-gateway') . '</strong> ' . esc_html($account_number) . '</p>';
+                echo '<p><strong>' . esc_html__('Account Name:', 'copn-payment-gateway') . '</strong> ' . esc_html($account_name) . '</p>';
+                echo '<p><strong>' . esc_html__('Bank Name:', 'copn-payment-gateway') . '</strong> ' . esc_html($bank_name) . '</p>';
                 echo '</div>';
             }
 
             if ($charges && is_array($charges)) {
                 echo '<div class="checkoutpay-charges-info" style="margin-top: 15px; padding: 15px; background: #f0f0f0; border-radius: 5px;">';
-                echo '<p><strong>' . esc_html__('Payment Details:', 'checkoutpay-gateway') . '</strong></p>';
-                echo '<p>' . esc_html__('Order Amount:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($display_amount)) . '</p>';
+                echo '<p><strong>' . esc_html__('Payment Details:', 'copn-payment-gateway') . '</strong></p>';
+                echo '<p>' . esc_html__('Order Amount:', 'copn-payment-gateway') . ' ' . wp_kses_post(wc_price($display_amount)) . '</p>';
                 if (isset($charges['total']) && $charges['total'] > 0) {
-                    echo '<p>' . esc_html__('Charges:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($charges['total'])) . '</p>';
+                    echo '<p>' . esc_html__('Charges:', 'copn-payment-gateway') . ' ' . wp_kses_post(wc_price($charges['total'])) . '</p>';
                     if (isset($charges['amount_to_pay'])) {
-                        echo '<p><strong>' . esc_html__('Total to Pay:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($charges['amount_to_pay'])) . '</strong></p>';
+                        echo '<p><strong>' . esc_html__('Total to Pay:', 'copn-payment-gateway') . ' ' . wp_kses_post(wc_price($charges['amount_to_pay'])) . '</strong></p>';
                     } elseif (isset($charges['business_receives'])) {
-                        echo '<p><strong>' . esc_html__('You will receive:', 'checkoutpay-gateway') . ' ' . wp_kses_post(wc_price($charges['business_receives'])) . '</strong></p>';
+                        echo '<p><strong>' . esc_html__('You will receive:', 'copn-payment-gateway') . ' ' . wp_kses_post(wc_price($charges['business_receives'])) . '</strong></p>';
                     }
                 }
                 echo '</div>';
             }
 
-            echo '<p><button type="button" id="checkoutpay-check-status" class="button">' . esc_html__('Check Payment Status', 'checkoutpay-gateway') . '</button></p>';
+            echo '<p><button type="button" id="copn-check-status" class="button">' . esc_html__('Check Payment Status', 'copn-payment-gateway') . '</button></p>';
 
             echo '<div class="checkoutpay-update-amount" style="margin-top: 15px; padding: 15px; background: #fff8e5; border: 1px solid #e5d48a; border-radius: 5px;">';
-            echo '<p><strong>' . esc_html__('Paid a different amount?', 'checkoutpay-gateway') . '</strong></p>';
-            echo '<p class="description">' . esc_html__('If you transferred a different sum than shown above, enter the actual amount you paid and we will update the transaction and re-check for your payment.', 'checkoutpay-gateway') . '</p>';
-            echo '<p style="margin-bottom: 8px;"><label for="checkoutpay-actual-amount">' . esc_html__('Amount paid:', 'checkoutpay-gateway') . ' </label>';
-            echo '<input type="number" id="checkoutpay-actual-amount" name="checkoutpay_actual_amount" min="0.01" step="0.01" placeholder="0.00" style="width: 120px; padding: 6px;"> ';
-            echo '<button type="button" id="checkoutpay-update-amount-btn" class="button">' . esc_html__('Update amount & check status', 'checkoutpay-gateway') . '</button></p>';
+            echo '<p><strong>' . esc_html__('Paid a different amount?', 'copn-payment-gateway') . '</strong></p>';
+            echo '<p class="description">' . esc_html__('If you transferred a different sum than shown above, enter the actual amount you paid and we will update the transaction and re-check for your payment.', 'copn-payment-gateway') . '</p>';
+            echo '<p style="margin-bottom: 8px;"><label for="checkoutpay-actual-amount">' . esc_html__('Amount paid:', 'copn-payment-gateway') . ' </label>';
+            echo '<input type="number" id="copn-actual-amount" name="checkoutpay_actual_amount" min="0.01" step="0.01" placeholder="0.00" style="width: 120px; padding: 6px;"> ';
+            echo '<button type="button" id="copn-update-amount-btn" class="button">' . esc_html__('Update amount & check status', 'copn-payment-gateway') . '</button></p>';
             echo '</div>';
             
             echo '</div>';

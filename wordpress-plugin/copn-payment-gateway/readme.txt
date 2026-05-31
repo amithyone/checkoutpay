@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -54,7 +54,7 @@ Developed and maintained by **CheckoutPay** ([check-outpay.com](https://check-ou
 
 = Phase 1 — Install in WordPress =
 
-1. Upload the `checkoutpay-gateway` folder to `/wp-content/plugins/`, or install the plugin ZIP via **Plugins → Add New → Upload Plugin**.
+1. Upload the `copn-payment-gateway` folder to `/wp-content/plugins/`, or install the plugin ZIP via **Plugins → Add New → Upload Plugin**.
 2. **Activate** the plugin through the **Plugins** screen. WooCommerce must be installed and active.
 3. Go to **WooCommerce → Settings → Payments**, find **CheckoutPay**, toggle **Enable**, then click **Manage**.
 
@@ -114,8 +114,11 @@ This plugin connects to **CheckoutPay** at https://check-outpay.com/
 
 == Changelog ==
 
+= 1.4.2 =
+* WordPress.org slug alignment: folder `copn-payment-gateway`, main file `copn-payment-gateway.php`, text domain `copn-payment-gateway`, admin script handles prefixed with `copn-`.
+
 = 1.4.1 =
-* Plugin Check: use literal text domain strings; folder/text domain **checkoutpay-gateway** (matches WordPress.org slug until **copn-payment-gateway** is reserved).
+* Plugin Check: literal text domain strings; COPN rebrand polish.
 
 = 1.4.0 =
 * Rebrand to COPN (CheckoutPay Nigeria): display name **COPN Payment Gateway for Nigerian Businesses**.
@@ -131,5 +134,8 @@ This plugin connects to **CheckoutPay** at https://check-outpay.com/
 
 == Upgrade Notice ==
 
+= 1.4.2 =
+Align plugin folder, text domain, and prefixes with WordPress.org slug `copn-payment-gateway`.
+
 = 1.4.0 =
-Rebrand to COPN display name. Plugin folder/text domain remain checkoutpay-gateway until WordPress.org approves copn-payment-gateway permalink.
+Rebrand to COPN display name (CheckoutPay Nigeria).

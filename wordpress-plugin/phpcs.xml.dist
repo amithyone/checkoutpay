@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <ruleset name="CheckoutPay Gateway">
-	<description>PHPCS rules for the CheckoutPay WooCommerce gateway plugin (directory slug: checkoutpay-gateway). Run from wordpress-plugin/: vendor/bin/phpcs -p</description>
+	<description>PHPCS rules for the COPN WooCommerce gateway plugin (directory slug: copn-payment-gateway). Run from wordpress-plugin/: vendor/bin/phpcs -p</description>
 
-	<file>checkoutpay-gateway</file>
+	<file>copn-payment-gateway</file>
 
 	<exclude-pattern>/vendor/*</exclude-pattern>
 
 	<rule ref="WordPress">
 		<properties>
 			<property name="text_domain" type="array">
-				<element value="checkoutpay-gateway"/>
+				<element value="copn-payment-gateway"/>
 			</property>
 		</properties>
 	</rule>

@@ -72,9 +72,9 @@ After uploading v1.3.0+, send the email in [REVIEW-REPLY.md](REVIEW-REPLY.md) (v
    - `assets/` — banners and screenshots (not inside plugin ZIP)
 
 ```bash
-svn checkout https://plugins.svn.wordpress.org/checkoutpay-gateway
-cp -r checkoutpay-gateway/* checkoutpay-gateway/trunk/
-cd checkoutpay-gateway
+svn checkout https://plugins.svn.wordpress.org/copn-payment-gateway
+cp -r copn-payment-gateway/* copn-payment-gateway/trunk/
+cd copn-payment-gateway
 svn cp trunk tags/1.2.5
 svn commit -m "Release 1.2.5"
 ```

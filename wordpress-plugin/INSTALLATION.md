@@ -17,9 +17,9 @@ This guide walks you through installing and configuring the **CheckoutPay – Ba
 
 ## Phase 1 — Install in WordPress
 
-1. **Download** the plugin ZIP (`checkoutpay-gateway.zip`) from [CheckoutPay](https://check-outpay.com/) or upload the `checkoutpay-gateway` folder.
+1. **Download** the plugin ZIP (`copn-payment-gateway.zip`) from [CheckoutPay](https://check-outpay.com/) or upload the `copn-payment-gateway` folder.
 2. In WordPress admin, go to **Plugins → Add New → Upload Plugin**, choose the ZIP, and click **Install Now**, then **Activate**.
-   - Or upload the `checkoutpay-gateway` folder to `wp-content/plugins/` via FTP/SFTP and activate under **Plugins**.
+   - Or upload the `copn-payment-gateway` folder to `wp-content/plugins/` via FTP/SFTP and activate under **Plugins**.
 3. Confirm **WooCommerce** is installed and active. The plugin cannot run without it.
 4. Go to **WooCommerce → Settings → Payments**.
 5. Find **CheckoutPay**, turn **Enable** on, and click **Manage**.
