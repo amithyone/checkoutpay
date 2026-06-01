@@ -42,6 +42,13 @@ Route::post('/wallet/whatsapp/set-pin/{token}', [\App\Http\Controllers\WhatsappW
     ->middleware('throttle:20,1')
     ->name('wallet.whatsapp.pin-setup.submit');
 
+Route::get('/wallet/whatsapp/reset-pin/{token}', [\App\Http\Controllers\WhatsappWalletPinSetupController::class, 'showReset'])
+    ->middleware('throttle:60,1')
+    ->name('wallet.whatsapp.pin-reset.show');
+Route::post('/wallet/whatsapp/reset-pin/{token}', [\App\Http\Controllers\WhatsappWalletPinSetupController::class, 'submitReset'])
+    ->middleware('throttle:20,1')
+    ->name('wallet.whatsapp.pin-reset.submit');
+
 Route::get('/wallet/whatsapp/vtu-confirm/{token}', [\App\Http\Controllers\WhatsappWalletVtuConfirmController::class, 'show'])
     ->middleware('throttle:60,1')
     ->name('wallet.whatsapp.vtu-confirm.show');

@@ -63,6 +63,12 @@ return [
         'transfer_confirm_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_TRANSFER_CONFIRM_TTL_MINUTES', 15))),
         /** One-time web link TTL for *REGISTER* wallet PIN setup (defaults to transfer_confirm TTL if unset). */
         'pin_setup_web_ttl_minutes' => max(5, min(60, (int) env('WHATSAPP_WALLET_PIN_SETUP_WEB_TTL_MINUTES', 15))),
+        /** Minimum name match score (0–100) for PIN reset after Tier 2 upgrade (profile vs bank account name). */
+        'pin_reset_name_min_score' => max(50, min(100, (int) env('WHATSAPP_WALLET_PIN_RESET_NAME_MIN_SCORE', 60))),
+        /** Failed BVN/name/CAC attempts before PIN reset is blocked temporarily. */
+        'pin_reset_max_failures' => max(3, min(20, (int) env('WHATSAPP_WALLET_PIN_RESET_MAX_FAILURES', 5))),
+        /** Minutes to block further PIN reset attempts after too many failures. */
+        'pin_reset_lockout_minutes' => max(5, min(120, (int) env('WHATSAPP_WALLET_PIN_RESET_LOCKOUT_MINUTES', 15))),
         /** Lazy MevonPay TSQ for pending bank payouts when user opens wallet (hours window). */
         'payout_reconcile_hours' => max(1, (int) env('WHATSAPP_WALLET_PAYOUT_RECONCILE_HOURS', 48)),
         /** Minimum minutes between TSQ calls per pending payout (lazy reconcile only). */

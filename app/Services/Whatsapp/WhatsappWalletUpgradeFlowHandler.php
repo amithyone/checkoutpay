@@ -22,7 +22,7 @@ class WhatsappWalletUpgradeFlowHandler
         private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
-    public function start(WhatsappSession $session, string $instance, string $phone): void
+    public function start(WhatsappSession $session, string $instance, string $phone, bool $resumePinReset = false): void
     {
         $wallet = WhatsappWallet::query()->firstOrCreate(
             ['phone_e164' => $phone],
@@ -85,9 +85,14 @@ class WhatsappWalletUpgradeFlowHandler
             'tier_before' => (int) $wallet->tier,
         ]);
 
+        $ctx = ['step' => 'account_kind'];
+        if ($resumePinReset) {
+            $ctx['resume_pin_reset'] = true;
+        }
+
         $session->update([
             'chat_flow' => self::FLOW,
-            'chat_context' => ['step' => 'account_kind'],
+            'chat_context' => $ctx,
         ]);
 
         $this->client->sendText(
@@ -553,7 +558,8 @@ class WhatsappWalletUpgradeFlowHandler
             'tier2_provisioned_at' => now(),
         ]);
 
-        $session->update(['chat_flow' => null, 'chat_context' => null]);
+        $priorCtx = is_array($session->chat_context) ? $session->chat_context : [];
+        $resumePinReset = (bool) ($priorCtx['resume_pin_reset'] ?? false);
 
         $this->kycLog('info', 'whatsapp.wallet.kyc.tier2_completed', [
             'phone' => $phone,
@@ -564,7 +570,21 @@ class WhatsappWalletUpgradeFlowHandler
             'mevon_reference_suffix' => ($va['reference'] ?? '') !== ''
                 ? substr((string) $va['reference'], -8)
                 : null,
+            'resume_pin_reset' => $resumePinReset,
         ]);
+
+        if ($resumePinReset) {
+            app(WhatsappWalletPinResetFlowHandler::class)->beginNameVerificationAfterUpgrade(
+                $session->fresh(),
+                $instance,
+                $phone,
+                $wallet->fresh()
+            );
+
+            return;
+        }
+
+        $session->update(['chat_flow' => null, 'chat_context' => null]);
 
         $label = $isBusiness ? 'Business Tier 2 active' : 'Tier 2 active';
         $this->client->sendText(

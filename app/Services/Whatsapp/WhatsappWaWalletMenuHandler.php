@@ -479,6 +479,7 @@ class WhatsappWaWalletMenuHandler
             ($tier1VaNote !== '' ? $tier1VaNote."\n" : '').
             ($bankNote !== '' ? $bankNote."\n\n" : '').
             $casualLine.
+            ($wallet->hasPin() ? "Forgot PIN? Send *RESET PIN*\n\n" : '').
             WhatsappWalletAppLinkCopy::menuFooter()
         );
 
@@ -700,6 +701,12 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
+        if (in_array($cmd, ['RESET PIN', 'FORGOT PIN', 'FORGOT', 'RESET'], true)) {
+            app(WhatsappWalletPinResetFlowHandler::class)->start($session->fresh(), $instance, $phone);
+
+            return;
+        }
+
         if (in_array($cmd, ['REGISTER', 'PIN'], true)) {
             if ($wallet->hasPin()) {
                 if ($wallet->normalizedSenderName() === null) {
@@ -710,7 +717,7 @@ class WhatsappWaWalletMenuHandler
                 $this->client->sendText(
                     $instance,
                     $phone,
-                    'A wallet PIN is already set on this number. Use the web wallet or support to reset it.'
+                    'A wallet PIN is already set. Send *RESET PIN* to reset it securely (Tier 2 verification required).'
                 );
 
                 return;

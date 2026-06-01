@@ -14,6 +14,8 @@ class WhatsappWalletPinSetupWebService
 {
     private const CACHE_PREFIX = 'wa_wallet_pin_setup:';
 
+    private const CACHE_PREFIX_RESET = 'wa_wallet_pin_reset:';
+
     public function __construct(
         private EvolutionWhatsAppClient $client,
         private WhatsappWalletPendingP2pService $pendingP2p,
@@ -47,6 +49,16 @@ class WhatsappWalletPinSetupWebService
     public function setupUrl(string $token): string
     {
         return $this->publicBaseUrl().'/wallet/whatsapp/set-pin/'.$token;
+    }
+
+    public function resetUrl(string $token): string
+    {
+        return $this->publicBaseUrl().'/wallet/whatsapp/reset-pin/'.$token;
+    }
+
+    private function resetCacheKey(string $token): string
+    {
+        return self::CACHE_PREFIX_RESET.$token;
     }
 
     /**
@@ -164,6 +176,109 @@ class WhatsappWalletPinSetupWebService
                 "*Your send name*\n\n".
                 'Reply here with the name you want shown on transfers (e.g. your full name). '.
                 'Between *2* and *120* characters, or *BACK* to skip for now.'
+            );
+        }
+
+        return ['ok' => true];
+    }
+
+    /**
+     * @return array{ok: bool, error?: string, token?: string}
+     */
+    public function createResetToken(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+    ): array {
+        if (! $wallet->hasPin()) {
+            return ['ok' => false, 'error' => 'PIN not set'];
+        }
+
+        $token = bin2hex(random_bytes(32));
+        Cache::put($this->resetCacheKey($token), [
+            'mode' => 'reset',
+            'whatsapp_session_id' => $session->id,
+            'wallet_id' => $wallet->id,
+            'phone_e164' => $phone,
+            'evolution_instance' => $instance,
+        ], now()->addSeconds($this->ttlSeconds()));
+
+        return ['ok' => true, 'token' => $token];
+    }
+
+    /**
+     * @return array{ok: bool, error?: string, mode?: string}
+     */
+    public function describeResetToken(string $token): array
+    {
+        $payload = Cache::get($this->resetCacheKey($token));
+        if (! is_array($payload) || ($payload['mode'] ?? '') !== 'reset') {
+            return ['ok' => false, 'error' => 'This link has expired or was already used.'];
+        }
+
+        $walletId = (int) ($payload['wallet_id'] ?? 0);
+        $wallet = WhatsappWallet::query()->find($walletId);
+        if (! $wallet || ! $wallet->hasPin()) {
+            return ['ok' => false, 'error' => 'This link is no longer valid.'];
+        }
+
+        return ['ok' => true, 'mode' => 'reset'];
+    }
+
+    /**
+     * @return array{ok: bool, error?: string}
+     */
+    public function completeReset(string $token, string $pin, string $pinConfirmation): array
+    {
+        if (! preg_match('/^\d{4}$/', $pin) || ! preg_match('/^\d{4}$/', $pinConfirmation)) {
+            return ['ok' => false, 'error' => 'Enter exactly 4 digits in both fields.'];
+        }
+        if ($pin !== $pinConfirmation) {
+            return ['ok' => false, 'error' => 'The two PINs do not match.'];
+        }
+
+        $payload = Cache::get($this->resetCacheKey($token));
+        if (! is_array($payload) || ($payload['mode'] ?? '') !== 'reset') {
+            return ['ok' => false, 'error' => 'This link has expired or was already used.'];
+        }
+
+        $sessionId = (int) ($payload['whatsapp_session_id'] ?? 0);
+        $walletId = (int) ($payload['wallet_id'] ?? 0);
+        $phone = (string) ($payload['phone_e164'] ?? '');
+        $instance = (string) ($payload['evolution_instance'] ?? '');
+
+        if ($sessionId < 1 || $walletId < 1 || $phone === '') {
+            return ['ok' => false, 'error' => 'Invalid reset data.'];
+        }
+
+        $session = WhatsappSession::query()->find($sessionId);
+        $wallet = WhatsappWallet::query()->find($walletId);
+        if (! $session || ! $wallet || (string) $session->phone_e164 !== $phone || (string) $wallet->phone_e164 !== $phone) {
+            return ['ok' => false, 'error' => 'Session no longer valid.'];
+        }
+
+        if (! $wallet->hasPin()) {
+            Cache::forget($this->resetCacheKey($token));
+
+            return ['ok' => false, 'error' => 'No PIN is set on this wallet.'];
+        }
+
+        $wallet->pin_hash = Hash::make($pin);
+        $wallet->pin_set_at = now();
+        $wallet->pin_failed_attempts = 0;
+        $wallet->pin_locked_until = null;
+        $wallet->save();
+
+        Cache::forget($this->resetCacheKey($token));
+
+        if ($instance !== '') {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*Wallet PIN reset*\n\n".
+                "Your new PIN is active. Use it for transfers and bills.\n\n".
+                '*Do not* share your PIN in this chat. *MENU* for wallet.'
             );
         }
 

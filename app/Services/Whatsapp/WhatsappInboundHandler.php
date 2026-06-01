@@ -23,6 +23,7 @@ class WhatsappInboundHandler
         private WhatsappWalletUpgradeFlowHandler $walletUpgradeFlow,
         private WhatsappWaWalletMenuHandler $waWalletMenu,
         private WhatsappWalletVtuFlowHandler $walletVtuFlow,
+        private WhatsappWalletPinResetFlowHandler $pinResetFlow,
         private WhatsappWalletPendingP2pService $pendingP2p,
     ) {}
 
@@ -155,6 +156,7 @@ class WhatsappInboundHandler
                 'BACK', 'RESTART', 'MAIN',
                 'WALLET',
                 'TOPUP', 'TOP UP', 'UPGRADE', 'TIER2', 'TIER 2',
+                'RESET PIN', 'FORGOT PIN', 'FORGOT', 'RESET',
                 '1', '2', '3', '4', '5', '6', '7',
             ];
             if (! in_array($cmd, $resume, true)) {
@@ -213,6 +215,18 @@ class WhatsappInboundHandler
             'is_linked_renter' => (bool) $linkedRenter,
             'command' => $cmd,
         ]);
+
+        if ($this->isPinResetCommand($cmd)) {
+            $this->pinResetFlow->start($session->fresh(), $instance, $phone);
+
+            return;
+        }
+
+        if ($session && $session->chat_flow === WhatsappWalletPinResetFlowHandler::FLOW) {
+            $this->pinResetFlow->handle($session, $instance, $phone, $text, $cmd);
+
+            return;
+        }
 
         if ($session && $session->chat_flow === WhatsappWalletUpgradeFlowHandler::FLOW) {
             $this->walletUpgradeFlow->handle($session, $instance, $phone, $text, $cmd);
@@ -338,6 +352,11 @@ class WhatsappInboundHandler
             'TOPUP', 'TOP UP',
             '1',
         ], true);
+    }
+
+    private function isPinResetCommand(string $cmd): bool
+    {
+        return in_array($cmd, ['RESET PIN', 'FORGOT PIN', 'FORGOT', 'RESET'], true);
     }
 
     /**

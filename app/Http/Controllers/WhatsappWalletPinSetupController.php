@@ -18,6 +18,20 @@ class WhatsappWalletPinSetupController extends Controller
 
         return view('wallet.whatsapp-pin-setup', [
             'token' => $token,
+            'mode' => 'setup',
+        ]);
+    }
+
+    public function showReset(string $token, WhatsappWalletPinSetupWebService $pinSetup)
+    {
+        $meta = $pinSetup->describeResetToken($token);
+        if (! ($meta['ok'] ?? false)) {
+            abort(404);
+        }
+
+        return view('wallet.whatsapp-pin-setup', [
+            'token' => $token,
+            'mode' => 'reset',
         ]);
     }
 
@@ -44,6 +58,32 @@ class WhatsappWalletPinSetupController extends Controller
             ])->withInput();
         }
 
-        return view('wallet.whatsapp-pin-setup-done');
+        return view('wallet.whatsapp-pin-setup-done', ['mode' => 'setup']);
+    }
+
+    public function submitReset(Request $request, string $token, WhatsappWalletPinSetupWebService $pinSetup)
+    {
+        $request->validate([
+            'wallet_pin' => ['required', 'regex:/^\d{4}$/'],
+            'wallet_pin_confirmation' => ['required', 'regex:/^\d{4}$/'],
+        ]);
+
+        $result = $pinSetup->completeReset(
+            $token,
+            (string) $request->input('wallet_pin'),
+            (string) $request->input('wallet_pin_confirmation')
+        );
+        if (! ($result['ok'] ?? false)) {
+            $error = (string) ($result['error'] ?? 'Could not reset PIN.');
+            if ($this->isConsumedWhatsappWalletWebLinkError($error)) {
+                return view('wallet.whatsapp-pin-setup-done', ['mode' => 'reset']);
+            }
+
+            return back()->withErrors([
+                'wallet_pin' => $error,
+            ])->withInput();
+        }
+
+        return view('wallet.whatsapp-pin-setup-done', ['mode' => 'reset']);
     }
 }

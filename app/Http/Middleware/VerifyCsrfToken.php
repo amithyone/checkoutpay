@@ -17,6 +17,7 @@ class VerifyCsrfToken extends Middleware
         // One-time token in URL; session cookies are unreliable in WhatsApp in-app browsers.
         'wallet/whatsapp/confirm/*',
         'wallet/whatsapp/set-pin/*',
+        'wallet/whatsapp/reset-pin/*',
         'wallet/whatsapp/vtu-confirm/*',
         'wallet/partner-pay/*',
     ];
