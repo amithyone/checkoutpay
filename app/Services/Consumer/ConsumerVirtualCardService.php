@@ -8,7 +8,6 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayCardApiClient;
 use App\Services\Whatsapp\PhoneNormalizer;
-use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -17,9 +16,10 @@ final class ConsumerVirtualCardService
 {
     public function __construct(
         private MevonPayCardApiClient $cardApi,
-        private WhatsappCrossBorderP2pFxService $fx,
+        private VirtualCardFxService $fx,
         private ConsumerWalletPinVerifier $pinVerifier,
-        private VirtualCardFeeRefundService $refunds,
+        private VirtualCardFeeRefundService $feeRefunds,
+        private VirtualCardDebitRefundService $debitRefunds,
         private VirtualCardProviderResponseService $providerResponse,
     ) {}
 
@@ -48,25 +48,10 @@ final class ConsumerVirtualCardService
      */
     public function status(WhatsappWallet $wallet): array
     {
-        $latest = VirtualCardRequest::query()
-            ->where('whatsapp_wallet_id', $wallet->id)
-            ->latest('id')
-            ->first();
-
-        $feeUsd = $this->requestFeeUsd();
-        $feeNgn = $this->quoteFeeNgn($feeUsd);
-
         return [
             'ok' => true,
             'message' => 'OK',
-            'data' => [
-                'enabled' => $this->isEnabled(),
-                'is_tier2' => $wallet->isTier2(),
-                'fee_usd' => $feeUsd,
-                'fee_ngn' => $feeNgn,
-                'fx_available' => $feeNgn !== null,
-                'latest_request' => $latest ? $this->serializeRequest($latest) : null,
-            ],
+            'data' => $this->statusPayload($wallet),
         ];
     }
 
@@ -75,20 +60,16 @@ final class ConsumerVirtualCardService
      */
     public function prefill(WhatsappWallet $wallet): array
     {
-        $feeUsd = $this->requestFeeUsd();
-        $feeNgn = $this->quoteFeeNgn($feeUsd);
+        $payload = $this->statusPayload($wallet);
+        unset($payload['latest_request']);
+
         $phone11 = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164);
         $dob = $wallet->kyc_dob?->format('Y-m-d');
 
         return [
             'ok' => true,
             'message' => 'OK',
-            'data' => [
-                'enabled' => $this->isEnabled(),
-                'is_tier2' => $wallet->isTier2(),
-                'fee_usd' => $feeUsd,
-                'fee_ngn' => $feeNgn,
-                'fx_available' => $feeNgn !== null,
+            'data' => array_merge($payload, [
                 'first_name' => $wallet->kyc_fname,
                 'last_name' => $wallet->kyc_lname,
                 'email' => $wallet->kyc_email,
@@ -97,7 +78,32 @@ final class ConsumerVirtualCardService
                 'home_number' => $wallet->card_home_number,
                 'home_address' => $wallet->card_home_address,
                 'card_name' => trim(($wallet->kyc_fname ?? '').' '.($wallet->kyc_lname ?? '')) ?: $wallet->displayName(),
-            ],
+                'latest_request' => $this->latestRequestForWallet($wallet),
+            ]),
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    public function quote(WhatsappWallet $wallet, float $amountUsd, string $action): array
+    {
+        if (! $this->isEnabled()) {
+            return ['ok' => false, 'message' => 'Dollar Virtual Card is not available right now.'];
+        }
+
+        $quote = $this->fx->quoteForAction($amountUsd, $action);
+        if ($quote === null) {
+            return ['ok' => false, 'message' => 'Exchange rate is not configured.'];
+        }
+
+        return [
+            'ok' => true,
+            'message' => 'OK',
+            'data' => array_merge($quote, [
+                'action' => $action === 'withdraw' || $action === 'buy' ? 'withdraw' : 'topup',
+                'rate_used' => $quote['sell_rate'] ?? $quote['buy_rate'] ?? null,
+            ]),
         ];
     }
 
@@ -121,11 +127,11 @@ final class ConsumerVirtualCardService
         }
 
         $feeUsd = $this->requestFeeUsd();
-        $feeNgn = $this->quoteFeeNgn($feeUsd);
+        $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
         if ($feeNgn === null || $feeNgn < 0.01) {
             return [
                 'ok' => false,
-                'message' => 'USD/NGN exchange rate is not configured. Ask admin to add it in WhatsApp wallet FX settings.',
+                'message' => 'USD/NGN sell rate is not configured. Ask admin to set virtual card FX rates.',
             ];
         }
 
@@ -145,17 +151,11 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => 'Home address, home number, and card name are required.'];
         }
 
-        $fromCur = (string) config('virtual_card.fee_currency_from', 'USD');
-        $toCur = (string) config('virtual_card.fee_currency_to', 'NGN');
-        $fxRate = $this->fx->convertCurrency($fromCur, $toCur, 1.0);
-        if ($fxRate === null || $fxRate < 0.01) {
-            return ['ok' => false, 'message' => 'Exchange rate unavailable.'];
-        }
-
+        $sellRate = $this->fx->sellRate();
         $reference = 'VCARD-'.strtoupper(Str::random(14));
 
         try {
-            DB::transaction(function () use ($wallet, $feeNgn, $reference) {
+            DB::transaction(function () use ($wallet, $feeNgn, $reference, $feeUsd, $sellRate) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -180,7 +180,10 @@ final class ConsumerVirtualCardService
                     'external_reference' => $reference,
                     'meta' => [
                         'channel' => 'consumer_api',
-                        'fee_usd' => $this->requestFeeUsd(),
+                        'fee_usd' => $feeUsd,
+                        'fx_mid_usd_ngn' => $this->fx->midUsdNgnRate(),
+                        'sell_rate' => $sellRate,
+                        'fx_side' => 'sell',
                     ],
                 ]);
             });
@@ -207,7 +210,7 @@ final class ConsumerVirtualCardService
             'status' => VirtualCardRequest::STATUS_PENDING,
             'fee_usd' => $feeUsd,
             'fee_ngn' => $feeNgn,
-            'fx_rate_used' => $fxRate,
+            'fx_rate_used' => $sellRate,
             'external_reference' => $reference,
             'card_name' => $cardName,
             'home_number' => $homeNumber,
@@ -234,7 +237,7 @@ final class ConsumerVirtualCardService
             ];
         }
 
-        $this->refunds->refundFee($wallet->id, $reference, $feeNgn, (string) ($api['message'] ?? 'Card provider error'));
+        $this->feeRefunds->refundFee($wallet->id, $reference, $feeNgn, (string) ($api['message'] ?? 'Card provider error'));
         $this->providerResponse->applyFailure($row, $api, (string) ($api['message'] ?? 'Failed'));
 
         return [
@@ -247,22 +250,313 @@ final class ConsumerVirtualCardService
     }
 
     /**
-     * @return array{ok: bool, message: string}
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function topupStub(): array
+    public function topupCard(WhatsappWallet $wallet, string $pin, float $amountUsd): array
     {
+        $gate = $this->gateOperableCard($wallet, $pin);
+        if (! $gate['ok']) {
+            return $gate;
+        }
+
+        $card = $gate['card'];
+        $min = (float) config('virtual_card.topup_min_usd', 1);
+        $max = (float) config('virtual_card.topup_max_usd', 500);
+        if ($amountUsd < $min || $amountUsd > $max) {
+            return ['ok' => false, 'message' => "Top-up amount must be between \${$min} and \${$max}."];
+        }
+
+        $quote = $this->fx->quoteTopupNgn($amountUsd);
+        if ($quote === null) {
+            return ['ok' => false, 'message' => 'Sell rate is not configured.'];
+        }
+
+        $amountNgn = $quote['amount_ngn'];
+        $cardCode = (string) $card->card_external_id;
+        $reference = 'VCARD-TOP-'.strtoupper(Str::random(12));
+
+        try {
+            DB::transaction(function () use ($wallet, $amountNgn, $reference, $amountUsd, $quote, $cardCode) {
+                $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
+                if (! $w) {
+                    throw new \RuntimeException('wallet_missing');
+                }
+                $w->resetDailyTransferIfNeeded();
+                $check = $w->canDebit($amountNgn);
+                if (! $w->hasPin() || ! $check['ok']) {
+                    throw new \RuntimeException('cannot_debit');
+                }
+                $newBal = round((float) $w->balance - $amountNgn, 2);
+                $w->balance = $newBal;
+                $w->daily_transfer_total = round((float) $w->daily_transfer_total + $amountNgn, 2);
+                $w->daily_transfer_for_date = now()->toDateString();
+                $w->save();
+
+                WhatsappWalletTransaction::query()->create([
+                    'whatsapp_wallet_id' => $w->id,
+                    'sender_name' => $w->normalizedSenderName(),
+                    'type' => WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP,
+                    'amount' => $amountNgn,
+                    'balance_after' => $newBal,
+                    'external_reference' => $reference,
+                    'meta' => array_merge($quote, [
+                        'channel' => 'consumer_api',
+                        'card_code' => $cardCode,
+                    ]),
+                ]);
+            });
+        } catch (\Throwable $e) {
+            Log::warning('consumer.virtual_card.topup_debit_failed', ['wallet_id' => $wallet->id, 'error' => $e->getMessage()]);
+
+            return ['ok' => false, 'message' => 'Could not debit wallet for card top-up. Check balance and limits.'];
+        }
+
+        $api = $this->cardApi->topupCard($amountUsd, $cardCode);
+        if ($api['ok'] ?? false) {
+            $card->update([
+                'last_operation_at' => now(),
+                'last_operation_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
+            ]);
+
+            return [
+                'ok' => true,
+                'message' => (string) ($api['message'] ?? 'Card funded successfully.'),
+                'data' => [
+                    'amount_usd' => $amountUsd,
+                    'amount_ngn' => $amountNgn,
+                    'sell_rate' => $quote['sell_rate'],
+                    'card_external_id' => $cardCode,
+                    'balance_after' => (float) $wallet->fresh()->balance,
+                    'request' => $this->serializeRequest($card->fresh()),
+                ],
+            ];
+        }
+
+        $this->debitRefunds->refundDebit(
+            $wallet->id,
+            $reference,
+            $amountNgn,
+            (string) ($api['message'] ?? 'Provider top-up failed'),
+            WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP,
+        );
+
         return [
             'ok' => false,
-            'message' => 'Card top-up is not available yet. We will enable it when the provider endpoint is ready.',
+            'message' => (string) ($api['message'] ?? 'Card top-up failed. Wallet debit refunded.'),
+            'data' => [
+                'balance_after' => (float) $wallet->fresh()->balance,
+            ],
         ];
     }
 
-    private function quoteFeeNgn(float $feeUsd): ?float
+    /**
+     * @param  'freeze'|'unfreeze'  $action
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    public function setCardFrozen(WhatsappWallet $wallet, string $pin, string $action): array
     {
-        $from = (string) config('virtual_card.fee_currency_from', 'USD');
-        $to = (string) config('virtual_card.fee_currency_to', 'NGN');
+        if (! in_array($action, ['freeze', 'unfreeze'], true)) {
+            return ['ok' => false, 'message' => 'Invalid card status action.'];
+        }
 
-        return $this->fx->convertCurrency($from, $to, $feeUsd);
+        $gate = $this->gateOperableCard($wallet, $pin);
+        if (! $gate['ok']) {
+            return $gate;
+        }
+
+        $card = $gate['card'];
+        $cardCode = (string) $card->card_external_id;
+        $api = $this->cardApi->setCardStatus($action, $cardCode);
+
+        if (! ($api['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => (string) ($api['message'] ?? 'Could not update card status.'),
+            ];
+        }
+
+        $card->update([
+            'is_frozen' => $action === 'freeze',
+            'last_operation_at' => now(),
+            'last_operation_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
+        ]);
+
+        return [
+            'ok' => true,
+            'message' => (string) ($api['message'] ?? ($action === 'freeze' ? 'Card frozen.' : 'Card unfrozen.')),
+            'data' => [
+                'request' => $this->serializeRequest($card->fresh()),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    public function withdrawFromCard(WhatsappWallet $wallet, string $pin, float $amountUsd, ?string $reason = null): array
+    {
+        $gate = $this->gateOperableCard($wallet, $pin);
+        if (! $gate['ok']) {
+            return $gate;
+        }
+
+        $card = $gate['card'];
+        if ($card->is_frozen) {
+            return ['ok' => false, 'message' => 'Card is frozen. Unfreeze it before withdrawing.'];
+        }
+
+        $min = (float) config('virtual_card.withdraw_min_usd', 1);
+        $max = (float) config('virtual_card.withdraw_max_usd', 500);
+        if ($amountUsd < $min || $amountUsd > $max) {
+            return ['ok' => false, 'message' => "Withdraw amount must be between \${$min} and \${$max}."];
+        }
+
+        $quote = $this->fx->quoteWithdrawNgn($amountUsd);
+        if ($quote === null) {
+            return ['ok' => false, 'message' => 'Buy rate is not configured.'];
+        }
+
+        $amountNgn = $quote['amount_ngn'];
+        $cardCode = (string) $card->card_external_id;
+        $reasonText = trim((string) ($reason ?? '')) ?: 'Withdrawal to Wallet';
+
+        $api = $this->cardApi->withdrawFromCard($amountUsd, $cardCode, $reasonText);
+        if (! ($api['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => (string) ($api['message'] ?? 'Card withdraw failed.'),
+            ];
+        }
+
+        $reference = 'VCARD-WD-'.strtoupper(Str::random(12));
+
+        try {
+            DB::transaction(function () use ($wallet, $amountNgn, $reference, $amountUsd, $quote, $cardCode, $reasonText) {
+                $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
+                if (! $w) {
+                    throw new \RuntimeException('wallet_missing');
+                }
+                if (! $w->canCredit($amountNgn)['ok']) {
+                    throw new \RuntimeException('cannot_credit');
+                }
+                $newBal = round((float) $w->balance + $amountNgn, 2);
+                $w->balance = $newBal;
+                $w->save();
+
+                WhatsappWalletTransaction::query()->create([
+                    'whatsapp_wallet_id' => $w->id,
+                    'sender_name' => $w->normalizedSenderName(),
+                    'type' => WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_WITHDRAW,
+                    'amount' => $amountNgn,
+                    'balance_after' => $newBal,
+                    'external_reference' => $reference,
+                    'meta' => array_merge($quote, [
+                        'channel' => 'consumer_api',
+                        'card_code' => $cardCode,
+                        'reason' => $reasonText,
+                    ]),
+                ]);
+            });
+        } catch (\Throwable $e) {
+            Log::error('consumer.virtual_card.withdraw_credit_failed', [
+                'wallet_id' => $wallet->id,
+                'amount_usd' => $amountUsd,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'ok' => false,
+                'message' => 'Provider withdraw succeeded but wallet credit failed. Contact support with your reference.',
+            ];
+        }
+
+        $card->update([
+            'last_operation_at' => now(),
+            'last_operation_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
+        ]);
+
+        return [
+            'ok' => true,
+            'message' => (string) ($api['message'] ?? 'Withdrawal credited to wallet.'),
+            'data' => [
+                'amount_usd' => $amountUsd,
+                'amount_ngn' => $amountNgn,
+                'buy_rate' => $quote['buy_rate'],
+                'card_external_id' => $cardCode,
+                'balance_after' => (float) $wallet->fresh()->balance,
+                'request' => $this->serializeRequest($card->fresh()),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, card?: VirtualCardRequest}
+     */
+    private function gateOperableCard(WhatsappWallet $wallet, string $pin): array
+    {
+        if (! $this->isEnabled()) {
+            return ['ok' => false, 'message' => 'Dollar Virtual Card is not available right now.'];
+        }
+        if (! $wallet->isTier2()) {
+            return ['ok' => false, 'message' => 'Complete Tier 2 KYC before managing your Dollar Virtual Card.'];
+        }
+        if (! $this->cardApi->isConfigured()) {
+            return ['ok' => false, 'message' => 'Dollar Virtual Card service is not configured.'];
+        }
+        if (! $this->pinVerifier->verify($wallet, $pin)) {
+            return ['ok' => false, 'message' => 'Invalid PIN.'];
+        }
+
+        $card = $this->resolveOperableCard($wallet);
+        if (! $card) {
+            return ['ok' => false, 'message' => 'No active virtual card found for this wallet.'];
+        }
+
+        return ['ok' => true, 'message' => 'OK', 'card' => $card];
+    }
+
+    private function resolveOperableCard(WhatsappWallet $wallet): ?VirtualCardRequest
+    {
+        return VirtualCardRequest::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->whereNotNull('card_external_id')
+            ->whereIn('status', [VirtualCardRequest::STATUS_SUBMITTED, VirtualCardRequest::STATUS_ACTIVE])
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function latestRequestForWallet(WhatsappWallet $wallet): ?array
+    {
+        $latest = VirtualCardRequest::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->latest('id')
+            ->first();
+
+        return $latest ? $this->serializeRequest($latest) : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function statusPayload(WhatsappWallet $wallet): array
+    {
+        $feeUsd = $this->requestFeeUsd();
+        $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
+
+        return array_merge($this->fx->ratesPayload(), [
+            'enabled' => $this->isEnabled(),
+            'is_tier2' => $wallet->isTier2(),
+            'fee_usd' => $feeUsd,
+            'fee_ngn' => $feeNgn,
+            'topup_min_usd' => (float) config('virtual_card.topup_min_usd', 1),
+            'topup_max_usd' => (float) config('virtual_card.topup_max_usd', 500),
+            'withdraw_min_usd' => (float) config('virtual_card.withdraw_min_usd', 1),
+            'withdraw_max_usd' => (float) config('virtual_card.withdraw_max_usd', 500),
+            'latest_request' => $this->latestRequestForWallet($wallet),
+        ]);
     }
 
     /**
@@ -270,6 +564,9 @@ final class ConsumerVirtualCardService
      */
     private function serializeRequest(VirtualCardRequest $row): array
     {
+        $canManage = $row->card_external_id
+            && in_array($row->status, [VirtualCardRequest::STATUS_SUBMITTED, VirtualCardRequest::STATUS_ACTIVE], true);
+
         return [
             'id' => $row->id,
             'status' => $row->status,
@@ -278,9 +575,10 @@ final class ConsumerVirtualCardService
             'fx_rate_used' => $row->fx_rate_used !== null ? (float) $row->fx_rate_used : null,
             'card_name' => $row->card_name,
             'card_external_id' => $row->card_external_id,
+            'is_frozen' => (bool) $row->is_frozen,
+            'can_manage' => $canManage,
             'failure_reason' => $row->failure_reason,
             'created_at' => $row->created_at?->toIso8601String(),
         ];
     }
-
 }

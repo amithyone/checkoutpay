@@ -23,6 +23,9 @@ class VirtualCardRequest extends Model
         'fx_rate_used',
         'external_reference',
         'card_external_id',
+        'is_frozen',
+        'last_operation_at',
+        'last_operation_payload',
         'card_name',
         'home_number',
         'home_address',
@@ -41,6 +44,9 @@ class VirtualCardRequest extends Model
         'request_payload' => 'array',
         'response_payload' => 'array',
         'activated_at' => 'datetime',
+        'is_frozen' => 'boolean',
+        'last_operation_at' => 'datetime',
+        'last_operation_payload' => 'array',
     ];
 
     public function wallet(): BelongsTo

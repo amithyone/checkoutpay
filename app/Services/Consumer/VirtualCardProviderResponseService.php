@@ -11,7 +11,7 @@ final class VirtualCardProviderResponseService
         if (! is_array($data)) {
             return null;
         }
-        $id = (string) ($data['card_id'] ?? $data['cardId'] ?? $data['id'] ?? '');
+        $id = (string) ($data['card_id'] ?? $data['cardId'] ?? $data['card_code'] ?? $data['cardCode'] ?? $data['id'] ?? '');
 
         return trim($id) !== '' ? $id : null;
     }

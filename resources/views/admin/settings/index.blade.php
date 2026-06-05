@@ -749,7 +749,44 @@
                 <input type="number" step="0.01" min="0" max="500" id="virtual_card_request_fee_usd" name="virtual_card_request_fee_usd"
                     value="{{ \App\Models\Setting::get('virtual_card_request_fee_usd', config('virtual_card.request_fee_usd', 5)) }}"
                     class="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg">
-                <p class="mt-1 text-xs text-gray-500">Debited from the user NGN wallet at the USD→NGN rate in <a href="{{ route('admin.whatsapp-wallet.index') }}" class="text-indigo-600 underline">WhatsApp wallet FX</a>.</p>
+                <p class="mt-1 text-xs text-gray-500">Debited from the user NGN wallet at the virtual card <strong>sell rate</strong> below.</p>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
+                <p class="text-sm font-semibold text-gray-800">Virtual card FX (sell / buy rates)</p>
+                <p class="text-xs text-gray-500">Top-up uses <strong>sell rate</strong> (user buys USD for card). Withdraw uses <strong>buy rate</strong> (user sells USD back to wallet). Leave mid blank to fall back to WhatsApp wallet USD→NGN table.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="virtual_card_fx_mid_usd_ngn" class="block text-sm font-medium text-gray-700 mb-1">Mid rate (NGN per $1)</label>
+                        <input type="number" step="0.0001" min="0" id="virtual_card_fx_mid_usd_ngn" name="virtual_card_fx_mid_usd_ngn"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_mid_usd_ngn', config('virtual_card.fx_mid_usd_ngn')) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_sell_markup_percent" class="block text-sm font-medium text-gray-700 mb-1">Sell markup %</label>
+                        <input type="number" step="0.01" min="0" max="50" id="virtual_card_fx_sell_markup_percent" name="virtual_card_fx_sell_markup_percent"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_sell_markup_percent', config('virtual_card.fx_sell_markup_percent', 3)) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_buy_markup_percent" class="block text-sm font-medium text-gray-700 mb-1">Buy markdown %</label>
+                        <input type="number" step="0.01" min="0" max="50" id="virtual_card_fx_buy_markup_percent" name="virtual_card_fx_buy_markup_percent"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_buy_markup_percent', config('virtual_card.fx_buy_markup_percent', 2)) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_sell_rate" class="block text-sm font-medium text-gray-700 mb-1">Sell rate override (optional)</label>
+                        <input type="number" step="0.0001" min="0" id="virtual_card_fx_sell_rate" name="virtual_card_fx_sell_rate"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_sell_rate', config('virtual_card.fx_sell_rate')) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto from mid + markup">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_buy_rate" class="block text-sm font-medium text-gray-700 mb-1">Buy rate override (optional)</label>
+                        <input type="number" step="0.0001" min="0" id="virtual_card_fx_buy_rate" name="virtual_card_fx_buy_rate"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_buy_rate', config('virtual_card.fx_buy_rate')) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto from mid − markdown">
+                    </div>
+                </div>
             </div>
 
             @if(isset($mevonBalance) && is_array($mevonBalance))

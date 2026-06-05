@@ -123,8 +123,11 @@ Route::prefix('v1')->group(function () {
         Route::post('vtu/airtime', [ConsumerWalletApiController::class, 'vtuAirtime']);
         Route::post('vtu/data', [ConsumerWalletApiController::class, 'vtuData']);
         Route::get('cards/prefill', [ConsumerVirtualCardController::class, 'prefill']);
+        Route::get('cards/quote', [ConsumerVirtualCardController::class, 'quote']);
         Route::post('cards/request', [ConsumerVirtualCardController::class, 'request']);
         Route::post('cards/topup', [ConsumerVirtualCardController::class, 'topup']);
+        Route::post('cards/status', [ConsumerVirtualCardController::class, 'setStatus']);
+        Route::post('cards/withdraw', [ConsumerVirtualCardController::class, 'withdraw']);
         Route::get('cards', [ConsumerVirtualCardController::class, 'index']);
         Route::get('kyc/tier2', [ConsumerWalletApiController::class, 'kycTier2Status']);
         Route::post('kyc/tier2/personal', [ConsumerWalletApiController::class, 'kycTier2Personal']);

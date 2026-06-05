@@ -215,6 +215,11 @@ class SettingsController extends Controller
                 'mevonpay_vtu_enabled' => 'nullable|boolean',
                 'virtual_card_enabled' => 'nullable|boolean',
                 'virtual_card_request_fee_usd' => 'nullable|numeric|min:0|max:500',
+                'virtual_card_fx_mid_usd_ngn' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_sell_markup_percent' => 'nullable|numeric|min:0|max:50',
+                'virtual_card_fx_buy_markup_percent' => 'nullable|numeric|min:0|max:50',
+                'virtual_card_fx_sell_rate' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_buy_rate' => 'nullable|numeric|min:0|max:100000',
             ]);
 
             Setting::set('vtu_provider', $validated['vtu_provider'], 'string', 'vtu', 'Active VTU bill payment provider');
@@ -247,6 +252,24 @@ class SettingsController extends Controller
                     'vtu',
                     'One-time card request fee in USD (debited from NGN wallet at FX rate)'
                 );
+            }
+            foreach ([
+                'virtual_card_fx_mid_usd_ngn' => 'Virtual card FX mid rate (NGN per 1 USD)',
+                'virtual_card_fx_sell_markup_percent' => 'Virtual card sell markup % (top-up / fund)',
+                'virtual_card_fx_buy_markup_percent' => 'Virtual card buy markup % (withdraw)',
+                'virtual_card_fx_sell_rate' => 'Virtual card explicit sell rate override (NGN per 1 USD)',
+                'virtual_card_fx_buy_rate' => 'Virtual card explicit buy rate override (NGN per 1 USD)',
+            ] as $key => $description) {
+                if (array_key_exists($key, $validated)) {
+                    $value = $validated[$key];
+                    Setting::set(
+                        $key,
+                        $value === null || $value === '' ? null : $value,
+                        'float',
+                        'vtu',
+                        $description,
+                    );
+                }
             }
         }
 
