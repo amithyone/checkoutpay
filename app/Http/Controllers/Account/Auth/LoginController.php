@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Account\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Business;
-use App\Models\Renter;
+use App\Services\Account\AccountLoginResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -31,7 +29,8 @@ class LoginController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::guard('web')->attempt($credentials, $request->filled('remember'))) {
+        if (AccountLoginResolver::usersTableExists()
+            && Auth::guard('web')->attempt($credentials, $request->filled('remember'))) {
             $request->session()->regenerate();
             $request->session()->put('show_welcome_back', true);
             return redirect()->intended(route('user.dashboard'));
@@ -62,13 +61,10 @@ class LoginController extends Controller
     public function sendOtp(Request $request): RedirectResponse
     {
         $request->validate(['email' => 'required|email']);
-        $email = strtolower($request->email);
+        $email = AccountLoginResolver::normalizedEmail($request->email);
 
-        $user = User::where('email', $email)->first();
-        $business = Business::where('email', $email)->first();
-        $renter = Renter::where('email', $email)->first();
-
-        if (!$user && !$business && !$renter) {
+        $account = AccountLoginResolver::resolveByEmail($email);
+        if (! $account) {
             return back()->withErrors(['email' => 'No account found with this email.'])->withInput();
         }
 
@@ -76,8 +72,8 @@ class LoginController extends Controller
         $key = self::OTP_CACHE_PREFIX . $email;
         Cache::put($key, [
             'code' => $code,
-            'guard' => $user ? 'web' : ($business ? 'business' : 'renter'),
-            'id' => $user ? $user->id : ($business ? $business->id : $renter->id),
+            'guard' => $account['guard'],
+            'id' => $account['id'],
         ], now()->addMinutes(self::OTP_TTL_MINUTES));
 
         Mail::send('emails.login-otp-code', [
@@ -105,7 +101,7 @@ class LoginController extends Controller
             'email' => 'required|email',
             'code' => 'required|string|size:6',
         ]);
-        $email = strtolower($request->email);
+        $email = AccountLoginResolver::normalizedEmail($request->email);
         $code = $request->code;
         $key = self::OTP_CACHE_PREFIX . $email;
         $data = Cache::get($key);
