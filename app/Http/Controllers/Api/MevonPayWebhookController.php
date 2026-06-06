@@ -48,17 +48,38 @@ class MevonPayWebhookController extends Controller
             }
         }
 
-        $payload = $request->all();
-        $event = (string) data_get($payload, 'event', data_get($payload, 'eventType', ''));
+        $payload = $this->normalizeWebhookPayload($request);
+        $cardWebhook = app(VirtualCardMevonWebhookService::class);
+        $event = $cardWebhook->extractWebhookEvent($payload);
+        $cardResult = $cardWebhook->handleWebhook($payload);
 
-        if (app(VirtualCardMevonWebhookService::class)->tryFulfillFromWebhook($payload)) {
+        if ($cardResult === VirtualCardMevonWebhookService::RESULT_ACTIVATED) {
             $this->recordWebhookSource($request, 'virtual_card_activated');
 
             return response()->json(['success' => true, 'message' => 'Virtual card activated']);
         }
 
+        if ($cardResult === VirtualCardMevonWebhookService::RESULT_ALREADY_ACTIVE) {
+            $this->recordWebhookSource($request, 'virtual_card_already_active');
+
+            return response()->json(['success' => true, 'message' => 'Virtual card already active']);
+        }
+
+        if ($cardResult === VirtualCardMevonWebhookService::RESULT_NO_MATCH) {
+            $this->recordWebhookSource($request, 'virtual_card_no_match');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Card webhook received; no matching virtual card request found',
+            ]);
+        }
+
         if ($event !== 'funding.success') {
             $this->recordWebhookSource($request, 'ignored_event');
+            Log::info('mevonpay.webhook.ignored', [
+                'event' => $event,
+                'payload_keys' => array_keys($payload),
+            ]);
 
             return response()->json(['success' => true, 'message' => 'Ignored']);
         }
@@ -174,6 +195,35 @@ class MevonPayWebhookController extends Controller
         $this->recordWebhookSource($request, 'processed');
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeWebhookPayload(Request $request): array
+    {
+        $payload = $request->all();
+        if ($payload !== []) {
+            return $payload;
+        }
+
+        $json = $request->json();
+        if ($json !== null) {
+            $decoded = $json->all();
+            if (is_array($decoded) && $decoded !== []) {
+                return $decoded;
+            }
+        }
+
+        $raw = trim((string) $request->getContent());
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
     }
 
     private function recordWebhookSource(Request $request, string $status): void

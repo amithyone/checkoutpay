@@ -133,4 +133,18 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $row->status);
         $this->assertSame('bab449bb-15e9-404a-aa73-657519df4794', $row->card_external_id);
     }
+
+    public function test_card_webhook_no_match_returns_clear_message_not_ignored(): void
+    {
+        $response = $this->postJson('/api/v1/webhook/mevonpay', [
+            'event' => 'card.created.success',
+            'data' => [
+                'reference' => '766f5cdb-9956-4cec-af77-b520f624acc3',
+                'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('message', 'Card webhook received; no matching virtual card request found');
+    }
 }

@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\Log;
 
 final class VirtualCardMevonWebhookService
 {
+    public const RESULT_NOT_CARD = 'not_card';
+
+    public const RESULT_ACTIVATED = 'activated';
+
+    public const RESULT_ALREADY_ACTIVE = 'already_active';
+
+    public const RESULT_NO_MATCH = 'no_match';
+
     public function __construct(
         private VirtualCardProviderResponseService $providerResponse,
     ) {}
@@ -17,8 +25,19 @@ final class VirtualCardMevonWebhookService
      */
     public function tryFulfillFromWebhook(array $payload): bool
     {
+        return in_array($this->handleWebhook($payload), [
+            self::RESULT_ACTIVATED,
+            self::RESULT_ALREADY_ACTIVE,
+        ], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function handleWebhook(array $payload): string
+    {
         if (! $this->isCardEvent($payload)) {
-            return false;
+            return self::RESULT_NOT_CARD;
         }
 
         $cardId = $this->extractWebhookCardId($payload);
@@ -35,7 +54,7 @@ final class VirtualCardMevonWebhookService
                 ])
                 ->first();
             if ($existing) {
-                return true;
+                return self::RESULT_ALREADY_ACTIVE;
             }
         }
 
@@ -47,30 +66,35 @@ final class VirtualCardMevonWebhookService
                 $this->providerResponse->applyWebhookReady($row, $payload, $cardId !== '' ? $cardId : null);
                 $this->logActivated($row, $payload);
 
-                return true;
+                return self::RESULT_ACTIVATED;
             }
         }
 
         $candidates = $this->openRequestCandidates($cardId);
         $row = $this->pickBestCandidate($candidates, $reference, $cardId, $email, $phone);
 
+        if (! $row && $cardId !== '') {
+            $row = $this->fallbackLatestOpenRequest($cardId);
+        }
+
         if (! $row) {
             Log::warning('virtual_card.webhook.no_match', [
-                'event' => data_get($payload, 'event'),
+                'event' => $this->extractWebhookEvent($payload),
                 'reference' => $reference,
                 'card_id' => $cardId,
                 'email' => $email,
                 'phone' => $phone,
                 'candidate_count' => $candidates->count(),
+                'payload_keys' => array_keys($payload),
             ]);
 
-            return false;
+            return self::RESULT_NO_MATCH;
         }
 
         $this->providerResponse->applyWebhookReady($row, $payload, $cardId !== '' ? $cardId : null);
         $this->logActivated($row, $payload);
 
-        return true;
+        return self::RESULT_ACTIVATED;
     }
 
     /**
@@ -117,10 +141,39 @@ final class VirtualCardMevonWebhookService
         }
 
         $recent = $candidates->filter(function (VirtualCardRequest $row) {
-            return $row->created_at !== null && $row->created_at->greaterThan(Carbon::now()->subHours(24));
+            return $row->created_at !== null && $row->created_at->greaterThan(Carbon::now()->subDays(7));
         });
 
         if ($cardId !== '' && $recent->count() === 1) {
+            return $recent->first();
+        }
+
+        return null;
+    }
+
+    private function fallbackLatestOpenRequest(string $cardId): ?VirtualCardRequest
+    {
+        $recent = VirtualCardRequest::query()
+            ->whereNull('card_external_id')
+            ->where(function ($query) {
+                $query->whereIn('status', [
+                    VirtualCardRequest::STATUS_PENDING,
+                    VirtualCardRequest::STATUS_PREPARING,
+                    VirtualCardRequest::STATUS_SUBMITTED,
+                ])->orWhere(function ($failed) {
+                    $failed->where('status', VirtualCardRequest::STATUS_FAILED)
+                        ->where('created_at', '>=', Carbon::now()->subDays(30));
+                })->orWhere(function ($active) {
+                    $active->where('status', VirtualCardRequest::STATUS_ACTIVE)
+                        ->whereNull('card_external_id');
+                });
+            })
+            ->where('created_at', '>=', Carbon::now()->subDays(7))
+            ->latest('id')
+            ->limit(2)
+            ->get();
+
+        if ($recent->count() === 1 && $cardId !== '') {
             return $recent->first();
         }
 
@@ -140,7 +193,10 @@ final class VirtualCardMevonWebhookService
                     VirtualCardRequest::STATUS_SUBMITTED,
                 ])->orWhere(function ($failed) {
                     $failed->where('status', VirtualCardRequest::STATUS_FAILED)
-                        ->where('created_at', '>=', Carbon::now()->subDays(3));
+                        ->where('created_at', '>=', Carbon::now()->subDays(30));
+                })->orWhere(function ($active) {
+                    $active->where('status', VirtualCardRequest::STATUS_ACTIVE)
+                        ->whereNull('card_external_id');
                 });
             })
             ->where(function ($query) use ($cardId) {
@@ -178,9 +234,10 @@ final class VirtualCardMevonWebhookService
      */
     private function isCardEvent(array $payload): bool
     {
-        $event = strtolower(trim((string) data_get($payload, 'event', data_get($payload, 'eventType', ''))));
+        $event = $this->extractWebhookEvent($payload);
         if ($event === '') {
-            return false;
+            return $this->extractWebhookCardId($payload) !== ''
+                && $this->extractWebhookReference($payload) !== '';
         }
 
         $cardEvents = [
@@ -202,7 +259,32 @@ final class VirtualCardMevonWebhookService
         }
 
         return str_contains($event, 'card')
-            && (str_contains($event, 'creat') || str_contains($event, 'ready') || str_contains($event, 'success'));
+            && (str_contains($event, 'creat') || str_contains($event, 'ready') || str_contains($event, 'success') || str_contains($event, 'active'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function extractWebhookEvent(array $payload): string
+    {
+        $candidates = [
+            data_get($payload, 'event'),
+            data_get($payload, 'eventType'),
+            data_get($payload, 'type'),
+            data_get($payload, 'action'),
+            data_get($payload, 'data.event'),
+            data_get($payload, 'data.type'),
+            data_get($payload, 'data.action'),
+        ];
+
+        foreach ($candidates as $value) {
+            $event = strtolower(trim((string) $value));
+            if ($event !== '') {
+                return $event;
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -211,6 +293,8 @@ final class VirtualCardMevonWebhookService
     private function extractWebhookCardId(array $payload): string
     {
         $candidates = [
+            data_get($payload, 'card_id'),
+            data_get($payload, 'cardId'),
             data_get($payload, 'data.card_id'),
             data_get($payload, 'data.cardId'),
             data_get($payload, 'data.card_code'),
@@ -235,6 +319,7 @@ final class VirtualCardMevonWebhookService
     private function extractWebhookReference(array $payload): string
     {
         $candidates = [
+            data_get($payload, 'reference'),
             data_get($payload, 'data.reference'),
             data_get($payload, 'data.external_reference'),
             data_get($payload, 'data.customer_reference'),
@@ -242,7 +327,6 @@ final class VirtualCardMevonWebhookService
             data_get($payload, 'data.order_id'),
             data_get($payload, 'data.request_id'),
             data_get($payload, 'data.transaction_reference'),
-            data_get($payload, 'reference'),
         ];
 
         foreach ($candidates as $value) {
@@ -261,6 +345,7 @@ final class VirtualCardMevonWebhookService
     private function extractWebhookEmail(array $payload): string
     {
         $candidates = [
+            data_get($payload, 'email'),
             data_get($payload, 'data.email'),
             data_get($payload, 'data.customer_email'),
             data_get($payload, 'data.customer.email'),
@@ -284,6 +369,8 @@ final class VirtualCardMevonWebhookService
     private function extractWebhookPhone(array $payload): string
     {
         $candidates = [
+            data_get($payload, 'phone_number'),
+            data_get($payload, 'phoneNumber'),
             data_get($payload, 'data.phone_number'),
             data_get($payload, 'data.phoneNumber'),
             data_get($payload, 'data.phone'),
@@ -321,7 +408,7 @@ final class VirtualCardMevonWebhookService
             'virtual_card_request_id' => $row->id,
             'wallet_id' => $row->whatsapp_wallet_id,
             'card_external_id' => $row->fresh()->card_external_id,
-            'event' => data_get($payload, 'event'),
+            'event' => $this->extractWebhookEvent($payload),
         ]);
     }
 }
