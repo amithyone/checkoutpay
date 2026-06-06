@@ -4,6 +4,7 @@ namespace App\Services\Consumer;
 
 use App\Models\Setting;
 use App\Models\VirtualCardRequest;
+use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayCardApiClient;
@@ -575,7 +576,35 @@ final class ConsumerVirtualCardService
 
     public function syncProviderCardCode(VirtualCardRequest $card): ?string
     {
-        return $this->resolveProviderCardCode($card->fresh());
+        $card = $card->fresh();
+        $this->repairCardExternalIdIfNeeded($card);
+        $card = $card->fresh();
+
+        return $this->resolveProviderCardCode($card);
+    }
+
+    public function repairCardExternalIdIfNeeded(VirtualCardRequest $card): ?string
+    {
+        $current = trim((string) ($card->card_external_id ?? ''));
+        if ($this->isUsableMevonCardIdentifier($current)) {
+            return $current;
+        }
+
+        $resolved = $this->resolveMevonCardIdentifier($card);
+        if ($resolved === null) {
+            return null;
+        }
+
+        if ($resolved !== $current) {
+            $card->update(['card_external_id' => $resolved]);
+            Log::info('consumer.virtual_card.external_id_repaired', [
+                'virtual_card_request_id' => $card->id,
+                'from' => $current !== '' ? $current : null,
+                'to' => $resolved,
+            ]);
+        }
+
+        return $resolved;
     }
 
     /**
@@ -583,8 +612,9 @@ final class ConsumerVirtualCardService
      */
     private function fetchAndStoreProviderCardDetails(VirtualCardRequest $card): ?array
     {
-        $cardId = trim((string) ($card->card_external_id ?? ''));
-        if ($cardId === '' || ! $this->cardApi->isConfigured()) {
+        $this->repairCardExternalIdIfNeeded($card);
+        $cardId = $this->resolveMevonCardIdentifier($card->fresh());
+        if ($cardId === null || ! $this->cardApi->isConfigured()) {
             return null;
         }
 
@@ -1124,8 +1154,13 @@ final class ConsumerVirtualCardService
 
     private function resolveProviderCardCode(VirtualCardRequest $card): ?string
     {
-        $externalId = trim((string) ($card->card_external_id ?? ''));
-        if ($externalId === '') {
+        $this->repairCardExternalIdIfNeeded($card);
+        $card = $card->fresh();
+
+        $stored = is_array($card->card_details_payload) ? $card->card_details_payload : null;
+
+        $externalId = $this->resolveMevonCardIdentifier($card);
+        if ($externalId === null) {
             return null;
         }
 
@@ -1133,7 +1168,6 @@ final class ConsumerVirtualCardService
             return $externalId;
         }
 
-        $stored = $card->card_details_payload;
         if (is_array($stored)) {
             $code = trim((string) ($stored['card_code'] ?? ''));
             if ($code !== '' && $this->looksLikeMevonCardCode($code)) {
@@ -1168,6 +1202,176 @@ final class ConsumerVirtualCardService
         $this->persistProviderCardCode($card, $code, $stored);
 
         return $code;
+    }
+
+    private function resolveMevonCardIdentifier(VirtualCardRequest $card): ?string
+    {
+        $candidates = [];
+
+        $stored = is_array($card->card_details_payload) ? $card->card_details_payload : [];
+        $candidates[] = $stored['card_external_id'] ?? null;
+        $candidates[] = $card->card_external_id;
+
+        $response = is_array($card->response_payload) ? $card->response_payload : [];
+        $webhook = $response['webhook'] ?? null;
+        if (is_array($webhook)) {
+            $data = is_array($webhook['data'] ?? null) ? $webhook['data'] : $webhook;
+            $candidates[] = $data['card_id'] ?? null;
+            $candidates[] = $data['cardId'] ?? null;
+            $candidates[] = $data['card_code'] ?? null;
+            $candidates[] = $data['cardCode'] ?? null;
+        }
+
+        $candidates[] = $response['card_id'] ?? null;
+        $candidates[] = $response['cardId'] ?? null;
+
+        foreach ($candidates as $candidate) {
+            $id = trim((string) $candidate);
+            if ($this->isUsableMevonCardIdentifier($id)) {
+                return $id;
+            }
+        }
+
+        return $this->resolveMevonCardIdentifierFromLogs($card, $stored);
+    }
+
+    /**
+     * @param  array<string, mixed>  $stored
+     */
+    private function resolveMevonCardIdentifierFromLogs(VirtualCardRequest $card, array $stored): ?string
+    {
+        $needles = array_values(array_filter([
+            trim((string) ($stored['card_number'] ?? '')),
+            trim((string) ($stored['last_four'] ?? '')),
+            trim((string) ($stored['provider_reference'] ?? '')),
+        ], fn (string $value) => $value !== ''));
+
+        if ($needles === []) {
+            return null;
+        }
+
+        $logs = VirtualCardRequestLog::query()
+            ->where(function ($query) use ($card) {
+                $query->where('virtual_card_request_id', $card->id)
+                    ->orWhere('whatsapp_wallet_id', $card->whatsapp_wallet_id);
+            })
+            ->latest('id')
+            ->limit(120)
+            ->get();
+
+        foreach ($logs as $log) {
+            $id = $this->extractCardIdentifierFromLog($log, $needles);
+            if ($id !== null) {
+                return $id;
+            }
+        }
+
+        foreach ($needles as $needle) {
+            if (strlen($needle) < 4) {
+                continue;
+            }
+
+            $orphanLogs = VirtualCardRequestLog::query()
+                ->whereRaw('CAST(context AS CHAR) LIKE ?', ['%'.$needle.'%'])
+                ->latest('id')
+                ->limit(20)
+                ->get();
+
+            foreach ($orphanLogs as $log) {
+                $id = $this->extractCardIdentifierFromLog($log, $needles);
+                if ($id !== null) {
+                    return $id;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $needles
+     */
+    private function extractCardIdentifierFromLog(VirtualCardRequestLog $log, array $needles): ?string
+    {
+        $context = is_array($log->context) ? $log->context : [];
+        $payload = $context['raw_payload'] ?? null;
+        if (! is_array($payload)) {
+            $rawBody = trim((string) ($context['raw_body'] ?? ''));
+            if ($rawBody !== '') {
+                $decoded = json_decode($rawBody, true);
+                $payload = is_array($decoded) ? $decoded : null;
+            }
+        }
+
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $serialized = json_encode($payload);
+        if (! is_string($serialized)) {
+            return null;
+        }
+
+        $matchesNeedle = false;
+        foreach ($needles as $needle) {
+            if ($needle !== '' && str_contains($serialized, $needle)) {
+                $matchesNeedle = true;
+                break;
+            }
+        }
+
+        if (! $matchesNeedle) {
+            return null;
+        }
+
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
+        foreach ([
+            $data['card_id'] ?? null,
+            $data['cardId'] ?? null,
+            $data['card_code'] ?? null,
+            $data['cardCode'] ?? null,
+            $payload['card_id'] ?? null,
+            $payload['cardId'] ?? null,
+        ] as $candidate) {
+            $id = trim((string) $candidate);
+            if ($this->isUsableMevonCardIdentifier($id)) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    private function isUsableMevonCardIdentifier(string $id): bool
+    {
+        if ($id === '' || $this->isPlaceholderCardIdentifier($id)) {
+            return false;
+        }
+
+        if ($this->looksLikeMevonCardCode($id)) {
+            return true;
+        }
+
+        return (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+            $id,
+        );
+    }
+
+    private function isPlaceholderCardIdentifier(string $id): bool
+    {
+        $normalized = strtolower(trim($id));
+
+        return str_contains($id, '{')
+            || str_contains($id, '}')
+            || in_array($normalized, [
+                'card_id',
+                '{card_id}',
+                'card_code',
+                '{card_code}',
+                'request_id_here',
+                'request-id',
+            ], true);
     }
 
     private function cardCodeFromWebhookPayload(VirtualCardRequest $card): ?string

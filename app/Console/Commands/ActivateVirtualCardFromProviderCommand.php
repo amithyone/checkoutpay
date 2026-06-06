@@ -25,8 +25,8 @@ class ActivateVirtualCardFromProviderCommand extends Command
     ): int
     {
         $cardId = trim((string) $this->argument('card_id'));
-        if ($cardId === '') {
-            $this->error('card_id is required.');
+        if ($cardId === '' || str_contains($cardId, '{') || str_contains($cardId, '}')) {
+            $this->error('card_id must be the real Mevon UUID (e.g. bab449bb-15e9-404a-aa73-657519df4794), not a placeholder.');
 
             return self::FAILURE;
         }

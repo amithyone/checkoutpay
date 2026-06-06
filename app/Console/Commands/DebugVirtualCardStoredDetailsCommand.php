@@ -33,6 +33,16 @@ class DebugVirtualCardStoredDetailsCommand extends Command
 
         $stored = $row->card_details_payload;
         $this->line('card_details_payload: '.(is_array($stored) ? 'present (encrypted)' : 'empty'));
+        if (is_array($stored)) {
+            $this->line('  stored card_external_id: '.(string) ($stored['card_external_id'] ?? '—'));
+            $this->line('  stored card_code: '.(string) ($stored['card_code'] ?? '—'));
+            $this->line('  stored last_four: '.(string) ($stored['last_four'] ?? '—'));
+        }
+
+        if (is_string($row->card_external_id) && (str_contains($row->card_external_id, '{') || str_contains($row->card_external_id, '}'))) {
+            $this->warn('card_external_id looks like a placeholder, not a real Mevon card id.');
+            $this->line('  Fix: php artisan virtual-card:activate-provider REAL_CARD_UUID --request-id='.$row->id);
+        }
 
         $response = is_array($row->response_payload) ? $row->response_payload : [];
         $webhook = $response['webhook'] ?? null;
@@ -79,7 +89,15 @@ class DebugVirtualCardStoredDetailsCommand extends Command
             }
         }
 
-        $providerCode = $cards->syncProviderCardCode($row->fresh());
+        $repairedId = $cards->repairCardExternalIdIfNeeded($row->fresh());
+        $row = $row->fresh();
+        $this->line('repaired card_external_id: '.($repairedId ?? 'FAILED'));
+        if ($repairedId !== null && $repairedId !== (string) $row->card_external_id) {
+            $row = $row->fresh();
+            $this->line('  updated row card_external_id: '.$row->card_external_id);
+        }
+
+        $providerCode = $cards->syncProviderCardCode($row);
         $this->line('provider card_code resolve: '.($providerCode ?? 'FAILED'));
 
         if ($this->option('sync')) {

@@ -110,6 +110,45 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $this->assertTrue($card->fresh()->is_frozen);
     }
 
+    public function test_freeze_repairs_placeholder_card_external_id_from_stored_payload(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_external_id' => '{card_id}',
+            'card_details_payload' => [
+                'card_number' => '4288520141503096',
+                'cvv' => '486',
+                'expiry' => '06/2029',
+                'card_external_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                    'card_code' => 'VCARD2026060611150700359',
+                ],
+            ], 200),
+            'https://mevon.test/V1/card_status' => Http::response([
+                'status' => 'success',
+                'message' => 'Card freeze successful',
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/status', [
+            'pin' => '2468',
+            'action' => 'freeze',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('bab449bb-15e9-404a-aa73-657519df4794', $card->fresh()->card_external_id);
+        $this->assertTrue($card->fresh()->is_frozen);
+    }
+
     public function test_freeze_resolves_vcard_code_from_uuid_card_external_id(): void
     {
         [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
