@@ -177,6 +177,14 @@ final class VirtualCardProviderResponseService
             return false;
         }
 
+        if (preg_match('/^REQ\d{6,}$/i', $value) === 1) {
+            return true;
+        }
+
+        if (preg_match('/^req_[a-z0-9]+$/i', $value) === 1) {
+            return true;
+        }
+
         return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value);
     }
 }

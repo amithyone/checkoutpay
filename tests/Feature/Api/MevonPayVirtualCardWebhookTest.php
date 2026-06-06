@@ -141,6 +141,53 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $this->assertSame('bab449bb-15e9-404a-aa73-657519df4794', $row->card_external_id);
     }
 
+    public function test_card_created_success_with_mevon_req_reference_matches_preparing_request(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348099988776',
+            'display_name' => 'Req Ref User',
+            'balance' => 30000,
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        $mevonReq = 'REQ1780744493644';
+        $cardId = 'bab449bb-15e9-404a-aa73-657519df4794';
+
+        $row = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_PREPARING,
+            'fee_usd' => 5,
+            'fee_ngn' => 6925,
+            'external_reference' => 'VCARD-REQ-REF-001',
+            'provider_reference' => $mevonReq,
+            'card_name' => 'Req User',
+            'request_payload' => [
+                'email' => 'requser@example.com',
+                'phoneNumber' => '08099988776',
+            ],
+            'response_payload' => [
+                'status' => false,
+                'message' => 'Card creation request processed successfully',
+                'data' => ['request_id' => $mevonReq],
+            ],
+        ]);
+
+        $response = $this->postJson('/api/v1/webhook/mevonpay', [
+            'event' => 'card.created.success',
+            'request_id' => $mevonReq,
+            'data' => [
+                'card_id' => $cardId,
+                'email' => 'requser@example.com',
+            ],
+        ]);
+
+        $response->assertOk()->assertJsonPath('message', 'Virtual card activated');
+
+        $row->refresh();
+        $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $row->status);
+        $this->assertSame($cardId, $row->card_external_id);
+    }
+
     public function test_card_webhook_no_match_returns_clear_message_not_ignored(): void
     {
         $response = $this->postJson('/api/v1/webhook/mevonpay', [

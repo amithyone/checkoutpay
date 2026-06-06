@@ -74,9 +74,7 @@ final class VirtualCardMevonWebhookService
         }
 
         if ($reference !== '' && ! $this->isCheckoutExternalReference($reference)) {
-            $row = VirtualCardRequest::query()
-                ->where('provider_reference', $reference)
-                ->first();
+            $row = $this->findRequestByProviderReference($reference);
             if ($row) {
                 $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
 
@@ -265,6 +263,31 @@ final class VirtualCardMevonWebhookService
             ->get();
     }
 
+    private function findRequestByProviderReference(string $reference): ?VirtualCardRequest
+    {
+        $row = VirtualCardRequest::query()
+            ->where('provider_reference', $reference)
+            ->first();
+        if ($row) {
+            return $row;
+        }
+
+        return VirtualCardRequest::query()
+            ->where(function ($query) use ($reference) {
+                $query->where('response_payload', 'like', '%'.$reference.'%')
+                    ->orWhere('request_payload', 'like', '%'.$reference.'%');
+            })
+            ->whereIn('status', [
+                VirtualCardRequest::STATUS_PENDING,
+                VirtualCardRequest::STATUS_PREPARING,
+                VirtualCardRequest::STATUS_SUBMITTED,
+                VirtualCardRequest::STATUS_FAILED,
+                VirtualCardRequest::STATUS_ACTIVE,
+            ])
+            ->latest('id')
+            ->first();
+    }
+
     private function payloadContainsReference(VirtualCardRequest $row, string $reference): bool
     {
         if ($reference === '') {
@@ -375,12 +398,15 @@ final class VirtualCardMevonWebhookService
     {
         $candidates = [
             data_get($payload, 'reference'),
+            data_get($payload, 'request_id'),
+            data_get($payload, 'requestId'),
             data_get($payload, 'data.reference'),
             data_get($payload, 'data.external_reference'),
             data_get($payload, 'data.customer_reference'),
             data_get($payload, 'data.order_reference'),
             data_get($payload, 'data.order_id'),
             data_get($payload, 'data.request_id'),
+            data_get($payload, 'data.requestId'),
             data_get($payload, 'data.transaction_reference'),
         ];
 

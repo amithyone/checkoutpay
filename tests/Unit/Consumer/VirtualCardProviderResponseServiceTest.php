@@ -53,4 +53,20 @@ class VirtualCardProviderResponseServiceTest extends TestCase
         $this->assertSame(VirtualCardRequest::STATUS_PREPARING, $fresh->status);
         $this->assertNull($fresh->card_external_id);
     }
+
+    public function test_extract_provider_reference_accepts_mevon_req_format(): void
+    {
+        $svc = app(VirtualCardProviderResponseService::class);
+
+        $ref = $svc->extractProviderReference([
+            'ok' => false,
+            'message' => 'Card creation request processed successfully',
+            'raw' => [
+                'status' => false,
+                'data' => ['request_id' => 'REQ1780744493644'],
+            ],
+        ]);
+
+        $this->assertSame('REQ1780744493644', $ref);
+    }
 }
