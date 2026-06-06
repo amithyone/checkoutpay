@@ -18,6 +18,8 @@ return [
     'fx_buy_rate' => env('VIRTUAL_CARD_FX_BUY_RATE') !== null ? (float) env('VIRTUAL_CARD_FX_BUY_RATE') : null,
     'topup_min_usd' => max(0.01, (float) env('VIRTUAL_CARD_TOPUP_MIN_USD', 1)),
     'topup_max_usd' => max(1.0, (float) env('VIRTUAL_CARD_TOPUP_MAX_USD', 500)),
+    /** Retries after Mevon card_topup reports low merchant USD (auto NGN→USD buy between attempts). */
+    'topup_merchant_usd_retries' => max(1, (int) env('VIRTUAL_CARD_TOPUP_MERCHANT_USD_RETRIES', 2)),
     'withdraw_min_usd' => max(0.01, (float) env('VIRTUAL_CARD_WITHDRAW_MIN_USD', 1)),
     'withdraw_max_usd' => max(1.0, (float) env('VIRTUAL_CARD_WITHDRAW_MAX_USD', 500)),
     'auto_fund_usd_enabled' => (bool) env('VIRTUAL_CARD_AUTO_FUND_USD_ENABLED', true),

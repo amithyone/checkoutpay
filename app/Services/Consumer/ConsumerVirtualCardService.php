@@ -494,6 +494,21 @@ final class ConsumerVirtualCardService
         if ($cardCode === null) {
             return ['ok' => false, 'message' => 'Could not resolve card for top-up.'];
         }
+
+        $preflightFund = $this->usdAutoFund->ensureUsdBalance($amountUsd, 'virtual_card_topup_preflight');
+        if (! ($preflightFund['ok'] ?? false)) {
+            Log::warning('consumer.virtual_card.usd_auto_fund_preflight_failed', [
+                'wallet_id' => $wallet->id,
+                'amount_usd' => $amountUsd,
+                'reason' => (string) ($preflightFund['message'] ?? 'USD auto-fund failed'),
+            ]);
+
+            return [
+                'ok' => false,
+                'message' => VirtualCardUserFacingMessage::serviceUnavailable(),
+            ];
+        }
+
         $reference = 'VCARD-TOP-'.strtoupper(Str::random(12));
 
         try {
@@ -535,44 +550,7 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => $this->debitFailureMessage($e, 'Could not debit wallet for card top-up. Check balance and limits.')];
         }
 
-        $fund = $this->usdAutoFund->ensureUsdBalance($amountUsd, 'virtual_card_topup');
-        if (! ($fund['ok'] ?? false)) {
-            $internalReason = (string) ($fund['message'] ?? 'USD auto-fund failed');
-            Log::warning('consumer.virtual_card.usd_auto_fund_failed', [
-                'wallet_id' => $wallet->id,
-                'reference' => $reference,
-                'reason' => $internalReason,
-            ]);
-            $this->debitRefunds->refundDebit(
-                $wallet->id,
-                $reference,
-                $amountNgn,
-                $internalReason,
-                WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP,
-            );
-
-            return [
-                'ok' => false,
-                'message' => VirtualCardUserFacingMessage::topupFailedRefunded(),
-                'data' => [
-                    'balance_after' => (float) $wallet->fresh()->balance,
-                ],
-            ];
-        }
-
-        $api = $this->cardApi->topupCard($amountUsd, $cardCode);
-        if (! ($api['ok'] ?? false) && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
-            Log::warning('consumer.virtual_card.provider_insufficient_usd', [
-                'wallet_id' => $wallet->id,
-                'reference' => $reference,
-                'amount_usd' => $amountUsd,
-                'provider_message' => (string) ($api['message'] ?? ''),
-            ]);
-            $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($amountUsd, 'virtual_card_topup_retry');
-            if ($retryFund['ok'] ?? false) {
-                $api = $this->cardApi->topupCard($amountUsd, $cardCode);
-            }
-        }
+        $api = $this->invokeCardTopupWithUsdRetry($amountUsd, $cardCode, $wallet->id, $reference);
 
         if ($api['ok'] ?? false) {
             $card->update([
@@ -913,6 +891,48 @@ final class ConsumerVirtualCardService
         }
 
         return $fallback;
+    }
+
+    /**
+     * Call Mevon card_topup; auto-buy USD from NGN and retry when merchant float is low.
+     *
+     * @return array{ok?: bool, message?: string, raw?: mixed}
+     */
+    private function invokeCardTopupWithUsdRetry(float $amountUsd, string $cardCode, int $walletId, string $reference): array
+    {
+        $api = $this->cardApi->topupCard($amountUsd, $cardCode);
+        $maxRetries = max(1, (int) config('virtual_card.topup_merchant_usd_retries', 2));
+
+        for ($attempt = 0; $attempt < $maxRetries; $attempt++) {
+            if ($api['ok'] ?? false) {
+                return $api;
+            }
+
+            $providerMessage = (string) ($api['message'] ?? '');
+            if (! $this->usdAutoFund->isInsufficientUsdError($providerMessage)) {
+                return $api;
+            }
+
+            Log::warning('consumer.virtual_card.provider_insufficient_usd', [
+                'wallet_id' => $walletId,
+                'reference' => $reference,
+                'amount_usd' => $amountUsd,
+                'attempt' => $attempt + 1,
+                'provider_message' => $providerMessage,
+            ]);
+
+            $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd(
+                $amountUsd,
+                'virtual_card_topup_retry_'.($attempt + 1),
+            );
+            if (! ($retryFund['ok'] ?? false)) {
+                return $api;
+            }
+
+            $api = $this->cardApi->topupCard($amountUsd, $cardCode);
+        }
+
+        return $api;
     }
 
     private function resolveOperableCard(WhatsappWallet $wallet): ?VirtualCardRequest

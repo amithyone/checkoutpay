@@ -217,9 +217,64 @@ class ConsumerVirtualCardOpsTest extends TestCase
         ]);
 
         $response->assertStatus(422)
-            ->assertJsonPath('message', 'Card top-up could not be completed. Your wallet has been refunded.');
+            ->assertJsonPath('message', 'Dollar Virtual Card is temporarily unavailable. Please try again shortly.');
         $wallet->refresh();
         $this->assertSame(30000.0, (float) $wallet->balance);
+    }
+
+    public function test_topup_retries_merchant_usd_buy_when_provider_reports_low_float(): void
+    {
+        [$wallet, $account] = $this->walletWithActiveCard();
+        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
+
+        Http::fake([
+            'https://mevon.test/V1/balance' => Http::sequence()
+                ->push([
+                    'status' => 'success',
+                    'data' => ['bal' => '500000', 'usd_balance' => '20.00'],
+                ], 200)
+                ->push([
+                    'status' => 'success',
+                    'data' => ['bal' => '500000', 'usd_balance' => '20.00'],
+                ], 200)
+                ->push([
+                    'status' => 'success',
+                    'data' => ['bal' => '497200', 'usd_balance' => '22.00'],
+                ], 200),
+            'https://mevon.test/V1/exchange' => Http::response([
+                'status' => true,
+                'message' => 'Conversion successful',
+                'data' => [
+                    'from_currency' => 'NGN',
+                    'to_currency' => 'USD',
+                    'amount' => 2800,
+                    'converted_amount' => 2,
+                    'new_usd_balance' => 22,
+                ],
+            ], 200),
+            'https://mevon.test/V1/card_topup' => Http::sequence()
+                ->push([
+                    'status' => false,
+                    'message' => 'Insufficient USD balance',
+                ], 200)
+                ->push([
+                    'status' => 'success',
+                    'message' => 'Card topup successful',
+                ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/topup', [
+            'pin' => '2468',
+            'amount_usd' => 10,
+        ]);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        $wallet->refresh();
+        $this->assertSame(14000.0, (float) $wallet->balance);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/V1/exchange'));
     }
 
     public function test_topup_returns_insufficient_balance_when_user_wallet_is_low(): void
@@ -228,6 +283,13 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $wallet->update(['balance' => 100]);
         Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
         Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
+
+        Http::fake([
+            'https://mevon.test/V1/balance' => Http::response([
+                'status' => 'success',
+                'data' => ['bal' => '500000', 'usd_balance' => '50.00'],
+            ], 200),
+        ]);
 
         Sanctum::actingAs($account);
 

@@ -96,6 +96,8 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
         $svc = app(MevonPayUsdAutoFundService::class);
 
         $this->assertTrue($svc->isInsufficientUsdError('Insufficient USD balance'));
+        $this->assertTrue($svc->isInsufficientUsdError('Merchant USD balance too low'));
+        $this->assertTrue($svc->isInsufficientUsdError('Not enough USD in float'));
         $this->assertFalse($svc->isInsufficientUsdError('Invalid PIN'));
     }
 

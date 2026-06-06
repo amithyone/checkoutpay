@@ -189,8 +189,23 @@ final class MevonPayUsdAutoFundService
             return false;
         }
 
-        return str_contains($haystack, 'insufficient')
-            && (str_contains($haystack, 'usd') || str_contains($haystack, 'dollar'));
+        if (str_contains($haystack, 'insufficient')
+            && (str_contains($haystack, 'usd')
+                || str_contains($haystack, 'dollar')
+                || str_contains($haystack, 'balance')
+                || str_contains($haystack, 'float'))) {
+            return true;
+        }
+
+        if (str_contains($haystack, 'low') && str_contains($haystack, 'usd')) {
+            return true;
+        }
+
+        if (str_contains($haystack, 'merchant') && str_contains($haystack, 'balance')) {
+            return true;
+        }
+
+        return str_contains($haystack, 'not enough') && str_contains($haystack, 'usd');
     }
 
     private function isEnabled(): bool
