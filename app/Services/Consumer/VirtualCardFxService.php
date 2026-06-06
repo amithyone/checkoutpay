@@ -9,6 +9,18 @@ use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 
 final class VirtualCardFxService
 {
+    private bool $midUsdNgnRateComputed = false;
+
+    private ?float $midUsdNgnRateCache = null;
+
+    private bool $sellRateComputed = false;
+
+    private ?float $sellRateCache = null;
+
+    private bool $buyRateComputed = false;
+
+    private ?float $buyRateCache = null;
+
     public function __construct(
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private MevonPayExchangeRateService $mevonRate,
@@ -48,36 +60,40 @@ final class VirtualCardFxService
 
     public function midUsdNgnRate(): ?float
     {
-        return once(function () {
-            if ($this->isMidAutoSyncEnabled()) {
-                $live = $this->mevonLiveMidRate();
-                if ($live !== null) {
-                    return $live;
-                }
-            }
+        if ($this->midUsdNgnRateComputed) {
+            return $this->midUsdNgnRateCache;
+        }
 
-            $manual = $this->manualMidUsdNgnRate();
-            if ($manual !== null) {
-                return $manual;
-            }
+        $this->midUsdNgnRateComputed = true;
 
-            $from = (string) config('virtual_card.fee_currency_from', 'USD');
-            $to = (string) config('virtual_card.fee_currency_to', 'NGN');
-            $fallback = $this->crossBorderFx->convertCurrency($from, $to, 1.0);
-            if ($fallback !== null && $fallback > 0) {
-                return round($fallback, 4);
+        if ($this->isMidAutoSyncEnabled()) {
+            $live = $this->mevonLiveMidRate();
+            if ($live !== null) {
+                return $this->midUsdNgnRateCache = $live;
             }
+        }
 
-            $row = WhatsappCrossBorderFxRate::query()
-                ->where('from_currency', 'USD')
-                ->where('to_currency', 'NGN')
-                ->first();
-            if ($row && (float) $row->rate > 0) {
-                return round((float) $row->rate, 4);
-            }
+        $manual = $this->manualMidUsdNgnRate();
+        if ($manual !== null) {
+            return $this->midUsdNgnRateCache = $manual;
+        }
 
-            return null;
-        });
+        $from = (string) config('virtual_card.fee_currency_from', 'USD');
+        $to = (string) config('virtual_card.fee_currency_to', 'NGN');
+        $fallback = $this->crossBorderFx->convertCurrency($from, $to, 1.0);
+        if ($fallback !== null && $fallback > 0) {
+            return $this->midUsdNgnRateCache = round($fallback, 4);
+        }
+
+        $row = WhatsappCrossBorderFxRate::query()
+            ->where('from_currency', 'USD')
+            ->where('to_currency', 'NGN')
+            ->first();
+        if ($row && (float) $row->rate > 0) {
+            return $this->midUsdNgnRateCache = round((float) $row->rate, 4);
+        }
+
+        return $this->midUsdNgnRateCache = null;
     }
 
     public function midSource(): string
@@ -151,41 +167,49 @@ final class VirtualCardFxService
 
     public function sellRate(): ?float
     {
-        return once(function () {
-            $explicit = Setting::get('virtual_card_fx_sell_rate');
-            if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
-                return round((float) $explicit, 4);
-            }
+        if ($this->sellRateComputed) {
+            return $this->sellRateCache;
+        }
 
-            $mid = $this->midUsdNgnRate();
-            if ($mid === null) {
-                return null;
-            }
+        $this->sellRateComputed = true;
 
-            return round($mid + $this->sellProfitNgnPerUsd(), 4);
-        });
+        $explicit = Setting::get('virtual_card_fx_sell_rate');
+        if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
+            return $this->sellRateCache = round((float) $explicit, 4);
+        }
+
+        $mid = $this->midUsdNgnRate();
+        if ($mid === null) {
+            return $this->sellRateCache = null;
+        }
+
+        return $this->sellRateCache = round($mid + $this->sellProfitNgnPerUsd(), 4);
     }
 
     public function buyRate(): ?float
     {
-        return once(function () {
-            $explicit = Setting::get('virtual_card_fx_buy_rate');
-            if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
-                return round((float) $explicit, 4);
-            }
+        if ($this->buyRateComputed) {
+            return $this->buyRateCache;
+        }
 
-            $mid = $this->midUsdNgnRate();
-            if ($mid === null) {
-                return null;
-            }
+        $this->buyRateComputed = true;
 
-            $rate = round($mid - $this->buyProfitNgnPerUsd(), 4);
-            if ($rate <= 0) {
-                return null;
-            }
+        $explicit = Setting::get('virtual_card_fx_buy_rate');
+        if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
+            return $this->buyRateCache = round((float) $explicit, 4);
+        }
 
-            return $rate;
-        });
+        $mid = $this->midUsdNgnRate();
+        if ($mid === null) {
+            return $this->buyRateCache = null;
+        }
+
+        $rate = round($mid - $this->buyProfitNgnPerUsd(), 4);
+        if ($rate <= 0) {
+            return $this->buyRateCache = null;
+        }
+
+        return $this->buyRateCache = $rate;
     }
 
     public function isAvailable(): bool
