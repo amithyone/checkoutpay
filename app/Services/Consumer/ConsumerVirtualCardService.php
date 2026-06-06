@@ -543,6 +543,7 @@ final class ConsumerVirtualCardService
                 'last_operation_at' => now(),
                 'last_operation_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
             ]);
+            $this->applyCardBalanceAfterOperation($card, $amountUsd, $api, 'credit');
 
             return [
                 'ok' => true,
@@ -828,6 +829,7 @@ final class ConsumerVirtualCardService
             'last_operation_at' => now(),
             'last_operation_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
         ]);
+        $this->applyCardBalanceAfterOperation($card, $amountUsd, $api, 'debit');
 
         return [
             'ok' => true,
@@ -841,6 +843,56 @@ final class ConsumerVirtualCardService
                 'request' => $this->serializeRequest($card->fresh()),
             ],
         ];
+    }
+
+    /**
+     * @param  array{ok?: bool, message?: string, data?: mixed, raw?: mixed}  $api
+     */
+    private function applyCardBalanceAfterOperation(
+        VirtualCardRequest $card,
+        float $amountUsd,
+        array $api,
+        string $direction,
+    ): void {
+        $fromResponse = $this->storedDetails->extractBalanceFromProviderPayload($api['raw'] ?? $api['data'] ?? $api);
+        if ($fromResponse !== null) {
+            $card->update(['card_balance_usd' => $fromResponse]);
+
+            return;
+        }
+
+        $before = $this->readStoredCardBalanceUsd($card->fresh());
+        $this->fetchAndStoreProviderCardDetails($card);
+        $afterFetch = $this->readStoredCardBalanceUsd($card->fresh());
+        if ($afterFetch !== null && ($before === null || abs($afterFetch - $before) >= 0.01)) {
+            $card->update(['card_balance_usd' => $afterFetch]);
+
+            return;
+        }
+
+        $current = $before ?? $afterFetch;
+        if ($current === null) {
+            return;
+        }
+
+        $next = $direction === 'credit'
+            ? round($current + $amountUsd, 2)
+            : max(0.0, round($current - $amountUsd, 2));
+        $card->update(['card_balance_usd' => $next]);
+    }
+
+    private function readStoredCardBalanceUsd(VirtualCardRequest $card): ?float
+    {
+        if ($card->card_balance_usd !== null) {
+            return (float) $card->card_balance_usd;
+        }
+
+        $stored = is_array($card->card_details_payload) ? $card->card_details_payload : null;
+        if ($stored !== null && is_numeric($stored['balance_usd'] ?? null)) {
+            return (float) $stored['balance_usd'];
+        }
+
+        return null;
     }
 
     /**
@@ -1113,7 +1165,9 @@ final class ConsumerVirtualCardService
             'billing_zip' => $billingParts['zip'],
             'billing_country' => $billingParts['country'],
             'currency' => strtoupper((string) ($row['currency'] ?? 'USD')),
-            'balance_usd' => $card->card_balance_usd ?? (is_numeric($row['balance_usd'] ?? null) ? (float) $row['balance_usd'] : null),
+            'balance_usd' => $this->storedDetails->extractBalanceFromProviderPayload($row)
+                ?? (is_numeric($row['balance_usd'] ?? null) ? (float) $row['balance_usd'] : null)
+                ?? ($card->card_balance_usd !== null ? (float) $card->card_balance_usd : null),
             'status' => (string) ($row['status'] ?? ($card->is_frozen ? 'frozen' : 'active')),
         ];
     }

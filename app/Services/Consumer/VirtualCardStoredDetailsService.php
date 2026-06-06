@@ -8,6 +8,26 @@ use App\Models\VirtualCardRequestLog;
 final class VirtualCardStoredDetailsService
 {
     /**
+     * Read USD balance from a Mevon card API payload (topup, withdraw, details, webhook).
+     */
+    public function extractBalanceFromProviderPayload(mixed $payload): ?float
+    {
+        $row = $this->flattenProviderPayload($payload);
+        if ($row === []) {
+            return null;
+        }
+
+        foreach (['balance', 'card_balance', 'available_balance', 'new_balance', 'balance_usd'] as $key) {
+            $value = $row[$key] ?? null;
+            if (is_numeric($value)) {
+                return round((float) $value, 2);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>|null
      */
@@ -28,7 +48,7 @@ final class VirtualCardStoredDetailsService
         }
 
         $billing = $data['billing_address'] ?? $data['billing'] ?? null;
-        $balance = $data['balance'] ?? $data['card_balance'] ?? $data['available_balance'] ?? null;
+        $balance = $this->extractBalanceFromProviderPayload($payload);
 
         return [
             'card_number' => $cardNumber,
@@ -264,5 +284,28 @@ final class VirtualCardStoredDetailsService
         return trim((string) ($stored['card_number'] ?? '')) !== ''
             || trim((string) ($stored['cvv'] ?? '')) !== ''
             || trim((string) ($stored['expiry'] ?? '')) !== '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function flattenProviderPayload(mixed $payload): array
+    {
+        if (! is_array($payload)) {
+            return [];
+        }
+
+        $row = $payload;
+        if (isset($row['data']) && is_array($row['data'])) {
+            $row = array_merge($row, $row['data']);
+        }
+        if (isset($row['details']) && is_array($row['details'])) {
+            $row = array_merge($row, $row['details']);
+        }
+        if (isset($row['card']) && is_array($row['card'])) {
+            $row = array_merge($row, $row['card']);
+        }
+
+        return $row;
     }
 }

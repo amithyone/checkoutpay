@@ -30,7 +30,8 @@ class ConsumerVirtualCardOpsTest extends TestCase
 
     public function test_topup_debits_wallet_and_calls_provider(): void
     {
-        [$wallet, $account] = $this->walletWithActiveCard();
+        [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update(['card_balance_usd' => 5]);
         Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
         Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
 
@@ -48,9 +49,12 @@ class ConsumerVirtualCardOpsTest extends TestCase
             'amount_usd' => 10,
         ]);
 
-        $response->assertOk()->assertJsonPath('success', true);
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.request.card_balance_usd', 15);
         $wallet->refresh();
         $this->assertSame(14000.0, (float) $wallet->balance);
+        $this->assertSame(15.0, (float) $card->fresh()->card_balance_usd);
         Http::assertSent(function ($request) {
             $data = $request->data();
 
@@ -199,6 +203,32 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('message', 'Card top-up could not be completed. Your wallet has been refunded.');
         $wallet->refresh();
         $this->assertSame(30000.0, (float) $wallet->balance);
+    }
+
+    public function test_topup_uses_balance_from_provider_response_when_present(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update(['card_balance_usd' => 5]);
+        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
+
+        Http::fake([
+            'https://mevon.test/V1/card_topup' => Http::response([
+                'status' => 'success',
+                'message' => 'Card topup successful',
+                'data' => ['balance' => 18.5],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/topup', [
+            'pin' => '2468',
+            'amount_usd' => 10,
+        ]);
+
+        $response->assertOk()->assertJsonPath('data.request.card_balance_usd', 18.5);
+        $this->assertSame(18.5, (float) $card->fresh()->card_balance_usd);
     }
 
     public function test_topup_skips_ngn_conversion_when_wallet_usd_is_already_sufficient(): void
