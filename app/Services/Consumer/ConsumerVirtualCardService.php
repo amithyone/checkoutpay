@@ -559,6 +559,15 @@ final class ConsumerVirtualCardService
         ];
     }
 
+    public function syncStoredCardDetails(VirtualCardRequest $card): bool
+    {
+        if ($this->storedDetails->resolveForRequest($card) !== null) {
+            return true;
+        }
+
+        return $this->fetchAndStoreProviderCardDetails($card) !== null;
+    }
+
     /**
      * @return array<string, mixed>|null
      */

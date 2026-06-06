@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\VirtualCardRequest;
-use App\Services\Consumer\VirtualCardStoredDetailsService;
+use App\Services\Consumer\ConsumerVirtualCardService;
 use Illuminate\Console\Command;
 
 class BackfillVirtualCardStoredDetailsCommand extends Command
@@ -14,7 +14,7 @@ class BackfillVirtualCardStoredDetailsCommand extends Command
 
     protected $description = 'Copy Mevon card.created webhook PAN/CVV/expiry from logs into encrypted card_details_payload';
 
-    public function handle(VirtualCardStoredDetailsService $storedDetails): int
+    public function handle(ConsumerVirtualCardService $cards): int
     {
         $query = VirtualCardRequest::query()
             ->whereNotNull('card_external_id')
@@ -37,11 +37,12 @@ class BackfillVirtualCardStoredDetailsCommand extends Command
 
         $filled = 0;
         foreach ($rows as $row) {
-            if ($storedDetails->backfillRequest($row)) {
+            if ($cards->syncStoredCardDetails($row)) {
                 $filled++;
                 $this->line("Request #{$row->id}: stored card details.");
             } else {
-                $this->warn("Request #{$row->id}: no webhook card details found in logs/payload.");
+                $this->warn("Request #{$row->id}: no details in logs/payload and Mevon card_id lookup failed.");
+                $this->line("  Run: php artisan virtual-card:debug-stored-details {$row->id}");
             }
         }
 

@@ -82,15 +82,11 @@ final class VirtualCardStoredDetailsService
             return $stored;
         }
 
-        $response = is_array($row->response_payload) ? $row->response_payload : [];
-        $webhook = $response['webhook'] ?? null;
-        if (is_array($webhook)) {
-            $extracted = $this->extractFromWebhook($webhook);
-            if ($extracted !== null) {
-                $this->persistFromWebhook($row, $webhook);
+        $fromResponse = $this->resolveFromResponsePayload($row);
+        if ($fromResponse !== null) {
+            $this->persistExtracted($row, $fromResponse);
 
-                return $row->fresh()->card_details_payload;
-            }
+            return $row->fresh()->card_details_payload;
         }
 
         $fromLogs = $this->resolveFromActivationLogs($row);
@@ -168,15 +164,62 @@ final class VirtualCardStoredDetailsService
             return null;
         }
 
-        return VirtualCardRequestLog::query()
-            ->where('context', 'like', '%'.$cardId.'%')
-            ->whereIn('event', ['webhook_activated', 'webhook_received', 'webhook_already_active'])
+        $orphanLogs = VirtualCardRequestLog::query()
+            ->whereRaw('CAST(context AS CHAR) LIKE ?', ['%'.$cardId.'%'])
             ->latest('id')
-            ->limit(30)
-            ->get()
-            ->map(fn (VirtualCardRequestLog $log) => $this->extractFromLogContext($log, $cardId))
-            ->filter()
-            ->first();
+            ->limit(40)
+            ->get();
+
+        foreach ($orphanLogs as $log) {
+            $extracted = $this->extractFromLogContext($log, $cardId);
+            if ($extracted !== null) {
+                return $extracted;
+            }
+            $extracted = $this->extractFromLogContext($log, '');
+            if ($extracted !== null && trim((string) ($extracted['card_number'] ?? '')) !== '') {
+                return $extracted;
+            }
+        }
+
+        $anyWithPan = VirtualCardRequestLog::query()
+            ->whereRaw("CAST(context AS CHAR) LIKE '%card_number%'")
+            ->latest('id')
+            ->limit(40)
+            ->get();
+
+        foreach ($anyWithPan as $log) {
+            $extracted = $this->extractFromLogContext($log, '');
+            if ($extracted !== null && trim((string) ($extracted['card_number'] ?? '')) !== '') {
+                return $extracted;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveFromResponsePayload(VirtualCardRequest $row): ?array
+    {
+        $payload = is_array($row->response_payload) ? $row->response_payload : [];
+        $candidates = [
+            $payload['webhook'] ?? null,
+            $payload['data'] ?? null,
+            $payload,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_array($candidate)) {
+                continue;
+            }
+            $extracted = $this->extractFromWebhook($candidate);
+            if ($extracted !== null) {
+                return $extracted;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -186,6 +229,14 @@ final class VirtualCardStoredDetailsService
     {
         $context = is_array($log->context) ? $log->context : [];
         $payload = $context['raw_payload'] ?? null;
+        if (! is_array($payload)) {
+            $rawBody = trim((string) ($context['raw_body'] ?? ''));
+            if ($rawBody !== '') {
+                $decoded = json_decode($rawBody, true);
+                $payload = is_array($decoded) ? $decoded : null;
+            }
+        }
+
         if (! is_array($payload)) {
             return null;
         }
