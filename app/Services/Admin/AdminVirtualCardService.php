@@ -41,6 +41,7 @@ final class AdminVirtualCardService
 
         return [
             'pending' => (int) ($counts[VirtualCardRequest::STATUS_PENDING] ?? 0),
+            'preparing' => (int) ($counts[VirtualCardRequest::STATUS_PREPARING] ?? 0),
             'submitted' => (int) ($counts[VirtualCardRequest::STATUS_SUBMITTED] ?? 0),
             'active' => (int) ($counts[VirtualCardRequest::STATUS_ACTIVE] ?? 0),
             'failed' => (int) ($counts[VirtualCardRequest::STATUS_FAILED] ?? 0),
@@ -160,10 +161,14 @@ final class AdminVirtualCardService
             }
         }
 
-        if ($api['ok'] ?? false) {
-            $this->providerResponse->applySuccess($card, $api);
+        if ($this->providerResponse->isCreateAccepted($api)) {
+            $this->providerResponse->applyAccepted($card, $api);
+            $fresh = $card->fresh();
+            $message = $fresh->status === VirtualCardRequest::STATUS_PREPARING
+                ? 'Card request accepted by MevonPay — waiting for webhook.'
+                : (string) ($api['message'] ?? 'Provider request succeeded.');
 
-            return ['ok' => true, 'message' => (string) ($api['message'] ?? 'Provider request succeeded.')];
+            return ['ok' => true, 'message' => $message];
         }
 
         $this->providerResponse->applyFailure($card, $api, (string) ($api['message'] ?? 'Provider error'));
@@ -202,6 +207,7 @@ final class AdminVirtualCardService
     {
         return in_array($card->status, [
             VirtualCardRequest::STATUS_PENDING,
+            VirtualCardRequest::STATUS_PREPARING,
             VirtualCardRequest::STATUS_SUBMITTED,
         ], true);
     }
@@ -210,6 +216,7 @@ final class AdminVirtualCardService
     {
         return in_array($card->status, [
             VirtualCardRequest::STATUS_PENDING,
+            VirtualCardRequest::STATUS_PREPARING,
             VirtualCardRequest::STATUS_SUBMITTED,
         ], true);
     }
@@ -220,7 +227,8 @@ final class AdminVirtualCardService
             return true;
         }
 
-        if ($card->status === VirtualCardRequest::STATUS_PENDING && trim((string) $card->card_external_id) === '') {
+        if (in_array($card->status, [VirtualCardRequest::STATUS_PENDING, VirtualCardRequest::STATUS_PREPARING], true)
+            && trim((string) $card->card_external_id) === '') {
             return true;
         }
 
@@ -236,6 +244,7 @@ final class AdminVirtualCardService
         return in_array($card->status, [
             VirtualCardRequest::STATUS_FAILED,
             VirtualCardRequest::STATUS_PENDING,
+            VirtualCardRequest::STATUS_PREPARING,
             VirtualCardRequest::STATUS_SUBMITTED,
         ], true);
     }
@@ -260,6 +269,7 @@ final class AdminVirtualCardService
         $status = $request->string('status')->toString();
         if ($status !== '' && in_array($status, [
             VirtualCardRequest::STATUS_PENDING,
+            VirtualCardRequest::STATUS_PREPARING,
             VirtualCardRequest::STATUS_SUBMITTED,
             VirtualCardRequest::STATUS_ACTIVE,
             VirtualCardRequest::STATUS_FAILED,

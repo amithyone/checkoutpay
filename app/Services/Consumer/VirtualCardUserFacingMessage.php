@@ -9,6 +9,16 @@ final class VirtualCardUserFacingMessage
         return 'Dollar Virtual Card request could not be completed. Your fee has been refunded.';
     }
 
+    public static function cardPreparing(): string
+    {
+        return 'We are preparing your Dollar Virtual Card. This usually takes a few minutes — do not submit another request.';
+    }
+
+    public static function requestAlreadyInProgress(): string
+    {
+        return 'You already have a card request in progress. We will notify you when it is ready.';
+    }
+
     public static function topupFailedRefunded(): string
     {
         return 'Card top-up could not be completed. Your wallet has been refunded.';

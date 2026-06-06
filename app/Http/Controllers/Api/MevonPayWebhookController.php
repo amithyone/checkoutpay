@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\BusinessRubiesFundingWebhookService;
 use App\Models\MevonPayLedgerEntry;
+use App\Services\Consumer\VirtualCardMevonWebhookService;
 use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
@@ -48,7 +49,14 @@ class MevonPayWebhookController extends Controller
         }
 
         $payload = $request->all();
-        $event = (string) data_get($payload, 'event', '');
+        $event = (string) data_get($payload, 'event', data_get($payload, 'eventType', ''));
+
+        if (app(VirtualCardMevonWebhookService::class)->tryFulfillFromWebhook($payload)) {
+            $this->recordWebhookSource($request, 'virtual_card_activated');
+
+            return response()->json(['success' => true, 'message' => 'Virtual card activated']);
+        }
+
         if ($event !== 'funding.success') {
             $this->recordWebhookSource($request, 'ignored_event');
 

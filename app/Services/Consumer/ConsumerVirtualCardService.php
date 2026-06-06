@@ -128,6 +128,23 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => 'Invalid PIN.'];
         }
 
+        $blocking = $this->blockingCardRequest($wallet);
+        if ($blocking !== null) {
+            if ($this->isOperableCardRequest($blocking)) {
+                return ['ok' => false, 'message' => 'You already have a Dollar Virtual Card on this wallet.'];
+            }
+
+            return [
+                'ok' => true,
+                'message' => VirtualCardUserFacingMessage::requestAlreadyInProgress(),
+                'data' => [
+                    'request' => $this->serializeRequest($blocking),
+                    'balance_after' => (float) $wallet->balance,
+                    'preparing' => true,
+                ],
+            ];
+        }
+
         $feeUsd = $this->requestFeeUsd();
         $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
         if ($feeNgn === null || $feeNgn < 0.01) {
@@ -261,15 +278,20 @@ final class ConsumerVirtualCardService
         $wallet->card_home_address = $homeAddress;
         $wallet->save();
 
-        if ($api['ok'] ?? false) {
-            $this->providerResponse->applySuccess($row, $api);
+        if ($this->providerResponse->isCreateAccepted($api)) {
+            $this->providerResponse->applyAccepted($row, $api);
+            $fresh = $row->fresh();
+            $preparing = $fresh->status === VirtualCardRequest::STATUS_PREPARING;
 
             return [
                 'ok' => true,
-                'message' => (string) ($api['message'] ?? 'Dollar Virtual Card request submitted.'),
+                'message' => $preparing
+                    ? VirtualCardUserFacingMessage::cardPreparing()
+                    : (string) ($api['message'] ?? 'Dollar Virtual Card request submitted.'),
                 'data' => [
-                    'request' => $this->serializeRequest($row->fresh()),
+                    'request' => $this->serializeRequest($fresh),
                     'balance_after' => (float) $wallet->fresh()->balance,
+                    'preparing' => $preparing,
                 ],
             ];
         }
@@ -648,6 +670,11 @@ final class ConsumerVirtualCardService
         $feeUsd = $this->requestFeeUsd();
         $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
 
+        $latest = VirtualCardRequest::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->latest('id')
+            ->first();
+
         return array_merge($this->fx->ratesPayload(), [
             'enabled' => $this->isEnabled(),
             'is_tier2' => $wallet->isTier2(),
@@ -657,7 +684,9 @@ final class ConsumerVirtualCardService
             'topup_max_usd' => (float) config('virtual_card.topup_max_usd', 500),
             'withdraw_min_usd' => (float) config('virtual_card.withdraw_min_usd', 1),
             'withdraw_max_usd' => (float) config('virtual_card.withdraw_max_usd', 500),
-            'latest_request' => $this->latestRequestForWallet($wallet),
+            'can_request_card' => $this->blockingCardRequest($wallet) === null,
+            'card_preparing' => $latest !== null && $this->isPreparingRequest($latest),
+            'latest_request' => $latest ? $this->serializeRequest($latest) : null,
         ]);
     }
 
@@ -672,6 +701,7 @@ final class ConsumerVirtualCardService
         return [
             'id' => $row->id,
             'status' => $row->status,
+            'is_preparing' => $this->isPreparingRequest($row),
             'fee_usd' => (float) $row->fee_usd,
             'fee_ngn' => (float) $row->fee_ngn,
             'fx_rate_used' => $row->fx_rate_used !== null ? (float) $row->fx_rate_used : null,
@@ -682,5 +712,37 @@ final class ConsumerVirtualCardService
             'failure_reason' => $row->failure_reason,
             'created_at' => $row->created_at?->toIso8601String(),
         ];
+    }
+
+    private function blockingCardRequest(WhatsappWallet $wallet): ?VirtualCardRequest
+    {
+        return VirtualCardRequest::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->whereIn('status', [
+                VirtualCardRequest::STATUS_PENDING,
+                VirtualCardRequest::STATUS_PREPARING,
+                VirtualCardRequest::STATUS_SUBMITTED,
+                VirtualCardRequest::STATUS_ACTIVE,
+            ])
+            ->latest('id')
+            ->first();
+    }
+
+    private function isOperableCardRequest(VirtualCardRequest $row): bool
+    {
+        return $row->card_external_id
+            && in_array($row->status, [VirtualCardRequest::STATUS_SUBMITTED, VirtualCardRequest::STATUS_ACTIVE], true);
+    }
+
+    private function isPreparingRequest(VirtualCardRequest $row): bool
+    {
+        if ($row->status === VirtualCardRequest::STATUS_PREPARING) {
+            return true;
+        }
+
+        return in_array($row->status, [
+            VirtualCardRequest::STATUS_PENDING,
+            VirtualCardRequest::STATUS_SUBMITTED,
+        ], true) && ! $row->card_external_id;
     }
 }

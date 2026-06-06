@@ -9,6 +9,9 @@ class VirtualCardRequest extends Model
 {
     public const STATUS_PENDING = 'pending';
 
+    /** Mevon accepted the request; waiting for card_id via webhook or provider. */
+    public const STATUS_PREPARING = 'preparing';
+
     public const STATUS_SUBMITTED = 'submitted';
 
     public const STATUS_ACTIVE = 'active';
