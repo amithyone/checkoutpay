@@ -945,11 +945,6 @@ final class ConsumerVirtualCardService
             return $withCardId;
         }
 
-        $blocking = $this->blockingCardRequest($wallet);
-        if ($blocking && $this->isOperableCardRequest($blocking)) {
-            return $blocking;
-        }
-
         return null;
     }
 
@@ -1260,11 +1255,6 @@ final class ConsumerVirtualCardService
 
     private function blockingCardRequest(WhatsappWallet $wallet): ?VirtualCardRequest
     {
-        $display = $this->resolveDisplayCard($wallet);
-        if ($display) {
-            return $display;
-        }
-
         return VirtualCardRequest::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->whereIn('status', [
