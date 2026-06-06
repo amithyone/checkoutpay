@@ -12,7 +12,8 @@ final class MevonPayUsdAutoFundService
     ) {}
 
     /**
-     * Top up MevonPay USD float from NGN when below the required amount.
+     * Top up MevonPay USD float from NGN when usd_balance (real wallet USD) is below the required amount.
+     * usd_ledger_bal is logged for debugging only — never used for card auto-fund decisions.
      *
      * @return array{
      *   ok: bool,
