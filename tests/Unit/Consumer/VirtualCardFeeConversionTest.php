@@ -18,8 +18,8 @@ class VirtualCardFeeConversionTest extends TestCase
         Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
 
         $fx = app(VirtualCardFxService::class);
-        $ngn = $fx->quoteRequestFeeNgn(5.0);
+        $ngn = $fx->quoteRequestFeeNgn(7.5);
 
-        $this->assertSame(8000.0, $ngn);
+        $this->assertSame(12000.0, $ngn);
     }
 }

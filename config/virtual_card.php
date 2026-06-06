@@ -2,7 +2,12 @@
 
 return [
     'enabled' => (bool) env('VIRTUAL_CARD_ENABLED', true),
-    'request_fee_usd' => max(0.0, (float) env('VIRTUAL_CARD_REQUEST_FEE_USD', 5)),
+    /** Mevon card-creation charge passed to the user (USD). */
+    'creation_fee_usd' => max(0.0, (float) env('VIRTUAL_CARD_CREATION_FEE_USD', 2.5)),
+    /** Initial spendable balance loaded on the new card (USD). */
+    'initial_load_usd' => max(0.01, (float) env('VIRTUAL_CARD_INITIAL_LOAD_USD', 5)),
+    /** Total debited from user wallet = creation + initial load (USD). */
+    'request_fee_usd' => max(0.0, (float) env('VIRTUAL_CARD_REQUEST_FEE_USD', 7.5)),
     'fee_currency_from' => 'USD',
     'fee_currency_to' => 'NGN',
     'fx_mid_usd_ngn' => env('VIRTUAL_CARD_FX_MID_USD_NGN') !== null ? (float) env('VIRTUAL_CARD_FX_MID_USD_NGN') : null,

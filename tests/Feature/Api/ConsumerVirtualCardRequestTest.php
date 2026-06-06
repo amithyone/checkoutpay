@@ -64,7 +64,16 @@ class ConsumerVirtualCardRequestTest extends TestCase
             ->assertJsonPath('data.request.status', VirtualCardRequest::STATUS_PREPARING);
 
         $wallet->refresh();
-        $this->assertSame($beforeBalance - 6925.0, (float) $wallet->balance);
+        $this->assertSame($beforeBalance - 10387.5, (float) $wallet->balance);
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), '/V1/card_request')) {
+                return false;
+            }
+            $body = $request->data();
+
+            return ($body['amount'] ?? null) === 5;
+        });
 
         $row = VirtualCardRequest::query()->where('whatsapp_wallet_id', $wallet->id)->first();
         $this->assertNotNull($row);

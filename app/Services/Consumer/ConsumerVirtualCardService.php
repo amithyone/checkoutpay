@@ -39,14 +39,61 @@ final class ConsumerVirtualCardService
         return (bool) config('virtual_card.enabled', true);
     }
 
-    public function requestFeeUsd(): float
+    public function creationFeeUsd(): float
     {
-        $stored = Setting::get('virtual_card_request_fee_usd');
+        $stored = Setting::get('virtual_card_creation_fee_usd');
         if ($stored !== null && is_numeric($stored)) {
-            return max(0.0, (float) $stored);
+            return max(0.0, round((float) $stored, 2));
         }
 
-        return max(0.0, (float) config('virtual_card.request_fee_usd', 5));
+        return max(0.0, round((float) config('virtual_card.creation_fee_usd', 2.5), 2));
+    }
+
+    public function initialLoadUsd(): float
+    {
+        $stored = Setting::get('virtual_card_initial_load_usd');
+        if ($stored !== null && is_numeric($stored)) {
+            return max(0.01, round((float) $stored, 2));
+        }
+
+        return max(0.01, round((float) config('virtual_card.initial_load_usd', 5), 2));
+    }
+
+    /** Total USD charged to the user (creation + starting balance). */
+    public function requestFeeUsd(): float
+    {
+        $total = round($this->creationFeeUsd() + $this->initialLoadUsd(), 2);
+
+        return $total > 0 ? $total : max(0.0, (float) config('virtual_card.request_fee_usd', 7.5));
+    }
+
+    /** USD sent to Mevon `card_request` as initial card balance. */
+    public function mevonInitialLoadUsd(): float
+    {
+        return $this->initialLoadUsd();
+    }
+
+    /** Total USD required in Mevon merchant float (creation + initial load). */
+    public function mevonTotalCostUsd(): float
+    {
+        return $this->requestFeeUsd();
+    }
+
+    /**
+     * @return array{creation_fee_usd: float, initial_load_usd: float, total_usd: float, total_ngn: ?float}
+     */
+    public function requestFeeBreakdown(): array
+    {
+        $creation = $this->creationFeeUsd();
+        $load = $this->initialLoadUsd();
+        $total = $this->requestFeeUsd();
+
+        return [
+            'creation_fee_usd' => $creation,
+            'initial_load_usd' => $load,
+            'total_usd' => $total,
+            'total_ngn' => $this->fx->quoteRequestFeeNgn($total),
+        ];
     }
 
     /**
@@ -189,8 +236,11 @@ final class ConsumerVirtualCardService
             ];
         }
 
-        $feeUsd = $this->requestFeeUsd();
-        $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
+        $feeBreakdown = $this->requestFeeBreakdown();
+        $feeUsd = $feeBreakdown['total_usd'];
+        $feeNgn = $feeBreakdown['total_ngn'];
+        $creationFeeUsd = $feeBreakdown['creation_fee_usd'];
+        $initialLoadUsd = $feeBreakdown['initial_load_usd'];
         if ($feeNgn === null || $feeNgn < 0.01) {
             return [
                 'ok' => false,
@@ -247,6 +297,9 @@ final class ConsumerVirtualCardService
                     'meta' => [
                         'channel' => 'consumer_api',
                         'fee_usd' => $feeUsd,
+                        'creation_fee_usd' => $creationFeeUsd,
+                        'initial_load_usd' => $initialLoadUsd,
+                        'mevon_amount_usd' => $initialLoadUsd,
                         'fx_mid_usd_ngn' => $this->fx->midUsdNgnRate(),
                         'sell_rate' => $sellRate,
                         'fx_side' => 'sell',
@@ -260,7 +313,7 @@ final class ConsumerVirtualCardService
         }
 
         $payload = [
-            'amount' => $feeUsd,
+            'amount' => $initialLoadUsd,
             'firstName' => $fname,
             'lastName' => $lname,
             'email' => $email,
@@ -290,7 +343,7 @@ final class ConsumerVirtualCardService
             'reference' => $reference,
         ], $wallet->id);
 
-        $fund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'virtual_card_request');
+        $fund = $this->usdAutoFund->ensureUsdBalance($this->mevonTotalCostUsd(), 'virtual_card_request');
         if (! ($fund['ok'] ?? false)) {
             $internalReason = (string) ($fund['message'] ?? 'USD auto-fund failed');
             Log::warning('consumer.virtual_card.usd_auto_fund_failed', [
@@ -350,7 +403,7 @@ final class ConsumerVirtualCardService
                 'fee_usd' => $feeUsd,
                 'provider_message' => (string) ($api['message'] ?? ''),
             ]);
-            $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($feeUsd, 'virtual_card_request_retry');
+            $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($this->mevonTotalCostUsd(), 'virtual_card_request_retry');
             if ($retryFund['ok'] ?? false) {
                 $api = $this->cardApi->createCard($payload);
             }
@@ -931,8 +984,7 @@ final class ConsumerVirtualCardService
      */
     private function statusPayload(WhatsappWallet $wallet): array
     {
-        $feeUsd = $this->requestFeeUsd();
-        $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
+        $feeBreakdown = $this->requestFeeBreakdown();
 
         $display = $this->resolveDisplayCard($wallet);
         $rawLatest = VirtualCardRequest::query()
@@ -945,8 +997,10 @@ final class ConsumerVirtualCardService
         return array_merge($this->fx->ratesPayload(), $this->profileFieldsForWallet($wallet), [
             'enabled' => $this->isEnabled(),
             'is_tier2' => $wallet->isTier2(),
-            'fee_usd' => $feeUsd,
-            'fee_ngn' => $feeNgn,
+            'fee_usd' => $feeBreakdown['total_usd'],
+            'fee_ngn' => $feeBreakdown['total_ngn'],
+            'creation_fee_usd' => $feeBreakdown['creation_fee_usd'],
+            'initial_load_usd' => $feeBreakdown['initial_load_usd'],
             'topup_min_usd' => (float) config('virtual_card.topup_min_usd', 1),
             'topup_max_usd' => (float) config('virtual_card.topup_max_usd', 500),
             'withdraw_min_usd' => (float) config('virtual_card.withdraw_min_usd', 1),

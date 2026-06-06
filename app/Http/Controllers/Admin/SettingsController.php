@@ -236,7 +236,8 @@ class SettingsController extends Controller
         if ($request->input('settings_section') === 'virtual_card') {
             $validated = $request->validate([
                 'virtual_card_enabled' => 'nullable|boolean',
-                'virtual_card_request_fee_usd' => 'nullable|numeric|min:0|max:500',
+                'virtual_card_creation_fee_usd' => 'nullable|numeric|min:0|max:500',
+                'virtual_card_initial_load_usd' => 'nullable|numeric|min:0.01|max:500',
                 'virtual_card_fx_mid_auto_sync' => 'nullable|boolean',
                 'virtual_card_fx_mid_usd_ngn' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_fx_sell_profit_ngn' => 'nullable|numeric|min:0|max:100000',
@@ -272,14 +273,20 @@ class SettingsController extends Controller
                 'virtual_card',
                 'Auto-sync virtual card FX mid from MevonPay live rate'
             );
-            if (array_key_exists('virtual_card_request_fee_usd', $validated) && $validated['virtual_card_request_fee_usd'] !== null) {
-                Setting::set(
-                    'virtual_card_request_fee_usd',
-                    $validated['virtual_card_request_fee_usd'],
-                    'float',
-                    'virtual_card',
-                    'One-time card request fee in USD (debited from NGN wallet at sell rate)'
-                );
+            foreach ([
+                'virtual_card_creation_fee_usd' => 'Mevon card creation fee passed to user (USD)',
+                'virtual_card_initial_load_usd' => 'Initial card balance loaded on creation (USD)',
+            ] as $key => $description) {
+                if (array_key_exists($key, $validated)) {
+                    $value = $validated[$key];
+                    Setting::set(
+                        $key,
+                        $value === null || $value === '' ? null : $value,
+                        'float',
+                        'virtual_card',
+                        $description,
+                    );
+                }
             }
             foreach ([
                 'virtual_card_fx_mid_usd_ngn' => 'Virtual card FX mid rate (NGN per 1 USD)',

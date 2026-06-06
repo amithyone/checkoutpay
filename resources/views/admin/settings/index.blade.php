@@ -778,15 +778,35 @@
                 Dollar Virtual Card enabled (CheckoutNow)
             </label>
 
-            <div>
-                <label for="virtual_card_request_fee_usd" class="block text-sm font-medium text-gray-700 mb-2">
-                    Card request fee (USD)
-                </label>
-                <input type="number" step="0.01" min="0" max="500" id="virtual_card_request_fee_usd" name="virtual_card_request_fee_usd"
-                    value="{{ \App\Models\Setting::get('virtual_card_request_fee_usd', config('virtual_card.request_fee_usd', 5)) }}"
-                    class="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg">
-                <p class="mt-1 text-xs text-gray-500">Debited from the user NGN wallet at your <strong>sell rate</strong> (mid + sell profit).</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+                <div>
+                    <label for="virtual_card_creation_fee_usd" class="block text-sm font-medium text-gray-700 mb-2">
+                        Card setup fee (USD)
+                    </label>
+                    <input type="number" step="0.01" min="0" max="500" id="virtual_card_creation_fee_usd" name="virtual_card_creation_fee_usd"
+                        value="{{ \App\Models\Setting::get('virtual_card_creation_fee_usd', config('virtual_card.creation_fee_usd', 2.5)) }}"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <p class="mt-1 text-xs text-gray-500">Mevon creation charge — passed to the user.</p>
+                </div>
+                <div>
+                    <label for="virtual_card_initial_load_usd" class="block text-sm font-medium text-gray-700 mb-2">
+                        Starting card balance (USD)
+                    </label>
+                    <input type="number" step="0.01" min="0.01" max="500" id="virtual_card_initial_load_usd" name="virtual_card_initial_load_usd"
+                        value="{{ \App\Models\Setting::get('virtual_card_initial_load_usd', config('virtual_card.initial_load_usd', 5)) }}"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    <p class="mt-1 text-xs text-gray-500">Loaded on the new card (Mevon <code>amount</code>).</p>
+                </div>
             </div>
+            @php
+                $vcCreation = (float) \App\Models\Setting::get('virtual_card_creation_fee_usd', config('virtual_card.creation_fee_usd', 2.5));
+                $vcLoad = (float) \App\Models\Setting::get('virtual_card_initial_load_usd', config('virtual_card.initial_load_usd', 5));
+            @endphp
+            <p class="text-sm text-gray-700">
+                User pays <strong>${{ number_format($vcCreation + $vcLoad, 2) }}</strong> total
+                (${{ number_format($vcCreation, 2) }} setup + ${{ number_format($vcLoad, 2) }} starting balance)
+                from NGN wallet at your <strong>sell rate</strong>.
+            </p>
 
             <div class="border border-violet-100 rounded-lg p-4 space-y-4 bg-violet-50/40">
                 <p class="text-sm font-semibold text-gray-800">FX rates &amp; your profit (NGN per $1)</p>
