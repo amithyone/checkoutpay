@@ -730,6 +730,7 @@ final class ConsumerVirtualCardService
         $feeUsd = $this->requestFeeUsd();
         $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
 
+        $operable = $this->resolveOperableCard($wallet);
         $latest = VirtualCardRequest::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->latest('id')
@@ -744,8 +745,10 @@ final class ConsumerVirtualCardService
             'topup_max_usd' => (float) config('virtual_card.topup_max_usd', 500),
             'withdraw_min_usd' => (float) config('virtual_card.withdraw_min_usd', 1),
             'withdraw_max_usd' => (float) config('virtual_card.withdraw_max_usd', 500),
-            'can_request_card' => $this->blockingCardRequest($wallet) === null,
-            'card_preparing' => $latest !== null && $this->isPreparingRequest($latest),
+            'has_active_card' => $operable !== null,
+            'can_request_card' => $operable === null && $this->blockingCardRequest($wallet) === null,
+            'card_preparing' => $operable === null && $latest !== null && $this->isPreparingRequest($latest),
+            'operable_request' => $operable ? $this->serializeRequest($operable) : null,
             'latest_request' => $latest ? $this->serializeRequest($latest) : null,
         ]);
     }
