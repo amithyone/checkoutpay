@@ -179,9 +179,9 @@
                             @endif
                         </div>
                         <p class="text-gray-900">{{ $log->message }}</p>
-                        @if($log->context)
-                            <pre class="text-xs bg-gray-50 border border-gray-100 rounded mt-2 p-2 overflow-x-auto">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
-                        @endif
+                        <div class="mt-2">
+                            @include('admin.virtual-cards._log-context', ['log' => $log])
+                        </div>
                     </div>
                 @endforeach
             </div>

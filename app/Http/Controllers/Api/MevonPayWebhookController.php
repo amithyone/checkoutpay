@@ -51,7 +51,9 @@ class MevonPayWebhookController extends Controller
         $payload = $this->normalizeWebhookPayload($request);
         $cardWebhook = app(VirtualCardMevonWebhookService::class);
         $event = $cardWebhook->extractWebhookEvent($payload);
-        $cardResult = $cardWebhook->handleWebhook($payload);
+        $cardResult = $cardWebhook->handleWebhook($payload, [
+            'raw_body' => (string) $request->getContent(),
+        ]);
 
         if ($cardResult === VirtualCardMevonWebhookService::RESULT_ACTIVATED) {
             $this->recordWebhookSource($request, 'virtual_card_activated');

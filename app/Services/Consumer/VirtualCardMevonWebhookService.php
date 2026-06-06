@@ -34,8 +34,9 @@ final class VirtualCardMevonWebhookService
 
     /**
      * @param  array<string, mixed>  $payload
+     * @param  array{raw_body?: string|null}  $ingress
      */
-    public function handleWebhook(array $payload): string
+    public function handleWebhook(array $payload, array $ingress = []): string
     {
         if (! $this->isCardEvent($payload)) {
             return self::RESULT_NOT_CARD;
@@ -45,14 +46,15 @@ final class VirtualCardMevonWebhookService
         $reference = $this->extractWebhookReference($payload);
         $email = $this->extractWebhookEmail($payload);
         $phone = $this->extractWebhookPhone($payload);
+        $rawBody = isset($ingress['raw_body']) ? (string) $ingress['raw_body'] : null;
 
-        $this->cardLogs->info('webhook_received', 'MevonPay card webhook received', null, [
+        $this->cardLogs->info('webhook_received', 'MevonPay card webhook received', null, $this->cardLogs->withMevonWebhook($payload, $rawBody, [
             'event' => $this->extractWebhookEvent($payload),
             'reference' => $reference,
             'card_id' => $cardId,
             'email' => $email,
             'phone' => $phone,
-        ]);
+        ]));
 
         if ($cardId !== '') {
             $existing = VirtualCardRequest::query()
@@ -63,9 +65,9 @@ final class VirtualCardMevonWebhookService
                 ])
                 ->first();
             if ($existing) {
-                $this->cardLogs->info('webhook_already_active', 'Card already active for this provider card_id', $existing, [
+                $this->cardLogs->info('webhook_already_active', 'Card already active for this provider card_id', $existing, $this->cardLogs->withMevonWebhook($payload, $rawBody, [
                     'card_id' => $cardId,
-                ]);
+                ]));
 
                 return self::RESULT_ALREADY_ACTIVE;
             }
@@ -76,7 +78,7 @@ final class VirtualCardMevonWebhookService
                 ->where('provider_reference', $reference)
                 ->first();
             if ($row) {
-                $this->activateFromWebhook($row, $payload, $cardId);
+                $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
 
                 return self::RESULT_ACTIVATED;
             }
@@ -87,7 +89,7 @@ final class VirtualCardMevonWebhookService
                 ->where('external_reference', $reference)
                 ->first();
             if ($row) {
-                $this->activateFromWebhook($row, $payload, $cardId);
+                $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
 
                 return self::RESULT_ACTIVATED;
             }
@@ -101,22 +103,21 @@ final class VirtualCardMevonWebhookService
         }
 
         if (! $row) {
-            $context = [
+            $context = $this->cardLogs->withMevonWebhook($payload, $rawBody, [
                 'event' => $this->extractWebhookEvent($payload),
                 'reference' => $reference,
                 'card_id' => $cardId,
                 'email' => $email,
                 'phone' => $phone,
                 'candidate_count' => $candidates->count(),
-                'payload_keys' => array_keys($payload),
-            ];
+            ]);
             Log::warning('virtual_card.webhook.no_match', $context);
             $this->cardLogs->warning('webhook_no_match', 'Card webhook received but no virtual card request matched', null, $context);
 
             return self::RESULT_NO_MATCH;
         }
 
-        $this->activateFromWebhook($row, $payload, $cardId);
+        $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
 
         return self::RESULT_ACTIVATED;
     }
@@ -124,17 +125,17 @@ final class VirtualCardMevonWebhookService
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function activateFromWebhook(VirtualCardRequest $row, array $payload, string $cardId): void
+    private function activateFromWebhook(VirtualCardRequest $row, array $payload, string $cardId, ?string $rawBody = null): void
     {
         $wasFailed = $row->status === VirtualCardRequest::STATUS_FAILED;
         $this->providerResponse->applyWebhookReady($row, $payload, $cardId !== '' ? $cardId : null);
         $fresh = $row->fresh();
 
-        $this->cardLogs->info('webhook_activated', 'Card activated from MevonPay webhook', $fresh, [
+        $this->cardLogs->info('webhook_activated', 'Card activated from MevonPay webhook', $fresh, $this->cardLogs->withMevonWebhook($payload, $rawBody, [
             'card_id' => $fresh->card_external_id,
             'was_failed' => $wasFailed,
             'event' => $this->extractWebhookEvent($payload),
-        ], $fresh->whatsapp_wallet_id);
+        ]), $fresh->whatsapp_wallet_id);
 
         Log::info('virtual_card.webhook.activated', [
             'virtual_card_request_id' => $fresh->id,

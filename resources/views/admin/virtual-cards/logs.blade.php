@@ -81,11 +81,7 @@
                             </td>
                             <td class="px-4 py-3 text-gray-900">{{ $log->message }}</td>
                             <td class="px-4 py-3">
-                                @if($log->context)
-                                    <pre class="text-xs bg-gray-50 border border-gray-200 rounded p-2 max-w-md overflow-x-auto">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
-                                @else
-                                    —
-                                @endif
+                                @include('admin.virtual-cards._log-context', ['log' => $log])
                             </td>
                         </tr>
                     @empty

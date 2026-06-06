@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\VirtualCardRequest;
+use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -47,6 +48,11 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $row->refresh();
         $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $row->status);
         $this->assertSame('MEVON-CARD-88', $row->card_external_id);
+
+        $received = VirtualCardRequestLog::query()->where('event', 'webhook_received')->first();
+        $this->assertNotNull($received);
+        $this->assertSame('card.created', data_get($received->context, 'raw_payload.event'));
+        $this->assertNotEmpty(data_get($received->context, 'raw_body'));
     }
 
     public function test_card_created_success_with_mevon_uuid_reference_matches_preparing_request(): void

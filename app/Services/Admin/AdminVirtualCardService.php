@@ -102,6 +102,7 @@ final class AdminVirtualCardService
             $query->where(function (Builder $q) use ($term) {
                 $q->where('message', 'like', $term)
                     ->orWhere('event', 'like', $term)
+                    ->orWhere('context', 'like', $term)
                     ->orWhereHas('request', function (Builder $rq) use ($term) {
                         $rq->where('external_reference', 'like', $term)
                             ->orWhere('provider_reference', 'like', $term)

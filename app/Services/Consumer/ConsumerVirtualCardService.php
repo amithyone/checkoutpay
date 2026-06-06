@@ -274,6 +274,10 @@ final class ConsumerVirtualCardService
             ];
         }
 
+        $this->cardLogs->info('provider_request_sent', 'Outbound MevonPay card_request payload', $row, $this->cardLogs->withMevonApiRequest($payload, [
+            'reference' => $reference,
+        ]), $wallet->id);
+
         $api = $this->cardApi->createCard($payload);
         if (! ($api['ok'] ?? false) && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
             Log::warning('consumer.virtual_card.provider_insufficient_usd', [
@@ -303,11 +307,11 @@ final class ConsumerVirtualCardService
                     ? 'Mevon accepted card request; fee held until card.created webhook'
                     : 'Mevon returned card_id immediately',
                 $fresh,
-                [
+                $this->cardLogs->withMevonApiResponse($api, [
                     'provider_message' => (string) ($api['message'] ?? ''),
                     'provider_reference' => $fresh->provider_reference,
                     'card_external_id' => $fresh->card_external_id,
-                ],
+                ]),
                 $wallet->id,
             );
 
@@ -327,9 +331,9 @@ final class ConsumerVirtualCardService
         $providerMessage = (string) ($api['message'] ?? 'Card provider error');
         $this->feeRefunds->refundFee($wallet->id, $reference, $feeNgn, $providerMessage);
         $this->providerResponse->applyFailure($row, $api, $providerMessage);
-        $this->cardLogs->error('provider_failed', 'MevonPay rejected card request; fee refunded', $row->fresh(), [
+        $this->cardLogs->error('provider_failed', 'MevonPay rejected card request; fee refunded', $row->fresh(), $this->cardLogs->withMevonApiResponse($api, [
             'provider_message' => $providerMessage,
-        ], $wallet->id);
+        ]), $wallet->id);
 
         return [
             'ok' => false,
