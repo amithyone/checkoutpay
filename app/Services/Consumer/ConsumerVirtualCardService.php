@@ -245,7 +245,13 @@ final class ConsumerVirtualCardService
 
         $api = $this->cardApi->createCard($payload);
         if (! ($api['ok'] ?? false) && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
-            $retryFund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'virtual_card_request_retry');
+            Log::warning('consumer.virtual_card.provider_insufficient_usd', [
+                'wallet_id' => $wallet->id,
+                'reference' => $reference,
+                'fee_usd' => $feeUsd,
+                'provider_message' => (string) ($api['message'] ?? ''),
+            ]);
+            $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($feeUsd, 'virtual_card_request_retry');
             if ($retryFund['ok'] ?? false) {
                 $api = $this->cardApi->createCard($payload);
             }
@@ -376,7 +382,13 @@ final class ConsumerVirtualCardService
 
         $api = $this->cardApi->topupCard($amountUsd, $cardCode);
         if (! ($api['ok'] ?? false) && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
-            $retryFund = $this->usdAutoFund->ensureUsdBalance($amountUsd, 'virtual_card_topup_retry');
+            Log::warning('consumer.virtual_card.provider_insufficient_usd', [
+                'wallet_id' => $wallet->id,
+                'reference' => $reference,
+                'amount_usd' => $amountUsd,
+                'provider_message' => (string) ($api['message'] ?? ''),
+            ]);
+            $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($amountUsd, 'virtual_card_topup_retry');
             if ($retryFund['ok'] ?? false) {
                 $api = $this->cardApi->topupCard($amountUsd, $cardCode);
             }

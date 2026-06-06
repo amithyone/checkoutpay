@@ -154,7 +154,7 @@ final class AdminVirtualCardService
 
         $api = $this->cardApi->createCard($payload);
         if (! ($api['ok'] ?? false) && $feeUsd > 0 && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
-            $retryFund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'admin_virtual_card_retry_2');
+            $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($feeUsd, 'admin_virtual_card_retry_2');
             if ($retryFund['ok'] ?? false) {
                 $api = $this->cardApi->createCard($payload);
             }

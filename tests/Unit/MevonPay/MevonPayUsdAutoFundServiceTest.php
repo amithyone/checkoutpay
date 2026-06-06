@@ -98,4 +98,44 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
         $this->assertTrue($svc->isInsufficientUsdError('Insufficient USD balance'));
         $this->assertFalse($svc->isInsufficientUsdError('Invalid PIN'));
     }
+
+    public function test_force_top_up_buys_usd_even_when_balance_api_looks_sufficient(): void
+    {
+        config(['virtual_card.auto_fund_force_buy_usd' => 2]);
+
+        Http::fake([
+            'https://mevon.test/V1/balance' => Http::sequence()
+                ->push([
+                    'status' => 'success',
+                    'data' => [
+                        'bal' => '500000',
+                        'usd_balance' => '20.00',
+                    ],
+                ], 200)
+                ->push([
+                    'status' => 'success',
+                    'data' => [
+                        'bal' => '497200',
+                        'usd_balance' => '22.00',
+                    ],
+                ], 200),
+            'https://mevon.test/V1/exchange' => Http::response([
+                'status' => true,
+                'message' => 'Conversion successful',
+                'data' => [
+                    'from_currency' => 'NGN',
+                    'to_currency' => 'USD',
+                    'amount' => 2800,
+                    'converted_amount' => 2,
+                    'new_usd_balance' => 22,
+                ],
+            ], 200),
+        ]);
+
+        $result = app(MevonPayUsdAutoFundService::class)->fundAfterProviderInsufficientUsd(5, 'test_force');
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['funded']);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/V1/exchange'));
+    }
 }

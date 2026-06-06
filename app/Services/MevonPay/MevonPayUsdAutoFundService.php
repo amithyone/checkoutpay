@@ -24,7 +24,7 @@ final class MevonPayUsdAutoFundService
      *   usd_balance_after?: ?float
      * }
      */
-    public function ensureUsdBalance(float $requiredUsd, string $context = 'virtual_card'): array
+    public function ensureUsdBalance(float $requiredUsd, string $context = 'virtual_card', bool $forceTopUp = false): array
     {
         if (! $this->isEnabled()) {
             return ['ok' => true, 'message' => 'Auto USD top-up disabled.', 'funded' => false];
@@ -53,7 +53,14 @@ final class MevonPayUsdAutoFundService
             return ['ok' => false, 'message' => 'MevonPay balance response is missing USD or NGN amounts.'];
         }
 
-        if ($usdBefore >= $targetUsd) {
+        if (! $forceTopUp && $usdBefore >= $targetUsd) {
+            Log::debug('mevonpay.usd_auto_fund.skipped', [
+                'context' => $context,
+                'required_usd' => $requiredUsd,
+                'target_usd' => $targetUsd,
+                'usd_balance' => $usdBefore,
+            ]);
+
             return [
                 'ok' => true,
                 'message' => 'USD balance is sufficient.',
@@ -63,7 +70,11 @@ final class MevonPayUsdAutoFundService
             ];
         }
 
-        $shortfallUsd = round($targetUsd - $usdBefore, 2);
+        $shortfallUsd = round(max($targetUsd - $usdBefore, 0), 2);
+        if ($forceTopUp) {
+            $forceBuyUsd = max(0.01, (float) config('virtual_card.auto_fund_force_buy_usd', 2));
+            $shortfallUsd = max($shortfallUsd, $forceBuyUsd);
+        }
         $maxPerOp = max(0.0, (float) config('virtual_card.auto_fund_usd_max_per_op', 500));
         if ($maxPerOp > 0 && $shortfallUsd > $maxPerOp) {
             return [
@@ -80,6 +91,16 @@ final class MevonPayUsdAutoFundService
             ];
         }
 
+        Log::info('mevonpay.usd_auto_fund.converting', [
+            'context' => $context,
+            'required_usd' => $requiredUsd,
+            'target_usd' => $targetUsd,
+            'shortfall_usd' => $shortfallUsd,
+            'ngn_attempt' => $ngnEstimate,
+            'usd_balance_before' => $usdBefore,
+            'force_top_up' => $forceTopUp,
+        ]);
+
         $conversion = $this->exchange->convert($ngnEstimate, 'NGN', 'USD');
         if (! ($conversion['ok'] ?? false)) {
             Log::warning('mevonpay.usd_auto_fund.exchange_failed', [
@@ -87,6 +108,7 @@ final class MevonPayUsdAutoFundService
                 'required_usd' => $requiredUsd,
                 'shortfall_usd' => $shortfallUsd,
                 'ngn_attempt' => $ngnEstimate,
+                'force_top_up' => $forceTopUp,
                 'message' => $conversion['message'] ?? null,
             ]);
 
@@ -148,6 +170,16 @@ final class MevonPayUsdAutoFundService
             'usd_balance_before' => $usdBefore,
             'usd_balance_after' => $usdAfter,
         ];
+    }
+
+    /**
+     * Buy USD after the provider rejected a card call for insufficient merchant float.
+     *
+     * @return array{ok: bool, message: string, funded?: bool, funded_ngn?: float, funded_usd?: float, usd_balance_before?: ?float, usd_balance_after?: ?float}
+     */
+    public function fundAfterProviderInsufficientUsd(float $requiredUsd, string $context): array
+    {
+        return $this->ensureUsdBalance($requiredUsd, $context, forceTopUp: true);
     }
 
     public function isInsufficientUsdError(string $message): bool
