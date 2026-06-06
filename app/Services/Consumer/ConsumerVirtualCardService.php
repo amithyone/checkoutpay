@@ -132,7 +132,13 @@ final class ConsumerVirtualCardService
         $blocking = $this->blockingCardRequest($wallet);
         if ($blocking !== null) {
             if ($this->isOperableCardRequest($blocking)) {
-                return ['ok' => false, 'message' => 'You already have a Dollar Virtual Card on this wallet.'];
+                return [
+                    'ok' => true,
+                    'message' => 'You already have a Dollar Virtual Card on this wallet.',
+                    'data' => array_merge($this->statusPayload($wallet), [
+                        'already_has_card' => true,
+                    ]),
+                ];
             }
 
             $this->cardLogs->info('request_blocked', 'Duplicate card request blocked while another is in progress', $blocking, [
@@ -701,12 +707,42 @@ final class ConsumerVirtualCardService
 
     private function resolveOperableCard(WhatsappWallet $wallet): ?VirtualCardRequest
     {
-        return VirtualCardRequest::query()
+        return $this->resolveDisplayCard($wallet);
+    }
+
+    private function resolveDisplayCard(WhatsappWallet $wallet): ?VirtualCardRequest
+    {
+        $operable = VirtualCardRequest::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->whereNotNull('card_external_id')
+            ->where('card_external_id', '!=', '')
             ->whereIn('status', [VirtualCardRequest::STATUS_SUBMITTED, VirtualCardRequest::STATUS_ACTIVE])
             ->latest('id')
             ->first();
+
+        if ($operable) {
+            return $operable;
+        }
+
+        $blocking = $this->blockingCardRequest($wallet);
+        if ($blocking && $this->isOperableCardRequest($blocking)) {
+            return $blocking;
+        }
+
+        return null;
+    }
+
+    private function cardScreenFor(?VirtualCardRequest $display, ?VirtualCardRequest $latest): string
+    {
+        if ($display !== null) {
+            return 'manage';
+        }
+
+        if ($latest !== null && $this->isPreparingRequest($latest)) {
+            return 'preparing';
+        }
+
+        return 'request';
     }
 
     /**
@@ -730,11 +766,12 @@ final class ConsumerVirtualCardService
         $feeUsd = $this->requestFeeUsd();
         $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
 
-        $operable = $this->resolveOperableCard($wallet);
+        $display = $this->resolveDisplayCard($wallet);
         $latest = VirtualCardRequest::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->latest('id')
             ->first();
+        $cardScreen = $this->cardScreenFor($display, $latest);
 
         return array_merge($this->fx->ratesPayload(), [
             'enabled' => $this->isEnabled(),
@@ -745,10 +782,11 @@ final class ConsumerVirtualCardService
             'topup_max_usd' => (float) config('virtual_card.topup_max_usd', 500),
             'withdraw_min_usd' => (float) config('virtual_card.withdraw_min_usd', 1),
             'withdraw_max_usd' => (float) config('virtual_card.withdraw_max_usd', 500),
-            'has_active_card' => $operable !== null,
-            'can_request_card' => $operable === null && $this->blockingCardRequest($wallet) === null,
-            'card_preparing' => $operable === null && $latest !== null && $this->isPreparingRequest($latest),
-            'operable_request' => $operable ? $this->serializeRequest($operable) : null,
+            'has_active_card' => $display !== null,
+            'card_screen' => $cardScreen,
+            'can_request_card' => $cardScreen === 'request',
+            'card_preparing' => $cardScreen === 'preparing',
+            'operable_request' => $display ? $this->serializeRequest($display) : null,
             'latest_request' => $latest ? $this->serializeRequest($latest) : null,
         ]);
     }

@@ -106,6 +106,35 @@ class ConsumerVirtualCardRequestTest extends TestCase
         $this->assertSame(1, VirtualCardRequest::query()->where('whatsapp_wallet_id', $wallet->id)->count());
     }
 
+    public function test_request_when_card_already_active_returns_manage_status(): void
+    {
+        Http::fake();
+        [$wallet, $account] = $this->walletTier2();
+        Sanctum::actingAs($account, ['consumer']);
+
+        VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_ACTIVE,
+            'fee_usd' => 5,
+            'fee_ngn' => 6925,
+            'external_reference' => 'VCARD-ALREADY-HAVE',
+            'card_external_id' => 'MEVON-CARD-EXISTING',
+            'card_name' => 'Existing Card',
+        ]);
+
+        $response = $this->postJson('/api/v1/consumer/cards/request', [
+            'pin' => '2468',
+            'card_name' => 'Existing Card',
+            'home_number' => '12',
+            'home_address' => 'Lagos',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.already_has_card', true)
+            ->assertJsonPath('data.card_screen', 'manage')
+            ->assertJsonPath('data.has_active_card', true);
+    }
+
     public function test_card_status_returns_operable_request_when_latest_attempt_failed(): void
     {
         [$wallet, $account] = $this->walletTier2();
@@ -136,6 +165,7 @@ class ConsumerVirtualCardRequestTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.has_active_card', true)
+            ->assertJsonPath('data.card_screen', 'manage')
             ->assertJsonPath('data.operable_request.card_external_id', 'MEVON-CARD-ACTIVE')
             ->assertJsonPath('data.operable_request.can_manage', true)
             ->assertJsonPath('data.latest_request.status', VirtualCardRequest::STATUS_FAILED)
