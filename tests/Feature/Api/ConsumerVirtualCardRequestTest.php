@@ -52,6 +52,7 @@ class ConsumerVirtualCardRequestTest extends TestCase
 
         $response = $this->postJson('/api/v1/consumer/cards/request', [
             'pin' => '2468',
+            'terms_accepted' => true,
             'card_name' => 'Test User',
             'home_number' => '12',
             'home_address' => 'Lagos',
@@ -94,6 +95,7 @@ class ConsumerVirtualCardRequestTest extends TestCase
 
         $response = $this->postJson('/api/v1/consumer/cards/request', [
             'pin' => '2468',
+            'terms_accepted' => true,
             'card_name' => 'Test User',
             'home_number' => '12',
             'home_address' => 'Lagos',
@@ -124,6 +126,7 @@ class ConsumerVirtualCardRequestTest extends TestCase
 
         $response = $this->postJson('/api/v1/consumer/cards/request', [
             'pin' => '2468',
+            'terms_accepted' => true,
             'card_name' => 'Existing Card',
             'home_number' => '12',
             'home_address' => 'Lagos',
@@ -133,6 +136,39 @@ class ConsumerVirtualCardRequestTest extends TestCase
             ->assertJsonPath('data.already_has_card', true)
             ->assertJsonPath('data.card_screen', 'manage')
             ->assertJsonPath('data.has_active_card', true);
+    }
+
+    public function test_card_request_requires_terms_acceptance(): void
+    {
+        Http::fake();
+        [, $account] = $this->walletTier2();
+        Sanctum::actingAs($account, ['consumer']);
+
+        $response = $this->postJson('/api/v1/consumer/cards/request', [
+            'pin' => '2468',
+            'card_name' => 'Test User',
+            'home_number' => '12',
+            'home_address' => 'Lagos',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['terms_accepted']);
+    }
+
+    public function test_card_status_includes_profile_fields_for_request_form(): void
+    {
+        [$wallet, $account] = $this->walletTier2();
+        Sanctum::actingAs($account, ['consumer']);
+
+        $response = $this->getJson('/api/v1/consumer/cards');
+
+        $response->assertOk()
+            ->assertJsonPath('data.first_name', 'Test')
+            ->assertJsonPath('data.last_name', 'User')
+            ->assertJsonPath('data.email', 'test@example.com')
+            ->assertJsonPath('data.card_name', 'Test User')
+            ->assertJsonPath('data.card_screen', 'request')
+            ->assertJsonPath('data.can_request_card', true);
     }
 
     public function test_card_status_shows_manage_when_card_id_exists_on_failed_row(): void

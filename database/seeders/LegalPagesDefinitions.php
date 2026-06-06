@@ -8,7 +8,7 @@ namespace Database\Seeders;
  */
 final class LegalPagesDefinitions
 {
-    public const LAST_UPDATED = 'March 2026';
+    public const LAST_UPDATED = 'June 2026';
 
     /** @var array<string, string> */
     private const FILE_SLUGS = [

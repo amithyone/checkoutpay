@@ -63,6 +63,7 @@ class ConsumerVirtualCardController extends Controller
     {
         $request->validate([
             'pin' => ['required', 'regex:/^\d{4}$/'],
+            'terms_accepted' => 'required|accepted',
             'card_name' => 'nullable|string|max:120',
             'home_number' => 'nullable|string|max:32',
             'home_address' => 'nullable|string|max:255',

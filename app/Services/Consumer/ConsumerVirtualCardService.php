@@ -69,21 +69,10 @@ final class ConsumerVirtualCardService
         $payload = $this->statusPayload($wallet);
         unset($payload['latest_request']);
 
-        $phone11 = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164);
-        $dob = $wallet->kyc_dob?->format('Y-m-d');
-
         return [
             'ok' => true,
             'message' => 'OK',
             'data' => array_merge($payload, [
-                'first_name' => $wallet->kyc_fname,
-                'last_name' => $wallet->kyc_lname,
-                'email' => $wallet->kyc_email,
-                'phone_number' => $phone11,
-                'dob' => $dob,
-                'home_number' => $wallet->card_home_number,
-                'home_address' => $wallet->card_home_address,
-                'card_name' => trim(($wallet->kyc_fname ?? '').' '.($wallet->kyc_lname ?? '')) ?: $wallet->displayName(),
                 'latest_request' => $this->latestRequestForWallet($wallet),
             ]),
         ];
@@ -121,6 +110,9 @@ final class ConsumerVirtualCardService
     {
         if (! $this->isEnabled()) {
             return ['ok' => false, 'message' => 'Dollar Virtual Card is not available right now.'];
+        }
+        if (! filter_var($input['terms_accepted'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return ['ok' => false, 'message' => 'Accept the Privacy Policy and Terms and Conditions to request a Dollar Virtual Card.'];
         }
         if (! $wallet->isTier2()) {
             return ['ok' => false, 'message' => 'Complete Tier 2 KYC on your profile before requesting a Dollar Virtual Card.'];
@@ -912,7 +904,7 @@ final class ConsumerVirtualCardService
         $latest = $display ?? $rawLatest;
         $cardScreen = $this->cardScreenFor($display, $rawLatest);
 
-        return array_merge($this->fx->ratesPayload(), [
+        return array_merge($this->fx->ratesPayload(), $this->profileFieldsForWallet($wallet), [
             'enabled' => $this->isEnabled(),
             'is_tier2' => $wallet->isTier2(),
             'fee_usd' => $feeUsd,
@@ -929,6 +921,26 @@ final class ConsumerVirtualCardService
             'operable_request' => $display ? $this->serializeRequest($display) : null,
             'latest_request' => $latest ? $this->serializeRequest($latest) : null,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function profileFieldsForWallet(WhatsappWallet $wallet): array
+    {
+        $phone11 = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164);
+        $dob = $wallet->kyc_dob?->format('Y-m-d');
+
+        return [
+            'first_name' => $wallet->kyc_fname,
+            'last_name' => $wallet->kyc_lname,
+            'email' => $wallet->kyc_email,
+            'phone_number' => $phone11,
+            'dob' => $dob,
+            'home_number' => $wallet->card_home_number,
+            'home_address' => $wallet->card_home_address,
+            'card_name' => trim(($wallet->kyc_fname ?? '').' '.($wallet->kyc_lname ?? '')) ?: $wallet->displayName(),
+        ];
     }
 
     private function cardDesignUrl(): ?string
