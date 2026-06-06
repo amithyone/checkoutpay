@@ -3,6 +3,7 @@
 namespace App\Services\Consumer;
 
 use App\Models\VirtualCardRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 final class VirtualCardMevonWebhookService
@@ -22,74 +23,154 @@ final class VirtualCardMevonWebhookService
 
         $cardId = $this->extractWebhookCardId($payload);
         $reference = $this->extractWebhookReference($payload);
-        $email = strtolower(trim((string) data_get($payload, 'data.email', data_get($payload, 'data.customer_email', ''))));
-        $phone = $this->normalizePhone((string) data_get($payload, 'data.phone_number', data_get($payload, 'data.phoneNumber', '')));
+        $email = $this->extractWebhookEmail($payload);
+        $phone = $this->extractWebhookPhone($payload);
 
-        $query = VirtualCardRequest::query()
-            ->whereIn('status', [
-                VirtualCardRequest::STATUS_PENDING,
-                VirtualCardRequest::STATUS_PREPARING,
-                VirtualCardRequest::STATUS_SUBMITTED,
-            ]);
-
-        if ($reference !== '') {
-            $query->where('external_reference', $reference);
-        } elseif ($cardId !== '') {
-            $query->where(function ($q) use ($cardId) {
-                $q->where('card_external_id', $cardId)
-                    ->orWhereNull('card_external_id');
-            });
-        } else {
-            $query->whereNull('card_external_id');
-        }
-
-        $candidates = $query->latest('id')->limit(20)->get();
-        $row = null;
-
-        foreach ($candidates as $candidate) {
-            if ($reference !== '' && $candidate->external_reference === $reference) {
-                $row = $candidate;
-                break;
-            }
-
-            $requestPayload = is_array($candidate->request_payload) ? $candidate->request_payload : [];
-            $reqEmail = strtolower(trim((string) ($requestPayload['email'] ?? '')));
-            $reqPhone = $this->normalizePhone((string) ($requestPayload['phoneNumber'] ?? ''));
-
-            if ($email !== '' && $reqEmail !== '' && $email === $reqEmail) {
-                $row = $candidate;
-                break;
-            }
-            if ($phone !== '' && $reqPhone !== '' && $phone === $reqPhone) {
-                $row = $candidate;
-                break;
+        if ($cardId !== '') {
+            $existing = VirtualCardRequest::query()
+                ->where('card_external_id', $cardId)
+                ->whereIn('status', [
+                    VirtualCardRequest::STATUS_SUBMITTED,
+                    VirtualCardRequest::STATUS_ACTIVE,
+                ])
+                ->first();
+            if ($existing) {
+                return true;
             }
         }
 
-        if (! $row && $candidates->count() === 1) {
-            $row = $candidates->first();
+        if ($reference !== '' && $this->isCheckoutExternalReference($reference)) {
+            $row = VirtualCardRequest::query()
+                ->where('external_reference', $reference)
+                ->first();
+            if ($row) {
+                $this->providerResponse->applyWebhookReady($row, $payload, $cardId !== '' ? $cardId : null);
+                $this->logActivated($row, $payload);
+
+                return true;
+            }
         }
+
+        $candidates = $this->openRequestCandidates($cardId);
+        $row = $this->pickBestCandidate($candidates, $reference, $cardId, $email, $phone);
 
         if (! $row) {
             Log::warning('virtual_card.webhook.no_match', [
                 'event' => data_get($payload, 'event'),
                 'reference' => $reference,
                 'card_id' => $cardId,
+                'email' => $email,
+                'phone' => $phone,
+                'candidate_count' => $candidates->count(),
             ]);
 
             return false;
         }
 
         $this->providerResponse->applyWebhookReady($row, $payload, $cardId !== '' ? $cardId : null);
-
-        Log::info('virtual_card.webhook.activated', [
-            'virtual_card_request_id' => $row->id,
-            'wallet_id' => $row->whatsapp_wallet_id,
-            'card_external_id' => $row->fresh()->card_external_id,
-            'event' => data_get($payload, 'event'),
-        ]);
+        $this->logActivated($row, $payload);
 
         return true;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, VirtualCardRequest>  $candidates
+     */
+    private function pickBestCandidate(
+        $candidates,
+        string $reference,
+        string $cardId,
+        string $email,
+        string $phone,
+    ): ?VirtualCardRequest {
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        foreach ($candidates as $candidate) {
+            if ($reference !== '' && $candidate->external_reference === $reference) {
+                return $candidate;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            if ($reference !== '' && $this->payloadContainsReference($candidate, $reference)) {
+                return $candidate;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $requestPayload = is_array($candidate->request_payload) ? $candidate->request_payload : [];
+            $reqEmail = strtolower(trim((string) ($requestPayload['email'] ?? '')));
+            $reqPhone = $this->normalizePhone((string) ($requestPayload['phoneNumber'] ?? ''));
+
+            if ($email !== '' && $reqEmail !== '' && $email === $reqEmail) {
+                return $candidate;
+            }
+            if ($phone !== '' && $reqPhone !== '' && $phone === $reqPhone) {
+                return $candidate;
+            }
+        }
+
+        if ($cardId !== '' && $candidates->count() === 1) {
+            return $candidates->first();
+        }
+
+        $recent = $candidates->filter(function (VirtualCardRequest $row) {
+            return $row->created_at !== null && $row->created_at->greaterThan(Carbon::now()->subHours(24));
+        });
+
+        if ($cardId !== '' && $recent->count() === 1) {
+            return $recent->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, VirtualCardRequest>
+     */
+    private function openRequestCandidates(string $cardId)
+    {
+        return VirtualCardRequest::query()
+            ->where(function ($query) use ($cardId) {
+                $query->whereIn('status', [
+                    VirtualCardRequest::STATUS_PENDING,
+                    VirtualCardRequest::STATUS_PREPARING,
+                    VirtualCardRequest::STATUS_SUBMITTED,
+                ])->orWhere(function ($failed) {
+                    $failed->where('status', VirtualCardRequest::STATUS_FAILED)
+                        ->where('created_at', '>=', Carbon::now()->subDays(3));
+                });
+            })
+            ->where(function ($query) use ($cardId) {
+                $query->whereNull('card_external_id');
+                if ($cardId !== '') {
+                    $query->orWhere('card_external_id', $cardId);
+                }
+            })
+            ->latest('id')
+            ->limit(50)
+            ->get();
+    }
+
+    private function payloadContainsReference(VirtualCardRequest $row, string $reference): bool
+    {
+        if ($reference === '') {
+            return false;
+        }
+
+        $encoded = json_encode($row->response_payload ?? []);
+        if (! is_string($encoded)) {
+            return false;
+        }
+
+        return str_contains($encoded, $reference);
+    }
+
+    private function isCheckoutExternalReference(string $reference): bool
+    {
+        return str_starts_with(strtoupper($reference), 'VCARD-');
     }
 
     /**
@@ -104,6 +185,7 @@ final class VirtualCardMevonWebhookService
 
         $cardEvents = [
             'card.created',
+            'card.created.success',
             'card_created',
             'card.create',
             'virtual_card.created',
@@ -115,13 +197,12 @@ final class VirtualCardMevonWebhookService
             'card_creation_success',
         ];
 
-        foreach ($cardEvents as $match) {
-            if ($event === $match || str_contains($event, 'card') && (str_contains($event, 'creat') || str_contains($event, 'ready') || str_contains($event, 'success'))) {
-                return true;
-            }
+        if (in_array($event, $cardEvents, true)) {
+            return true;
         }
 
-        return false;
+        return str_contains($event, 'card')
+            && (str_contains($event, 'creat') || str_contains($event, 'ready') || str_contains($event, 'success'));
     }
 
     /**
@@ -134,8 +215,8 @@ final class VirtualCardMevonWebhookService
             data_get($payload, 'data.cardId'),
             data_get($payload, 'data.card_code'),
             data_get($payload, 'data.cardCode'),
-            data_get($payload, 'data.id'),
             data_get($payload, 'data.card.id'),
+            data_get($payload, 'data.id'),
         ];
 
         foreach ($candidates as $value) {
@@ -159,6 +240,8 @@ final class VirtualCardMevonWebhookService
             data_get($payload, 'data.customer_reference'),
             data_get($payload, 'data.order_reference'),
             data_get($payload, 'data.order_id'),
+            data_get($payload, 'data.request_id'),
+            data_get($payload, 'data.transaction_reference'),
             data_get($payload, 'reference'),
         ];
 
@@ -166,6 +249,52 @@ final class VirtualCardMevonWebhookService
             $ref = trim((string) $value);
             if ($ref !== '') {
                 return $ref;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function extractWebhookEmail(array $payload): string
+    {
+        $candidates = [
+            data_get($payload, 'data.email'),
+            data_get($payload, 'data.customer_email'),
+            data_get($payload, 'data.customer.email'),
+            data_get($payload, 'data.cardholder.email'),
+            data_get($payload, 'data.user.email'),
+        ];
+
+        foreach ($candidates as $value) {
+            $email = strtolower(trim((string) $value));
+            if ($email !== '' && str_contains($email, '@')) {
+                return $email;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function extractWebhookPhone(array $payload): string
+    {
+        $candidates = [
+            data_get($payload, 'data.phone_number'),
+            data_get($payload, 'data.phoneNumber'),
+            data_get($payload, 'data.phone'),
+            data_get($payload, 'data.customer.phone'),
+            data_get($payload, 'data.cardholder.phone'),
+        ];
+
+        foreach ($candidates as $value) {
+            $phone = $this->normalizePhone((string) $value);
+            if ($phone !== '') {
+                return $phone;
             }
         }
 
@@ -181,5 +310,18 @@ final class VirtualCardMevonWebhookService
         }
 
         return strlen($digits) >= 11 ? substr($digits, -11) : $digits;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function logActivated(VirtualCardRequest $row, array $payload): void
+    {
+        Log::info('virtual_card.webhook.activated', [
+            'virtual_card_request_id' => $row->id,
+            'wallet_id' => $row->whatsapp_wallet_id,
+            'card_external_id' => $row->fresh()->card_external_id,
+            'event' => data_get($payload, 'event'),
+        ]);
     }
 }
