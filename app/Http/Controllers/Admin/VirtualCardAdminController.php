@@ -23,6 +23,13 @@ class VirtualCardAdminController extends Controller
         ]);
     }
 
+    public function logs(Request $request): View
+    {
+        return view('admin.virtual-cards.logs', [
+            'logs' => $this->cards->logsQuery($request),
+        ]);
+    }
+
     public function show(VirtualCardRequest $virtualCardRequest): View
     {
         $ctx = $this->cards->showContext($virtualCardRequest);

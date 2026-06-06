@@ -68,6 +68,10 @@ class ConsumerVirtualCardRequestTest extends TestCase
         $row = VirtualCardRequest::query()->where('whatsapp_wallet_id', $wallet->id)->first();
         $this->assertNotNull($row);
         $this->assertSame(VirtualCardRequest::STATUS_PREPARING, $row->status);
+        $this->assertDatabaseHas('virtual_card_request_logs', [
+            'virtual_card_request_id' => $row->id,
+            'event' => 'fee_held_awaiting_webhook',
+        ]);
     }
 
     public function test_duplicate_request_blocked_while_preparing(): void

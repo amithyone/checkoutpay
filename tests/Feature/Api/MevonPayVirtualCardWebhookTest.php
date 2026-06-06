@@ -67,6 +67,7 @@ class MevonPayVirtualCardWebhookTest extends TestCase
             'fee_usd' => 5,
             'fee_ngn' => 6925,
             'external_reference' => 'VCARD-USER-REF-001',
+            'provider_reference' => $mevonRef,
             'card_name' => 'Test User',
             'request_payload' => [
                 'email' => 'reviewer@example.com',

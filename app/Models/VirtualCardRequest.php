@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VirtualCardRequest extends Model
 {
@@ -25,6 +26,7 @@ class VirtualCardRequest extends Model
         'fee_ngn',
         'fx_rate_used',
         'external_reference',
+        'provider_reference',
         'card_external_id',
         'is_frozen',
         'last_operation_at',
@@ -60,5 +62,10 @@ class VirtualCardRequest extends Model
     public function handledBy(): BelongsTo
     {
         return $this->belongsTo(Admin::class, 'handled_by_admin_id');
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(VirtualCardRequestLog::class)->latest('id');
     }
 }

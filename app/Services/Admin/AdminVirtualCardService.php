@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\Admin;
 use App\Models\VirtualCardRequest;
+use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\VirtualCardFeeRefundService;
 use App\Services\Consumer\VirtualCardProviderResponseService;
@@ -34,6 +35,7 @@ final class AdminVirtualCardService
 
         $feeTotal = (float) VirtualCardRequest::query()
             ->whereIn('status', [
+                VirtualCardRequest::STATUS_PREPARING,
                 VirtualCardRequest::STATUS_SUBMITTED,
                 VirtualCardRequest::STATUS_ACTIVE,
             ])
@@ -63,17 +65,52 @@ final class AdminVirtualCardService
      */
     public function showContext(VirtualCardRequest $card): array
     {
-        $card->load(['wallet', 'handledBy']);
+        $card->load(['wallet', 'handledBy', 'logs']);
         $feeTxn = $this->feeTransaction($card);
 
         return [
             'card' => $card,
             'feeTransaction' => $feeTxn,
+            'requestLogs' => $card->logs()->limit(100)->get(),
             'canMarkActive' => $this->canMarkActive($card),
             'canMarkFailed' => $this->canMarkFailed($card),
             'canRetry' => $this->canRetry($card),
             'canRefund' => $this->canRefund($card, $feeTxn),
         ];
+    }
+
+    public function logsQuery(Request $request): LengthAwarePaginator
+    {
+        $query = VirtualCardRequestLog::query()
+            ->with(['request.wallet'])
+            ->latest('id');
+
+        if ($request->filled('event')) {
+            $query->where('event', (string) $request->input('event'));
+        }
+
+        if ($request->filled('level')) {
+            $query->where('level', (string) $request->input('level'));
+        }
+
+        if ($request->filled('request_id')) {
+            $query->where('virtual_card_request_id', (int) $request->input('request_id'));
+        }
+
+        if ($request->filled('q')) {
+            $term = '%'.trim((string) $request->input('q')).'%';
+            $query->where(function (Builder $q) use ($term) {
+                $q->where('message', 'like', $term)
+                    ->orWhere('event', 'like', $term)
+                    ->orWhereHas('request', function (Builder $rq) use ($term) {
+                        $rq->where('external_reference', 'like', $term)
+                            ->orWhere('provider_reference', 'like', $term)
+                            ->orWhere('card_external_id', 'like', $term);
+                    });
+            });
+        }
+
+        return $query->paginate(50)->withQueryString();
     }
 
     /**

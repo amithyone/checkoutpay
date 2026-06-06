@@ -6,6 +6,34 @@ use App\Models\VirtualCardRequest;
 
 final class VirtualCardProviderResponseService
 {
+    /**
+     * MevonPay async reference (UUID) used in card.created webhooks.
+     *
+     * @param  array{ok?: bool, message?: string, data?: mixed, raw?: mixed}  $api
+     */
+    public function extractProviderReference(array $api): ?string
+    {
+        $sources = [
+            $api['data'] ?? null,
+            is_array($api['raw'] ?? null) ? ($api['raw']['data'] ?? $api['raw']) : null,
+        ];
+
+        foreach ($sources as $data) {
+            if (! is_array($data)) {
+                continue;
+            }
+
+            foreach (['reference', 'request_id', 'requestId', 'order_id', 'order_reference', 'id'] as $key) {
+                $value = trim((string) ($data[$key] ?? ''));
+                if ($value !== '' && $this->looksLikeProviderReference($value)) {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function extractCardId(mixed $data): ?string
     {
         if (! is_array($data)) {
@@ -83,6 +111,7 @@ final class VirtualCardProviderResponseService
     {
         $row->update([
             'status' => VirtualCardRequest::STATUS_PREPARING,
+            'provider_reference' => $this->extractProviderReference($api) ?? $row->provider_reference,
             'response_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
             'card_external_id' => null,
             'failure_reason' => null,
@@ -98,6 +127,7 @@ final class VirtualCardProviderResponseService
     {
         $row->update([
             'status' => VirtualCardRequest::STATUS_SUBMITTED,
+            'provider_reference' => $this->extractProviderReference($api) ?? $row->provider_reference,
             'response_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
             'card_external_id' => $this->extractCardId($api['data'] ?? null),
             'failure_reason' => null,
@@ -139,5 +169,14 @@ final class VirtualCardProviderResponseService
         ]);
 
         return $row->fresh();
+    }
+
+    private function looksLikeProviderReference(string $value): bool
+    {
+        if (str_starts_with(strtoupper($value), 'VCARD-')) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value);
     }
 }

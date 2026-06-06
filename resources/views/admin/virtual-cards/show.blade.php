@@ -24,6 +24,10 @@
                 <dd class="font-mono text-xs text-gray-900">{{ $card->external_reference ?? '—' }}</dd>
             </div>
             <div>
+                <dt class="text-gray-500">Mevon reference</dt>
+                <dd class="font-mono text-xs text-gray-900">{{ $card->provider_reference ?? '—' }}</dd>
+            </div>
+            <div>
                 <dt class="text-gray-500">Provider card ID</dt>
                 <dd class="font-mono text-xs text-gray-900">{{ $card->card_external_id ?? '—' }}</dd>
             </div>
@@ -153,6 +157,36 @@
         </dl>
         @else
         <p class="text-sm text-gray-500">No fee transaction found for this reference.</p>
+        @endif
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between gap-3 mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Event log</h3>
+            <a href="{{ route('admin.virtual-cards.logs', ['request_id' => $card->id]) }}" class="text-sm text-primary hover:underline">View all logs</a>
+        </div>
+        @if(($requestLogs ?? collect())->isNotEmpty())
+            <div class="space-y-3 max-h-96 overflow-y-auto">
+                @foreach($requestLogs as $log)
+                    <div class="border border-gray-100 rounded-lg p-3 text-sm">
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <span class="text-xs text-gray-500">{{ $log->created_at?->format('M d, H:i:s') }}</span>
+                            <span class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{{ $log->event }}</span>
+                            @if($log->level === 'error')
+                                <span class="text-xs text-red-700 font-medium">error</span>
+                            @elseif($log->level === 'warning')
+                                <span class="text-xs text-amber-700 font-medium">warning</span>
+                            @endif
+                        </div>
+                        <p class="text-gray-900">{{ $log->message }}</p>
+                        @if($log->context)
+                            <pre class="text-xs bg-gray-50 border border-gray-100 rounded mt-2 p-2 overflow-x-auto">{{ json_encode($log->context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <p class="text-sm text-gray-500">No structured logs for this request yet.</p>
         @endif
     </div>
 

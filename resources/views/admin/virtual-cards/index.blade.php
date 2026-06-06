@@ -10,15 +10,25 @@
             <h2 class="text-2xl font-bold text-gray-900">Card Management</h2>
             <p class="text-sm text-gray-600 mt-1">Dollar Virtual Card requests from CheckoutNow — review, activate, retry, or refund fees</p>
         </div>
-        <a href="{{ route('admin.settings.index') }}#vtu-virtual-card" class="text-sm text-primary hover:underline">
-            <i class="fas fa-cog mr-1"></i> Card settings (enable &amp; fee)
-        </a>
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ route('admin.virtual-cards.logs') }}" class="text-sm text-indigo-700 hover:underline font-medium">
+                <i class="fas fa-list-alt mr-1"></i> Request &amp; webhook logs
+            </a>
+            <a href="{{ route('admin.settings.index') }}#vtu-virtual-card" class="text-sm text-primary hover:underline">
+                <i class="fas fa-cog mr-1"></i> Card settings (enable &amp; fee)
+            </a>
+        </div>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <p class="text-xs text-gray-500 uppercase">Pending</p>
             <p class="text-2xl font-bold text-yellow-700">{{ number_format($stats['pending']) }}</p>
+        </div>
+        <div class="bg-white rounded-lg border border-violet-200 p-4 shadow-sm bg-violet-50/40">
+            <p class="text-xs text-gray-500 uppercase">Preparing</p>
+            <p class="text-2xl font-bold text-violet-700">{{ number_format($stats['preparing'] ?? 0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">Awaiting webhook</p>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <p class="text-xs text-gray-500 uppercase">Submitted</p>
@@ -35,7 +45,7 @@
         <div class="bg-white rounded-lg border border-indigo-200 p-4 shadow-sm bg-indigo-50/50">
             <p class="text-xs text-gray-500 uppercase">Fees collected</p>
             <p class="text-xl font-bold text-gray-900">₦{{ number_format($stats['total_fees_ngn'], 2) }}</p>
-            <p class="text-xs text-gray-500 mt-1">Submitted + active</p>
+            <p class="text-xs text-gray-500 mt-1">Preparing + submitted + active</p>
         </div>
     </div>
 
@@ -46,6 +56,7 @@
                 <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                     <option value="">All</option>
                     <option value="pending" @selected(request('status') === 'pending')>Pending</option>
+                    <option value="preparing" @selected(request('status') === 'preparing')>Preparing</option>
                     <option value="submitted" @selected(request('status') === 'submitted')>Submitted</option>
                     <option value="active" @selected(request('status') === 'active')>Active</option>
                     <option value="failed" @selected(request('status') === 'failed')>Failed</option>

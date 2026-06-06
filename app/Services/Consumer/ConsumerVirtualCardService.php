@@ -23,6 +23,7 @@ final class ConsumerVirtualCardService
         private VirtualCardDebitRefundService $debitRefunds,
         private VirtualCardProviderResponseService $providerResponse,
         private MevonPayUsdAutoFundService $usdAutoFund,
+        private VirtualCardRequestLogService $cardLogs,
     ) {}
 
     public function isEnabled(): bool
@@ -134,6 +135,10 @@ final class ConsumerVirtualCardService
                 return ['ok' => false, 'message' => 'You already have a Dollar Virtual Card on this wallet.'];
             }
 
+            $this->cardLogs->info('request_blocked', 'Duplicate card request blocked while another is in progress', $blocking, [
+                'status' => $blocking->status,
+            ], $wallet->id);
+
             return [
                 'ok' => true,
                 'message' => VirtualCardUserFacingMessage::requestAlreadyInProgress(),
@@ -240,6 +245,12 @@ final class ConsumerVirtualCardService
             'request_payload' => $payload,
         ]);
 
+        $this->cardLogs->info('fee_debited', 'Card request fee debited from wallet; awaiting MevonPay response', $row, [
+            'fee_ngn' => $feeNgn,
+            'fee_usd' => $feeUsd,
+            'reference' => $reference,
+        ], $wallet->id);
+
         $fund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'virtual_card_request');
         if (! ($fund['ok'] ?? false)) {
             $internalReason = (string) ($fund['message'] ?? 'USD auto-fund failed');
@@ -250,6 +261,9 @@ final class ConsumerVirtualCardService
             ]);
             $this->feeRefunds->refundFee($wallet->id, $reference, $feeNgn, $internalReason);
             $this->providerResponse->applyFailure($row, ['message' => $internalReason], $internalReason);
+            $this->cardLogs->warning('fee_refunded', 'Fee refunded after USD auto-fund failed', $row->fresh(), [
+                'reason' => $internalReason,
+            ], $wallet->id);
 
             return [
                 'ok' => false,
@@ -283,6 +297,20 @@ final class ConsumerVirtualCardService
             $fresh = $row->fresh();
             $preparing = $fresh->status === VirtualCardRequest::STATUS_PREPARING;
 
+            $this->cardLogs->info(
+                $preparing ? 'fee_held_awaiting_webhook' : 'provider_submitted',
+                $preparing
+                    ? 'Mevon accepted card request; fee held until card.created webhook'
+                    : 'Mevon returned card_id immediately',
+                $fresh,
+                [
+                    'provider_message' => (string) ($api['message'] ?? ''),
+                    'provider_reference' => $fresh->provider_reference,
+                    'card_external_id' => $fresh->card_external_id,
+                ],
+                $wallet->id,
+            );
+
             return [
                 'ok' => true,
                 'message' => $preparing
@@ -299,6 +327,9 @@ final class ConsumerVirtualCardService
         $providerMessage = (string) ($api['message'] ?? 'Card provider error');
         $this->feeRefunds->refundFee($wallet->id, $reference, $feeNgn, $providerMessage);
         $this->providerResponse->applyFailure($row, $api, $providerMessage);
+        $this->cardLogs->error('provider_failed', 'MevonPay rejected card request; fee refunded', $row->fresh(), [
+            'provider_message' => $providerMessage,
+        ], $wallet->id);
 
         return [
             'ok' => false,
@@ -702,6 +733,7 @@ final class ConsumerVirtualCardService
             'id' => $row->id,
             'status' => $row->status,
             'is_preparing' => $this->isPreparingRequest($row),
+            'provider_reference' => $row->provider_reference,
             'fee_usd' => (float) $row->fee_usd,
             'fee_ngn' => (float) $row->fee_ngn,
             'fx_rate_used' => $row->fx_rate_used !== null ? (float) $row->fx_rate_used : null,
