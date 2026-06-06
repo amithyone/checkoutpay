@@ -58,4 +58,16 @@ final class MevonPayCardApiClient
             'reason' => $reason,
         ], 'raw');
     }
+
+    /**
+     * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
+     */
+    public function getCardDetails(string $cardCode): array
+    {
+        $path = (string) config('virtual_card.mevon_card_details_path', '/V1/card_details');
+
+        return $this->http->postJson($path, [
+            'card_code' => $cardCode,
+        ], 'raw');
+    }
 }

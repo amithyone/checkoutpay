@@ -6,6 +6,9 @@ use App\Models\VirtualCardRequest;
 
 final class VirtualCardProviderResponseService
 {
+    public function __construct(
+        private VirtualCardStoredDetailsService $storedDetails,
+    ) {}
     /**
      * MevonPay async reference (UUID) used in card.created webhooks.
      *
@@ -168,7 +171,10 @@ final class VirtualCardProviderResponseService
             ),
         ]);
 
-        return $row->fresh();
+        $fresh = $row->fresh();
+        $this->storedDetails->persistFromWebhook($fresh, $payload);
+
+        return $fresh->fresh();
     }
 
     private function looksLikeProviderReference(string $value): bool

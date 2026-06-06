@@ -125,6 +125,22 @@ class ConsumerVirtualCardController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
+    public function details(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        $result = $this->cards->cardDetails($wallet, (string) $validated['pin']);
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => $result['data'] ?? null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
     public function withdraw(Request $request): JsonResponse
     {
         $validated = $request->validate([

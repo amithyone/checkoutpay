@@ -243,7 +243,20 @@ class SettingsController extends Controller
                 'virtual_card_fx_buy_profit_ngn' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_fx_sell_rate' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_fx_buy_rate' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_design_image' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:4096',
             ]);
+
+            if ($request->hasFile('virtual_card_design_image')) {
+                $image = $request->file('virtual_card_design_image');
+                $imagePath = $image->store('settings/virtual-card', 'public');
+                Setting::set(
+                    'virtual_card_design_image',
+                    $imagePath,
+                    'string',
+                    'virtual_card',
+                    'CheckoutNow virtual card mockup background image'
+                );
+            }
 
             Setting::set(
                 'virtual_card_enabled',

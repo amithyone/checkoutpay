@@ -174,6 +174,56 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.sell_rate', 1648);
     }
 
+    public function test_card_details_requires_pin_and_returns_stored_webhook_fields(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_details_payload' => [
+                'card_number' => '4288520141503096',
+                'cvv' => '486',
+                'expiry' => '06/2029',
+                'last_four' => '3096',
+                'card_name' => 'Test User',
+                'brand' => 'visa',
+                'balance_usd' => 5,
+                'billing_address' => [
+                    'street' => '3401 N. Miami, Ave. Ste 230',
+                    'city' => 'Miami',
+                    'country' => 'United States',
+                    'zip_code' => '33127',
+                ],
+            ],
+            'card_balance_usd' => 5,
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.card_number', '4288520141503096')
+            ->assertJsonPath('data.cvv', '486')
+            ->assertJsonPath('data.expiry', '06/29')
+            ->assertJsonPath('data.card_external_id', 'VCARD-TEST-001')
+            ->assertJsonPath('data.last_four', '3096')
+            ->assertJsonPath('data.balance_usd', 5);
+    }
+
+    public function test_card_status_includes_design_url_when_configured(): void
+    {
+        [, $account] = $this->walletWithActiveCard();
+        Setting::set('virtual_card_design_image', 'settings/virtual-card/test-bg.png', 'string', 'virtual_card', 'test');
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards');
+
+        $response->assertOk()
+            ->assertJsonPath('data.card_design_url', url('storage/settings/virtual-card/test-bg.png'));
+    }
+
     /**
      * @return array{0: WhatsappWallet, 1: ConsumerWalletApiAccount, 2?: VirtualCardRequest}
      */

@@ -25,6 +25,7 @@ final class ConsumerVirtualCardService
         private MevonPayUsdAutoFundService $usdAutoFund,
         private VirtualCardRequestLogService $cardLogs,
         private VirtualCardRequestSupersedeService $supersede,
+        private VirtualCardStoredDetailsService $storedDetails,
     ) {}
 
     public function isEnabled(): bool
@@ -528,6 +529,33 @@ final class ConsumerVirtualCardService
     }
 
     /**
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    public function cardDetails(WhatsappWallet $wallet, string $pin): array
+    {
+        $gate = $this->gateOperableCard($wallet, $pin);
+        if (! $gate['ok']) {
+            return $gate;
+        }
+
+        $card = $gate['card'];
+        $stored = $this->storedDetails->resolveForRequest($card);
+
+        if ($stored === null) {
+            return [
+                'ok' => false,
+                'message' => 'Card details are not available yet. If your card was just created, wait a moment and try again.',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'message' => 'OK',
+            'data' => $this->normalizeCardDetails($stored, $card->fresh()),
+        ];
+    }
+
+    /**
      * @param  'freeze'|'unfreeze'  $action
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
@@ -802,9 +830,115 @@ final class ConsumerVirtualCardService
             'card_screen' => $cardScreen,
             'can_request_card' => $cardScreen === 'request',
             'card_preparing' => $cardScreen === 'preparing',
+            'card_design_url' => $this->cardDesignUrl(),
             'operable_request' => $display ? $this->serializeRequest($display) : null,
             'latest_request' => $latest ? $this->serializeRequest($latest) : null,
         ]);
+    }
+
+    private function cardDesignUrl(): ?string
+    {
+        $path = Setting::get('virtual_card_design_image');
+        if (! is_string($path) || trim($path) === '') {
+            return null;
+        }
+
+        return url('storage/'.ltrim($path, '/'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeCardDetails(mixed $payload, VirtualCardRequest $card): array
+    {
+        $row = is_array($payload) ? $payload : [];
+        if (isset($row['data']) && is_array($row['data'])) {
+            $row = array_merge($row, $row['data']);
+        }
+        if (isset($row['details']) && is_array($row['details'])) {
+            $row = array_merge($row, $row['details']);
+        }
+        if (isset($row['card']) && is_array($row['card'])) {
+            $row = array_merge($row, $row['card']);
+        }
+
+        $cardNumber = $this->pickCardDetailString($row, [
+            'card_number', 'cardNumber', 'number', 'pan', 'card_pan',
+        ]);
+        $cvv = $this->pickCardDetailString($row, ['cvv', 'cvv2', 'security_code', 'cvc']);
+        $expiryMonth = $this->pickCardDetailString($row, ['expiry_month', 'exp_month', 'expiration_month', 'expiryMonth']);
+        $expiryYear = $this->pickCardDetailString($row, ['expiry_year', 'exp_year', 'expiration_year', 'expiryYear']);
+        $expiry = $this->pickCardDetailString($row, ['expiry', 'expiry_date', 'expiration', 'exp_date']);
+
+        if ($expiry === '' && $expiryMonth !== '' && $expiryYear !== '') {
+            $year = strlen($expiryYear) === 4 ? substr($expiryYear, -2) : $expiryYear;
+            $expiry = str_pad($expiryMonth, 2, '0', STR_PAD_LEFT).'/'.$year;
+        }
+        if (preg_match('/^(\d{1,2})\/(\d{4})$/', $expiry, $expiryMatch) === 1) {
+            $expiry = str_pad($expiryMatch[1], 2, '0', STR_PAD_LEFT).'/'.substr($expiryMatch[2], -2);
+        }
+
+        $billing = $row['billing'] ?? $row['billing_address'] ?? $row['address'] ?? null;
+        $billingText = '';
+        if (is_string($billing)) {
+            $billingText = trim($billing);
+        } elseif (is_array($billing)) {
+            $parts = array_filter([
+                $billing['address1'] ?? $billing['street'] ?? $billing['line1'] ?? null,
+                $billing['address2'] ?? $billing['line2'] ?? null,
+                $billing['city'] ?? null,
+                $billing['state'] ?? null,
+                $billing['zip_code'] ?? $billing['zip'] ?? null,
+                $billing['country'] ?? null,
+            ], fn ($v) => is_string($v) && trim($v) !== '');
+            $billingText = implode(', ', array_map('trim', $parts));
+        }
+
+        $lastFour = $cardNumber !== '' ? substr(preg_replace('/\D/', '', $cardNumber) ?? '', -4) : '';
+        if ($lastFour === '' && isset($row['last_four'])) {
+            $lastFour = (string) $row['last_four'];
+        }
+        if ($lastFour === '' && isset($row['last4'])) {
+            $lastFour = (string) $row['last4'];
+        }
+
+        return [
+            'card_number' => $cardNumber,
+            'cvv' => $cvv,
+            'expiry' => $expiry,
+            'expiry_month' => $expiryMonth,
+            'expiry_year' => $expiryYear,
+            'card_name' => trim((string) ($row['card_name'] ?? $row['name_on_card'] ?? $card->card_name ?? '')),
+            'card_external_id' => (string) $card->card_external_id,
+            'last_four' => $lastFour,
+            'brand' => strtolower((string) ($row['brand'] ?? $row['card_brand'] ?? $row['scheme'] ?? 'visa')),
+            'billing_address' => $billingText,
+            'currency' => strtoupper((string) ($row['currency'] ?? 'USD')),
+            'balance_usd' => $card->card_balance_usd ?? (is_numeric($row['balance_usd'] ?? null) ? (float) $row['balance_usd'] : null),
+            'status' => (string) ($row['status'] ?? ($card->is_frozen ? 'frozen' : 'active')),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  list<string>  $keys
+     */
+    private function pickCardDetailString(array $row, array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (! array_key_exists($key, $row)) {
+                continue;
+            }
+            $value = $row[$key];
+            if (is_string($value) || is_numeric($value)) {
+                $text = trim((string) $value);
+                if ($text !== '') {
+                    return $text;
+                }
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -819,6 +953,12 @@ final class ConsumerVirtualCardService
             $status = VirtualCardRequest::STATUS_ACTIVE;
         }
 
+        $lastFour = null;
+        $stored = is_array($row->card_details_payload) ? $row->card_details_payload : null;
+        if ($stored) {
+            $lastFour = trim((string) ($stored['last_four'] ?? '')) ?: null;
+        }
+
         return [
             'id' => $row->id,
             'status' => $status,
@@ -829,6 +969,8 @@ final class ConsumerVirtualCardService
             'fx_rate_used' => $row->fx_rate_used !== null ? (float) $row->fx_rate_used : null,
             'card_name' => $row->card_name,
             'card_external_id' => $row->card_external_id,
+            'card_last_four' => $lastFour,
+            'card_balance_usd' => $row->card_balance_usd !== null ? (float) $row->card_balance_usd : null,
             'is_frozen' => (bool) $row->is_frozen,
             'can_manage' => $canManage,
             'failure_reason' => $row->failure_reason,

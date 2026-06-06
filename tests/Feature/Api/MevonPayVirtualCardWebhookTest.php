@@ -108,6 +108,12 @@ class MevonPayVirtualCardWebhookTest extends TestCase
                 'reference' => $mevonRef,
                 'card_id' => $cardId,
                 'email' => 'reviewer@example.com',
+                'card_number' => '4288520141503096',
+                'last4' => '3096',
+                'expiry' => '06/2029',
+                'cvv' => '486',
+                'balance' => 5,
+                'card_name' => 'Test User',
             ],
         ]);
 
@@ -116,6 +122,9 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $row->refresh();
         $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $row->status);
         $this->assertSame($cardId, $row->card_external_id);
+        $this->assertSame('4288520141503096', data_get($row->card_details_payload, 'card_number'));
+        $this->assertSame('486', data_get($row->card_details_payload, 'cvv'));
+        $this->assertSame(5.0, (float) $row->card_balance_usd);
     }
 
     public function test_card_created_success_recovers_recent_failed_request_by_email(): void

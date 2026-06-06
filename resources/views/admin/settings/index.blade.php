@@ -766,7 +766,7 @@
         </h3>
         <p class="text-sm text-gray-600 mb-4">CheckoutNow app card requests, fund, withdraw, and freeze. Uses MevonPay card APIs and your own NGN sell/buy rates.</p>
 
-        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+        <form action="{{ route('admin.settings.update') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
             @csrf
             @method('PUT')
             <input type="hidden" name="settings_section" value="virtual_card">
@@ -866,6 +866,21 @@
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto: mid − buy profit">
                     </div>
                 </div>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg p-4 space-y-3 bg-white">
+                <p class="text-sm font-semibold text-gray-800">Card mockup background (CheckoutNow)</p>
+                <p class="text-xs text-gray-500">
+                    Upload the artwork shown behind the virtual card in the app. Recommended size: <strong>1012×638px</strong> (card ratio ~1.59:1), PNG or JPG.
+                </p>
+                @php
+                    $cardDesign = \App\Models\Setting::get('virtual_card_design_image');
+                @endphp
+                @if($cardDesign)
+                    <img src="{{ asset('storage/' . $cardDesign) }}?v={{ time() }}" alt="Virtual card design" class="max-w-xs rounded-xl border border-gray-200 shadow-sm">
+                @endif
+                <input type="file" name="virtual_card_design_image" accept="image/png,image/jpeg,image/webp"
+                    class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100">
             </div>
 
             @if(isset($mevonBalance) && is_array($mevonBalance))
