@@ -134,6 +134,27 @@ return [
         'description' => 'Discover businesses and services on the CheckoutPay marketplace.',
         'keywords' => 'CheckoutPay marketplace Nigeria',
     ],
+    '/tickets' => [
+        'title' => 'Event Tickets Nigeria — Buy Tickets Online | CheckoutPay',
+        'description' => 'Browse and buy event tickets in Nigeria with bank transfer checkout on CheckoutPay.',
+        'keywords' => 'event tickets Nigeria, buy tickets online Naira',
+    ],
+    '/memberships' => [
+        'title' => 'Membership Plans Nigeria — Subscribe Online | CheckoutPay',
+        'description' => 'Browse and join membership plans with Nigerian bank transfer payments on CheckoutPay.',
+        'keywords' => 'membership plans Nigeria, join membership online',
+    ],
+    '/rentals' => [
+        'title' => 'Equipment & Space Rentals Nigeria | CheckoutPay',
+        'description' => 'Browse rentals and book equipment or spaces with secure payments on CheckoutPay.',
+        'keywords' => 'rentals Nigeria, equipment rental payments',
+    ],
+    '/developers/program/apply/thanks' => [
+        'title' => 'Developer Program Application Received | CheckoutPay',
+        'description' => 'Your CheckoutPay Developer Program application has been received.',
+        'keywords' => 'developer program application CheckoutPay',
+        'noindex' => true,
+    ],
     '/business-loans' => [
         'title' => 'Business Loans | CheckoutPay',
         'description' => 'Peer lending and business loan options for CheckoutPay merchants in Nigeria.',

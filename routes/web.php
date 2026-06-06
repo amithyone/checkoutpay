@@ -72,7 +72,6 @@ Route::get('/products/memberships-info', [\App\Http\Controllers\ProductsControll
 Route::get('/products/rentals-info', [\App\Http\Controllers\ProductsController::class, 'rentalsInfo'])->name('products.rentals-info');
 Route::get('/products/tickets-info', [\App\Http\Controllers\ProductsController::class, 'ticketsInfo'])->name('products.tickets-info');
 Route::get('/marketplace', [\App\Http\Controllers\Public\MarketplaceController::class, 'index'])->name('marketplace.index');
-Route::get('/tickets', [\App\Http\Controllers\Public\TicketsController::class, 'index'])->name('tickets.index');
 Route::get('/payout', [\App\Http\Controllers\PayoutController::class, 'index'])->name('payout.index');
 Route::get('/collections', [\App\Http\Controllers\CollectionsController::class, 'index'])->name('collections.index');
 Route::get('/checkout-demo', [\App\Http\Controllers\CheckoutDemoController::class, 'index'])->name('checkout-demo.index');

@@ -13,6 +13,7 @@ final class Seo
      */
     public static function forPath(string $path): array
     {
+        $path = self::normalizePublicPath($path);
         $pages = config('seo_pages', []);
         $overrides = is_array($pages[$path] ?? null) ? $pages[$path] : [];
         $overrides['path'] = $path;
@@ -23,10 +24,10 @@ final class Seo
     public static function resolve(array $overrides = []): array
     {
         $base = rtrim((string) config('app.url'), '/');
-        $path = $overrides['path'] ?? '/';
-        if ($path !== '/' && ! str_starts_with($path, '/')) {
-            $path = '/'.$path;
-        }
+        $path = self::normalizePublicPath((string) ($overrides['canonical_path'] ?? $overrides['path'] ?? '/'));
+
+        $pages = config('seo_pages', []);
+        $pageMeta = is_array($pages[$path] ?? null) ? $pages[$path] : [];
 
         $image = $overrides['image'] ?? (string) config('seo.og_image', '/checkout-logo.png');
         if ($image !== '' && ! str_starts_with($image, 'http')) {
@@ -34,13 +35,61 @@ final class Seo
         }
 
         return [
-            'title' => (string) ($overrides['title'] ?? config('seo.default_title')),
-            'description' => (string) ($overrides['description'] ?? config('seo.default_description')),
-            'keywords' => (string) ($overrides['keywords'] ?? config('seo.default_keywords')),
-            'canonical' => $base.$path,
+            'title' => (string) ($overrides['title'] ?? $pageMeta['title'] ?? config('seo.default_title')),
+            'description' => (string) ($overrides['description'] ?? $pageMeta['description'] ?? config('seo.default_description')),
+            'keywords' => (string) ($overrides['keywords'] ?? $pageMeta['keywords'] ?? config('seo.default_keywords')),
+            'canonical' => self::absoluteCanonicalUrl($path),
             'image' => $image,
-            'noindex' => (bool) ($overrides['noindex'] ?? false),
+            'noindex' => (bool) ($overrides['noindex'] ?? $pageMeta['noindex'] ?? false),
         ];
+    }
+
+    /**
+     * Preferred public path for a CMS page slug (top-level vs /page/{slug}).
+     */
+    public static function publicPathForPageSlug(string $slug): string
+    {
+        $slug = trim($slug, '/');
+        if ($slug === '') {
+            return '/';
+        }
+
+        if (in_array($slug, self::dedicatedPageSlugs(), true)) {
+            return '/'.$slug;
+        }
+
+        return '/page/'.$slug;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function dedicatedPageSlugs(): array
+    {
+        $slugs = config('seo.dedicated_page_slugs', []);
+
+        return is_array($slugs) ? array_values($slugs) : [];
+    }
+
+    public static function normalizePublicPath(string $path): string
+    {
+        $path = '/'.trim($path, '/');
+        if ($path === '//') {
+            return '/';
+        }
+
+        if ($path !== '/') {
+            $path = rtrim($path, '/');
+        }
+
+        return $path === '' ? '/' : $path;
+    }
+
+    public static function absoluteCanonicalUrl(string $path): string
+    {
+        $base = rtrim((string) config('app.url'), '/');
+
+        return $base.self::normalizePublicPath($path);
     }
 
     /**

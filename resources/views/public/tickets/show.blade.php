@@ -3,7 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $event->title }} - Tickets</title>
+    @php
+        $seo = \App\Support\Seo::resolve([
+            'path' => '/tickets/event/'.$event->id,
+            'title' => $event->title.' — Event Tickets | CheckoutPay',
+            'description' => \Illuminate\Support\Str::limit(strip_tags((string) $event->description), 155) ?: 'Buy tickets for '.$event->title.' with Nigerian bank transfer checkout on CheckoutPay.',
+        ]);
+    @endphp
+    @include('partials.marketing-head', ['seo' => $seo])
 <style>
         :root {
             --primary: #14b8a6;

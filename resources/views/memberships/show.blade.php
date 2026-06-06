@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $membership->name }} - Memberships</title>
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
-    
+    @php
+        $seo = \App\Support\Seo::resolve([
+            'path' => '/memberships/'.$membership->slug,
+            'title' => $membership->name.' — Membership | CheckoutPay',
+            'description' => \Illuminate\Support\Str::limit(strip_tags((string) $membership->description), 155) ?: 'Join '.$membership->name.' with Nigerian bank transfer payments on CheckoutPay.',
+        ]);
+    @endphp
+    @include('partials.marketing-head', ['seo' => $seo])
 @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-50">

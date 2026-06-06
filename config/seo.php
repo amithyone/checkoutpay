@@ -17,6 +17,17 @@ return [
         'area_served' => 'Nigeria',
         'price_range' => '₦',
     ],
+    /**
+     * CMS page slugs that also have a top-level route (e.g. /privacy-policy).
+     * /page/{slug} requests 301 to the preferred URL; sitemap uses the same path.
+     */
+    'dedicated_page_slugs' => [
+        'privacy-policy',
+        'terms-and-conditions',
+        'security',
+        'fraud-awareness',
+        'esg-policy',
+    ],
     'sitemap_exclude_page_slugs' => [
         'home',
         'pricing',
@@ -55,6 +66,7 @@ return [
         '/marketplace',
         '/business-loans',
         '/charity',
+        '/tickets',
         '/privacy-policy',
         '/terms-and-conditions',
         '/site-map',

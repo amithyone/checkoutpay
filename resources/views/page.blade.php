@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @php
-        $seoPath = '/'.ltrim((string) ($page->slug ?? ''), '/');
+        $seoPath = \App\Support\Seo::publicPathForPageSlug((string) ($page->slug ?? ''));
         $seo = \App\Support\Seo::forPath($seoPath);
         if ($page->meta_title ?? null) {
             $seo['title'] = $page->meta_title;

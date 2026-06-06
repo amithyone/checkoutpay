@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loan offer — {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
+    @php
+        $seo = \App\Support\Seo::resolve([
+            'path' => '/business-loans/'.$offer->public_slug,
+            'title' => 'Business loan offer — CheckoutPay',
+            'description' => \Illuminate\Support\Str::limit(strip_tags((string) $offer->description), 155) ?: 'View this business loan offer on CheckoutPay.',
+        ]);
+    @endphp
+    @include('partials.marketing-head', ['seo' => $seo])
     <meta name="csrf-token" content="{{ csrf_token() }}">
 @include('partials.tailwind-assets')
 </head>

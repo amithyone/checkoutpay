@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Application received — {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
+    @include('partials.marketing-head', ['seoPath' => '/developers/program/apply/thanks'])
 @include('partials.tailwind-assets')
 </head>
 <body class="bg-gray-50 text-gray-900">

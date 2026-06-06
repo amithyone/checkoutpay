@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Page;
+use App\Support\Seo;
 use Illuminate\Http\Response;
 
 class SeoController extends Controller
@@ -57,7 +58,7 @@ class SeoController extends Controller
             if (in_array($slug, $dedicatedPaths, true)) {
                 continue;
             }
-            $path = '/'.$slug;
+            $path = Seo::publicPathForPageSlug($slug);
             if (! in_array($path, $paths, true)) {
                 $paths[] = $path;
             }
@@ -69,7 +70,7 @@ class SeoController extends Controller
         $lastmods = [];
         foreach (Page::query()->where('is_published', true)->get(['slug', 'updated_at']) as $page) {
             if ($page->updated_at) {
-                $lastmods['/'.$page->slug] = $page->updated_at->toAtomString();
+                $lastmods[Seo::publicPathForPageSlug((string) $page->slug)] = $page->updated_at->toAtomString();
             }
         }
 

@@ -3,11 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tickets - {{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</title>
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
-    
+    @include('partials.marketing-head', ['seoPath' => '/tickets'])
 <style>
         .group:hover .tickets-card-btn { background-color: var(--tickets-accent) !important; color: white !important; }
     </style>

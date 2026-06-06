@@ -21,8 +21,12 @@ class TicketController extends Controller
     /**
      * Display event ticket page
      */
-    public function show(Event $event)
+    public function show(Request $request, Event $event)
     {
+        if (! str_contains($request->path(), 'event/')) {
+            return redirect()->route('tickets.show', $event, 301);
+        }
+
         // Only show published events
         if (!$event->isPublished()) {
             abort(404);
