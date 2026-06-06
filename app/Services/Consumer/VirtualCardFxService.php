@@ -48,34 +48,36 @@ final class VirtualCardFxService
 
     public function midUsdNgnRate(): ?float
     {
-        if ($this->isMidAutoSyncEnabled()) {
-            $live = $this->mevonLiveMidRate();
-            if ($live !== null) {
-                return $live;
+        return once(function () {
+            if ($this->isMidAutoSyncEnabled()) {
+                $live = $this->mevonLiveMidRate();
+                if ($live !== null) {
+                    return $live;
+                }
             }
-        }
 
-        $manual = $this->manualMidUsdNgnRate();
-        if ($manual !== null) {
-            return $manual;
-        }
+            $manual = $this->manualMidUsdNgnRate();
+            if ($manual !== null) {
+                return $manual;
+            }
 
-        $from = (string) config('virtual_card.fee_currency_from', 'USD');
-        $to = (string) config('virtual_card.fee_currency_to', 'NGN');
-        $fallback = $this->crossBorderFx->convertCurrency($from, $to, 1.0);
-        if ($fallback !== null && $fallback > 0) {
-            return round($fallback, 4);
-        }
+            $from = (string) config('virtual_card.fee_currency_from', 'USD');
+            $to = (string) config('virtual_card.fee_currency_to', 'NGN');
+            $fallback = $this->crossBorderFx->convertCurrency($from, $to, 1.0);
+            if ($fallback !== null && $fallback > 0) {
+                return round($fallback, 4);
+            }
 
-        $row = WhatsappCrossBorderFxRate::query()
-            ->where('from_currency', 'USD')
-            ->where('to_currency', 'NGN')
-            ->first();
-        if ($row && (float) $row->rate > 0) {
-            return round((float) $row->rate, 4);
-        }
+            $row = WhatsappCrossBorderFxRate::query()
+                ->where('from_currency', 'USD')
+                ->where('to_currency', 'NGN')
+                ->first();
+            if ($row && (float) $row->rate > 0) {
+                return round((float) $row->rate, 4);
+            }
 
-        return null;
+            return null;
+        });
     }
 
     public function midSource(): string
@@ -149,37 +151,41 @@ final class VirtualCardFxService
 
     public function sellRate(): ?float
     {
-        $explicit = Setting::get('virtual_card_fx_sell_rate');
-        if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
-            return round((float) $explicit, 4);
-        }
+        return once(function () {
+            $explicit = Setting::get('virtual_card_fx_sell_rate');
+            if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
+                return round((float) $explicit, 4);
+            }
 
-        $mid = $this->midUsdNgnRate();
-        if ($mid === null) {
-            return null;
-        }
+            $mid = $this->midUsdNgnRate();
+            if ($mid === null) {
+                return null;
+            }
 
-        return round($mid + $this->sellProfitNgnPerUsd(), 4);
+            return round($mid + $this->sellProfitNgnPerUsd(), 4);
+        });
     }
 
     public function buyRate(): ?float
     {
-        $explicit = Setting::get('virtual_card_fx_buy_rate');
-        if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
-            return round((float) $explicit, 4);
-        }
+        return once(function () {
+            $explicit = Setting::get('virtual_card_fx_buy_rate');
+            if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
+                return round((float) $explicit, 4);
+            }
 
-        $mid = $this->midUsdNgnRate();
-        if ($mid === null) {
-            return null;
-        }
+            $mid = $this->midUsdNgnRate();
+            if ($mid === null) {
+                return null;
+            }
 
-        $rate = round($mid - $this->buyProfitNgnPerUsd(), 4);
-        if ($rate <= 0) {
-            return null;
-        }
+            $rate = round($mid - $this->buyProfitNgnPerUsd(), 4);
+            if ($rate <= 0) {
+                return null;
+            }
 
-        return $rate;
+            return $rate;
+        });
     }
 
     public function isAvailable(): bool
