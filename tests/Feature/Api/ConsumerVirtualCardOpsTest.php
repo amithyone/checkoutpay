@@ -211,6 +211,45 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.balance_usd', 5);
     }
 
+    public function test_card_details_backfills_from_orphan_webhook_log_by_card_id(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+
+        \App\Models\VirtualCardRequestLog::query()->create([
+            'virtual_card_request_id' => null,
+            'whatsapp_wallet_id' => null,
+            'level' => 'info',
+            'event' => 'webhook_received',
+            'message' => 'MevonPay card webhook received',
+            'context' => [
+                'raw_payload' => [
+                    'event' => 'card.created.success',
+                    'data' => [
+                        'card_id' => 'VCARD-TEST-001',
+                        'card_number' => '4288520141503096',
+                        'cvv' => '486',
+                        'expiry' => '06/2029',
+                        'last4' => '3096',
+                        'balance' => 5,
+                    ],
+                ],
+            ],
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.card_number', '4288520141503096')
+            ->assertJsonPath('data.cvv', '486');
+
+        $card->refresh();
+        $this->assertSame('4288520141503096', data_get($card->card_details_payload, 'card_number'));
+    }
+
     public function test_card_status_includes_design_url_when_configured(): void
     {
         [, $account] = $this->walletWithActiveCard();

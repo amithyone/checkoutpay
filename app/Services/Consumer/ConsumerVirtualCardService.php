@@ -542,9 +542,13 @@ final class ConsumerVirtualCardService
         $stored = $this->storedDetails->resolveForRequest($card);
 
         if ($stored === null) {
+            $stored = $this->fetchAndStoreProviderCardDetails($card);
+        }
+
+        if ($stored === null) {
             return [
                 'ok' => false,
-                'message' => 'Card details are not available yet. If your card was just created, wait a moment and try again.',
+                'message' => 'Card details are not available yet. Ask support to sync your card from Mevon logs.',
             ];
         }
 
@@ -553,6 +557,33 @@ final class ConsumerVirtualCardService
             'message' => 'OK',
             'data' => $this->normalizeCardDetails($stored, $card->fresh()),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchAndStoreProviderCardDetails(VirtualCardRequest $card): ?array
+    {
+        $cardId = trim((string) ($card->card_external_id ?? ''));
+        if ($cardId === '' || ! $this->cardApi->isConfigured()) {
+            return null;
+        }
+
+        $api = $this->cardApi->getCardDetails($cardId);
+        if (! ($api['ok'] ?? false)) {
+            Log::info('consumer.virtual_card.details_provider_miss', [
+                'virtual_card_request_id' => $card->id,
+                'card_external_id' => $cardId,
+                'message' => (string) ($api['message'] ?? 'unknown'),
+            ]);
+
+            return null;
+        }
+
+        $payload = is_array($api['raw'] ?? null) ? $api['raw'] : ['data' => $api['data'] ?? null];
+        $this->storedDetails->persistFromWebhook($card, $payload);
+
+        return $this->storedDetails->resolveForRequest($card->fresh());
     }
 
     /**
