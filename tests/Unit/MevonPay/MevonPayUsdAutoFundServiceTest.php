@@ -112,13 +112,15 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
                     'data' => [
                         'bal' => '500000',
                         'usd_balance' => '20.00',
+                        'usd_ledger_bal' => '20.00',
                     ],
                 ], 200)
                 ->push([
                     'status' => 'success',
                     'data' => [
-                        'bal' => '497200',
-                        'usd_balance' => '22.00',
+                        'bal' => '491600',
+                        'usd_balance' => '26.00',
+                        'usd_ledger_bal' => '26.00',
                     ],
                 ], 200),
             'https://mevon.test/V1/exchange' => Http::response([
@@ -127,14 +129,54 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
                 'data' => [
                     'from_currency' => 'NGN',
                     'to_currency' => 'USD',
-                    'amount' => 2800,
-                    'converted_amount' => 2,
-                    'new_usd_balance' => 22,
+                    'amount' => 8400,
+                    'converted_amount' => 6,
+                    'new_usd_balance' => 26,
                 ],
             ], 200),
         ]);
 
         $result = app(MevonPayUsdAutoFundService::class)->fundAfterProviderInsufficientUsd(5, 'test_force');
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['funded']);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/V1/exchange'));
+    }
+
+    public function test_prefers_usd_ledger_when_wallet_balance_is_higher(): void
+    {
+        Http::fake([
+            'https://mevon.test/V1/balance' => Http::sequence()
+                ->push([
+                    'status' => 'success',
+                    'data' => [
+                        'bal' => '500000',
+                        'usd_balance' => '28.25',
+                        'usd_ledger_bal' => '0.00',
+                    ],
+                ], 200)
+                ->push([
+                    'status' => 'success',
+                    'data' => [
+                        'bal' => '484600',
+                        'usd_balance' => '28.25',
+                        'usd_ledger_bal' => '11.00',
+                    ],
+                ], 200),
+            'https://mevon.test/V1/exchange' => Http::response([
+                'status' => true,
+                'message' => 'Conversion successful',
+                'data' => [
+                    'from_currency' => 'NGN',
+                    'to_currency' => 'USD',
+                    'amount' => 15400,
+                    'converted_amount' => 11,
+                    'new_usd_balance' => 11,
+                ],
+            ], 200),
+        ]);
+
+        $result = app(MevonPayUsdAutoFundService::class)->ensureUsdBalance(10, 'test_ledger');
 
         $this->assertTrue($result['ok']);
         $this->assertTrue($result['funded']);

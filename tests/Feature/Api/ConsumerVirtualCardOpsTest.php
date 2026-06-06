@@ -41,6 +41,7 @@ class ConsumerVirtualCardOpsTest extends TestCase
                     'data' => [
                         'bal' => '500000',
                         'usd_balance' => '0.00',
+                        'usd_ledger_bal' => '0.00',
                     ],
                 ], 200)
                 ->push([
@@ -48,6 +49,7 @@ class ConsumerVirtualCardOpsTest extends TestCase
                     'data' => [
                         'bal' => '484600',
                         'usd_balance' => '11.00',
+                        'usd_ledger_bal' => '11.00',
                     ],
                 ], 200),
             'https://mevon.test/V1/exchange' => Http::response([
@@ -232,15 +234,15 @@ class ConsumerVirtualCardOpsTest extends TestCase
             'https://mevon.test/V1/balance' => Http::sequence()
                 ->push([
                     'status' => 'success',
-                    'data' => ['bal' => '500000', 'usd_balance' => '20.00'],
+                    'data' => ['bal' => '500000', 'usd_balance' => '28.25', 'usd_ledger_bal' => '28.25'],
                 ], 200)
                 ->push([
                     'status' => 'success',
-                    'data' => ['bal' => '500000', 'usd_balance' => '20.00'],
+                    'data' => ['bal' => '500000', 'usd_balance' => '28.25', 'usd_ledger_bal' => '28.25'],
                 ], 200)
                 ->push([
                     'status' => 'success',
-                    'data' => ['bal' => '497200', 'usd_balance' => '22.00'],
+                    'data' => ['bal' => '484600', 'usd_balance' => '28.25', 'usd_ledger_bal' => '39.25'],
                 ], 200),
             'https://mevon.test/V1/exchange' => Http::response([
                 'status' => true,
@@ -248,9 +250,9 @@ class ConsumerVirtualCardOpsTest extends TestCase
                 'data' => [
                     'from_currency' => 'NGN',
                     'to_currency' => 'USD',
-                    'amount' => 2800,
-                    'converted_amount' => 2,
-                    'new_usd_balance' => 22,
+                    'amount' => 15400,
+                    'converted_amount' => 11,
+                    'new_usd_balance' => 11,
                 ],
             ], 200),
             'https://mevon.test/V1/card_topup' => Http::sequence()
