@@ -7,6 +7,7 @@ use App\Models\VirtualCardRequest;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayCardApiClient;
+use App\Services\MevonPay\MevonPayUsdAutoFundService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +22,7 @@ final class ConsumerVirtualCardService
         private VirtualCardFeeRefundService $feeRefunds,
         private VirtualCardDebitRefundService $debitRefunds,
         private VirtualCardProviderResponseService $providerResponse,
+        private MevonPayUsdAutoFundService $usdAutoFund,
     ) {}
 
     public function isEnabled(): bool
@@ -162,8 +164,11 @@ final class ConsumerVirtualCardService
                 }
                 $w->resetDailyTransferIfNeeded();
                 $check = $w->canDebit($feeNgn);
-                if (! $w->hasPin() || ! $check['ok']) {
-                    throw new \RuntimeException('cannot_debit');
+                if (! $w->hasPin()) {
+                    throw new \RuntimeException('invalid_pin');
+                }
+                if (! $check['ok']) {
+                    throw new \RuntimeException('cannot_debit:'.(string) ($check['message'] ?? 'Insufficient balance.'));
                 }
                 $newBal = round((float) $w->balance - $feeNgn, 2);
                 $w->balance = $newBal;
@@ -190,7 +195,7 @@ final class ConsumerVirtualCardService
         } catch (\Throwable $e) {
             Log::warning('consumer.virtual_card.debit_failed', ['wallet_id' => $wallet->id, 'error' => $e->getMessage()]);
 
-            return ['ok' => false, 'message' => 'Could not debit wallet for card fee. Check balance and limits.'];
+            return ['ok' => false, 'message' => $this->debitFailureMessage($e, 'Could not debit wallet for card fee. Check balance and limits.')];
         }
 
         $payload = [
@@ -218,7 +223,33 @@ final class ConsumerVirtualCardService
             'request_payload' => $payload,
         ]);
 
+        $fund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'virtual_card_request');
+        if (! ($fund['ok'] ?? false)) {
+            $internalReason = (string) ($fund['message'] ?? 'USD auto-fund failed');
+            Log::warning('consumer.virtual_card.usd_auto_fund_failed', [
+                'wallet_id' => $wallet->id,
+                'reference' => $reference,
+                'reason' => $internalReason,
+            ]);
+            $this->feeRefunds->refundFee($wallet->id, $reference, $feeNgn, $internalReason);
+            $this->providerResponse->applyFailure($row, ['message' => $internalReason], $internalReason);
+
+            return [
+                'ok' => false,
+                'message' => VirtualCardUserFacingMessage::requestFailedRefunded(),
+                'data' => [
+                    'balance_after' => (float) $wallet->fresh()->balance,
+                ],
+            ];
+        }
+
         $api = $this->cardApi->createCard($payload);
+        if (! ($api['ok'] ?? false) && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
+            $retryFund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'virtual_card_request_retry');
+            if ($retryFund['ok'] ?? false) {
+                $api = $this->cardApi->createCard($payload);
+            }
+        }
 
         $wallet->card_home_number = $homeNumber;
         $wallet->card_home_address = $homeAddress;
@@ -237,12 +268,16 @@ final class ConsumerVirtualCardService
             ];
         }
 
-        $this->feeRefunds->refundFee($wallet->id, $reference, $feeNgn, (string) ($api['message'] ?? 'Card provider error'));
-        $this->providerResponse->applyFailure($row, $api, (string) ($api['message'] ?? 'Failed'));
+        $providerMessage = (string) ($api['message'] ?? 'Card provider error');
+        $this->feeRefunds->refundFee($wallet->id, $reference, $feeNgn, $providerMessage);
+        $this->providerResponse->applyFailure($row, $api, $providerMessage);
 
         return [
             'ok' => false,
-            'message' => (string) ($api['message'] ?? 'Dollar Virtual Card request failed. Fee refunded.'),
+            'message' => VirtualCardUserFacingMessage::sanitizeProviderMessage(
+                $providerMessage,
+                VirtualCardUserFacingMessage::requestFailedRefunded(),
+            ),
             'data' => [
                 'balance_after' => (float) $wallet->fresh()->balance,
             ],
@@ -283,8 +318,11 @@ final class ConsumerVirtualCardService
                 }
                 $w->resetDailyTransferIfNeeded();
                 $check = $w->canDebit($amountNgn);
-                if (! $w->hasPin() || ! $check['ok']) {
-                    throw new \RuntimeException('cannot_debit');
+                if (! $w->hasPin()) {
+                    throw new \RuntimeException('invalid_pin');
+                }
+                if (! $check['ok']) {
+                    throw new \RuntimeException('cannot_debit:'.(string) ($check['message'] ?? 'Insufficient balance.'));
                 }
                 $newBal = round((float) $w->balance - $amountNgn, 2);
                 $w->balance = $newBal;
@@ -308,10 +346,42 @@ final class ConsumerVirtualCardService
         } catch (\Throwable $e) {
             Log::warning('consumer.virtual_card.topup_debit_failed', ['wallet_id' => $wallet->id, 'error' => $e->getMessage()]);
 
-            return ['ok' => false, 'message' => 'Could not debit wallet for card top-up. Check balance and limits.'];
+            return ['ok' => false, 'message' => $this->debitFailureMessage($e, 'Could not debit wallet for card top-up. Check balance and limits.')];
+        }
+
+        $fund = $this->usdAutoFund->ensureUsdBalance($amountUsd, 'virtual_card_topup');
+        if (! ($fund['ok'] ?? false)) {
+            $internalReason = (string) ($fund['message'] ?? 'USD auto-fund failed');
+            Log::warning('consumer.virtual_card.usd_auto_fund_failed', [
+                'wallet_id' => $wallet->id,
+                'reference' => $reference,
+                'reason' => $internalReason,
+            ]);
+            $this->debitRefunds->refundDebit(
+                $wallet->id,
+                $reference,
+                $amountNgn,
+                $internalReason,
+                WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP,
+            );
+
+            return [
+                'ok' => false,
+                'message' => VirtualCardUserFacingMessage::topupFailedRefunded(),
+                'data' => [
+                    'balance_after' => (float) $wallet->fresh()->balance,
+                ],
+            ];
         }
 
         $api = $this->cardApi->topupCard($amountUsd, $cardCode);
+        if (! ($api['ok'] ?? false) && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
+            $retryFund = $this->usdAutoFund->ensureUsdBalance($amountUsd, 'virtual_card_topup_retry');
+            if ($retryFund['ok'] ?? false) {
+                $api = $this->cardApi->topupCard($amountUsd, $cardCode);
+            }
+        }
+
         if ($api['ok'] ?? false) {
             $card->update([
                 'last_operation_at' => now(),
@@ -332,17 +402,21 @@ final class ConsumerVirtualCardService
             ];
         }
 
+        $providerMessage = (string) ($api['message'] ?? 'Provider top-up failed');
         $this->debitRefunds->refundDebit(
             $wallet->id,
             $reference,
             $amountNgn,
-            (string) ($api['message'] ?? 'Provider top-up failed'),
+            $providerMessage,
             WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP,
         );
 
         return [
             'ok' => false,
-            'message' => (string) ($api['message'] ?? 'Card top-up failed. Wallet debit refunded.'),
+            'message' => VirtualCardUserFacingMessage::sanitizeProviderMessage(
+                $providerMessage,
+                VirtualCardUserFacingMessage::topupFailedRefunded(),
+            ),
             'data' => [
                 'balance_after' => (float) $wallet->fresh()->balance,
             ],
@@ -422,9 +496,15 @@ final class ConsumerVirtualCardService
 
         $api = $this->cardApi->withdrawFromCard($amountUsd, $cardCode, $reasonText);
         if (! ($api['ok'] ?? false)) {
+            $providerMessage = (string) ($api['message'] ?? 'Card withdraw failed.');
+
             return [
                 'ok' => false,
-                'message' => (string) ($api['message'] ?? 'Card withdraw failed.'),
+                'message' => VirtualCardUserFacingMessage::sanitizeProviderMessage(
+                    $providerMessage,
+                    'Card withdraw failed.',
+                    treatInsufficientUsdAsInternal: false,
+                ),
             ];
         }
 
@@ -513,6 +593,16 @@ final class ConsumerVirtualCardService
         }
 
         return ['ok' => true, 'message' => 'OK', 'card' => $card];
+    }
+
+    private function debitFailureMessage(\Throwable $e, string $fallback): string
+    {
+        $error = $e->getMessage();
+        if (str_starts_with($error, 'cannot_debit:')) {
+            return substr($error, strlen('cannot_debit:'));
+        }
+
+        return $fallback;
     }
 
     private function resolveOperableCard(WhatsappWallet $wallet): ?VirtualCardRequest

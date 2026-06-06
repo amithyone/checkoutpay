@@ -8,6 +8,7 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\VirtualCardFeeRefundService;
 use App\Services\Consumer\VirtualCardProviderResponseService;
 use App\Services\MevonPay\MevonPayCardApiClient;
+use App\Services\MevonPay\MevonPayUsdAutoFundService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ final class AdminVirtualCardService
         private MevonPayCardApiClient $cardApi,
         private VirtualCardFeeRefundService $refunds,
         private VirtualCardProviderResponseService $providerResponse,
+        private MevonPayUsdAutoFundService $usdAutoFund,
     ) {}
 
     /**
@@ -142,7 +144,21 @@ final class AdminVirtualCardService
             return ['ok' => false, 'message' => 'No stored request payload to resend.'];
         }
 
+        $feeUsd = (float) ($card->fee_usd ?? 0);
+        if ($feeUsd > 0) {
+            $fund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'admin_virtual_card_retry');
+            if (! ($fund['ok'] ?? false)) {
+                return ['ok' => false, 'message' => (string) ($fund['message'] ?? 'Could not prepare MevonPay USD balance.')];
+            }
+        }
+
         $api = $this->cardApi->createCard($payload);
+        if (! ($api['ok'] ?? false) && $feeUsd > 0 && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
+            $retryFund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'admin_virtual_card_retry_2');
+            if ($retryFund['ok'] ?? false) {
+                $api = $this->cardApi->createCard($payload);
+            }
+        }
 
         if ($api['ok'] ?? false) {
             $this->providerResponse->applySuccess($card, $api);

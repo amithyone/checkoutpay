@@ -133,6 +133,13 @@ class AdminVirtualCardServiceTest extends TestCase
         ]);
 
         Http::fake([
+            'https://mevon.test/V1/balance' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'bal' => '500000',
+                    'usd_balance' => '20.00',
+                ],
+            ], 200),
             'https://mevon.test/V1/card_request' => Http::response([
                 'status' => 'success',
                 'data' => ['card_id' => 'CARD-99'],

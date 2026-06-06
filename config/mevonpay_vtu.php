@@ -5,6 +5,7 @@ return [
 
     'paths' => [
         'balance' => '/V1/balance',
+        'exchange' => '/V1/exchange',
         'electricity' => '/V1/electricity',
         'cabletv' => '/V1/cabletv',
         'airtime' => '/V1/airtime',
