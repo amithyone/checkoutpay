@@ -74,7 +74,13 @@ class DebugVirtualCardStoredDetailsCommand extends Command
         if (! $resolved && $cardId !== '' && $cardApi->isConfigured()) {
             $api = $cardApi->getCardDetails($cardId);
             $this->line('Mevon card details API: '.(($api['ok'] ?? false) ? 'OK' : 'FAILED — '.($api['message'] ?? 'unknown')));
+            if ($api['ok'] ?? false) {
+                $this->line('  provider card_code: '.(string) ($api['data']['card_code'] ?? '—'));
+            }
         }
+
+        $providerCode = $cards->syncProviderCardCode($row->fresh());
+        $this->line('provider card_code resolve: '.($providerCode ?? 'FAILED'));
 
         if ($this->option('sync')) {
             $ok = $cards->syncStoredCardDetails($row->fresh());

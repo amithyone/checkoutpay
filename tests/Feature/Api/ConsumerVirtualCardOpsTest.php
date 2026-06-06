@@ -110,6 +110,50 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $this->assertTrue($card->fresh()->is_frozen);
     }
 
+    public function test_freeze_resolves_vcard_code_from_uuid_card_external_id(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_external_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+            'card_details_payload' => null,
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                    'card_code' => 'VCARD2026060611150700359',
+                ],
+            ], 200),
+            'https://mevon.test/V1/card_status' => Http::response([
+                'status' => 'success',
+                'message' => 'Card freeze successful',
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/status', [
+            'pin' => '2468',
+            'action' => 'freeze',
+        ]);
+
+        $response->assertOk();
+        $this->assertTrue($card->fresh()->is_frozen);
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://mevon.test/V1/card_status') {
+                return false;
+            }
+
+            return ($request->data()['card_code'] ?? '') === 'VCARD2026060611150700359';
+        });
+        $this->assertSame(
+            'VCARD2026060611150700359',
+            $card->fresh()->card_details_payload['card_code'] ?? null,
+        );
+    }
+
     public function test_topup_hides_merchant_usd_errors_from_user(): void
     {
         [$wallet, $account] = $this->walletWithActiveCard();

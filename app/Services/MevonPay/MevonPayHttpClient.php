@@ -145,6 +145,14 @@ final class MevonPayHttpClient
      */
     private function isSuccessStatus(array $json): bool
     {
+        $success = $json['success'] ?? null;
+        if ($success === true || $success === 1 || $success === '1') {
+            return true;
+        }
+        if (is_string($success) && strtolower($success) === 'success') {
+            return true;
+        }
+
         $status = $json['status'] ?? null;
         if ($status === true || $status === 1 || $status === '1') {
             return true;

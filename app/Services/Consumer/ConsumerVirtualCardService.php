@@ -406,7 +406,10 @@ final class ConsumerVirtualCardService
         }
 
         $amountNgn = $quote['amount_ngn'];
-        $cardCode = (string) $card->card_external_id;
+        $cardCode = $this->resolveProviderCardCode($card);
+        if ($cardCode === null) {
+            return ['ok' => false, 'message' => 'Could not resolve card for top-up.'];
+        }
         $reference = 'VCARD-TOP-'.strtoupper(Str::random(12));
 
         try {
@@ -561,11 +564,18 @@ final class ConsumerVirtualCardService
 
     public function syncStoredCardDetails(VirtualCardRequest $card): bool
     {
-        if ($this->storedDetails->resolveForRequest($card) !== null) {
+        $this->syncProviderCardCode($card);
+
+        if ($this->storedDetails->resolveForRequest($card->fresh()) !== null) {
             return true;
         }
 
-        return $this->fetchAndStoreProviderCardDetails($card) !== null;
+        return $this->fetchAndStoreProviderCardDetails($card->fresh()) !== null;
+    }
+
+    public function syncProviderCardCode(VirtualCardRequest $card): ?string
+    {
+        return $this->resolveProviderCardCode($card->fresh());
     }
 
     /**
@@ -611,10 +621,22 @@ final class ConsumerVirtualCardService
         }
 
         $card = $gate['card'];
-        $cardCode = (string) $card->card_external_id;
+        $cardCode = $this->resolveProviderCardCode($card);
+        if ($cardCode === null) {
+            return ['ok' => false, 'message' => 'Could not resolve card for status update.'];
+        }
+
         $api = $this->cardApi->setCardStatus($action, $cardCode);
 
         if (! ($api['ok'] ?? false)) {
+            Log::warning('consumer.virtual_card.status_failed', [
+                'virtual_card_request_id' => $card->id,
+                'card_external_id' => $card->card_external_id,
+                'card_code' => $cardCode,
+                'action' => $action,
+                'message' => (string) ($api['message'] ?? 'unknown'),
+            ]);
+
             return [
                 'ok' => false,
                 'message' => (string) ($api['message'] ?? 'Could not update card status.'),
@@ -663,7 +685,10 @@ final class ConsumerVirtualCardService
         }
 
         $amountNgn = $quote['amount_ngn'];
-        $cardCode = (string) $card->card_external_id;
+        $cardCode = $this->resolveProviderCardCode($card);
+        if ($cardCode === null) {
+            return ['ok' => false, 'message' => 'Could not resolve card for withdraw.'];
+        }
         $reasonText = trim((string) ($reason ?? '')) ?: 'Withdrawal to Wallet';
 
         $api = $this->cardApi->withdrawFromCard($amountUsd, $cardCode, $reasonText);
@@ -1095,5 +1120,86 @@ final class ConsumerVirtualCardService
             VirtualCardRequest::STATUS_PENDING,
             VirtualCardRequest::STATUS_SUBMITTED,
         ], true) && ! $row->card_external_id;
+    }
+
+    private function resolveProviderCardCode(VirtualCardRequest $card): ?string
+    {
+        $externalId = trim((string) ($card->card_external_id ?? ''));
+        if ($externalId === '') {
+            return null;
+        }
+
+        if ($this->looksLikeMevonCardCode($externalId)) {
+            return $externalId;
+        }
+
+        $stored = $card->card_details_payload;
+        if (is_array($stored)) {
+            $code = trim((string) ($stored['card_code'] ?? ''));
+            if ($code !== '' && $this->looksLikeMevonCardCode($code)) {
+                return $code;
+            }
+        }
+
+        $webhookCode = $this->cardCodeFromWebhookPayload($card);
+        if ($webhookCode !== null) {
+            $this->persistProviderCardCode($card, $webhookCode, $stored);
+
+            return $webhookCode;
+        }
+
+        $api = $this->cardApi->getCardDetails($externalId);
+        if (! ($api['ok'] ?? false)) {
+            Log::warning('consumer.virtual_card.card_code_lookup_failed', [
+                'virtual_card_request_id' => $card->id,
+                'card_external_id' => $externalId,
+                'message' => (string) ($api['message'] ?? 'unknown'),
+            ]);
+
+            return null;
+        }
+
+        $data = is_array($api['data'] ?? null) ? $api['data'] : [];
+        $code = trim((string) ($data['card_code'] ?? ''));
+        if ($code === '' || ! $this->looksLikeMevonCardCode($code)) {
+            return null;
+        }
+
+        $this->persistProviderCardCode($card, $code, $stored);
+
+        return $code;
+    }
+
+    private function cardCodeFromWebhookPayload(VirtualCardRequest $card): ?string
+    {
+        $response = is_array($card->response_payload) ? $card->response_payload : [];
+        $webhook = $response['webhook'] ?? null;
+        if (! is_array($webhook)) {
+            return null;
+        }
+
+        $data = is_array($webhook['data'] ?? null) ? $webhook['data'] : $webhook;
+        $code = trim((string) ($data['card_code'] ?? $data['cardCode'] ?? ''));
+
+        return $code !== '' && $this->looksLikeMevonCardCode($code) ? $code : null;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $stored
+     */
+    private function persistProviderCardCode(VirtualCardRequest $card, string $code, ?array $stored): void
+    {
+        $payload = is_array($stored) ? $stored : [];
+        if (($payload['card_code'] ?? '') === $code) {
+            return;
+        }
+
+        $payload['card_code'] = $code;
+        $card->update(['card_details_payload' => $payload]);
+    }
+
+    private function looksLikeMevonCardCode(string $value): bool
+    {
+        return preg_match('/^VCARD/i', $value) === 1;
     }
 }

@@ -39,6 +39,7 @@ final class VirtualCardStoredDetailsService
             'brand' => strtolower(trim((string) ($data['card_brand'] ?? $data['brand'] ?? 'visa'))),
             'card_type' => trim((string) ($data['card_type'] ?? 'virtual')),
             'card_external_id' => trim((string) ($data['card_id'] ?? $data['cardId'] ?? $data['card_code'] ?? '')),
+            'card_code' => trim((string) ($data['card_code'] ?? $data['cardCode'] ?? '')),
             'billing_address' => is_array($billing) ? $billing : null,
             'balance_usd' => is_numeric($balance) ? round((float) $balance, 2) : null,
             'provider_reference' => trim((string) ($data['reference'] ?? $data['request_id'] ?? '')),
