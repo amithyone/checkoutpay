@@ -204,6 +204,7 @@ final class MevonPayUsdAutoFundService
                     'required_usd' => $requiredUsd,
                     'usd_balance' => $walletUsd,
                     'usd_ledger' => $snapshot['usd_ledger'] ?? null,
+                    'note' => 'usd_balance covers amount; card_topup may be failing for another reason (auth, card_code, or Mevon float pool).',
                 ]);
 
                 return [

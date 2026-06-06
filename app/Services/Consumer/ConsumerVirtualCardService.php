@@ -900,14 +900,17 @@ final class ConsumerVirtualCardService
             }
 
             $balanceSnap = app(\App\Services\MevonPay\MevonPayBalanceSnapshotService::class)->forDashboard();
+            $walletUsd = $balanceSnap['usd_balance'] ?? null;
             Log::warning('consumer.virtual_card.provider_insufficient_usd', [
                 'wallet_id' => $walletId,
                 'reference' => $reference,
                 'amount_usd' => $amountUsd,
+                'card_code' => $cardCode,
                 'attempt' => $attempt + 1,
                 'provider_message' => $providerMessage,
-                'usd_balance' => $balanceSnap['usd_balance'] ?? null,
+                'usd_balance' => $walletUsd,
                 'usd_ledger' => $balanceSnap['usd_ledger'] ?? null,
+                'mevon_balance_covers_topup' => $walletUsd !== null && (float) $walletUsd >= $amountUsd,
             ]);
 
             $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd(

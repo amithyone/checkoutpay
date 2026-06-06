@@ -21,7 +21,7 @@ final class MevonPayCardApiClient
     {
         $body = array_merge(['action' => 'create'], $payload);
 
-        return $this->http->postJson('/V1/card_request', $body, 'bearer');
+        return $this->postCardEndpoint('/V1/card_request', $body);
     }
 
     /**
@@ -29,10 +29,32 @@ final class MevonPayCardApiClient
      */
     public function topupCard(float $amountUsd, string $cardCode): array
     {
-        return $this->http->postJson('/V1/card_topup', [
+        return $this->postCardEndpoint('/V1/card_topup', [
             'amount' => round($amountUsd, 2),
             'card_code' => $cardCode,
-        ], 'bearer');
+        ]);
+    }
+
+    /**
+     * MevonPay docs use raw secret-key auth (same as /V1/balance and /V1/exchange).
+     * Bearer is only attempted as a fallback for older integrations.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
+     */
+    private function postCardEndpoint(string $path, array $payload): array
+    {
+        $raw = $this->http->postJson($path, $payload, 'raw');
+        if ($raw['ok'] ?? false) {
+            return $raw;
+        }
+
+        $bearer = $this->http->postJson($path, $payload, 'bearer');
+        if ($bearer['ok'] ?? false) {
+            return $bearer;
+        }
+
+        return $raw;
     }
 
     /**
