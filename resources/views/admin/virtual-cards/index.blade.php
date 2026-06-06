@@ -39,7 +39,7 @@
                     —
                 @endif
             </p>
-            <p class="text-xs text-gray-500 mt-1">CheckoutNow fund / request fee</p>
+            <p class="text-xs text-gray-500 mt-1">CheckoutNow fund &amp; card setup</p>
         </div>
         <div class="bg-white rounded-lg border border-violet-200 p-4 shadow-sm bg-violet-50/40">
             <p class="text-xs text-gray-500 uppercase">App buy rate</p>
@@ -75,6 +75,31 @@
         </div>
     </div>
 
+    <div class="bg-white rounded-lg border border-amber-200 p-5 shadow-sm bg-amber-50/30">
+        <p class="text-xs text-gray-500 uppercase mb-2">Current card setup pricing (CheckoutNow)</p>
+        <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <p class="text-2xl font-bold text-gray-900">
+                ${{ number_format($feeBreakdown['total_usd'], 2) }}
+                @if($feeBreakdown['total_ngn'] !== null)
+                    <span class="text-lg font-semibold text-gray-600">≈ ₦{{ number_format($feeBreakdown['total_ngn'], 2) }}</span>
+                @endif
+            </p>
+        </div>
+        <p class="text-sm text-gray-700 mt-2">
+            <strong>${{ number_format($feeBreakdown['creation_fee_usd'], 2) }}</strong> Mevon setup
+            + <strong>${{ number_format($feeBreakdown['initial_load_usd'], 2) }}</strong> starting card balance
+            (Mevon <code>amount</code>).
+        </p>
+        @if($fxMarkupPerUsd !== null && $estimatedSetupProfitNgn !== null)
+            <p class="text-xs text-gray-600 mt-2">
+                Your FX markup per setup: <strong>₦{{ number_format($fxMarkupPerUsd, 2) }}</strong>/$
+                → about <strong>₦{{ number_format($estimatedSetupProfitNgn, 2) }}</strong> profit per new card
+                ({{ number_format($feeBreakdown['total_usd'], 2) }} × ₦{{ number_format($fxMarkupPerUsd, 2) }}).
+                User pays full provider cost; you do not subsidise Mevon.
+            </p>
+        @endif
+    </div>
+
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg border-2 border-emerald-200 p-4">
             <p class="text-xs text-gray-600 uppercase">Total FX profit</p>
@@ -82,9 +107,9 @@
             <a href="{{ route('admin.virtual-cards.stats') }}" class="text-xs text-emerald-700 hover:underline mt-2 inline-block">Full statistics →</a>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-            <p class="text-xs text-gray-500 uppercase">Request fee profit</p>
+            <p class="text-xs text-gray-500 uppercase">Card setup profit</p>
             <p class="text-xl font-bold text-indigo-700">₦{{ number_format($profitSummary['request_profit_ngn'], 2) }}</p>
-            <p class="text-xs text-gray-500 mt-1">{{ number_format($profitSummary['request_count']) }} fees</p>
+            <p class="text-xs text-gray-500 mt-1">{{ number_format($profitSummary['request_count']) }} setups</p>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <p class="text-xs text-gray-500 uppercase">Fund card profit</p>
@@ -121,9 +146,9 @@
             <p class="text-2xl font-bold text-red-700">{{ number_format($stats['failed']) }}</p>
         </div>
         <div class="bg-white rounded-lg border border-indigo-200 p-4 shadow-sm bg-indigo-50/50">
-            <p class="text-xs text-gray-500 uppercase">Fees collected</p>
+            <p class="text-xs text-gray-500 uppercase">Setup fees collected</p>
             <p class="text-xl font-bold text-gray-900">₦{{ number_format($stats['total_fees_ngn'], 2) }}</p>
-            <p class="text-xs text-gray-500 mt-1">Preparing + submitted + active</p>
+            <p class="text-xs text-gray-500 mt-1">Gross NGN debited (preparing + submitted + active)</p>
         </div>
     </div>
 
@@ -187,6 +212,17 @@
                         <td class="px-6 py-4 text-sm text-gray-900">
                             ${{ number_format($card->fee_usd, 2) }}
                             <span class="text-gray-500 text-xs block">₦{{ number_format($card->fee_ngn, 2) }}</span>
+                            @php
+                                $loadUsd = is_array($card->request_payload)
+                                    ? (float) ($card->request_payload['amount'] ?? 0)
+                                    : 0.0;
+                                $setupUsd = $loadUsd > 0 && $card->fee_usd > $loadUsd + 0.001
+                                    ? round((float) $card->fee_usd - $loadUsd, 2)
+                                    : null;
+                            @endphp
+                            @if($setupUsd !== null && $loadUsd > 0)
+                                <span class="text-gray-400 text-xs block">${{ number_format($setupUsd, 2) }} setup + ${{ number_format($loadUsd, 2) }} load</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-xs font-mono text-gray-600">{{ $card->external_reference ?? '—' }}</td>
                         <td class="px-6 py-4 text-xs font-mono text-gray-600">{{ $card->card_external_id ?? '—' }}</td>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\VirtualCardRequest;
 use App\Services\Admin\AdminVirtualCardProfitService;
 use App\Services\Admin\AdminVirtualCardService;
+use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFxPublishService;
 use App\Services\Consumer\VirtualCardFxService;
 use Illuminate\Http\RedirectResponse;
@@ -29,13 +30,26 @@ class VirtualCardAdminController extends Controller
         }
 
         $cardFx = app(VirtualCardFxService::class);
+        $consumerCards = app(ConsumerVirtualCardService::class);
+        $feeBreakdown = $consumerCards->requestFeeBreakdown();
         $profitStats = $this->profit->stats($request);
+        $sellRate = $published['sell_rate'] ?? $cardFx->sellRate();
+        $midRate = $published['mid'] ?? $cardFx->midUsdNgnRate();
+        $fxMarkupPerUsd = ($sellRate !== null && $midRate !== null && $sellRate > $midRate)
+            ? round($sellRate - $midRate, 2)
+            : null;
+        $estimatedSetupProfitNgn = $fxMarkupPerUsd !== null
+            ? round($feeBreakdown['total_usd'] * $fxMarkupPerUsd, 2)
+            : null;
 
         return view('admin.virtual-cards.index', [
             'cards' => $this->cards->indexQuery($request),
             'stats' => $this->cards->stats(),
             'profitSummary' => $profitStats['summary'],
             'monthlyProfit' => $profitStats['monthly'],
+            'feeBreakdown' => $feeBreakdown,
+            'estimatedSetupProfitNgn' => $estimatedSetupProfitNgn,
+            'fxMarkupPerUsd' => $fxMarkupPerUsd,
             'publishedRates' => array_merge($published, [
                 'fx_available' => $cardFx->isAvailable(),
             ]),

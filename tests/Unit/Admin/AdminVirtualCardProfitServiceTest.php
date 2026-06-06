@@ -45,4 +45,19 @@ class AdminVirtualCardProfitServiceTest extends TestCase
 
         $this->assertSame(100.0, $profit);
     }
+
+    public function test_profit_from_setup_breakdown_meta(): void
+    {
+        $service = app(AdminVirtualCardProfitService::class);
+
+        $profit = $service->profitNgnFromMeta([
+            'fee_usd' => 7.5,
+            'creation_fee_usd' => 2.5,
+            'initial_load_usd' => 5,
+            'fx_mid_usd_ngn' => 1370,
+            'sell_rate' => 1385,
+        ], 'fee');
+
+        $this->assertSame(112.5, $profit);
+    }
 }

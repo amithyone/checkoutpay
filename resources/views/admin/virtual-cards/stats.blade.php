@@ -46,7 +46,7 @@
             <p class="text-xs text-gray-500 mt-2">Request + fund + withdraw markup</p>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-            <p class="text-xs text-gray-500 uppercase">Request fees profit</p>
+            <p class="text-xs text-gray-500 uppercase">Card setup profit</p>
             <p class="text-2xl font-bold text-indigo-700">₦{{ number_format($summary['request_profit_ngn'], 2) }}</p>
             <p class="text-xs text-gray-500 mt-2">{{ number_format($summary['request_count']) }} fees · gross ₦{{ number_format($summary['request_gross_ngn'], 2) }}</p>
         </div>
@@ -73,7 +73,7 @@
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm text-sm text-gray-600">
             <p class="font-medium text-gray-900 mb-1">How profit is calculated</p>
-            <p>Fund &amp; request: USD amount × (sell rate − mid rate). Withdraw: USD amount × (mid rate − buy rate). Refunded fees are excluded.</p>
+            <p>Card setup, fund &amp; request: total USD charged × (sell rate − mid rate). Setup is ${{ number_format(app(\App\Services\Consumer\ConsumerVirtualCardService::class)->requestFeeUsd(), 2) }} today ($2.50 setup + $5.00 load unless you changed settings). Withdraw: USD amount × (mid rate − buy rate). Refunded fees are excluded.</p>
             <p class="mt-2 text-xs text-gray-500">Card merchant spend at stores is not in this ledger yet — only wallet movements tied to the card product.</p>
         </div>
     </div>

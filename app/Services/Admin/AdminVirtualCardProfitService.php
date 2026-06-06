@@ -147,7 +147,7 @@ final class AdminVirtualCardProfitService
      */
     public function profitNgnFromMeta(array $meta, string $kind): float
     {
-        $usd = (float) ($meta['amount_usd'] ?? $meta['fee_usd'] ?? 0);
+        $usd = $this->profitUsdFromMeta($meta, $kind);
         $mid = (float) ($meta['fx_mid_usd_ngn'] ?? 0);
 
         if ($usd < 0.01 || $mid < 0.01) {
@@ -169,6 +169,24 @@ final class AdminVirtualCardProfitService
         }
 
         return round($usd * ($sell - $mid), 2);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function profitUsdFromMeta(array $meta, string $kind): float
+    {
+        if ($kind === 'fee') {
+            $creation = (float) ($meta['creation_fee_usd'] ?? 0);
+            $load = (float) ($meta['initial_load_usd'] ?? 0);
+            if ($creation > 0 && $load > 0) {
+                return round($creation + $load, 2);
+            }
+
+            return (float) ($meta['fee_usd'] ?? 0);
+        }
+
+        return (float) ($meta['amount_usd'] ?? $meta['fee_usd'] ?? 0);
     }
 
     /**
