@@ -91,6 +91,109 @@
                 </a>
             </div>
         </div>
+
+        @if($mevonTodayStats)
+            <div class="mt-5 pt-5 border-t border-blue-200">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-dollar-sign text-indigo-600 mr-2"></i>
+                        MevonPay &amp; card FX
+                    </h3>
+                    @if($mevonTodayStats['fetched_at'] ?? null)
+                        <span class="text-xs text-gray-500">
+                            Balances {{ \Carbon\Carbon::parse($mevonTodayStats['fetched_at'])->timezone(config('app.timezone'))->format('g:i A') }}
+                        </span>
+                    @endif
+                </div>
+                @if(!($mevonTodayStats['configured'] ?? false))
+                    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        {{ $mevonTodayStats['message'] ?? 'MevonPay is not configured.' }}
+                    </p>
+                @else
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-indigo-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-xs text-gray-600">Mevon USD rate</p>
+                                <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-chart-line text-indigo-600 text-sm"></i>
+                                </div>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900">
+                                @if($mevonTodayStats['mevon_ngn_per_usd'] !== null)
+                                    ₦{{ number_format($mevonTodayStats['mevon_ngn_per_usd'], 2) }}
+                                @else
+                                    —
+                                @endif
+                            </h3>
+                            <p class="text-xs text-gray-500 mt-1">NGN per $1 (MevonPay exchange)</p>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-emerald-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-xs text-gray-600">Mevon dollar balance</p>
+                                <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-wallet text-emerald-600 text-sm"></i>
+                                </div>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900">
+                                @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['usd_balance'] !== null)
+                                    ${{ number_format($mevonTodayStats['usd_balance'], 2) }}
+                                @else
+                                    —
+                                @endif
+                            </h3>
+                            <p class="text-xs text-gray-500 mt-1">Available USD float</p>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-green-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-xs text-gray-600">Mevon naira balance</p>
+                                <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-money-bill-wave text-green-600 text-sm"></i>
+                                </div>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900">
+                                @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['naira_balance'] !== null)
+                                    ₦{{ number_format($mevonTodayStats['naira_balance'], 2) }}
+                                @else
+                                    —
+                                @endif
+                            </h3>
+                            <p class="text-xs text-gray-500 mt-1">Available NGN float</p>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-violet-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-xs text-gray-600">Your card rate (sell)</p>
+                                <div class="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-credit-card text-violet-600 text-sm"></i>
+                                </div>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900">
+                                @if($mevonTodayStats['sell_rate'] !== null)
+                                    ₦{{ number_format($mevonTodayStats['sell_rate'], 2) }}
+                                @else
+                                    —
+                                @endif
+                            </h3>
+                            <p class="text-xs text-gray-500 mt-1">
+                                @if($mevonTodayStats['mid_rate'] !== null)
+                                    Mid ₦{{ number_format($mevonTodayStats['mid_rate'], 2) }}
+                                    @if($mevonTodayStats['buy_rate'] !== null)
+                                        · Buy ₦{{ number_format($mevonTodayStats['buy_rate'], 2) }}
+                                    @endif
+                                @else
+                                    Set virtual card FX in Settings
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    @if(!($mevonTodayStats['ok'] ?? false))
+                        <p class="text-xs text-red-600 mt-2">{{ $mevonTodayStats['message'] ?? 'Could not refresh MevonPay balances.' }}</p>
+                    @endif
+                @endif
+            </div>
+        @endif
     </div>
 
     <!-- NigTax: PRO plan vs certified consultant revenue -->

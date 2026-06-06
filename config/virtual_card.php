@@ -20,4 +20,5 @@ return [
     'auto_fund_ngn_per_usd' => max(1.0, (float) env('VIRTUAL_CARD_AUTO_FUND_NGN_PER_USD', 1400)),
     'auto_fund_ngn_buffer_percent' => max(0.0, (float) env('VIRTUAL_CARD_AUTO_FUND_NGN_BUFFER_PERCENT', 3)),
     'auto_fund_force_buy_usd' => max(0.01, (float) env('VIRTUAL_CARD_AUTO_FUND_FORCE_BUY_USD', 2)),
+    'mevon_rate_cache_seconds' => max(60, (int) env('VIRTUAL_CARD_MEVON_RATE_CACHE_SECONDS', 600)),
 ];

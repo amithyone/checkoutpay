@@ -12,7 +12,9 @@ use App\Models\Payment;
 use App\Models\ProcessedEmail;
 use App\Models\WithdrawalRequest;
 use App\Services\Credit\BusinessPeerLoanService;
+use App\Services\Consumer\VirtualCardFxService;
 use App\Services\MevonPay\MevonPayBalanceSnapshotService;
+use App\Services\MevonPay\MevonPayExchangeRateService;
 use App\Services\NigtaxRevenueStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -185,12 +187,26 @@ class DashboardController extends Controller
             'usd_ledger' => null,
             'fetched_at' => null,
         ];
+        $mevonTodayStats = null;
         $admin = auth('admin')->user();
         if ($admin && ($admin->isSuperAdmin() || $admin->role === 'admin')) {
             $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard();
+            $cardFx = app(VirtualCardFxService::class);
+            $mevonTodayStats = [
+                'configured' => $mevonBalance['configured'],
+                'ok' => $mevonBalance['ok'],
+                'message' => $mevonBalance['message'],
+                'naira_balance' => $mevonBalance['naira_balance'],
+                'usd_balance' => $mevonBalance['usd_balance'],
+                'mevon_ngn_per_usd' => app(MevonPayExchangeRateService::class)->ngnPerUsd(),
+                'sell_rate' => $cardFx->sellRate(),
+                'buy_rate' => $cardFx->buyRate(),
+                'mid_rate' => $cardFx->midUsdNgnRate(),
+                'fetched_at' => $mevonBalance['fetched_at'],
+            ];
         }
 
-        return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails', 'mevonBalance'));
+        return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails', 'mevonBalance', 'mevonTodayStats'));
     }
 
     /**
