@@ -43,6 +43,43 @@ final class VirtualCardFxService
         return ($live !== null && $live > 0) ? round($live, 4) : null;
     }
 
+    public function publishedMidUsdNgnRate(): ?float
+    {
+        $stored = Setting::get('virtual_card_fx_published_mid');
+        if ($stored !== null && is_numeric($stored) && (float) $stored > 0) {
+            return round((float) $stored, 4);
+        }
+
+        return null;
+    }
+
+    public function publishedSellRate(): ?float
+    {
+        $stored = Setting::get('virtual_card_fx_published_sell_rate');
+        if ($stored !== null && is_numeric($stored) && (float) $stored > 0) {
+            return round((float) $stored, 4);
+        }
+
+        return null;
+    }
+
+    public function publishedBuyRate(): ?float
+    {
+        $stored = Setting::get('virtual_card_fx_published_buy_rate');
+        if ($stored !== null && is_numeric($stored) && (float) $stored > 0) {
+            return round((float) $stored, 4);
+        }
+
+        return null;
+    }
+
+    public function publishedAt(): ?string
+    {
+        $at = Setting::get('virtual_card_fx_published_at');
+
+        return is_string($at) && $at !== '' ? $at : null;
+    }
+
     public function manualMidUsdNgnRate(): ?float
     {
         $stored = Setting::get('virtual_card_fx_mid_usd_ngn');
@@ -66,11 +103,9 @@ final class VirtualCardFxService
 
         $this->midUsdNgnRateComputed = true;
 
-        if ($this->isMidAutoSyncEnabled()) {
-            $live = $this->mevonLiveMidRate();
-            if ($live !== null) {
-                return $this->midUsdNgnRateCache = $live;
-            }
+        $published = $this->publishedMidUsdNgnRate();
+        if ($published !== null) {
+            return $this->midUsdNgnRateCache = $published;
         }
 
         $manual = $this->manualMidUsdNgnRate();
@@ -98,15 +133,15 @@ final class VirtualCardFxService
 
     public function midSource(): string
     {
-        if ($this->isMidAutoSyncEnabled()) {
-            $live = $this->mevonLiveMidRate();
-            if ($live !== null) {
-                return 'mevon_live';
-            }
+        $publishedSource = Setting::get('virtual_card_fx_published_source');
+        if ($this->publishedMidUsdNgnRate() !== null) {
+            return is_string($publishedSource) && $publishedSource !== ''
+                ? 'published_'.$publishedSource
+                : 'admin_published';
         }
 
         if ($this->manualMidUsdNgnRate() !== null) {
-            return $this->isMidAutoSyncEnabled() ? 'manual_fallback' : 'manual';
+            return 'manual';
         }
 
         $from = (string) config('virtual_card.fee_currency_from', 'USD');
@@ -178,6 +213,11 @@ final class VirtualCardFxService
             return $this->sellRateCache = round((float) $explicit, 4);
         }
 
+        $publishedSell = $this->publishedSellRate();
+        if ($publishedSell !== null) {
+            return $this->sellRateCache = $publishedSell;
+        }
+
         $mid = $this->midUsdNgnRate();
         if ($mid === null) {
             return $this->sellRateCache = null;
@@ -197,6 +237,11 @@ final class VirtualCardFxService
         $explicit = Setting::get('virtual_card_fx_buy_rate');
         if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
             return $this->buyRateCache = round((float) $explicit, 4);
+        }
+
+        $publishedBuy = $this->publishedBuyRate();
+        if ($publishedBuy !== null) {
+            return $this->buyRateCache = $publishedBuy;
         }
 
         $mid = $this->midUsdNgnRate();
@@ -227,6 +272,7 @@ final class VirtualCardFxService
             'fx_mid_usd_ngn' => $this->midUsdNgnRate(),
             'fx_mid_auto_sync' => $this->isMidAutoSyncEnabled(),
             'fx_mid_source' => $this->midSource(),
+            'fx_published_at' => $this->publishedAt(),
             'sell_rate' => $this->sellRate(),
             'buy_rate' => $this->buyRate(),
             'sell_profit_ngn_per_usd' => $this->sellProfitNgnPerUsd(),

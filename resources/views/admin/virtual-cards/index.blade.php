@@ -11,12 +11,90 @@
             <p class="text-sm text-gray-600 mt-1">Dollar Virtual Card requests from CheckoutNow — review, activate, retry, or refund fees</p>
         </div>
         <div class="flex flex-wrap gap-3">
+            <form method="POST" action="{{ route('admin.virtual-cards.refresh-rates') }}">
+                @csrf
+                <button type="submit" class="text-sm text-blue-700 hover:underline font-medium">
+                    <i class="fas fa-sync-alt mr-1"></i> Refresh app FX rates
+                </button>
+            </form>
+            <a href="{{ route('admin.virtual-cards.stats') }}" class="text-sm text-emerald-700 hover:underline font-medium">
+                <i class="fas fa-chart-line mr-1"></i> Profit statistics
+            </a>
             <a href="{{ route('admin.virtual-cards.logs') }}" class="text-sm text-indigo-700 hover:underline font-medium">
                 <i class="fas fa-list-alt mr-1"></i> Request &amp; webhook logs
             </a>
             <a href="{{ route('admin.settings.index') }}#vtu-virtual-card" class="text-sm text-primary hover:underline">
                 <i class="fas fa-cog mr-1"></i> Card settings (enable &amp; fee)
             </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg border border-blue-200 p-4 shadow-sm bg-blue-50/40">
+            <p class="text-xs text-gray-500 uppercase">App sell rate</p>
+            <p class="text-2xl font-bold text-blue-800">
+                @if(($publishedRates['sell_rate'] ?? null) !== null)
+                    ₦{{ number_format($publishedRates['sell_rate'], 2) }}
+                @else
+                    —
+                @endif
+            </p>
+            <p class="text-xs text-gray-500 mt-1">CheckoutNow fund / request fee</p>
+        </div>
+        <div class="bg-white rounded-lg border border-violet-200 p-4 shadow-sm bg-violet-50/40">
+            <p class="text-xs text-gray-500 uppercase">App buy rate</p>
+            <p class="text-2xl font-bold text-violet-800">
+                @if(($publishedRates['buy_rate'] ?? null) !== null)
+                    ₦{{ number_format($publishedRates['buy_rate'], 2) }}
+                @else
+                    —
+                @endif
+            </p>
+            <p class="text-xs text-gray-500 mt-1">CheckoutNow withdraw</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm md:col-span-2">
+            <p class="text-xs text-gray-500 uppercase">Published FX for app</p>
+            <p class="text-sm text-gray-800 mt-1">
+                Mid:
+                @if(($publishedRates['mid'] ?? null) !== null)
+                    <strong>₦{{ number_format($publishedRates['mid'], 2) }}</strong>
+                @else
+                    <strong>—</strong>
+                @endif
+                · Source: <strong>{{ $publishedRates['source'] ?? 'not published' }}</strong>
+            </p>
+            <p class="text-xs text-gray-500 mt-2">
+                @if(!empty($publishedRates['published_at']))
+                    Last synced {{ \Carbon\Carbon::parse($publishedRates['published_at'])->diffForHumans() }}
+                    ({{ \Carbon\Carbon::parse($publishedRates['published_at'])->format('M j, Y g:i A') }})
+                @else
+                    Rates not published yet — use Refresh app FX rates.
+                @endif
+                · App reads settings only (no live Mevon per user).
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg border-2 border-emerald-200 p-4">
+            <p class="text-xs text-gray-600 uppercase">Total FX profit</p>
+            <p class="text-2xl font-bold text-gray-900">₦{{ number_format($profitSummary['total_profit_ngn'], 2) }}</p>
+            <a href="{{ route('admin.virtual-cards.stats') }}" class="text-xs text-emerald-700 hover:underline mt-2 inline-block">Full statistics →</a>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <p class="text-xs text-gray-500 uppercase">Request fee profit</p>
+            <p class="text-xl font-bold text-indigo-700">₦{{ number_format($profitSummary['request_profit_ngn'], 2) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ number_format($profitSummary['request_count']) }} fees</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <p class="text-xs text-gray-500 uppercase">Fund card profit</p>
+            <p class="text-xl font-bold text-blue-700">₦{{ number_format($profitSummary['topup_profit_ngn'], 2) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ number_format($profitSummary['topup_count']) }} top-ups</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <p class="text-xs text-gray-500 uppercase">Withdraw profit</p>
+            <p class="text-xl font-bold text-violet-700">₦{{ number_format($profitSummary['withdraw_profit_ngn'], 2) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ number_format($profitSummary['withdraw_count']) }} withdraws</p>
         </div>
     </div>
 

@@ -351,6 +351,48 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.card_design_url', url('storage/settings/virtual-card/test-bg.png'));
     }
 
+    public function test_card_transactions_lists_wallet_card_activity(): void
+    {
+        [$wallet, $account] = $this->walletWithActiveCard();
+
+        \App\Models\WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'type' => \App\Models\WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE,
+            'amount' => 8000,
+            'balance_after' => 22000,
+            'external_reference' => 'VCARD-REF-TEST',
+            'meta' => [
+                'fee_usd' => 5,
+                'fx_mid_usd_ngn' => 1600,
+                'sell_rate' => 1600,
+            ],
+        ]);
+
+        \App\Models\WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'type' => \App\Models\WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP,
+            'amount' => 16000,
+            'balance_after' => 14000,
+            'external_reference' => 'VCARD-TOP-TEST123',
+            'meta' => [
+                'amount_usd' => 10,
+                'fx_mid_usd_ngn' => 1600,
+                'sell_rate' => 1600,
+            ],
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards/transactions');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.type', 'virtual_card_topup')
+            ->assertJsonPath('data.0.label', 'Fund card')
+            ->assertJsonPath('data.1.type', 'virtual_card_fee');
+    }
+
     /**
      * @return array{0: WhatsappWallet, 1: ConsumerWalletApiAccount, 2?: VirtualCardRequest}
      */

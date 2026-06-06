@@ -273,6 +273,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('whatsapp-wallet/transactions/{transaction}/manual-refund', [WhatsappWalletTransactionAdminController::class, 'manualRefund'])->name('whatsapp-wallet.transactions.manual-refund');
 
             Route::get('virtual-cards', [VirtualCardAdminController::class, 'index'])->name('virtual-cards.index');
+            Route::post('virtual-cards/refresh-rates', [VirtualCardAdminController::class, 'refreshRates'])->name('virtual-cards.refresh-rates');
+            Route::get('virtual-cards/stats', [VirtualCardAdminController::class, 'stats'])->name('virtual-cards.stats');
             Route::get('virtual-cards/logs/events', [VirtualCardAdminController::class, 'logs'])->name('virtual-cards.logs');
             Route::get('virtual-cards/{virtualCardRequest}', [VirtualCardAdminController::class, 'show'])->name('virtual-cards.show');
             Route::post('virtual-cards/{virtualCardRequest}/notes', [VirtualCardAdminController::class, 'updateNotes'])->name('virtual-cards.update-notes');

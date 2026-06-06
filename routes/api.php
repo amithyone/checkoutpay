@@ -130,6 +130,7 @@ Route::prefix('v1')->group(function () {
         Route::post('cards/withdraw', [ConsumerVirtualCardController::class, 'withdraw']);
         Route::post('cards/details', [ConsumerVirtualCardController::class, 'details']);
         Route::get('cards', [ConsumerVirtualCardController::class, 'index']);
+        Route::get('cards/transactions', [ConsumerVirtualCardController::class, 'transactions']);
         Route::get('kyc/tier2', [ConsumerWalletApiController::class, 'kycTier2Status']);
         Route::post('kyc/tier2/personal', [ConsumerWalletApiController::class, 'kycTier2Personal']);
         Route::post('kyc/tier2/business', [ConsumerWalletApiController::class, 'kycTier2Business']);

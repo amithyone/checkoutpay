@@ -62,6 +62,44 @@ final class ConsumerVirtualCardService
     }
 
     /**
+     * Wallet-side Dollar Virtual Card activity (request fee, fund, withdraw).
+     *
+     * @return array{ok: bool, message: string, data?: list<array<string, mixed>>, meta?: array<string, mixed>}
+     */
+    public function cardTransactions(WhatsappWallet $wallet, int $perPage = 20, int $page = 1): array
+    {
+        $perPage = max(1, min(50, $perPage));
+        $page = max(1, $page);
+
+        $paginator = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->whereIn('type', [
+                WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE,
+                WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP,
+                WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_WITHDRAW,
+            ])
+            ->orderByDesc('id')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        $items = collect($paginator->items())
+            ->map(fn (WhatsappWalletTransaction $txn) => $this->serializeCardTransaction($txn))
+            ->values()
+            ->all();
+
+        return [
+            'ok' => true,
+            'message' => 'OK',
+            'data' => $items,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
     public function prefill(WhatsappWallet $wallet): array
@@ -1089,6 +1127,44 @@ final class ConsumerVirtualCardService
         }
 
         return '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeCardTransaction(WhatsappWalletTransaction $txn): array
+    {
+        $meta = is_array($txn->meta) ? $txn->meta : [];
+        $usd = (float) ($meta['amount_usd'] ?? $meta['fee_usd'] ?? 0);
+        $refunded = (bool) ($meta['refunded'] ?? false);
+
+        return [
+            'id' => $txn->id,
+            'type' => $txn->type,
+            'label' => $this->cardTransactionLabel($txn->type),
+            'direction' => match ($txn->type) {
+                WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_WITHDRAW => 'credit',
+                default => 'debit',
+            },
+            'amount_ngn' => abs((float) $txn->amount),
+            'amount_usd' => $usd > 0 ? round($usd, 2) : null,
+            'balance_after' => $txn->balance_after !== null ? (float) $txn->balance_after : null,
+            'external_reference' => $txn->external_reference,
+            'sell_rate' => isset($meta['sell_rate']) ? (float) $meta['sell_rate'] : null,
+            'buy_rate' => isset($meta['buy_rate']) ? (float) $meta['buy_rate'] : null,
+            'refunded' => $refunded,
+            'created_at' => $txn->created_at?->toIso8601String(),
+        ];
+    }
+
+    private function cardTransactionLabel(string $type): string
+    {
+        return match ($type) {
+            WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE => 'Card request fee',
+            WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP => 'Fund card',
+            WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_WITHDRAW => 'Withdraw to wallet',
+            default => 'Card activity',
+        };
     }
 
     /**

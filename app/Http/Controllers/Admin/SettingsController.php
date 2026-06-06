@@ -299,6 +299,8 @@ class SettingsController extends Controller
                     );
                 }
             }
+
+            app(\App\Services\Consumer\VirtualCardFxPublishService::class)->syncFromMevon();
         }
 
         return redirect()->route('admin.settings.index')

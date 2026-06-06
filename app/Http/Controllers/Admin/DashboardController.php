@@ -191,6 +191,7 @@ class DashboardController extends Controller
         $admin = auth('admin')->user();
         if ($admin && ($admin->isSuperAdmin() || $admin->role === 'admin')) {
             $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard();
+            $publish = app(\App\Services\Consumer\VirtualCardFxPublishService::class)->syncFromMevon();
             $cardFx = app(VirtualCardFxService::class);
             $mevonTodayStats = [
                 'configured' => $mevonBalance['configured'],
@@ -198,7 +199,7 @@ class DashboardController extends Controller
                 'message' => $mevonBalance['message'],
                 'naira_balance' => $mevonBalance['naira_balance'],
                 'usd_balance' => $mevonBalance['usd_balance'],
-                'mevon_ngn_per_usd' => app(MevonPayExchangeRateService::class)->ngnPerUsd(),
+                'mevon_ngn_per_usd' => $publish['live_mevon'] ?? app(MevonPayExchangeRateService::class)->ngnPerUsd(),
                 'mid_rate' => $cardFx->midUsdNgnRate(),
                 'mid_auto_sync' => $cardFx->isMidAutoSyncEnabled(),
                 'mid_source' => $cardFx->midSource(),
@@ -206,6 +207,8 @@ class DashboardController extends Controller
                 'buy_profit_ngn' => $cardFx->buyProfitNgnPerUsd(),
                 'sell_rate' => $cardFx->sellRate(),
                 'buy_rate' => $cardFx->buyRate(),
+                'fx_published_at' => $cardFx->publishedAt(),
+                'fx_publish_ok' => $publish['ok'] ?? false,
                 'fetched_at' => $mevonBalance['fetched_at'],
             ];
         }

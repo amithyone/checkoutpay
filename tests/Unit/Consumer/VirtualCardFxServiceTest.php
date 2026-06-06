@@ -77,50 +77,32 @@ class VirtualCardFxServiceTest extends TestCase
         $this->assertSame(1550.0, $fx->midUsdNgnRate());
     }
 
-    public function test_auto_sync_uses_mevon_live_rate_for_sell_and_buy(): void
+    public function test_published_rates_are_used_without_mevon_http(): void
     {
-        Cache::flush();
-
-        config([
-            'services.mevonpay.base_url' => 'https://mevon.test',
-            'services.mevonpay.secret_key' => 'test-secret',
-            'mevonpay_vtu.paths.exchange' => '/V1/exchange',
-        ]);
-
-        Http::fake([
-            'https://mevon.test/V1/exchange' => Http::response([
-                'status' => true,
-                'data' => ['rate' => '1370.00'],
-            ], 200),
-        ]);
+        Http::fake(function () {
+            $this->fail('VirtualCardFxService must not call Mevon when published rates exist.');
+        });
 
         Setting::set('virtual_card_fx_mid_auto_sync', 1, 'boolean', 'virtual_card', 'test');
-        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'virtual_card', 'test');
-        Setting::set('virtual_card_fx_sell_profit_ngn', 15, 'float', 'virtual_card', 'test');
-        Setting::set('virtual_card_fx_buy_profit_ngn', 30, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_published_mid', 1370, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_published_sell_rate', 1385, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_published_buy_rate', 1340, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_published_source', 'mevon_live', 'string', 'virtual_card', 'test');
 
         $fx = app(VirtualCardFxService::class);
 
         $this->assertTrue($fx->isMidAutoSyncEnabled());
-        $this->assertSame('mevon_live', $fx->midSource());
+        $this->assertSame('published_mevon_live', $fx->midSource());
         $this->assertSame(1370.0, $fx->midUsdNgnRate());
         $this->assertSame(1385.0, $fx->sellRate());
         $this->assertSame(1340.0, $fx->buyRate());
     }
 
-    public function test_auto_sync_falls_back_to_manual_when_mevon_unavailable(): void
+    public function test_manual_mid_used_when_published_missing(): void
     {
-        Cache::flush();
-
-        config([
-            'services.mevonpay.base_url' => 'https://mevon.test',
-            'services.mevonpay.secret_key' => 'test-secret',
-            'mevonpay_vtu.paths.exchange' => '/V1/exchange',
-        ]);
-
-        Http::fake([
-            'https://mevon.test/V1/exchange' => Http::response(['status' => false], 500),
-        ]);
+        Http::fake(function () {
+            $this->fail('VirtualCardFxService must not call Mevon when manual mid is configured.');
+        });
 
         Setting::set('virtual_card_fx_mid_auto_sync', 1, 'boolean', 'virtual_card', 'test');
         Setting::set('virtual_card_fx_mid_usd_ngn', 1370, 'float', 'virtual_card', 'test');
@@ -129,7 +111,7 @@ class VirtualCardFxServiceTest extends TestCase
 
         $fx = app(VirtualCardFxService::class);
 
-        $this->assertSame('manual_fallback', $fx->midSource());
+        $this->assertSame('manual', $fx->midSource());
         $this->assertSame(1370.0, $fx->midUsdNgnRate());
         $this->assertSame(1385.0, $fx->sellRate());
         $this->assertSame(1340.0, $fx->buyRate());

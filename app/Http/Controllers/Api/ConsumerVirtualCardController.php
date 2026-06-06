@@ -26,6 +26,21 @@ class ConsumerVirtualCardController extends Controller
         ]);
     }
 
+    public function transactions(Request $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request);
+        $perPage = max(1, min(50, (int) $request->input('per_page', 20)));
+        $page = max(1, (int) $request->input('page', 1));
+        $result = $this->cards->cardTransactions($wallet, $perPage, $page);
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => $result['data'] ?? [],
+            'meta' => $result['meta'] ?? null,
+        ]);
+    }
+
     public function prefill(Request $request): JsonResponse
     {
         $wallet = $this->walletFor($request);
