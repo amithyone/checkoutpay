@@ -128,7 +128,12 @@
                             <p class="text-xs text-gray-500 mt-1">What MevonPay charges per $1 today</p>
                         </div>
                         <div class="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
-                            <p class="text-xs text-gray-600 mb-1">Your mid (settings)</p>
+                            <p class="text-xs text-gray-600 mb-1">
+                                Active mid
+                                @if($mevonTodayStats['mid_auto_sync'] ?? false)
+                                    <span class="text-emerald-700 font-medium">(auto-sync)</span>
+                                @endif
+                            </p>
                             <h3 class="text-2xl font-bold text-gray-900">
                                 @if($mevonTodayStats['mid_rate'] !== null)
                                     ₦{{ number_format($mevonTodayStats['mid_rate'], 2) }}
@@ -137,10 +142,12 @@
                                 @endif
                             </h3>
                             <p class="text-xs text-gray-500 mt-1">
-                                @if($mevonTodayStats['mid_rate'] !== null && $mevonTodayStats['mevon_ngn_per_usd'] !== null && abs($mevonTodayStats['mid_rate'] - $mevonTodayStats['mevon_ngn_per_usd']) > 5)
-                                    <span class="text-amber-700">Differs from Mevon — align in Settings → Virtual Card</span>
+                                @if($mevonTodayStats['mid_auto_sync'] ?? false)
+                                    <span class="text-emerald-700">Follows Mevon live — sell/buy stay profitable with your fixed ₦ profit</span>
+                                @elseif($mevonTodayStats['mid_rate'] !== null && $mevonTodayStats['mevon_ngn_per_usd'] !== null && abs($mevonTodayStats['mid_rate'] - $mevonTodayStats['mevon_ngn_per_usd']) > 5)
+                                    <span class="text-amber-700">Differs from Mevon — enable auto-sync in Settings → Virtual Card</span>
                                 @else
-                                    Base rate for your sell/buy math
+                                    Manual mid — base for sell/buy math
                                 @endif
                             </p>
                         </div>

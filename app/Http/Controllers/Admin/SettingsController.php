@@ -237,6 +237,7 @@ class SettingsController extends Controller
             $validated = $request->validate([
                 'virtual_card_enabled' => 'nullable|boolean',
                 'virtual_card_request_fee_usd' => 'nullable|numeric|min:0|max:500',
+                'virtual_card_fx_mid_auto_sync' => 'nullable|boolean',
                 'virtual_card_fx_mid_usd_ngn' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_fx_sell_profit_ngn' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_fx_buy_profit_ngn' => 'nullable|numeric|min:0|max:100000',
@@ -250,6 +251,13 @@ class SettingsController extends Controller
                 'boolean',
                 'virtual_card',
                 'Enable Dollar Virtual Card in CheckoutNow app'
+            );
+            Setting::set(
+                'virtual_card_fx_mid_auto_sync',
+                $request->boolean('virtual_card_fx_mid_auto_sync') ? 1 : 0,
+                'boolean',
+                'virtual_card',
+                'Auto-sync virtual card FX mid from MevonPay live rate'
             );
             if (array_key_exists('virtual_card_request_fee_usd', $validated) && $validated['virtual_card_request_fee_usd'] !== null) {
                 Setting::set(

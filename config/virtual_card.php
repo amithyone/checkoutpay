@@ -6,6 +6,7 @@ return [
     'fee_currency_from' => 'USD',
     'fee_currency_to' => 'NGN',
     'fx_mid_usd_ngn' => env('VIRTUAL_CARD_FX_MID_USD_NGN') !== null ? (float) env('VIRTUAL_CARD_FX_MID_USD_NGN') : null,
+    'fx_mid_auto_sync' => (bool) env('VIRTUAL_CARD_FX_MID_AUTO_SYNC', true),
     'fx_sell_profit_ngn' => max(0.0, (float) env('VIRTUAL_CARD_FX_SELL_PROFIT_NGN', 50)),
     'fx_buy_profit_ngn' => max(0.0, (float) env('VIRTUAL_CARD_FX_BUY_PROFIT_NGN', 30)),
     'fx_sell_rate' => env('VIRTUAL_CARD_FX_SELL_RATE') !== null ? (float) env('VIRTUAL_CARD_FX_SELL_RATE') : null,

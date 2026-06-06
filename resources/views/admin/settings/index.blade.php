@@ -695,7 +695,10 @@
 
     @php
         $cardFx = app(\App\Services\Consumer\VirtualCardFxService::class);
+        $cardMidAutoSync = $cardFx->isMidAutoSyncEnabled();
+        $cardMevonLiveMid = $cardFx->mevonLiveMidRate();
         $cardMid = $cardFx->midUsdNgnRate();
+        $cardMidSource = $cardFx->midSource();
         $cardSellProfit = $cardFx->sellProfitNgnPerUsd();
         $cardBuyProfit = $cardFx->buyProfitNgnPerUsd();
         $cardSellRate = $cardFx->sellRate();
@@ -792,13 +795,32 @@
                     Sell rate = mid + sell profit (user pays more to fund card).
                     Buy rate = mid − buy profit (user receives less on withdraw).
                 </p>
+                <label class="inline-flex items-center text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 w-full">
+                    <input type="hidden" name="virtual_card_fx_mid_auto_sync" value="0">
+                    <input type="checkbox" name="virtual_card_fx_mid_auto_sync" value="1" id="virtual_card_fx_mid_auto_sync" class="mr-2 rounded"
+                        {{ \App\Models\Setting::get('virtual_card_fx_mid_auto_sync', config('virtual_card.fx_mid_auto_sync', true)) ? 'checked' : '' }}>
+                    <span><strong>Auto-sync mid from Mevon live rate</strong> — sell/buy rates follow Mevon automatically; your ₦15 / ₦30 profit stays fixed.</span>
+                </label>
+                @if($cardMevonLiveMid !== null)
+                    <p class="text-xs text-gray-600">Mevon live mid now: <strong>₦{{ number_format($cardMevonLiveMid, 2) }}</strong>
+                        @if($cardMidAutoSync)
+                            · Active mid: <strong>₦{{ number_format($cardMid, 2) }}</strong>
+                        @endif
+                    </p>
+                @endif
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="virtual_card_fx_mid_usd_ngn" class="block text-sm font-medium text-gray-700 mb-1">Mid rate (NGN per $1)</label>
+                        <label for="virtual_card_fx_mid_usd_ngn" class="block text-sm font-medium text-gray-700 mb-1">Manual mid fallback (NGN per $1)</label>
                         <input type="number" step="0.01" min="0" id="virtual_card_fx_mid_usd_ngn" name="virtual_card_fx_mid_usd_ngn"
                             value="{{ \App\Models\Setting::get('virtual_card_fx_mid_usd_ngn', config('virtual_card.fx_mid_usd_ngn')) }}"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                        <p class="text-xs text-gray-500 mt-1">Your cost reference rate. Blank = WhatsApp USD→NGN table.</p>
+                        <p class="text-xs text-gray-500 mt-1" id="virtual_card_mid_help">
+                            @if($cardMidAutoSync)
+                                Used only when Mevon rate is unavailable. Recommended: keep near last known Mevon rate (e.g. ₦1,370).
+                            @else
+                                Your cost reference rate. Blank = WhatsApp USD→NGN table.
+                            @endif
+                        </p>
                     </div>
                     <div>
                         <label for="virtual_card_fx_sell_profit_ngn" class="block text-sm font-medium text-gray-700 mb-1">Sell profit (₦ per $1)</label>
@@ -825,6 +847,7 @@
                         @if($cardMid !== null)
                             <p class="text-xs text-gray-500 mt-1">
                                 Mid ₦{{ number_format($cardMid, 2) }}
+                                ({{ $cardMidSource === 'mevon_live' ? 'Mevon live' : ($cardMidSource === 'manual_fallback' ? 'manual fallback' : $cardMidSource) }})
                                 + sell ₦{{ number_format($cardSellProfit, 2) }}
                                 / − buy ₦{{ number_format($cardBuyProfit, 2) }}
                             </p>

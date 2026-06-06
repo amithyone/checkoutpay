@@ -200,7 +200,10 @@ final class MevonPayUsdAutoFundService
 
     private function estimateNgnForUsd(float $usdAmount): float
     {
-        $rate = max(1.0, (float) config('virtual_card.auto_fund_ngn_per_usd', 1400));
+        $liveRate = app(MevonPayExchangeRateService::class)->ngnPerUsd();
+        $rate = ($liveRate !== null && $liveRate > 0)
+            ? $liveRate
+            : max(1.0, (float) config('virtual_card.auto_fund_ngn_per_usd', 1400));
         $bufferPercent = max(0.0, (float) config('virtual_card.auto_fund_ngn_buffer_percent', 3));
 
         return ceil($usdAmount * $rate * (1 + ($bufferPercent / 100)));

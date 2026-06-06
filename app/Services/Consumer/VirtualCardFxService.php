@@ -4,19 +4,60 @@ namespace App\Services\Consumer;
 
 use App\Models\Setting;
 use App\Models\WhatsappCrossBorderFxRate;
+use App\Services\MevonPay\MevonPayExchangeRateService;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 
 final class VirtualCardFxService
 {
     public function __construct(
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
+        private MevonPayExchangeRateService $mevonRate,
     ) {}
 
-    public function midUsdNgnRate(): ?float
+    public function isMidAutoSyncEnabled(): bool
+    {
+        $stored = Setting::get('virtual_card_fx_mid_auto_sync');
+        if ($stored !== null) {
+            return (bool) $stored;
+        }
+
+        return (bool) config('virtual_card.fx_mid_auto_sync', true);
+    }
+
+    public function mevonLiveMidRate(): ?float
+    {
+        $live = $this->mevonRate->ngnPerUsd();
+
+        return ($live !== null && $live > 0) ? round($live, 4) : null;
+    }
+
+    public function manualMidUsdNgnRate(): ?float
     {
         $stored = Setting::get('virtual_card_fx_mid_usd_ngn');
         if ($stored !== null && is_numeric($stored) && (float) $stored > 0) {
             return round((float) $stored, 4);
+        }
+
+        $fromConfig = config('virtual_card.fx_mid_usd_ngn');
+        if ($fromConfig !== null && is_numeric($fromConfig) && (float) $fromConfig > 0) {
+            return round((float) $fromConfig, 4);
+        }
+
+        return null;
+    }
+
+    public function midUsdNgnRate(): ?float
+    {
+        if ($this->isMidAutoSyncEnabled()) {
+            $live = $this->mevonLiveMidRate();
+            if ($live !== null) {
+                return $live;
+            }
+        }
+
+        $manual = $this->manualMidUsdNgnRate();
+        if ($manual !== null) {
+            return $manual;
         }
 
         $from = (string) config('virtual_card.fee_currency_from', 'USD');
@@ -35,6 +76,37 @@ final class VirtualCardFxService
         }
 
         return null;
+    }
+
+    public function midSource(): string
+    {
+        if ($this->isMidAutoSyncEnabled()) {
+            $live = $this->mevonLiveMidRate();
+            if ($live !== null) {
+                return 'mevon_live';
+            }
+        }
+
+        if ($this->manualMidUsdNgnRate() !== null) {
+            return $this->isMidAutoSyncEnabled() ? 'manual_fallback' : 'manual';
+        }
+
+        $from = (string) config('virtual_card.fee_currency_from', 'USD');
+        $to = (string) config('virtual_card.fee_currency_to', 'NGN');
+        $fallback = $this->crossBorderFx->convertCurrency($from, $to, 1.0);
+        if ($fallback !== null && $fallback > 0) {
+            return 'cross_border';
+        }
+
+        $row = WhatsappCrossBorderFxRate::query()
+            ->where('from_currency', 'USD')
+            ->where('to_currency', 'NGN')
+            ->first();
+        if ($row && (float) $row->rate > 0) {
+            return 'fx_table';
+        }
+
+        return 'unavailable';
     }
 
     /**
@@ -123,6 +195,8 @@ final class VirtualCardFxService
         return [
             'fx_available' => $this->isAvailable(),
             'fx_mid_usd_ngn' => $this->midUsdNgnRate(),
+            'fx_mid_auto_sync' => $this->isMidAutoSyncEnabled(),
+            'fx_mid_source' => $this->midSource(),
             'sell_rate' => $this->sellRate(),
             'buy_rate' => $this->buyRate(),
             'sell_profit_ngn_per_usd' => $this->sellProfitNgnPerUsd(),

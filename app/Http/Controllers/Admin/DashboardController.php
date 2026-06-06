@@ -200,6 +200,8 @@ class DashboardController extends Controller
                 'usd_balance' => $mevonBalance['usd_balance'],
                 'mevon_ngn_per_usd' => app(MevonPayExchangeRateService::class)->ngnPerUsd(),
                 'mid_rate' => $cardFx->midUsdNgnRate(),
+                'mid_auto_sync' => $cardFx->isMidAutoSyncEnabled(),
+                'mid_source' => $cardFx->midSource(),
                 'sell_profit_ngn' => $cardFx->sellProfitNgnPerUsd(),
                 'buy_profit_ngn' => $cardFx->buyProfitNgnPerUsd(),
                 'sell_rate' => $cardFx->sellRate(),

@@ -24,6 +24,8 @@ class ConsumerVirtualCardOpsTest extends TestCase
             'services.mevonpay.base_url' => 'https://mevon.test',
             'services.mevonpay.secret_key' => 'test-secret',
         ]);
+
+        Setting::set('virtual_card_fx_mid_auto_sync', 0, 'boolean', 'virtual_card', 'test');
     }
 
     public function test_topup_debits_wallet_and_calls_provider(): void
