@@ -918,21 +918,9 @@ final class ConsumerVirtualCardService
             $expiry = str_pad($expiryMatch[1], 2, '0', STR_PAD_LEFT).'/'.substr($expiryMatch[2], -2);
         }
 
-        $billing = $row['billing'] ?? $row['billing_address'] ?? $row['address'] ?? null;
-        $billingText = '';
-        if (is_string($billing)) {
-            $billingText = trim($billing);
-        } elseif (is_array($billing)) {
-            $parts = array_filter([
-                $billing['address1'] ?? $billing['street'] ?? $billing['line1'] ?? null,
-                $billing['address2'] ?? $billing['line2'] ?? null,
-                $billing['city'] ?? null,
-                $billing['state'] ?? null,
-                $billing['zip_code'] ?? $billing['zip'] ?? null,
-                $billing['country'] ?? null,
-            ], fn ($v) => is_string($v) && trim($v) !== '');
-            $billingText = implode(', ', array_map('trim', $parts));
-        }
+        $billingParts = $this->normalizeBillingParts(
+            $row['billing'] ?? $row['billing_address'] ?? $row['address'] ?? null,
+        );
 
         $lastFour = $cardNumber !== '' ? substr(preg_replace('/\D/', '', $cardNumber) ?? '', -4) : '';
         if ($lastFour === '' && isset($row['last_four'])) {
@@ -952,10 +940,65 @@ final class ConsumerVirtualCardService
             'card_external_id' => (string) $card->card_external_id,
             'last_four' => $lastFour,
             'brand' => strtolower((string) ($row['brand'] ?? $row['card_brand'] ?? $row['scheme'] ?? 'visa')),
-            'billing_address' => $billingText,
+            'billing_address' => $billingParts['formatted'],
+            'billing_street' => $billingParts['street'],
+            'billing_city' => $billingParts['city'],
+            'billing_state' => $billingParts['state'],
+            'billing_zip' => $billingParts['zip'],
+            'billing_country' => $billingParts['country'],
             'currency' => strtoupper((string) ($row['currency'] ?? 'USD')),
             'balance_usd' => $card->card_balance_usd ?? (is_numeric($row['balance_usd'] ?? null) ? (float) $row['balance_usd'] : null),
             'status' => (string) ($row['status'] ?? ($card->is_frozen ? 'frozen' : 'active')),
+        ];
+    }
+
+    /**
+     * @return array{street: string, city: string, state: string, zip: string, country: string, formatted: string}
+     */
+    private function normalizeBillingParts(mixed $billing): array
+    {
+        $empty = [
+            'street' => '',
+            'city' => '',
+            'state' => '',
+            'zip' => '',
+            'country' => '',
+            'formatted' => '',
+        ];
+
+        if (is_string($billing)) {
+            $text = trim($billing);
+
+            return array_merge($empty, ['formatted' => $text]);
+        }
+
+        if (! is_array($billing)) {
+            return $empty;
+        }
+
+        $line1 = trim((string) ($billing['address1'] ?? $billing['street'] ?? $billing['line1'] ?? ''));
+        $line2 = trim((string) ($billing['address2'] ?? $billing['line2'] ?? ''));
+        $street = trim($line1.($line2 !== '' ? ', '.$line2 : ''));
+        $city = trim((string) ($billing['city'] ?? ''));
+        $state = trim((string) ($billing['state'] ?? $billing['region'] ?? ''));
+        $zip = trim((string) ($billing['zip_code'] ?? $billing['zip'] ?? $billing['postal_code'] ?? ''));
+        $country = trim((string) ($billing['country'] ?? ''));
+
+        $labeled = array_filter([
+            $street !== '' ? $street : null,
+            $city !== '' ? $city : null,
+            $state !== '' ? $state : null,
+            $zip !== '' ? $zip : null,
+            $country !== '' ? $country : null,
+        ]);
+
+        return [
+            'street' => $street,
+            'city' => $city,
+            'state' => $state,
+            'zip' => $zip,
+            'country' => $country,
+            'formatted' => implode(', ', $labeled),
         ];
     }
 

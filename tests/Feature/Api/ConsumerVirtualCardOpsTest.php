@@ -189,6 +189,7 @@ class ConsumerVirtualCardOpsTest extends TestCase
                 'billing_address' => [
                     'street' => '3401 N. Miami, Ave. Ste 230',
                     'city' => 'Miami',
+                    'state' => 'FL',
                     'country' => 'United States',
                     'zip_code' => '33127',
                 ],
@@ -208,7 +209,11 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.expiry', '06/29')
             ->assertJsonPath('data.card_external_id', 'VCARD-TEST-001')
             ->assertJsonPath('data.last_four', '3096')
-            ->assertJsonPath('data.balance_usd', 5);
+            ->assertJsonPath('data.balance_usd', 5)
+            ->assertJsonPath('data.billing_city', 'Miami')
+            ->assertJsonPath('data.billing_state', 'FL')
+            ->assertJsonPath('data.billing_zip', '33127')
+            ->assertJsonPath('data.billing_country', 'United States');
     }
 
     public function test_card_details_backfills_from_orphan_webhook_log_by_card_id(): void
