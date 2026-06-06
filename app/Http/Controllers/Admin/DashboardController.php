@@ -199,9 +199,11 @@ class DashboardController extends Controller
                 'naira_balance' => $mevonBalance['naira_balance'],
                 'usd_balance' => $mevonBalance['usd_balance'],
                 'mevon_ngn_per_usd' => app(MevonPayExchangeRateService::class)->ngnPerUsd(),
+                'mid_rate' => $cardFx->midUsdNgnRate(),
+                'sell_profit_ngn' => $cardFx->sellProfitNgnPerUsd(),
+                'buy_profit_ngn' => $cardFx->buyProfitNgnPerUsd(),
                 'sell_rate' => $cardFx->sellRate(),
                 'buy_rate' => $cardFx->buyRate(),
-                'mid_rate' => $cardFx->midUsdNgnRate(),
                 'fetched_at' => $mevonBalance['fetched_at'],
             ];
         }

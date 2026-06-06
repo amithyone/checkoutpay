@@ -110,14 +110,14 @@
                         {{ $mevonTodayStats['message'] ?? 'MevonPay is not configured.' }}
                     </p>
                 @else
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <p class="text-xs text-gray-600 mb-3 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                        <strong>How it works:</strong> Set your <strong>mid</strong> to match Mevon (~₦1,370).
+                        <strong>Sell (fund card)</strong> = mid + your sell profit (e.g. ₦1,370 + ₦15 = <strong>₦1,385</strong> per $1).
+                        <strong>Buy (withdraw)</strong> = mid − your buy profit (e.g. ₦1,370 − ₦30 = <strong>₦1,340</strong> per $1).
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
                         <div class="bg-white rounded-lg shadow-sm p-4 border border-indigo-100">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-xs text-gray-600">Mevon USD rate</p>
-                                <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-chart-line text-indigo-600 text-sm"></i>
-                                </div>
-                            </div>
+                            <p class="text-xs text-gray-600 mb-1">Mevon rate (live)</p>
                             <h3 class="text-2xl font-bold text-gray-900">
                                 @if($mevonTodayStats['mevon_ngn_per_usd'] !== null)
                                     ₦{{ number_format($mevonTodayStats['mevon_ngn_per_usd'], 2) }}
@@ -125,67 +125,83 @@
                                     —
                                 @endif
                             </h3>
-                            <p class="text-xs text-gray-500 mt-1">NGN per $1 (MevonPay exchange)</p>
+                            <p class="text-xs text-gray-500 mt-1">What MevonPay charges per $1 today</p>
                         </div>
-
-                        <div class="bg-white rounded-lg shadow-sm p-4 border border-emerald-100">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-xs text-gray-600">Mevon dollar balance</p>
-                                <div class="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-wallet text-emerald-600 text-sm"></i>
-                                </div>
-                            </div>
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
+                            <p class="text-xs text-gray-600 mb-1">Your mid (settings)</p>
                             <h3 class="text-2xl font-bold text-gray-900">
-                                @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['usd_balance'] !== null)
-                                    ${{ number_format($mevonTodayStats['usd_balance'], 2) }}
-                                @else
-                                    —
-                                @endif
-                            </h3>
-                            <p class="text-xs text-gray-500 mt-1">Available USD float</p>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow-sm p-4 border border-green-100">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-xs text-gray-600">Mevon naira balance</p>
-                                <div class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-money-bill-wave text-green-600 text-sm"></i>
-                                </div>
-                            </div>
-                            <h3 class="text-2xl font-bold text-gray-900">
-                                @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['naira_balance'] !== null)
-                                    ₦{{ number_format($mevonTodayStats['naira_balance'], 2) }}
-                                @else
-                                    —
-                                @endif
-                            </h3>
-                            <p class="text-xs text-gray-500 mt-1">Available NGN float</p>
-                        </div>
-
-                        <div class="bg-white rounded-lg shadow-sm p-4 border border-violet-100">
-                            <div class="flex items-center justify-between mb-2">
-                                <p class="text-xs text-gray-600">Your card rate (sell)</p>
-                                <div class="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
-                                    <i class="fas fa-credit-card text-violet-600 text-sm"></i>
-                                </div>
-                            </div>
-                            <h3 class="text-2xl font-bold text-gray-900">
-                                @if($mevonTodayStats['sell_rate'] !== null)
-                                    ₦{{ number_format($mevonTodayStats['sell_rate'], 2) }}
+                                @if($mevonTodayStats['mid_rate'] !== null)
+                                    ₦{{ number_format($mevonTodayStats['mid_rate'], 2) }}
                                 @else
                                     —
                                 @endif
                             </h3>
                             <p class="text-xs text-gray-500 mt-1">
-                                @if($mevonTodayStats['mid_rate'] !== null)
-                                    Mid ₦{{ number_format($mevonTodayStats['mid_rate'], 2) }}
-                                    @if($mevonTodayStats['buy_rate'] !== null)
-                                        · Buy ₦{{ number_format($mevonTodayStats['buy_rate'], 2) }}
-                                    @endif
+                                @if($mevonTodayStats['mid_rate'] !== null && $mevonTodayStats['mevon_ngn_per_usd'] !== null && abs($mevonTodayStats['mid_rate'] - $mevonTodayStats['mevon_ngn_per_usd']) > 5)
+                                    <span class="text-amber-700">Differs from Mevon — align in Settings → Virtual Card</span>
                                 @else
-                                    Set virtual card FX in Settings
+                                    Base rate for your sell/buy math
                                 @endif
                             </p>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-emerald-100">
+                            <p class="text-xs text-gray-600 mb-1">Mevon balances</p>
+                            <p class="text-lg font-bold text-gray-900">
+                                @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['usd_balance'] !== null)
+                                    ${{ number_format($mevonTodayStats['usd_balance'], 2) }} USD
+                                @else
+                                    — USD
+                                @endif
+                            </p>
+                            <p class="text-lg font-bold text-gray-900">
+                                @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['naira_balance'] !== null)
+                                    ₦{{ number_format($mevonTodayStats['naira_balance'], 2) }} NGN
+                                @else
+                                    — NGN
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-violet-200 border-l-4 border-l-violet-500">
+                            <p class="text-xs font-semibold text-violet-800 mb-1">Sell rate — customer funds card</p>
+                            <h3 class="text-2xl font-bold text-gray-900">
+                                @if($mevonTodayStats['sell_rate'] !== null)
+                                    ₦{{ number_format($mevonTodayStats['sell_rate'], 2) }} <span class="text-base font-normal text-gray-500">/ $1</span>
+                                @else
+                                    —
+                                @endif
+                            </h3>
+                            <p class="text-xs text-gray-600 mt-2">
+                                @if($mevonTodayStats['mid_rate'] !== null)
+                                    Mid ₦{{ number_format($mevonTodayStats['mid_rate'], 2) }}
+                                    + profit ₦{{ number_format($mevonTodayStats['sell_profit_ngn'] ?? 0, 2) }}
+                                    = customer pays this rate
+                                @else
+                                    Set mid &amp; sell profit in Settings → Virtual Card
+                                @endif
+                            </p>
+                            <p class="text-xs text-violet-700 mt-1">You keep <strong>₦{{ number_format($mevonTodayStats['sell_profit_ngn'] ?? 0, 2) }}</strong> per $1 funded</p>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm p-4 border border-teal-200 border-l-4 border-l-teal-500">
+                            <p class="text-xs font-semibold text-teal-800 mb-1">Buy rate — customer withdraws to wallet</p>
+                            <h3 class="text-2xl font-bold text-gray-900">
+                                @if($mevonTodayStats['buy_rate'] !== null)
+                                    ₦{{ number_format($mevonTodayStats['buy_rate'], 2) }} <span class="text-base font-normal text-gray-500">/ $1</span>
+                                @else
+                                    —
+                                @endif
+                            </h3>
+                            <p class="text-xs text-gray-600 mt-2">
+                                @if($mevonTodayStats['mid_rate'] !== null)
+                                    Mid ₦{{ number_format($mevonTodayStats['mid_rate'], 2) }}
+                                    − profit ₦{{ number_format($mevonTodayStats['buy_profit_ngn'] ?? 0, 2) }}
+                                    = customer receives this rate
+                                @else
+                                    Set mid &amp; buy profit in Settings → Virtual Card
+                                @endif
+                            </p>
+                            <p class="text-xs text-teal-700 mt-1">You keep <strong>₦{{ number_format($mevonTodayStats['buy_profit_ngn'] ?? 0, 2) }}</strong> per $1 withdrawn</p>
                         </div>
                     </div>
                     @if(!($mevonTodayStats['ok'] ?? false))
