@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\VirtualCardRequest;
 use App\Services\Consumer\VirtualCardFeeRefundService;
 use App\Services\Consumer\VirtualCardProviderResponseService;
+use App\Services\Consumer\VirtualCardRequestSupersedeService;
 use Illuminate\Console\Command;
 
 class ActivateVirtualCardFromProviderCommand extends Command
@@ -20,6 +21,7 @@ class ActivateVirtualCardFromProviderCommand extends Command
     public function handle(
         VirtualCardProviderResponseService $providerResponse,
         VirtualCardFeeRefundService $feeRefunds,
+        VirtualCardRequestSupersedeService $supersede,
     ): int
     {
         $cardId = trim((string) $this->argument('card_id'));
@@ -88,6 +90,10 @@ class ActivateVirtualCardFromProviderCommand extends Command
         ], $cardId);
 
         $row->refresh();
+        $superseded = $supersede->supersedeStaleAttempts($row);
+        if ($superseded > 0) {
+            $this->warn("Superseded {$superseded} stale card attempt(s) for this wallet.");
+        }
         $this->info("Activated request #{$row->id} for wallet #{$row->whatsapp_wallet_id} with card {$row->card_external_id}");
 
         return self::SUCCESS;

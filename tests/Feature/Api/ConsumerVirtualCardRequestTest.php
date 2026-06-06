@@ -168,7 +168,8 @@ class ConsumerVirtualCardRequestTest extends TestCase
             ->assertJsonPath('data.card_screen', 'manage')
             ->assertJsonPath('data.operable_request.card_external_id', 'MEVON-CARD-ACTIVE')
             ->assertJsonPath('data.operable_request.can_manage', true)
-            ->assertJsonPath('data.latest_request.status', VirtualCardRequest::STATUS_FAILED)
+            ->assertJsonPath('data.latest_request.card_external_id', 'MEVON-CARD-ACTIVE')
+            ->assertJsonPath('data.latest_request.status', VirtualCardRequest::STATUS_ACTIVE)
             ->assertJsonPath('data.can_request_card', false)
             ->assertJsonPath('data.card_preparing', false);
     }

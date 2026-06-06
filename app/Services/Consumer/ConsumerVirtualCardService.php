@@ -24,6 +24,7 @@ final class ConsumerVirtualCardService
         private VirtualCardProviderResponseService $providerResponse,
         private MevonPayUsdAutoFundService $usdAutoFund,
         private VirtualCardRequestLogService $cardLogs,
+        private VirtualCardRequestSupersedeService $supersede,
     ) {}
 
     public function isEnabled(): bool
@@ -330,6 +331,9 @@ final class ConsumerVirtualCardService
         if ($this->providerResponse->isCreateAccepted($api)) {
             $this->providerResponse->applyAccepted($row, $api);
             $fresh = $row->fresh();
+            if ($this->isOperableCardRequest($fresh)) {
+                $this->supersede->supersedeStaleAttempts($fresh);
+            }
             $preparing = $fresh->status === VirtualCardRequest::STATUS_PREPARING;
 
             $this->cardLogs->info(
@@ -767,11 +771,12 @@ final class ConsumerVirtualCardService
         $feeNgn = $this->fx->quoteRequestFeeNgn($feeUsd);
 
         $display = $this->resolveDisplayCard($wallet);
-        $latest = VirtualCardRequest::query()
+        $rawLatest = VirtualCardRequest::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->latest('id')
             ->first();
-        $cardScreen = $this->cardScreenFor($display, $latest);
+        $latest = $display ?? $rawLatest;
+        $cardScreen = $this->cardScreenFor($display, $rawLatest);
 
         return array_merge($this->fx->ratesPayload(), [
             'enabled' => $this->isEnabled(),
@@ -818,6 +823,11 @@ final class ConsumerVirtualCardService
 
     private function blockingCardRequest(WhatsappWallet $wallet): ?VirtualCardRequest
     {
+        $display = $this->resolveDisplayCard($wallet);
+        if ($display) {
+            return $display;
+        }
+
         return VirtualCardRequest::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->whereIn('status', [

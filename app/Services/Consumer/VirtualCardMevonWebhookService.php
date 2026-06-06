@@ -22,6 +22,7 @@ final class VirtualCardMevonWebhookService
         private VirtualCardProviderResponseService $providerResponse,
         private VirtualCardRequestLogService $cardLogs,
         private VirtualCardFeeRefundService $feeRefunds,
+        private VirtualCardRequestSupersedeService $supersede,
     ) {}
 
     /**
@@ -152,8 +153,10 @@ final class VirtualCardMevonWebhookService
 
         $this->providerResponse->applyWebhookReady($row, $payload, $cardId !== '' ? $cardId : null);
         $fresh = $row->fresh();
+        $superseded = $this->supersede->supersedeStaleAttempts($fresh);
 
         $this->cardLogs->info('webhook_activated', 'Card activated from MevonPay webhook', $fresh, $this->cardLogs->withMevonWebhook($payload, $rawBody, [
+            'superseded_attempts' => $superseded,
             'card_id' => $fresh->card_external_id,
             'was_failed' => $wasFailed,
             'fee_recollected' => (bool) ($collection['collected'] ?? false),

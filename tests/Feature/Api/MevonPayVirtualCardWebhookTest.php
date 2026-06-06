@@ -177,6 +177,74 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         ]);
     }
 
+    public function test_webhook_activation_supersedes_other_failed_attempts_for_wallet(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348011112222',
+            'display_name' => 'Multi Attempt',
+            'balance' => 50000,
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        $failedNewer = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_FAILED,
+            'fee_usd' => 5,
+            'fee_ngn' => 6925,
+            'external_reference' => 'VCARD-FAILED-NEWER',
+            'failure_reason' => 'provider timeout',
+            'request_payload' => [
+                'email' => 'multi@example.com',
+                'phoneNumber' => '08011112222',
+            ],
+        ]);
+
+        $winner = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_FAILED,
+            'fee_usd' => 5,
+            'fee_ngn' => 6925,
+            'external_reference' => 'VCARD-WINNER-OLD',
+            'failure_reason' => 'Card creation request processed successfully',
+            'created_at' => now()->subHours(3),
+            'request_payload' => [
+                'email' => 'multi@example.com',
+                'phoneNumber' => '08011112222',
+            ],
+        ]);
+
+        WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'sender_name' => 'Multi Attempt',
+            'type' => WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE,
+            'amount' => 6925,
+            'balance_after' => 43075,
+            'external_reference' => $winner->external_reference,
+            'meta' => [
+                'refunded' => true,
+                'refund_reason' => 'provider_failed',
+            ],
+        ]);
+
+        $response = $this->postJson('/api/v1/webhook/mevonpay', [
+            'event' => 'card.created.success',
+            'data' => [
+                'reference' => '766f5cdb-9956-4cec-af77-b520f624acc3',
+                'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                'email' => 'multi@example.com',
+            ],
+        ]);
+
+        $response->assertOk()->assertJsonPath('message', 'Virtual card activated');
+
+        $failedNewer->refresh();
+        $winner->refresh();
+
+        $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $winner->status);
+        $this->assertStringContainsString('Superseded', (string) $failedNewer->failure_reason);
+        $this->assertSame(VirtualCardRequest::STATUS_FAILED, $failedNewer->status);
+    }
+
     public function test_card_created_success_with_mevon_req_reference_matches_preparing_request(): void
     {
         $wallet = WhatsappWallet::query()->create([
