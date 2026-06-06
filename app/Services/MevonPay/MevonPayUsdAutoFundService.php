@@ -51,32 +51,32 @@ final class MevonPayUsdAutoFundService
             ];
         }
 
-        $usdBefore = $this->spendableUsd($snapshot);
+        $walletUsd = $snapshot['usd_balance'] ?? null;
         $nairaAvailable = $snapshot['naira_balance'];
-        if ($usdBefore === null || $nairaAvailable === null) {
+        if ($walletUsd === null || $nairaAvailable === null) {
             return ['ok' => false, 'message' => 'MevonPay balance response is missing USD or NGN amounts.'];
         }
 
-        if (! $forceTopUp && $usdBefore >= $targetUsd) {
+        if ($walletUsd >= $targetUsd) {
             Log::debug('mevonpay.usd_auto_fund.skipped', [
                 'context' => $context,
                 'required_usd' => $requiredUsd,
                 'target_usd' => $targetUsd,
-                'spendable_usd' => $usdBefore,
-                'usd_balance' => $snapshot['usd_balance'] ?? null,
+                'usd_balance' => $walletUsd,
                 'usd_ledger' => $snapshot['usd_ledger'] ?? null,
+                'force_top_up' => $forceTopUp,
             ]);
 
             return [
                 'ok' => true,
                 'message' => 'USD balance is sufficient.',
                 'funded' => false,
-                'usd_balance_before' => $usdBefore,
-                'usd_balance_after' => $usdBefore,
+                'usd_balance_before' => $walletUsd,
+                'usd_balance_after' => $walletUsd,
             ];
         }
 
-        $shortfallUsd = round(max($targetUsd - $usdBefore, 0), 2);
+        $shortfallUsd = round(max($targetUsd - $walletUsd, 0), 2);
         if ($forceTopUp) {
             $forceBuyUsd = max(0.01, (float) config('virtual_card.auto_fund_force_buy_usd', 2));
             $shortfallUsd = max($shortfallUsd, $forceBuyUsd);
@@ -106,8 +106,7 @@ final class MevonPayUsdAutoFundService
             'target_usd' => $targetUsd,
             'shortfall_usd' => $shortfallUsd,
             'ngn_attempt' => $ngnEstimate,
-            'spendable_usd_before' => $usdBefore,
-            'usd_balance' => $snapshot['usd_balance'] ?? null,
+            'usd_balance_before' => $walletUsd,
             'usd_ledger' => $snapshot['usd_ledger'] ?? null,
             'force_top_up' => $forceTopUp,
             'minimum_buy_usd' => $minimumBuyUsd,
@@ -134,7 +133,7 @@ final class MevonPayUsdAutoFundService
         $fundedNgn = round($ngnEstimate, 2);
 
         $after = $this->balances->forDashboard();
-        $usdAfter = ($after['ok'] ?? false) ? $this->spendableUsd($after) : null;
+        $usdAfter = ($after['ok'] ?? false) ? ($after['usd_balance'] ?? null) : null;
 
         if ($usdAfter !== null && $usdAfter < $targetUsd) {
             $remaining = round($targetUsd - $usdAfter, 2);
@@ -147,7 +146,7 @@ final class MevonPayUsdAutoFundService
                     $fundedNgn = round($fundedNgn + $topUpNgn, 2);
                     $convertedUsd = round($convertedUsd + $this->convertedUsdAmount($second), 4);
                     $after = $this->balances->forDashboard();
-                    $usdAfter = ($after['ok'] ?? false) ? $this->spendableUsd($after) : $usdAfter;
+                    $usdAfter = ($after['ok'] ?? false) ? ($after['usd_balance'] ?? null) : $usdAfter;
                 }
             }
         }
@@ -159,7 +158,7 @@ final class MevonPayUsdAutoFundService
                 'funded' => true,
                 'funded_ngn' => $fundedNgn,
                 'funded_usd' => $convertedUsd,
-                'usd_balance_before' => $usdBefore,
+                'usd_balance_before' => $walletUsd,
                 'usd_balance_after' => $usdAfter,
             ];
         }
@@ -169,7 +168,7 @@ final class MevonPayUsdAutoFundService
             'required_usd' => $requiredUsd,
             'funded_ngn' => $fundedNgn,
             'funded_usd' => $convertedUsd,
-            'usd_balance_before' => $usdBefore,
+            'usd_balance_before' => $walletUsd,
             'usd_balance_after' => $usdAfter,
         ]);
 
@@ -179,46 +178,49 @@ final class MevonPayUsdAutoFundService
             'funded' => true,
             'funded_ngn' => $fundedNgn,
             'funded_usd' => $convertedUsd,
-            'usd_balance_before' => $usdBefore,
+            'usd_balance_before' => $walletUsd,
             'usd_balance_after' => $usdAfter,
         ];
     }
 
     /**
      * Buy USD after the provider rejected a card call for insufficient merchant float.
+     * Skips NGN conversion when wallet USD already covers the amount.
      *
      * @return array{ok: bool, message: string, funded?: bool, funded_ngn?: float, funded_usd?: float, usd_balance_before?: ?float, usd_balance_after?: ?float}
      */
     public function fundAfterProviderInsufficientUsd(float $requiredUsd, string $context): array
     {
         $buffer = max(0.0, (float) config('virtual_card.auto_fund_usd_buffer', 1));
+        $targetUsd = round($requiredUsd + $buffer, 2);
+
+        $snapshot = $this->balances->forDashboard();
+        if (($snapshot['ok'] ?? false) && ($snapshot['usd_balance'] ?? null) !== null) {
+            $walletUsd = (float) $snapshot['usd_balance'];
+            if ($walletUsd >= $targetUsd) {
+                Log::info('mevonpay.usd_auto_fund.provider_retry_skipped', [
+                    'context' => $context,
+                    'required_usd' => $requiredUsd,
+                    'usd_balance' => $walletUsd,
+                    'usd_ledger' => $snapshot['usd_ledger'] ?? null,
+                ]);
+
+                return [
+                    'ok' => true,
+                    'message' => 'Wallet USD already sufficient; retrying card without NGN conversion.',
+                    'funded' => false,
+                    'usd_balance_before' => $walletUsd,
+                    'usd_balance_after' => $walletUsd,
+                ];
+            }
+        }
 
         return $this->ensureUsdBalance(
             $requiredUsd,
             $context,
             forceTopUp: true,
-            minimumBuyUsd: round($requiredUsd + $buffer, 2),
+            minimumBuyUsd: $targetUsd,
         );
-    }
-
-    /**
-     * USD MevonPay exposes for card ops — prefer ledger (usd_ledger_bal) over wallet display (usd_balance).
-     *
-     * @param  array{naira_balance?: ?float, usd_balance?: ?float, usd_ledger?: ?float}  $snapshot
-     */
-    private function spendableUsd(array $snapshot): ?float
-    {
-        $balance = $snapshot['usd_balance'] ?? null;
-        $ledger = $snapshot['usd_ledger'] ?? null;
-        $source = (string) config('virtual_card.auto_fund_usd_source', 'ledger');
-
-        return match ($source) {
-            'balance' => $balance,
-            'min' => ($balance !== null && $ledger !== null)
-                ? min($balance, $ledger)
-                : ($ledger ?? $balance),
-            default => $ledger ?? $balance,
-        };
     }
 
     public function isInsufficientUsdError(string $message): bool

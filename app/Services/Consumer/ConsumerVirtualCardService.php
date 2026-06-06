@@ -495,20 +495,6 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => 'Could not resolve card for top-up.'];
         }
 
-        $preflightFund = $this->usdAutoFund->ensureUsdBalance($amountUsd, 'virtual_card_topup_preflight');
-        if (! ($preflightFund['ok'] ?? false)) {
-            Log::warning('consumer.virtual_card.usd_auto_fund_preflight_failed', [
-                'wallet_id' => $wallet->id,
-                'amount_usd' => $amountUsd,
-                'reason' => (string) ($preflightFund['message'] ?? 'USD auto-fund failed'),
-            ]);
-
-            return [
-                'ok' => false,
-                'message' => VirtualCardUserFacingMessage::serviceUnavailable(),
-            ];
-        }
-
         $reference = 'VCARD-TOP-'.strtoupper(Str::random(12));
 
         try {

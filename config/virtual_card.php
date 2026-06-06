@@ -23,8 +23,8 @@ return [
     'withdraw_min_usd' => max(0.01, (float) env('VIRTUAL_CARD_WITHDRAW_MIN_USD', 1)),
     'withdraw_max_usd' => max(1.0, (float) env('VIRTUAL_CARD_WITHDRAW_MAX_USD', 500)),
     'auto_fund_usd_enabled' => (bool) env('VIRTUAL_CARD_AUTO_FUND_USD_ENABLED', true),
-    /** ledger = usd_ledger_bal (card spendable), balance = usd_balance, min = lower of both */
-    'auto_fund_usd_source' => env('VIRTUAL_CARD_AUTO_FUND_USD_SOURCE', 'ledger'),
+    /** Sufficiency checks use usd_balance (wallet USD). NGN→USD only when balance is short. */
+    'auto_fund_usd_source' => env('VIRTUAL_CARD_AUTO_FUND_USD_SOURCE', 'balance'),
     'auto_fund_usd_buffer' => max(0.0, (float) env('VIRTUAL_CARD_AUTO_FUND_USD_BUFFER', 1)),
     'auto_fund_usd_max_per_op' => max(0.0, (float) env('VIRTUAL_CARD_AUTO_FUND_USD_MAX_PER_OP', 500)),
     'auto_fund_ngn_per_usd' => max(1.0, (float) env('VIRTUAL_CARD_AUTO_FUND_NGN_PER_USD', 1400)),

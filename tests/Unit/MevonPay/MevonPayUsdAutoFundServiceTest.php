@@ -101,7 +101,7 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
         $this->assertFalse($svc->isInsufficientUsdError('Invalid PIN'));
     }
 
-    public function test_force_top_up_buys_usd_even_when_balance_api_looks_sufficient(): void
+    public function test_force_top_up_buys_usd_when_wallet_balance_is_short(): void
     {
         config(['virtual_card.auto_fund_force_buy_usd' => 2]);
 
@@ -109,19 +109,15 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
             'https://mevon.test/V1/balance' => Http::sequence()
                 ->push([
                     'status' => 'success',
-                    'data' => [
-                        'bal' => '500000',
-                        'usd_balance' => '20.00',
-                        'usd_ledger_bal' => '20.00',
-                    ],
+                    'data' => ['bal' => '500000', 'usd_balance' => '3.00'],
                 ], 200)
                 ->push([
                     'status' => 'success',
-                    'data' => [
-                        'bal' => '491600',
-                        'usd_balance' => '26.00',
-                        'usd_ledger_bal' => '26.00',
-                    ],
+                    'data' => ['bal' => '500000', 'usd_balance' => '3.00'],
+                ], 200)
+                ->push([
+                    'status' => 'success',
+                    'data' => ['bal' => '491600', 'usd_balance' => '9.00'],
                 ], 200),
             'https://mevon.test/V1/exchange' => Http::response([
                 'status' => true,
@@ -131,7 +127,7 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
                     'to_currency' => 'USD',
                     'amount' => 8400,
                     'converted_amount' => 6,
-                    'new_usd_balance' => 26,
+                    'new_usd_balance' => 9,
                 ],
             ], 200),
         ]);
@@ -143,43 +139,43 @@ class MevonPayUsdAutoFundServiceTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), '/V1/exchange'));
     }
 
-    public function test_prefers_usd_ledger_when_wallet_balance_is_higher(): void
+    public function test_skips_conversion_when_wallet_usd_covers_amount_even_if_ledger_is_zero(): void
     {
         Http::fake([
-            'https://mevon.test/V1/balance' => Http::sequence()
-                ->push([
-                    'status' => 'success',
-                    'data' => [
-                        'bal' => '500000',
-                        'usd_balance' => '28.25',
-                        'usd_ledger_bal' => '0.00',
-                    ],
-                ], 200)
-                ->push([
-                    'status' => 'success',
-                    'data' => [
-                        'bal' => '484600',
-                        'usd_balance' => '28.25',
-                        'usd_ledger_bal' => '11.00',
-                    ],
-                ], 200),
-            'https://mevon.test/V1/exchange' => Http::response([
-                'status' => true,
-                'message' => 'Conversion successful',
+            'https://mevon.test/V1/balance' => Http::response([
+                'status' => 'success',
                 'data' => [
-                    'from_currency' => 'NGN',
-                    'to_currency' => 'USD',
-                    'amount' => 15400,
-                    'converted_amount' => 11,
-                    'new_usd_balance' => 11,
+                    'bal' => '500000',
+                    'usd_balance' => '32.31',
+                    'usd_ledger_bal' => '0.00',
                 ],
             ], 200),
         ]);
 
-        $result = app(MevonPayUsdAutoFundService::class)->ensureUsdBalance(10, 'test_ledger');
+        $result = app(MevonPayUsdAutoFundService::class)->ensureUsdBalance(10, 'test_skip');
 
         $this->assertTrue($result['ok']);
-        $this->assertTrue($result['funded']);
-        Http::assertSent(fn ($request) => str_contains($request->url(), '/V1/exchange'));
+        $this->assertFalse($result['funded']);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/V1/exchange'));
+    }
+
+    public function test_provider_retry_skips_ngn_conversion_when_wallet_usd_is_already_enough(): void
+    {
+        Http::fake([
+            'https://mevon.test/V1/balance' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'bal' => '500000',
+                    'usd_balance' => '32.31',
+                    'usd_ledger_bal' => '0.00',
+                ],
+            ], 200),
+        ]);
+
+        $result = app(MevonPayUsdAutoFundService::class)->fundAfterProviderInsufficientUsd(10, 'test_retry_skip');
+
+        $this->assertTrue($result['ok']);
+        $this->assertFalse($result['funded']);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/V1/exchange'));
     }
 }
