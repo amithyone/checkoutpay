@@ -30,7 +30,7 @@ class ConsumerVirtualCardOpsTest extends TestCase
     {
         [$wallet, $account] = $this->walletWithActiveCard();
         Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_sell_markup_percent', 0, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
 
         Http::fake([
             'https://mevon.test/V1/balance' => Http::sequence()
@@ -112,7 +112,7 @@ class ConsumerVirtualCardOpsTest extends TestCase
     {
         [$wallet, $account] = $this->walletWithActiveCard();
         Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_sell_markup_percent', 0, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
 
         Http::fake([
             'https://mevon.test/V1/balance' => Http::response([
@@ -142,7 +142,7 @@ class ConsumerVirtualCardOpsTest extends TestCase
         [$wallet, $account] = $this->walletWithActiveCard();
         $wallet->update(['balance' => 100]);
         Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_sell_markup_percent', 0, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
 
         Sanctum::actingAs($account);
 
@@ -161,7 +161,7 @@ class ConsumerVirtualCardOpsTest extends TestCase
     {
         [, $account] = $this->walletWithActiveCard();
         Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_sell_markup_percent', 3, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 48, 'float', 'virtual_card', 'test');
 
         Sanctum::actingAs($account);
 

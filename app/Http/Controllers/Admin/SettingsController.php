@@ -22,7 +22,8 @@ class SettingsController extends Controller
             'general' => 'General Settings',
             'security' => 'Security Settings',
             'charges' => 'Charge Settings',
-            'vtu' => 'VTU & Virtual Card',
+            'vtu' => 'VTU (Pay Bills)',
+            'virtual_card' => 'Dollar Virtual Card',
         ];
 
         $settings = [];
@@ -208,18 +209,11 @@ class SettingsController extends Controller
             }
         }
 
-        if ($request->has('vtu_provider')) {
+        if ($request->input('settings_section') === 'vtu') {
             $validated = $request->validate([
                 'vtu_provider' => 'required|in:vtu_ng,mevonpay',
                 'vtu_ng_enabled' => 'nullable|boolean',
                 'mevonpay_vtu_enabled' => 'nullable|boolean',
-                'virtual_card_enabled' => 'nullable|boolean',
-                'virtual_card_request_fee_usd' => 'nullable|numeric|min:0|max:500',
-                'virtual_card_fx_mid_usd_ngn' => 'nullable|numeric|min:0|max:100000',
-                'virtual_card_fx_sell_markup_percent' => 'nullable|numeric|min:0|max:50',
-                'virtual_card_fx_buy_markup_percent' => 'nullable|numeric|min:0|max:50',
-                'virtual_card_fx_sell_rate' => 'nullable|numeric|min:0|max:100000',
-                'virtual_card_fx_buy_rate' => 'nullable|numeric|min:0|max:100000',
             ]);
 
             Setting::set('vtu_provider', $validated['vtu_provider'], 'string', 'vtu', 'Active VTU bill payment provider');
@@ -237,26 +231,39 @@ class SettingsController extends Controller
                 'vtu',
                 'Allow MevonPay VTU when selected'
             );
+        }
+
+        if ($request->input('settings_section') === 'virtual_card') {
+            $validated = $request->validate([
+                'virtual_card_enabled' => 'nullable|boolean',
+                'virtual_card_request_fee_usd' => 'nullable|numeric|min:0|max:500',
+                'virtual_card_fx_mid_usd_ngn' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_sell_profit_ngn' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_buy_profit_ngn' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_sell_rate' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_buy_rate' => 'nullable|numeric|min:0|max:100000',
+            ]);
+
             Setting::set(
                 'virtual_card_enabled',
                 $request->boolean('virtual_card_enabled') ? 1 : 0,
                 'boolean',
-                'vtu',
-                'Enable Dollar Virtual Card requests in CheckoutNow app'
+                'virtual_card',
+                'Enable Dollar Virtual Card in CheckoutNow app'
             );
             if (array_key_exists('virtual_card_request_fee_usd', $validated) && $validated['virtual_card_request_fee_usd'] !== null) {
                 Setting::set(
                     'virtual_card_request_fee_usd',
                     $validated['virtual_card_request_fee_usd'],
                     'float',
-                    'vtu',
-                    'One-time card request fee in USD (debited from NGN wallet at FX rate)'
+                    'virtual_card',
+                    'One-time card request fee in USD (debited from NGN wallet at sell rate)'
                 );
             }
             foreach ([
                 'virtual_card_fx_mid_usd_ngn' => 'Virtual card FX mid rate (NGN per 1 USD)',
-                'virtual_card_fx_sell_markup_percent' => 'Virtual card sell markup % (top-up / fund)',
-                'virtual_card_fx_buy_markup_percent' => 'Virtual card buy markup % (withdraw)',
+                'virtual_card_fx_sell_profit_ngn' => 'Virtual card sell profit (NGN per $1 funded)',
+                'virtual_card_fx_buy_profit_ngn' => 'Virtual card buy profit (NGN per $1 withdrawn)',
                 'virtual_card_fx_sell_rate' => 'Virtual card explicit sell rate override (NGN per 1 USD)',
                 'virtual_card_fx_buy_rate' => 'Virtual card explicit buy rate override (NGN per 1 USD)',
             ] as $key => $description) {
@@ -266,7 +273,7 @@ class SettingsController extends Controller
                         $key,
                         $value === null || $value === '' ? null : $value,
                         'float',
-                        'vtu',
+                        'virtual_card',
                         $description,
                     );
                 }

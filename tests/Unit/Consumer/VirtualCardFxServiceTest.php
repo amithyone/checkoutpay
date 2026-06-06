@@ -12,11 +12,11 @@ class VirtualCardFxServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_sell_and_buy_rates_from_mid_and_markup(): void
+    public function test_sell_and_buy_rates_from_mid_and_ngn_profit(): void
     {
-        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_sell_markup_percent', 3, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_buy_markup_percent', 2, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 48, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_buy_profit_ngn', 32, 'float', 'virtual_card', 'test');
 
         $fx = app(VirtualCardFxService::class);
 
@@ -32,11 +32,25 @@ class VirtualCardFxServiceTest extends TestCase
         $this->assertSame('buy', $withdraw['fx_side']);
     }
 
-    public function test_explicit_rate_overrides_beat_mid_markup(): void
+    public function test_legacy_percent_maps_to_ngn_profit_when_profit_not_set(): void
     {
-        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_sell_rate', 1700, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_buy_rate', 1500, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_sell_markup_percent', 3, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_buy_markup_percent', 2, 'float', 'virtual_card', 'test');
+
+        $fx = app(VirtualCardFxService::class);
+
+        $this->assertSame(48.0, $fx->sellProfitNgnPerUsd());
+        $this->assertSame(32.0, $fx->buyProfitNgnPerUsd());
+        $this->assertSame(1648.0, $fx->sellRate());
+        $this->assertSame(1568.0, $fx->buyRate());
+    }
+
+    public function test_explicit_rate_overrides_beat_mid_profit(): void
+    {
+        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_sell_rate', 1700, 'float', 'virtual_card', 'test');
+        Setting::set('virtual_card_fx_buy_rate', 1500, 'float', 'virtual_card', 'test');
 
         $fx = app(VirtualCardFxService::class);
 

@@ -14,7 +14,7 @@ class VirtualCardFeeConversionTest extends TestCase
     public function test_usd_to_ngn_conversion_for_card_fee_uses_sell_rate(): void
     {
         Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
-        Setting::set('virtual_card_fx_sell_markup_percent', 0, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_sell_profit_ngn', 0, 'float', 'virtual_card', 'test');
 
         $fx = app(VirtualCardFxService::class);
         $ngn = $fx->quoteRequestFeeNgn(5.0);

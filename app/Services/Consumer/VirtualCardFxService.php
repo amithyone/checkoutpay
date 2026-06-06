@@ -37,14 +37,42 @@ final class VirtualCardFxService
         return null;
     }
 
-    public function sellMarkupPercent(): float
+    /**
+     * Fixed NGN profit per $1 when user funds card (sell side).
+     */
+    public function sellProfitNgnPerUsd(): float
     {
-        return $this->percentSetting('virtual_card_fx_sell_markup_percent', 'virtual_card.fx_sell_markup_percent', 0.0);
+        $stored = Setting::get('virtual_card_fx_sell_profit_ngn');
+        if ($stored !== null && is_numeric($stored)) {
+            return max(0.0, round((float) $stored, 2));
+        }
+
+        $legacyPercent = Setting::get('virtual_card_fx_sell_markup_percent');
+        $mid = $this->midUsdNgnRate();
+        if ($legacyPercent !== null && is_numeric($legacyPercent) && $mid !== null && $mid > 0) {
+            return max(0.0, round($mid * ((float) $legacyPercent / 100), 2));
+        }
+
+        return max(0.0, round((float) config('virtual_card.fx_sell_profit_ngn', 0), 2));
     }
 
-    public function buyMarkupPercent(): float
+    /**
+     * Fixed NGN profit per $1 when user withdraws from card (buy side).
+     */
+    public function buyProfitNgnPerUsd(): float
     {
-        return $this->percentSetting('virtual_card_fx_buy_markup_percent', 'virtual_card.fx_buy_markup_percent', 0.0);
+        $stored = Setting::get('virtual_card_fx_buy_profit_ngn');
+        if ($stored !== null && is_numeric($stored)) {
+            return max(0.0, round((float) $stored, 2));
+        }
+
+        $legacyPercent = Setting::get('virtual_card_fx_buy_markup_percent');
+        $mid = $this->midUsdNgnRate();
+        if ($legacyPercent !== null && is_numeric($legacyPercent) && $mid !== null && $mid > 0) {
+            return max(0.0, round($mid * ((float) $legacyPercent / 100), 2));
+        }
+
+        return max(0.0, round((float) config('virtual_card.fx_buy_profit_ngn', 0), 2));
     }
 
     public function sellRate(): ?float
@@ -59,7 +87,7 @@ final class VirtualCardFxService
             return null;
         }
 
-        return round($mid * (1 + ($this->sellMarkupPercent() / 100)), 4);
+        return round($mid + $this->sellProfitNgnPerUsd(), 4);
     }
 
     public function buyRate(): ?float
@@ -74,12 +102,12 @@ final class VirtualCardFxService
             return null;
         }
 
-        $factor = 1 - ($this->buyMarkupPercent() / 100);
-        if ($factor <= 0) {
+        $rate = round($mid - $this->buyProfitNgnPerUsd(), 4);
+        if ($rate <= 0) {
             return null;
         }
 
-        return round($mid * $factor, 4);
+        return $rate;
     }
 
     public function isAvailable(): bool
@@ -97,8 +125,8 @@ final class VirtualCardFxService
             'fx_mid_usd_ngn' => $this->midUsdNgnRate(),
             'sell_rate' => $this->sellRate(),
             'buy_rate' => $this->buyRate(),
-            'sell_markup_percent' => $this->sellMarkupPercent(),
-            'buy_markup_percent' => $this->buyMarkupPercent(),
+            'sell_profit_ngn_per_usd' => $this->sellProfitNgnPerUsd(),
+            'buy_profit_ngn_per_usd' => $this->buyProfitNgnPerUsd(),
         ];
     }
 
@@ -159,13 +187,4 @@ final class VirtualCardFxService
         };
     }
 
-    private function percentSetting(string $settingKey, string $configKey, float $default): float
-    {
-        $stored = Setting::get($settingKey);
-        if ($stored !== null && is_numeric($stored)) {
-            return max(0.0, (float) $stored);
-        }
-
-        return max(0.0, (float) config($configKey, $default));
-    }
 }

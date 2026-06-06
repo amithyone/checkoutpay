@@ -693,16 +693,27 @@
         </form>
     </div>
 
-    <!-- VTU & Virtual Card -->
-    <div id="vtu-virtual-card"></div>
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-            <i class="fas fa-bolt mr-2 text-primary"></i>VTU &amp; Virtual Card (MevonPay)
+    @php
+        $cardFx = app(\App\Services\Consumer\VirtualCardFxService::class);
+        $cardMid = $cardFx->midUsdNgnRate();
+        $cardSellProfit = $cardFx->sellProfitNgnPerUsd();
+        $cardBuyProfit = $cardFx->buyProfitNgnPerUsd();
+        $cardSellRate = $cardFx->sellRate();
+        $cardBuyRate = $cardFx->buyRate();
+    @endphp
+
+    <!-- VTU (Pay Bills) -->
+    <div id="vtu-settings"></div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-bolt mr-2 text-primary"></i>VTU — Pay Bills
         </h3>
+        <p class="text-sm text-gray-600 mb-4">Airtime, data, electricity, and cable TV for WhatsApp wallet and CheckoutNow. Separate from Dollar Virtual Card.</p>
 
         <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
             @csrf
             @method('PUT')
+            <input type="hidden" name="settings_section" value="vtu">
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Active VTU provider</label>
@@ -718,7 +729,7 @@
                         MevonPay
                     </label>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">WhatsApp wallet and CheckoutNow Pay Bills use this provider. Requires env credentials for the chosen provider.</p>
+                <p class="mt-1 text-xs text-gray-500">Requires env credentials for the chosen provider.</p>
             </div>
 
             <div class="flex flex-wrap gap-6">
@@ -734,57 +745,102 @@
                         {{ \App\Models\Setting::get('mevonpay_vtu_enabled', true) ? 'checked' : '' }}>
                     MevonPay VTU enabled
                 </label>
-                <label class="inline-flex items-center text-sm">
-                    <input type="hidden" name="virtual_card_enabled" value="0">
-                    <input type="checkbox" name="virtual_card_enabled" value="1" class="mr-2 rounded"
-                        {{ \App\Models\Setting::get('virtual_card_enabled', config('virtual_card.enabled', true)) ? 'checked' : '' }}>
-                    Dollar Virtual Card (CheckoutNow app)
-                </label>
             </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save VTU Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Dollar Virtual Card -->
+    <div id="virtual-card-settings"></div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-credit-card mr-2 text-violet-600"></i>Dollar Virtual Card
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">CheckoutNow app card requests, fund, withdraw, and freeze. Uses MevonPay card APIs and your own NGN sell/buy rates.</p>
+
+        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+            <input type="hidden" name="settings_section" value="virtual_card">
+
+            <label class="inline-flex items-center text-sm">
+                <input type="hidden" name="virtual_card_enabled" value="0">
+                <input type="checkbox" name="virtual_card_enabled" value="1" class="mr-2 rounded"
+                    {{ \App\Models\Setting::get('virtual_card_enabled', config('virtual_card.enabled', true)) ? 'checked' : '' }}>
+                Dollar Virtual Card enabled (CheckoutNow)
+            </label>
 
             <div>
                 <label for="virtual_card_request_fee_usd" class="block text-sm font-medium text-gray-700 mb-2">
-                    Dollar Virtual Card request fee (USD)
+                    Card request fee (USD)
                 </label>
                 <input type="number" step="0.01" min="0" max="500" id="virtual_card_request_fee_usd" name="virtual_card_request_fee_usd"
                     value="{{ \App\Models\Setting::get('virtual_card_request_fee_usd', config('virtual_card.request_fee_usd', 5)) }}"
                     class="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg">
-                <p class="mt-1 text-xs text-gray-500">Debited from the user NGN wallet at the virtual card <strong>sell rate</strong> below.</p>
+                <p class="mt-1 text-xs text-gray-500">Debited from the user NGN wallet at your <strong>sell rate</strong> (mid + sell profit).</p>
             </div>
 
-            <div class="border border-gray-200 rounded-lg p-4 space-y-4 bg-white">
-                <p class="text-sm font-semibold text-gray-800">Virtual card FX (sell / buy rates)</p>
-                <p class="text-xs text-gray-500">Top-up uses <strong>sell rate</strong> (user buys USD for card). Withdraw uses <strong>buy rate</strong> (user sells USD back to wallet). Leave mid blank to fall back to WhatsApp wallet USD→NGN table.</p>
+            <div class="border border-violet-100 rounded-lg p-4 space-y-4 bg-violet-50/40">
+                <p class="text-sm font-semibold text-gray-800">FX rates &amp; your profit (NGN per $1)</p>
+                <p class="text-xs text-gray-500">
+                    Set how many <strong>naira you keep per dollar</strong> — not a percentage.
+                    Sell rate = mid + sell profit (user pays more to fund card).
+                    Buy rate = mid − buy profit (user receives less on withdraw).
+                </p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="virtual_card_fx_mid_usd_ngn" class="block text-sm font-medium text-gray-700 mb-1">Mid rate (NGN per $1)</label>
-                        <input type="number" step="0.0001" min="0" id="virtual_card_fx_mid_usd_ngn" name="virtual_card_fx_mid_usd_ngn"
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_mid_usd_ngn" name="virtual_card_fx_mid_usd_ngn"
                             value="{{ \App\Models\Setting::get('virtual_card_fx_mid_usd_ngn', config('virtual_card.fx_mid_usd_ngn')) }}"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Your cost reference rate. Blank = WhatsApp USD→NGN table.</p>
                     </div>
                     <div>
-                        <label for="virtual_card_fx_sell_markup_percent" class="block text-sm font-medium text-gray-700 mb-1">Sell markup %</label>
-                        <input type="number" step="0.01" min="0" max="50" id="virtual_card_fx_sell_markup_percent" name="virtual_card_fx_sell_markup_percent"
-                            value="{{ \App\Models\Setting::get('virtual_card_fx_sell_markup_percent', config('virtual_card.fx_sell_markup_percent', 3)) }}"
+                        <label for="virtual_card_fx_sell_profit_ngn" class="block text-sm font-medium text-gray-700 mb-1">Sell profit (₦ per $1)</label>
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_sell_profit_ngn" name="virtual_card_fx_sell_profit_ngn"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_sell_profit_ngn', config('virtual_card.fx_sell_profit_ngn', 50)) }}"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Extra ₦ you charge when user funds card.</p>
                     </div>
                     <div>
-                        <label for="virtual_card_fx_buy_markup_percent" class="block text-sm font-medium text-gray-700 mb-1">Buy markdown %</label>
-                        <input type="number" step="0.01" min="0" max="50" id="virtual_card_fx_buy_markup_percent" name="virtual_card_fx_buy_markup_percent"
-                            value="{{ \App\Models\Setting::get('virtual_card_fx_buy_markup_percent', config('virtual_card.fx_buy_markup_percent', 2)) }}"
+                        <label for="virtual_card_fx_buy_profit_ngn" class="block text-sm font-medium text-gray-700 mb-1">Buy profit (₦ per $1)</label>
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_buy_profit_ngn" name="virtual_card_fx_buy_profit_ngn"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_buy_profit_ngn', config('virtual_card.fx_buy_profit_ngn', 30)) }}"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">₦ you keep when user withdraws from card to wallet.</p>
+                    </div>
+                    <div class="md:col-span-2 bg-white border border-gray-200 rounded-lg p-3 text-sm">
+                        <p class="font-medium text-gray-800 mb-1">Live preview</p>
+                        <p class="text-gray-700">
+                            Sell rate:
+                            <strong>{{ $cardSellRate !== null ? '₦'.number_format($cardSellRate, 2) : '—' }}</strong>
+                            · Buy rate:
+                            <strong>{{ $cardBuyRate !== null ? '₦'.number_format($cardBuyRate, 2) : '—' }}</strong>
+                        </p>
+                        @if($cardMid !== null)
+                            <p class="text-xs text-gray-500 mt-1">
+                                Mid ₦{{ number_format($cardMid, 2) }}
+                                + sell ₦{{ number_format($cardSellProfit, 2) }}
+                                / − buy ₦{{ number_format($cardBuyProfit, 2) }}
+                            </p>
+                        @endif
                     </div>
                     <div>
                         <label for="virtual_card_fx_sell_rate" class="block text-sm font-medium text-gray-700 mb-1">Sell rate override (optional)</label>
-                        <input type="number" step="0.0001" min="0" id="virtual_card_fx_sell_rate" name="virtual_card_fx_sell_rate"
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_sell_rate" name="virtual_card_fx_sell_rate"
                             value="{{ \App\Models\Setting::get('virtual_card_fx_sell_rate', config('virtual_card.fx_sell_rate')) }}"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto from mid + markup">
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto: mid + sell profit">
                     </div>
                     <div>
                         <label for="virtual_card_fx_buy_rate" class="block text-sm font-medium text-gray-700 mb-1">Buy rate override (optional)</label>
-                        <input type="number" step="0.0001" min="0" id="virtual_card_fx_buy_rate" name="virtual_card_fx_buy_rate"
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_buy_rate" name="virtual_card_fx_buy_rate"
                             value="{{ \App\Models\Setting::get('virtual_card_fx_buy_rate', config('virtual_card.fx_buy_rate')) }}"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto from mid − markdown">
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto: mid − buy profit">
                     </div>
                 </div>
             </div>
@@ -801,8 +857,8 @@
             @endif
 
             <div class="flex justify-end">
-                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
-                    <i class="fas fa-save mr-2"></i> Save VTU &amp; Card Settings
+                <button type="submit" class="bg-violet-600 text-white px-6 py-2 rounded-lg hover:bg-violet-700 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save Virtual Card Settings
                 </button>
             </div>
         </form>
