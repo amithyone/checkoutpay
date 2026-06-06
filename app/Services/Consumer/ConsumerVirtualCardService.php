@@ -728,6 +728,17 @@ final class ConsumerVirtualCardService
             return $operable;
         }
 
+        $withCardId = VirtualCardRequest::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->whereNotNull('card_external_id')
+            ->where('card_external_id', '!=', '')
+            ->latest('id')
+            ->first();
+
+        if ($withCardId) {
+            return $withCardId;
+        }
+
         $blocking = $this->blockingCardRequest($wallet);
         if ($blocking && $this->isOperableCardRequest($blocking)) {
             return $blocking;
@@ -801,12 +812,16 @@ final class ConsumerVirtualCardService
      */
     private function serializeRequest(VirtualCardRequest $row): array
     {
-        $canManage = $row->card_external_id
-            && in_array($row->status, [VirtualCardRequest::STATUS_SUBMITTED, VirtualCardRequest::STATUS_ACTIVE], true);
+        $hasCard = trim((string) ($row->card_external_id ?? '')) !== '';
+        $canManage = $hasCard;
+        $status = $row->status;
+        if ($hasCard && ! in_array($status, [VirtualCardRequest::STATUS_SUBMITTED, VirtualCardRequest::STATUS_ACTIVE], true)) {
+            $status = VirtualCardRequest::STATUS_ACTIVE;
+        }
 
         return [
             'id' => $row->id,
-            'status' => $row->status,
+            'status' => $status,
             'is_preparing' => $this->isPreparingRequest($row),
             'provider_reference' => $row->provider_reference,
             'fee_usd' => (float) $row->fee_usd,
@@ -842,8 +857,7 @@ final class ConsumerVirtualCardService
 
     private function isOperableCardRequest(VirtualCardRequest $row): bool
     {
-        return $row->card_external_id
-            && in_array($row->status, [VirtualCardRequest::STATUS_SUBMITTED, VirtualCardRequest::STATUS_ACTIVE], true);
+        return trim((string) ($row->card_external_id ?? '')) !== '';
     }
 
     private function isPreparingRequest(VirtualCardRequest $row): bool

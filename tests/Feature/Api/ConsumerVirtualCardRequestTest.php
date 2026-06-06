@@ -135,6 +135,32 @@ class ConsumerVirtualCardRequestTest extends TestCase
             ->assertJsonPath('data.has_active_card', true);
     }
 
+    public function test_card_status_shows_manage_when_card_id_exists_on_failed_row(): void
+    {
+        [$wallet, $account] = $this->walletTier2();
+        Sanctum::actingAs($account, ['consumer']);
+
+        VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_FAILED,
+            'fee_usd' => 5,
+            'fee_ngn' => 6925,
+            'external_reference' => 'VCARD-FAILED-WITH-ID',
+            'card_external_id' => 'MEVON-CARD-ON-FAILED',
+            'failure_reason' => 'provider timeout before webhook',
+            'card_name' => 'Recovered Card',
+        ]);
+
+        $response = $this->getJson('/api/v1/consumer/cards');
+
+        $response->assertOk()
+            ->assertJsonPath('data.card_screen', 'manage')
+            ->assertJsonPath('data.has_active_card', true)
+            ->assertJsonPath('data.operable_request.card_external_id', 'MEVON-CARD-ON-FAILED')
+            ->assertJsonPath('data.operable_request.can_manage', true)
+            ->assertJsonPath('data.operable_request.status', VirtualCardRequest::STATUS_ACTIVE);
+    }
+
     public function test_card_status_returns_operable_request_when_latest_attempt_failed(): void
     {
         [$wallet, $account] = $this->walletTier2();
