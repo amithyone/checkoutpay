@@ -274,6 +274,31 @@ final class ConsumerVirtualCardService
             ];
         }
 
+        $feeTxn = $this->feeRefunds->findFeeTransaction($wallet->id, $reference);
+        if (! $feeTxn) {
+            Log::error('consumer.virtual_card.fee_txn_missing_before_provider', [
+                'wallet_id' => $wallet->id,
+                'reference' => $reference,
+                'virtual_card_request_id' => $row->id,
+            ]);
+            $internalReason = 'Card fee transaction missing';
+            $this->providerResponse->applyFailure($row, ['message' => $internalReason], $internalReason);
+
+            return ['ok' => false, 'message' => 'Could not complete card request. Contact support.'];
+        }
+
+        if ($this->feeRefunds->isFeeRefunded($feeTxn)) {
+            Log::error('consumer.virtual_card.fee_already_refunded_before_provider', [
+                'wallet_id' => $wallet->id,
+                'reference' => $reference,
+                'virtual_card_request_id' => $row->id,
+            ]);
+            $internalReason = 'Card fee was already refunded for this request';
+            $this->providerResponse->applyFailure($row, ['message' => $internalReason], $internalReason);
+
+            return ['ok' => false, 'message' => VirtualCardUserFacingMessage::requestFailedRefunded()];
+        }
+
         $this->cardLogs->info('provider_request_sent', 'Outbound MevonPay card_request payload', $row, $this->cardLogs->withMevonApiRequest($payload, [
             'reference' => $reference,
         ]), $wallet->id);

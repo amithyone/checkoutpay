@@ -76,6 +76,15 @@ class MevonPayWebhookController extends Controller
             ]);
         }
 
+        if ($cardResult === VirtualCardMevonWebhookService::RESULT_FEE_COLLECTION_FAILED) {
+            $this->recordWebhookSource($request, 'virtual_card_fee_collection_failed');
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Card webhook received but fee could not be collected from wallet',
+            ], 422);
+        }
+
         if ($event !== 'funding.success') {
             $this->recordWebhookSource($request, 'ignored_event');
             Log::info('mevonpay.webhook.ignored', [

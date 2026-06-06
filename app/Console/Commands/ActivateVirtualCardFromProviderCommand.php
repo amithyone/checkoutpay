@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\VirtualCardRequest;
+use App\Services\Consumer\VirtualCardFeeRefundService;
 use App\Services\Consumer\VirtualCardProviderResponseService;
 use Illuminate\Console\Command;
 
@@ -16,7 +17,10 @@ class ActivateVirtualCardFromProviderCommand extends Command
 
     protected $description = 'Manually attach a MevonPay card_id to a virtual card request (webhook recovery)';
 
-    public function handle(VirtualCardProviderResponseService $providerResponse): int
+    public function handle(
+        VirtualCardProviderResponseService $providerResponse,
+        VirtualCardFeeRefundService $feeRefunds,
+    ): int
     {
         $cardId = trim((string) $this->argument('card_id'));
         if ($cardId === '') {
@@ -65,6 +69,17 @@ class ActivateVirtualCardFromProviderCommand extends Command
             $this->error('No matching virtual card request found.');
 
             return self::FAILURE;
+        }
+
+        $collection = $feeRefunds->ensureFeeCollectedForActivation($row);
+        if (! ($collection['ok'] ?? false)) {
+            $this->error((string) ($collection['message'] ?? 'Could not collect card fee before activation.'));
+
+            return self::FAILURE;
+        }
+
+        if ($collection['collected'] ?? false) {
+            $this->warn('Refunded card fee was re-debited from the wallet before activation.');
         }
 
         $providerResponse->applyWebhookReady($row, [

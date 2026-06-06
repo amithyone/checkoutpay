@@ -16,9 +16,12 @@ final class VirtualCardMevonWebhookService
 
     public const RESULT_NO_MATCH = 'no_match';
 
+    public const RESULT_FEE_COLLECTION_FAILED = 'fee_collection_failed';
+
     public function __construct(
         private VirtualCardProviderResponseService $providerResponse,
         private VirtualCardRequestLogService $cardLogs,
+        private VirtualCardFeeRefundService $feeRefunds,
     ) {}
 
     /**
@@ -76,9 +79,7 @@ final class VirtualCardMevonWebhookService
         if ($reference !== '' && ! $this->isCheckoutExternalReference($reference)) {
             $row = $this->findRequestByProviderReference($reference);
             if ($row) {
-                $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
-
-                return self::RESULT_ACTIVATED;
+                return $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
             }
         }
 
@@ -87,9 +88,7 @@ final class VirtualCardMevonWebhookService
                 ->where('external_reference', $reference)
                 ->first();
             if ($row) {
-                $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
-
-                return self::RESULT_ACTIVATED;
+                return $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
             }
         }
 
@@ -115,23 +114,49 @@ final class VirtualCardMevonWebhookService
             return self::RESULT_NO_MATCH;
         }
 
-        $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
-
-        return self::RESULT_ACTIVATED;
+        return $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function activateFromWebhook(VirtualCardRequest $row, array $payload, string $cardId, ?string $rawBody = null): void
+    private function activateFromWebhook(VirtualCardRequest $row, array $payload, string $cardId, ?string $rawBody = null): string
     {
         $wasFailed = $row->status === VirtualCardRequest::STATUS_FAILED;
+        $collection = $this->feeRefunds->ensureFeeCollectedForActivation($row);
+
+        if (! ($collection['ok'] ?? false)) {
+            $context = $this->cardLogs->withMevonWebhook($payload, $rawBody, [
+                'virtual_card_request_id' => $row->id,
+                'was_failed' => $wasFailed,
+                'collection_message' => (string) ($collection['message'] ?? ''),
+            ]);
+            Log::warning('virtual_card.webhook.fee_collection_failed', $context);
+            $this->cardLogs->error(
+                'webhook_fee_collection_failed',
+                'Card webhook matched but refunded fee could not be re-debited',
+                $row,
+                $context,
+                $row->whatsapp_wallet_id,
+            );
+
+            return self::RESULT_FEE_COLLECTION_FAILED;
+        }
+
+        if ($collection['collected'] ?? false) {
+            $this->cardLogs->info('webhook_fee_recollected', 'Refunded card fee re-debited before webhook activation', $row, [
+                'fee_ngn' => $row->fee_ngn,
+                'reference' => $row->external_reference,
+            ], $row->whatsapp_wallet_id);
+        }
+
         $this->providerResponse->applyWebhookReady($row, $payload, $cardId !== '' ? $cardId : null);
         $fresh = $row->fresh();
 
         $this->cardLogs->info('webhook_activated', 'Card activated from MevonPay webhook', $fresh, $this->cardLogs->withMevonWebhook($payload, $rawBody, [
             'card_id' => $fresh->card_external_id,
             'was_failed' => $wasFailed,
+            'fee_recollected' => (bool) ($collection['collected'] ?? false),
             'event' => $this->extractWebhookEvent($payload),
         ]), $fresh->whatsapp_wallet_id);
 
@@ -141,7 +166,10 @@ final class VirtualCardMevonWebhookService
             'card_external_id' => $fresh->card_external_id,
             'event' => $this->extractWebhookEvent($payload),
             'was_failed' => $wasFailed,
+            'fee_recollected' => (bool) ($collection['collected'] ?? false),
         ]);
+
+        return self::RESULT_ACTIVATED;
     }
 
     /**

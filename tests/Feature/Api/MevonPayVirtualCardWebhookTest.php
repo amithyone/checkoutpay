@@ -5,12 +5,26 @@ namespace Tests\Feature\Api;
 use App\Models\VirtualCardRequest;
 use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWallet;
+use App\Models\WhatsappWalletTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MevonPayVirtualCardWebhookTest extends TestCase
 {
     use RefreshDatabase;
+
+    private function createHeldFeeTransaction(WhatsappWallet $wallet, VirtualCardRequest $row): void
+    {
+        WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'sender_name' => $wallet->display_name,
+            'type' => WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE,
+            'amount' => $row->fee_ngn,
+            'balance_after' => round((float) $wallet->balance - (float) $row->fee_ngn, 2),
+            'external_reference' => $row->external_reference,
+            'meta' => ['channel' => 'consumer_api'],
+        ]);
+    }
 
     public function test_card_created_webhook_activates_preparing_request(): void
     {
@@ -33,6 +47,7 @@ class MevonPayVirtualCardWebhookTest extends TestCase
                 'phoneNumber' => '08148790554',
             ],
         ]);
+        $this->createHeldFeeTransaction($wallet, $row);
 
         $response = $this->postJson('/api/v1/webhook/mevonpay', [
             'event' => 'card.created',
@@ -85,6 +100,7 @@ class MevonPayVirtualCardWebhookTest extends TestCase
                 'data' => ['reference' => $mevonRef],
             ],
         ]);
+        $this->createHeldFeeTransaction($wallet, $row);
 
         $response = $this->postJson('/api/v1/webhook/mevonpay', [
             'event' => 'card.created.success',
@@ -107,7 +123,7 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $wallet = WhatsappWallet::query()->create([
             'phone_e164' => '+2348012345678',
             'display_name' => 'Failed User',
-            'balance' => 30000,
+            'balance' => 50000,
             'tier' => WhatsappWallet::TIER_RUBIES_VA,
         ]);
 
@@ -125,6 +141,19 @@ class MevonPayVirtualCardWebhookTest extends TestCase
             ],
         ]);
 
+        WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'sender_name' => 'Failed User',
+            'type' => WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE,
+            'amount' => 6925,
+            'balance_after' => 43075,
+            'external_reference' => $row->external_reference,
+            'meta' => [
+                'refunded' => true,
+                'refund_reason' => 'provider_failed',
+            ],
+        ]);
+
         $response = $this->postJson('/api/v1/webhook/mevonpay', [
             'event' => 'card.created.success',
             'data' => [
@@ -137,8 +166,15 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $response->assertOk()->assertJsonPath('message', 'Virtual card activated');
 
         $row->refresh();
+        $wallet->refresh();
         $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $row->status);
         $this->assertSame('bab449bb-15e9-404a-aa73-657519df4794', $row->card_external_id);
+        $this->assertSame(43075.0, (float) $wallet->balance);
+
+        $this->assertDatabaseHas('virtual_card_request_logs', [
+            'virtual_card_request_id' => $row->id,
+            'event' => 'webhook_fee_recollected',
+        ]);
     }
 
     public function test_card_created_success_with_mevon_req_reference_matches_preparing_request(): void
@@ -171,6 +207,7 @@ class MevonPayVirtualCardWebhookTest extends TestCase
                 'data' => ['request_id' => $mevonReq],
             ],
         ]);
+        $this->createHeldFeeTransaction($wallet, $row);
 
         $response = $this->postJson('/api/v1/webhook/mevonpay', [
             'event' => 'card.created.success',
