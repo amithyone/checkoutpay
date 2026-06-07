@@ -156,6 +156,13 @@ final class VirtualCardMevonWebhookService
         $fresh = $row->fresh();
         $this->cards->syncProviderCardCode($fresh);
         $fresh = $fresh->fresh();
+
+        $wallet = $fresh->wallet;
+        if ($wallet) {
+            $this->cards->refreshProviderCardBalance($wallet);
+            $fresh = $fresh->fresh();
+        }
+
         $superseded = $this->supersede->supersedeStaleAttempts($fresh);
 
         $this->cardLogs->info('webhook_activated', 'Card activated from MevonPay webhook', $fresh, $this->cardLogs->withMevonWebhook($payload, $rawBody, [

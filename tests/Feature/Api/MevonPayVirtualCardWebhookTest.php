@@ -7,6 +7,7 @@ use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class MevonPayVirtualCardWebhookTest extends TestCase
@@ -300,6 +301,78 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $row->refresh();
         $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $row->status);
         $this->assertSame($cardId, $row->card_external_id);
+        $this->assertSame($mevonReq, $row->provider_reference);
+    }
+
+    public function test_card_created_success_webhook_persists_request_id_and_balance_from_full_payload(): void
+    {
+        config([
+            'services.mevonpay.base_url' => 'https://mevon.test',
+            'services.mevonpay.secret_key' => 'test-secret',
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'success' => true,
+                'message' => 'Card balance updated successfully',
+                'data' => ['balance' => 10, 'currency' => 'USD'],
+            ], 200),
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                    'card_code' => 'VCARD2026060611150700359',
+                    'card_number' => '4288520141503096',
+                    'cvv' => '486',
+                    'expiry_month_year' => '06/29',
+                    'balance' => 10,
+                ],
+            ], 200),
+        ]);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348148790554',
+            'display_name' => 'innocent Solomon',
+            'balance' => 30000,
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        $row = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_PREPARING,
+            'fee_usd' => 5,
+            'fee_ngn' => 6915.65,
+            'external_reference' => 'VCARD-REF-INNOCENT',
+            'card_name' => 'innocent Solomon',
+            'request_payload' => [
+                'email' => 'amithyone@gmail.com',
+                'phoneNumber' => '08148790554',
+            ],
+        ]);
+        $this->createHeldFeeTransaction($wallet, $row);
+
+        $response = $this->postJson('/api/v1/webhook/mevonpay', [
+            'event' => 'card.created.success',
+            'data' => [
+                'request_id' => 'REQ1780744493644',
+                'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                'card_brand' => 'visa',
+                'card_type' => 'virtual',
+                'card_name' => 'innocent Solomon',
+                'card_number' => '4288520141503096',
+                'last4' => '3096',
+                'expiry' => '06/2029',
+                'cvv' => '486',
+                'balance' => 5,
+                'reference' => '766f5cdb-9956-4cec-af77-b520f624acc3',
+            ],
+        ]);
+
+        $response->assertOk()->assertJsonPath('message', 'Virtual card activated');
+
+        $row->refresh();
+        $this->assertSame('REQ1780744493644', $row->provider_reference);
+        $this->assertSame(10.0, (float) $row->card_balance_usd);
     }
 
     public function test_card_webhook_no_match_returns_clear_message_not_ignored(): void

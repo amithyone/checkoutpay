@@ -481,14 +481,19 @@ class ConsumerVirtualCardOpsTest extends TestCase
     public function test_card_status_refresh_queries_mevon_for_live_balance(): void
     {
         [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
-        $card->update(['card_balance_usd' => 5]);
+        $card->update([
+            'card_balance_usd' => 5,
+            'provider_reference' => 'REQ1779645711521',
+        ]);
 
         Http::fake([
-            'https://mevon.test/V1/card_details' => Http::response([
-                'success' => true,
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'success' => 1,
+                'message' => 'Card balance updated successfully',
                 'data' => [
-                    'card_id' => 'VCARD-TEST-001',
+                    'card_id' => '',
                     'balance' => 22.75,
+                    'currency' => 'USD',
                 ],
             ], 200),
         ]);
@@ -500,7 +505,128 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.operable_request.card_balance_usd', 22.75);
         $this->assertSame(22.75, (float) $card->fresh()->card_balance_usd);
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return $request->url() === 'https://mevon.test/V1/card_balance'
+                && ($data['request_id'] ?? '') === 'REQ1779645711521';
+        });
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://mevon.test/V1/card_details');
+    }
+
+    public function test_card_status_refresh_uses_req_from_stored_webhook_for_card_balance(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_balance_usd' => 5,
+            'provider_reference' => null,
+            'card_external_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+            'response_payload' => [
+                'webhook' => [
+                    'event' => 'card.created.success',
+                    'data' => [
+                        'request_id' => 'REQ1780744493644',
+                        'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                        'balance' => 5,
+                        'reference' => '766f5cdb-9956-4cec-af77-b520f624acc3',
+                    ],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'success' => true,
+                'message' => 'Card balance updated successfully',
+                'data' => ['balance' => 10, 'currency' => 'USD'],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards?refresh=1');
+
+        $response->assertOk()->assertJsonPath('data.operable_request.card_balance_usd', 10);
+        $this->assertSame(10.0, (float) $card->fresh()->card_balance_usd);
+        $this->assertSame('REQ1780744493644', $card->fresh()->provider_reference);
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return $request->url() === 'https://mevon.test/V1/card_balance'
+                && ($data['request_id'] ?? '') === 'REQ1780744493644';
+        });
+    }
+
+    public function test_card_status_refresh_falls_back_to_card_details_without_request_id(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update(['card_balance_usd' => 5, 'provider_reference' => null]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'VCARD-TEST-001',
+                    'card_code' => 'VCARD2026060611150700359',
+                    'card_number' => '4288520141503096',
+                    'cvv' => '123',
+                    'expiry_month_year' => '06/29',
+                    'balance' => 12.5,
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards?refresh=1');
+
+        $response->assertOk()->assertJsonPath('data.operable_request.card_balance_usd', 12.5);
+        $this->assertSame(12.5, (float) $card->fresh()->card_balance_usd);
         Http::assertSent(fn ($request) => $request->url() === 'https://mevon.test/V1/card_details');
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://mevon.test/V1/card_balance');
+    }
+
+    public function test_card_transactions_includes_mevon_merchant_activity(): void
+    {
+        [, $account] = $this->walletWithActiveCard();
+
+        Http::fake([
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'success' => true,
+                'message' => 'Result successful',
+                'data' => [[
+                    'code' => '09eea695-e2c5-4620-9e70-86a25d19f28b',
+                    'description' => 'Google CLOUD M9QWV5 Dublin IR',
+                    'status' => 'success',
+                    'reference' => '88942e4e978b',
+                    'amount' => 10.00,
+                    'amountInfo' => '$10.00',
+                    'fee' => 0.00,
+                    'currency' => 'USD',
+                    'createdOn' => '2026-06-01T15:02:13.2763678',
+                    'drcr' => 'DR',
+                    'category' => 'withdraw card',
+                ]],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards/transactions');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.0.source', 'mevon')
+            ->assertJsonPath('data.0.type', 'card_spend')
+            ->assertJsonPath('data.0.amount_usd', 10)
+            ->assertJsonPath('data.0.description', 'Google CLOUD M9QWV5 Dublin IR');
+
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return $request->url() === 'https://mevon.test/V1/card_transactions'
+                && ($data['card_code'] ?? '') === 'VCARD-TEST-001';
+        });
     }
 
     /**

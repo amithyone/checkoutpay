@@ -82,6 +82,34 @@ final class MevonPayCardApiClient
     }
 
     /**
+     * Live card spend balance (Mevon docs: POST /V1/card_balance with request_id).
+     *
+     * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
+     */
+    public function getCardBalance(string $requestId): array
+    {
+        $path = (string) config('virtual_card.mevon_card_balance_path', '/V1/card_balance');
+
+        return $this->postCardEndpoint($path, [
+            'request_id' => trim($requestId),
+        ]);
+    }
+
+    /**
+     * Merchant spend / decline history (Mevon docs: POST /V1/card_transactions with card_code).
+     *
+     * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
+     */
+    public function getCardTransactions(string $cardCode): array
+    {
+        $path = (string) config('virtual_card.mevon_card_transactions_path', '/V1/card_transactions');
+
+        return $this->postCardEndpoint($path, [
+            'card_code' => trim($cardCode),
+        ]);
+    }
+
+    /**
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
     public function getCardDetails(string $cardId): array

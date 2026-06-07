@@ -160,7 +160,7 @@ final class VirtualCardProviderResponseService
     {
         $cardId = trim((string) ($cardId ?? '')) !== '' ? trim((string) $cardId) : $row->card_external_id;
 
-        $row->update([
+        $updates = [
             'status' => VirtualCardRequest::STATUS_ACTIVE,
             'card_external_id' => $cardId,
             'activated_at' => $row->activated_at ?? now(),
@@ -169,12 +169,46 @@ final class VirtualCardProviderResponseService
                 is_array($row->response_payload) ? $row->response_payload : [],
                 ['webhook' => $payload],
             ),
-        ]);
+        ];
+
+        $mevonRequestId = $this->extractMevonRequestId($payload);
+        if ($mevonRequestId !== null) {
+            $updates['provider_reference'] = $mevonRequestId;
+        }
+
+        $balance = $this->storedDetails->extractBalanceFromProviderPayload($payload);
+        if ($balance !== null) {
+            $updates['card_balance_usd'] = $balance;
+        }
+
+        $row->update($updates);
 
         $fresh = $row->fresh();
         $this->storedDetails->persistFromWebhook($fresh, $payload);
 
         return $fresh->fresh();
+    }
+
+    /**
+     * Mevon card.created.success carries REQ… in data.request_id (used by /V1/card_balance).
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function extractMevonRequestId(array $payload): ?string
+    {
+        foreach ([
+            data_get($payload, 'data.request_id'),
+            data_get($payload, 'data.requestId'),
+            data_get($payload, 'request_id'),
+            data_get($payload, 'requestId'),
+        ] as $value) {
+            $id = trim((string) $value);
+            if ($this->looksLikeProviderReference($id) && preg_match('/^REQ\d{6,}$/i', $id) === 1) {
+                return strtoupper($id);
+            }
+        }
+
+        return null;
     }
 
     private function looksLikeProviderReference(string $value): bool

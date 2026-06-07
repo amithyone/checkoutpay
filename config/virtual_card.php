@@ -31,4 +31,6 @@ return [
     'auto_fund_force_buy_usd' => max(0.01, (float) env('VIRTUAL_CARD_AUTO_FUND_FORCE_BUY_USD', 2)),
     'mevon_rate_cache_seconds' => max(60, (int) env('VIRTUAL_CARD_MEVON_RATE_CACHE_SECONDS', 600)),
     'mevon_card_details_path' => env('VIRTUAL_CARD_MEVON_CARD_DETAILS_PATH', '/V1/card_details'),
+    'mevon_card_balance_path' => env('VIRTUAL_CARD_MEVON_CARD_BALANCE_PATH', '/V1/card_balance'),
+    'mevon_card_transactions_path' => env('VIRTUAL_CARD_MEVON_CARD_TRANSACTIONS_PATH', '/V1/card_transactions'),
 ];

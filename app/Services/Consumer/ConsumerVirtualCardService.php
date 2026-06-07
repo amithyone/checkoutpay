@@ -119,7 +119,8 @@ final class ConsumerVirtualCardService
             return;
         }
 
-        $this->fetchAndStoreProviderCardDetails($card);
+        $this->backfillMevonRequestId($card->fresh());
+        $this->syncProviderCardBalance($card->fresh());
     }
 
     /**
@@ -132,7 +133,9 @@ final class ConsumerVirtualCardService
         $perPage = max(1, min(50, $perPage));
         $page = max(1, $page);
 
-        $paginator = WhatsappWalletTransaction::query()
+        $items = $this->fetchMevonCardTransactions($wallet);
+
+        $walletTxns = WhatsappWalletTransaction::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->whereIn('type', [
                 WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE,
@@ -140,22 +143,34 @@ final class ConsumerVirtualCardService
                 WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_WITHDRAW,
             ])
             ->orderByDesc('id')
-            ->paginate($perPage, ['*'], 'page', $page);
+            ->limit(200)
+            ->get();
 
-        $items = collect($paginator->items())
-            ->map(fn (WhatsappWalletTransaction $txn) => $this->serializeCardTransaction($txn))
-            ->values()
-            ->all();
+        foreach ($walletTxns as $txn) {
+            $items[] = array_merge($this->serializeCardTransaction($txn), ['source' => 'wallet']);
+        }
+
+        usort($items, function (array $a, array $b): int {
+            $ta = strtotime((string) ($a['created_at'] ?? '')) ?: 0;
+            $tb = strtotime((string) ($b['created_at'] ?? '')) ?: 0;
+
+            return $tb <=> $ta;
+        });
+
+        $total = count($items);
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
+        $offset = ($page - 1) * $perPage;
 
         return [
             'ok' => true,
             'message' => 'OK',
-            'data' => $items,
+            'data' => array_values(array_slice($items, $offset, $perPage)),
             'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
             ],
         ];
     }
@@ -669,6 +684,338 @@ final class ConsumerVirtualCardService
         return $resolved;
     }
 
+    private function syncProviderCardBalance(VirtualCardRequest $card): void
+    {
+        $requestId = $this->resolveMevonBalanceRequestId($card);
+        if ($requestId !== null) {
+            $api = $this->cardApi->getCardBalance($requestId);
+            if ($api['ok'] ?? false) {
+                $balance = $this->storedDetails->extractBalanceFromProviderPayload($api['raw'] ?? $api);
+                if ($balance !== null) {
+                    $card->update(['card_balance_usd' => $balance]);
+
+                    return;
+                }
+            }
+
+            Log::info('consumer.virtual_card.card_balance_api_miss', [
+                'virtual_card_request_id' => $card->id,
+                'request_id' => $requestId,
+                'message' => (string) ($api['message'] ?? 'unknown'),
+            ]);
+        }
+
+        $this->fetchAndStoreProviderCardDetails($card);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function fetchMevonCardTransactions(WhatsappWallet $wallet): array
+    {
+        $card = $this->resolveOperableCard($wallet);
+        if ($card === null || ! $this->cardApi->isConfigured()) {
+            return [];
+        }
+
+        $cardCode = $this->resolveProviderCardCode($card);
+        if ($cardCode === null) {
+            return [];
+        }
+
+        $api = $this->cardApi->getCardTransactions($cardCode);
+        if (! ($api['ok'] ?? false)) {
+            Log::warning('consumer.virtual_card.transactions_mevon_failed', [
+                'virtual_card_request_id' => $card->id,
+                'card_code' => $cardCode,
+                'message' => (string) ($api['message'] ?? 'unknown'),
+            ]);
+
+            return [];
+        }
+
+        $rows = $this->normalizeMevonTransactionList($api['data'] ?? null);
+        $items = [];
+        foreach ($rows as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $items[] = $this->serializeMevonCardTransaction($row, (int) $index);
+        }
+
+        return $items;
+    }
+
+    private function resolveMevonBalanceRequestId(VirtualCardRequest $card): ?string
+    {
+        foreach ($this->mevonBalanceRequestIdCandidates($card) as $candidate) {
+            if ($this->looksLikeMevonBalanceRequestId($candidate)) {
+                return $candidate;
+            }
+        }
+
+        $fromLogs = $this->resolveMevonBalanceRequestIdFromLogs($card);
+        if ($fromLogs !== null) {
+            if (trim((string) ($card->provider_reference ?? '')) === '') {
+                $card->update(['provider_reference' => $fromLogs]);
+            }
+
+            return $fromLogs;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function mevonBalanceRequestIdCandidates(VirtualCardRequest $card): array
+    {
+        $candidates = [];
+
+        $ref = trim((string) ($card->provider_reference ?? ''));
+        if ($ref !== '') {
+            $candidates[] = $ref;
+        }
+
+        $fromLogs = $this->resolveMevonBalanceRequestIdFromLogs($card);
+        if ($fromLogs !== null) {
+            $candidates[] = $fromLogs;
+        }
+
+        $stored = is_array($card->card_details_payload) ? $card->card_details_payload : [];
+        foreach ([
+            $stored['provider_reference'] ?? null,
+            $stored['request_id'] ?? null,
+        ] as $value) {
+            $text = trim((string) $value);
+            if ($text !== '') {
+                $candidates[] = $text;
+            }
+        }
+
+        $response = is_array($card->response_payload) ? $card->response_payload : [];
+        $webhook = $response['webhook'] ?? null;
+        if (is_array($webhook)) {
+            $req = $this->providerResponse->extractMevonRequestId($webhook);
+            if ($req !== null) {
+                $candidates[] = $req;
+            }
+            $data = is_array($webhook['data'] ?? null) ? $webhook['data'] : $webhook;
+            foreach (['request_id', 'requestId'] as $key) {
+                $text = trim((string) ($data[$key] ?? ''));
+                if ($text !== '') {
+                    $candidates[] = $text;
+                }
+            }
+        }
+
+        $req = $this->extractMevonRequestIdFromPayload($response);
+        if ($req !== null) {
+            $candidates[] = $req;
+        }
+
+        return array_values(array_unique($candidates));
+    }
+
+    /**
+     * Backfill REQ… on cards activated before provider_reference was persisted from webhooks.
+     */
+    public function backfillMevonRequestId(VirtualCardRequest $card): ?string
+    {
+        $existing = trim((string) ($card->provider_reference ?? ''));
+        if ($this->looksLikeMevonBalanceRequestId($existing)) {
+            return strtoupper($existing);
+        }
+
+        $resolved = $this->resolveMevonBalanceRequestId($card);
+        if ($resolved === null) {
+            return null;
+        }
+
+        if ($existing === '') {
+            $card->update(['provider_reference' => $resolved]);
+        }
+
+        return $resolved;
+    }
+
+    private function resolveMevonBalanceRequestIdFromLogs(VirtualCardRequest $card): ?string
+    {
+        $logs = VirtualCardRequestLog::query()
+            ->where(function ($query) use ($card) {
+                $query->where('virtual_card_request_id', $card->id)
+                    ->orWhere('whatsapp_wallet_id', $card->whatsapp_wallet_id);
+            })
+            ->latest('id')
+            ->limit(150)
+            ->get();
+
+        foreach ($logs as $log) {
+            $context = is_array($log->context) ? $log->context : [];
+            foreach ([$context['raw_payload'] ?? null, $context['response'] ?? null, $context] as $payload) {
+                $req = $this->extractMevonRequestIdFromPayload($payload);
+                if ($req !== null) {
+                    return $req;
+                }
+            }
+
+            $rawBody = trim((string) ($context['raw_body'] ?? ''));
+            if ($rawBody !== '' && preg_match('/REQ\d{6,}/i', $rawBody, $match) === 1) {
+                return strtoupper($match[0]);
+            }
+        }
+
+        $response = is_array($card->response_payload) ? $card->response_payload : [];
+        $req = $this->extractMevonRequestIdFromPayload($response);
+        if ($req !== null) {
+            return $req;
+        }
+
+        return null;
+    }
+
+    private function extractMevonRequestIdFromPayload(mixed $payload): ?string
+    {
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $serialized = json_encode($payload);
+        if (is_string($serialized) && preg_match('/REQ\d{6,}/i', $serialized, $match) === 1) {
+            return strtoupper($match[0]);
+        }
+
+        foreach ([$payload['data'] ?? null, $payload] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            foreach (['request_id', 'requestId', 'reference'] as $key) {
+                $value = trim((string) ($row[$key] ?? ''));
+                if ($this->looksLikeMevonBalanceRequestId($value)) {
+                    return strtoupper($value);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikeMevonBalanceRequestId(string $value): bool
+    {
+        return preg_match('/^REQ\d{6,}$/i', trim($value)) === 1;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function normalizeMevonTransactionList(mixed $data): array
+    {
+        if (! is_array($data)) {
+            return [];
+        }
+
+        if ($this->isListArray($data)) {
+            return array_values(array_filter($data, fn ($row) => is_array($row)));
+        }
+
+        foreach (['transactions', 'items', 'records', 'history'] as $key) {
+            $nested = $data[$key] ?? null;
+            if (is_array($nested) && $this->isListArray($nested)) {
+                return array_values(array_filter($nested, fn ($row) => is_array($row)));
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function serializeMevonCardTransaction(array $row, int $index): array
+    {
+        $drcr = strtoupper(trim((string) ($row['drcr'] ?? 'DR')));
+        $amount = is_numeric($row['amount'] ?? null) ? round((float) $row['amount'], 2) : 0.0;
+        $status = strtolower(trim((string) ($row['status'] ?? '')));
+        $category = trim((string) ($row['category'] ?? ''));
+        $description = trim((string) ($row['description'] ?? ''));
+        $reference = trim((string) ($row['reference'] ?? ''));
+        $code = trim((string) ($row['code'] ?? ''));
+
+        return [
+            'id' => $code !== '' ? 'mevon:'.$code : 'mevon:'.$reference.':'.$index,
+            'source' => 'mevon',
+            'type' => $this->mevonCategoryType($category),
+            'label' => $description !== '' ? $description : $this->mevonCategoryLabel($category),
+            'direction' => $drcr === 'CR' ? 'credit' : 'debit',
+            'amount_ngn' => null,
+            'amount_usd' => $amount > 0 ? $amount : null,
+            'amount_display' => trim((string) ($row['amountInfo'] ?? '')) ?: null,
+            'status' => $status !== '' ? $status : null,
+            'category' => $category !== '' ? $category : null,
+            'description' => $description !== '' ? $description : null,
+            'reference' => $reference !== '' ? $reference : null,
+            'fee_usd' => is_numeric($row['fee'] ?? null) ? round((float) $row['fee'], 2) : null,
+            'customer_name' => trim((string) ($row['customerName'] ?? '')) ?: null,
+            'balance_after' => null,
+            'external_reference' => $reference !== '' ? $reference : null,
+            'created_at' => $this->normalizeMevonTimestamp($row['createdOn'] ?? null),
+        ];
+    }
+
+    private function mevonCategoryType(string $category): string
+    {
+        $normalized = strtolower(trim($category));
+
+        return match (true) {
+            str_contains($normalized, 'declined') => 'card_declined',
+            str_contains($normalized, 'reversed') => 'card_reversed',
+            str_contains($normalized, 'card_withdrawal') => 'card_withdrawal',
+            str_contains($normalized, 'withdraw card') => 'card_spend',
+            default => 'card_spend',
+        };
+    }
+
+    private function mevonCategoryLabel(string $category): string
+    {
+        $normalized = strtolower(trim($category));
+
+        return match (true) {
+            str_contains($normalized, 'declined') => 'Declined charge',
+            str_contains($normalized, 'reversed') => 'Reversal',
+            str_contains($normalized, 'card_withdrawal') => 'Withdraw from card',
+            str_contains($normalized, 'withdraw card') => 'Card spend',
+            default => 'Card spend',
+        };
+    }
+
+    private function normalizeMevonTimestamp(mixed $value): ?string
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($text)->toIso8601String();
+        } catch (\Throwable) {
+            return $text;
+        }
+    }
+
+    /**
+     * @param  array<mixed>  $data
+     */
+    private function isListArray(array $data): bool
+    {
+        if ($data === []) {
+            return true;
+        }
+
+        return array_keys($data) === range(0, count($data) - 1);
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -693,6 +1040,13 @@ final class ConsumerVirtualCardService
 
         $payload = is_array($api['raw'] ?? null) ? $api['raw'] : ['data' => $api['data'] ?? null];
         $this->storedDetails->persistFromWebhook($card, $payload);
+
+        $data = is_array($api['data'] ?? null) ? $api['data'] : [];
+        $cardCode = trim((string) ($data['card_code'] ?? ''));
+        if ($cardCode !== '' && $this->looksLikeMevonCardCode($cardCode)) {
+            $stored = is_array($card->card_details_payload) ? $card->card_details_payload : [];
+            $this->persistProviderCardCode($card, $cardCode, $stored);
+        }
 
         $balance = $this->storedDetails->extractBalanceFromProviderPayload($payload);
         if ($balance !== null) {
