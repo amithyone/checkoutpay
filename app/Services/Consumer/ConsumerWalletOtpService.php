@@ -16,6 +16,8 @@ class ConsumerWalletOtpService
 
     private const CACHE_ATTEMPTS = 'consumer_wallet_otp_attempts:';
 
+    private const CACHE_UNUSED_SENDS = 'consumer_wallet_otp_unused_sends:';
+
     public function __construct(
         private EvolutionWhatsAppClient $whatsapp,
     ) {}
@@ -28,6 +30,33 @@ class ConsumerWalletOtpService
     private function attemptsKey(string $e164): string
     {
         return self::CACHE_ATTEMPTS.hash('sha256', $e164);
+    }
+
+    private function unusedSendsKey(string $e164): string
+    {
+        return self::CACHE_UNUSED_SENDS.hash('sha256', $e164);
+    }
+
+    public function isOtpBlocked(string $e164): bool
+    {
+        return (int) Cache::get($this->unusedSendsKey($e164), 0) >= $this->maxUnusedOtpSends();
+    }
+
+    public function clearUnusedOtpSends(string $e164): void
+    {
+        Cache::forget($this->unusedSendsKey($e164));
+    }
+
+    private function maxUnusedOtpSends(): int
+    {
+        return max(2, min(5, (int) config('consumer_wallet.otp_max_unused_sends', 3)));
+    }
+
+    private function recordUnusedOtpSend(string $e164): void
+    {
+        $key = $this->unusedSendsKey($e164);
+        $n = (int) Cache::get($key, 0);
+        Cache::put($key, $n + 1, now()->addHours(24));
     }
 
     /**
@@ -43,13 +72,16 @@ class ConsumerWalletOtpService
         $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
         $email = $wallet?->resolveOtpEmail();
         $emailEligible = $wallet?->isTier2() === true && $email !== null;
+        $otpBlocked = $this->isOtpBlocked($e164);
 
         return [
             'ok' => true,
             'message' => 'OK',
-            'whatsapp' => true,
-            'email' => $emailEligible,
+            'whatsapp' => ! $otpBlocked,
+            'email' => $emailEligible && ! $otpBlocked,
             'email_masked' => $emailEligible ? $this->maskEmail($email) : null,
+            'otp_blocked' => $otpBlocked,
+            'has_pin' => $wallet?->hasPin() ?? false,
         ];
     }
 
@@ -66,6 +98,14 @@ class ConsumerWalletOtpService
         $channel = strtolower(trim($channel));
         if (! in_array($channel, ['whatsapp', 'email'], true)) {
             return ['ok' => false, 'message' => 'Invalid delivery channel.'];
+        }
+
+        if ($this->isOtpBlocked($e164)) {
+            return [
+                'ok' => false,
+                'message' => 'Too many unused login codes. Sign in with your wallet PIN or use Forgot PIN.',
+                'otp_blocked' => true,
+            ];
         }
 
         $ttl = max(60, (int) config('consumer_wallet.otp_ttl_seconds', 600));
@@ -102,6 +142,9 @@ class ConsumerWalletOtpService
                 return ['ok' => false, 'message' => 'Could not send OTP email. Try WhatsApp instead.'];
             }
 
+            Cache::forget($this->attemptsKey($e164));
+            $this->recordUnusedOtpSend($e164);
+
             return [
                 'ok' => true,
                 'message' => 'OTP sent to your KYC email.',
@@ -126,6 +169,9 @@ class ConsumerWalletOtpService
 
             return ['ok' => false, 'message' => 'Could not send OTP. Try again later.'];
         }
+
+        Cache::forget($this->attemptsKey($e164));
+        $this->recordUnusedOtpSend($e164);
 
         return ['ok' => true, 'message' => 'OTP sent to your WhatsApp.', 'channel' => 'whatsapp'];
     }
@@ -159,7 +205,7 @@ class ConsumerWalletOtpService
         $attempts = (int) Cache::get($attemptsKey, 0);
         $maxAttempts = max(3, (int) config('consumer_wallet.otp_max_attempts', 5));
         if ($attempts >= $maxAttempts) {
-            return ['ok' => false, 'message' => 'Too many attempts. Request a new OTP.'];
+            return ['ok' => false, 'message' => 'Too many wrong codes. Tap back and send a new code to try again.'];
         }
 
         $payload = Cache::get($this->otpKey($e164));
@@ -178,6 +224,7 @@ class ConsumerWalletOtpService
 
         Cache::forget($this->otpKey($e164));
         Cache::forget($attemptsKey);
+        $this->clearUnusedOtpSends($e164);
 
         return ['ok' => true, 'message' => 'Verified.', 'phone_e164' => $e164];
     }

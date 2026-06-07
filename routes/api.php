@@ -92,6 +92,11 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
         Route::post('auth/otp/verify', [ConsumerWalletAuthController::class, 'verifyOtp']);
         Route::post('auth/pin/verify', [ConsumerWalletAuthController::class, 'verifyPin']);
+        Route::post('auth/recovery/options', [ConsumerWalletAuthController::class, 'recoveryOptions']);
+        Route::post('auth/recovery/verify-p2p', [ConsumerWalletAuthController::class, 'recoveryVerifyP2p']);
+        Route::post('auth/recovery/verify-bvn', [ConsumerWalletAuthController::class, 'recoveryVerifyBvn']);
+        Route::post('auth/recovery/verify-name', [ConsumerWalletAuthController::class, 'recoveryVerifyName']);
+        Route::post('auth/recovery/reset-pin', [ConsumerWalletAuthController::class, 'recoveryResetPin']);
     });
 
     Route::prefix('consumer')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {

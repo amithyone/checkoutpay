@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Services\Consumer\ConsumerWalletOtpService;
+use App\Services\Consumer\ConsumerWalletPinRecoveryService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,8 @@ class ConsumerWalletAuthController extends Controller
                 'whatsapp' => (bool) ($result['whatsapp'] ?? true),
                 'email' => (bool) ($result['email'] ?? false),
                 'email_masked' => $result['email_masked'] ?? null,
+                'otp_blocked' => (bool) ($result['otp_blocked'] ?? false),
+                'has_pin' => (bool) ($result['has_pin'] ?? false),
             ],
         ]);
     }
@@ -52,8 +55,11 @@ class ConsumerWalletAuthController extends Controller
         return response()->json([
             'success' => $result['ok'],
             'message' => $result['message'],
-            'data' => isset($result['channel']) ? ['channel' => $result['channel']] : null,
-        ], $result['ok'] ? 200 : 422);
+            'data' => array_filter([
+                'channel' => $result['channel'] ?? null,
+                'otp_blocked' => ($result['otp_blocked'] ?? false) ? true : null,
+            ], fn ($v) => $v !== null),
+        ], $result['ok'] ? 200 : ($result['otp_blocked'] ?? false ? 429 : 422));
     }
 
     public function verifyOtp(Request $request, ConsumerWalletOtpService $otp): JsonResponse
@@ -182,6 +188,105 @@ class ConsumerWalletAuthController extends Controller
                 'wallet_id' => $wallet->id,
             ],
         ]);
+    }
+
+    public function recoveryOptions(Request $request, ConsumerWalletPinRecoveryService $recovery): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+        ]);
+
+        $result = $recovery->options((string) $request->input('phone'));
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['data'] ?? [],
+        ]);
+    }
+
+    public function recoveryVerifyP2p(Request $request, ConsumerWalletPinRecoveryService $recovery): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'sender_hint' => 'required|string|min:2|max:120',
+            'amount' => 'nullable|string|max:24',
+        ]);
+
+        $result = $recovery->verifyP2pQuiz(
+            (string) $request->input('phone'),
+            (string) $request->input('sender_hint'),
+            $request->input('amount') !== null ? (string) $request->input('amount') : null,
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => isset($result['recovery_token']) ? ['recovery_token' => $result['recovery_token']] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function recoveryVerifyBvn(Request $request, ConsumerWalletPinRecoveryService $recovery): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'bvn' => 'required|string|min:11|max:11',
+        ]);
+
+        $result = $recovery->verifyBvn(
+            (string) $request->input('phone'),
+            (string) $request->input('bvn'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => isset($result['recovery_token']) ? ['recovery_token' => $result['recovery_token']] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function recoveryVerifyName(Request $request, ConsumerWalletPinRecoveryService $recovery): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'name' => 'required|string|min:2|max:120',
+        ]);
+
+        $result = $recovery->verifyBankName(
+            (string) $request->input('phone'),
+            (string) $request->input('name'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => isset($result['recovery_token']) ? ['recovery_token' => $result['recovery_token']] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function recoveryResetPin(Request $request, ConsumerWalletPinRecoveryService $recovery): JsonResponse
+    {
+        $request->validate([
+            'recovery_token' => 'required|string|min:32|max:128',
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+            'pin_confirmation' => ['required', 'regex:/^\d{4}$/'],
+        ]);
+
+        $result = $recovery->completeReset(
+            (string) $request->input('recovery_token'),
+            (string) $request->input('pin'),
+            (string) $request->input('pin_confirmation'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+        ], $result['ok'] ? 200 : 422);
     }
 
     public function logout(Request $request): JsonResponse
