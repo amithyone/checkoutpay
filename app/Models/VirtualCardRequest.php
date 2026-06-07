@@ -29,6 +29,7 @@ class VirtualCardRequest extends Model
         'provider_reference',
         'card_external_id',
         'is_frozen',
+        'auto_freeze_on_decline',
         'last_operation_at',
         'last_operation_payload',
         'card_name',
@@ -54,6 +55,7 @@ class VirtualCardRequest extends Model
         'card_balance_usd' => 'float',
         'activated_at' => 'datetime',
         'is_frozen' => 'boolean',
+        'auto_freeze_on_decline' => 'boolean',
         'last_operation_at' => 'datetime',
         'last_operation_payload' => 'array',
     ];

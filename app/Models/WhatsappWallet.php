@@ -48,6 +48,10 @@ class WhatsappWallet extends Model
         'rubies_account_type',
         'kyc_cac',
         'transfer_email_otp_enabled',
+        'notify_card_created_email',
+        'notify_card_created_whatsapp',
+        'notify_card_transaction_email',
+        'notify_card_transaction_whatsapp',
         'status',
         'admin_bot_paused',
         'support_whatsapp_welcome_sent_at',
@@ -65,6 +69,10 @@ class WhatsappWallet extends Model
         'kyc_dob' => 'date',
         'tier' => 'integer',
         'transfer_email_otp_enabled' => 'boolean',
+        'notify_card_created_email' => 'boolean',
+        'notify_card_created_whatsapp' => 'boolean',
+        'notify_card_transaction_email' => 'boolean',
+        'notify_card_transaction_whatsapp' => 'boolean',
         'admin_bot_paused' => 'boolean',
         'support_whatsapp_welcome_sent_at' => 'datetime',
     ];
@@ -201,6 +209,26 @@ class WhatsappWallet extends Model
         return $this->isTier2()
             && $this->transfer_email_otp_enabled
             && $this->resolveOtpEmail() !== null;
+    }
+
+    public function wantsCardCreatedEmail(): bool
+    {
+        return (bool) ($this->notify_card_created_email ?? true);
+    }
+
+    public function wantsCardCreatedWhatsapp(): bool
+    {
+        return (bool) ($this->notify_card_created_whatsapp ?? true);
+    }
+
+    public function wantsCardTransactionEmail(): bool
+    {
+        return (bool) ($this->notify_card_transaction_email ?? true);
+    }
+
+    public function wantsCardTransactionWhatsapp(): bool
+    {
+        return (bool) ($this->notify_card_transaction_whatsapp ?? true);
     }
 
     public function isPinLocked(): bool

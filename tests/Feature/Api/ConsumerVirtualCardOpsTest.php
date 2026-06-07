@@ -629,6 +629,128 @@ class ConsumerVirtualCardOpsTest extends TestCase
         });
     }
 
+    public function test_card_transactions_resolves_vcard_from_card_details_when_only_uuid_stored(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_external_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+            'provider_reference' => null,
+            'card_details_payload' => null,
+            'response_payload' => [
+                'webhook' => [
+                    'event' => 'card.created.success',
+                    'data' => [
+                        'request_id' => 'REQ1780744493644',
+                        'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                        'balance' => 5,
+                    ],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                    'card_code' => 'VCARD2026060611150700359',
+                    'balance' => 10,
+                ],
+            ], 200),
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'success' => true,
+                'data' => [[
+                    'description' => 'Google CLOUD M9QWV5 Dublin IR',
+                    'status' => 'success',
+                    'amount' => 10.00,
+                    'currency' => 'USD',
+                    'createdOn' => '2026-06-01T15:02:13.2763678',
+                    'category' => 'withdraw card',
+                ]],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards/transactions');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.0.source', 'mevon')
+            ->assertJsonPath('data.0.description', 'Google CLOUD M9QWV5 Dublin IR');
+
+        $fresh = $card->fresh();
+        $this->assertSame('REQ1780744493644', $fresh->provider_reference);
+        $this->assertSame('VCARD2026060611150700359', $fresh->card_details_payload['card_code'] ?? null);
+
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return $request->url() === 'https://mevon.test/V1/card_details'
+                && ($data['card_id'] ?? '') === 'bab449bb-15e9-404a-aa73-657519df4794';
+        });
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return $request->url() === 'https://mevon.test/V1/card_transactions'
+                && ($data['card_code'] ?? '') === 'VCARD2026060611150700359';
+        });
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://mevon.test/V1/card_balance');
+    }
+
+    public function test_card_transactions_auto_freezes_after_declined_payment(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'auto_freeze_on_decline' => true,
+            'is_frozen' => false,
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'success' => true,
+                'data' => [[
+                    'code' => 'decline-ref-001',
+                    'description' => 'Merchant declined',
+                    'status' => 'failed',
+                    'amount' => 4.50,
+                    'currency' => 'USD',
+                    'createdOn' => '2026-06-02T10:00:00.0000000',
+                    'category' => 'declined card',
+                ]],
+            ], 200),
+            'https://mevon.test/V1/card_status' => Http::response([
+                'success' => true,
+                'message' => 'Card freeze successful',
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards/transactions');
+
+        $response->assertOk()
+            ->assertJsonPath('meta.auto_frozen', true)
+            ->assertJsonPath('data.0.status', 'failed');
+
+        $this->assertTrue($card->fresh()->is_frozen);
+        Http::assertSent(fn ($request) => $request->url() === 'https://mevon.test/V1/card_status');
+    }
+
+    public function test_user_can_toggle_auto_freeze_setting(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update(['auto_freeze_on_decline' => true]);
+
+        Sanctum::actingAs($account);
+
+        $this->postJson('/api/v1/consumer/cards/auto-freeze', ['enabled' => false])
+            ->assertOk()
+            ->assertJsonPath('data.request.auto_freeze_on_decline', false);
+
+        $this->assertFalse($card->fresh()->auto_freeze_on_decline);
+    }
+
     /**
      * @return array{0: WhatsappWallet, 1: ConsumerWalletApiAccount, 2?: VirtualCardRequest}
      */

@@ -24,6 +24,7 @@ final class VirtualCardMevonWebhookService
         private VirtualCardFeeRefundService $feeRefunds,
         private VirtualCardRequestSupersedeService $supersede,
         private ConsumerVirtualCardService $cards,
+        private VirtualCardNotificationService $cardNotifier,
     ) {}
 
     /**
@@ -181,6 +182,10 @@ final class VirtualCardMevonWebhookService
             'was_failed' => $wasFailed,
             'fee_recollected' => (bool) ($collection['collected'] ?? false),
         ]);
+
+        if ($wallet) {
+            $this->cardNotifier->notifyCardReadyIfNeeded($wallet->fresh(), $fresh->fresh());
+        }
 
         return self::RESULT_ACTIVATED;
     }

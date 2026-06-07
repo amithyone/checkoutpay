@@ -181,6 +181,11 @@ class ConsumerWalletApiController extends Controller
                 'transfer_email_otp_eligible' => $wallet->isTier2(),
                 'transfer_email_otp_has_email' => $wallet->resolveOtpEmail() !== null,
                 'transfer_email_otp_effective' => $wallet->wantsTransferEmailOtp(),
+                'notify_card_created_email' => $wallet->wantsCardCreatedEmail(),
+                'notify_card_created_whatsapp' => $wallet->wantsCardCreatedWhatsapp(),
+                'notify_card_transaction_email' => $wallet->wantsCardTransactionEmail(),
+                'notify_card_transaction_whatsapp' => $wallet->wantsCardTransactionWhatsapp(),
+                'card_notify_has_email' => $wallet->resolveOtpEmail() !== null,
                 'pay_code' => $payCode,
             ]),
         ]);
@@ -624,6 +629,63 @@ class ConsumerWalletApiController extends Controller
             'data' => [
                 'transfer_email_otp_enabled' => (bool) $wallet->transfer_email_otp_enabled,
                 'transfer_email_otp_effective' => $wallet->wantsTransferEmailOtp(),
+            ],
+        ]);
+    }
+
+    public function updateCardNotifications(Request $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request)->fresh();
+
+        $validated = $request->validate([
+            'notify_card_created_email' => 'sometimes|boolean',
+            'notify_card_created_whatsapp' => 'sometimes|boolean',
+            'notify_card_transaction_email' => 'sometimes|boolean',
+            'notify_card_transaction_whatsapp' => 'sometimes|boolean',
+        ]);
+
+        if ($validated === []) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No notification settings provided.',
+            ], 422);
+        }
+
+        foreach ([
+            'notify_card_created_email',
+            'notify_card_created_whatsapp',
+            'notify_card_transaction_email',
+            'notify_card_transaction_whatsapp',
+        ] as $key) {
+            if (array_key_exists($key, $validated)) {
+                $wallet->{$key} = (bool) $validated[$key];
+            }
+        }
+
+        $emailKeys = ['notify_card_created_email', 'notify_card_transaction_email'];
+        $wantsEmail = $wallet->wantsCardCreatedEmail() || $wallet->wantsCardTransactionEmail();
+        if ($wantsEmail && $wallet->resolveOtpEmail() === null) {
+            foreach ($emailKeys as $key) {
+                if (array_key_exists($key, $validated) && $validated[$key]) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Add a KYC email on your profile before enabling card email alerts.',
+                    ], 422);
+                }
+            }
+        }
+
+        $wallet->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Card notification settings updated.',
+            'data' => [
+                'notify_card_created_email' => $wallet->wantsCardCreatedEmail(),
+                'notify_card_created_whatsapp' => $wallet->wantsCardCreatedWhatsapp(),
+                'notify_card_transaction_email' => $wallet->wantsCardTransactionEmail(),
+                'notify_card_transaction_whatsapp' => $wallet->wantsCardTransactionWhatsapp(),
+                'card_notify_has_email' => $wallet->resolveOtpEmail() !== null,
             ],
         ]);
     }

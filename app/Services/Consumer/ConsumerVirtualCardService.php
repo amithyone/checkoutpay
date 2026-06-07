@@ -27,6 +27,7 @@ final class ConsumerVirtualCardService
         private VirtualCardRequestLogService $cardLogs,
         private VirtualCardRequestSupersedeService $supersede,
         private VirtualCardStoredDetailsService $storedDetails,
+        private VirtualCardNotificationService $cardNotifier,
     ) {}
 
     public function isEnabled(): bool
@@ -101,14 +102,24 @@ final class ConsumerVirtualCardService
      */
     public function status(WhatsappWallet $wallet, bool $forceRefresh = false): array
     {
+        $autoFrozen = false;
         if ($forceRefresh) {
             $this->refreshProviderCardBalance($wallet);
+            $card = $this->resolveOperableCard($wallet);
+            if ($card !== null) {
+                $autoFrozen = $this->evaluateAutoFreezeForCard($card->fresh());
+            }
+        }
+
+        $data = $this->statusPayload($wallet);
+        if ($autoFrozen) {
+            $data['auto_frozen'] = true;
         }
 
         return [
             'ok' => true,
-            'message' => 'OK',
-            'data' => $this->statusPayload($wallet),
+            'message' => $autoFrozen ? 'Card frozen after a declined payment.' : 'OK',
+            'data' => $data,
         ];
     }
 
@@ -120,6 +131,7 @@ final class ConsumerVirtualCardService
         }
 
         $this->backfillMevonRequestId($card->fresh());
+        $this->backfillMevonCardCode($card->fresh());
         $this->syncProviderCardBalance($card->fresh());
     }
 
@@ -133,7 +145,9 @@ final class ConsumerVirtualCardService
         $perPage = max(1, min(50, $perPage));
         $page = max(1, $page);
 
-        $items = $this->fetchMevonCardTransactions($wallet);
+        $mevonFetch = $this->fetchMevonCardTransactions($wallet);
+        $items = $mevonFetch['items'];
+        $autoFrozen = $mevonFetch['auto_frozen'];
 
         $walletTxns = WhatsappWalletTransaction::query()
             ->where('whatsapp_wallet_id', $wallet->id)
@@ -164,13 +178,14 @@ final class ConsumerVirtualCardService
 
         return [
             'ok' => true,
-            'message' => 'OK',
+            'message' => $autoFrozen ? 'Card frozen after a declined payment.' : 'OK',
             'data' => array_values(array_slice($items, $offset, $perPage)),
             'meta' => [
                 'current_page' => $page,
                 'last_page' => $lastPage,
                 'per_page' => $perPage,
                 'total' => $total,
+                'auto_frozen' => $autoFrozen,
             ],
         ];
     }
@@ -573,6 +588,16 @@ final class ConsumerVirtualCardService
                 'last_operation_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
             ]);
             $this->applyCardBalanceAfterOperation($card, $amountUsd, $api, 'credit');
+            $this->notifyWalletCardTransaction(
+                $wallet,
+                $card,
+                'virtual_card_topup',
+                'Fund card',
+                $amountUsd,
+                $amountNgn,
+                'debit',
+                $reference,
+            );
 
             return [
                 'ok' => true,
@@ -709,18 +734,20 @@ final class ConsumerVirtualCardService
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array{items: list<array<string, mixed>>, auto_frozen: bool}
      */
     private function fetchMevonCardTransactions(WhatsappWallet $wallet): array
     {
+        $empty = ['items' => [], 'auto_frozen' => false];
+
         $card = $this->resolveOperableCard($wallet);
         if ($card === null || ! $this->cardApi->isConfigured()) {
-            return [];
+            return $empty;
         }
 
-        $cardCode = $this->resolveProviderCardCode($card);
+        $cardCode = $this->backfillMevonCardCode($card);
         if ($cardCode === null) {
-            return [];
+            return $empty;
         }
 
         $api = $this->cardApi->getCardTransactions($cardCode);
@@ -731,10 +758,16 @@ final class ConsumerVirtualCardService
                 'message' => (string) ($api['message'] ?? 'unknown'),
             ]);
 
-            return [];
+            return $empty;
         }
 
         $rows = $this->normalizeMevonTransactionList($api['data'] ?? null);
+        $wallet = $card->wallet;
+        if ($wallet) {
+            $this->maybeNotifyNewMevonTransactions($card, $wallet, $rows);
+            $card = $card->fresh();
+        }
+        $autoFrozen = $this->maybeAutoFreezeOnDeclinedTransaction($card->fresh(), $rows);
         $items = [];
         foreach ($rows as $index => $row) {
             if (! is_array($row)) {
@@ -743,7 +776,238 @@ final class ConsumerVirtualCardService
             $items[] = $this->serializeMevonCardTransaction($row, (int) $index);
         }
 
-        return $items;
+        return ['items' => $items, 'auto_frozen' => $autoFrozen];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    public function setAutoFreezeOnDecline(WhatsappWallet $wallet, bool $enabled): array
+    {
+        $card = $this->resolveOperableCard($wallet);
+        if ($card === null) {
+            return ['ok' => false, 'message' => 'No active card found.'];
+        }
+
+        $card->update(['auto_freeze_on_decline' => $enabled]);
+
+        return [
+            'ok' => true,
+            'message' => $enabled
+                ? 'Auto-freeze enabled. Your card will freeze after a declined payment.'
+                : 'Auto-freeze disabled.',
+            'data' => [
+                'request' => $this->serializeRequest($card->fresh()),
+            ],
+        ];
+    }
+
+    private function evaluateAutoFreezeForCard(VirtualCardRequest $card): bool
+    {
+        if (! $this->cardApi->isConfigured()) {
+            return false;
+        }
+
+        $cardCode = $this->backfillMevonCardCode($card);
+        if ($cardCode === null) {
+            return false;
+        }
+
+        $api = $this->cardApi->getCardTransactions($cardCode);
+        if (! ($api['ok'] ?? false)) {
+            return false;
+        }
+
+        $rows = $this->normalizeMevonTransactionList($api['data'] ?? null);
+
+        return $this->maybeAutoFreezeOnDeclinedTransaction($card->fresh(), $rows);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function maybeAutoFreezeOnDeclinedTransaction(VirtualCardRequest $card, array $rows): bool
+    {
+        if (! ($card->auto_freeze_on_decline ?? true) || $card->is_frozen) {
+            return false;
+        }
+
+        $sorted = array_values(array_filter($rows, fn ($row) => is_array($row)));
+        usort($sorted, function (array $a, array $b): int {
+            $ta = strtotime((string) ($a['createdOn'] ?? '')) ?: 0;
+            $tb = strtotime((string) ($b['createdOn'] ?? '')) ?: 0;
+
+            return $tb <=> $ta;
+        });
+
+        $latestFailedRef = null;
+        foreach ($sorted as $row) {
+            if (! $this->isMevonDeclinedRow($row)) {
+                continue;
+            }
+            $latestFailedRef = trim((string) ($row['code'] ?? $row['reference'] ?? ''));
+            break;
+        }
+
+        if ($latestFailedRef === null || $latestFailedRef === '') {
+            return false;
+        }
+
+        $payload = is_array($card->last_operation_payload) ? $card->last_operation_payload : [];
+        if (($payload['auto_freeze_trigger_ref'] ?? '') === $latestFailedRef) {
+            return false;
+        }
+
+        if (! $this->freezeCardWithoutPin($card->fresh())) {
+            return false;
+        }
+
+        $fresh = $card->fresh();
+        $operationPayload = is_array($fresh->last_operation_payload) ? $fresh->last_operation_payload : [];
+        $fresh->update([
+            'last_operation_payload' => array_merge($operationPayload, [
+                'auto_freeze_trigger_ref' => $latestFailedRef,
+                'auto_freeze_at' => now()->toIso8601String(),
+                'auto_freeze_reason' => 'declined_transaction',
+            ]),
+        ]);
+
+        Log::info('consumer.virtual_card.auto_frozen', [
+            'virtual_card_request_id' => $fresh->id,
+            'trigger_ref' => $latestFailedRef,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function isMevonDeclinedRow(array $row): bool
+    {
+        $status = strtolower(trim((string) ($row['status'] ?? '')));
+        if (in_array($status, ['failed', 'declined', 'failure', 'fail', 'unsuccessful', 'rejected'], true)) {
+            return true;
+        }
+
+        $category = strtolower(trim((string) ($row['category'] ?? '')));
+
+        return str_contains($category, 'declined') || str_contains($category, 'failed');
+    }
+
+    private function notifyWalletCardTransaction(
+        WhatsappWallet $wallet,
+        VirtualCardRequest $card,
+        string $type,
+        string $label,
+        float $amountUsd,
+        ?float $amountNgn,
+        string $direction,
+        string $reference,
+    ): void {
+        $this->cardNotifier->notifyTransaction($wallet, $card, [
+            'type' => $type,
+            'label' => $label,
+            'amount_usd' => $amountUsd,
+            'amount_ngn' => $amountNgn,
+            'direction' => $direction,
+            'status' => 'success',
+            'reference' => $reference,
+            'created_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function maybeNotifyNewMevonTransactions(
+        VirtualCardRequest $card,
+        WhatsappWallet $wallet,
+        array $rows,
+    ): void {
+        $payload = is_array($card->last_operation_payload) ? $card->last_operation_payload : [];
+        $notified = is_array($payload['notified_transaction_refs'] ?? null)
+            ? $payload['notified_transaction_refs']
+            : [];
+        $notifiedSet = array_flip(array_map('strval', $notified));
+
+        $sorted = array_values(array_filter($rows, fn ($row) => is_array($row)));
+        usort($sorted, function (array $a, array $b): int {
+            $ta = strtotime((string) ($a['createdOn'] ?? '')) ?: 0;
+            $tb = strtotime((string) ($b['createdOn'] ?? '')) ?: 0;
+
+            return $tb <=> $ta;
+        });
+
+        $newRefs = [];
+        foreach ($sorted as $row) {
+            $ref = trim((string) ($row['code'] ?? $row['reference'] ?? ''));
+            if ($ref === '' || isset($notifiedSet[$ref])) {
+                continue;
+            }
+
+            $amount = is_numeric($row['amount'] ?? null) ? round((float) $row['amount'], 2) : null;
+            $status = strtolower(trim((string) ($row['status'] ?? 'success')));
+            $category = trim((string) ($row['category'] ?? ''));
+            $description = trim((string) ($row['description'] ?? ''));
+            $label = $description !== '' ? $description : $this->mevonCategoryLabel($category);
+            $drcr = strtoupper(trim((string) ($row['drcr'] ?? 'DR')));
+
+            $this->cardNotifier->notifyTransaction($wallet, $card, [
+                'type' => $this->mevonCategoryType($category),
+                'label' => $label,
+                'amount_usd' => $amount,
+                'amount_ngn' => null,
+                'direction' => $drcr === 'CR' ? 'credit' : 'debit',
+                'status' => $status !== '' ? $status : 'success',
+                'reference' => $ref,
+                'created_at' => $this->normalizeMevonTimestamp($row['createdOn'] ?? null),
+            ]);
+            $newRefs[] = $ref;
+        }
+
+        if ($newRefs === []) {
+            return;
+        }
+
+        $merged = array_slice(array_values(array_unique(array_merge($notified, $newRefs))), -500);
+        $card->update([
+            'last_operation_payload' => array_merge($payload, [
+                'notified_transaction_refs' => $merged,
+            ]),
+        ]);
+    }
+
+    private function freezeCardWithoutPin(VirtualCardRequest $card): bool
+    {
+        $cardCode = $this->backfillMevonCardCode($card);
+        if ($cardCode === null) {
+            return false;
+        }
+
+        $api = $this->cardApi->setCardStatus('freeze', $cardCode);
+        if (! ($api['ok'] ?? false)) {
+            Log::warning('consumer.virtual_card.auto_freeze_failed', [
+                'virtual_card_request_id' => $card->id,
+                'card_code' => $cardCode,
+                'message' => (string) ($api['message'] ?? 'unknown'),
+            ]);
+
+            return false;
+        }
+
+        $card->update([
+            'is_frozen' => true,
+            'last_operation_at' => now(),
+            'last_operation_payload' => array_merge(
+                is_array($card->last_operation_payload) ? $card->last_operation_payload : [],
+                [
+                    'auto_freeze_provider_response' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
+                ]
+            ),
+        ]);
+
+        return true;
     }
 
     private function resolveMevonBalanceRequestId(VirtualCardRequest $card): ?string
@@ -838,6 +1102,132 @@ final class ConsumerVirtualCardService
         }
 
         return $resolved;
+    }
+
+    /**
+     * Backfill VCARD… code from webhook, stored details, or card_details (same path as live balance).
+     */
+    public function backfillMevonCardCode(VirtualCardRequest $card): ?string
+    {
+        $this->backfillMevonRequestId($card->fresh());
+        $this->repairCardExternalIdIfNeeded($card->fresh());
+        $card = $card->fresh();
+
+        $resolved = $this->resolveMevonCardCode($card);
+        if ($resolved !== null) {
+            $stored = is_array($card->card_details_payload) ? $card->card_details_payload : null;
+            $this->persistProviderCardCode($card, $resolved, $stored);
+
+            return $resolved;
+        }
+
+        $code = $this->resolveProviderCardCode($card);
+        if ($code !== null) {
+            return $code;
+        }
+
+        $this->fetchAndStoreProviderCardDetails($card->fresh());
+
+        return $this->resolveProviderCardCode($card->fresh());
+    }
+
+    private function resolveMevonCardCode(VirtualCardRequest $card): ?string
+    {
+        foreach ($this->mevonCardCodeCandidates($card) as $candidate) {
+            if ($this->looksLikeMevonCardCode($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function mevonCardCodeCandidates(VirtualCardRequest $card): array
+    {
+        $candidates = [];
+
+        $stored = is_array($card->card_details_payload) ? $card->card_details_payload : [];
+        $storedCode = trim((string) ($stored['card_code'] ?? ''));
+        if ($storedCode !== '') {
+            $candidates[] = $storedCode;
+        }
+
+        $externalId = trim((string) ($card->card_external_id ?? ''));
+        if ($externalId !== '') {
+            $candidates[] = $externalId;
+        }
+
+        $webhookCode = $this->cardCodeFromWebhookPayload($card);
+        if ($webhookCode !== null) {
+            $candidates[] = $webhookCode;
+        }
+
+        $fromLogs = $this->resolveMevonCardCodeFromLogs($card);
+        if ($fromLogs !== null) {
+            $candidates[] = $fromLogs;
+        }
+
+        return array_values(array_unique(array_filter($candidates, fn (string $value) => $value !== '')));
+    }
+
+    private function resolveMevonCardCodeFromLogs(VirtualCardRequest $card): ?string
+    {
+        $logs = VirtualCardRequestLog::query()
+            ->where(function ($query) use ($card) {
+                $query->where('virtual_card_request_id', $card->id)
+                    ->orWhere('whatsapp_wallet_id', $card->whatsapp_wallet_id);
+            })
+            ->latest('id')
+            ->limit(150)
+            ->get();
+
+        foreach ($logs as $log) {
+            $context = is_array($log->context) ? $log->context : [];
+            foreach ([$context['raw_payload'] ?? null, $context['response'] ?? null, $context] as $payload) {
+                $code = $this->extractMevonCardCodeFromPayload($payload);
+                if ($code !== null) {
+                    return $code;
+                }
+            }
+
+            $rawBody = trim((string) ($context['raw_body'] ?? ''));
+            if ($rawBody !== '' && preg_match('/VCARD\d{6,}/i', $rawBody, $match) === 1) {
+                return strtoupper($match[0]);
+            }
+        }
+
+        $response = is_array($card->response_payload) ? $card->response_payload : [];
+
+        return $this->extractMevonCardCodeFromPayload($response);
+    }
+
+    private function extractMevonCardCodeFromPayload(mixed $payload): ?string
+    {
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $serialized = json_encode($payload);
+        if (is_string($serialized) && preg_match('/VCARD\d{6,}/i', $serialized, $match) === 1) {
+            return strtoupper($match[0]);
+        }
+
+        foreach ([$payload['data'] ?? null, $payload] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            foreach (['card_code', 'cardCode'] as $key) {
+                $value = trim((string) ($row[$key] ?? ''));
+                if ($this->looksLikeMevonCardCode($value)) {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function resolveMevonBalanceRequestIdFromLogs(VirtualCardRequest $card): ?string
@@ -1203,6 +1593,16 @@ final class ConsumerVirtualCardService
             'last_operation_payload' => is_array($api['raw'] ?? null) ? $api['raw'] : ['raw' => $api['raw'] ?? null],
         ]);
         $this->applyCardBalanceAfterOperation($card, $amountUsd, $api, 'debit');
+        $this->notifyWalletCardTransaction(
+            $wallet,
+            $card,
+            'virtual_card_withdraw',
+            'Withdraw from card',
+            $amountUsd,
+            $amountNgn,
+            'credit',
+            $reference,
+        );
 
         return [
             'ok' => true,
@@ -1686,6 +2086,7 @@ final class ConsumerVirtualCardService
             'card_last_four' => $lastFour,
             'card_balance_usd' => $row->card_balance_usd !== null ? (float) $row->card_balance_usd : null,
             'is_frozen' => (bool) $row->is_frozen,
+            'auto_freeze_on_decline' => (bool) ($row->auto_freeze_on_decline ?? true),
             'can_manage' => $canManage,
             'failure_reason' => $row->failure_reason,
             'created_at' => $row->created_at?->toIso8601String(),

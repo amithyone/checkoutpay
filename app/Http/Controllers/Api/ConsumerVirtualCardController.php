@@ -142,6 +142,22 @@ class ConsumerVirtualCardController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
+    public function setAutoFreeze(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        $wallet = $this->walletFor($request)->fresh();
+        $result = $this->cards->setAutoFreezeOnDecline($wallet, (bool) $validated['enabled']);
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => $result['data'] ?? null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
     public function details(Request $request): JsonResponse
     {
         $validated = $request->validate([

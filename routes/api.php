@@ -106,6 +106,7 @@ Route::prefix('v1')->group(function () {
         Route::put('wallet/pin', [ConsumerWalletApiController::class, 'changePin']);
         Route::patch('profile/sender-name', [ConsumerWalletApiController::class, 'updateSenderName']);
         Route::patch('wallet/transfer-email-otp', [ConsumerWalletApiController::class, 'updateTransferEmailOtp']);
+        Route::patch('wallet/card-notifications', [ConsumerWalletApiController::class, 'updateCardNotifications']);
         Route::post('wallet/push-token', [ConsumerWalletApiController::class, 'registerPushToken']);
         Route::post('transfers/p2p', [ConsumerWalletApiController::class, 'transferP2p']);
         Route::post('transfers/bank', [ConsumerWalletApiController::class, 'transferBank']);
@@ -127,6 +128,7 @@ Route::prefix('v1')->group(function () {
         Route::post('cards/request', [ConsumerVirtualCardController::class, 'request']);
         Route::post('cards/topup', [ConsumerVirtualCardController::class, 'topup']);
         Route::post('cards/status', [ConsumerVirtualCardController::class, 'setStatus']);
+        Route::post('cards/auto-freeze', [ConsumerVirtualCardController::class, 'setAutoFreeze']);
         Route::post('cards/withdraw', [ConsumerVirtualCardController::class, 'withdraw']);
         Route::post('cards/details', [ConsumerVirtualCardController::class, 'details']);
         Route::get('cards', [ConsumerVirtualCardController::class, 'index']);

@@ -51,7 +51,7 @@ class ProbeVirtualCardMevonEndpointsCommand extends Command
                 $mevonRequestId = trim((string) ($row->provider_reference ?? ''));
             }
             if ($cardCode === '') {
-                $cardCode = (string) ($cards->syncProviderCardCode($row) ?? '');
+                $cardCode = (string) ($cards->backfillMevonCardCode($row) ?? '');
             }
 
             $wallet = WhatsappWallet::query()->find($row->whatsapp_wallet_id);
