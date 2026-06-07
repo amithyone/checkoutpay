@@ -456,7 +456,7 @@ class WhatsappWaWalletMenuHandler
             : "*4* WhatsApp send (intl OK).\n";
 
         $casualLine = $ngRails
-            ? "Or: *send 5k to Name Opay* · *send 20000 to 0210085995 gtbank* · *send 5000 on whatsapp to 081...*\n\n"
+            ? "Or: *send 20000 to 0210085995 gtbank* · *send 5000 on whatsapp to 081...* · *send mon 8148790554 1000*\n\n"
             : '';
 
         $this->client->sendText(
@@ -943,9 +943,8 @@ class WhatsappWaWalletMenuHandler
                 if (WhatsappWalletCasualSendParser::largestNairaAmount($norm) !== null) {
                     $bankTips = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)
                         ? "• Use *2* once to send to their account (we save it for next time).\n".
-                            "• Then try e.g. *send 5k to Tunde Opay* or *pay 2000 for mama GTB*.\n".
-                            "• Any order: *send mon 8148790554 1000* or *1000 opay 8012345678*.\n".
-                            "• Direct account+bank: *send 20000 to 0210085995 gtbank*.\n"
+                            "• Then try e.g. *pay 2000 for mama GTB* or *send 20000 to 0210085995 gtbank*.\n".
+                            "• Any order: *send mon 8148790554 1000* or *1000 opay 8012345678*.\n"
                         : '';
                     $this->client->sendText(
                         $instance,
@@ -989,7 +988,7 @@ class WhatsappWaWalletMenuHandler
         }
 
         $plainHint = $ng
-            ? "or say e.g. *send mon 8148790554 1000* or *send 5k to Tunde Opay*.\n\n"
+            ? "or say e.g. *send mon 8148790554 1000* or *send 20000 to 0210085995 gtbank*.\n\n"
             : "or type a *WhatsApp send* (amount + their number).\n\n";
 
         $this->client->sendText(

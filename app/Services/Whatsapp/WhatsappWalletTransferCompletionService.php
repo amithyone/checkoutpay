@@ -220,7 +220,7 @@ class WhatsappWalletTransferCompletionService
             : "*4* WhatsApp send (intl OK).\n";
 
         $casualLine = $ngRails
-            ? "Or: *send 5k to Name Opay*\n\n"
+            ? "Or: *send 20000 to 0210085995 gtbank* · *send mon 8148790554 1000*\n\n"
             : '';
 
         $this->client->sendText(
