@@ -88,6 +88,7 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::prefix('consumer')->middleware('throttle:consumer_wallet_otp')->group(function () {
+        Route::post('auth/otp/options', [ConsumerWalletAuthController::class, 'otpOptions']);
         Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
         Route::post('auth/otp/verify', [ConsumerWalletAuthController::class, 'verifyOtp']);
         Route::post('auth/pin/verify', [ConsumerWalletAuthController::class, 'verifyPin']);

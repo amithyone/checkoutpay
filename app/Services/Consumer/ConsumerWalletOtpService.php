@@ -2,11 +2,13 @@
 
 namespace App\Services\Consumer;
 
+use App\Models\WhatsappWallet;
 use App\Services\Whatsapp\EvolutionWhatsAppClient;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class ConsumerWalletOtpService
 {
@@ -29,13 +31,41 @@ class ConsumerWalletOtpService
     }
 
     /**
-     * @return array{ok: bool, message: string}
+     * @return array{ok: bool, message: string, whatsapp?: bool, email?: bool, email_masked?: string|null}
      */
-    public function requestOtp(string $phoneInput): array
+    public function otpOptions(string $phoneInput): array
     {
         $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
         if ($e164 === null) {
             return ['ok' => false, 'message' => 'Invalid Nigerian mobile number.'];
+        }
+
+        $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
+        $email = $wallet?->resolveOtpEmail();
+        $emailEligible = $wallet?->isTier2() === true && $email !== null;
+
+        return [
+            'ok' => true,
+            'message' => 'OK',
+            'whatsapp' => true,
+            'email' => $emailEligible,
+            'email_masked' => $emailEligible ? $this->maskEmail($email) : null,
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, channel?: string}
+     */
+    public function requestOtp(string $phoneInput, string $channel = 'whatsapp'): array
+    {
+        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        if ($e164 === null) {
+            return ['ok' => false, 'message' => 'Invalid Nigerian mobile number.'];
+        }
+
+        $channel = strtolower(trim($channel));
+        if (! in_array($channel, ['whatsapp', 'email'], true)) {
+            return ['ok' => false, 'message' => 'Invalid delivery channel.'];
         }
 
         $ttl = max(60, (int) config('consumer_wallet.otp_ttl_seconds', 600));
@@ -48,9 +78,41 @@ class ConsumerWalletOtpService
             'expires_at' => now()->addSeconds($ttl)->timestamp,
         ], $ttl);
 
+        if ($channel === 'email') {
+            $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
+            $email = $wallet?->resolveOtpEmail();
+            if (! $wallet?->isTier2() || $email === null) {
+                Cache::forget($this->otpKey($e164));
+
+                return ['ok' => false, 'message' => 'Email OTP is only available for verified Tier 2 wallets with a KYC email.'];
+            }
+
+            try {
+                $brand = (string) config('whatsapp.bot_brand_name', 'Checkout');
+                Mail::send('emails.login-otp-code', [
+                    'code' => $code,
+                    'ttlMinutes' => max(1, (int) round($ttl / 60)),
+                ], function ($message) use ($email, $brand) {
+                    $message->to($email)->subject("Your {$brand} app login code");
+                });
+            } catch (\Throwable $e) {
+                Cache::forget($this->otpKey($e164));
+                Log::warning('consumer_wallet.otp: email send failed', ['error' => $e->getMessage()]);
+
+                return ['ok' => false, 'message' => 'Could not send OTP email. Try WhatsApp instead.'];
+            }
+
+            return [
+                'ok' => true,
+                'message' => 'OTP sent to your KYC email.',
+                'channel' => 'email',
+            ];
+        }
+
         $instance = WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance === '') {
             Log::warning('consumer_wallet.otp: no evolution instance');
+            Cache::forget($this->otpKey($e164));
 
             return ['ok' => false, 'message' => 'OTP delivery is not configured.'];
         }
@@ -65,7 +127,22 @@ class ConsumerWalletOtpService
             return ['ok' => false, 'message' => 'Could not send OTP. Try again later.'];
         }
 
-        return ['ok' => true, 'message' => 'OTP sent to your WhatsApp.'];
+        return ['ok' => true, 'message' => 'OTP sent to your WhatsApp.', 'channel' => 'whatsapp'];
+    }
+
+    private function maskEmail(string $email): string
+    {
+        $email = strtolower(trim($email));
+        $parts = explode('@', $email, 2);
+        if (count($parts) !== 2 || $parts[0] === '') {
+            return '***';
+        }
+        $local = $parts[0];
+        $domain = $parts[1];
+        $visible = substr($local, 0, 1);
+        $maskedLocal = strlen($local) <= 2 ? $visible.'*' : $visible.str_repeat('*', min(6, strlen($local) - 1));
+
+        return $maskedLocal.'@'.$domain;
     }
 
     /**

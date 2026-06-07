@@ -13,17 +13,46 @@ use Illuminate\Http\Request;
 
 class ConsumerWalletAuthController extends Controller
 {
-    public function requestOtp(Request $request, ConsumerWalletOtpService $otp): JsonResponse
+    public function otpOptions(Request $request, ConsumerWalletOtpService $otp): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
         ]);
 
-        $result = $otp->requestOtp((string) $request->input('phone'));
+        $result = $otp->otpOptions((string) $request->input('phone'));
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'whatsapp' => (bool) ($result['whatsapp'] ?? true),
+                'email' => (bool) ($result['email'] ?? false),
+                'email_masked' => $result['email_masked'] ?? null,
+            ],
+        ]);
+    }
+
+    public function requestOtp(Request $request, ConsumerWalletOtpService $otp): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'channel' => 'nullable|string|in:whatsapp,email',
+        ]);
+
+        $result = $otp->requestOtp(
+            (string) $request->input('phone'),
+            (string) $request->input('channel', 'whatsapp'),
+        );
 
         return response()->json([
             'success' => $result['ok'],
             'message' => $result['message'],
+            'data' => isset($result['channel']) ? ['channel' => $result['channel']] : null,
         ], $result['ok'] ? 200 : 422);
     }
 
