@@ -107,5 +107,13 @@ return [
             'quick' => false,
             'priority' => 'medium',
         ],
+        'account_deletion' => [
+            'label' => 'Delete my account and data',
+            'hint' => 'Request closure of your CheckoutNow or WhatsApp Wallet account. Zero your balance first. You can also use check-outpay.com/account-deletion.',
+            'subject_prefix' => 'Account deletion',
+            'requires_payment' => false,
+            'quick' => true,
+            'priority' => 'medium',
+        ],
     ],
 ];

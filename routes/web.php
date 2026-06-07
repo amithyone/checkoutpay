@@ -149,6 +149,10 @@ Route::get('/contact', function () {
     return view('contact');
 })->name('contact');
 
+Route::get('/account-deletion', function () {
+    return view('account-deletion');
+})->name('account-deletion');
+
 Route::get('/careers', function () {
     return view('careers');
 })->name('careers');

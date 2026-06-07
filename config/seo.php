@@ -69,6 +69,7 @@ return [
         '/tickets',
         '/privacy-policy',
         '/terms-and-conditions',
+        '/account-deletion',
         '/site-map',
     ],
     'sitemap_priority' => [
@@ -85,5 +86,6 @@ return [
         '/contact' => '0.8',
         '/privacy-policy' => '0.5',
         '/terms-and-conditions' => '0.5',
+        '/account-deletion' => '0.5',
     ],
 ];

@@ -176,6 +176,11 @@ return [
         'description' => 'CheckoutPay privacy policy for merchants, developers, and wallet users in Nigeria.',
         'keywords' => 'CheckoutPay privacy',
     ],
+    '/account-deletion' => [
+        'title' => 'Request Account Deletion | CheckoutPay',
+        'description' => 'Request deletion of your CheckoutNow or WhatsApp Wallet consumer account and associated personal data.',
+        'keywords' => 'CheckoutPay account deletion, delete wallet data',
+    ],
     '/terms-and-conditions' => [
         'title' => 'Terms and Conditions | CheckoutPay',
         'description' => 'Terms and conditions for using CheckoutPay payment gateway and related services in Nigeria.',

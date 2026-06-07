@@ -68,6 +68,7 @@
                     <li><a href="{{ route('security') }}" class="hover:text-white transition-colors">Security</a></li>
                     <li><a href="{{ route('terms') }}" class="hover:text-white transition-colors">Terms and Conditions</a></li>
                     <li><a href="{{ route('privacy-policy') }}" class="hover:text-white transition-colors">Privacy Policy</a></li>
+                    <li><a href="{{ route('account-deletion') }}" class="hover:text-white transition-colors">Request account deletion</a></li>
                     <li><a href="{{ route('esg-policy') }}" class="hover:text-white transition-colors">ESG Policy</a></li>
                     <li><a href="{{ route('fraud-awareness') }}" class="hover:text-white transition-colors">Fraud Awareness</a></li>
                 </ul>
