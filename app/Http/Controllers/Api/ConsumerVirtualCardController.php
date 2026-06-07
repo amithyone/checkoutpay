@@ -17,7 +17,8 @@ class ConsumerVirtualCardController extends Controller
     public function index(Request $request): JsonResponse
     {
         $wallet = $this->walletFor($request);
-        $result = $this->cards->status($wallet);
+        $forceRefresh = filter_var($request->query('refresh', false), FILTER_VALIDATE_BOOLEAN);
+        $result = $this->cards->status($wallet, $forceRefresh);
 
         return response()->json([
             'success' => $result['ok'],

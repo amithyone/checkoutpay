@@ -478,6 +478,31 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.1.type', 'virtual_card_fee');
     }
 
+    public function test_card_status_refresh_queries_mevon_for_live_balance(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update(['card_balance_usd' => 5]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'VCARD-TEST-001',
+                    'balance' => 22.75,
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards?refresh=1');
+
+        $response->assertOk()
+            ->assertJsonPath('data.operable_request.card_balance_usd', 22.75);
+        $this->assertSame(22.75, (float) $card->fresh()->card_balance_usd);
+        Http::assertSent(fn ($request) => $request->url() === 'https://mevon.test/V1/card_details');
+    }
+
     /**
      * @return array{0: WhatsappWallet, 1: ConsumerWalletApiAccount, 2?: VirtualCardRequest}
      */

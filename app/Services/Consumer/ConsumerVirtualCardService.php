@@ -99,13 +99,27 @@ final class ConsumerVirtualCardService
     /**
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function status(WhatsappWallet $wallet): array
+    public function status(WhatsappWallet $wallet, bool $forceRefresh = false): array
     {
+        if ($forceRefresh) {
+            $this->refreshProviderCardBalance($wallet);
+        }
+
         return [
             'ok' => true,
             'message' => 'OK',
             'data' => $this->statusPayload($wallet),
         ];
+    }
+
+    public function refreshProviderCardBalance(WhatsappWallet $wallet): void
+    {
+        $card = $this->resolveDisplayCard($wallet);
+        if ($card === null || ! $this->cardApi->isConfigured()) {
+            return;
+        }
+
+        $this->fetchAndStoreProviderCardDetails($card);
     }
 
     /**
@@ -679,6 +693,11 @@ final class ConsumerVirtualCardService
 
         $payload = is_array($api['raw'] ?? null) ? $api['raw'] : ['data' => $api['data'] ?? null];
         $this->storedDetails->persistFromWebhook($card, $payload);
+
+        $balance = $this->storedDetails->extractBalanceFromProviderPayload($payload);
+        if ($balance !== null) {
+            $card->update(['card_balance_usd' => $balance]);
+        }
 
         return $this->storedDetails->resolveForRequest($card->fresh());
     }
