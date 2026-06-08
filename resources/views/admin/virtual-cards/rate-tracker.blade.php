@@ -44,47 +44,50 @@
         <div class="absolute inset-0 opacity-30 pointer-events-none" style="background-image: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.15), transparent 40%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.12), transparent 35%);"></div>
         <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent"></div>
 
-        <div class="relative grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
-            <div class="lg:col-span-5">
+        <div class="relative space-y-6">
+            <div>
                 <p class="text-xs uppercase tracking-[0.2em] text-cyan-400/90 font-semibold mb-2">Mevon live mid · NGN per 1 USD</p>
-                <p class="text-5xl sm:text-6xl font-bold text-white tabular-nums tracking-tight font-mono">
+                <p class="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tabular-nums tracking-tight font-mono break-all sm:break-normal">
                     {{ $current['mevon_mid'] !== null ? number_format($current['mevon_mid'], 2) : '—' }}
                 </p>
-                <div class="flex flex-wrap gap-4 mt-4 text-sm">
+                <div class="flex flex-wrap gap-3 mt-4 text-sm">
                     @foreach (['24h' => '24H', '7d' => '7D', '30d' => '30D'] as $key => $label)
                         @php $c = $change[$key] ?? []; @endphp
-                        <div class="rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2">
-                            <span class="text-slate-500 text-xs block">{{ $label }}</span>
-                            <span class="{{ $deltaClass($c['pct'] ?? null) }} font-mono font-semibold">
-                                {{ isset($c['pct']) ? $deltaPrefix($c['pct']).number_format($c['pct'], 2).'%' : '—' }}
-                            </span>
-                            @if(isset($c['abs']))
-                                <span class="text-slate-500 text-xs ml-1">({{ $deltaPrefix($c['abs']).number_format($c['abs'], 2) }})</span>
-                            @endif
+                        <div class="rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2 min-w-[5.5rem]">
+                            <span class="text-slate-500 text-xs block mb-0.5">{{ $label }}</span>
+                            <div class="font-mono font-semibold leading-tight">
+                                <span class="{{ $deltaClass($c['pct'] ?? null) }}">
+                                    {{ isset($c['pct']) ? $deltaPrefix($c['pct']).number_format($c['pct'], 2).'%' : '—' }}
+                                </span>
+                                @if(isset($c['abs']))
+                                    <span class="text-slate-500 text-xs block mt-0.5">({{ $deltaPrefix($c['abs']).number_format($c['abs'], 2) }})</span>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>
             </div>
 
-            <div class="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div class="rounded-xl bg-slate-800/50 border border-slate-700/60 p-4 backdrop-blur-sm">
-                    <p class="text-[10px] uppercase tracking-wider text-slate-500">Published mid</p>
-                    <p class="text-xl font-bold text-white font-mono mt-1">{{ $current['published_mid'] !== null ? number_format($current['published_mid'], 2) : '—' }}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="rounded-xl bg-slate-800/50 border border-slate-700/60 p-4 sm:p-5 backdrop-blur-sm min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-400 leading-snug">Published mid</p>
+                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-white font-mono mt-2 tabular-nums">{{ $current['published_mid'] !== null ? number_format($current['published_mid'], 2) : '—' }}</p>
+                    <p class="text-[10px] text-slate-500 mt-2">App mid rate</p>
                 </div>
-                <div class="rounded-xl bg-emerald-950/40 border border-emerald-800/40 p-4">
-                    <p class="text-[10px] uppercase tracking-wider text-emerald-500/80">Sell rate</p>
-                    <p class="text-xl font-bold text-emerald-300 font-mono mt-1">{{ $current['sell_rate'] !== null ? number_format($current['sell_rate'], 2) : '—' }}</p>
-                    <p class="text-[10px] text-emerald-600/70 mt-1">+{{ $current['sell_markup'] !== null ? number_format($current['sell_markup'], 2) : '—' }} markup</p>
+                <div class="rounded-xl bg-emerald-950/40 border border-emerald-800/40 p-4 sm:p-5 min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-[10px] uppercase tracking-wider text-emerald-500/90 leading-snug">Sell rate</p>
+                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-emerald-300 font-mono mt-2 tabular-nums">{{ $current['sell_rate'] !== null ? number_format($current['sell_rate'], 2) : '—' }}</p>
+                    <p class="text-[10px] text-emerald-500/80 mt-2 leading-snug">+{{ $current['sell_markup'] !== null ? number_format($current['sell_markup'], 2) : '—' }} markup</p>
                 </div>
-                <div class="rounded-xl bg-violet-950/40 border border-violet-800/40 p-4">
-                    <p class="text-[10px] uppercase tracking-wider text-violet-400/80">Buy rate</p>
-                    <p class="text-xl font-bold text-violet-300 font-mono mt-1">{{ $current['buy_rate'] !== null ? number_format($current['buy_rate'], 2) : '—' }}</p>
-                    <p class="text-[10px] text-violet-500/70 mt-1">−{{ $current['buy_discount'] !== null ? number_format($current['buy_discount'], 2) : '—' }} discount</p>
+                <div class="rounded-xl bg-violet-950/40 border border-violet-800/40 p-4 sm:p-5 min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-[10px] uppercase tracking-wider text-violet-400/90 leading-snug">Buy rate</p>
+                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-violet-300 font-mono mt-2 tabular-nums">{{ $current['buy_rate'] !== null ? number_format($current['buy_rate'], 2) : '—' }}</p>
+                    <p class="text-[10px] text-violet-400/80 mt-2 leading-snug">−{{ $current['buy_discount'] !== null ? number_format($current['buy_discount'], 2) : '—' }} discount</p>
                 </div>
-                <div class="rounded-xl bg-amber-950/30 border border-amber-800/30 p-4">
-                    <p class="text-[10px] uppercase tracking-wider text-amber-500/80">Spread</p>
-                    <p class="text-xl font-bold text-amber-200 font-mono mt-1">{{ $current['spread'] !== null ? number_format($current['spread'], 2) : '—' }}</p>
-                    <p class="text-[10px] text-amber-600/60 mt-1">{{ $current['source'] ?? 'unknown' }}</p>
+                <div class="rounded-xl bg-amber-950/30 border border-amber-800/30 p-4 sm:p-5 min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-[10px] uppercase tracking-wider text-amber-500/90 leading-snug">Spread</p>
+                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-amber-200 font-mono mt-2 tabular-nums">{{ $current['spread'] !== null ? number_format($current['spread'], 2) : '—' }}</p>
+                    <p class="text-[10px] text-amber-500/70 mt-2 truncate" title="{{ $current['source'] ?? 'unknown' }}">{{ $current['source'] ?? 'unknown' }}</p>
                 </div>
             </div>
         </div>
