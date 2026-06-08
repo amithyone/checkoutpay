@@ -182,8 +182,23 @@
                 <span id="fx-live-label">{{ $livePoll ? 'Live · updates every '.$pollSeconds.'s' : 'Historical' }}</span>
                 <span id="fx-live-countdown" class="text-gray-400 normal-case {{ $livePoll ? '' : 'hidden' }}"></span>
             </div>
-            <h3 class="text-sm font-semibold text-gray-900 mb-1">Rate movement</h3>
-            <p class="text-xs text-gray-500 mb-4">Mevon mid (blue) · Sell (green) · Buy (violet) · Published mid (gray)</p>
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3 pr-28">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900">Rate movement</h3>
+                    <p id="fx-chart-legend-hint" class="text-xs text-gray-500 mt-0.5">Price (₦) on the left · time along the bottom</p>
+                </div>
+                <div class="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+                    <button type="button" id="fx-chart-mode-line"
+                            class="fx-chart-mode-btn px-3 py-1.5 rounded-md text-xs font-semibold bg-white text-indigo-900 border border-indigo-200 shadow-sm">
+                        Line
+                    </button>
+                    <button type="button" id="fx-chart-mode-candle"
+                            class="fx-chart-mode-btn px-3 py-1.5 rounded-md text-xs font-semibold text-gray-600 hover:text-gray-900">
+                        Candles
+                    </button>
+                </div>
+            </div>
+            <p id="fx-chart-series-hint" class="text-xs text-gray-500 mb-3">Mevon mid (blue) · Sell (green) · Buy (violet) · Published mid (gray)</p>
             <div class="h-80 sm:h-96">
                 <canvas id="fxRateChart"></canvas>
             </div>
@@ -315,6 +330,8 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
 <script>
 const FX_LIVE_MID = @json($liveMid);
 const FX_NGN_BUFFER_PERCENT = @json((float) config('virtual_card.auto_fund_ngn_buffer_percent', 3));
@@ -363,8 +380,8 @@ function updateSellEstimate() {
     const livePoll = @json($livePoll);
     const pollSeconds = @json($pollSeconds);
     const dataUrl = @json(route('admin.virtual-cards.rate-tracker.data'));
-    const ctx = document.getElementById('fxRateChart');
-    if (!ctx) {
+    const canvas = document.getElementById('fxRateChart');
+    if (!canvas) {
         return;
     }
 
@@ -377,68 +394,234 @@ function updateSellEstimate() {
         ['Published mid', 'published_mid', '#6b7280', 'transparent'],
     ];
 
-    const mkDataset = (label, key, color, fill, series) => ({
+    let chartMode = 'line';
+    let chart = null;
+    let lastSeries = initialSeries;
+
+    const parseTime = (p) => {
+        if (!p?.t) return null;
+        const ms = new Date(p.t).getTime();
+        return Number.isFinite(ms) ? ms : null;
+    };
+
+    const timeUnitForRange = () => {
+        if (range === '1h') return 'minute';
+        if (['6h', '7h', '12h', '24h'].includes(range)) return 'hour';
+        return 'day';
+    };
+
+    const timeScale = () => ({
+        type: 'time',
+        position: 'bottom',
+        title: {
+            display: true,
+            text: 'Time',
+            color: tickColor,
+            font: { size: 11, weight: '600' },
+        },
+        ticks: {
+            color: tickColor,
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 10,
+            font: { size: 10 },
+        },
+        time: {
+            unit: timeUnitForRange(),
+            displayFormats: {
+                minute: 'HH:mm',
+                hour: 'MMM d, HH:mm',
+                day: 'MMM d',
+            },
+            tooltipFormat: 'MMM d, yyyy · HH:mm:ss',
+        },
+        grid: { color: gridColor },
+    });
+
+    const priceScale = () => ({
+        type: 'linear',
+        position: 'left',
+        title: {
+            display: true,
+            text: '₦ per 1 USD',
+            color: tickColor,
+            font: { size: 11, weight: '600' },
+        },
+        ticks: {
+            color: tickColor,
+            callback: (v) => '₦' + Number(v).toLocaleString(),
+        },
+        grid: { color: gridColor },
+    });
+
+    const mkLineDataset = (label, key, color, fill, series) => ({
         label,
-        data: series.map((p) => p[key]),
+        data: series.map((p) => {
+            const x = parseTime(p);
+            const y = p[key];
+            return x != null && y != null ? { x, y } : null;
+        }).filter(Boolean),
         borderColor: color,
         backgroundColor: fill,
         borderWidth: key === 'mevon_mid' ? 2.5 : 1.5,
         pointRadius: series.length > 80 ? 0 : (series.length > 40 ? 1 : 2),
         pointHoverRadius: 4,
-        tension: 0.35,
+        tension: 0.25,
         fill: key === 'mevon_mid',
         spanGaps: true,
     });
 
-    const buildChartData = (series) => ({
-        labels: series.map((p) => p.label || p.t),
-        datasets: datasetDefs.map(([label, key, color, fill]) => mkDataset(label, key, color, fill, series)),
-    });
+    const buildCandleData = (series) => series.map((p, i) => {
+        const x = parseTime(p);
+        if (x == null) return null;
+        const rates = [p.mevon_mid, p.sell_rate, p.buy_rate, p.published_mid].filter((v) => v != null);
+        const close = p.mevon_mid ?? p.published_mid;
+        const prev = i > 0 ? (series[i - 1].mevon_mid ?? series[i - 1].published_mid) : close;
+        const open = prev ?? close;
+        const hi = rates.length ? Math.max(...rates) : close;
+        const lo = rates.length ? Math.min(...rates) : close;
+        return { x, o: open, h: hi, l: lo, c: close };
+    }).filter(Boolean);
 
-    let chart = null;
-    if (initialSeries.length) {
-        chart = new Chart(ctx, {
-            type: 'line',
-            data: buildChartData(initialSeries),
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: { duration: livePoll ? 300 : 750 },
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: {
-                        labels: { color: '#374151', boxWidth: 12, font: { size: 11 } },
+    const baseOptions = () => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: livePoll ? 300 : 500 },
+        interaction: { mode: chartMode === 'line' ? 'index' : 'nearest', intersect: false },
+        plugins: {
+            legend: {
+                display: chartMode === 'line',
+                labels: { color: '#374151', boxWidth: 12, font: { size: 11 } },
+            },
+            tooltip: {
+                backgroundColor: '#1f2937',
+                titleColor: '#f9fafb',
+                bodyColor: '#e5e7eb',
+                borderColor: '#d1d5db',
+                borderWidth: 1,
+                callbacks: chartMode === 'line' ? {
+                    title: (items) => {
+                        if (!items.length) return '';
+                        const x = items[0].parsed.x;
+                        return x ? new Date(x).toLocaleString() : '';
                     },
-                    tooltip: {
-                        backgroundColor: '#1f2937',
-                        titleColor: '#f9fafb',
-                        bodyColor: '#e5e7eb',
-                        borderColor: '#d1d5db',
-                        borderWidth: 1,
-                        callbacks: {
-                            label: (item) => {
-                                const v = item.parsed.y;
-                                return v == null ? `${item.dataset.label}: —` : `${item.dataset.label}: ₦${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                            },
-                        },
+                    label: (item) => {
+                        const v = item.parsed.y;
+                        return v == null ? `${item.dataset.label}: —` : `${item.dataset.label}: ₦${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     },
-                },
-                scales: {
-                    x: {
-                        ticks: { color: tickColor, maxRotation: 45, font: { size: 10 }, maxTicksLimit: 12 },
-                        grid: { color: gridColor },
+                } : {
+                    title: (items) => {
+                        if (!items.length) return '';
+                        const x = items[0].parsed.x;
+                        return x ? new Date(x).toLocaleString() : '';
                     },
-                    y: {
-                        ticks: {
-                            color: tickColor,
-                            callback: (v) => '₦' + Number(v).toLocaleString(),
-                        },
-                        grid: { color: gridColor },
+                    label: (item) => {
+                        const v = item.raw;
+                        if (!v) return '';
+                        const fmt = (n) => '₦' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        return [
+                            `Open: ${fmt(v.o)}`,
+                            `High: ${fmt(v.h)}`,
+                            `Low: ${fmt(v.l)}`,
+                            `Close: ${fmt(v.c)}`,
+                        ];
                     },
                 },
             },
+        },
+        scales: {
+            x: timeScale(),
+            y: priceScale(),
+        },
+    });
+
+    const destroyChart = () => {
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+    };
+
+    const setModeButtons = () => {
+        document.querySelectorAll('.fx-chart-mode-btn').forEach((btn) => {
+            const active = btn.id === `fx-chart-mode-${chartMode}`;
+            btn.classList.toggle('bg-white', active);
+            btn.classList.toggle('text-indigo-900', active);
+            btn.classList.toggle('border', active);
+            btn.classList.toggle('border-indigo-200', active);
+            btn.classList.toggle('shadow-sm', active);
+            btn.classList.toggle('text-gray-600', !active);
         });
+        const hint = document.getElementById('fx-chart-series-hint');
+        const legend = document.getElementById('fx-chart-legend-hint');
+        if (hint) {
+            hint.textContent = chartMode === 'line'
+                ? 'Mevon mid (blue) · Sell (green) · Buy (violet) · Published mid (gray)'
+                : 'Each candle = Mevon mid OHLC per snapshot (wick spans sell/buy when present)';
+        }
+        if (legend) {
+            legend.textContent = chartMode === 'line'
+                ? 'Price (₦) on the left · time along the bottom · 4 rate lines'
+                : 'Price (₦) on the left · time along the bottom · candlesticks';
+        }
+    };
+
+    const renderChart = (series) => {
+        const empty = document.getElementById('fx-chart-empty');
+        if (!series.length) {
+            destroyChart();
+            if (empty) empty.classList.remove('hidden');
+            return;
+        }
+        if (empty) empty.classList.add('hidden');
+        destroyChart();
+
+        if (chartMode === 'candle') {
+            chart = new Chart(canvas, {
+                type: 'candlestick',
+                data: {
+                    datasets: [{
+                        label: 'Mevon mid',
+                        data: buildCandleData(series),
+                        borderColor: '#3C50E0',
+                        color: {
+                            up: '#059669',
+                            down: '#dc2626',
+                            unchanged: '#6b7280',
+                        },
+                    }],
+                },
+                options: baseOptions(),
+            });
+            return;
+        }
+
+        chart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                datasets: datasetDefs.map(([label, key, color, fill]) => mkLineDataset(label, key, color, fill, series)),
+            },
+            options: baseOptions(),
+        });
+    };
+
+    setModeButtons();
+    if (initialSeries.length) {
+        renderChart(initialSeries);
     }
+
+    document.getElementById('fx-chart-mode-line')?.addEventListener('click', () => {
+        if (chartMode === 'line') return;
+        chartMode = 'line';
+        setModeButtons();
+        renderChart(lastSeries);
+    });
+    document.getElementById('fx-chart-mode-candle')?.addEventListener('click', () => {
+        if (chartMode === 'candle') return;
+        chartMode = 'candle';
+        setModeButtons();
+        renderChart(lastSeries);
+    });
 
     const fmtNgn = (v) => v == null ? '—' : Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtMoney = (v) => v == null ? '—' : '₦' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -487,41 +670,8 @@ function updateSellEstimate() {
     };
 
     const updateChart = (series) => {
-        const empty = document.getElementById('fx-chart-empty');
-        if (!series.length) {
-            if (empty) empty.classList.remove('hidden');
-            return;
-        }
-        if (empty) empty.classList.add('hidden');
-
-        if (!chart) {
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: buildChartData(series),
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 300 },
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { labels: { color: '#374151', boxWidth: 12, font: { size: 11 } } },
-                    },
-                    scales: {
-                        x: { ticks: { color: tickColor, maxRotation: 45, font: { size: 10 }, maxTicksLimit: 12 }, grid: { color: gridColor } },
-                        y: { ticks: { color: tickColor, callback: (v) => '₦' + Number(v).toLocaleString() }, grid: { color: gridColor } },
-                    },
-                },
-            });
-            return;
-        }
-
-        const next = buildChartData(series);
-        chart.data.labels = next.labels;
-        chart.data.datasets.forEach((ds, i) => {
-            ds.data = next.datasets[i].data;
-            ds.pointRadius = series.length > 80 ? 0 : (series.length > 40 ? 1 : 2);
-        });
-        chart.update('none');
+        lastSeries = series;
+        renderChart(series);
     };
 
     let pollTimer = null;
