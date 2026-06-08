@@ -68,6 +68,13 @@ final class VirtualCardFxPublishService
             Setting::set('virtual_card_fx_mid_usd_ngn', $mid, 'float', 'virtual_card', 'Virtual card FX mid rate (NGN per 1 USD)');
         }
 
+        try {
+            app(\App\Services\Admin\MevonPayFxRateTrackerService::class)
+                ->recordPublished($mid, $sell, $buy, $source, $liveMevon);
+        } catch (\Throwable) {
+            // Tracking must not break FX publish.
+        }
+
         return [
             'ok' => true,
             'message' => 'Card FX rates published for the app.',

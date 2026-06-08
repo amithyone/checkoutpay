@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\VirtualCardRequest;
 use App\Services\Admin\AdminVirtualCardProfitService;
 use App\Services\Admin\AdminVirtualCardService;
+use App\Services\Admin\MevonPayFxRateTrackerService;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFxPublishService;
 use App\Services\Consumer\VirtualCardFxService;
@@ -77,6 +78,22 @@ class VirtualCardAdminController extends Controller
         return view('admin.virtual-cards.stats', [
             'stats' => $this->profit->stats($request),
         ]);
+    }
+
+    public function rateTracker(Request $request): View
+    {
+        return view('admin.virtual-cards.rate-tracker', [
+            'tracker' => app(MevonPayFxRateTrackerService::class)->dashboard($request),
+        ]);
+    }
+
+    public function refreshRateTracker(Request $request): RedirectResponse
+    {
+        $result = app(VirtualCardFxPublishService::class)->syncFromMevon();
+
+        return redirect()
+            ->route('admin.virtual-cards.rate-tracker', ['range' => $request->query('range', $request->input('range', '7d'))])
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
     public function show(VirtualCardRequest $virtualCardRequest): View

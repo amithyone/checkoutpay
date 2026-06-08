@@ -29,7 +29,15 @@ final class MevonPayExchangeRateService
 
             $rate = $this->extractRate($response);
             if ($rate !== null && $rate > 0) {
-                return round($rate, 4);
+                $rounded = round($rate, 4);
+                try {
+                    app(\App\Services\Admin\MevonPayFxRateTrackerService::class)
+                        ->recordLive($rounded, source: 'mevon_live');
+                } catch (\Throwable) {
+                    // Tracking must not break live rate fetch.
+                }
+
+                return $rounded;
             }
 
             return null;

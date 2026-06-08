@@ -17,6 +17,9 @@
                     <i class="fas fa-sync-alt mr-1"></i> Refresh app FX rates
                 </button>
             </form>
+            <a href="{{ route('admin.virtual-cards.rate-tracker') }}" class="text-sm text-cyan-700 hover:underline font-medium">
+                <i class="fas fa-chart-area mr-1"></i> FX rate tracker
+            </a>
             <a href="{{ route('admin.virtual-cards.stats') }}" class="text-sm text-emerald-700 hover:underline font-medium">
                 <i class="fas fa-chart-line mr-1"></i> Profit statistics
             </a>
