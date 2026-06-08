@@ -19,6 +19,18 @@
                 <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
                     WhatsApp Wallet. Payments. Invoices. Rentals. Tickets. Memberships.
                 </p>
+                <div class="flex flex-col sm:flex-row justify-center items-center gap-3">
+                    <x-checkoutnow-apk-download
+                        label="Download CheckoutNow Android app"
+                        class="inline-flex items-center px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-semibold shadow-sm transition"
+                    />
+                    <a href="{{ \App\Support\CheckoutNowApp::webUrl() }}"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="inline-flex items-center px-6 py-3 border border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50 font-medium transition">
+                        <i class="fas fa-external-link-alt mr-2"></i> Open web app
+                    </a>
+                </div>
             </div>
         </div>
     </section>
@@ -31,6 +43,42 @@
                 <p class="text-lg text-gray-600">Accept payments in NGN.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                <!-- CheckoutNow mobile app -->
+                <div id="checkoutnow-app" class="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-indigo-50 to-white rounded-xl shadow-lg border-2 border-indigo-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                        <div class="flex-1">
+                            <div class="inline-flex items-center gap-2 bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-xs font-semibold mb-3">
+                                <i class="fas fa-mobile-alt"></i> Consumer app
+                            </div>
+                            <h3 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">CheckoutNow app</h3>
+                            <p class="text-gray-600 mb-4 max-w-2xl">
+                                NGN wallet, bills, transfers, virtual dollar card, and support — in one Android app. Install the APK or use the web app in your browser.
+                            </p>
+                            <ul class="grid sm:grid-cols-2 gap-2 text-sm text-gray-600 mb-6">
+                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> Wallet, airtime &amp; bill pay</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> Bank &amp; WhatsApp transfers</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> Dollar virtual card</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> PIN &amp; biometric security</li>
+                            </ul>
+                            <div class="flex flex-col sm:flex-row flex-wrap gap-3">
+                                <x-checkoutnow-apk-download
+                                    label="Download Android APK"
+                                    class="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
+                                />
+                                <a href="{{ \App\Support\CheckoutNowApp::webUrl() }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   class="inline-flex items-center justify-center px-6 py-3 border border-indigo-300 text-indigo-800 rounded-lg hover:bg-indigo-50 font-semibold">
+                                    Open web app <i class="fas fa-external-link-alt ml-2"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="hidden sm:flex w-32 h-32 lg:w-40 lg:h-40 rounded-2xl bg-indigo-100 items-center justify-center shrink-0">
+                            <i class="fas fa-mobile-alt text-indigo-600 text-6xl lg:text-7xl"></i>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- WhatsApp Wallet (featured) -->
                 <div id="whatsapp-wallet" class="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-green-50 to-white rounded-xl shadow-lg border-2 border-green-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
                     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">

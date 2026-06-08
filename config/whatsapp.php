@@ -43,6 +43,8 @@ return [
     | Web app where users create the WhatsApp Wallet, complete KYC, and view tx history.
     */
     'wallet_app_url' => rtrim((string) env('WHATSAPP_WALLET_APP_URL', 'https://app.check-outnow.com'), '/'),
+    /** Full URL to CheckoutNow Android APK; defaults to {wallet_app_url}/checkoutnow-android.apk */
+    'wallet_android_apk_url' => rtrim((string) env('WHATSAPP_WALLET_ANDROID_APK_URL', ''), '/'),
 
     /*
     | WhatsApp Wallet tiers: Tier 1 = WhatsApp identity only (caps). Tier 2 = Mevon Rubies VA + full KYC.

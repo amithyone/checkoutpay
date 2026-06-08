@@ -2,6 +2,8 @@
 
 namespace App\Services\Whatsapp;
 
+use App\Support\CheckoutNowApp;
+
 /**
  * CheckoutNow wallet app download link shown in WhatsApp wallet menus and receipts.
  */
@@ -9,12 +11,12 @@ final class WhatsappWalletAppLinkCopy
 {
     public static function url(): string
     {
-        $configured = rtrim((string) config('whatsapp.wallet_app_url', ''), '/');
-        if ($configured !== '') {
-            return $configured;
-        }
+        return CheckoutNowApp::webUrl();
+    }
 
-        return 'https://app.check-outnow.com';
+    public static function androidApkUrl(): string
+    {
+        return CheckoutNowApp::androidApkUrl();
     }
 
     public static function downloadBlock(): string
