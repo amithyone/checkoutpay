@@ -112,9 +112,9 @@
                     <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-800 font-bold text-sm mb-4">3</span>
                     <h3 class="font-semibold text-gray-900 mb-2">Test &amp; go live</h3>
                     <ol class="text-sm text-gray-600 space-y-2 list-decimal list-inside">
-                        <li>Place a test order and confirm bank details on the thank-you page.</li>
-                        <li>Confirm the order status updates when payment is approved.</li>
-                        <li>Disable test mode for live sales.</li>
+                        <li>Click <strong>Refresh charges</strong> in plugin settings — fees loading means your API connection works.</li>
+                        <li>Place a small test order and confirm bank details on the thank-you page.</li>
+                        <li>When the order updates on payment approval, keep CheckoutPay <strong>enabled</strong> — you are live.</li>
                     </ol>
                 </div>
             </div>

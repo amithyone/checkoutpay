@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.4.4
+Stable tag: 1.4.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,9 +68,10 @@ Developed and maintained by **CheckoutPay** ([check-outpay.com](https://check-ou
 
 = Phase 3 — Test and go live =
 
-1. Place a **test order** and select CheckoutPay at checkout.
-2. Confirm bank details on the thank-you page.
-3. Disable **Test mode** when ready for live payments.
+1. Click **Refresh charges** in plugin settings — if fees load, your API connection is working.
+2. Place a **small test order** and select CheckoutPay at checkout.
+3. Confirm bank details on the thank-you page and that the order updates when payment is approved.
+4. Keep **Enable CheckoutPay** turned on at WooCommerce → Payments — you are live.
 
 == Frequently Asked Questions ==
 
@@ -85,6 +86,10 @@ Yes. The plugin registers with WooCommerce Cart/Checkout blocks.
 = Does the plugin work without WooCommerce? =
 
 No. WooCommerce must be installed and active.
+
+= How do I know I am ready for production? =
+
+Click **Refresh charges** in WooCommerce → Payments → CheckoutPay. If your fee preview loads, your API key and website URL are correct. Then place a small test order, confirm bank details appear, and check that the order status updates when CheckoutPay approves the payment. Keep **Enable CheckoutPay** on — there is no separate sandbox mode.
 
 == Screenshots ==
 
@@ -120,6 +125,9 @@ CheckoutPay is provided by CheckoutPay. By using this plugin you are also subjec
 
 == Changelog ==
 
+= 1.4.5 =
+* Replace unused Test mode checkbox with a clear test-and-go-live checklist (Refresh charges → test order → enable gateway).
+
 = 1.4.4 =
 * WordPress.org review: expand External services section with CheckoutPay terms of service and privacy policy links.
 
@@ -145,6 +153,9 @@ CheckoutPay is provided by CheckoutPay. By using this plugin you are also subjec
 * WordPress.org review: enqueue scripts, sanitization, Checkoutpay_* class prefix.
 
 == Upgrade Notice ==
+
+= 1.4.5 =
+Clarifies production readiness: use Refresh charges and a test order, then keep the gateway enabled.
 
 = 1.4.4 =
 Documents CheckoutPay external API usage, data sent, and legal links for WordPress.org compliance.

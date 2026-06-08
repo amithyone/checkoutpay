@@ -3,7 +3,7 @@
  * Plugin Name:       COPN Payment Gateway for Nigerian Businesses
  * Plugin URI:        https://check-outpay.com/wordpress-plugin
  * Description:       COPN (CheckoutPay Nigeria) — official bank-transfer payment gateway for Nigerian businesses. Connects your store to CheckoutPay for virtual account checkout, webhooks, and order updates. Requires WooCommerce.
- * Version:           1.4.4
+ * Version:           1.4.5
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('COPN_VERSION', '1.4.4');
+define('COPN_VERSION', '1.4.5');
 define('COPN_PORTAL_URL', 'https://check-outpay.com');
 define('COPN_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('COPN_PLUGIN_URL', plugin_dir_url(__FILE__));

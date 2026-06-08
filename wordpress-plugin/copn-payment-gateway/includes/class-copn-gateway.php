@@ -39,7 +39,6 @@ class Copn_Gateway extends WC_Payment_Gateway {
         if (empty($this->api_url)) {
             $this->api_url = 'https://check-outpay.com/api/v1';
         }
-        $this->test_mode = $this->get_option('test_mode');
         $this->developer_program_partner_business_id = $this->get_option('developer_program_partner_business_id');
         $this->auto_complete_orders = $this->get_option('auto_complete_orders');
 
@@ -360,12 +359,10 @@ class Copn_Gateway extends WC_Payment_Gateway {
                 'type' => 'title',
                 'description' => __('Installment and split payments are configured in your CheckoutPay dashboard (business websites and invoices), not in this plugin. WooCommerce orders use a single bank transfer per checkout.', 'copn-payment-gateway'),
             ),
-            'test_mode' => array(
-                'title' => __('Test Mode', 'copn-payment-gateway'),
-                'type' => 'checkbox',
-                'label' => __('Enable Test Mode', 'copn-payment-gateway'),
-                'default' => 'no',
-                'description' => __('Enable test mode to use test API credentials.', 'copn-payment-gateway'),
+            'go_live_notice' => array(
+                'title' => __('Test and go live', 'copn-payment-gateway'),
+                'type' => 'title',
+                'description' => __('1) Click Refresh charges below to confirm your API key and website URL. 2) Place a small test order and confirm bank details on the thank-you page. 3) When payment updates the order correctly, keep Enable CheckoutPay turned on — you are ready for production.', 'copn-payment-gateway'),
             ),
             'developer_program_partner_business_id' => array(
                 'title' => __('Developer program partner ID', 'copn-payment-gateway'),
@@ -546,7 +543,7 @@ class Copn_Gateway extends WC_Payment_Gateway {
                     </p>
                     <div id="copn-charges-panel" style="margin-top: 12px; max-width: 40rem; padding: 12px 14px; background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 4px;">
                         <p class="description" style="margin: 0;">
-                            <?php esc_html_e('Save your API URL and API Key above, then click Refresh charges.', 'copn-payment-gateway'); ?>
+                            <?php esc_html_e('Save your API URL and API Key above, then click Refresh charges to verify you are ready for production.', 'copn-payment-gateway'); ?>
                         </p>
                     </div>
                 </fieldset>
