@@ -87,6 +87,16 @@ class WhatsappWallet extends Model
         return $this->hasMany(WhatsappWalletTransaction::class, 'whatsapp_wallet_id');
     }
 
+    public function consumerApiAccount(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ConsumerWalletApiAccount::class, 'whatsapp_wallet_id');
+    }
+
+    public function inactiveReminders(): HasMany
+    {
+        return $this->hasMany(WhatsappWalletInactiveReminder::class, 'whatsapp_wallet_id');
+    }
+
     /**
      * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
      * @return \Illuminate\Database\Eloquent\Builder<self>

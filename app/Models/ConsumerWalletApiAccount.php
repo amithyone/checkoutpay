@@ -21,10 +21,12 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
         'phone_e164',
         'fcm_token',
         'fcm_platform',
+        'last_app_active_at',
     ];
 
     protected $casts = [
         'fcm_token_updated_at' => 'datetime',
+        'last_app_active_at' => 'datetime',
     ];
 
     public function wallet(): BelongsTo

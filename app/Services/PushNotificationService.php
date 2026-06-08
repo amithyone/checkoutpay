@@ -36,10 +36,16 @@ class PushNotificationService
             ->pluck('token')
             ->all();
 
-        $this->sendToTokens($tokens, $title, $body, $data);
+        $this->sendToTokens($tokens, $title, $body, $data, 'rentals_alerts');
     }
 
-    public function sendToTokens(array $tokens, string $title, string $body, array $data = []): void
+    public function sendToTokens(
+        array $tokens,
+        string $title,
+        string $body,
+        array $data = [],
+        string $androidChannelId = 'rentals_alerts',
+    ): void
     {
         if (empty($tokens)) {
             return;
@@ -71,7 +77,7 @@ class PushNotificationService
                     'android' => [
                         'notification' => [
                             'sound' => 'default',
-                            'channel_id' => 'rentals_alerts',
+                            'channel_id' => $androidChannelId,
                         ],
                     ],
                     'apns' => [

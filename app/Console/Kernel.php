@@ -14,6 +14,14 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('banks:sync')->weekly();
         $schedule->command('whatsapp-wallet:expire-pending-p2p')->everyFiveMinutes();
+        $schedule->command('wallet:send-inactive-reminders --slot=morning')
+            ->dailyAt('09:00')
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping(30);
+        $schedule->command('wallet:send-inactive-reminders --slot=evening')
+            ->dailyAt('18:00')
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping(30);
         $schedule->command('overdraft:charge-interest')->weekly();
         $schedule->command('overdraft:process-installments')->daily();
         // Peer loans: one scheduler pass per repayment rhythm (offer frequency). Lump-sum loans run with the daily pass.

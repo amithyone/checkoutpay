@@ -71,6 +71,12 @@ class ConsumerWalletApiController extends Controller
 
     public function showWallet(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if ($user instanceof ConsumerWalletApiAccount) {
+            $user->last_app_active_at = now();
+            $user->saveQuietly();
+        }
+
         $wallet = $this->walletFor($request)->fresh();
 
         try {

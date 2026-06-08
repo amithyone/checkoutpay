@@ -21,4 +21,11 @@ return [
 
     /** HMAC secret for pay QR tokens; falls back to APP_KEY when empty. */
     'pay_qr_secret' => (string) env('CONSUMER_PAY_QR_SECRET', ''),
+
+    /** Twice-daily nudge for wallets with balance and no activity today. */
+    'inactive_reminders_enabled' => (bool) env('CONSUMER_WALLET_INACTIVE_REMINDERS_ENABLED', true),
+    'inactive_reminder_timezone' => (string) env('CONSUMER_WALLET_INACTIVE_REMINDER_TZ', 'Africa/Lagos'),
+    'inactive_reminder_min_balance' => (float) env('CONSUMER_WALLET_INACTIVE_REMINDER_MIN_BALANCE', 1),
+    'inactive_reminder_push_title' => (string) env('CONSUMER_WALLET_INACTIVE_REMINDER_PUSH_TITLE', 'Hope your day is going well'),
+    'inactive_reminder_push_channel' => 'wallet_alerts',
 ];
