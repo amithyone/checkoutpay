@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.4.3
+Stable tag: 1.4.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -94,25 +94,34 @@ No. WooCommerce must be installed and active.
 
 == External services ==
 
-This plugin connects to **CheckoutPay** at https://check-outpay.com/
+This plugin relies on **CheckoutPay** (operated by CheckoutPay / check-outpay.com), a third-party payment platform in Nigeria. CheckoutPay is required to create bank-transfer payment requests, show virtual account details to customers, confirm payments, and load fee rules for your store. The plugin does not process payments on its own.
 
-**Data sent**
+**Service:** CheckoutPay merchant API (default base URL: `https://check-outpay.com/api/v1`). Merchants may point the API URL setting to another CheckoutPay-hosted endpoint if instructed by CheckoutPay support.
 
-* Order amount, customer name, order reference, store `website_url`, and `webhook_url`
-* API key in the `X-API-Key` header on each request
+**What data is sent and when**
 
-**When it is sent**
+Data is sent only after you save your **API URL** and **API Key** in WooCommerce → Settings → Payments → CheckoutPay.
 
-* When checkout completes (create payment request)
-* When the customer checks payment status on the thank-you page
-* When CheckoutPay sends a webhook to your site
-* When a store admin refreshes charges in settings
+* **When a customer completes checkout** — order amount, currency, customer name, WooCommerce order reference, your store website URL, and webhook URL (to create a payment request and receive bank details).
+* **When a customer checks payment status** on the order thank-you page — order reference and amount (to query payment status).
+* **When a customer updates the paid amount** on the thank-you page — order reference and corrected amount.
+* **When a store admin refreshes charges** in plugin settings — your store website URL (to load fee rules configured in CheckoutPay).
+* **On each API request** — your merchant API key in the `X-API-Key` header.
 
-**Terms and privacy**
+CheckoutPay may also **send data to your site** when a payment is approved: a server-to-server webhook POST to the webhook URL shown in plugin settings (order reference, payment status, and related payment metadata).
 
-* CheckoutPay: https://check-outpay.com/
+**Terms of service and privacy policy**
+
+CheckoutPay is provided by CheckoutPay. By using this plugin you are also subject to CheckoutPay’s policies:
+
+* Terms of service: https://check-outpay.com/terms-and-conditions
+* Privacy policy: https://check-outpay.com/privacy-policy
+* Service website: https://check-outpay.com/
 
 == Changelog ==
+
+= 1.4.4 =
+* WordPress.org review: expand External services section with CheckoutPay terms of service and privacy policy links.
 
 = 1.4.3 =
 * WordPress.org slug `copn-payment-gateway`: blocks script renamed to `copn-blocks.js` / handle `copn-blocks`; translation template metadata updated.
@@ -136,6 +145,9 @@ This plugin connects to **CheckoutPay** at https://check-outpay.com/
 * WordPress.org review: enqueue scripts, sanitization, Checkoutpay_* class prefix.
 
 == Upgrade Notice ==
+
+= 1.4.4 =
+Documents CheckoutPay external API usage, data sent, and legal links for WordPress.org compliance.
 
 = 1.4.3 =
 Final slug alignment for WordPress.org (`copn-payment-gateway`).

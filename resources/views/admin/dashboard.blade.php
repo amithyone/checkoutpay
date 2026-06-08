@@ -925,6 +925,41 @@
                     <strong>Monthly split</strong> offers (30-day step schedules). Schedule once per month.
                 </p>
             </div>
+
+            <div class="bg-white rounded-lg p-4 border border-rose-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-1 rounded">WALLET</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Inactive wallet reminders (morning)</span>
+                    </div>
+                    <button type="button" onclick="copyCronUrl('wallet-inactive-morning')" class="text-rose-600 hover:text-rose-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/wallet/inactive-reminders/morning') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>WhatsApp + app push</strong> for wallets with balance and no activity today. Schedule once daily around <strong>09:00 Africa/Lagos</strong>.
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Token:</strong> If <code class="bg-gray-100 px-1 rounded">CRON_EMAIL_FETCH_TOKEN</code> is set, append <code class="bg-gray-100 px-1 rounded">?token=YOUR_TOKEN</code>.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-lg p-4 border border-pink-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-pink-700 bg-pink-100 px-2 py-1 rounded">WALLET</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Inactive wallet reminders (evening)</span>
+                    </div>
+                    <button type="button" onclick="copyCronUrl('wallet-inactive-evening')" class="text-pink-600 hover:text-pink-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/wallet/inactive-reminders/evening') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    Same reminder pass for inactive wallets. Schedule once daily around <strong>18:00 Africa/Lagos</strong>.
+                </p>
+            </div>
             @endif
         </div>
 
@@ -938,6 +973,7 @@
                 <li><strong>Global Matching:</strong> Every 10-30 minutes (matches unmatched items)</li>
                 @if(auth('admin')->user()->isSuperAdmin())
                 <li><strong>Peer loan repayments:</strong> Three URLs above — schedule <strong>daily</strong>, <strong>weekly</strong>, and <strong>monthly</strong> cadences separately (or use server cron <code class="bg-yellow-100 px-1 rounded text-yellow-900">php artisan schedule:run</code> every minute instead).</li>
+                <li><strong>Wallet inactive reminders:</strong> Morning and evening URLs — schedule twice daily (09:00 and 18:00 Lagos time), or rely on <code class="bg-yellow-100 px-1 rounded text-yellow-900">php artisan schedule:run</code>.</li>
                 @endif
             </ul>
             <p class="text-xs text-yellow-700 mt-2">
@@ -1429,6 +1465,10 @@ function copyCronUrl(type = 'direct') {
         url = '{{ url('/cron/peer-loans/collect-weekly') }}';
     } else if (type === 'peer-loan-monthly') {
         url = '{{ url('/cron/peer-loans/collect-monthly') }}';
+    } else if (type === 'wallet-inactive-morning') {
+        url = '{{ url('/cron/wallet/inactive-reminders/morning') }}';
+    } else if (type === 'wallet-inactive-evening') {
+        url = '{{ url('/cron/wallet/inactive-reminders/evening') }}';
     } else {
         url = '{{ url('/cron/read-emails-direct') }}';
     }

@@ -741,6 +741,8 @@ Route::get('/cron/extract-missing-names', function (\Illuminate\Http\Request $re
 Route::get('/cron/peer-loans/collect-daily', [\App\Http\Controllers\Cron\PeerLoanCronController::class, 'collectDaily'])->name('cron.peer-loans.collect-daily');
 Route::get('/cron/peer-loans/collect-weekly', [\App\Http\Controllers\Cron\PeerLoanCronController::class, 'collectWeekly'])->name('cron.peer-loans.collect-weekly');
 Route::get('/cron/peer-loans/collect-monthly', [\App\Http\Controllers\Cron\PeerLoanCronController::class, 'collectMonthly'])->name('cron.peer-loans.collect-monthly');
+Route::get('/cron/wallet/inactive-reminders/morning', [\App\Http\Controllers\Cron\WalletInactiveReminderCronController::class, 'sendMorning'])->name('cron.wallet.inactive-reminders.morning');
+Route::get('/cron/wallet/inactive-reminders/evening', [\App\Http\Controllers\Cron\WalletInactiveReminderCronController::class, 'sendEvening'])->name('cron.wallet.inactive-reminders.evening');
 
 // Master Email Processing Cron (All 3 Steps Sequentially)
 Route::get('/cron/process-emails', function () {
