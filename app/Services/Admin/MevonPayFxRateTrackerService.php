@@ -32,11 +32,14 @@ final class MevonPayFxRateTrackerService
         $series = $this->series($from, $to, $range);
         $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
         $published = $this->publishedCurrent();
+        $wallet = app(\App\Services\MevonPay\MevonPayBalanceSnapshotService::class)->forDashboard();
 
         return [
             'range' => $range,
             'from' => $from->toIso8601String(),
             'to' => $to->toIso8601String(),
+            'wallet' => $wallet,
+            'max_fx_usd_per_op' => app(MevonPayAdminFxConversionService::class)->maxUsdPerOp(),
             'current' => $this->currentSnapshot($latest, $published),
             'change' => $this->changeWindows($latest),
             'stats' => $this->periodStats($from, $to),
@@ -71,6 +74,7 @@ final class MevonPayFxRateTrackerService
         $to = now();
         $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
         $published = $this->publishedCurrent();
+        $wallet = app(\App\Services\MevonPay\MevonPayBalanceSnapshotService::class)->forDashboard();
 
         return [
             'ok' => true,
@@ -78,6 +82,7 @@ final class MevonPayFxRateTrackerService
             'from' => $from->toIso8601String(),
             'to' => $to->toIso8601String(),
             'updated_at' => $to->toIso8601String(),
+            'wallet' => $wallet,
             'current' => $this->currentSnapshot($latest, $published),
             'stats' => $this->periodStats($from, $to),
             'series' => $this->series($from, $to, $range),

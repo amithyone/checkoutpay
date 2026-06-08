@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\VirtualCardRequest;
 use App\Services\Admin\AdminVirtualCardProfitService;
 use App\Services\Admin\AdminVirtualCardService;
+use App\Services\Admin\MevonPayAdminFxConversionService;
 use App\Services\Admin\MevonPayFxRateTrackerService;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFxPublishService;
@@ -103,6 +104,48 @@ class VirtualCardAdminController extends Controller
 
         return redirect()
             ->route('admin.virtual-cards.rate-tracker', ['range' => $request->query('range', $request->input('range', '1h'))])
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
+    public function buyUsdOnRateTracker(Request $request): RedirectResponse
+    {
+        $max = app(MevonPayAdminFxConversionService::class)->maxUsdPerOp();
+        $maxRule = $max > 0 ? '|max:'.$max : '';
+
+        $validated = $request->validate([
+            'usd_amount' => 'required|numeric|min:0.01'.$maxRule,
+            'range' => 'nullable|string|max:8',
+        ]);
+
+        $admin = auth('admin')->user();
+        $result = app(MevonPayAdminFxConversionService::class)->buyUsd(
+            (float) $validated['usd_amount'],
+            $admin?->id,
+        );
+
+        return redirect()
+            ->route('admin.virtual-cards.rate-tracker', ['range' => $validated['range'] ?? $request->input('range', '1h')])
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
+    public function sellUsdOnRateTracker(Request $request): RedirectResponse
+    {
+        $max = app(MevonPayAdminFxConversionService::class)->maxUsdPerOp();
+        $maxRule = $max > 0 ? '|max:'.$max : '';
+
+        $validated = $request->validate([
+            'usd_amount' => 'required|numeric|min:0.01'.$maxRule,
+            'range' => 'nullable|string|max:8',
+        ]);
+
+        $admin = auth('admin')->user();
+        $result = app(MevonPayAdminFxConversionService::class)->sellUsd(
+            (float) $validated['usd_amount'],
+            $admin?->id,
+        );
+
+        return redirect()
+            ->route('admin.virtual-cards.rate-tracker', ['range' => $validated['range'] ?? $request->input('range', '1h')])
             ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 

@@ -13,6 +13,9 @@
     $range = $tracker['range'];
     $livePoll = $tracker['live_poll'] ?? false;
     $pollSeconds = $tracker['poll_seconds'] ?? 60;
+    $wallet = $tracker['wallet'] ?? [];
+    $maxFxUsd = $tracker['max_fx_usd_per_op'] ?? 500;
+    $liveMid = $current['mevon_mid'] ?? $current['published_mid'];
     $fmt = fn (?float $v, int $dec = 2) => $v !== null ? '₦'.number_format($v, $dec) : '—';
     $deltaClass = fn (?float $v) => $v === null ? 'text-gray-500' : ($v >= 0 ? 'text-emerald-700' : 'text-red-600');
     $deltaPrefix = fn (?float $v) => $v === null ? '' : ($v > 0 ? '+' : '');
@@ -25,6 +28,18 @@
             <p class="text-sm text-gray-600 mt-1">Live Mevon mid, published sell/buy spreads, and historical movement</p>
         </div>
         <div class="flex flex-wrap gap-3 items-center">
+            @if($wallet['configured'] ?? false)
+                <button type="button" onclick="openBuyUsdModal()"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium shadow-sm transition"
+                        @if(!($wallet['ok'] ?? false)) disabled title="Could not load MevonPay balances" @endif>
+                    <i class="fas fa-arrow-down"></i> Buy USD
+                </button>
+                <button type="button" onclick="openSellUsdModal()"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium shadow-sm transition"
+                        @if(!($wallet['ok'] ?? false)) disabled title="Could not load MevonPay balances" @endif>
+                    <i class="fas fa-arrow-up"></i> Sell USD
+                </button>
+            @endif
             <form method="POST" action="{{ route('admin.virtual-cards.rate-tracker.refresh') }}">
                 @csrf
                 <input type="hidden" name="range" value="{{ $range }}">
@@ -40,6 +55,41 @@
             </a>
         </div>
     </div>
+
+    @if($wallet['configured'] ?? false)
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <p class="text-xs uppercase tracking-wider text-gray-500 font-semibold">MevonPay wallet balances</p>
+                    @if($wallet['ok'] ?? false)
+                        <div class="flex flex-wrap gap-6 mt-2 text-sm">
+                            <div>
+                                <span class="text-gray-500">NGN</span>
+                                <p id="fx-wallet-ngn" class="text-xl font-bold font-mono text-gray-900">
+                                    {{ $wallet['naira_balance'] !== null ? '₦'.number_format($wallet['naira_balance'], 2) : '—' }}
+                                </p>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">USD</span>
+                                <p id="fx-wallet-usd" class="text-xl font-bold font-mono text-indigo-700">
+                                    {{ $wallet['usd_balance'] !== null ? '$'.number_format($wallet['usd_balance'], 2) : '—' }}
+                                </p>
+                            </div>
+                        </div>
+                    @else
+                        <p class="text-sm text-red-600 mt-2">{{ $wallet['message'] ?? 'Could not load balances.' }}</p>
+                    @endif
+                </div>
+                <p class="text-xs text-gray-500 max-w-sm">
+                    Buy USD spends NGN via Mevon <code class="text-[11px] bg-gray-100 px-1 rounded">/V1/exchange</code>.
+                    Sell USD converts USD back to NGN on the same endpoint.
+                    @if($maxFxUsd > 0)
+                        Max per trade: <strong>${{ number_format($maxFxUsd, 2) }}</strong>.
+                    @endif
+                </p>
+            </div>
+        </div>
+    @endif
 
     {{-- Hero ticker panel (light theme — matches other admin card pages) --}}
     <div class="rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6 sm:p-8 shadow-sm">
@@ -192,14 +242,121 @@
 
     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 leading-relaxed">
         <p class="font-semibold text-gray-800 mb-1">How tracking works</p>
-        <p>Rates are captured when MevonPay is queried live (cached fetch) and when app FX is published. Historical card transactions are backfilled once on first visit. Use <strong>Sync live rate</strong> to force a fresh Mevon read and publish to the app.</p>
+        <p>Rates are captured when MevonPay is queried live (cached fetch) and when app FX is published. Historical card transactions are backfilled once on first visit. Use <strong>Sync live rate</strong> to force a fresh Mevon read and publish to the app. <strong>Buy USD</strong> / <strong>Sell USD</strong> call MevonPay exchange directly to fund or withdraw merchant float.</p>
     </div>
 </div>
+
+@if($wallet['configured'] ?? false)
+{{-- Buy USD modal --}}
+<div id="buyUsdModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg p-5 sm:p-6 max-w-md w-full shadow-xl">
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">
+            <i class="fas fa-arrow-down text-violet-600 mr-2"></i>Buy USD (NGN → USD)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">Spend NGN from your MevonPay wallet to increase USD float for virtual cards.</p>
+        <form method="POST" action="{{ route('admin.virtual-cards.rate-tracker.buy-usd') }}">
+            @csrf
+            <input type="hidden" name="range" value="{{ $range }}">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">USD to buy <span class="text-red-500">*</span></label>
+                <input type="number" name="usd_amount" step="0.01" min="0.01" @if($maxFxUsd > 0) max="{{ $maxFxUsd }}" @endif
+                       required id="buy-usd-amount" value="10"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary font-mono"
+                       oninput="updateBuyEstimate()">
+                <p id="buy-usd-estimate" class="text-xs text-gray-500 mt-2"></p>
+            </div>
+            <div class="bg-violet-50 border border-violet-200 rounded-lg p-3 mb-4 text-xs text-violet-900">
+                Available NGN: <strong>{{ $wallet['naira_balance'] !== null ? '₦'.number_format($wallet['naira_balance'], 2) : '—' }}</strong>
+                · Live mid: <strong>{{ $liveMid !== null ? '₦'.number_format($liveMid, 2) : '—' }}</strong> / USD
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="closeBuyUsdModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 font-medium">
+                    Confirm buy
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Sell USD modal --}}
+<div id="sellUsdModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg p-5 sm:p-6 max-w-md w-full shadow-xl">
+        <h3 class="text-lg font-semibold text-gray-900 mb-1">
+            <i class="fas fa-arrow-up text-emerald-600 mr-2"></i>Sell USD (USD → NGN)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">Convert USD from your MevonPay wallet back to NGN.</p>
+        <form method="POST" action="{{ route('admin.virtual-cards.rate-tracker.sell-usd') }}">
+            @csrf
+            <input type="hidden" name="range" value="{{ $range }}">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">USD to sell <span class="text-red-500">*</span></label>
+                <input type="number" name="usd_amount" step="0.01" min="0.01" @if($maxFxUsd > 0) max="{{ $maxFxUsd }}" @endif
+                       required id="sell-usd-amount" value="10"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary font-mono"
+                       oninput="updateSellEstimate()">
+                <p id="sell-usd-estimate" class="text-xs text-gray-500 mt-2"></p>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-xs text-emerald-900">
+                Available USD: <strong>{{ $wallet['usd_balance'] !== null ? '$'.number_format($wallet['usd_balance'], 2) : '—' }}</strong>
+                · Est. rate: <strong>{{ $liveMid !== null ? '₦'.number_format($liveMid, 2) : '—' }}</strong> / USD
+            </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="closeSellUsdModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium">
+                    Confirm sell
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 @endsection
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
+const FX_LIVE_MID = @json($liveMid);
+const FX_NGN_BUFFER_PERCENT = @json((float) config('virtual_card.auto_fund_ngn_buffer_percent', 3));
+
+function openBuyUsdModal() {
+    document.getElementById('buyUsdModal')?.classList.remove('hidden');
+    updateBuyEstimate();
+}
+function closeBuyUsdModal() {
+    document.getElementById('buyUsdModal')?.classList.add('hidden');
+}
+function openSellUsdModal() {
+    document.getElementById('sellUsdModal')?.classList.remove('hidden');
+    updateSellEstimate();
+}
+function closeSellUsdModal() {
+    document.getElementById('sellUsdModal')?.classList.add('hidden');
+}
+function updateBuyEstimate() {
+    const input = document.getElementById('buy-usd-amount');
+    const out = document.getElementById('buy-usd-estimate');
+    if (!input || !out || FX_LIVE_MID == null) return;
+    const usd = parseFloat(input.value) || 0;
+    const ngn = Math.ceil(usd * FX_LIVE_MID * (1 + (FX_NGN_BUFFER_PERCENT / 100)));
+    out.textContent = usd > 0 ? `Estimated NGN spend: ₦${ngn.toLocaleString()} (includes ${FX_NGN_BUFFER_PERCENT}% buffer)` : '';
+}
+function updateSellEstimate() {
+    const input = document.getElementById('sell-usd-amount');
+    const out = document.getElementById('sell-usd-estimate');
+    if (!input || !out || FX_LIVE_MID == null) return;
+    const usd = parseFloat(input.value) || 0;
+    const ngn = Math.round(usd * FX_LIVE_MID * 100) / 100;
+    out.textContent = usd > 0 ? `Estimated NGN received: ₦${ngn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+}
+['buyUsdModal', 'sellUsdModal'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('click', (e) => {
+        if (e.target.id === id) {
+            e.currentTarget.classList.add('hidden');
+        }
+    });
+});
+
 (() => {
     const initialSeries = @json($series);
     const range = @json($range);
@@ -286,7 +443,7 @@
     const fmtNgn = (v) => v == null ? '—' : Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtMoney = (v) => v == null ? '—' : '₦' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const updateHero = (current) => {
+    const updateHero = (current, wallet) => {
         const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
         set('fx-live-mevon', fmtNgn(current.mevon_mid));
         set('fx-published-mid', fmtNgn(current.published_mid));
@@ -296,6 +453,14 @@
         if (current.recorded_at) {
             const at = new Date(current.recorded_at);
             set('fx-last-snapshot', `Last snapshot just now · ${at.toLocaleString()}`);
+        }
+        if (wallet) {
+            if (wallet.naira_balance != null) {
+                set('fx-wallet-ngn', `₦${Number(wallet.naira_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            }
+            if (wallet.usd_balance != null) {
+                set('fx-wallet-usd', `$${Number(wallet.usd_balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+            }
         }
     };
 
@@ -377,7 +542,7 @@
             if (!res.ok) return;
             const payload = await res.json();
             if (!payload.ok) return;
-            updateHero(payload.current || {});
+            updateHero(payload.current || {}, payload.wallet || null);
             updateStats(payload.stats || {});
             updateChart(payload.series || []);
             secondsLeft = payload.poll_seconds || pollSeconds;
