@@ -99,4 +99,24 @@ class WhatsappWalletCasualSendParserTest extends TestCase
         $this->assertSame('bank_direct', $parsed['flow']);
         $this->assertSame('0210085995', $parsed['ctx']['dest_acct']);
     }
+
+    public function test_leading_zero_account_not_picked_as_amount(): void
+    {
+        $text = 'send 2k to 0098767877 sterling';
+
+        $this->assertSame(2000.0, WhatsappWalletCasualSendParser::largestNairaAmount($text));
+
+        $parsed = WhatsappWalletCasualSendParser::tryParse(
+            $text,
+            $this->wallet(),
+            $this->bankPayout(),
+            []
+        );
+
+        $this->assertNotNull($parsed);
+        $this->assertSame('bank_direct', $parsed['flow']);
+        $this->assertSame(2000.0, $parsed['amount']);
+        $this->assertSame('0098767877', $parsed['ctx']['dest_acct']);
+        $this->assertSame('000001', $parsed['ctx']['dest_bank_code']);
+    }
 }

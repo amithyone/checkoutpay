@@ -315,7 +315,7 @@ final class WhatsappWalletCasualSendParser
         if (preg_match_all('/\b(\d{2,}(?:\.\d{1,2})?)\b/', $text, $m)) {
             foreach ($m[1] as $x) {
                 $digits = preg_replace('/\D+/', '', $x) ?? '';
-                if (self::digitsLookLikeInternationalPhone($digits)) {
+                if (self::digitsLookLikeNonAmountRecipient($digits)) {
                     continue;
                 }
                 $n = (float) str_replace([',', ' '], '', $x);
@@ -326,6 +326,22 @@ final class WhatsappWalletCasualSendParser
         }
 
         return $amounts === [] ? null : max($amounts);
+    }
+
+    /** Account numbers and phone notation must not be parsed as Naira amounts. */
+    private static function digitsLookLikeNonAmountRecipient(string $digits): bool
+    {
+        if ($digits === '') {
+            return false;
+        }
+        if (str_starts_with($digits, '0')) {
+            return true;
+        }
+        if (strlen($digits) === 10) {
+            return true;
+        }
+
+        return self::digitsLookLikeInternationalPhone($digits);
     }
 
     private static function digitsLookLikeNgPhone(string $digits): bool
