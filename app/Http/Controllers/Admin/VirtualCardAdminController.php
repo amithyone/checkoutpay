@@ -10,6 +10,7 @@ use App\Services\Admin\MevonPayFxRateTrackerService;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFxPublishService;
 use App\Services\Consumer\VirtualCardFxService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -87,12 +88,21 @@ class VirtualCardAdminController extends Controller
         ]);
     }
 
+    public function rateTrackerData(Request $request): JsonResponse
+    {
+        $fetchFresh = filter_var($request->query('fresh', '1'), FILTER_VALIDATE_BOOLEAN);
+
+        return response()->json(
+            app(MevonPayFxRateTrackerService::class)->liveData($request, $fetchFresh)
+        );
+    }
+
     public function refreshRateTracker(Request $request): RedirectResponse
     {
         $result = app(VirtualCardFxPublishService::class)->syncFromMevon();
 
         return redirect()
-            ->route('admin.virtual-cards.rate-tracker', ['range' => $request->query('range', $request->input('range', '7d'))])
+            ->route('admin.virtual-cards.rate-tracker', ['range' => $request->query('range', $request->input('range', '1h'))])
             ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 

@@ -21,6 +21,25 @@ final class MevonPayExchangeRateService
 
         $cacheSeconds = max(60, (int) config('virtual_card.mevon_rate_cache_seconds', 600));
 
+        return $this->fetchAndCacheNgnPerUsd($cacheSeconds);
+    }
+
+    /** Bypass cache — for admin live rate tracker polling. */
+    public function ngnPerUsdFresh(): ?float
+    {
+        if (! $this->exchange->isConfigured()) {
+            return null;
+        }
+
+        Cache::forget('mevonpay_usd_ngn_rate');
+
+        $cacheSeconds = max(60, (int) config('virtual_card.mevon_rate_cache_seconds', 600));
+
+        return $this->fetchAndCacheNgnPerUsd($cacheSeconds);
+    }
+
+    private function fetchAndCacheNgnPerUsd(int $cacheSeconds): ?float
+    {
         return Cache::remember('mevonpay_usd_ngn_rate', $cacheSeconds, function () {
             $response = $this->exchange->convert(1, 'NGN', 'USD');
             if (! ($response['ok'] ?? false)) {

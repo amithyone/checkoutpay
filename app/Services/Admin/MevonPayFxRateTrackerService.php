@@ -9,9 +9,12 @@ use Illuminate\Http\Request;
 
 final class MevonPayFxRateTrackerService
 {
-    private const DEDUP_MINUTES = 30;
+    private const DEDUP_MINUTES = 1;
 
     private const DEDUP_EPSILON = 0.0001;
+
+    /** @var list<string> */
+    private const LIVE_RANGES = ['1h', '6h', '7h', '12h', '24h'];
 
     /**
      * @return array<string, mixed>
@@ -22,7 +25,7 @@ final class MevonPayFxRateTrackerService
             $this->backfillFromTransactions();
         }
 
-        $range = $this->normalizeRange((string) $request->query('range', '7d'));
+        $range = $this->normalizeRange((string) $request->query('range', '1h'));
         $from = $this->rangeStart($range);
         $to = now();
 
@@ -39,6 +42,47 @@ final class MevonPayFxRateTrackerService
             'stats' => $this->periodStats($from, $to),
             'series' => $series,
             'recent' => $this->recentRows(25),
+            'live_poll' => $this->isLiveRange($range),
+            'poll_seconds' => 60,
+        ];
+    }
+
+    /**
+     * Fresh Mevon read + chart payload for admin live polling.
+     *
+     * @return array<string, mixed>
+     */
+    public function liveData(Request $request, bool $fetchFresh = true): array
+    {
+        if (MevonPayFxRateSnapshot::query()->count() === 0) {
+            $this->backfillFromTransactions();
+        }
+
+        if ($fetchFresh) {
+            try {
+                app(\App\Services\MevonPay\MevonPayExchangeRateService::class)->ngnPerUsdFresh();
+            } catch (\Throwable) {
+                // Poll must still return the latest stored series.
+            }
+        }
+
+        $range = $this->normalizeRange((string) $request->query('range', '1h'));
+        $from = $this->rangeStart($range);
+        $to = now();
+        $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
+        $published = $this->publishedCurrent();
+
+        return [
+            'ok' => true,
+            'range' => $range,
+            'from' => $from->toIso8601String(),
+            'to' => $to->toIso8601String(),
+            'updated_at' => $to->toIso8601String(),
+            'current' => $this->currentSnapshot($latest, $published),
+            'stats' => $this->periodStats($from, $to),
+            'series' => $this->series($from, $to, $range),
+            'live_poll' => $this->isLiveRange($range),
+            'poll_seconds' => 60,
         ];
     }
 
@@ -297,8 +341,8 @@ final class MevonPayFxRateTrackerService
             return [];
         }
 
-        if ($range === '24h') {
-            return $this->mapSeriesPoints($rows);
+        if (in_array($range, self::LIVE_RANGES, true)) {
+            return $this->mapSeriesPoints($rows, $range);
         }
 
         $bucket = match ($range) {
@@ -319,8 +363,8 @@ final class MevonPayFxRateTrackerService
             $grouped[$key] = $row;
         }
 
-        return array_values(array_map(function (MevonPayFxRateSnapshot $row) {
-            return $this->pointFromRow($row);
+        return array_values(array_map(function (MevonPayFxRateSnapshot $row) use ($range) {
+            return $this->pointFromRow($row, $range);
         }, $grouped));
     }
 
@@ -328,21 +372,21 @@ final class MevonPayFxRateTrackerService
      * @param  \Illuminate\Support\Collection<int, MevonPayFxRateSnapshot>  $rows
      * @return list<array<string, mixed>>
      */
-    private function mapSeriesPoints($rows): array
+    private function mapSeriesPoints($rows, string $range = '24h'): array
     {
-        return $rows->map(fn (MevonPayFxRateSnapshot $row) => $this->pointFromRow($row))->all();
+        return $rows->map(fn (MevonPayFxRateSnapshot $row) => $this->pointFromRow($row, $range))->all();
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function pointFromRow(MevonPayFxRateSnapshot $row): array
+    private function pointFromRow(MevonPayFxRateSnapshot $row, string $range = '24h'): array
     {
         $at = $this->recordedAtCarbon($row);
 
         return [
             't' => $at?->toIso8601String(),
-            'label' => $at?->format('M j, g:i A') ?? '',
+            'label' => $at?->format($this->seriesLabelFormat($range)) ?? '',
             'mevon_mid' => $row->mevon_mid,
             'published_mid' => $row->published_mid,
             'sell_rate' => $row->sell_rate,
@@ -411,12 +455,32 @@ final class MevonPayFxRateTrackerService
 
     private function normalizeRange(string $range): string
     {
-        return in_array($range, ['24h', '7d', '30d', '90d', 'all'], true) ? $range : '7d';
+        $allowed = ['1h', '6h', '7h', '12h', '24h', '7d', '30d', '90d', 'all'];
+
+        return in_array($range, $allowed, true) ? $range : '1h';
+    }
+
+    private function isLiveRange(string $range): bool
+    {
+        return in_array($range, self::LIVE_RANGES, true);
+    }
+
+    private function seriesLabelFormat(string $range): string
+    {
+        return match ($range) {
+            '1h' => 'g:i:s A',
+            '6h', '7h', '12h' => 'g:i A',
+            default => 'M j, g:i A',
+        };
     }
 
     private function rangeStart(string $range): Carbon
     {
         return match ($range) {
+            '1h' => now()->subHour(),
+            '6h' => now()->subHours(6),
+            '7h' => now()->subHours(7),
+            '12h' => now()->subHours(12),
             '24h' => now()->subDay(),
             '7d' => now()->subDays(7),
             '30d' => now()->subDays(30),
