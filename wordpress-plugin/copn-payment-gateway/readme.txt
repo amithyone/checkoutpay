@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.4.2
+Stable tag: 1.4.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,6 +114,9 @@ This plugin connects to **CheckoutPay** at https://check-outpay.com/
 
 == Changelog ==
 
+= 1.4.3 =
+* WordPress.org slug `copn-payment-gateway`: blocks script renamed to `copn-blocks.js` / handle `copn-blocks`; translation template metadata updated.
+
 = 1.4.2 =
 * WordPress.org slug alignment: folder `copn-payment-gateway`, main file `copn-payment-gateway.php`, text domain `copn-payment-gateway`, admin script handles prefixed with `copn-`.
 
@@ -133,6 +136,9 @@ This plugin connects to **CheckoutPay** at https://check-outpay.com/
 * WordPress.org review: enqueue scripts, sanitization, Checkoutpay_* class prefix.
 
 == Upgrade Notice ==
+
+= 1.4.3 =
+Final slug alignment for WordPress.org (`copn-payment-gateway`).
 
 = 1.4.2 =
 Align plugin folder, text domain, and prefixes with WordPress.org slug `copn-payment-gateway`.

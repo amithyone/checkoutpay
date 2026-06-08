@@ -54,11 +54,11 @@ final class Copn_Blocks extends AbstractPaymentMethodType
      */
     public function get_payment_method_script_handles()
     {
-        $script_path = COPN_PLUGIN_DIR . 'assets/js/checkout-blocks.js';
-        $script_url = COPN_PLUGIN_URL . 'assets/js/checkout-blocks.js';
+        $script_path = COPN_PLUGIN_DIR . 'assets/js/copn-blocks.js';
+        $script_url = COPN_PLUGIN_URL . 'assets/js/copn-blocks.js';
 
         wp_register_script(
-            'checkoutpay-blocks',
+            'copn-blocks',
             $script_url,
             array(
                 'wc-blocks-registry',
@@ -70,7 +70,7 @@ final class Copn_Blocks extends AbstractPaymentMethodType
             true
         );
 
-        return array('checkoutpay-blocks');
+        return array('copn-blocks');
     }
 
     /**

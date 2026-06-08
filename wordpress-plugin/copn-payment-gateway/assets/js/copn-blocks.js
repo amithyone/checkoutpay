@@ -18,7 +18,7 @@
     var Content = function () {
         return window.wp.element.createElement(
             'div',
-            { className: 'wc-checkoutpay-blocks-description' },
+            { className: 'wc-copn-blocks-description' },
             description
         );
     };
