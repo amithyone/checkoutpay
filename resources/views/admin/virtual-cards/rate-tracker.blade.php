@@ -12,25 +12,25 @@
     $recent = $tracker['recent'];
     $range = $tracker['range'];
     $fmt = fn (?float $v, int $dec = 2) => $v !== null ? '₦'.number_format($v, $dec) : '—';
-    $deltaClass = fn (?float $v) => $v === null ? 'text-slate-400' : ($v >= 0 ? 'text-emerald-400' : 'text-rose-400');
+    $deltaClass = fn (?float $v) => $v === null ? 'text-gray-500' : ($v >= 0 ? 'text-emerald-700' : 'text-red-600');
     $deltaPrefix = fn (?float $v) => $v === null ? '' : ($v > 0 ? '+' : '');
 @endphp
 
-<div class="space-y-6 -mx-2 sm:mx-0">
-    <div class="flex flex-wrap items-center justify-between gap-4 px-2 sm:px-0">
+<div class="space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-slate-900 tracking-tight">MevonPay USD/NGN rate tracker</h2>
-            <p class="text-sm text-slate-500 mt-1">Live Mevon mid, published sell/buy spreads, and historical movement</p>
+            <h2 class="text-2xl font-bold text-gray-900">MevonPay USD/NGN rate tracker</h2>
+            <p class="text-sm text-gray-600 mt-1">Live Mevon mid, published sell/buy spreads, and historical movement</p>
         </div>
         <div class="flex flex-wrap gap-3 items-center">
             <form method="POST" action="{{ route('admin.virtual-cards.rate-tracker.refresh') }}">
                 @csrf
                 <input type="hidden" name="range" value="{{ $range }}">
-                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium shadow-lg shadow-cyan-900/20 transition">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-white text-sm font-medium shadow-sm transition">
                     <i class="fas fa-bolt"></i> Sync live rate
                 </button>
             </form>
-            <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-slate-600 hover:text-slate-900 font-medium">
+            <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-gray-600 hover:text-gray-900 font-medium">
                 <i class="fas fa-arrow-left mr-1"></i> Card management
             </a>
             <a href="{{ route('admin.virtual-cards.stats') }}" class="text-sm text-emerald-700 hover:underline font-medium">
@@ -39,28 +39,25 @@
         </div>
     </div>
 
-    {{-- Hero ticker panel --}}
-    <div class="relative overflow-hidden rounded-2xl border border-slate-700/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 sm:p-8 shadow-2xl">
-        <div class="absolute inset-0 opacity-30 pointer-events-none" style="background-image: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.15), transparent 40%), radial-gradient(circle at 80% 0%, rgba(16,185,129,0.12), transparent 35%);"></div>
-        <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent"></div>
-
-        <div class="relative space-y-6">
+    {{-- Hero ticker panel (light theme — matches other admin card pages) --}}
+    <div class="rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6 sm:p-8 shadow-sm">
+        <div class="space-y-6">
             <div>
-                <p class="text-xs uppercase tracking-[0.2em] text-cyan-400/90 font-semibold mb-2">Mevon live mid · NGN per 1 USD</p>
-                <p class="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tabular-nums tracking-tight font-mono break-all sm:break-normal">
+                <p class="text-xs uppercase tracking-wider text-indigo-700 font-semibold mb-2">Mevon live mid · NGN per 1 USD</p>
+                <p class="text-4xl sm:text-5xl font-bold text-gray-900 tabular-nums tracking-tight font-mono">
                     {{ $current['mevon_mid'] !== null ? number_format($current['mevon_mid'], 2) : '—' }}
                 </p>
                 <div class="flex flex-wrap gap-3 mt-4 text-sm">
                     @foreach (['24h' => '24H', '7d' => '7D', '30d' => '30D'] as $key => $label)
                         @php $c = $change[$key] ?? []; @endphp
-                        <div class="rounded-lg bg-slate-800/60 border border-slate-700/50 px-3 py-2 min-w-[5.5rem]">
-                            <span class="text-slate-500 text-xs block mb-0.5">{{ $label }}</span>
+                        <div class="rounded-lg bg-white border border-gray-200 px-3 py-2 min-w-[5.5rem] shadow-sm">
+                            <span class="text-gray-500 text-xs block mb-0.5">{{ $label }}</span>
                             <div class="font-mono font-semibold leading-tight">
                                 <span class="{{ $deltaClass($c['pct'] ?? null) }}">
                                     {{ isset($c['pct']) ? $deltaPrefix($c['pct']).number_format($c['pct'], 2).'%' : '—' }}
                                 </span>
                                 @if(isset($c['abs']))
-                                    <span class="text-slate-500 text-xs block mt-0.5">({{ $deltaPrefix($c['abs']).number_format($c['abs'], 2) }})</span>
+                                    <span class="text-gray-500 text-xs block mt-0.5">({{ $deltaPrefix($c['abs']).number_format($c['abs'], 2) }})</span>
                                 @endif
                             </div>
                         </div>
@@ -69,30 +66,30 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div class="rounded-xl bg-slate-800/50 border border-slate-700/60 p-4 sm:p-5 backdrop-blur-sm min-h-[7.5rem] flex flex-col justify-between">
-                    <p class="text-[10px] uppercase tracking-wider text-slate-400 leading-snug">Published mid</p>
-                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-white font-mono mt-2 tabular-nums">{{ $current['published_mid'] !== null ? number_format($current['published_mid'], 2) : '—' }}</p>
-                    <p class="text-[10px] text-slate-500 mt-2">App mid rate</p>
+                <div class="rounded-lg border border-gray-200 bg-white p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-xs uppercase tracking-wider text-gray-500 font-medium">Published mid</p>
+                    <p class="text-2xl font-bold text-gray-900 font-mono mt-2 tabular-nums">{{ $current['published_mid'] !== null ? number_format($current['published_mid'], 2) : '—' }}</p>
+                    <p class="text-xs text-gray-500 mt-2">App mid rate</p>
                 </div>
-                <div class="rounded-xl bg-emerald-950/40 border border-emerald-800/40 p-4 sm:p-5 min-h-[7.5rem] flex flex-col justify-between">
-                    <p class="text-[10px] uppercase tracking-wider text-emerald-500/90 leading-snug">Sell rate</p>
-                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-emerald-300 font-mono mt-2 tabular-nums">{{ $current['sell_rate'] !== null ? number_format($current['sell_rate'], 2) : '—' }}</p>
-                    <p class="text-[10px] text-emerald-500/80 mt-2 leading-snug">+{{ $current['sell_markup'] !== null ? number_format($current['sell_markup'], 2) : '—' }} markup</p>
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-xs uppercase tracking-wider text-emerald-800 font-medium">Sell rate</p>
+                    <p class="text-2xl font-bold text-emerald-800 font-mono mt-2 tabular-nums">{{ $current['sell_rate'] !== null ? number_format($current['sell_rate'], 2) : '—' }}</p>
+                    <p class="text-xs text-emerald-700 mt-2">+{{ $current['sell_markup'] !== null ? number_format($current['sell_markup'], 2) : '—' }} markup</p>
                 </div>
-                <div class="rounded-xl bg-violet-950/40 border border-violet-800/40 p-4 sm:p-5 min-h-[7.5rem] flex flex-col justify-between">
-                    <p class="text-[10px] uppercase tracking-wider text-violet-400/90 leading-snug">Buy rate</p>
-                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-violet-300 font-mono mt-2 tabular-nums">{{ $current['buy_rate'] !== null ? number_format($current['buy_rate'], 2) : '—' }}</p>
-                    <p class="text-[10px] text-violet-400/80 mt-2 leading-snug">−{{ $current['buy_discount'] !== null ? number_format($current['buy_discount'], 2) : '—' }} discount</p>
+                <div class="rounded-lg border border-violet-200 bg-violet-50/60 p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-xs uppercase tracking-wider text-violet-800 font-medium">Buy rate</p>
+                    <p class="text-2xl font-bold text-violet-800 font-mono mt-2 tabular-nums">{{ $current['buy_rate'] !== null ? number_format($current['buy_rate'], 2) : '—' }}</p>
+                    <p class="text-xs text-violet-700 mt-2">−{{ $current['buy_discount'] !== null ? number_format($current['buy_discount'], 2) : '—' }} discount</p>
                 </div>
-                <div class="rounded-xl bg-amber-950/30 border border-amber-800/30 p-4 sm:p-5 min-h-[7.5rem] flex flex-col justify-between">
-                    <p class="text-[10px] uppercase tracking-wider text-amber-500/90 leading-snug">Spread</p>
-                    <p class="text-2xl sm:text-xl lg:text-2xl font-bold text-amber-200 font-mono mt-2 tabular-nums">{{ $current['spread'] !== null ? number_format($current['spread'], 2) : '—' }}</p>
-                    <p class="text-[10px] text-amber-500/70 mt-2 truncate" title="{{ $current['source'] ?? 'unknown' }}">{{ $current['source'] ?? 'unknown' }}</p>
+                <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-xs uppercase tracking-wider text-amber-800 font-medium">Spread</p>
+                    <p class="text-2xl font-bold text-amber-900 font-mono mt-2 tabular-nums">{{ $current['spread'] !== null ? number_format($current['spread'], 2) : '—' }}</p>
+                    <p class="text-xs text-amber-800 mt-2 truncate" title="{{ $current['source'] ?? 'unknown' }}">{{ $current['source'] ?? 'unknown' }}</p>
                 </div>
             </div>
         </div>
 
-        <p class="relative text-xs text-slate-500 mt-6">
+        <p class="text-xs text-gray-500 mt-6">
             @if(!empty($current['recorded_at']))
                 Last snapshot {{ \Carbon\Carbon::parse($current['recorded_at'])->diffForHumans() }}
                 · {{ \Carbon\Carbon::parse($current['recorded_at'])->format('M j, Y g:i:s A') }}
@@ -107,52 +104,52 @@
 
     {{-- Range + period stats --}}
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-4">
-        <div class="xl:col-span-1 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-semibold uppercase text-slate-500 mb-3">Time range</p>
+        <div class="xl:col-span-1 bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase text-gray-500 mb-3">Time range</p>
             <div class="flex flex-wrap gap-2">
                 @foreach (['24h' => '24H', '7d' => '7D', '30d' => '30D', '90d' => '90D', 'all' => 'ALL'] as $key => $label)
                     <a href="{{ route('admin.virtual-cards.rate-tracker', ['range' => $key]) }}"
-                       class="px-3 py-1.5 rounded-lg text-sm font-medium transition {{ $range === $key ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+                       class="px-3 py-1.5 rounded-lg text-sm font-medium transition border {{ $range === $key ? 'bg-indigo-100 text-indigo-900 border-indigo-300 shadow-sm' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200' }}">
                         {{ $label }}
                     </a>
                 @endforeach
             </div>
             <dl class="mt-5 space-y-3 text-sm">
-                <div class="flex justify-between"><dt class="text-slate-500">Snapshots</dt><dd class="font-mono font-semibold text-slate-800">{{ number_format($stats['count'] ?? 0) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-500">Period high</dt><dd class="font-mono text-emerald-700">{{ $fmt($stats['high'] ?? null) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-500">Period low</dt><dd class="font-mono text-rose-600">{{ $fmt($stats['low'] ?? null) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-500">Average</dt><dd class="font-mono text-slate-800">{{ $fmt($stats['avg'] ?? null) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-500">Volatility (σ)</dt><dd class="font-mono text-amber-700">{{ $stats['volatility'] !== null ? number_format($stats['volatility'], 2) : '—' }}</dd></div>
-                <div class="flex justify-between border-t border-slate-100 pt-3"><dt class="text-slate-500">Net change</dt><dd class="font-mono font-semibold {{ $deltaClass($stats['total_abs_change'] ?? null) }}">{{ isset($stats['total_abs_change']) ? $deltaPrefix($stats['total_abs_change']).number_format($stats['total_abs_change'], 2) : '—' }}</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Snapshots</dt><dd class="font-mono font-semibold text-gray-900">{{ number_format($stats['count'] ?? 0) }}</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Period high</dt><dd class="font-mono text-emerald-700">{{ $fmt($stats['high'] ?? null) }}</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Period low</dt><dd class="font-mono text-red-600">{{ $fmt($stats['low'] ?? null) }}</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Average</dt><dd class="font-mono text-gray-900">{{ $fmt($stats['avg'] ?? null) }}</dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Volatility (σ)</dt><dd class="font-mono text-amber-700">{{ $stats['volatility'] !== null ? number_format($stats['volatility'], 2) : '—' }}</dd></div>
+                <div class="flex justify-between border-t border-gray-100 pt-3"><dt class="text-gray-500">Net change</dt><dd class="font-mono font-semibold {{ $deltaClass($stats['total_abs_change'] ?? null) }}">{{ isset($stats['total_abs_change']) ? $deltaPrefix($stats['total_abs_change']).number_format($stats['total_abs_change'], 2) : '—' }}</dd></div>
             </dl>
         </div>
 
-        <div class="xl:col-span-3 relative rounded-2xl border border-slate-800 bg-slate-950 p-5 shadow-xl overflow-hidden">
-            <div class="absolute top-3 right-4 flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500">
-                <span class="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span> Live series
+        <div class="xl:col-span-3 relative rounded-lg border border-gray-200 bg-white p-5 shadow-sm overflow-hidden">
+            <div class="absolute top-3 right-4 flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-500">
+                <span class="inline-block w-2 h-2 rounded-full bg-indigo-500"></span> Live series
             </div>
-            <h3 class="text-sm font-semibold text-slate-300 mb-1">Rate movement</h3>
-            <p class="text-xs text-slate-500 mb-4">Mevon mid (cyan) · Sell (green) · Buy (violet) · Published mid (slate)</p>
-            <div class="h-[22rem] sm:h-96">
+            <h3 class="text-sm font-semibold text-gray-900 mb-1">Rate movement</h3>
+            <p class="text-xs text-gray-500 mb-4">Mevon mid (blue) · Sell (green) · Buy (violet) · Published mid (gray)</p>
+            <div class="h-80 sm:h-96">
                 <canvas id="fxRateChart"></canvas>
             </div>
             @if(empty($series))
-                <div class="absolute inset-0 flex items-center justify-center bg-slate-950/80 rounded-2xl">
-                    <p class="text-slate-400 text-sm">No rate history in this range. Sync live rate to start tracking.</p>
+                <div class="absolute inset-0 flex items-center justify-center bg-white/90 rounded-lg">
+                    <p class="text-gray-500 text-sm">No rate history in this range. Sync live rate to start tracking.</p>
                 </div>
             @endif
         </div>
     </div>
 
     {{-- Recent snapshots table --}}
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-slate-900">Recent snapshots</h3>
-            <span class="text-xs text-slate-500">{{ count($recent) }} rows · deduped every 30 min if unchanged</span>
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900">Recent snapshots</h3>
+            <span class="text-xs text-gray-500">{{ count($recent) }} rows · deduped every 30 min if unchanged</span>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
-                <thead class="bg-slate-50 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
                         <th class="px-4 py-3">Recorded</th>
                         <th class="px-4 py-3">Mevon mid</th>
@@ -163,27 +160,27 @@
                         <th class="px-4 py-3">Source</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 font-mono text-xs sm:text-sm">
+                <tbody class="divide-y divide-gray-100 font-mono text-xs sm:text-sm">
                     @forelse($recent as $row)
-                        <tr class="hover:bg-slate-50/80">
-                            <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ $row['recorded_at'] }}</td>
-                            <td class="px-4 py-3 font-semibold text-cyan-800">{{ $row['mevon_mid'] !== null ? number_format($row['mevon_mid'], 2) : '—' }}</td>
-                            <td class="px-4 py-3 text-slate-800">{{ number_format($row['published_mid'], 2) }}</td>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ $row['recorded_at'] }}</td>
+                            <td class="px-4 py-3 font-semibold text-indigo-700">{{ $row['mevon_mid'] !== null ? number_format($row['mevon_mid'], 2) : '—' }}</td>
+                            <td class="px-4 py-3 text-gray-900">{{ number_format($row['published_mid'], 2) }}</td>
                             <td class="px-4 py-3 text-emerald-700">{{ $row['sell_rate'] !== null ? number_format($row['sell_rate'], 2) : '—' }}</td>
                             <td class="px-4 py-3 text-violet-700">{{ $row['buy_rate'] !== null ? number_format($row['buy_rate'], 2) : '—' }}</td>
                             <td class="px-4 py-3 {{ $deltaClass($row['change_pct']) }}">
                                 @if($row['change_pct'] !== null)
                                     {{ ($row['change_pct'] > 0 ? '+' : '').number_format($row['change_pct'], 3) }}%
-                                    <span class="text-slate-400">({{ ($row['change_abs'] > 0 ? '+' : '').number_format($row['change_abs'], 2) }})</span>
+                                    <span class="text-gray-400">({{ ($row['change_abs'] > 0 ? '+' : '').number_format($row['change_abs'], 2) }})</span>
                                 @else
                                     —
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-slate-500">{{ $row['source'] }}</td>
+                            <td class="px-4 py-3 text-gray-500">{{ $row['source'] }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-10 text-center text-slate-500">No snapshots recorded yet.</td>
+                            <td colspan="7" class="px-4 py-10 text-center text-gray-500">No snapshots recorded yet.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -191,8 +188,8 @@
         </div>
     </div>
 
-    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600 leading-relaxed">
-        <p class="font-semibold text-slate-800 mb-1">How tracking works</p>
+    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 leading-relaxed">
+        <p class="font-semibold text-gray-800 mb-1">How tracking works</p>
         <p>Rates are captured when MevonPay is queried live (cached fetch) and when app FX is published. Historical card transactions are backfilled once on first visit. Use <strong>Sync live rate</strong> to force a fresh Mevon read and publish to the app.</p>
     </div>
 </div>
@@ -209,8 +206,8 @@
     }
 
     const labels = series.map((p) => p.label || p.t);
-    const gridColor = 'rgba(148, 163, 184, 0.12)';
-    const tickColor = '#94a3b8';
+    const gridColor = 'rgba(209, 213, 219, 0.6)';
+    const tickColor = '#6b7280';
 
     const mkDataset = (label, key, color, fill) => ({
         label,
@@ -230,10 +227,10 @@
         data: {
             labels,
             datasets: [
-                mkDataset('Mevon mid', 'mevon_mid', '#22d3ee', 'rgba(34, 211, 238, 0.08)'),
-                mkDataset('Sell rate', 'sell_rate', '#34d399', 'transparent'),
-                mkDataset('Buy rate', 'buy_rate', '#a78bfa', 'transparent'),
-                mkDataset('Published mid', 'published_mid', '#64748b', 'transparent'),
+                mkDataset('Mevon mid', 'mevon_mid', '#3C50E0', 'rgba(60, 80, 224, 0.08)'),
+                mkDataset('Sell rate', 'sell_rate', '#059669', 'transparent'),
+                mkDataset('Buy rate', 'buy_rate', '#7c3aed', 'transparent'),
+                mkDataset('Published mid', 'published_mid', '#6b7280', 'transparent'),
             ],
         },
         options: {
@@ -242,13 +239,13 @@
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: {
-                    labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } },
+                    labels: { color: '#374151', boxWidth: 12, font: { size: 11 } },
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    titleColor: '#f1f5f9',
-                    bodyColor: '#e2e8f0',
-                    borderColor: 'rgba(34, 211, 238, 0.3)',
+                    backgroundColor: '#1f2937',
+                    titleColor: '#f9fafb',
+                    bodyColor: '#e5e7eb',
+                    borderColor: '#d1d5db',
                     borderWidth: 1,
                     callbacks: {
                         label: (item) => {
