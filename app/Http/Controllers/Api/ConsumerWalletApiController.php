@@ -182,6 +182,8 @@ class ConsumerWalletApiController extends Controller
                     'available' => $vtuEligible && $vtuConfigured,
                     'airtime_min' => (float) config('vtu.airtime_min', 50),
                     'airtime_max' => (float) config('vtu.airtime_max', 50000),
+                    'daily_limit' => $wallet->isTier1() ? (float) $wallet->tier1DailyOutLimit() : null,
+                    'daily_remaining' => $wallet->isTier1() ? (float) $wallet->tier1DailyOutRemaining() : null,
                 ],
                 'transfer_email_otp_enabled' => (bool) $wallet->transfer_email_otp_enabled,
                 'transfer_email_otp_eligible' => $wallet->isTier2(),

@@ -123,8 +123,16 @@ class ConsumerWalletTransferService
                 $sender->resetDailyTransferIfNeeded();
                 $recv->resetDailyTransferIfNeeded();
 
-                if (! $sender->hasPin() || ! $sender->canDebit($debitAmount)['ok'] || ! $recv->canCredit($creditAmount)['ok']) {
-                    throw new \RuntimeException('limits');
+                if (! $sender->hasPin()) {
+                    throw new \RuntimeException('PIN not set.');
+                }
+                $debitCheck = $sender->canDebit($debitAmount);
+                if (! $debitCheck['ok']) {
+                    throw new \RuntimeException($debitCheck['message'] ?? 'Debit limit exceeded.');
+                }
+                $creditCheck = $recv->canCredit($creditAmount);
+                if (! $creditCheck['ok']) {
+                    throw new \RuntimeException($creditCheck['message'] ?? 'Recipient credit limit exceeded.');
                 }
 
                 $newSenderBal = round((float) $sender->balance - $debitAmount, 2);
@@ -172,6 +180,11 @@ class ConsumerWalletTransferService
             });
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.p2p_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
+
+            $msg = $e->getMessage();
+            if (in_array($msg, ['wallet_missing', 'pair_missing', 'recipient_missing', 'PIN not set.']) || str_starts_with($msg, 'Tier 1') || $msg === 'Insufficient balance.') {
+                return ['ok' => false, 'message' => $msg === 'wallet_missing' || $msg === 'pair_missing' || $msg === 'recipient_missing' ? 'Wallet not found.' : $msg];
+            }
 
             return ['ok' => false, 'message' => 'Send failed (limits or availability).'];
         }
@@ -262,8 +275,11 @@ class ConsumerWalletTransferService
                 }
                 $w->resetDailyTransferIfNeeded();
                 $check = $w->canDebit($amount);
-                if (! $w->hasPin() || ! $check['ok']) {
-                    throw new \RuntimeException('cannot_debit');
+                if (! $w->hasPin()) {
+                    throw new \RuntimeException('PIN not set.');
+                }
+                if (! $check['ok']) {
+                    throw new \RuntimeException($check['message'] ?? 'cannot_debit');
                 }
                 $newBal = round((float) $w->balance - $amount, 2);
                 $w->balance = $newBal;
@@ -296,7 +312,13 @@ class ConsumerWalletTransferService
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.bank_debit_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
 
-            return ['ok' => false, 'message' => 'Could not complete transfer. Check balance and limits.'];
+            $msg = $e->getMessage();
+            if (in_array($msg, ['wallet_missing', 'PIN not set.']) || str_starts_with($msg, 'Tier 1') || $msg === 'Insufficient balance.') {
+                return ['ok' => false, 'message' => $msg === 'wallet_missing' ? 'Wallet not found.' : $msg];
+            }
+
+            $limitMsg = $wallet->isTier1() ? ' and limits' : '';
+            return ['ok' => false, 'message' => "Could not complete transfer. Check balance{$limitMsg}."];
         }
 
         $walletFresh = $wallet->fresh();
@@ -426,8 +448,11 @@ class ConsumerWalletTransferService
                 }
                 $w->resetDailyTransferIfNeeded();
                 $check = $w->canDebit($amount);
-                if (! $w->hasPin() || ! $check['ok']) {
-                    throw new \RuntimeException('cannot_debit');
+                if (! $w->hasPin()) {
+                    throw new \RuntimeException('PIN not set.');
+                }
+                if (! $check['ok']) {
+                    throw new \RuntimeException($check['message'] ?? 'cannot_debit');
                 }
                 $newBal = round((float) $w->balance - $amount, 2);
                 $w->balance = $newBal;
@@ -456,6 +481,10 @@ class ConsumerWalletTransferService
                 ]);
             });
         } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (in_array($msg, ['wallet_missing', 'PIN not set.']) || str_starts_with($msg, 'Tier 1') || $msg === 'Insufficient balance.') {
+                return ['ok' => false, 'message' => $msg === 'wallet_missing' ? 'Wallet not found.' : $msg];
+            }
             return ['ok' => false, 'message' => 'Could not record transfer.'];
         }
 

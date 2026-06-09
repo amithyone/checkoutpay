@@ -298,8 +298,11 @@ class WhatsappWalletVtuPurchaseService
                 }
                 $w->resetDailyTransferIfNeeded();
                 $check = $w->canDebit($amount);
-                if (! $w->hasPin() || ! $check['ok']) {
-                    throw new \RuntimeException('cannot_debit');
+                if (! $w->hasPin()) {
+                    throw new \RuntimeException('PIN not set.');
+                }
+                if (! $check['ok']) {
+                    throw new \RuntimeException($check['message'] ?? 'Debit check failed.');
                 }
                 $newBal = round((float) $w->balance - $amount, 2);
                 $w->balance = $newBal;
@@ -323,7 +326,12 @@ class WhatsappWalletVtuPurchaseService
         } catch (\Throwable $e) {
             Log::warning('whatsapp.wallet.vtu_debit_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
 
-            return ['ok' => false, 'message' => 'Could not debit wallet. Check balance and Tier 1 daily limits.'];
+            $msg = $e->getMessage();
+            if ($msg === 'wallet_missing') {
+                return ['ok' => false, 'message' => 'Wallet not found.'];
+            }
+
+            return ['ok' => false, 'message' => $msg];
         }
 
         return ['ok' => true];
