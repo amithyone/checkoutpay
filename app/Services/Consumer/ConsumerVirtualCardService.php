@@ -103,12 +103,10 @@ final class ConsumerVirtualCardService
     public function status(WhatsappWallet $wallet, bool $forceRefresh = false): array
     {
         $autoFrozen = false;
-        if ($forceRefresh) {
-            $this->refreshProviderCardBalance($wallet);
-            $card = $this->resolveOperableCard($wallet);
-            if ($card !== null) {
-                $autoFrozen = $this->evaluateAutoFreezeForCard($card->fresh());
-            }
+        $this->refreshProviderCardBalance($wallet);
+        $card = $this->resolveOperableCard($wallet);
+        if ($card !== null) {
+            $autoFrozen = $this->evaluateAutoFreezeForCard($card->fresh());
         }
 
         $data = $this->statusPayload($wallet);
@@ -312,7 +310,7 @@ final class ConsumerVirtualCardService
         $reference = 'VCARD-'.strtoupper(Str::random(14));
 
         try {
-            DB::transaction(function () use ($wallet, $feeNgn, $reference, $feeUsd, $sellRate) {
+            DB::transaction(function () use ($wallet, $feeNgn, $reference, $feeUsd, $sellRate, $creationFeeUsd, $initialLoadUsd) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -749,6 +747,9 @@ final class ConsumerVirtualCardService
         if ($cardCode === null) {
             return $empty;
         }
+
+        $this->syncProviderCardBalance($card);
+        $card = $card->fresh();
 
         $api = $this->cardApi->getCardTransactions($cardCode);
         if (! ($api['ok'] ?? false)) {
@@ -1899,7 +1900,7 @@ final class ConsumerVirtualCardService
         $cvv = $this->pickCardDetailString($row, ['cvv', 'cvv2', 'security_code', 'cvc']);
         $expiryMonth = $this->pickCardDetailString($row, ['expiry_month', 'exp_month', 'expiration_month', 'expiryMonth']);
         $expiryYear = $this->pickCardDetailString($row, ['expiry_year', 'exp_year', 'expiration_year', 'expiryYear']);
-        $expiry = $this->pickCardDetailString($row, ['expiry', 'expiry_date', 'expiration', 'exp_date']);
+        $expiry = $this->pickCardDetailString($row, ['expiry', 'expiry_date', 'expiration', 'exp_date', 'expiry_month_year', 'expiryMonthYear']);
 
         if ($expiry === '' && $expiryMonth !== '' && $expiryYear !== '') {
             $year = strlen($expiryYear) === 4 ? substr($expiryYear, -2) : $expiryYear;
@@ -1938,9 +1939,9 @@ final class ConsumerVirtualCardService
             'billing_zip' => $billingParts['zip'],
             'billing_country' => $billingParts['country'],
             'currency' => strtoupper((string) ($row['currency'] ?? 'USD')),
-            'balance_usd' => $this->storedDetails->extractBalanceFromProviderPayload($row)
-                ?? (is_numeric($row['balance_usd'] ?? null) ? (float) $row['balance_usd'] : null)
-                ?? ($card->card_balance_usd !== null ? (float) $card->card_balance_usd : null),
+            'balance_usd' => ($card->card_balance_usd !== null ? (float) $card->card_balance_usd : null)
+                ?? $this->storedDetails->extractBalanceFromProviderPayload($row)
+                ?? (is_numeric($row['balance_usd'] ?? null) ? (float) $row['balance_usd'] : null),
             'status' => (string) ($row['status'] ?? ($card->is_frozen ? 'frozen' : 'active')),
         ];
     }
@@ -1961,12 +1962,73 @@ final class ConsumerVirtualCardService
 
         if (is_string($billing)) {
             $text = trim($billing);
+            if ($text === '') {
+                return [
+                    'street' => '3401 N. Miami, Ave. Ste 230',
+                    'city' => 'Miami',
+                    'state' => 'Florida',
+                    'zip' => '33127',
+                    'country' => 'United States',
+                    'formatted' => '3401 N. Miami, Ave. Ste 230, Miami, Florida, 33127, United States',
+                ];
+            }
 
-            return array_merge($empty, ['formatted' => $text]);
+            $parts = array_map('trim', explode(',', $text));
+            $count = count($parts);
+            if ($count >= 3) {
+                $country = $parts[$count - 1];
+                $zip = '';
+                $state = '';
+                $city = '';
+                
+                if (preg_match('/\d/', $parts[$count - 2])) {
+                    $zip = $parts[$count - 2];
+                    $state = $parts[$count - 3] ?? '';
+                    $city = $parts[$count - 4] ?? '';
+                    $streetParts = array_slice($parts, 0, max(0, $count - 4));
+                } else {
+                    $state = $parts[$count - 2] ?? '';
+                    $city = $parts[$count - 3] ?? '';
+                    $streetParts = array_slice($parts, 0, max(0, $count - 3));
+                }
+
+                $street = implode(', ', $streetParts);
+
+                if ($state === '') {
+                    $state = 'Florida';
+                }
+
+                return [
+                    'street' => $street,
+                    'city' => $city,
+                    'state' => $state,
+                    'zip' => $zip,
+                    'country' => $country,
+                    'formatted' => $text,
+                ];
+            }
+
+            $state = 'Florida';
+            if (preg_match('/\b(Florida|FL)\b/i', $text)) {
+                $state = 'Florida';
+            }
+
+            return array_merge($empty, [
+                'state' => $state,
+                'country' => 'United States',
+                'formatted' => $text,
+            ]);
         }
 
-        if (! is_array($billing)) {
-            return $empty;
+        if (! is_array($billing) || empty($billing)) {
+            return [
+                'street' => '3401 N. Miami, Ave. Ste 230',
+                'city' => 'Miami',
+                'state' => 'Florida',
+                'zip' => '33127',
+                'country' => 'United States',
+                'formatted' => '3401 N. Miami, Ave. Ste 230, Miami, Florida, 33127, United States',
+            ];
         }
 
         $line1 = trim((string) ($billing['address1'] ?? $billing['street'] ?? $billing['line1'] ?? ''));
@@ -1974,8 +2036,22 @@ final class ConsumerVirtualCardService
         $street = trim($line1.($line2 !== '' ? ', '.$line2 : ''));
         $city = trim((string) ($billing['city'] ?? ''));
         $state = trim((string) ($billing['state'] ?? $billing['region'] ?? ''));
+        if ($state === '') {
+            $state = 'Florida';
+        }
         $zip = trim((string) ($billing['zip_code'] ?? $billing['zip'] ?? $billing['postal_code'] ?? ''));
         $country = trim((string) ($billing['country'] ?? ''));
+
+        if ($street === '' && $city === '') {
+            return [
+                'street' => '3401 N. Miami, Ave. Ste 230',
+                'city' => 'Miami',
+                'state' => 'Florida',
+                'zip' => '33127',
+                'country' => 'United States',
+                'formatted' => '3401 N. Miami, Ave. Ste 230, Miami, Florida, 33127, United States',
+            ];
+        }
 
         $labeled = array_filter([
             $street !== '' ? $street : null,

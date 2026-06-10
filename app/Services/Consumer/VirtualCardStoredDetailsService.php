@@ -40,8 +40,19 @@ final class VirtualCardStoredDetailsService
 
         $cardNumber = trim((string) ($data['card_number'] ?? $data['cardNumber'] ?? $data['pan'] ?? ''));
         $cvv = trim((string) ($data['cvv'] ?? $data['cvv2'] ?? ''));
-        $expiry = trim((string) ($data['expiry'] ?? $data['expiry_date'] ?? ''));
+        $expiry = trim((string) ($data['expiry'] ?? $data['expiry_date'] ?? $data['expiry_month_year'] ?? $data['expiryMonthYear'] ?? $data['expiration'] ?? $data['exp_date'] ?? ''));
         $expiry = str_replace('\\/', '/', $expiry);
+
+        $expiryMonth = trim((string) ($data['expiry_month'] ?? $data['exp_month'] ?? $data['expiration_month'] ?? $data['expiryMonth'] ?? ''));
+        $expiryYear = trim((string) ($data['expiry_year'] ?? $data['exp_year'] ?? $data['expiration_year'] ?? $data['expiryYear'] ?? ''));
+
+        if ($expiry === '' && $expiryMonth !== '' && $expiryYear !== '') {
+            $year = strlen($expiryYear) === 4 ? substr($expiryYear, -2) : $expiryYear;
+            $expiry = str_pad($expiryMonth, 2, '0', STR_PAD_LEFT).'/'.$year;
+        }
+        if (preg_match('/^(\d{1,2})\/(\d{4})$/', $expiry, $expiryMatch) === 1) {
+            $expiry = str_pad($expiryMatch[1], 2, '0', STR_PAD_LEFT).'/'.substr($expiryMatch[2], -2);
+        }
 
         if ($cardNumber === '' && $cvv === '' && $expiry === '') {
             return null;
@@ -54,13 +65,15 @@ final class VirtualCardStoredDetailsService
             'card_number' => $cardNumber,
             'cvv' => $cvv,
             'expiry' => $expiry,
+            'expiry_month' => $expiryMonth,
+            'expiry_year' => $expiryYear,
             'last_four' => trim((string) ($data['last4'] ?? $data['last_four'] ?? '')),
             'card_name' => trim((string) ($data['card_name'] ?? $data['name_on_card'] ?? '')),
             'brand' => strtolower(trim((string) ($data['card_brand'] ?? $data['brand'] ?? 'visa'))),
             'card_type' => trim((string) ($data['card_type'] ?? 'virtual')),
             'card_external_id' => trim((string) ($data['card_id'] ?? $data['cardId'] ?? $data['card_code'] ?? '')),
             'card_code' => trim((string) ($data['card_code'] ?? $data['cardCode'] ?? '')),
-            'billing_address' => is_array($billing) ? $billing : null,
+            'billing_address' => (is_array($billing) || is_string($billing)) ? $billing : null,
             'balance_usd' => is_numeric($balance) ? round((float) $balance, 2) : null,
             'provider_reference' => trim((string) ($data['reference'] ?? $data['request_id'] ?? '')),
             'synced_at' => now()->toIso8601String(),
@@ -104,14 +117,14 @@ final class VirtualCardStoredDetailsService
         }
 
         $fromResponse = $this->resolveFromResponsePayload($row);
-        if ($fromResponse !== null) {
+        if ($fromResponse !== null && $this->hasSensitiveFields($fromResponse)) {
             $this->persistExtracted($row, $fromResponse);
 
             return $row->fresh()->card_details_payload;
         }
 
         $fromLogs = $this->resolveFromActivationLogs($row);
-        if ($fromLogs !== null) {
+        if ($fromLogs !== null && $this->hasSensitiveFields($fromLogs)) {
             $this->persistExtracted($row, $fromLogs);
 
             return $row->fresh()->card_details_payload;
@@ -282,8 +295,8 @@ final class VirtualCardStoredDetailsService
     private function hasSensitiveFields(array $stored): bool
     {
         return trim((string) ($stored['card_number'] ?? '')) !== ''
-            || trim((string) ($stored['cvv'] ?? '')) !== ''
-            || trim((string) ($stored['expiry'] ?? '')) !== '';
+            && trim((string) ($stored['cvv'] ?? '')) !== ''
+            && trim((string) ($stored['expiry'] ?? '')) !== '';
     }
 
     /**

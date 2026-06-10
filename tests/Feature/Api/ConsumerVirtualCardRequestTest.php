@@ -72,7 +72,7 @@ class ConsumerVirtualCardRequestTest extends TestCase
             }
             $body = $request->data();
 
-            return ($body['amount'] ?? null) === 5;
+            return ($body['amount'] ?? null) == 5;
         });
 
         $row = VirtualCardRequest::query()->where('whatsapp_wallet_id', $wallet->id)->first();

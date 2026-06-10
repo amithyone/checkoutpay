@@ -384,6 +384,137 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.billing_country', 'United States');
     }
 
+    public function test_card_details_defaults_empty_billing_state_to_florida_and_parses_expiry_month_year(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_details_payload' => [
+                'card_number' => '4288520141503096',
+                'cvv' => '486',
+                'expiry' => '',
+                'expiry_month_year' => '06/29',
+                'last_four' => '3096',
+                'card_name' => 'Test User',
+                'brand' => 'visa',
+                'balance_usd' => 5,
+                'billing_address' => [
+                    'street' => '3401 N. Miami, Ave. Ste 230',
+                    'city' => 'Miami',
+                    'state' => '',
+                    'country' => 'United States',
+                    'zip_code' => '33127',
+                ],
+            ],
+            'card_balance_usd' => 5,
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'VCARD-TEST-001',
+                    'card_code' => 'VCARD2026060611150700359',
+                    'card_number' => '4288520141503096',
+                    'cvv' => '486',
+                    'expiry_month_year' => '06/29',
+                    'balance' => 5,
+                    'billing_address' => [
+                        'street' => '3401 N. Miami, Ave. Ste 230',
+                        'city' => 'Miami',
+                        'state' => '',
+                        'country' => 'United States',
+                        'zip_code' => '33127',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.card_number', '4288520141503096')
+            ->assertJsonPath('data.cvv', '486')
+            ->assertJsonPath('data.expiry', '06/29')
+            ->assertJsonPath('data.billing_city', 'Miami')
+            ->assertJsonPath('data.billing_state', 'Florida')
+            ->assertJsonPath('data.billing_zip', '33127')
+            ->assertJsonPath('data.billing_country', 'United States');
+    }
+
+    public function test_card_details_parses_string_billing_address(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_details_payload' => [
+                'card_number' => '4288520141503096',
+                'cvv' => '486',
+                'expiry' => '06/29',
+                'last_four' => '3096',
+                'card_name' => 'Test User',
+                'brand' => 'visa',
+                'balance_usd' => 5,
+                'billing_address' => '3401 N. Miami, Ave. Ste 230, Miami, Florida, 33127, United States',
+            ],
+            'card_balance_usd' => 10.50,
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.balance_usd', 10.50)
+            ->assertJsonPath('data.billing_street', '3401 N. Miami, Ave. Ste 230')
+            ->assertJsonPath('data.billing_city', 'Miami')
+            ->assertJsonPath('data.billing_state', 'Florida')
+            ->assertJsonPath('data.billing_zip', '33127')
+            ->assertJsonPath('data.billing_country', 'United States');
+    }
+
+    public function test_card_details_parses_split_expiry_month_and_year_from_webhook(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'VCARD-TEST-001',
+                    'card_code' => 'VCARD2026060611150700359',
+                    'card_number' => '4288520141503096',
+                    'cvv' => '486',
+                    'exp_month' => '6',
+                    'exp_year' => '2029',
+                    'balance' => 5,
+                    'billing_address' => '3401 N. Miami, Ave. Ste 230, Miami, Florida, 33127, United States',
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.card_number', '4288520141503096')
+            ->assertJsonPath('data.cvv', '486')
+            ->assertJsonPath('data.expiry', '06/29')
+            ->assertJsonPath('data.billing_street', '3401 N. Miami, Ave. Ste 230')
+            ->assertJsonPath('data.billing_city', 'Miami')
+            ->assertJsonPath('data.billing_state', 'Florida')
+            ->assertJsonPath('data.billing_zip', '33127')
+            ->assertJsonPath('data.billing_country', 'United States');
+    }
+
+
     public function test_card_details_backfills_from_orphan_webhook_log_by_card_id(): void
     {
         [, $account, $card] = $this->walletWithActiveCard(returnCard: true);

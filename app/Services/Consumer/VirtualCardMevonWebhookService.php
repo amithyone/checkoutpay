@@ -18,6 +18,8 @@ final class VirtualCardMevonWebhookService
 
     public const RESULT_FEE_COLLECTION_FAILED = 'fee_collection_failed';
 
+    public const RESULT_TOPUP_SUCCESS = 'topup_success';
+
     public function __construct(
         private VirtualCardProviderResponseService $providerResponse,
         private VirtualCardRequestLogService $cardLogs,
@@ -44,6 +46,11 @@ final class VirtualCardMevonWebhookService
      */
     public function handleWebhook(array $payload, array $ingress = []): string
     {
+        $event = $this->extractWebhookEvent($payload);
+        if ($this->isTopupEvent($event)) {
+            return $this->handleTopupWebhook($payload, isset($ingress['raw_body']) ? (string) $ingress['raw_body'] : null);
+        }
+
         if (! $this->isCardEvent($payload)) {
             return self::RESULT_NOT_CARD;
         }
@@ -118,6 +125,87 @@ final class VirtualCardMevonWebhookService
         }
 
         return $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
+    }
+
+    private function isTopupEvent(string $event): bool
+    {
+        return in_array($event, [
+            'card.topup.success',
+            'card.topup',
+            'card_topup',
+            'virtual_card.topup',
+        ], true) || (str_contains($event, 'card') && str_contains($event, 'topup'));
+    }
+
+    private function handleTopupWebhook(array $payload, ?string $rawBody = null): string
+    {
+        $data = $payload['data'] ?? $payload;
+        if (! is_array($data)) {
+            return self::RESULT_NO_MATCH;
+        }
+
+        $cardCode = trim((string) ($data['card_code'] ?? $data['card_id'] ?? $data['cardCode'] ?? ''));
+        $reference = trim((string) ($data['reference'] ?? ''));
+        $newBalance = $data['new_balance'] ?? $data['balance'] ?? null;
+
+        if ($cardCode === '') {
+            return self::RESULT_NO_MATCH;
+        }
+
+        if ($reference !== '' && \Illuminate\Support\Facades\Cache::has('vcard:topup:processed:'.$reference)) {
+            $this->cardLogs->info('webhook_topup_ignored', 'Topup webhook ignored (already processed in cache)', null, [
+                'reference' => $reference,
+                'card_code' => $cardCode,
+            ]);
+
+            return self::RESULT_TOPUP_SUCCESS;
+        }
+
+        $card = VirtualCardRequest::query()
+            ->where('card_external_id', $cardCode)
+            ->orWhere('card_details_payload->card_code', $cardCode)
+            ->first();
+
+        if (! $card) {
+            $this->cardLogs->warning('webhook_topup_no_match', 'Card topup webhook matched no card request', null, [
+                'reference' => $reference,
+                'card_code' => $cardCode,
+            ]);
+
+            return self::RESULT_NO_MATCH;
+        }
+
+        $lastPayload = $card->last_operation_payload;
+        if (is_array($lastPayload)) {
+            $encoded = json_encode($lastPayload);
+            if (is_string($encoded) && $reference !== '' && str_contains($encoded, $reference)) {
+                if ($reference !== '') {
+                    \Illuminate\Support\Facades\Cache::put('vcard:topup:processed:'.$reference, true, now()->addDays(30));
+                }
+                $this->cardLogs->info('webhook_topup_ignored', 'Topup webhook ignored (already processed in sync)', $card, [
+                    'reference' => $reference,
+                    'card_code' => $cardCode,
+                ]);
+
+                return self::RESULT_TOPUP_SUCCESS;
+            }
+        }
+
+        if ($newBalance !== null && is_numeric($newBalance)) {
+            $card->update(['card_balance_usd' => round((float) $newBalance, 2)]);
+        }
+
+        if ($reference !== '') {
+            \Illuminate\Support\Facades\Cache::put('vcard:topup:processed:'.$reference, true, now()->addDays(30));
+        }
+
+        $this->cardLogs->info('webhook_topup_success', 'Card topup confirmed from MevonPay webhook', $card, [
+            'reference' => $reference,
+            'card_code' => $cardCode,
+            'new_balance' => $newBalance,
+        ], $card->whatsapp_wallet_id);
+
+        return self::RESULT_TOPUP_SUCCESS;
     }
 
     /**

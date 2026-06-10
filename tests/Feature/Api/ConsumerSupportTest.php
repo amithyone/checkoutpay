@@ -159,6 +159,7 @@ class ConsumerSupportTest extends TestCase
             'issue_type' => 'general',
             'consent_accepted' => true,
         ])
+            ->dump()
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.wallet_linked', true)

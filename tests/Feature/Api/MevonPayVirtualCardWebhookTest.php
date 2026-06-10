@@ -388,4 +388,55 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('message', 'Card webhook received; no matching virtual card request found');
     }
+
+    public function test_card_topup_success_webhook_updates_balance_once(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348148790554',
+            'display_name' => 'Reviewer',
+            'balance' => 30000,
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        $card = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_ACTIVE,
+            'card_external_id' => 'VCARD2026060611150700359',
+            'fee_usd' => 5,
+            'fee_ngn' => 8000,
+            'card_balance_usd' => 10,
+        ]);
+
+        $payload = [
+            'event' => 'card.topup.success',
+            'data' => [
+                'card_code' => 'VCARD2026060611150700359',
+                'last4' => '3096',
+                'new_balance' => 138,
+                'reference' => '766f5cdb-9956-4cec-af77-b520f624acc3',
+                'timestamp' => '2026-06-10T10:39:29+01:00',
+            ],
+        ];
+
+        // 1. Process webhook first time
+        $response = $this->postJson('/api/v1/webhook/mevonpay', $payload);
+
+        $response->assertOk()
+            ->assertJsonPath('message', 'Card topup processed');
+
+        $card->refresh();
+        $this->assertSame(138.0, (float) $card->card_balance_usd);
+
+        // Modify balance locally to verify duplicate webhook is ignored and doesn't reset it
+        $card->update(['card_balance_usd' => 200]);
+
+        // 2. Process webhook second time
+        $response = $this->postJson('/api/v1/webhook/mevonpay', $payload);
+
+        $response->assertOk()
+            ->assertJsonPath('message', 'Card topup processed');
+
+        $card->refresh();
+        $this->assertSame(200.0, (float) $card->card_balance_usd); // balance remained 200, webhook ignored
+    }
 }
