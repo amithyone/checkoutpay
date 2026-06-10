@@ -643,6 +643,10 @@ final class ConsumerVirtualCardService
         }
 
         $card = $gate['card'];
+        
+        // Sync fresh card balance from provider
+        $this->refreshProviderCardBalance($wallet);
+
         $stored = $this->storedDetails->resolveForRequest($card);
 
         if ($stored === null) {
