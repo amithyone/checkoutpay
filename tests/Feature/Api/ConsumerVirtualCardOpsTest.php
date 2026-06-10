@@ -342,6 +342,38 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.sell_rate', 1648);
     }
 
+    public function test_card_details_returns_stored_payload_without_calling_mevon(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_details_payload' => [
+                'card_number' => '4288520141503096',
+                'cvv' => '486',
+                'expiry' => '06/29',
+                'last_four' => '3096',
+                'card_name' => 'Test User',
+                'brand' => 'visa',
+                'balance_usd' => 5,
+            ],
+            'card_balance_usd' => 5,
+        ]);
+
+        Http::fake([
+            'https://mevon.test/*' => Http::response(['message' => 'provider down'], 500),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.card_number', '4288520141503096')
+            ->assertJsonPath('data.cvv', '486');
+        Http::assertSentCount(0);
+    }
+
     public function test_card_details_requires_pin_and_returns_stored_webhook_fields(): void
     {
         [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
