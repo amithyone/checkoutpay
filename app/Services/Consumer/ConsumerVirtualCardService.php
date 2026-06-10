@@ -1469,6 +1469,16 @@ final class ConsumerVirtualCardService
         }
 
         $card = $gate['card'];
+        if ($action === 'unfreeze') {
+            $balance = $card->card_balance_usd !== null ? (float) $card->card_balance_usd : 0.0;
+            if ($balance <= 4.0) {
+                return [
+                    'ok' => false,
+                    'message' => 'Your card balance must be greater than $4 to unfreeze it.',
+                ];
+            }
+        }
+
         $cardCode = $this->resolveProviderCardCode($card);
         if ($cardCode === null) {
             return ['ok' => false, 'message' => 'Could not resolve card for status update.'];
@@ -2609,6 +2619,17 @@ final class ConsumerVirtualCardService
             'card_balance_usd' => $finalBalance,
             'reconciliation_pending' => $pending,
         ]);
+
+        if ($finalBalance <= 0.0 && ! $card->is_frozen && trim((string) $card->card_external_id) !== '') {
+            $cardCode = $this->resolveProviderCardCode($card);
+            if ($cardCode !== null) {
+                $api = $this->cardApi->setCardStatus('freeze', $cardCode);
+                if ($api['ok'] ?? false) {
+                    $card->update(['is_frozen' => true]);
+                    $this->cardLogs->info('auto_freeze_zero_balance', 'Card auto-frozen because reconciled balance reached $0.', $card, [], $card->whatsapp_wallet_id);
+                }
+            }
+        }
     }
 
     public function isReconciliationPending(VirtualCardRequest $card, ?float $providerBalance = null): bool

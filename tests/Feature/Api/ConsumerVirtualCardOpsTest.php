@@ -956,6 +956,121 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $this->assertTrue($card->reconciliation_pending);
     }
 
+    public function test_card_auto_freezes_when_reconciled_balance_reaches_zero(): void
+    {
+        [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+
+        // Card starts with $37, but has a pending spend of $37
+        $card->update([
+            'card_balance_usd' => 37,
+            'is_frozen' => false,
+            'request_payload' => ['amount' => 37],
+            'card_external_id' => 'VCARD2026060611150700359',
+            'provider_reference' => 'REQ123456',
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+                'card_number' => '4288520141503096',
+                'cvv' => '486',
+                'expiry' => '06/2029',
+                'last_four' => '3096',
+                'card_name' => 'Test User',
+                'brand' => 'visa',
+                'balance_usd' => 37,
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'status' => 'success',
+                'data' => ['balance' => 37],
+            ], 200),
+            'https://mevon.test/V1/card_status' => Http::response([
+                'status' => 'success',
+                'message' => 'Card frozen successfully',
+            ], 200),
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    [
+                        'code' => 'TXN001',
+                        'reference' => 'ref-spend-1',
+                        'drcr' => 'DR',
+                        'amount' => 37.0,
+                        'status' => 'completed',
+                        'category' => 'Card Purchase',
+                        'description' => 'Netflix.com',
+                        'createdOn' => '2026-06-10T10:39:29+01:00',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        // Fetching details forces sync, which recalculates balance and triggers auto-freeze
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk();
+        $this->assertTrue($card->fresh()->is_frozen);
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://mevon.test/V1/card_status'
+                && ($request->data()['action'] ?? '') === 'freeze'
+                && ($request->data()['card_code'] ?? '') === 'VCARD2026060611150700359';
+        });
+    }
+
+    public function test_unfreeze_fails_if_reconciled_balance_is_four_or_less(): void
+    {
+        [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_balance_usd' => 4.0,
+            'is_frozen' => true,
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/status', [
+            'pin' => '2468',
+            'action' => 'unfreeze',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('message', 'Your card balance must be greater than $4 to unfreeze it.');
+        $this->assertTrue($card->fresh()->is_frozen);
+    }
+
+    public function test_unfreeze_succeeds_if_reconciled_balance_is_greater_than_four(): void
+    {
+        [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_balance_usd' => 4.01,
+            'is_frozen' => true,
+            'card_external_id' => 'VCARD2026060611150700359',
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_status' => Http::response([
+                'status' => 'success',
+                'message' => 'Card unfrozen successfully',
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/status', [
+            'pin' => '2468',
+            'action' => 'unfreeze',
+        ]);
+
+        $response->assertOk();
+        $this->assertFalse($card->fresh()->is_frozen);
+    }
+
     /**
      * @return array{0: WhatsappWallet, 1: ConsumerWalletApiAccount, 2?: VirtualCardRequest}
      */
