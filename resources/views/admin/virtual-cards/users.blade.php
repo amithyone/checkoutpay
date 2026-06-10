@@ -83,6 +83,11 @@
                         </td>
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">
                             ${{ number_format($card->card_balance_usd ?? 0, 2) }}
+                            @if($card->reconciliation_pending)
+                                <span class="text-[10px] text-amber-600 font-semibold flex items-center mt-1" title="MevonPay has a higher stale balance. Displaying locally calculated balance.">
+                                    <i class="fas fa-clock mr-1 animate-pulse"></i> RECONCILED
+                                </span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500">
                             {{ $card->activated_at ? $card->activated_at->format('M d, Y H:i') : '—' }}

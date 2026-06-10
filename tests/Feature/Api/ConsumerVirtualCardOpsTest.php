@@ -882,6 +882,80 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $this->assertFalse($card->fresh()->auto_freeze_on_decline);
     }
 
+    public function test_balance_reconciliation_applies_spend_deduction_and_sets_pending_flag(): void
+    {
+        [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+
+        // Set card starting balance to $138 on database, and mock MevonPay details balance also returning $138 (stale)
+        $card->update([
+            'card_balance_usd' => 138,
+            'request_payload' => ['amount' => 138],
+            'card_external_id' => 'VCARD2026060611150700359',
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+                'card_number' => '4288520141503096',
+                'cvv' => '486',
+                'expiry' => '06/2029',
+                'last_four' => '3096',
+                'card_name' => 'Test User',
+                'brand' => 'visa',
+                'balance_usd' => 138,
+            ],
+        ]);
+
+        // Mock MevonPay endpoints: getCardDetails (stale balance 138) and getCardTransactions (with a successful spend of $37)
+        Http::fake([
+            'https://mevon.test/V1/card_details' => Http::response([
+                'success' => true,
+                'data' => [
+                    'card_id' => 'bab449bb-15e9-404a-aa73-657519df4794',
+                    'card_code' => 'VCARD2026060611150700359',
+                    'balance' => 138,
+                ],
+            ], 200),
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'balance' => 138,
+                ],
+            ], 200),
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    [
+                        'code' => 'TXN001',
+                        'reference' => 'ref-spend-1',
+                        'drcr' => 'DR',
+                        'amount' => 37.0,
+                        'status' => 'completed',
+                        'category' => 'Card Purchase',
+                        'description' => 'Netflix.com',
+                        'createdOn' => '2026-06-10T10:39:29+01:00',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        // Call the details endpoint, which will trigger sync and refresh balance
+        $response = $this->postJson('/api/v1/consumer/cards/details', [
+            'pin' => '2468',
+        ]);
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        // We expect the balance to be reconciled: 138 (initial load) - 37 (Netflix spend) = 101.
+        $this->assertEquals(101, $data['balance_usd']);
+        $this->assertTrue($data['reconciliation_pending']);
+
+        // Verify the database was updated with the correct reconciled balance and pending flag
+        $card->refresh();
+        $this->assertEquals(101.0, (float) $card->card_balance_usd);
+        $this->assertTrue($card->reconciliation_pending);
+    }
+
     /**
      * @return array{0: WhatsappWallet, 1: ConsumerWalletApiAccount, 2?: VirtualCardRequest}
      */

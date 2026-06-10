@@ -16,6 +16,8 @@ use Illuminate\Support\Str;
 
 final class ConsumerVirtualCardService
 {
+    private array $transactionsCache = [];
+
     public function __construct(
         private MevonPayCardApiClient $cardApi,
         private VirtualCardFxService $fx,
@@ -719,7 +721,7 @@ final class ConsumerVirtualCardService
             if ($api['ok'] ?? false) {
                 $balance = $this->storedDetails->extractBalanceFromProviderPayload($api['raw'] ?? $api);
                 if ($balance !== null) {
-                    $card->update(['card_balance_usd' => $balance]);
+                    $this->updateReconciledBalance($card, $balance);
 
                     return;
                 }
@@ -755,7 +757,7 @@ final class ConsumerVirtualCardService
         $this->syncProviderCardBalance($card);
         $card = $card->fresh();
 
-        $api = $this->cardApi->getCardTransactions($cardCode);
+        $api = $this->getCardTransactionsCached($cardCode);
         if (! ($api['ok'] ?? false)) {
             Log::warning('consumer.virtual_card.transactions_mevon_failed', [
                 'virtual_card_request_id' => $card->id,
@@ -818,7 +820,7 @@ final class ConsumerVirtualCardService
             return false;
         }
 
-        $api = $this->cardApi->getCardTransactions($cardCode);
+        $api = $this->getCardTransactionsCached($cardCode);
         if (! ($api['ok'] ?? false)) {
             return false;
         }
@@ -1445,7 +1447,7 @@ final class ConsumerVirtualCardService
 
         $balance = $this->storedDetails->extractBalanceFromProviderPayload($payload);
         if ($balance !== null) {
-            $card->update(['card_balance_usd' => $balance]);
+            $this->updateReconciledBalance($card, $balance);
         }
 
         return $this->storedDetails->resolveForRequest($card->fresh());
@@ -1634,7 +1636,7 @@ final class ConsumerVirtualCardService
     ): void {
         $fromResponse = $this->storedDetails->extractBalanceFromProviderPayload($api['raw'] ?? $api['data'] ?? $api);
         if ($fromResponse !== null) {
-            $card->update(['card_balance_usd' => $fromResponse]);
+            $this->updateReconciledBalance($card, $fromResponse);
 
             return;
         }
@@ -1643,7 +1645,7 @@ final class ConsumerVirtualCardService
         $this->fetchAndStoreProviderCardDetails($card);
         $afterFetch = $this->readStoredCardBalanceUsd($card->fresh());
         if ($afterFetch !== null && ($before === null || abs($afterFetch - $before) >= 0.01)) {
-            $card->update(['card_balance_usd' => $afterFetch]);
+            $this->updateReconciledBalance($card, $afterFetch);
 
             return;
         }
@@ -1656,7 +1658,7 @@ final class ConsumerVirtualCardService
         $next = $direction === 'credit'
             ? round($current + $amountUsd, 2)
             : max(0.0, round($current - $amountUsd, 2));
-        $card->update(['card_balance_usd' => $next]);
+        $this->updateReconciledBalance($card, $next);
     }
 
     private function readStoredCardBalanceUsd(VirtualCardRequest $card): ?float
@@ -1946,6 +1948,7 @@ final class ConsumerVirtualCardService
             'balance_usd' => ($card->card_balance_usd !== null ? (float) $card->card_balance_usd : null)
                 ?? $this->storedDetails->extractBalanceFromProviderPayload($row)
                 ?? (is_numeric($row['balance_usd'] ?? null) ? (float) $row['balance_usd'] : null),
+            'reconciliation_pending' => (bool) $card->reconciliation_pending,
             'status' => (string) ($row['status'] ?? ($card->is_frozen ? 'frozen' : 'active')),
         ];
     }
@@ -2165,6 +2168,7 @@ final class ConsumerVirtualCardService
             'card_external_id' => $row->card_external_id,
             'card_last_four' => $lastFour,
             'card_balance_usd' => $row->card_balance_usd !== null ? (float) $row->card_balance_usd : null,
+            'reconciliation_pending' => (bool) $row->reconciliation_pending,
             'is_frozen' => (bool) $row->is_frozen,
             'auto_freeze_on_decline' => (bool) ($row->auto_freeze_on_decline ?? true),
             'can_manage' => $canManage,
@@ -2457,5 +2461,167 @@ final class ConsumerVirtualCardService
     private function looksLikeMevonCardCode(string $value): bool
     {
         return preg_match('/^VCARD/i', $value) === 1;
+    }
+
+    private function getCardTransactionsCached(string $cardCode): array
+    {
+        if (isset($this->transactionsCache[$cardCode])) {
+            return $this->transactionsCache[$cardCode];
+        }
+
+        $api = $this->cardApi->getCardTransactions($cardCode);
+        $this->transactionsCache[$cardCode] = $api;
+
+        return $api;
+    }
+
+    private function isSuccessfulSpend(array $row): bool
+    {
+        if ($this->isMevonDeclinedRow($row)) {
+            return false;
+        }
+
+        $category = strtolower(trim((string) ($row['category'] ?? '')));
+        $status = strtolower(trim((string) ($row['status'] ?? '')));
+        if (str_contains($category, 'reversed') || str_contains($status, 'reversed')) {
+            return false;
+        }
+
+        $drcr = strtoupper(trim((string) ($row['drcr'] ?? 'DR')));
+
+        return $drcr === 'DR';
+    }
+
+    private function isSuccessfulReversal(array $row): bool
+    {
+        if ($this->isMevonDeclinedRow($row)) {
+            return false;
+        }
+
+        $drcr = strtoupper(trim((string) ($row['drcr'] ?? 'DR')));
+        if ($drcr !== 'CR') {
+            return false;
+        }
+
+        $category = strtolower(trim((string) ($row['category'] ?? '')));
+        if (str_contains($category, 'topup') || str_contains($category, 'load') || str_contains($category, 'fund')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function getReconciledBalance(VirtualCardRequest $card, float $providerBalance): float
+    {
+        $cardCode = $this->resolveProviderCardCode($card);
+        if ($cardCode === null) {
+            return $providerBalance;
+        }
+
+        $initialLoadUsd = 0.0;
+        if (is_array($card->request_payload) && isset($card->request_payload['amount'])) {
+            $initialLoadUsd = (float) $card->request_payload['amount'];
+        } else {
+            $feeTxn = WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $card->whatsapp_wallet_id)
+                ->where('external_reference', $card->external_reference)
+                ->where('type', WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE)
+                ->first();
+            if ($feeTxn && is_array($feeTxn->meta) && isset($feeTxn->meta['initial_load_usd'])) {
+                $initialLoadUsd = (float) $feeTxn->meta['initial_load_usd'];
+            }
+        }
+        if ($initialLoadUsd <= 0) {
+            $initialLoadUsd = $this->initialLoadUsd();
+        }
+
+        $topupTxns = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $card->whatsapp_wallet_id)
+            ->where('type', WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_TOPUP)
+            ->get();
+
+        $totalTopups = 0.0;
+        foreach ($topupTxns as $txn) {
+            $meta = is_array($txn->meta) ? $txn->meta : [];
+            if (! empty($meta['refunded'])) {
+                continue;
+            }
+            $txnCardCode = trim((string) ($meta['card_code'] ?? ''));
+            if ($txnCardCode === '' || $txnCardCode === $cardCode) {
+                $totalTopups += (float) ($meta['amount_usd'] ?? 0);
+            }
+        }
+
+        $withdrawTxns = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $card->whatsapp_wallet_id)
+            ->where('type', WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_WITHDRAW)
+            ->get();
+
+        $totalWithdrawals = 0.0;
+        foreach ($withdrawTxns as $txn) {
+            $meta = is_array($txn->meta) ? $txn->meta : [];
+            if (! empty($meta['refunded'])) {
+                continue;
+            }
+            $txnCardCode = trim((string) ($meta['card_code'] ?? ''));
+            if ($txnCardCode === '' || $txnCardCode === $cardCode) {
+                $totalWithdrawals += (float) ($meta['amount_usd'] ?? 0);
+            }
+        }
+
+        $totalSpends = 0.0;
+        $totalReversals = 0.0;
+
+        $api = $this->getCardTransactionsCached($cardCode);
+        if ($api['ok'] ?? false) {
+            $rows = $this->normalizeMevonTransactionList($api['data'] ?? null);
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $amount = is_numeric($row['amount'] ?? null) ? round((float) $row['amount'], 2) : 0.0;
+                $fee = is_numeric($row['fee'] ?? null) ? round((float) $row['fee'], 2) : 0.0;
+
+                if ($this->isSuccessfulSpend($row)) {
+                    $totalSpends += ($amount + $fee);
+                } elseif ($this->isSuccessfulReversal($row)) {
+                    $totalReversals += $amount;
+                }
+            }
+        }
+
+        if ($totalSpends === 0.0 && $totalReversals === 0.0) {
+            return $providerBalance;
+        }
+
+        $calculated = round($initialLoadUsd + $totalTopups - $totalWithdrawals - $totalSpends + $totalReversals, 2);
+
+        return max(0.0, $calculated);
+    }
+
+    public function updateReconciledBalance(VirtualCardRequest $card, float $providerBalance): void
+    {
+        $reconciled = $this->getReconciledBalance($card, $providerBalance);
+        $finalBalance = min($providerBalance, $reconciled);
+        $pending = $providerBalance > $reconciled;
+
+        $card->update([
+            'card_balance_usd' => $finalBalance,
+            'reconciliation_pending' => $pending,
+        ]);
+    }
+
+    public function isReconciliationPending(VirtualCardRequest $card, ?float $providerBalance = null): bool
+    {
+        if ($providerBalance === null) {
+            $providerBalance = $this->readStoredCardBalanceUsd($card);
+        }
+        if ($providerBalance === null) {
+            return false;
+        }
+
+        $reconciled = $this->getReconciledBalance($card, $providerBalance);
+
+        return $providerBalance > $reconciled;
     }
 }

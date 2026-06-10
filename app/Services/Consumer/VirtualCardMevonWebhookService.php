@@ -192,7 +192,7 @@ final class VirtualCardMevonWebhookService
         }
 
         if ($newBalance !== null && is_numeric($newBalance)) {
-            $card->update(['card_balance_usd' => round((float) $newBalance, 2)]);
+            $this->cards->updateReconciledBalance($card, round((float) $newBalance, 2));
         }
 
         if ($reference !== '') {
