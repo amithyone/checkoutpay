@@ -6,6 +6,7 @@ use App\Models\Admin;
 use App\Models\VirtualCardRequest;
 use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFeeRefundService;
 use App\Services\Consumer\VirtualCardProviderResponseService;
 use App\Services\MevonPay\MevonPayCardApiClient;
@@ -60,18 +61,58 @@ final class AdminVirtualCardService
             ->withQueryString();
     }
 
+    public function usersQuery(Request $request): LengthAwarePaginator
+    {
+        $query = VirtualCardRequest::query()
+            ->where('status', VirtualCardRequest::STATUS_ACTIVE);
+
+        $q = trim($request->string('q')->toString());
+        if ($q !== '') {
+            $query->where(function (Builder $inner) use ($q) {
+                $inner->where('external_reference', 'like', '%'.$q.'%')
+                    ->orWhere('card_name', 'like', '%'.$q.'%')
+                    ->orWhere('card_external_id', 'like', '%'.$q.'%')
+                    ->orWhereHas('wallet', function (Builder $w) use ($q) {
+                        $w->where('phone_e164', 'like', '%'.$q.'%')
+                            ->orWhere('kyc_fname', 'like', '%'.$q.'%')
+                            ->orWhere('kyc_lname', 'like', '%'.$q.'%');
+                    });
+            });
+        }
+
+        return $query->with('wallet')
+            ->latest('activated_at')
+            ->paginate(20)
+            ->withQueryString();
+    }
+
     /**
-     * @return array{card: VirtualCardRequest, feeTransaction: ?WhatsappWalletTransaction, canMarkActive: bool, canMarkFailed: bool, canRetry: bool, canRefund: bool}
+     * @return array{card: VirtualCardRequest, feeTransaction: ?WhatsappWalletTransaction, canMarkActive: bool, canMarkFailed: bool, canRetry: bool, canRefund: bool, cardTransactions: array}
      */
     public function showContext(VirtualCardRequest $card): array
     {
         $card->load(['wallet', 'handledBy', 'logs']);
         $feeTxn = $this->feeTransaction($card);
 
+        $cardTransactions = [];
+        if ($card->status === VirtualCardRequest::STATUS_ACTIVE && $card->wallet) {
+            try {
+                $consumerService = app(ConsumerVirtualCardService::class);
+                $txnFetch = $consumerService->fetchMevonCardTransactions($card->wallet);
+                $cardTransactions = $txnFetch['items'] ?? [];
+            } catch (\Exception $e) {
+                \Log::warning('admin.virtual_card.show_transactions_failed', [
+                    'card_id' => $card->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return [
             'card' => $card,
             'feeTransaction' => $feeTxn,
             'requestLogs' => $card->logs()->limit(100)->get(),
+            'cardTransactions' => $cardTransactions,
             'canMarkActive' => $this->canMarkActive($card),
             'canMarkFailed' => $this->canMarkFailed($card),
             'canRetry' => $this->canRetry($card),

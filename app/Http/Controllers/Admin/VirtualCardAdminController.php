@@ -75,6 +75,13 @@ class VirtualCardAdminController extends Controller
         ]);
     }
 
+    public function users(Request $request): View
+    {
+        return view('admin.virtual-cards.users', [
+            'cards' => $this->cards->usersQuery($request),
+        ]);
+    }
+
     public function stats(Request $request): View
     {
         return view('admin.virtual-cards.stats', [

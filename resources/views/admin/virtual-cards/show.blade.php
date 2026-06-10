@@ -190,6 +190,57 @@
         @endif
     </div>
 
+    @if($card->status === \App\Models\VirtualCardRequest::STATUS_ACTIVE)
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Card transaction history (MevonPay)</h3>
+        @if(!empty($cardTransactions))
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-left">
+                        <tr>
+                            <th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">When</th>
+                            <th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Merchant / Description</th>
+                            <th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Type</th>
+                            <th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-4 py-3 text-xs font-medium text-gray-500 uppercase text-right">Amount (USD)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($cardTransactions as $txn)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 whitespace-nowrap text-gray-600">
+                                {{ !empty($txn['created_at']) ? \Carbon\Carbon::parse($txn['created_at'])->format('Y-m-d H:i') : '—' }}
+                            </td>
+                            <td class="px-4 py-3 text-gray-900 font-medium">
+                                {{ $txn['label'] ?? '—' }}
+                                @if(!empty($txn['reference']))
+                                    <span class="text-xs text-gray-400 block font-mono">Ref: {{ $txn['reference'] }}</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-xs text-gray-600 font-mono">
+                                {{ strtoupper($txn['type'] ?? 'payment') }} ({{ $txn['direction'] ?? 'debit' }})
+                            </td>
+                            <td class="px-4 py-3">
+                                @if(($txn['status'] ?? 'success') === 'success')
+                                    <span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-semibold">Success</span>
+                                @else
+                                    <span class="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded font-semibold">{{ ucfirst($txn['status'] ?? 'failed') }}</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-right font-medium {{ ($txn['direction'] ?? 'debit') === 'credit' ? 'text-green-700' : 'text-gray-900' }}">
+                                {{ ($txn['direction'] ?? 'debit') === 'credit' ? '+' : '-' }}${{ number_format((float) ($txn['amount_usd'] ?? 0), 2) }}
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="text-sm text-gray-500">No card transactions found from MevonPay.</p>
+        @endif
+    </div>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 class="text-sm font-semibold text-gray-900 mb-2">Request payload</h3>

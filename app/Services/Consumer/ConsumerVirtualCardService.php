@@ -738,7 +738,7 @@ final class ConsumerVirtualCardService
     /**
      * @return array{items: list<array<string, mixed>>, auto_frozen: bool}
      */
-    private function fetchMevonCardTransactions(WhatsappWallet $wallet): array
+    public function fetchMevonCardTransactions(WhatsappWallet $wallet): array
     {
         $empty = ['items' => [], 'auto_frozen' => false];
 

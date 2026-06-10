@@ -281,6 +281,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('virtual-cards/rate-tracker/sell-usd', [VirtualCardAdminController::class, 'sellUsdOnRateTracker'])->name('virtual-cards.rate-tracker.sell-usd');
             Route::post('virtual-cards/rate-tracker/refresh', [VirtualCardAdminController::class, 'refreshRateTracker'])->name('virtual-cards.rate-tracker.refresh');
             Route::get('virtual-cards/logs/events', [VirtualCardAdminController::class, 'logs'])->name('virtual-cards.logs');
+            Route::get('virtual-cards/users', [VirtualCardAdminController::class, 'users'])->name('virtual-cards.users');
             Route::get('virtual-cards/{virtualCardRequest}', [VirtualCardAdminController::class, 'show'])->name('virtual-cards.show');
             Route::post('virtual-cards/{virtualCardRequest}/notes', [VirtualCardAdminController::class, 'updateNotes'])->name('virtual-cards.update-notes');
             Route::post('virtual-cards/{virtualCardRequest}/mark-active', [VirtualCardAdminController::class, 'markActive'])->name('virtual-cards.mark-active');

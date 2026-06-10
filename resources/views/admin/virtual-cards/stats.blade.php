@@ -18,6 +18,9 @@
             <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-gray-600 hover:text-gray-900 font-medium">
                 <i class="fas fa-arrow-left mr-1"></i> Card management
             </a>
+            <a href="{{ route('admin.virtual-cards.users') }}" class="text-sm text-violet-700 hover:underline font-medium">
+                <i class="fas fa-users mr-1"></i> Card users
+            </a>
             <a href="{{ route('admin.virtual-cards.rate-tracker') }}" class="text-sm text-cyan-700 hover:underline font-medium">
                 <i class="fas fa-chart-area mr-1"></i> FX rate tracker
             </a>
