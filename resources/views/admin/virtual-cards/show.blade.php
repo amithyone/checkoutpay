@@ -228,7 +228,10 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-right font-medium {{ ($txn['direction'] ?? 'debit') === 'credit' ? 'text-green-700' : 'text-gray-900' }}">
-                                {{ ($txn['direction'] ?? 'debit') === 'credit' ? '+' : '-' }}${{ number_format((float) ($txn['amount_usd'] ?? 0), 2) }}
+                                {{ ($txn['direction'] ?? 'debit') === 'credit' ? '+' : '−' }}${{ number_format((float) ($txn['amount_usd'] ?? 0), 2) }}
+                                @if(!empty($txn['amount_ngn']))
+                                    <span class="text-xs text-gray-500 block font-normal">₦{{ number_format((float) $txn['amount_ngn'], 2) }}</span>
+                                @endif
                             </td>
                         </tr>
                         @endforeach

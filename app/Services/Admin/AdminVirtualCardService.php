@@ -98,8 +98,8 @@ final class AdminVirtualCardService
         if ($card->status === VirtualCardRequest::STATUS_ACTIVE && $card->wallet) {
             try {
                 $consumerService = app(ConsumerVirtualCardService::class);
-                $txnFetch = $consumerService->fetchMevonCardTransactions($card->wallet);
-                $cardTransactions = $txnFetch['items'] ?? [];
+                $txnFetch = $consumerService->cardTransactions($card->wallet, 200, 1);
+                $cardTransactions = $txnFetch['data'] ?? [];
             } catch (\Exception $e) {
                 \Log::warning('admin.virtual_card.show_transactions_failed', [
                     'card_id' => $card->id,
