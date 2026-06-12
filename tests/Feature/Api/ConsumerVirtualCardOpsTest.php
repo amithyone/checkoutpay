@@ -1051,6 +1051,60 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $this->assertSame(101.0, (float) $card->fresh()->card_balance_usd);
     }
 
+    public function test_reconciliation_dedupes_same_reference_with_different_mevon_codes(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+
+        $card->update([
+            'card_balance_usd' => 138,
+            'request_payload' => ['amount' => 138],
+            'card_external_id' => 'VCARD2026060611150700359',
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'status' => 'success',
+                'data' => ['balance' => 138],
+            ], 200),
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    [
+                        'code' => 'TXN-AUTH',
+                        'reference' => 'ref-spend-1',
+                        'drcr' => 'DR',
+                        'amount' => 37.0,
+                        'status' => 'completed',
+                        'category' => 'Card Purchase',
+                        'description' => 'Netflix.com',
+                        'createdOn' => '2026-06-10T10:39:29+01:00',
+                    ],
+                    [
+                        'code' => 'TXN-SETTLE',
+                        'reference' => 'ref-spend-1',
+                        'drcr' => 'DR',
+                        'amount' => 37.0,
+                        'status' => 'completed',
+                        'category' => 'Card Purchase',
+                        'description' => 'Netflix.com',
+                        'createdOn' => '2026-06-10T10:39:30+01:00',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards?refresh=1');
+
+        $response->assertOk()
+            ->assertJsonPath('data.operable_request.card_balance_usd', 101);
+        $this->assertSame(101.0, (float) $card->fresh()->card_balance_usd);
+    }
+
     public function test_card_auto_freezes_when_reconciled_balance_reaches_zero(): void
     {
         [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);

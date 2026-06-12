@@ -1470,11 +1470,17 @@ final class ConsumerVirtualCardService
      */
     public function mevonTransactionDedupeKey(array $row): string
     {
-        $code = strtolower(trim((string) ($row['code'] ?? $row['transaction_id'] ?? $row['transactionId'] ?? '')));
-        if ($code !== '') {
-            return 'code:'.$code;
-        }
+        $keys = $this->mevonTransactionDedupeKeys($row);
 
+        return $keys[0];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return list<string>
+     */
+    public function mevonTransactionDedupeKeys(array $row): array
+    {
         $reference = strtolower(trim((string) ($row['reference'] ?? $row['transaction_reference'] ?? '')));
         $amount = is_numeric($row['amount'] ?? null) ? number_format((float) $row['amount'], 2, '.', '') : '';
         $fee = is_numeric($row['fee'] ?? null) ? number_format((float) $row['fee'], 2, '.', '') : '0.00';
@@ -1483,11 +1489,21 @@ final class ConsumerVirtualCardService
         $description = strtolower(trim((string) ($row['description'] ?? '')));
         $createdOn = strtolower(trim((string) ($row['createdOn'] ?? $row['created_at'] ?? $row['timestamp'] ?? '')));
 
+        $keys = [];
         if ($reference !== '') {
-            return 'ref:'.$reference.'|'.$amount.'|'.$fee.'|'.$drcr.'|'.$category;
+            $keys[] = 'ref:'.$reference.'|'.$amount.'|'.$fee.'|'.$drcr.'|'.$category;
         }
 
-        return 'sig:'.$amount.'|'.$fee.'|'.$drcr.'|'.$category.'|'.$description.'|'.$createdOn;
+        $code = strtolower(trim((string) ($row['code'] ?? $row['transaction_id'] ?? $row['transactionId'] ?? '')));
+        if ($code !== '') {
+            $keys[] = 'code:'.$code;
+        }
+
+        if ($keys !== []) {
+            return $keys;
+        }
+
+        return ['sig:'.$amount.'|'.$fee.'|'.$drcr.'|'.$category.'|'.$description.'|'.$createdOn];
     }
 
     /**
@@ -1526,11 +1542,22 @@ final class ConsumerVirtualCardService
             if (! is_array($row)) {
                 continue;
             }
-            $key = $this->mevonTransactionDedupeKey($row);
-            if (isset($seen[$key])) {
+
+            $keys = $this->mevonTransactionDedupeKeys($row);
+            $duplicate = false;
+            foreach ($keys as $key) {
+                if (isset($seen[$key])) {
+                    $duplicate = true;
+                    break;
+                }
+            }
+            if ($duplicate) {
                 continue;
             }
-            $seen[$key] = true;
+
+            foreach ($keys as $key) {
+                $seen[$key] = true;
+            }
             $unique[] = $row;
         }
 
