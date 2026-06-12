@@ -517,4 +517,61 @@ class MevonPayVirtualCardWebhookTest extends TestCase
 
         $this->assertSame(999.0, (float) $card->fresh()->card_balance_usd);
     }
+
+    public function test_replayed_spend_webhook_is_ignored_when_transaction_already_recorded(): void
+    {
+        config([
+            'services.mevonpay.base_url' => 'https://mevon.test',
+            'services.mevonpay.secret_key' => 'test-secret',
+        ]);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348148790554',
+            'display_name' => 'Reviewer',
+            'balance' => 30000,
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        $card = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_ACTIVE,
+            'card_external_id' => 'VCARD2026060611150700359',
+            'fee_usd' => 5,
+            'fee_ngn' => 8000,
+            'card_balance_usd' => 101,
+            'request_payload' => ['amount' => 138],
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+            ],
+            'last_operation_payload' => [
+                'recorded_mevon_transaction_keys' => [
+                    'replay:name-cheap.com|1pqf3k|37.00',
+                    'code:3b260886-fbac-4d5a-96d1-0e12cb047655',
+                ],
+            ],
+        ]);
+
+        $payload = [
+            'event' => 'card.spend.success',
+            'data' => [
+                'card_code' => 'VCARD2026060611150700359',
+                'code' => '04a9d640-b67a-4d93-a12b-50d7a78495cd',
+                'reference' => 'e6487bcf03c3',
+                'amount' => 37.0,
+                'drcr' => 'DR',
+                'category' => 'withdraw card',
+                'description' => 'NAME-CHEAP.COM* 1PQF3K  +13233752822 AZUS',
+                'balance' => 101,
+                'createdOn' => '2026-06-10T08:20:57+01:00',
+            ],
+        ];
+
+        $card->update(['card_balance_usd' => 555]);
+
+        $this->postJson('/api/v1/webhook/mevonpay', $payload)
+            ->assertOk()
+            ->assertJsonPath('message', 'Card spend processed');
+
+        $this->assertSame(555.0, (float) $card->fresh()->card_balance_usd);
+    }
 }

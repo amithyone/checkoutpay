@@ -1160,6 +1160,67 @@ class ConsumerVirtualCardOpsTest extends TestCase
         $this->assertSame(101.0, (float) $card->fresh()->card_balance_usd);
     }
 
+    public function test_card_transactions_history_shows_one_row_for_webhook_replayed_merchant_spend(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+
+        $card->update([
+            'card_external_id' => 'VCARD2026060611150700359',
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'status' => 'success',
+                'data' => ['balance' => 101],
+            ], 200),
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    [
+                        'code' => '3b260886-fbac-4d5a-96d1-0e12cb047655',
+                        'reference' => '934ac3096b54',
+                        'drcr' => 'DR',
+                        'amount' => 37.0,
+                        'status' => 'success',
+                        'category' => 'withdraw card',
+                        'description' => 'NAME-CHEAP.COM* 1PQF3K WWW.NAMECHEAPAZUS',
+                        'createdOn' => '2026-06-11T18:10:41+01:00',
+                    ],
+                    [
+                        'code' => '04a9d640-b67a-4d93-a12b-50d7a78495cd',
+                        'reference' => 'e6487bcf03c3',
+                        'drcr' => 'DR',
+                        'amount' => 37.0,
+                        'status' => 'success',
+                        'category' => 'withdraw card',
+                        'description' => 'NAME-CHEAP.COM* 1PQF3K  +13233752822 AZUS',
+                        'createdOn' => '2026-06-10T08:20:57+01:00',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards/transactions');
+
+        $response->assertOk();
+        $items = $response->json('data');
+        $this->assertIsArray($items);
+
+        $namecheapRows = array_values(array_filter($items, function ($item) {
+            return is_array($item)
+                && ($item['source'] ?? '') === 'mevon'
+                && str_contains(strtoupper((string) ($item['label'] ?? '')), 'NAME-CHEAP');
+        }));
+
+        $this->assertCount(1, $namecheapRows);
+        $this->assertSame(37.0, (float) ($namecheapRows[0]['amount_usd'] ?? 0));
+    }
+
     public function test_card_auto_freezes_when_reconciled_balance_reaches_zero(): void
     {
         [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);

@@ -910,6 +910,8 @@ final class ConsumerVirtualCardService
             $this->maybeNotifyNewMevonTransactions($card, $wallet, $rows);
             $card = $card->fresh();
         }
+        $this->recordMevonTransactionKeys($card, $rows);
+        $card = $card->fresh();
         $autoFrozen = $this->maybeAutoFreezeOnDeclinedTransaction($card->fresh(), $rows);
         $items = [];
         foreach ($rows as $index => $row) {
@@ -1084,8 +1086,12 @@ final class ConsumerVirtualCardService
 
         $newRefs = [];
         foreach ($sorted as $row) {
+            if ($this->mevonTransactionAlreadyRecorded($card, $row)) {
+                continue;
+            }
+
             $ref = trim((string) ($row['code'] ?? $row['reference'] ?? ''));
-            if ($ref === '' || isset($notifiedSet[$ref])) {
+            if ($ref !== '' && isset($notifiedSet[$ref])) {
                 continue;
             }
 
@@ -1117,6 +1123,90 @@ final class ConsumerVirtualCardService
         $card->update([
             'last_operation_payload' => array_merge($payload, [
                 'notified_transaction_refs' => $merged,
+            ]),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    public function mevonTransactionAlreadyRecorded(VirtualCardRequest $card, array $row): bool
+    {
+        $stored = array_flip($this->recordedMevonTransactionKeys($card));
+
+        foreach ($this->mevonTransactionDedupeKeys($row) as $key) {
+            if (isset($stored[$key])) {
+                return true;
+            }
+        }
+
+        $code = trim((string) ($row['code'] ?? ''));
+        if ($code !== '' && isset($stored[$code])) {
+            return true;
+        }
+
+        $reference = trim((string) ($row['reference'] ?? ''));
+        if ($reference !== '' && isset($stored[$reference])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function recordedMevonTransactionKeys(VirtualCardRequest $card): array
+    {
+        $payload = is_array($card->last_operation_payload) ? $card->last_operation_payload : [];
+        $keys = [];
+
+        if (is_array($payload['recorded_mevon_transaction_keys'] ?? null)) {
+            $keys = array_merge($keys, $payload['recorded_mevon_transaction_keys']);
+        }
+
+        if (is_array($payload['notified_transaction_refs'] ?? null)) {
+            $keys = array_merge($keys, $payload['notified_transaction_refs']);
+        }
+
+        return array_values(array_unique(array_map('strval', $keys)));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     */
+    public function recordMevonTransactionKeys(VirtualCardRequest $card, array $rows): void
+    {
+        if ($rows === []) {
+            return;
+        }
+
+        $payload = is_array($card->last_operation_payload) ? $card->last_operation_payload : [];
+        $keys = $this->recordedMevonTransactionKeys($card);
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            foreach ($this->mevonTransactionDedupeKeys($row) as $key) {
+                $keys[] = $key;
+            }
+
+            $code = trim((string) ($row['code'] ?? ''));
+            if ($code !== '') {
+                $keys[] = $code;
+            }
+
+            $reference = trim((string) ($row['reference'] ?? ''));
+            if ($reference !== '') {
+                $keys[] = $reference;
+            }
+        }
+
+        $card->update([
+            'last_operation_payload' => array_merge($payload, [
+                'recorded_mevon_transaction_keys' => array_slice(array_values(array_unique($keys)), -1000),
             ]),
         ]);
     }

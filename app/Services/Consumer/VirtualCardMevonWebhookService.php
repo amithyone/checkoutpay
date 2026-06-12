@@ -248,15 +248,17 @@ final class VirtualCardMevonWebhookService
         $cardCode = trim((string) ($data['card_code'] ?? $data['card_id'] ?? $data['cardCode'] ?? ''));
         $newBalance = $data['new_balance'] ?? $data['balance'] ?? null;
         $txnRow = $this->cards->mevonTransactionRowFromWebhookPayload($payload);
-        $dedupeKey = $txnRow !== [] ? $this->cards->mevonTransactionDedupeKey($txnRow) : '';
+        $dedupeKeys = $txnRow !== [] ? $this->cards->mevonTransactionDedupeKeys($txnRow) : [];
 
-        if ($dedupeKey !== '' && \Illuminate\Support\Facades\Cache::has('vcard:spend:processed:'.$dedupeKey)) {
-            $this->cardLogs->info('webhook_spend_ignored', 'Spend webhook ignored (duplicate transaction)', null, [
-                'dedupe_key' => $dedupeKey,
-                'card_code' => $cardCode,
-            ]);
+        foreach ($dedupeKeys as $dedupeKey) {
+            if (\Illuminate\Support\Facades\Cache::has('vcard:spend:processed:'.$dedupeKey)) {
+                $this->cardLogs->info('webhook_spend_ignored', 'Spend webhook ignored (duplicate transaction)', null, [
+                    'dedupe_key' => $dedupeKey,
+                    'card_code' => $cardCode,
+                ]);
 
-            return self::RESULT_SPEND_SUCCESS;
+                return self::RESULT_SPEND_SUCCESS;
+            }
         }
 
         if ($cardCode === '') {
@@ -271,10 +273,19 @@ final class VirtualCardMevonWebhookService
         if (! $card) {
             $this->cardLogs->warning('webhook_spend_no_match', 'Card spend webhook matched no card request', null, [
                 'card_code' => $cardCode,
-                'dedupe_key' => $dedupeKey !== '' ? $dedupeKey : null,
+                'dedupe_key' => $dedupeKeys !== [] ? $dedupeKeys[0] : null,
             ]);
 
             return self::RESULT_NO_MATCH;
+        }
+
+        if ($txnRow !== [] && $this->cards->mevonTransactionAlreadyRecorded($card, $txnRow)) {
+            $this->cardLogs->info('webhook_spend_ignored', 'Spend webhook ignored (transaction already recorded on card)', $card, [
+                'dedupe_keys' => $dedupeKeys,
+                'card_code' => $cardCode,
+            ]);
+
+            return self::RESULT_SPEND_SUCCESS;
         }
 
         if ($newBalance !== null && is_numeric($newBalance)) {
@@ -283,12 +294,16 @@ final class VirtualCardMevonWebhookService
             $this->cards->reconcileCardBalance($card);
         }
 
-        if ($dedupeKey !== '') {
+        foreach ($dedupeKeys as $dedupeKey) {
             \Illuminate\Support\Facades\Cache::put('vcard:spend:processed:'.$dedupeKey, true, now()->addDays(30));
         }
 
+        if ($txnRow !== []) {
+            $this->cards->recordMevonTransactionKeys($card, [$txnRow]);
+        }
+
         $this->cardLogs->info('webhook_spend_success', 'Card spend/debit webhook processed', $card->fresh(), [
-            'dedupe_key' => $dedupeKey !== '' ? $dedupeKey : null,
+            'dedupe_keys' => $dedupeKeys !== [] ? $dedupeKeys : null,
             'card_code' => $cardCode,
             'new_balance' => $newBalance,
         ], $card->whatsapp_wallet_id);
