@@ -5,7 +5,7 @@ Requires at least: 5.8
 Tested up to: 7.0
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.4.5
+Stable tag: 1.4.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -125,6 +125,9 @@ CheckoutPay is provided by CheckoutPay. By using this plugin you are also subjec
 
 == Changelog ==
 
+= 1.4.6 =
+* Update CheckoutPay logo to the current brand mark (blue COPN icon).
+
 = 1.4.5 =
 * Replace unused Test mode checkbox with a clear test-and-go-live checklist (Refresh charges → test order → enable gateway).
 
@@ -153,6 +156,9 @@ CheckoutPay is provided by CheckoutPay. By using this plugin you are also subjec
 * WordPress.org review: enqueue scripts, sanitization, Checkoutpay_* class prefix.
 
 == Upgrade Notice ==
+
+= 1.4.6 =
+Updates the CheckoutPay logo shown in WooCommerce payment settings.
 
 = 1.4.5 =
 Clarifies production readiness: use Refresh charges and a test order, then keep the gateway enabled.

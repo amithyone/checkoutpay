@@ -25,7 +25,7 @@ return [
     |
     */
     'wordpress_plugin' => [
-        'version' => '1.4.5',
+        'version' => '1.4.6',
         'zip' => 'downloads/copn-payment-gateway.zip',
         'slug' => 'copn-payment-gateway',
         'requires_wordpress' => '5.8',
