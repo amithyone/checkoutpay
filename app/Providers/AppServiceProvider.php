@@ -6,6 +6,7 @@ use App\Services\Admin\AdminSidebarMenu;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Notifications\ChannelManager;
@@ -26,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configurePublicUrlFromRequest();
+
         // Register Telegram notification channel
         $this->app->make(ChannelManager::class)->extend('telegram', function ($app) {
             return new TelegramChannel();
@@ -52,6 +55,50 @@ class AppServiceProvider extends ServiceProvider
                     'error' => $e->getMessage()
                 ]);
             }
+        }
+    }
+
+    /**
+     * When APP_URL is still localhost on a live host (common after cPanel deploys),
+     * generate route()/url() links from the domain the visitor actually used.
+     */
+    protected function configurePublicUrlFromRequest(): void
+    {
+        if ($this->app->runningInConsole() && ! $this->app->runningUnitTests()) {
+            return;
+        }
+
+        if (! $this->app->bound('request')) {
+            return;
+        }
+
+        $configured = rtrim((string) config('app.url'), '/');
+        if ($configured === '') {
+            return;
+        }
+
+        $configuredHost = strtolower((string) parse_url($configured, PHP_URL_HOST));
+        $isLocalConfigured = in_array($configuredHost, ['', 'localhost', '127.0.0.1', '::1'], true)
+            || str_ends_with($configuredHost, '.local')
+            || str_ends_with($configuredHost, '.test');
+
+        if (! $isLocalConfigured) {
+            return;
+        }
+
+        $request = request();
+        $requestHost = strtolower($request->getHost());
+        if ($requestHost === '' || in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true)) {
+            return;
+        }
+
+        $scheme = $request->header('X-Forwarded-Proto') === 'https' || $request->isSecure()
+            ? 'https'
+            : $request->getScheme();
+
+        URL::forceRootUrl($scheme.'://'.$requestHost);
+        if ($scheme === 'https') {
+            URL::forceScheme('https');
         }
     }
 
