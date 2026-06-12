@@ -1499,11 +1499,170 @@ final class ConsumerVirtualCardService
             $keys[] = 'code:'.$code;
         }
 
+        $replayKey = $this->mevonMerchantSpendReplayKey($row);
+        if ($replayKey !== null) {
+            $keys[] = $replayKey;
+        }
+
         if ($keys !== []) {
             return $keys;
         }
 
         return ['sig:'.$amount.'|'.$fee.'|'.$drcr.'|'.$category.'|'.$description.'|'.$createdOn];
+    }
+
+    /**
+     * Collapse webhook-replay duplicates: Mevon sometimes lists the same merchant charge
+     * twice (different code/reference) when webhooks were enabled after the first spend.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    public function mevonMerchantSpendReplayKey(array $row): ?string
+    {
+        if (! $this->isMerchantMevonSpendRow($row)) {
+            return null;
+        }
+
+        $amount = is_numeric($row['amount'] ?? null) ? number_format((float) $row['amount'], 2, '.', '') : '';
+        if ($amount === '' || (float) $amount <= 0) {
+            return null;
+        }
+
+        $description = trim((string) ($row['description'] ?? ''));
+        if ($description === '') {
+            return null;
+        }
+
+        $merchant = $this->normalizeMevonMerchantLabel($description);
+        if ($merchant === '') {
+            return null;
+        }
+
+        $orderToken = $this->extractMevonMerchantOrderToken($description);
+        if ($orderToken !== '') {
+            return 'replay:'.$merchant.'|'.$orderToken.'|'.$amount;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function isMerchantMevonSpendRow(array $row): bool
+    {
+        if ($this->isMevonDeclinedRow($row)) {
+            return false;
+        }
+
+        if (strtoupper(trim((string) ($row['drcr'] ?? 'DR'))) !== 'DR') {
+            return false;
+        }
+
+        $category = strtolower(trim((string) ($row['category'] ?? '')));
+        $status = strtolower(trim((string) ($row['status'] ?? '')));
+        if (str_contains($category, 'reversed') || str_contains($status, 'reversed')) {
+            return false;
+        }
+
+        if (str_contains($category, 'card_withdrawal')
+            || str_contains($category, 'topup')
+            || str_contains($category, 'load')
+            || str_contains($category, 'fund')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * When Mevon replays a spend without a shared order token, same merchant + amount within 72h is one charge.
+     *
+     * @param  array<string, mixed>  $row
+     * @param  list<array<string, mixed>>  $keptRows
+     */
+    private function isMerchantSpendReplayWithinWindow(array $row, array $keptRows): bool
+    {
+        if (! $this->isMerchantMevonSpendRow($row)) {
+            return false;
+        }
+
+        $merchant = $this->normalizeMevonMerchantLabel(trim((string) ($row['description'] ?? '')));
+        if ($merchant === '') {
+            return false;
+        }
+
+        $amount = is_numeric($row['amount'] ?? null) ? round((float) $row['amount'], 2) : 0.0;
+        if ($amount <= 0) {
+            return false;
+        }
+
+        $createdAt = strtotime((string) ($row['createdOn'] ?? $row['created_at'] ?? $row['timestamp'] ?? '')) ?: 0;
+        if ($createdAt <= 0) {
+            return false;
+        }
+
+        $windowSeconds = max(3600, (int) config('virtual_card.mevon_spend_replay_window_seconds', 72 * 3600));
+
+        foreach ($keptRows as $kept) {
+            if (! $this->isMerchantMevonSpendRow($kept)) {
+                continue;
+            }
+
+            if ($this->normalizeMevonMerchantLabel(trim((string) ($kept['description'] ?? ''))) !== $merchant) {
+                continue;
+            }
+
+            $keptAmount = is_numeric($kept['amount'] ?? null) ? round((float) $kept['amount'], 2) : 0.0;
+            if (abs($keptAmount - $amount) >= 0.01) {
+                continue;
+            }
+
+            $keptAt = strtotime((string) ($kept['createdOn'] ?? $kept['created_at'] ?? $kept['timestamp'] ?? '')) ?: 0;
+            if ($keptAt <= 0) {
+                continue;
+            }
+
+            if (abs($createdAt - $keptAt) <= $windowSeconds) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizeMevonMerchantLabel(string $description): string
+    {
+        $description = strtolower(trim($description));
+        if ($description === '') {
+            return '';
+        }
+
+        if (preg_match('/^([^*]+)\*/', $description, $match) === 1) {
+            return preg_replace('/[^a-z0-9.-]+/', '', $match[1]) ?? '';
+        }
+
+        if (preg_match('/^([a-z0-9.-]{4,40})/', $description, $match) === 1) {
+            return $match[1];
+        }
+
+        return '';
+    }
+
+    private function extractMevonMerchantOrderToken(string $description): string
+    {
+        if (preg_match('/\*+\s*([A-Z0-9]{4,16})\b/i', $description, $match) === 1) {
+            return strtolower($match[1]);
+        }
+
+        if (preg_match('/\b([A-Z0-9]{5,16})\b/', $description, $match) === 1) {
+            $token = strtolower($match[1]);
+            if (! in_array($token, ['azus', 'www', 'namecheapazus'], true)) {
+                return $token;
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -1551,6 +1710,10 @@ final class ConsumerVirtualCardService
                     break;
                 }
             }
+            if (! $duplicate && $this->isMerchantSpendReplayWithinWindow($row, $unique)) {
+                $duplicate = true;
+            }
+
             if ($duplicate) {
                 continue;
             }
@@ -2852,7 +3015,7 @@ final class ConsumerVirtualCardService
                 $amount = is_numeric($row['amount'] ?? null) ? round((float) $row['amount'], 2) : 0.0;
                 $fee = is_numeric($row['fee'] ?? null) ? round((float) $row['fee'], 2) : 0.0;
 
-                if ($this->isSuccessfulSpend($row)) {
+                if ($this->isMerchantMevonSpendRow($row)) {
                     $totalSpends += ($amount + $fee);
                 } elseif ($this->isSuccessfulReversal($row)) {
                     $totalReversals += $amount;
