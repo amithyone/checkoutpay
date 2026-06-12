@@ -904,7 +904,7 @@ final class ConsumerVirtualCardService
             return $empty;
         }
 
-        $rows = $this->normalizeMevonTransactionList($api['data'] ?? null);
+        $rows = $this->dedupeMevonTransactionRows($this->normalizeMevonTransactionList($api['data'] ?? null));
         $wallet = $card->wallet;
         if ($wallet) {
             $this->maybeNotifyNewMevonTransactions($card, $wallet, $rows);
@@ -961,7 +961,7 @@ final class ConsumerVirtualCardService
             return false;
         }
 
-        $rows = $this->normalizeMevonTransactionList($api['data'] ?? null);
+        $rows = $this->dedupeMevonTransactionRows($this->normalizeMevonTransactionList($api['data'] ?? null));
 
         return $this->maybeAutoFreezeOnDeclinedTransaction($card->fresh(), $rows);
     }
@@ -1460,6 +1460,81 @@ final class ConsumerVirtualCardService
         }
 
         return [];
+    }
+
+    /**
+     * Stable identity for a Mevon card transaction row (API list or webhook payload).
+     * Rows with the same key are treated as one spend/reversal for reconciliation.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    public function mevonTransactionDedupeKey(array $row): string
+    {
+        $code = strtolower(trim((string) ($row['code'] ?? $row['transaction_id'] ?? $row['transactionId'] ?? '')));
+        if ($code !== '') {
+            return 'code:'.$code;
+        }
+
+        $reference = strtolower(trim((string) ($row['reference'] ?? $row['transaction_reference'] ?? '')));
+        $amount = is_numeric($row['amount'] ?? null) ? number_format((float) $row['amount'], 2, '.', '') : '';
+        $fee = is_numeric($row['fee'] ?? null) ? number_format((float) $row['fee'], 2, '.', '') : '0.00';
+        $drcr = strtoupper(trim((string) ($row['drcr'] ?? 'DR')));
+        $category = strtolower(trim((string) ($row['category'] ?? '')));
+        $description = strtolower(trim((string) ($row['description'] ?? '')));
+        $createdOn = strtolower(trim((string) ($row['createdOn'] ?? $row['created_at'] ?? $row['timestamp'] ?? '')));
+
+        if ($reference !== '') {
+            return 'ref:'.$reference.'|'.$amount.'|'.$fee.'|'.$drcr.'|'.$category;
+        }
+
+        return 'sig:'.$amount.'|'.$fee.'|'.$drcr.'|'.$category.'|'.$description.'|'.$createdOn;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function mevonTransactionRowFromWebhookPayload(array $payload): array
+    {
+        $data = $payload['data'] ?? $payload;
+        if (! is_array($data)) {
+            return [];
+        }
+
+        return array_filter([
+            'code' => $data['code'] ?? $data['transaction_id'] ?? $data['transactionId'] ?? null,
+            'reference' => $data['reference'] ?? $data['transaction_reference'] ?? null,
+            'amount' => $data['amount'] ?? null,
+            'fee' => $data['fee'] ?? null,
+            'drcr' => $data['drcr'] ?? 'DR',
+            'category' => $data['category'] ?? null,
+            'description' => $data['description'] ?? null,
+            'createdOn' => $data['createdOn'] ?? $data['created_at'] ?? $data['timestamp'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    public function dedupeMevonTransactionRows(array $rows): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $key = $this->mevonTransactionDedupeKey($row);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $row;
+        }
+
+        return $unique;
     }
 
     /**
@@ -2742,7 +2817,7 @@ final class ConsumerVirtualCardService
 
         $api = $this->getCardTransactionsCached($cardCode);
         if ($api['ok'] ?? false) {
-            $rows = $this->normalizeMevonTransactionList($api['data'] ?? null);
+            $rows = $this->dedupeMevonTransactionRows($this->normalizeMevonTransactionList($api['data'] ?? null));
             foreach ($rows as $row) {
                 if (! is_array($row)) {
                     continue;

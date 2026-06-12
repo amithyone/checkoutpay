@@ -20,6 +20,8 @@ final class VirtualCardMevonWebhookService
 
     public const RESULT_TOPUP_SUCCESS = 'topup_success';
 
+    public const RESULT_SPEND_SUCCESS = 'spend_success';
+
     public function __construct(
         private VirtualCardProviderResponseService $providerResponse,
         private VirtualCardRequestLogService $cardLogs,
@@ -49,6 +51,10 @@ final class VirtualCardMevonWebhookService
         $event = $this->extractWebhookEvent($payload);
         if ($this->isTopupEvent($event)) {
             return $this->handleTopupWebhook($payload, isset($ingress['raw_body']) ? (string) $ingress['raw_body'] : null);
+        }
+
+        if ($this->isSpendEvent($event)) {
+            return $this->handleSpendWebhook($payload, isset($ingress['raw_body']) ? (string) $ingress['raw_body'] : null);
         }
 
         if (! $this->isCardEvent($payload)) {
@@ -206,6 +212,88 @@ final class VirtualCardMevonWebhookService
         ], $card->whatsapp_wallet_id);
 
         return self::RESULT_TOPUP_SUCCESS;
+    }
+
+    private function isSpendEvent(string $event): bool
+    {
+        if ($event === '' || str_contains($event, 'topup') || str_contains($event, 'creat')) {
+            return false;
+        }
+
+        $spendEvents = [
+            'card.spend',
+            'card.spend.success',
+            'card.transaction',
+            'card.transaction.success',
+            'card.debit',
+            'card_debit',
+            'virtual_card.spend',
+        ];
+
+        if (in_array($event, $spendEvents, true)) {
+            return true;
+        }
+
+        return str_contains($event, 'card')
+            && (str_contains($event, 'spend') || str_contains($event, 'debit') || str_contains($event, 'transaction') || str_contains($event, 'purchase'));
+    }
+
+    private function handleSpendWebhook(array $payload, ?string $rawBody = null): string
+    {
+        $data = $payload['data'] ?? $payload;
+        if (! is_array($data)) {
+            return self::RESULT_NO_MATCH;
+        }
+
+        $cardCode = trim((string) ($data['card_code'] ?? $data['card_id'] ?? $data['cardCode'] ?? ''));
+        $newBalance = $data['new_balance'] ?? $data['balance'] ?? null;
+        $txnRow = $this->cards->mevonTransactionRowFromWebhookPayload($payload);
+        $dedupeKey = $txnRow !== [] ? $this->cards->mevonTransactionDedupeKey($txnRow) : '';
+
+        if ($dedupeKey !== '' && \Illuminate\Support\Facades\Cache::has('vcard:spend:processed:'.$dedupeKey)) {
+            $this->cardLogs->info('webhook_spend_ignored', 'Spend webhook ignored (duplicate transaction)', null, [
+                'dedupe_key' => $dedupeKey,
+                'card_code' => $cardCode,
+            ]);
+
+            return self::RESULT_SPEND_SUCCESS;
+        }
+
+        if ($cardCode === '') {
+            return self::RESULT_NO_MATCH;
+        }
+
+        $card = VirtualCardRequest::query()
+            ->where('card_external_id', $cardCode)
+            ->orWhere('card_details_payload->card_code', $cardCode)
+            ->first();
+
+        if (! $card) {
+            $this->cardLogs->warning('webhook_spend_no_match', 'Card spend webhook matched no card request', null, [
+                'card_code' => $cardCode,
+                'dedupe_key' => $dedupeKey !== '' ? $dedupeKey : null,
+            ]);
+
+            return self::RESULT_NO_MATCH;
+        }
+
+        if ($newBalance !== null && is_numeric($newBalance)) {
+            $this->cards->updateReconciledBalance($card, round((float) $newBalance, 2));
+        } else {
+            $this->cards->reconcileCardBalance($card);
+        }
+
+        if ($dedupeKey !== '') {
+            \Illuminate\Support\Facades\Cache::put('vcard:spend:processed:'.$dedupeKey, true, now()->addDays(30));
+        }
+
+        $this->cardLogs->info('webhook_spend_success', 'Card spend/debit webhook processed', $card->fresh(), [
+            'dedupe_key' => $dedupeKey !== '' ? $dedupeKey : null,
+            'card_code' => $cardCode,
+            'new_balance' => $newBalance,
+        ], $card->whatsapp_wallet_id);
+
+        return self::RESULT_SPEND_SUCCESS;
     }
 
     /**

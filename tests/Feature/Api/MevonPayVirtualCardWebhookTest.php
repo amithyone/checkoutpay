@@ -439,4 +439,82 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $card->refresh();
         $this->assertSame(200.0, (float) $card->card_balance_usd); // balance remained 200, webhook ignored
     }
+
+    public function test_duplicate_card_spend_webhook_is_processed_once(): void
+    {
+        config([
+            'services.mevonpay.base_url' => 'https://mevon.test',
+            'services.mevonpay.secret_key' => 'test-secret',
+        ]);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348148790554',
+            'display_name' => 'Reviewer',
+            'balance' => 30000,
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        $card = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_ACTIVE,
+            'card_external_id' => 'VCARD2026060611150700359',
+            'fee_usd' => 5,
+            'fee_ngn' => 8000,
+            'card_balance_usd' => 138,
+            'request_payload' => ['amount' => 138],
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'status' => 'success',
+                'data' => ['balance' => 138],
+            ], 200),
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'status' => 'success',
+                'data' => [[
+                    'code' => 'TXN-SPEND-1',
+                    'reference' => 'ref-spend-1',
+                    'drcr' => 'DR',
+                    'amount' => 37.0,
+                    'status' => 'completed',
+                    'category' => 'Card Purchase',
+                    'description' => 'Netflix.com',
+                    'createdOn' => '2026-06-10T10:39:29+01:00',
+                ]],
+            ], 200),
+        ]);
+
+        $payload = [
+            'event' => 'card.spend.success',
+            'data' => [
+                'card_code' => 'VCARD2026060611150700359',
+                'code' => 'TXN-SPEND-1',
+                'reference' => 'ref-spend-1',
+                'amount' => 37.0,
+                'drcr' => 'DR',
+                'category' => 'Card Purchase',
+                'description' => 'Netflix.com',
+                'balance' => 138,
+                'createdOn' => '2026-06-10T10:39:29+01:00',
+            ],
+        ];
+
+        $this->postJson('/api/v1/webhook/mevonpay', $payload)
+            ->assertOk()
+            ->assertJsonPath('message', 'Card spend processed');
+
+        $card->refresh();
+        $this->assertSame(101.0, (float) $card->card_balance_usd);
+
+        $card->update(['card_balance_usd' => 999]);
+
+        $this->postJson('/api/v1/webhook/mevonpay', $payload)
+            ->assertOk()
+            ->assertJsonPath('message', 'Card spend processed');
+
+        $this->assertSame(999.0, (float) $card->fresh()->card_balance_usd);
+    }
 }

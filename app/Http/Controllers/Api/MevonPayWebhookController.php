@@ -67,6 +67,12 @@ class MevonPayWebhookController extends Controller
             return response()->json(['success' => true, 'message' => 'Card topup processed']);
         }
 
+        if ($cardResult === VirtualCardMevonWebhookService::RESULT_SPEND_SUCCESS) {
+            $this->recordWebhookSource($request, 'virtual_card_spend_success');
+
+            return response()->json(['success' => true, 'message' => 'Card spend processed']);
+        }
+
         if ($cardResult === VirtualCardMevonWebhookService::RESULT_ALREADY_ACTIVE) {
             $this->recordWebhookSource($request, 'virtual_card_already_active');
 
