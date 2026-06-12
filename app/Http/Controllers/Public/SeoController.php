@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Page;
+use App\Support\MarketingPricing;
 use App\Support\Seo;
 use Illuminate\Http\Response;
 
@@ -94,6 +95,7 @@ class SeoController extends Controller
     public function llmsTxt(): Response
     {
         $base = rtrim((string) config('app.url'), '/');
+        $pricingSnippet = MarketingPricing::snapshot()['pricing_text'];
 
         $body = <<<TXT
 # CheckoutPay & CheckoutNow
@@ -102,7 +104,7 @@ class SeoController extends Controller
 
 ## What we do
 - Payment gateway for Nigerian merchants (bank transfer matching, virtual accounts, webhooks)
-- Transparent low fees — see {$base}/pricing (typically 1% + ₦50 per successful transaction)
+- Transparent low fees — see {$base}/pricing (typically {$pricingSnippet})
 - WhatsApp Wallet (send money on WhatsApp or to any bank): {$base}/whatsapp-wallet
 - Official WooCommerce / WordPress payment plugin for Nigeria: {$base}/wordpress-plugin
 - REST API and webhooks for custom apps: {$base}/api-docs

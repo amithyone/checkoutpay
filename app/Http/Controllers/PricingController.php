@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Page;
+use App\Support\MarketingPricing;
 use Illuminate\View\View;
 
 class PricingController extends Controller
@@ -17,10 +18,12 @@ class PricingController extends Controller
 
         // Content is already cast to array by the model
         $content = is_array($page->content) ? $page->content : (json_decode($page->content, true) ?? []);
+        $content = MarketingPricing::mergeIntoPricingContent($content);
         
         return view('pricing', [
             'page' => $page,
             'content' => $content,
+            'virtualCard' => \App\Support\MarketingVirtualCard::snapshot(),
         ]);
     }
 }

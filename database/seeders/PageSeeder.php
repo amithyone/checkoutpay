@@ -63,7 +63,7 @@ class PageSeeder extends Seeder
                 'title' => 'CheckoutPay',
                 'title_highlight' => null,
                 'description' => 'Built to stay out of the way while everything else continues.',
-                'pricing_text' => '1% + ₦50 per transaction',
+                'pricing_text' => '1% + ₦100 per transaction',
                 'cta_primary' => 'Get started',
                 'cta_secondary' => 'View pricing',
             ],
@@ -121,7 +121,7 @@ class PageSeeder extends Seeder
                 'badge_text' => null,
                 'plan_name' => 'Pay As You Go',
                 'rate_percentage' => '1%',
-                'rate_fixed' => '₦50',
+                'rate_fixed' => '₦100',
                 'rate_description' => 'per successful transaction',
                 'included' => [
                     'Unlimited transactions',
@@ -132,11 +132,11 @@ class PageSeeder extends Seeder
                     '24/7 support',
                 ],
                 'examples' => [
-                    ['amount' => '₦1,000', 'fee' => '₦60'],
-                    ['amount' => '₦5,000', 'fee' => '₦100'],
-                    ['amount' => '₦10,000', 'fee' => '₦150'],
-                    ['amount' => '₦50,000', 'fee' => '₦550'],
-                    ['amount' => '₦100,000', 'fee' => '₦1,050'],
+                    ['amount' => '₦1,000', 'fee' => '₦110'],
+                    ['amount' => '₦5,000', 'fee' => '₦150'],
+                    ['amount' => '₦10,000', 'fee' => '₦200'],
+                    ['amount' => '₦50,000', 'fee' => '₦600'],
+                    ['amount' => '₦100,000', 'fee' => '₦1,100'],
                 ],
                 'cta_text' => 'Get started',
                 'cta_note' => 'No setup fees. No monthly fees. Pay only for successful transactions.',
@@ -174,7 +174,7 @@ class PageSeeder extends Seeder
                 'title' => 'Simple, Transparent Pricing',
                 'description' => 'Premium payment gateway with competitive rates. Pay only for successful transactions.',
                 'rate_percentage' => '1%',
-                'rate_fixed' => '₦50',
+                'rate_fixed' => '₦100',
                 'rate_description' => 'per successful transaction',
             ],
             'pricing_card' => [
@@ -182,7 +182,7 @@ class PageSeeder extends Seeder
                 'plan_name' => 'Pay As You Go',
                 'description' => 'No setup fees. No monthly fees. Pay only for successful transactions.',
                 'rate_percentage' => '1%',
-                'rate_fixed' => '₦50',
+                'rate_fixed' => '₦100',
                 'rate_description' => 'per transaction',
                 'included' => [
                     [
@@ -215,11 +215,11 @@ class PageSeeder extends Seeder
                     ],
                 ],
                 'examples' => [
-                    ['amount' => '₦1,000', 'calculation' => '1% = ₦10 + ₦50', 'fee' => '₦60'],
-                    ['amount' => '₦5,000', 'calculation' => '1% = ₦50 + ₦50', 'fee' => '₦100'],
-                    ['amount' => '₦10,000', 'calculation' => '1% = ₦100 + ₦50', 'fee' => '₦150'],
-                    ['amount' => '₦50,000', 'calculation' => '1% = ₦500 + ₦50', 'fee' => '₦550'],
-                    ['amount' => '₦100,000', 'calculation' => '1% = ₦1,000 + ₦50', 'fee' => '₦1,050'],
+                    ['amount' => '₦1,000', 'calculation' => '1% = ₦10 + ₦100', 'fee' => '₦110'],
+                    ['amount' => '₦5,000', 'calculation' => '1% = ₦50 + ₦100', 'fee' => '₦150'],
+                    ['amount' => '₦10,000', 'calculation' => '1% = ₦100 + ₦100', 'fee' => '₦200'],
+                    ['amount' => '₦50,000', 'calculation' => '1% = ₦500 + ₦100', 'fee' => '₦600'],
+                    ['amount' => '₦100,000', 'calculation' => '1% = ₦1,000 + ₦100', 'fee' => '₦1,100'],
                 ],
                 'cta_text' => 'Get Started Now',
                 'cta_note' => 'No setup fees. No monthly fees. No hidden charges.',
@@ -241,7 +241,7 @@ class PageSeeder extends Seeder
                     [
                         'icon' => 'fas fa-check-circle',
                         'title' => 'Low Transaction Fees',
-                        'description' => 'Just 1% + ₦50 per successful transaction',
+                        'description' => 'Just 1% + ₦100 per successful transaction',
                     ],
                 ],
             ],
@@ -250,11 +250,11 @@ class PageSeeder extends Seeder
                 'items' => [
                     [
                         'question' => 'How are fees calculated?',
-                        'answer' => 'Fees are calculated as 1% of the transaction amount plus a fixed ₦50 charge. For example, a ₦10,000 transaction costs ₦150 (1% = ₦100 + ₦50 = ₦150).',
+                        'answer' => 'Fees are calculated as 1% of the transaction amount plus a fixed ₦100 charge. For example, a ₦10,000 transaction costs ₦200 (1% = ₦100 + ₦100 = ₦200).',
                     ],
                     [
                         'question' => 'Are there any hidden fees?',
-                        'answer' => 'No hidden fees. The pricing is transparent - just 1% + ₦50 per successful transaction. No setup fees, no monthly fees, no annual fees.',
+                        'answer' => 'No hidden fees. The pricing is transparent - just 1% + ₦100 per successful transaction. No setup fees, no monthly fees, no annual fees.',
                     ],
                     [
                         'question' => 'When do I pay the fees?',

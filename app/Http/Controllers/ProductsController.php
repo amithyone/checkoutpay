@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Page;
+use App\Support\MarketingVirtualCard;
 use Illuminate\View\View;
 
 class ProductsController extends Controller
 {
     public function index(): View
     {
-        return view('products.index');
+        return view('products.index', [
+            'virtualCard' => MarketingVirtualCard::snapshot(),
+        ]);
     }
 
     public function invoices(): View

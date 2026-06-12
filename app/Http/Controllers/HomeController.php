@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Page;
+use App\Support\MarketingPricing;
+use App\Support\MarketingVirtualCard;
 use Illuminate\Http\Response;
 
 class HomeController extends Controller
@@ -24,6 +26,7 @@ class HomeController extends Controller
 
         // Content is already cast to array by the model
         $content = is_array($page->content) ? $page->content : (json_decode($page->content, true) ?? []);
+        $content = MarketingPricing::mergeIntoHomeContent($content);
 
         // OPTIMIZED: Pre-load all settings used in the view to avoid N+1 queries
         // Settings are already cached in the model, but loading them here ensures single cache lookup
@@ -37,6 +40,7 @@ class HomeController extends Controller
             'page' => $page,
             'content' => $content,
             'settings' => $settings, // Pass settings to view
+            'virtualCard' => MarketingVirtualCard::snapshot(),
         ]);
 
         return $response;

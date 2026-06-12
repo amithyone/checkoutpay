@@ -195,6 +195,8 @@
         </div>
     </section>
 
+    <x-dollar-card-marketing :virtual-card="$virtualCard ?? []" />
+
     <!-- Pricing Section -->
     @if(isset($pricingSection['title']))
     <section id="pricing" class="py-12 sm:py-16 md:py-20 bg-gray-50">
@@ -218,7 +220,7 @@
                         <div class="mb-4 sm:mb-6">
                             <span class="text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{{ $pricingSection['rate_percentage'] ?? '1%' }}</span>
                             <span class="text-xl sm:text-2xl text-gray-600"> + </span>
-                            <span class="text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{{ $pricingSection['rate_fixed'] ?? '₦50' }}</span>
+                            <span class="text-3xl sm:text-4xl md:text-5xl font-bold text-primary">{{ $pricingSection['rate_fixed'] ?? '₦100' }}</span>
                             <p class="text-sm sm:text-base text-gray-600 mt-2">{{ $pricingSection['rate_description'] ?? 'per successful transaction' }}</p>
                         </div>
                     </div>

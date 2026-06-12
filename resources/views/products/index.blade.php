@@ -17,7 +17,7 @@
                     Business Solutions
                 </h1>
                 <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
-                    WhatsApp Wallet. Payments. Invoices. Rentals. Tickets. Memberships.
+                    WhatsApp Wallet. Payments. Dollar card. Invoices. Rentals. Tickets. Memberships.
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-3">
                     <x-checkoutnow-apk-download
@@ -34,6 +34,8 @@
             </div>
         </div>
     </section>
+
+    <x-dollar-card-marketing :virtual-card="$virtualCard ?? []" id="dollar-virtual-card" />
 
     <!-- Core Payment Products -->
     <section class="py-12 sm:py-16 md:py-20 bg-white">
