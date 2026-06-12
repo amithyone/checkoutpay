@@ -65,11 +65,12 @@ final class NormalizeCanonicalUrls
             || str_starts_with($path, '/my-account')
             || str_starts_with($path, '/cron/')
             || str_starts_with($path, '/storage/')
+            || str_starts_with($path, '/download/')
         ) {
             return true;
         }
 
-        return preg_match('/\.(xml|txt|json|css|js|png|jpe?g|gif|webp|svg|ico|woff2?|map)$/i', $path) === 1;
+        return preg_match('/\.(xml|txt|json|css|js|png|jpe?g|gif|webp|svg|ico|woff2?|map|apk|zip)$/i', $path) === 1;
     }
 
     private function normalizePath(string $path): string

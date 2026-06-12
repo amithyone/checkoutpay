@@ -66,6 +66,8 @@ Route::post('/wallet/partner-pay/{token}', [\App\Http\Controllers\WhatsappWallet
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
 
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
+Route::get('/download/checkoutnow-android.apk', \App\Http\Controllers\Public\CheckoutNowApkDownloadController::class)
+    ->name('checkoutnow.apk.download');
 Route::get('/products/invoices', [\App\Http\Controllers\ProductsController::class, 'invoices'])->name('products.invoices');
 Route::get('/products/memberships', [\App\Http\Controllers\ProductsController::class, 'memberships'])->name('products.memberships');
 Route::get('/products/memberships-info', [\App\Http\Controllers\ProductsController::class, 'membershipsInfo'])->name('products.memberships-info');

@@ -46,6 +46,9 @@ return [
     /** Full URL to CheckoutNow Android APK; defaults to {wallet_app_url}/checkoutnow-android.apk */
     'wallet_android_apk_url' => rtrim((string) env('WHATSAPP_WALLET_ANDROID_APK_URL', ''), '/'),
 
+    /** Server path to the APK file served by GET /download/checkoutnow-android.apk */
+    'wallet_android_apk_path' => (string) env('WHATSAPP_WALLET_ANDROID_APK_PATH', '/var/www/checkoutnow/dist/checkoutnow-android.apk'),
+
     /*
     | WhatsApp Wallet tiers: Tier 1 = WhatsApp identity only (caps). Tier 2 = Mevon Rubies VA + full KYC.
     */

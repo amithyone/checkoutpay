@@ -7,7 +7,7 @@
     $downloadLabel = $label ?? ($slot->isEmpty() ? 'Download Android APK' : null);
 @endphp
 <a
-    href="{{ CheckoutNowApp::androidApkUrl() }}"
+    href="{{ CheckoutNowApp::androidApkDownloadUrl() }}"
     download="checkoutnow-android.apk"
     {{ $attributes }}
 >
