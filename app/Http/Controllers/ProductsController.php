@@ -40,8 +40,7 @@ class ProductsController extends Controller
             return view('products.memberships-editable', compact('page'));
         }
 
-        // Fallback to static view - redirect to public memberships page
-        return redirect()->route('memberships.index');
+        return view('products.memberships');
     }
 
     public function membershipsInfo(): View

@@ -27,7 +27,8 @@ final class CheckoutNowApp
             return $configured;
         }
 
-        return route('checkoutnow.apk.download');
+        // Use url() so stale route:cache cannot break marketing pages after deploy.
+        return url('/download/checkoutnow-android.apk');
     }
 
     /**
