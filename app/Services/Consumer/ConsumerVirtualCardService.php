@@ -105,9 +105,11 @@ final class ConsumerVirtualCardService
     public function status(WhatsappWallet $wallet, bool $forceRefresh = false): array
     {
         $autoFrozen = false;
-        $this->refreshProviderCardBalance($wallet);
+        if ($forceRefresh) {
+            $this->refreshProviderCardBalance($wallet);
+        }
         $card = $this->resolveOperableCard($wallet);
-        if ($card !== null) {
+        if ($card !== null && $forceRefresh) {
             $autoFrozen = $this->evaluateAutoFreezeForCard($card->fresh());
         }
 

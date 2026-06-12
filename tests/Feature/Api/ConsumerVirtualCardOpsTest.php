@@ -641,6 +641,27 @@ class ConsumerVirtualCardOpsTest extends TestCase
             ->assertJsonPath('data.1.type', 'virtual_card_fee');
     }
 
+    public function test_card_status_without_refresh_does_not_call_mevon(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        $card->update([
+            'card_balance_usd' => 12.5,
+            'provider_reference' => 'REQ1779645711521',
+        ]);
+
+        Http::fake([
+            'https://mevon.test/*' => Http::response(['message' => 'provider down'], 500),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->getJson('/api/v1/consumer/cards');
+
+        $response->assertOk()
+            ->assertJsonPath('data.operable_request.card_balance_usd', 12.5);
+        Http::assertSentCount(0);
+    }
+
     public function test_card_status_refresh_queries_mevon_for_live_balance(): void
     {
         [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
@@ -970,16 +991,14 @@ class ConsumerVirtualCardOpsTest extends TestCase
 
         Sanctum::actingAs($account);
 
-        // Call the details endpoint, which will trigger sync and refresh balance
-        $response = $this->postJson('/api/v1/consumer/cards/details', [
-            'pin' => '2468',
-        ]);
+        // Live refresh reconciles provider balance against Mevon spend history.
+        $response = $this->getJson('/api/v1/consumer/cards?refresh=1');
 
         $response->assertOk();
-        $data = $response->json('data');
+        $data = $response->json('data.operable_request');
 
         // We expect the balance to be reconciled: 138 (initial load) - 37 (Netflix spend) = 101.
-        $this->assertEquals(101, $data['balance_usd']);
+        $this->assertEquals(101, $data['card_balance_usd']);
         $this->assertTrue($data['reconciliation_pending']);
 
         // Verify the database was updated with the correct reconciled balance and pending flag
@@ -1039,10 +1058,8 @@ class ConsumerVirtualCardOpsTest extends TestCase
 
         Sanctum::actingAs($account);
 
-        // Fetching details forces sync, which recalculates balance and triggers auto-freeze
-        $response = $this->postJson('/api/v1/consumer/cards/details', [
-            'pin' => '2468',
-        ]);
+        // Live refresh reconciles balance and auto-freezes at $0.
+        $response = $this->getJson('/api/v1/consumer/cards?refresh=1');
 
         $response->assertOk();
         $this->assertTrue($card->fresh()->is_frozen);
