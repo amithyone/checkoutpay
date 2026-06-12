@@ -716,17 +716,123 @@ final class ConsumerVirtualCardService
         return $resolved;
     }
 
-    private function syncProviderCardBalance(VirtualCardRequest $card): void
+    /**
+     * Sync provider balance with Mevon spend history and persist min(provider, reconciled) to card_balance_usd.
+     *
+     * @return array{
+     *     ok: bool,
+     *     message?: string,
+     *     before?: array{card_balance_usd: float|null, reconciliation_pending: bool},
+     *     after?: array{card_balance_usd: float|null, reconciliation_pending: bool},
+     *     provider_balance_usd?: float|null,
+     *     reconciled_balance_usd?: float|null
+     * }
+     */
+    public function reconcileCardBalance(VirtualCardRequest $card): array
     {
+        $before = [
+            'card_balance_usd' => $card->card_balance_usd,
+            'reconciliation_pending' => (bool) $card->reconciliation_pending,
+        ];
+
+        if (! $this->cardApi->isConfigured()) {
+            return [
+                'ok' => false,
+                'message' => 'MevonPay card API is not configured.',
+                'before' => $before,
+            ];
+        }
+
+        $card = $this->prepareCardForProviderSync($card);
+        $providerBalance = $this->readProviderBalanceUsd($card);
+        if ($providerBalance === null) {
+            $this->syncProviderCardBalance($card);
+        } else {
+            $this->updateReconciledBalance($card, $providerBalance);
+        }
+
+        $card = $card->fresh();
+
+        return [
+            'ok' => true,
+            'before' => $before,
+            'after' => [
+                'card_balance_usd' => $card->card_balance_usd,
+                'reconciliation_pending' => (bool) $card->reconciliation_pending,
+            ],
+            'provider_balance_usd' => $providerBalance,
+            'reconciled_balance_usd' => $providerBalance !== null
+                ? $this->getReconciledBalance($card, $providerBalance)
+                : null,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     ok: bool,
+     *     message?: string,
+     *     current_balance_usd?: float|null,
+     *     provider_balance_usd?: float,
+     *     reconciled_balance_usd?: float,
+     *     final_balance_usd?: float,
+     *     reconciliation_pending?: bool
+     * }
+     */
+    public function previewCardBalanceReconciliation(VirtualCardRequest $card): array
+    {
+        if (! $this->cardApi->isConfigured()) {
+            return ['ok' => false, 'message' => 'MevonPay card API is not configured.'];
+        }
+
+        $card = $this->prepareCardForProviderSync($card);
+        $providerBalance = $this->readProviderBalanceUsd($card);
+        if ($providerBalance === null) {
+            return ['ok' => false, 'message' => 'Could not read provider card balance from MevonPay.'];
+        }
+
+        $reconciled = $this->getReconciledBalance($card, $providerBalance);
+
+        return [
+            'ok' => true,
+            'current_balance_usd' => $card->card_balance_usd,
+            'provider_balance_usd' => $providerBalance,
+            'reconciled_balance_usd' => $reconciled,
+            'final_balance_usd' => min($providerBalance, $reconciled),
+            'reconciliation_pending' => $providerBalance > $reconciled,
+        ];
+    }
+
+    public function withdrawableBalanceUsd(VirtualCardRequest $card): ?float
+    {
+        if ($card->card_balance_usd === null) {
+            return null;
+        }
+
+        return round(max(0.0, (float) $card->card_balance_usd), 2);
+    }
+
+    private function prepareCardForProviderSync(VirtualCardRequest $card): VirtualCardRequest
+    {
+        $this->repairCardExternalIdIfNeeded($card);
+        $this->backfillMevonRequestId($card->fresh());
+        $this->backfillMevonCardCode($card->fresh());
+
+        return $card->fresh();
+    }
+
+    private function readProviderBalanceUsd(VirtualCardRequest $card): ?float
+    {
+        if (! $this->cardApi->isConfigured()) {
+            return null;
+        }
+
         $requestId = $this->resolveMevonBalanceRequestId($card);
         if ($requestId !== null) {
             $api = $this->cardApi->getCardBalance($requestId);
             if ($api['ok'] ?? false) {
                 $balance = $this->storedDetails->extractBalanceFromProviderPayload($api['raw'] ?? $api);
                 if ($balance !== null) {
-                    $this->updateReconciledBalance($card, $balance);
-
-                    return;
+                    return round((float) $balance, 2);
                 }
             }
 
@@ -735,6 +841,33 @@ final class ConsumerVirtualCardService
                 'request_id' => $requestId,
                 'message' => (string) ($api['message'] ?? 'unknown'),
             ]);
+        }
+
+        $cardId = $this->resolveMevonCardIdentifier($card);
+        if ($cardId === null) {
+            return null;
+        }
+
+        $api = $this->cardApi->getCardDetails($cardId);
+        if (! ($api['ok'] ?? false)) {
+            return null;
+        }
+
+        $balance = $this->storedDetails->extractBalanceFromProviderPayload($api['raw'] ?? $api);
+        if ($balance === null) {
+            return null;
+        }
+
+        return round((float) $balance, 2);
+    }
+
+    private function syncProviderCardBalance(VirtualCardRequest $card): void
+    {
+        $balance = $this->readProviderBalanceUsd($card);
+        if ($balance !== null) {
+            $this->updateReconciledBalance($card, $balance);
+
+            return;
         }
 
         $this->fetchAndStoreProviderCardDetails($card);
@@ -1551,6 +1684,28 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => 'Could not resolve card for withdraw.'];
         }
         $reasonText = trim((string) ($reason ?? '')) ?: 'Withdrawal to Wallet';
+
+        $card = $this->prepareCardForProviderSync($card);
+        $this->syncProviderCardBalance($card);
+        $card = $card->fresh();
+        $withdrawable = $this->withdrawableBalanceUsd($card);
+        if ($withdrawable === null) {
+            return ['ok' => false, 'message' => 'Could not determine your cleared card balance. Try again shortly.'];
+        }
+        if (round($amountUsd, 2) > $withdrawable) {
+            $suffix = $card->reconciliation_pending
+                ? ' Some provider balance is still pending from recent purchases.'
+                : '';
+
+            return [
+                'ok' => false,
+                'message' => sprintf(
+                    'Insufficient cleared card balance. You can withdraw up to $%.2f.%s',
+                    $withdrawable,
+                    $suffix,
+                ),
+            ];
+        }
 
         $api = $this->cardApi->withdrawFromCard($amountUsd, $cardCode, $reasonText);
         if (! ($api['ok'] ?? false)) {

@@ -1070,6 +1070,59 @@ class ConsumerVirtualCardOpsTest extends TestCase
         });
     }
 
+    public function test_withdraw_rejects_amount_above_reconciled_balance(): void
+    {
+        [, $account, $card] = $this->walletWithActiveCard(returnCard: true);
+        Setting::set('virtual_card_fx_mid_usd_ngn', 1600, 'float', 'vtu', 'test');
+        Setting::set('virtual_card_fx_buy_profit_ngn', 30, 'float', 'virtual_card', 'test');
+
+        $card->update([
+            'card_balance_usd' => 138,
+            'provider_reference' => 'REQ1780744493644',
+            'request_payload' => ['amount' => 138],
+            'card_external_id' => 'VCARD2026060611150700359',
+            'card_details_payload' => [
+                'card_code' => 'VCARD2026060611150700359',
+            ],
+        ]);
+
+        Http::fake([
+            'https://mevon.test/V1/card_balance' => Http::response([
+                'status' => 'success',
+                'data' => ['balance' => 138],
+            ], 200),
+            'https://mevon.test/V1/card_transactions' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    [
+                        'code' => 'TXN001',
+                        'reference' => 'ref-spend-1',
+                        'drcr' => 'DR',
+                        'amount' => 37.0,
+                        'status' => 'completed',
+                        'category' => 'Card Purchase',
+                        'description' => 'Netflix.com',
+                        'createdOn' => '2026-06-10T10:39:29+01:00',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Sanctum::actingAs($account);
+
+        $response = $this->postJson('/api/v1/consumer/cards/withdraw', [
+            'pin' => '2468',
+            'amount_usd' => 120,
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonFragment([
+                'message' => 'Insufficient cleared card balance. You can withdraw up to $101.00. Some provider balance is still pending from recent purchases.',
+            ]);
+        Http::assertNotSent(fn ($request) => $request->url() === 'https://mevon.test/V1/card_withdraw');
+    }
+
     public function test_unfreeze_fails_if_reconciled_balance_is_four_or_less(): void
     {
         [$wallet, $account, $card] = $this->walletWithActiveCard(returnCard: true);
