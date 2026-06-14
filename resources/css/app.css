@@ -80,4 +80,38 @@
     .product-page-content a:not([class]) {
         @apply text-brand-primary font-semibold hover:underline;
     }
+
+    /* Code blocks: dark background → light text; light background → dark text */
+    .code-block-dark,
+    .code-block {
+        @apply bg-midnight-deep rounded-xl p-4 overflow-x-auto;
+    }
+
+    .code-block-dark pre,
+    .code-block-dark code,
+    .code-block pre,
+    .code-block code {
+        @apply font-mono text-xs sm:text-sm text-emerald-300;
+        background: transparent !important;
+        color: rgb(110 231 183) !important;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .code-block-light {
+        @apply bg-surface-container-low border border-slate-200 rounded-xl p-4 overflow-x-auto;
+    }
+
+    .code-block-light pre,
+    .code-block-light code {
+        @apply font-mono text-xs sm:text-sm text-midnight-deep;
+        background: transparent !important;
+        color: rgb(15 23 42) !important;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .code-inline {
+        @apply bg-surface-container-low text-midnight-deep px-1.5 py-0.5 rounded text-sm font-mono border border-slate-200/80;
+    }
 }

@@ -95,8 +95,8 @@
 
                 <div class="mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-slate-200">
                     <h3 class="text-lg sm:text-xl font-bold text-midnight-deep mb-4">Integration example</h3>
-                    <div class="bg-midnight-deep rounded-xl p-4 overflow-x-auto">
-                        <pre class="text-emerald-400 text-xs sm:text-sm"><code>&lt;!-- Redirect to CheckoutPay hosted checkout --&gt;
+                    <div class="code-block-dark">
+                        <pre><code>&lt;!-- Redirect to CheckoutPay hosted checkout --&gt;
 &lt;a href="https://check-outpay.com/pay?
     business_id=YOUR_BUSINESS_ID&amp;
     amount=5000&amp;
@@ -107,7 +107,7 @@
                     </div>
                     <p class="mt-3 text-sm text-slate-600 font-medium">
                         <i class="fas fa-lightbulb text-amber-500 mr-2" aria-hidden="true"></i>
-                        Redirect customers to <code class="bg-surface-container-low px-2 py-1 rounded text-xs">/pay</code> with the required parameters.
+                        Redirect customers to <code class="code-inline text-xs">/pay</code> with the required parameters.
                     </p>
                 </div>
             </div>

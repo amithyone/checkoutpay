@@ -23,7 +23,6 @@
         $pricingSnapshot = MarketingPricing::snapshot();
     @endphp
 
-    <!-- Hero Section -->
     <section class="bg-midnight-deep py-14 sm:py-20">
         <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8 text-center">
             @if(isset($hero['badge_text']))
@@ -35,7 +34,7 @@
                 {{ $hero['title'] ?? 'Simple, Transparent Pricing' }}
             </h1>
             @if(isset($hero['description']))
-            <p class="text-base sm:text-lg text-slate-300 font-medium mb-8 max-w-3xl mx-auto px-2">
+            <p class="section-subheading mx-auto text-white/70 mb-8 px-2">
                 {{ $hero['description'] }}
             </p>
             @endif
@@ -50,12 +49,10 @@
         </div>
     </section>
 
-    <!-- Pricing Card -->
     @if(isset($pricingCard['plan_name']))
     <section class="py-12 sm:py-16 md:py-20 -mt-6 sm:-mt-8 md:-mt-10">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="card-marketing border-2 border-brand-primary/20 overflow-hidden shadow-brand">
-                <!-- Header -->
                 <div class="bg-gradient-to-r from-brand-primary to-brand-secondary p-6 sm:p-8 md:p-12 text-center text-white">
                     @if(isset($pricingCard['badge_text']))
                     <div class="inline-block bg-white/20 backdrop-blur-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-3 sm:mb-4">
@@ -64,33 +61,31 @@
                     @endif
                     <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">{{ $pricingCard['plan_name'] }}</h2>
                     @if(isset($pricingCard['description']))
-                    <p class="text-base sm:text-lg md:text-xl text-primary-100 mb-4 sm:mb-6 px-2">{{ $pricingCard['description'] }}</p>
+                    <p class="text-base sm:text-lg md:text-xl text-white/80 mb-4 sm:mb-6 px-2 font-medium">{{ $pricingCard['description'] }}</p>
                     @endif
                     <div class="flex items-center justify-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
                         <span class="text-4xl sm:text-5xl md:text-6xl font-bold">{{ $pricingSnapshot['rate_percentage'] }}</span>
                         <span class="text-2xl sm:text-3xl text-white/80">+</span>
                         <span class="text-4xl sm:text-5xl md:text-6xl font-bold">{{ $pricingSnapshot['rate_fixed'] }}</span>
                     </div>
-                    <p class="text-primary-100 text-sm sm:text-base">{{ $pricingCard['rate_description'] ?? 'per transaction' }}</p>
+                    <p class="text-white/70 text-sm sm:text-base font-medium">{{ $pricingCard['rate_description'] ?? 'per transaction' }}</p>
                 </div>
 
-                <!-- Content -->
                 <div class="p-6 sm:p-8 md:p-12">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-10 md:gap-12 mb-8 sm:mb-10 md:mb-12">
-                        <!-- What's Included -->
                         @if(isset($pricingCard['included']) && is_array($pricingCard['included']))
                         <div>
-                            <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Everything Included</h3>
+                            <h3 class="text-xl sm:text-2xl font-bold text-midnight-deep mb-4 sm:mb-6">Everything Included</h3>
                             <div class="space-y-3 sm:space-y-4">
                                 @foreach($pricingCard['included'] as $item)
                                 <div class="flex items-start">
-                                    <div class="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center mr-3 sm:mr-4">
-                                        <i class="fas fa-check text-green-600 text-sm"></i>
+                                    <div class="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-success-green/10 rounded-full flex items-center justify-center mr-3 sm:mr-4">
+                                        <i class="fas fa-check text-success-green text-sm"></i>
                                     </div>
                                     <div class="flex-1">
-                                        <h4 class="font-semibold text-sm sm:text-base text-gray-900">{{ is_array($item) ? ($item['title'] ?? '') : $item }}</h4>
+                                        <h4 class="font-semibold text-sm sm:text-base text-midnight-deep">{{ is_array($item) ? ($item['title'] ?? '') : $item }}</h4>
                                         @if(is_array($item) && isset($item['description']))
-                                        <p class="text-xs sm:text-sm text-gray-600 mt-1">{{ $item['description'] }}</p>
+                                        <p class="text-xs sm:text-sm text-slate-500 mt-1 font-medium">{{ $item['description'] }}</p>
                                         @endif
                                     </div>
                                 </div>
@@ -99,7 +94,6 @@
                         </div>
                         @endif
 
-                        <!-- Pricing Examples -->
                         @php
                             $pricingExamples = MarketingPricing::pricingPageExamples(
                                 $pricingSnapshot['percentage'],
@@ -107,30 +101,29 @@
                             );
                         @endphp
                         <div>
-                            <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Pricing Examples</h3>
-                            <div class="bg-gray-50 rounded-xl p-4 sm:p-6 space-y-4 sm:space-y-6">
+                            <h3 class="text-xl sm:text-2xl font-bold text-midnight-deep mb-4 sm:mb-6">Pricing Examples</h3>
+                            <div class="bg-surface-container-low rounded-xl p-4 sm:p-6 space-y-4 sm:space-y-6 border border-slate-200/80">
                                 @foreach($pricingExamples as $example)
-                                <div class="flex justify-between items-center pb-3 sm:pb-4 border-b border-gray-200 gap-2">
+                                <div class="flex justify-between items-center pb-3 sm:pb-4 border-b border-slate-200 gap-2">
                                     <div class="flex-1 min-w-0">
-                                        <p class="font-semibold text-sm sm:text-base text-gray-900 break-words">{{ $example['amount'] ?? '' }}</p>
+                                        <p class="font-semibold text-sm sm:text-base text-midnight-deep break-words">{{ $example['amount'] ?? '' }}</p>
                                         @if(isset($example['calculation']))
-                                        <p class="text-xs sm:text-sm text-gray-600 mt-1">{{ $example['calculation'] }}</p>
+                                        <p class="text-xs sm:text-sm text-slate-500 mt-1 font-medium">{{ $example['calculation'] }}</p>
                                         @endif
                                     </div>
                                     <div class="text-right flex-shrink-0">
-                                        <p class="text-xl sm:text-2xl font-bold text-primary">{{ $example['fee'] ?? '' }}</p>
-                                        <p class="text-xs text-gray-500">fee</p>
+                                        <p class="text-xl sm:text-2xl font-bold text-brand-primary">{{ $example['fee'] ?? '' }}</p>
+                                        <p class="text-xs text-slate-400 font-medium">fee</p>
                                     </div>
                                 </div>
                                 @endforeach
                             </div>
 
-                            <!-- Calculator -->
                             <div class="mt-6 sm:mt-8 bg-brand-primary/5 rounded-xl p-4 sm:p-6 border border-brand-primary/20">
                                 <h4 class="font-bold text-sm sm:text-base text-midnight-deep mb-3 sm:mb-4">Calculate Your Fees</h4>
                                 <div class="space-y-2 sm:space-y-3">
-                                    <input type="number" id="calc-amount" placeholder="Enter amount" 
-                                        class="w-full px-3 sm:px-4 py-2.5 text-sm sm:text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none">
+                                    <input type="number" id="calc-amount" placeholder="Enter amount"
+                                        class="w-full px-3 sm:px-4 py-2.5 text-sm sm:text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none bg-white text-midnight-deep">
                                     <div class="flex justify-between items-center pt-2">
                                         <span class="text-sm sm:text-base text-slate-600 font-semibold">Fee:</span>
                                         <span id="calc-fee" class="text-xl sm:text-2xl font-black text-brand-primary">₦0</span>
@@ -140,13 +133,12 @@
                         </div>
                     </div>
 
-                    <!-- CTA Button -->
-                    <div class="text-center pt-6 sm:pt-8 border-t border-gray-200">
+                    <div class="text-center pt-6 sm:pt-8 border-t border-slate-200">
                         <a href="{{ route('business.register') }}" class="btn-brand">
                             <i class="fas fa-rocket"></i> {{ $pricingCard['cta_text'] ?? 'Get Started Now' }}
                         </a>
                         @if(isset($pricingCard['cta_note']))
-                        <p class="text-xs sm:text-sm text-gray-500 px-2">{{ $pricingCard['cta_note'] }}</p>
+                        <p class="text-xs sm:text-sm text-slate-500 px-2 mt-3 font-medium">{{ $pricingCard['cta_note'] }}</p>
                         @endif
                     </div>
                 </div>
@@ -155,26 +147,25 @@
     </section>
     @endif
 
-    <!-- Comparison Section -->
     @if(isset($comparison['title']))
     <section class="py-12 sm:py-16 md:py-20 bg-white">
         <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-8 sm:mb-10 md:mb-12">
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{{ $comparison['title'] }}</h2>
+                <h2 class="section-heading mb-3 sm:mb-4">{{ $comparison['title'] }}</h2>
                 @if(isset($comparison['subtitle']))
-                <p class="text-base sm:text-lg text-gray-600 px-2">{{ $comparison['subtitle'] }}</p>
+                <p class="section-subheading mx-auto px-2">{{ $comparison['subtitle'] }}</p>
                 @endif
             </div>
 
             @if(isset($comparison['items']) && is_array($comparison['items']))
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
                 @foreach($comparison['items'] as $item)
-                <div class="text-center p-5 sm:p-6 bg-gray-50 rounded-xl">
-                    <div class="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                        <i class="{{ $item['icon'] ?? 'fas fa-check' }} text-primary text-xl sm:text-2xl"></i>
+                <div class="card-marketing text-center p-5 sm:p-6">
+                    <div class="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                        <i class="{{ $item['icon'] ?? 'fas fa-check' }} text-brand-primary text-xl sm:text-2xl"></i>
                     </div>
-                    <h3 class="font-bold text-sm sm:text-base text-gray-900 mb-2">{{ $item['title'] ?? '' }}</h3>
-                    <p class="text-xs sm:text-sm text-gray-600 px-2">{{ $item['description'] ?? '' }}</p>
+                    <h3 class="font-bold text-sm sm:text-base text-midnight-deep mb-2">{{ $item['title'] ?? '' }}</h3>
+                    <p class="text-xs sm:text-sm text-slate-500 px-2 font-medium">{{ $item['description'] ?? '' }}</p>
                 </div>
                 @endforeach
             </div>
@@ -183,20 +174,19 @@
     </section>
     @endif
 
-    <!-- FAQ Section -->
     @if(isset($faq['title']))
-    <section class="py-12 sm:py-16 md:py-20 bg-gray-50">
+    <section class="py-12 sm:py-16 md:py-20 bg-surface-container-low/40">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-8 sm:mb-10 md:mb-12">
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{{ $faq['title'] }}</h2>
+                <h2 class="section-heading mb-3 sm:mb-4">{{ $faq['title'] }}</h2>
             </div>
 
             @if(isset($faq['items']) && is_array($faq['items']))
             <div class="space-y-4 sm:space-y-6">
                 @foreach($faq['items'] as $item)
-                <div class="bg-white rounded-lg p-5 sm:p-6 border border-gray-200">
-                    <h3 class="font-bold text-base sm:text-lg text-gray-900 mb-2">{{ $item['question'] ?? '' }}</h3>
-                    <p class="text-sm sm:text-base text-gray-600">{{ $item['answer'] ?? '' }}</p>
+                <div class="card-marketing p-5 sm:p-6">
+                    <h3 class="font-bold text-base sm:text-lg text-midnight-deep mb-2">{{ $item['question'] ?? '' }}</h3>
+                    <p class="text-sm sm:text-base text-slate-600 font-medium">{{ $item['answer'] ?? '' }}</p>
                 </div>
                 @endforeach
             </div>
@@ -205,19 +195,13 @@
     </section>
     @endif
 
-    <!-- CTA Section -->
     @if(isset($cta['title']))
-    <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-brand-primary to-brand-secondary">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-3 sm:mb-4 px-2">{{ $cta['title'] }}</h2>
-            @if(isset($cta['description']))
-            <p class="text-base sm:text-lg text-white/80 font-medium mb-6 sm:mb-8 px-2">{{ $cta['description'] }}</p>
-            @endif
-            <a href="{{ route('business.register') }}" class="inline-flex items-center bg-white text-brand-primary px-8 py-4 rounded-xl hover:bg-slate-50 font-bold text-base sm:text-lg transition-colors shadow-lg">
-                {{ $cta['cta_text'] ?? 'Create Your Account' }}
-            </a>
-        </div>
-    </section>
+    <x-marketing.product-cta
+        :title="$cta['title']"
+        :subtitle="$cta['description'] ?? null"
+        :primary-url="route('business.register')"
+        :primary-label="$cta['cta_text'] ?? 'Create Your Account'"
+    />
     @endif
 
     @include('partials.faq-section', [

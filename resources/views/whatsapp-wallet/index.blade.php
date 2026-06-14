@@ -203,8 +203,8 @@
                         </a>
                     </div>
                 </div>
-                <div class="bg-gray-900 rounded-xl p-6 text-green-400 font-mono text-xs sm:text-sm overflow-x-auto">
-                    <pre class="whitespace-pre-wrap">POST /api/v1/whatsapp-wallet/pay/start
+                <div class="code-block-dark">
+                    <pre><code>POST /api/v1/whatsapp-wallet/pay/start
 X-API-Key: pk_your_key
 
 {
@@ -213,7 +213,7 @@ X-API-Key: pk_your_key
   "order_reference": "ORDER-123",
   "order_summary": "2x Jollof + delivery",
   "webhook_url": "https://your-app.com/hooks/checkout"
-}</pre>
+}</code></pre>
                 </div>
             </div>
         </div>

@@ -31,22 +31,24 @@
     <x-marketing.product-section title="API reference" bg="white">
         <div class="card-marketing p-6 sm:p-8 max-w-4xl mx-auto">
             <h3 class="text-xl font-bold text-midnight-deep mb-4">Base URL</h3>
-            <div class="bg-midnight-deep rounded-xl p-4 mb-6">
-                <code class="text-emerald-400 text-sm">{{ url('/api/v1') }}</code>
+            <div class="code-block-dark mb-6">
+                <code>{{ url('/api/v1') }}</code>
             </div>
             <h3 class="text-xl font-bold text-midnight-deep mb-4">Authentication</h3>
             <p class="text-slate-600 mb-4 font-medium">All API requests require an API key in the header:</p>
-            <div class="bg-midnight-deep rounded-xl p-4 mb-6">
-                <code class="text-emerald-400 text-sm">X-API-Key: pk_your_api_key_here</code>
+            <div class="code-block-dark mb-6">
+                <code>X-API-Key: pk_your_api_key_here</code>
             </div>
             <div class="flex flex-wrap gap-3">
                 <a href="{{ route('api-docs') }}" class="btn-brand">
-                    Public API docs
+                    Full API documentation
                     <i class="fas fa-arrow-right" aria-hidden="true"></i>
                 </a>
-                <a href="{{ route('business.api-documentation.index') }}" class="btn-brand-outline">
-                    Business dashboard docs
-                </a>
+                @auth('business')
+                    <a href="{{ route('business.api-documentation.index') }}" class="btn-brand-outline">
+                        Business dashboard docs
+                    </a>
+                @endauth
             </div>
         </div>
     </x-marketing.product-section>
@@ -56,11 +58,11 @@
             <div class="bg-surface-container-low rounded-xl p-4 mb-4">
                 <h4 class="font-semibold text-midnight-deep mb-2">Webhook events</h4>
                 <ul class="space-y-2 text-sm text-slate-600">
-                    <li><code class="bg-white px-2 py-1 rounded border border-slate-200">payment.approved</code> — Payment verified and approved</li>
-                    <li><code class="bg-white px-2 py-1 rounded border border-slate-200">payment.rejected</code> — Payment rejected or expired</li>
+                    <li><code class="code-inline">payment.approved</code> — Payment verified and approved</li>
+                    <li><code class="code-inline">payment.rejected</code> — Payment rejected or expired</li>
                 </ul>
             </div>
-            <a href="{{ route('business.api-documentation.index') }}#webhooks" class="text-brand-primary hover:text-brand-secondary font-semibold">
+            <a href="{{ route('api-docs') }}#webhooks" class="text-brand-primary hover:text-brand-secondary font-semibold">
                 Learn more about webhooks <i class="fas fa-arrow-right ml-1 text-xs"></i>
             </a>
         </div>

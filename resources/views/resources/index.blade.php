@@ -57,7 +57,7 @@
                             <span>Charge management</span>
                         </li>
                     </ul>
-                    <a href="{{ route('business.api-documentation.index') }}" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">
+                    <a href="{{ route('api-docs') }}" class="btn-brand">
                         View Full Documentation
                         <i class="fas fa-arrow-right ml-2"></i>
                     </a>
@@ -183,7 +183,7 @@
                         </div>
                     </div>
                     <p class="text-gray-700 mb-4">Use our RESTful API with any programming language. Comprehensive documentation with examples in PHP, JavaScript, Python, and more.</p>
-                    <a href="{{ route('business.api-documentation.index') }}" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">
+                    <a href="{{ route('api-docs') }}#code-examples" class="btn-brand">
                         View API Docs
                         <i class="fas fa-arrow-right ml-2"></i>
                     </a>
@@ -201,18 +201,18 @@
             </div>
             <div class="space-y-6">
                 <!-- PHP Example -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-900 px-4 py-2 flex items-center justify-between">
+                <div class="card-marketing overflow-hidden">
+                    <div class="bg-midnight-deep px-4 py-2 flex items-center justify-between">
                         <div class="flex items-center">
                             <i class="fab fa-php text-purple-400 text-xl mr-2"></i>
                             <span class="text-white font-medium">PHP (Laravel)</span>
                         </div>
-                        <button onclick="copyCode('php-example')" class="text-gray-400 hover:text-white">
+                        <button onclick="copyCode('php-example')" class="text-white/50 hover:text-white">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
-                    <div class="p-4 overflow-x-auto">
-                        <pre id="php-example" class="text-xs text-gray-800"><code>use Illuminate\Support\Facades\Http;
+                    <div class="code-block-dark rounded-none rounded-b-2xl">
+                        <pre id="php-example"><code>use Illuminate\Support\Facades\Http;
 
 $response = Http::withHeaders([
     'X-API-Key' => 'your_api_key',
@@ -231,18 +231,18 @@ $transactionId = $data['data']['transaction_id'];</code></pre>
                 </div>
 
                 <!-- JavaScript Example -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-900 px-4 py-2 flex items-center justify-between">
+                <div class="card-marketing overflow-hidden">
+                    <div class="bg-midnight-deep px-4 py-2 flex items-center justify-between">
                         <div class="flex items-center">
                             <i class="fab fa-js text-yellow-400 text-xl mr-2"></i>
                             <span class="text-white font-medium">JavaScript (Node.js)</span>
                         </div>
-                        <button onclick="copyCode('js-example')" class="text-gray-400 hover:text-white">
+                        <button onclick="copyCode('js-example')" class="text-white/50 hover:text-white">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
-                    <div class="p-4 overflow-x-auto">
-                        <pre id="js-example" class="text-xs text-gray-800"><code>const axios = require('axios');
+                    <div class="code-block-dark rounded-none rounded-b-2xl">
+                        <pre id="js-example"><code>const axios = require('axios');
 
 const response = await axios.post(
     'https://check-outpay.com/api/v1/payment-request',
@@ -265,18 +265,18 @@ const { account_number, transaction_id } = response.data.data;</code></pre>
                 </div>
 
                 <!-- Python Example -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-gray-900 px-4 py-2 flex items-center justify-between">
+                <div class="card-marketing overflow-hidden">
+                    <div class="bg-midnight-deep px-4 py-2 flex items-center justify-between">
                         <div class="flex items-center">
                             <i class="fab fa-python text-blue-400 text-xl mr-2"></i>
                             <span class="text-white font-medium">Python</span>
                         </div>
-                        <button onclick="copyCode('python-example')" class="text-gray-400 hover:text-white">
+                        <button onclick="copyCode('python-example')" class="text-white/50 hover:text-white">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
-                    <div class="p-4 overflow-x-auto">
-                        <pre id="python-example" class="text-xs text-gray-800"><code>import requests
+                    <div class="code-block-dark rounded-none rounded-b-2xl">
+                        <pre id="python-example"><code>import requests
 
 response = requests.post(
     'https://check-outpay.com/api/v1/payment-request',

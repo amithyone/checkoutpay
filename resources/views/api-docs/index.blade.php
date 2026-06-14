@@ -9,16 +9,6 @@
 
 @push('head')
 <style>
-        pre { white-space: pre-wrap; word-wrap: break-word; }
-        code { font-family: 'Courier New', monospace; }
-        .code-block {
-            background: #1e293b;
-            color: #e2e8f0;
-            border-radius: 0.75rem;
-            padding: 1rem;
-            overflow-x: auto;
-        }
-        .code-block code { color: #e2e8f0; }
         .endpoint-badge {
             display: inline-block;
             padding: 0.25rem 0.75rem;
@@ -104,8 +94,8 @@
 
                             <div>
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3">2. Base URL</h3>
-                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                    <code class="text-sm text-gray-900">{{ url('/api/v1') }}</code>
+                                <div class="code-block-light">
+                                    <code class="text-sm">{{ url('/api/v1') }}</code>
                                 </div>
                             </div>
 
@@ -136,8 +126,8 @@
                         
                         <p class="text-gray-700 mb-4">Authenticated routes accept your API key in the <code class="bg-gray-100 px-2 py-1 rounded">X-API-Key</code> header (recommended), or as <code class="bg-gray-100 px-2 py-1 rounded">api_key</code> in the JSON body for POST/PATCH requests.</p>
                         
-                        <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto mb-4">
-                            <pre class="text-sm text-gray-100"><code>X-API-Key: pk_your_api_key_here</code></pre>
+                        <div class="code-block-dark mb-4">
+                            <pre><code>X-API-Key: pk_your_api_key_here</code></pre>
                         </div>
 
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
