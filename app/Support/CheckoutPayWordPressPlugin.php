@@ -23,11 +23,24 @@ class CheckoutPayWordPressPlugin
     }
 
     /**
-     * Public download URL with version query string (cache busting).
+     * Public download / listing URL (WordPress.org by default; admin-configurable).
      */
     public static function downloadUrl(): string
     {
+        return MarketingDownloadLinks::wordpressPluginUrl();
+    }
+
+    /**
+     * @deprecated Prefer downloadUrl() — kept for ZIP fallback if ever re-enabled.
+     */
+    public static function zipDownloadUrl(): string
+    {
         return asset(static::zipPath()).'?v='.rawurlencode(static::version());
+    }
+
+    public static function isWordPressOrgListing(): bool
+    {
+        return str_contains(static::downloadUrl(), 'wordpress.org/plugins/');
     }
 
     public static function requiresWordPress(): string

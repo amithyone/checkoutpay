@@ -30,6 +30,10 @@ return [
         'slug' => 'copn-payment-gateway',
         'requires_wordpress' => '5.8',
         'requires_woocommerce' => '7.0',
+        'wordpress_org_url' => env(
+            'CHECKOUT_WORDPRESS_PLUGIN_URL',
+            'https://wordpress.org/plugins/copn-payment-gateway/'
+        ),
     ],
 
     /*

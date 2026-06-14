@@ -4,15 +4,17 @@
 ])
 @php
     use App\Support\CheckoutPayWordPressPlugin;
-    $downloadLabel = $label ?? ($slot->isEmpty() ? 'Download Plugin' : null);
+    $downloadLabel = $label ?? ($slot->isEmpty() ? 'Get on WordPress.org' : null);
+    $url = CheckoutPayWordPressPlugin::downloadUrl();
+    $external = str_starts_with($url, 'http') && ! str_starts_with($url, url('/'));
 @endphp
 <a
-    href="{{ CheckoutPayWordPressPlugin::downloadUrl() }}"
-    download="{{ CheckoutPayWordPressPlugin::slug() }}-{{ CheckoutPayWordPressPlugin::version() }}.zip"
+    href="{{ $url }}"
+    @if($external) target="_blank" rel="noopener noreferrer" @else download="{{ CheckoutPayWordPressPlugin::slug() }}-{{ CheckoutPayWordPressPlugin::version() }}.zip" @endif
     {{ $attributes }}
 >
     @if ($icon)
-        <i class="fas fa-download mr-2"></i>
+        <i class="fab fa-wordpress mr-2"></i>
     @endif
     @if ($downloadLabel)
         {{ $downloadLabel }}

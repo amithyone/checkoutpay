@@ -49,8 +49,11 @@ return [
     /** Server path to the APK file served by GET /download/checkoutnow-android.apk */
     'wallet_android_apk_path' => (string) env('WHATSAPP_WALLET_ANDROID_APK_PATH', '/var/www/checkoutnow/dist/checkoutnow-android.apk'),
 
-    /** CheckoutNow consumer app — Google Play listing (falls back to APK download URL in marketing). */
-    'checkoutnow_play_store_url' => rtrim((string) env('CHECKOUTNOW_PLAY_STORE_URL', ''), '/'),
+    /** CheckoutNow consumer app — Google Play listing. */
+    'checkoutnow_play_store_url' => rtrim((string) env(
+        'CHECKOUTNOW_PLAY_STORE_URL',
+        'https://play.google.com/store/apps/details?id=com.checkoutnow.app'
+    ), '/'),
 
     /** CheckoutNow consumer app — Apple App Store listing (falls back to web app URL in marketing). */
     'checkoutnow_app_store_url' => rtrim((string) env('CHECKOUTNOW_APP_STORE_URL', ''), '/'),

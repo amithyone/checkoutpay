@@ -523,6 +523,82 @@
         </form>
     </div>
 
+    <!-- Marketing download links -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-download mr-2 text-primary"></i>Marketing download links
+        </h3>
+        <p class="text-sm text-gray-600 mb-6">
+            Public URLs used on marketing pages, product CTAs, and download buttons. Leave blank to use defaults from config / <code class="text-xs bg-gray-100 px-1 rounded">.env</code>.
+        </p>
+
+        <form action="{{ route('admin.settings.update-marketing-downloads') }}" method="POST" class="space-y-5">
+            @csrf
+
+            <div>
+                <label for="wordpress_plugin_download_url" class="block text-sm font-medium text-gray-700 mb-2">
+                    WordPress / WooCommerce plugin
+                </label>
+                <input
+                    type="url"
+                    id="wordpress_plugin_download_url"
+                    name="wordpress_plugin_download_url"
+                    value="{{ \App\Models\Setting::get('wordpress_plugin_download_url', '') }}"
+                    placeholder="{{ \App\Support\MarketingDownloadLinks::WORDPRESS_PLUGIN }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">
+                    Live: <a href="{{ \App\Support\MarketingDownloadLinks::wordpressPluginUrl() }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ \App\Support\MarketingDownloadLinks::wordpressPluginUrl() }}</a>
+                </p>
+            </div>
+
+            <div>
+                <label for="checkoutnow_play_store_url" class="block text-sm font-medium text-gray-700 mb-2">
+                    CheckoutNow — Google Play (Android)
+                </label>
+                <input
+                    type="url"
+                    id="checkoutnow_play_store_url"
+                    name="checkoutnow_play_store_url"
+                    value="{{ \App\Models\Setting::get('checkoutnow_play_store_url', '') }}"
+                    placeholder="{{ \App\Support\MarketingDownloadLinks::PLAY_STORE }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">
+                    Live: <a href="{{ \App\Support\CheckoutNowApp::playStoreUrl() }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ \App\Support\CheckoutNowApp::playStoreUrl() }}</a>
+                </p>
+            </div>
+
+            <div>
+                <label for="checkoutnow_app_store_url" class="block text-sm font-medium text-gray-700 mb-2">
+                    CheckoutNow — Apple App Store (iOS)
+                </label>
+                <input
+                    type="url"
+                    id="checkoutnow_app_store_url"
+                    name="checkoutnow_app_store_url"
+                    value="{{ \App\Models\Setting::get('checkoutnow_app_store_url', '') }}"
+                    placeholder="https://apps.apple.com/app/checkoutnow/id…"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                <p class="mt-2 text-xs text-gray-500">
+                    Live:
+                    @if(\App\Support\MarketingDownloadLinks::checkoutNowAppStoreUrl())
+                        <a href="{{ \App\Support\CheckoutNowApp::appStoreUrl() }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ \App\Support\CheckoutNowApp::appStoreUrl() }}</a>
+                    @else
+                        <span class="text-gray-600">Falls back to web app — {{ \App\Support\CheckoutNowApp::webUrl() }}</span>
+                    @endif
+                </p>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="submit" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 flex items-center">
+                    <i class="fas fa-save mr-2"></i> Save download links
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Charge Settings -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">

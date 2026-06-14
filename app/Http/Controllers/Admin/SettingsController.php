@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Models\WhitelistedEmailAddress;
 use App\Services\MevonPay\MevonPayHttpClient;
 use App\Services\Vtu\VtuProviderResolver;
+use App\Support\MarketingDownloadLinks;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
@@ -431,5 +432,42 @@ class SettingsController extends Controller
 
         return redirect()->route('admin.settings.index')
             ->with('success', 'General settings updated successfully!');
+    }
+
+    /**
+     * Update public marketing download links (WordPress plugin, app stores).
+     */
+    public function updateMarketingDownloads(Request $request)
+    {
+        $validated = $request->validate([
+            'wordpress_plugin_download_url' => 'nullable|url|max:500',
+            'checkoutnow_play_store_url' => 'nullable|url|max:500',
+            'checkoutnow_app_store_url' => 'nullable|url|max:500',
+        ]);
+
+        Setting::set(
+            'wordpress_plugin_download_url',
+            $validated['wordpress_plugin_download_url'] ?: null,
+            'string',
+            'marketing',
+            'WordPress / WooCommerce plugin listing URL'
+        );
+        Setting::set(
+            'checkoutnow_play_store_url',
+            $validated['checkoutnow_play_store_url'] ?: null,
+            'string',
+            'marketing',
+            'CheckoutNow Google Play Store URL'
+        );
+        Setting::set(
+            'checkoutnow_app_store_url',
+            $validated['checkoutnow_app_store_url'] ?: null,
+            'string',
+            'marketing',
+            'CheckoutNow Apple App Store URL'
+        );
+
+        return redirect()->route('admin.settings.index')
+            ->with('success', 'Marketing download links updated successfully.');
     }
 }

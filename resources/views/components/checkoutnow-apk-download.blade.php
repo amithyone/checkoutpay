@@ -4,15 +4,16 @@
 ])
 @php
     use App\Support\CheckoutNowApp;
-    $downloadLabel = $label ?? ($slot->isEmpty() ? 'Download Android APK' : null);
+    $downloadLabel = $label ?? ($slot->isEmpty() ? 'Get on Google Play' : null);
 @endphp
 <a
-    href="{{ CheckoutNowApp::androidApkDownloadUrl() }}"
-    download="checkoutnow-android.apk"
+    href="{{ CheckoutNowApp::playStoreUrl() }}"
+    target="_blank"
+    rel="noopener noreferrer"
     {{ $attributes }}
 >
     @if ($icon)
-        <i class="fab fa-android mr-2"></i>
+        <i class="fab fa-google-play mr-2"></i>
     @endif
     @if ($downloadLabel)
         {{ $downloadLabel }}

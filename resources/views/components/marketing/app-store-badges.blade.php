@@ -73,8 +73,8 @@
         <p class="text-[11px] text-slate-400 font-medium">
             Prefer a browser?
             <a href="{{ $webUrl }}" target="_blank" rel="noopener noreferrer" class="text-brand-primary font-semibold hover:underline">Open {{ $brand }} web app</a>
-            @unless(CheckoutNowApp::hasConfiguredPlayStoreUrl() || CheckoutNowApp::hasConfiguredAppStoreUrl())
-                <span class="text-slate-400"> · Android APK also available while store listings roll out.</span>
+            @unless(CheckoutNowApp::hasConfiguredAppStoreUrl())
+                <span class="text-slate-400"> · App Store listing coming soon — use the web app in the meantime.</span>
             @endunless
         </p>
     @endif

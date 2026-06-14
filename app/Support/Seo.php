@@ -192,7 +192,7 @@ final class Seo
             'softwareVersion' => $version,
             'description' => 'Official WooCommerce payment gateway plugin for Nigerian bank transfer and virtual account checkout.',
             'url' => $base.'/wordpress-plugin',
-            'downloadUrl' => $base.'/wordpress-plugin',
+            'downloadUrl' => CheckoutPayWordPressPlugin::downloadUrl(),
             'offers' => [
                 '@type' => 'Offer',
                 'price' => '0',

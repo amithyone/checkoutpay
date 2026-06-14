@@ -34,7 +34,7 @@ final class MarketingVirtualCard
             'enabled' => true,
             'brand_name' => CheckoutNowApp::brandName(),
             'app_url' => CheckoutNowApp::webUrl(),
-            'apk_url' => CheckoutNowApp::androidApkDownloadUrl(),
+            'apk_url' => CheckoutNowApp::playStoreUrl(),
             'sell_rate' => $sellRate,
             'buy_rate' => $buyRate,
             'sell_rate_label' => $sellRate !== null ? MarketingPricing::formatNaira($sellRate) : null,

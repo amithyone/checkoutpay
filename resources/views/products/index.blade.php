@@ -11,7 +11,7 @@
         subtitle="WhatsApp Wallet. Payments. Dollar card. Invoices. Rentals. Tickets. Memberships."
     >
         <x-slot:actions>
-            <x-checkoutnow-apk-download label="Download CheckoutNow" class="btn-brand" />
+            <x-checkoutnow-apk-download label="Get CheckoutNow on Google Play" class="btn-brand" />
             <a href="{{ \App\Support\CheckoutNowApp::webUrl() }}" target="_blank" rel="noopener noreferrer" class="btn-brand-outline">
                 Open web app <i class="fas fa-external-link-alt text-xs" aria-hidden="true"></i>
             </a>

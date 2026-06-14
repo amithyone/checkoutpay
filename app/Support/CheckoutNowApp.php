@@ -54,12 +54,7 @@ final class CheckoutNowApp
      */
     public static function playStoreUrl(): string
     {
-        $configured = rtrim((string) config('whatsapp.checkoutnow_play_store_url', ''), '/');
-        if ($configured !== '') {
-            return $configured;
-        }
-
-        return self::androidApkDownloadUrl();
+        return MarketingDownloadLinks::checkoutNowPlayStoreUrl();
     }
 
     /**
@@ -67,8 +62,8 @@ final class CheckoutNowApp
      */
     public static function appStoreUrl(): string
     {
-        $configured = rtrim((string) config('whatsapp.checkoutnow_app_store_url', ''), '/');
-        if ($configured !== '') {
+        $configured = MarketingDownloadLinks::checkoutNowAppStoreUrl();
+        if ($configured !== null) {
             return $configured;
         }
 
@@ -77,11 +72,12 @@ final class CheckoutNowApp
 
     public static function hasConfiguredPlayStoreUrl(): bool
     {
-        return rtrim((string) config('whatsapp.checkoutnow_play_store_url', ''), '/') !== '';
+        return MarketingDownloadLinks::hasAdminPlayStoreUrl()
+            || rtrim((string) config('whatsapp.checkoutnow_play_store_url', ''), '/') !== '';
     }
 
     public static function hasConfiguredAppStoreUrl(): bool
     {
-        return rtrim((string) config('whatsapp.checkoutnow_app_store_url', ''), '/') !== '';
+        return MarketingDownloadLinks::checkoutNowAppStoreUrl() !== null;
     }
 }
