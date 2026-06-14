@@ -8,36 +8,31 @@
 @endsection
 
 @section('content')
-<section class="py-14 sm:py-20">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p class="text-sm font-semibold text-primary uppercase tracking-wide mb-3">Developer Program</p>
-            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-midnight-deep mb-4 sm:mb-6">Built by a developer who was tired of working for free</h1>
-            <p class="text-base sm:text-lg md:text-xl text-slate-600 mb-6 max-w-3xl mx-auto">
-                If you ship payment integrations for clients, you deserve a share—not just a line on your portfolio. We pay approved partners through clear attribution, starting with your <strong class="text-midnight-deep">Business ID</strong> in our WordPress / WooCommerce plugin.
-            </p>
-            <p class="text-sm sm:text-base text-amber-950 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 max-w-2xl mx-auto mb-8">
-                <strong>Apply first:</strong> You must <strong>submit an application and be approved</strong> into the Developer Program before any revenue share can accrue—even if you already added a Business ID in the plugin.
-                <a href="{{ url('/developers/program/apply') }}" class="block mt-2 text-primary font-semibold underline hover:text-primary/80">Open application form →</a>
-            </p>
-            <div class="flex flex-col gap-4 justify-center items-stretch sm:items-center max-w-lg mx-auto">
-                <div class="flex flex-col sm:flex-row gap-3 w-full sm:justify-center">
-                <a href="{{ url('/developers/program/apply') }}" class="inline-flex items-center justify-center px-6 py-3.5 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium touch-manipulation order-1">
-                    Apply to the program
-                    <i class="fas fa-arrow-right ml-2"></i>
-                </a>
-                <a href="{{ route('developers.index') }}" class="inline-flex items-center justify-center px-6 py-3 border-2 border-primary text-primary rounded-lg hover:bg-primary/5 font-medium touch-manipulation order-2">
-                    Developer hub
-                </a>
-                </div>
-                <p class="text-xs text-center text-slate-500 sm:pt-1">Need help before you apply?</p>
-                <a href="{{ route('contact') }}" class="inline-flex items-center justify-center px-6 py-2.5 text-slate-600 border border-dashed border-gray-300 rounded-lg hover:bg-surface-container-low font-medium text-sm touch-manipulation">
-                    Contact us (general questions)
-                </a>
+    <x-marketing.product-hero
+        badge="Developer Program"
+        title="Built by a developer who was tired of working for free"
+        subtitle="If you ship payment integrations for clients, you deserve a share—not just a line on your portfolio. We pay approved partners through clear attribution, starting with your Business ID in our WordPress / WooCommerce plugin."
+        align="center"
+    >
+        <x-slot:actions>
+            <a href="{{ route('developers.program.apply') }}" class="btn-brand">
+                Apply to the program
+                <i class="fas fa-arrow-right" aria-hidden="true"></i>
+            </a>
+            <a href="{{ route('developers.index') }}" class="btn-brand-outline">Developer hub</a>
+        </x-slot:actions>
+    </x-marketing.product-hero>
+
+    <x-marketing.product-section bg="white">
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-10 text-sm text-amber-950 font-medium">
+                <strong>Apply first:</strong> You must submit an application and be approved before any revenue share can accrue—even if you already added a Business ID in the plugin.
+                <a href="{{ route('developers.program.apply') }}" class="block mt-2 text-brand-primary font-semibold hover:underline">Open application form →</a>
             </div>
         </div>
-    </section>
+    </x-marketing.product-section>
 
-    <article class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+    <article class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-20">
         <section class="mb-14" id="story">
             <h2 class="text-2xl font-bold text-midnight-deep mb-6">Why this program exists</h2>
             <div class="text-slate-700 leading-relaxed space-y-5 text-base sm:text-lg border-l-4 border-primary/40 pl-5 sm:pl-6">
@@ -53,7 +48,7 @@
             </div>
         </section>
 
-        <section class="mb-14 bg-white rounded-xl border-2 border-primary/30 shadow-sm p-6 sm:p-8" id="how-we-pay-you">
+        <section class="mb-14 card-marketing border-brand-primary/20 bg-gradient-to-br from-brand-primary/5 to-white p-6 sm:p-8" id="how-we-pay-you">
             <div class="flex items-start gap-3 mb-4">
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><i class="fab fa-wordpress text-xl"></i></span>
                 <div>
@@ -93,7 +88,7 @@
             </p>
         </section>
 
-        <section class="mb-14 bg-amber-50 border border-amber-200 rounded-xl p-6 sm:p-8" id="revenue-share">
+        <section class="mb-14 card-marketing bg-amber-50 border-amber-200 p-6 sm:p-8" id="revenue-share">
             <h2 class="text-xl font-bold text-midnight-deep mb-3 flex items-center gap-2">
                 <i class="fas fa-percent text-amber-700"></i>
                 Revenue share
@@ -136,15 +131,15 @@
         <section class="mb-14" id="integrations">
             <h2 class="text-2xl font-bold text-midnight-deep mb-4">What counts as a qualifying integration</h2>
             <div class="space-y-6 text-slate-600 leading-relaxed">
-                <div class="border border-gray-200 rounded-lg p-5 ring-1 ring-primary/10">
+                <div class="card-marketing p-5">
                     <h3 class="font-semibold text-midnight-deep mb-2 flex items-center gap-2"><i class="fab fa-wordpress text-purple-600"></i> WordPress / WooCommerce (plugin + Business ID)</h3>
                     <p>Production use of our official plugin with the merchant’s API keys, plus your <strong class="text-midnight-deep">Developer Business ID</strong> entered in the plugin field so shareable volume can be credited to your business account. Sandbox-only or missing IDs may not qualify.</p>
                 </div>
-                <div class="border border-gray-200 rounded-lg p-5">
+                <div class="card-marketing p-5">
                     <h3 class="font-semibold text-midnight-deep mb-2">REST API &amp; server-to-server</h3>
                     <p>Production API keys on behalf of a registered merchant, with webhooks and patterns documented in our API reference. Partner attribution follows the same principle as the plugin: an explicit, approved identifier—not guesswork from IP or domain alone.</p>
                 </div>
-                <div class="border border-gray-200 rounded-lg p-5">
+                <div class="card-marketing p-5">
                     <h3 class="font-semibold text-midnight-deep mb-2">Hosted checkout &amp; payment links</h3>
                     <p>Flows that complete on our infrastructure with clear merchant identification and any partner metadata we agree during onboarding.</p>
                 </div>
@@ -198,14 +193,14 @@
             'sectionId' => 'faq',
         ])
 
-        <section class="bg-primary/5 border border-primary/20 rounded-xl p-8 text-center">
-            <h2 class="text-xl font-bold text-midnight-deep mb-2">Ready to stop working for free?</h2>
-            <p class="text-slate-600 mb-6 max-w-xl mx-auto">Submit the Developer Program application with your contact details and how you want to join our Slack or WhatsApp community. After approval, your Business ID can start earning on qualifying integrations.</p>
-            <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href="{{ url('/developers/program/apply') }}" class="inline-flex items-center justify-center px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium touch-manipulation">Apply to the program</a>
-                <a href="{{ route('contact') }}" class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-midnight-deep rounded-lg hover:bg-white font-medium">Contact us</a>
-                <a href="{{ route('business.register') }}" class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-midnight-deep rounded-lg hover:bg-white font-medium">Create a business account</a>
-            </div>
-        </section>
     </article>
+
+    <x-marketing.product-cta
+        title="Ready to stop working for free?"
+        subtitle="Submit the Developer Program application. After approval, your Business ID can start earning on qualifying integrations."
+        :primary-url="route('developers.program.apply')"
+        primary-label="Apply to the program"
+        :secondary-url="route('contact')"
+        secondary-label="Contact us"
+    />
 @endsection

@@ -11,116 +11,101 @@
 @endsection
 
 @section('content')
-<!-- Hero -->
-    <section class="py-14 sm:py-20">
-        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center">
-                <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-midnight-deep mb-4 sm:mb-6">Developer Hub</h1>
-                <p class="text-base sm:text-lg md:text-xl text-slate-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
-                    Everything you need to integrate CheckoutPay into your application. API reference, webhooks, testing tools, and more.
-                </p>
-                <div class="flex flex-col sm:flex-row gap-3 justify-center items-center flex-wrap">
-                    <a href="{{ route('developers.program') }}" class="inline-flex items-center px-5 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium shadow-sm">
-                        <i class="fas fa-handshake mr-2"></i>
-                        Developer Program — earn on client integrations
-                    </a>
-                    <a href="{{ url('/developers/program/apply') }}" class="inline-flex items-center px-5 py-2.5 border-2 border-primary text-primary rounded-lg hover:bg-primary/5 text-sm font-medium touch-manipulation">
-                        Apply to the program
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
+    <x-marketing.product-hero
+        badge="Developer hub"
+        icon="fa-code"
+        title="Developer Hub"
+        subtitle="Everything you need to integrate CheckoutPay — API reference, webhooks, testing tools, and the Developer Program."
+    >
+        <x-slot:actions>
+            <a href="{{ route('developers.program') }}" class="btn-brand">
+                <i class="fas fa-handshake" aria-hidden="true"></i>
+                Developer Program
+            </a>
+            <a href="{{ route('developers.program.apply') }}" class="btn-brand-outline">
+                Apply to the program
+            </a>
+        </x-slot:actions>
+    </x-marketing.product-hero>
 
-    <!-- API Reference -->
-    <section id="api-reference" class="py-12 sm:py-16 md:py-20 bg-white">
-        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-bold text-midnight-deep mb-8 text-center">API Reference</h2>
-            <div class="bg-white card-marketing p-6 sm:p-8">
-                <h3 class="text-xl font-bold text-midnight-deep mb-4">Base URL</h3>
-                <div class="bg-gray-900 rounded-lg p-4 mb-6">
-                    <code class="text-green-400 text-sm">https://check-outpay.com/api/v1</code>
-                </div>
-                <h3 class="text-xl font-bold text-midnight-deep mb-4">Authentication</h3>
-                <p class="text-slate-600 mb-4">All API requests require an API key in the header:</p>
-                <div class="bg-gray-900 rounded-lg p-4 mb-6">
-                    <code class="text-green-400 text-sm">X-API-Key: pk_your_api_key_here</code>
-                </div>
-                <a href="{{ route('business.api-documentation.index') }}" class="btn-brand">
-                    View Complete API Documentation
-                    <i class="fas fa-arrow-right ml-2"></i>
+    <x-marketing.product-section title="API reference" bg="white">
+        <div class="card-marketing p-6 sm:p-8 max-w-4xl mx-auto">
+            <h3 class="text-xl font-bold text-midnight-deep mb-4">Base URL</h3>
+            <div class="bg-midnight-deep rounded-xl p-4 mb-6">
+                <code class="text-emerald-400 text-sm">{{ url('/api/v1') }}</code>
+            </div>
+            <h3 class="text-xl font-bold text-midnight-deep mb-4">Authentication</h3>
+            <p class="text-slate-600 mb-4 font-medium">All API requests require an API key in the header:</p>
+            <div class="bg-midnight-deep rounded-xl p-4 mb-6">
+                <code class="text-emerald-400 text-sm">X-API-Key: pk_your_api_key_here</code>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ route('api-docs') }}" class="btn-brand">
+                    Public API docs
+                    <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                </a>
+                <a href="{{ route('business.api-documentation.index') }}" class="btn-brand-outline">
+                    Business dashboard docs
                 </a>
             </div>
         </div>
-    </section>
+    </x-marketing.product-section>
 
-    <!-- Webhooks -->
-    <section id="webhooks" class="py-12 sm:py-16 md:py-20 bg-surface-container-low">
-        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-bold text-midnight-deep mb-8 text-center">Webhooks</h2>
-            <div class="bg-white card-marketing p-6 sm:p-8">
-                <p class="text-slate-600 mb-6">Receive real-time notifications when payment status changes. Configure your webhook URL in your dashboard.</p>
-                <div class="bg-surface-container-low rounded-lg p-4 mb-4">
-                    <h4 class="font-semibold text-midnight-deep mb-2">Webhook Events</h4>
-                    <ul class="space-y-2 text-sm text-slate-600">
-                        <li><code class="bg-white px-2 py-1 rounded">payment.approved</code> - Payment verified and approved</li>
-                        <li><code class="bg-white px-2 py-1 rounded">payment.rejected</code> - Payment rejected or expired</li>
-                    </ul>
+    <x-marketing.product-section title="Webhooks" subtitle="Real-time notifications when payment status changes." bg="muted">
+        <div class="card-marketing p-6 sm:p-8 max-w-4xl mx-auto">
+            <div class="bg-surface-container-low rounded-xl p-4 mb-4">
+                <h4 class="font-semibold text-midnight-deep mb-2">Webhook events</h4>
+                <ul class="space-y-2 text-sm text-slate-600">
+                    <li><code class="bg-white px-2 py-1 rounded border border-slate-200">payment.approved</code> — Payment verified and approved</li>
+                    <li><code class="bg-white px-2 py-1 rounded border border-slate-200">payment.rejected</code> — Payment rejected or expired</li>
+                </ul>
+            </div>
+            <a href="{{ route('business.api-documentation.index') }}#webhooks" class="text-brand-primary hover:text-brand-secondary font-semibold">
+                Learn more about webhooks <i class="fas fa-arrow-right ml-1 text-xs"></i>
+            </a>
+        </div>
+    </x-marketing.product-section>
+
+    <x-marketing.product-section title="Quick integration guide" bg="white">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            @foreach([
+                ['step' => '1', 'title' => 'Get API keys', 'desc' => 'Sign up and get your API keys from the dashboard'],
+                ['step' => '2', 'title' => 'Make API call', 'desc' => 'Create payment requests using our REST API'],
+                ['step' => '3', 'title' => 'Receive webhook', 'desc' => 'Get notified when payment is verified'],
+            ] as $item)
+                <div class="card-marketing p-6 text-center">
+                    <div class="w-10 h-10 bg-brand-primary/10 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                        <span class="text-brand-primary font-bold text-xl">{{ $item['step'] }}</span>
+                    </div>
+                    <h3 class="font-bold text-midnight-deep mb-2">{{ $item['title'] }}</h3>
+                    <p class="text-sm text-slate-600">{{ $item['desc'] }}</p>
                 </div>
-                <a href="{{ route('business.api-documentation.index') }}#webhooks" class="text-brand-primary hover:text-brand-secondary font-medium">
-                    Learn More About Webhooks <i class="fas fa-arrow-right ml-1"></i>
-                </a>
+            @endforeach
+        </div>
+    </x-marketing.product-section>
+
+    <x-marketing.product-section title="Testing" bg="muted">
+        <div class="card-marketing p-6 sm:p-8 max-w-4xl mx-auto">
+            <h3 class="text-xl font-bold text-midnight-deep mb-4">Test mode</h3>
+            <p class="text-slate-600 mb-4 font-medium">Use test API keys to validate your integration without processing real payments.</p>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                <p class="text-sm text-amber-900"><strong>Note:</strong> Test mode uses the same API endpoints but with test credentials. No real payments will be processed.</p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ route('checkout-demo.index') }}" class="btn-brand-outline">Try hosted checkout demo</a>
+                <a href="{{ route('business.register') }}" class="btn-brand">Get started with test keys</a>
             </div>
         </div>
-    </section>
-
-    <!-- API Integration -->
-    <section id="api-integration" class="py-12 sm:py-16 md:py-20 bg-surface-container-low">
-        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-bold text-midnight-deep mb-8 text-center">Quick Integration Guide</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="card-marketing p-6">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <span class="text-primary font-bold text-xl">1</span>
-                    </div>
-                    <h3 class="font-bold text-midnight-deep mb-2">Get API Keys</h3>
-                    <p class="text-sm text-slate-600">Sign up and get your API keys from the dashboard</p>
-                </div>
-                <div class="card-marketing p-6">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <span class="text-primary font-bold text-xl">2</span>
-                    </div>
-                    <h3 class="font-bold text-midnight-deep mb-2">Make API Call</h3>
-                    <p class="text-sm text-slate-600">Create payment request using our REST API</p>
-                </div>
-                <div class="card-marketing p-6">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <span class="text-primary font-bold text-xl">3</span>
-                    </div>
-                    <h3 class="font-bold text-midnight-deep mb-2">Receive Webhook</h3>
-                    <p class="text-sm text-slate-600">Get notified when payment is verified</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Testing -->
-    <section id="testing" class="py-12 sm:py-16 md:py-20 bg-white">
-        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-bold text-midnight-deep mb-8 text-center">Testing</h2>
-            <div class="bg-white card-marketing p-6 sm:p-8">
-                <h3 class="text-xl font-bold text-midnight-deep mb-4">Test Mode</h3>
-                <p class="text-slate-600 mb-4">Use test API keys to test your integration without processing real payments.</p>
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                    <p class="text-sm text-yellow-800"><strong>Note:</strong> Test mode uses the same API endpoints but with test credentials. No real payments will be processed.</p>
-                </div>
-                <a href="{{ route('business.register') }}" class="btn-brand">
-                    Get Started with Test Keys
-                    <i class="fas fa-arrow-right ml-2"></i>
-                </a>
-            </div>
-        </div>
-    </section>
+    </x-marketing.product-section>
 
     @include('partials.faq-section', ['categories' => ['api', 'developer-program'], 'title' => 'Developer & API FAQs'])
+
+    <x-marketing.product-cta
+        title="Build with CheckoutPay"
+        subtitle="Join the Developer Program or create a business account to get API keys."
+        :primary-url="route('developers.program.apply')"
+        primary-label="Apply to Developer Program"
+        :secondary-url="route('business.register')"
+        secondary-label="Create business account"
+    />
 @endsection
