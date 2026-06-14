@@ -173,6 +173,7 @@
     update();
 
     if (dataUrl && pollSeconds > 0) {
+        pollRates();
         setInterval(pollRates, pollSeconds * 1000);
     }
 })();

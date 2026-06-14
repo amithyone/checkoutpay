@@ -2,9 +2,9 @@
 
 namespace App\Support;
 
-use App\Services\Admin\MevonPayFxRateTrackerService;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFxPublishService;
+use App\Services\Consumer\VirtualCardFxService;
 
 /**
  * Public-facing Dollar Virtual Card rates and fees for marketing pages.
@@ -18,13 +18,8 @@ final class MarketingVirtualCard
             return ['enabled' => false];
         }
 
-        $publish = app(VirtualCardFxPublishService::class);
-        $published = $publish->publishedSnapshot();
-        if ($published['sell_rate'] === null || $published['buy_rate'] === null) {
-            $publish->syncFromMevon();
-        }
+        $rates = self::appRates();
 
-        $rates = app(MevonPayFxRateTrackerService::class)->calculatorRates();
         $sellRate = $rates['sell_rate'];
         $buyRate = $rates['buy_rate'];
         $setupUsd = $cards->requestFeeUsd();
@@ -52,6 +47,35 @@ final class MarketingVirtualCard
             'published_at' => $rates['published_at'],
             'fx_rates_url' => route('virtual-card.fx-rates'),
             'poll_seconds' => $rates['poll_seconds'],
+        ];
+    }
+
+    /**
+     * Published CheckoutNow app FX rates — same source as admin settings and consumer API.
+     *
+     * @return array{ok: bool, sell_rate: ?float, buy_rate: ?float, mid: ?float, published_at: ?string, updated_at: string, poll_seconds: int}
+     */
+    public static function appRates(bool $fetchFresh = false): array
+    {
+        $publish = app(VirtualCardFxPublishService::class);
+        $published = $publish->publishedSnapshot();
+
+        if ($published['sell_rate'] === null || $published['buy_rate'] === null) {
+            $publish->syncFromMevon();
+        } elseif ($fetchFresh) {
+            $publish->syncFromMevon();
+        }
+
+        $fx = app(VirtualCardFxService::class);
+
+        return [
+            'ok' => true,
+            'sell_rate' => $fx->sellRate(),
+            'buy_rate' => $fx->buyRate(),
+            'mid' => $fx->midUsdNgnRate(),
+            'published_at' => $fx->publishedAt(),
+            'updated_at' => now()->toIso8601String(),
+            'poll_seconds' => 60,
         ];
     }
 }
