@@ -33,7 +33,10 @@ class Payment extends Model
         'rental_id',
         'status',
         'payment_source',
+        'payment_method_used',
         'external_reference',
+        'checkout_pay_code',
+        'checkout_pay_code_expires_at',
         'email_data',
         'matched_at',
         'expires_at',
@@ -69,6 +72,7 @@ class Payment extends Model
         'webhook_urls_sent' => 'array',
         'matched_at' => 'datetime',
         'expires_at' => 'datetime',
+        'checkout_pay_code_expires_at' => 'datetime',
         'webhook_sent_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -106,6 +110,10 @@ class Payment extends Model
 
     /** Debit customer WhatsApp wallet, credit merchant via X-API-Key partner API (no chat PIN). */
     const SOURCE_PARTNER_WALLET_API = 'partner_wallet_api';
+
+    const METHOD_BANK_TRANSFER = 'bank_transfer';
+
+    const METHOD_WHATSAPP_WALLET = 'whatsapp_wallet';
 
     /**
      * Get pending payments
@@ -285,6 +293,10 @@ class Payment extends Model
             'mismatch_reason' => $mismatchReason,
         ];
 
+        if (empty($this->payment_method_used)) {
+            $updateData['payment_method_used'] = self::METHOD_BANK_TRANSFER;
+        }
+
         // Update payer_name, bank, and payer_account_number from email_data if provided
         // Map sender_name to payer_name if payer_name is not set (they are the same)
         $payerName = $emailData['payer_name'] ?? $emailData['sender_name'] ?? null;
@@ -303,6 +315,9 @@ class Payment extends Model
         }
 
         $updated = $this->update($updateData);
+        if ($updated && $this->checkout_pay_code && $this->payment_method_used !== self::METHOD_WHATSAPP_WALLET) {
+            app(\App\Services\Whatsapp\WhatsappCheckoutPayCodeService::class)->invalidateCode($this->fresh());
+        }
         if ($updated && $this->user_id) {
             $this->creditUserWallet($receivedAmount ?? (float) $this->amount);
         }

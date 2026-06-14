@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
 
 return [
-    'name' => env('APP_NAME', 'Email Payment Gateway'),
+    'name' => env('APP_NAME', 'CheckoutPay'),
     'env' => env('APP_ENV', 'production'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => rtrim(env('APP_URL', 'http://localhost'), '/'),

@@ -23,25 +23,27 @@
 @endphp
 
 @if(count($items) > 0)
-<section class="py-12 sm:py-16 bg-white border-t border-gray-100" id="{{ $sectionId }}">
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 text-center">{{ $title }}</h2>
+<section class="{{ empty($title) ? 'py-0' : 'py-12 sm:py-16' }} bg-transparent border-0" id="{{ $sectionId }}">
+    <div class="{{ empty($title) ? '' : 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8' }}">
+        @if(!empty($title))
+        <h2 class="section-heading text-center mb-2">{{ $title }}</h2>
+        @endif
         @if($showAllLink)
-            <p class="text-center text-sm text-gray-500 mb-8">
-                <a href="{{ route('faqs.index') }}#{{ $anchorSlug }}" class="text-primary font-medium hover:underline">See all FAQs</a>
-                including search for WordPress, API, and developer program topics.
+            <p class="text-center text-sm text-slate-500 font-medium mb-8">
+                <a href="{{ route('faqs.index') }}#{{ $anchorSlug }}" class="text-brand-primary font-semibold hover:underline">See all FAQs</a>
+                including WordPress, API, and developer program topics.
             </p>
-        @else
+        @elseif(!empty($title))
             <div class="mb-8"></div>
         @endif
         <div class="space-y-3">
             @foreach($items as $item)
-                <details class="group border border-gray-200 rounded-lg p-4 open:bg-gray-50">
-                    <summary class="font-semibold text-gray-900 cursor-pointer list-none flex justify-between items-center gap-4">
+                <details class="group card-marketing p-4 open:border-brand-primary/30">
+                    <summary class="font-bold text-midnight-deep cursor-pointer list-none flex justify-between items-center gap-4">
                         <span>{{ $item['q'] }}</span>
-                        <i class="fas fa-chevron-down text-gray-400 group-open:rotate-180 transition-transform text-sm shrink-0"></i>
+                        <i class="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform text-sm shrink-0"></i>
                     </summary>
-                    <p class="mt-3 text-gray-600 text-sm leading-relaxed">{!! nl2br(e(FaqCatalog::formatAnswer($item))) !!}</p>
+                    <p class="mt-3 text-slate-600 text-sm leading-relaxed font-medium">{!! nl2br(e(FaqCatalog::formatAnswer($item))) !!}</p>
                 </details>
             @endforeach
         </div>

@@ -1,30 +1,24 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+@extends('layouts.marketing')
+
+@section('title')
     @include('partials.marketing-head', [
         'seoPath' => '/api-docs',
         'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('api'))],
     ])
+@endsection
+
+@push('head')
 <style>
-        pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        code {
-            font-family: 'Courier New', monospace;
-        }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+        code { font-family: 'Courier New', monospace; }
         .code-block {
             background: #1e293b;
             color: #e2e8f0;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             padding: 1rem;
             overflow-x: auto;
         }
-        .code-block code {
-            color: #e2e8f0;
-        }
+        .code-block code { color: #e2e8f0; }
         .endpoint-badge {
             display: inline-block;
             padding: 0.25rem 0.75rem;
@@ -39,28 +33,28 @@
         .badge-put { background: #f59e0b; color: white; }
         .badge-delete { background: #ef4444; color: white; }
     </style>
-    @include('partials.tailwind-assets')
-</head>
-<body class="bg-gray-50">
-    @include('partials.nav')
+@endpush
+
+@section('content')
 
     <!-- Hero Section -->
-    <section class="bg-gradient-to-br from-primary/10 via-white to-primary/5 py-12 sm:py-16">
+    <section class="py-12 sm:py-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center">
-                <h1 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-                    <i class="fas fa-code mr-3 text-primary"></i>API Documentation
+                <div class="badge-brand mx-auto mb-4"><i class="fas fa-code"></i> REST API</div>
+                <h1 class="section-heading mb-4">
+                    API Documentation
                 </h1>
-                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                <p class="section-subheading mx-auto">
                     Complete integration guide for CheckoutPay Payment Gateway API. Build powerful payment solutions with our RESTful API.
                 </p>
-                <p class="mt-6 text-sm text-gray-600 max-w-2xl mx-auto">
+                <p class="mt-6 text-sm text-slate-500 font-medium max-w-2xl mx-auto">
                     Building for clients?
-                    <a href="{{ route('developers.program') }}" class="text-primary font-medium hover:underline">Developer Program (revenue share)</a>
+                    <a href="{{ route('developers.program') }}" class="text-brand-primary font-semibold hover:underline">Developer Program (revenue share)</a>
                     ·
-                    <a href="{{ route('wordpress-plugin.index') }}" class="text-primary font-medium hover:underline">WordPress plugin</a>
+                    <a href="{{ route('wordpress-plugin.index') }}" class="text-brand-primary font-semibold hover:underline">WordPress plugin</a>
                     ·
-                    <a href="{{ route('faqs.index') }}#api" class="text-primary font-medium hover:underline">API FAQs</a>
+                    <a href="{{ route('faqs.index') }}#api" class="text-brand-primary font-semibold hover:underline">API FAQs</a>
                 </p>
             </div>
         </div>
@@ -72,13 +66,14 @@
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <!-- Sidebar Navigation -->
                 <div class="lg:col-span-1">
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-20">
-                        <h3 class="font-semibold text-gray-900 mb-4">Quick Navigation</h3>
+                    <div class="card-marketing p-4 sticky top-24">
+                        <h3 class="font-bold text-midnight-deep mb-4">Quick Navigation</h3>
                         <nav class="space-y-2">
-                            <a href="#getting-started" class="block text-sm text-gray-700 hover:text-primary py-2">Getting Started</a>
-                            <a href="#authentication" class="block text-sm text-gray-700 hover:text-primary py-2">Authentication</a>
-                            <a href="#endpoints" class="block text-sm text-gray-700 hover:text-primary py-2">API Endpoints</a>
+                            <a href="#getting-started" class="block text-sm text-slate-600 hover:text-brand-primary py-2 font-medium">Getting Started</a>
+                            <a href="#authentication" class="block text-sm text-slate-600 hover:text-brand-primary py-2 font-medium">Authentication</a>
+                            <a href="#endpoints" class="block text-sm text-slate-600 hover:text-brand-primary py-2 font-medium">API Endpoints</a>
                             <a href="#payments" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Payments</a>
+                            <a href="#whatsapp-pay-code" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">WhatsApp Pay Code</a>
                             <a href="#developer-program" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Developer program</a>
                             <a href="#update-amount" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Update payment amount</a>
                             <a href="#whatsapp-wallet" class="block text-sm text-gray-700 hover:text-primary py-2">WhatsApp wallet API</a>
@@ -292,6 +287,12 @@
                                                     <td class="px-4 py-3 text-gray-700">No</td>
                                                     <td class="px-4 py-3 text-gray-700">Alias for <code class="bg-gray-100 px-1 rounded">developer_program_partner_business_id</code> when the long key is not sent.</td>
                                                 </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">include_whatsapp_pay</td>
+                                                    <td class="px-4 py-3 text-gray-700">boolean</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Default <code class="bg-gray-100 px-1 rounded">true</code>. When your business has WhatsApp wallet API enabled and Pay Code is allowed for at least one country, include a <code class="bg-gray-100 px-1 rounded">whatsapp_pay</code> block in the response. Set <code class="bg-gray-100 px-1 rounded">false</code> to omit it.</td>
+                                                </tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -324,10 +325,21 @@
     "website": {
       "id": 1,
       "url": "https://yourwebsite.com"
+    },
+    "whatsapp_pay": {
+      "code": "ABC12",
+      "message": "PAY ABC12",
+      "wa_link": "https://wa.me/234XXXXXXXXXX?text=PAY%20ABC12",
+      "expires_at": "2024-01-15T10:30:00Z",
+      "amount": 5000.00,
+      "enabled_countries": ["NG"],
+      "status": "available",
+      "instructions": "Send the message on WhatsApp, then enter your wallet PIN on the secure link."
     }
   }
 }</code></pre>
                                     </div>
+                                    <p class="text-sm text-gray-600 mt-2"><code class="bg-gray-100 px-1 rounded">whatsapp_pay</code> is omitted when WhatsApp wallet API is disabled on your business, Pay Code is disabled platform-wide, or you send <code class="bg-gray-100 px-1 rounded">include_whatsapp_pay: false</code>. Bank transfer fields are unchanged — existing integrations can ignore the new block.</p>
                                 </div>
                             </div>
 
@@ -485,6 +497,28 @@ X-API-Key: pk_your_api_key_here</code></pre>
                         </div>
                     </div>
 
+                    <!-- WhatsApp Pay Code (checkout dual rail) -->
+                    <div id="whatsapp-pay-code" class="bg-white rounded-lg shadow-sm border border-green-200 p-6 sm:p-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">
+                            <i class="fab fa-whatsapp text-green-600 mr-2"></i>WhatsApp Pay Code
+                        </h2>
+                        <p class="text-gray-700 mb-4">
+                            Optional second payment rail on <code class="bg-gray-100 px-2 py-1 rounded text-sm">POST /payment-request</code>. The customer pays the <strong>same</strong> pending payment by sending <code class="bg-gray-100 px-1 rounded">PAY {CODE}</code> on WhatsApp (or tapping the prefilled <code class="bg-gray-100 px-1 rounded">wa_link</code>), then entering their wallet PIN on a secure Checkout page. <strong>First successful method wins</strong> — bank transfer or WhatsApp — same <code class="bg-gray-100 px-1 rounded">transaction_id</code> and <code class="bg-gray-100 px-1 rounded">payment.approved</code> webhook.
+                        </p>
+
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 text-sm text-green-900 space-y-2">
+                            <p><strong>Requirements:</strong> Admin enables Pay Code for customer countries (default Nigeria). Your business must have <strong>WhatsApp wallet API</strong> enabled.</p>
+                            <p><strong>vs <code>pay/start</code>:</strong> Pay Code is <em>customer-initiated</em> at checkout (you do not need their phone). <code>POST /whatsapp-wallet/pay/start</code> is when you already know the customer number and push a WhatsApp message from your backend.</p>
+                            <p><strong>UI tip:</strong> Show your virtual account <em>and</em> a “Pay on WhatsApp” button using <code class="bg-white px-1 rounded">whatsapp_pay.wa_link</code> or a QR code.</p>
+                        </div>
+
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Poll payment status</h3>
+                        <p class="text-gray-700 mb-3"><code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> includes <code class="bg-gray-100 px-1 rounded">payment_method_used</code> (<code class="bg-gray-100 px-1 rounded">bank_transfer</code> | <code class="bg-gray-100 px-1 rounded">whatsapp_wallet</code> | null while pending) and <code class="bg-gray-100 px-1 rounded">whatsapp_pay.status</code> (<code class="bg-gray-100 px-1 rounded">available</code>, <code class="bg-gray-100 px-1 rounded">claimed</code>, <code class="bg-gray-100 px-1 rounded">completed</code>, <code class="bg-gray-100 px-1 rounded">expired</code>).</p>
+
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3 mt-6">Security</h3>
+                        <p class="text-gray-700">Wallet PIN is <strong>never</strong> accepted in WhatsApp chat. The bot sends a time-limited HTTPS link; the customer enters their 4-digit PIN only on that page.</p>
+                    </div>
+
                     <!-- WhatsApp wallet merchant API -->
                     <div id="whatsapp-wallet" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
                         <h2 class="text-3xl font-bold text-gray-900 mb-4">
@@ -638,6 +672,7 @@ X-API-Key: pk_your_api_key_here
     "business_receives": 4900.00
   },
   "timestamp": "2024-01-15T10:35:00Z",
+  "payment_method": "bank_transfer",
   "email_data": {},
   "developer_program_partner_business_id": 42,
   "developer_program_partner_share_amount": 25.00,
@@ -645,7 +680,7 @@ X-API-Key: pk_your_api_key_here
   "developer_program_fee_share_base_description": "CheckoutPay's transaction fee revenue on qualifying attributed volume"
 }</code></pre>
                                 </div>
-                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
+                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>payment_method</code> (<code>bank_transfer</code> or <code>whatsapp_wallet</code>, nullable), <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
                             </div>
 
                             <div>
@@ -1061,9 +1096,9 @@ if ($payload['event'] === 'payment.approved') {
         'category' => 'api',
         'title' => 'Payment gateway API FAQs',
     ])
+@endsection
 
-    @include('partials.footer')
-
+@push('scripts')
     <script>
         // Smooth scrolling for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -1093,5 +1128,4 @@ if ($payload['event'] === 'payment.approved') {
             });
         });
     </script>
-</body>
-</html>
+@endpush

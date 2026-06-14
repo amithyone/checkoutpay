@@ -419,6 +419,6 @@ Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',
         'timestamp' => now()->toISOString(),
-        'service' => 'Email Payment Gateway',
+        'service' => \App\Support\SiteBranding::name(),
     ]);
 });

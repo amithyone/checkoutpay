@@ -194,6 +194,8 @@ class WhatsappWalletAdminController extends Controller
             'fxRates' => $fxRates,
             'fxCurrencyCodes' => $this->fxCurrencyCodesForAdmin(),
             'legacyFxPairCount' => $legacyFxPairCount,
+            'checkoutPayCodeCountries' => \App\Services\Whatsapp\WhatsappCheckoutPayCodePolicy::countryOptionsForAdmin(),
+            'checkoutPayCodeEnabledCountries' => \App\Services\Whatsapp\WhatsappCheckoutPayCodePolicy::enabledCountries(),
         ];
     }
 
@@ -349,6 +351,22 @@ class WhatsappWalletAdminController extends Controller
             'float',
             'whatsapp',
             'Self bank transfer fee percent (deducted from amount sent; recipient gets remainder)'
+        );
+
+        $enabledPayCodeCountries = $request->input('whatsapp_checkout_pay_code_countries', []);
+        if (! is_array($enabledPayCodeCountries)) {
+            $enabledPayCodeCountries = [];
+        }
+        $enabledPayCodeCountries = array_values(array_unique(array_filter(array_map(
+            static fn ($cc) => strtoupper(substr(preg_replace('/\s+/', '', (string) $cc), 0, 2)),
+            $enabledPayCodeCountries
+        ), static fn (string $cc): bool => strlen($cc) === 2)));
+        Setting::set(
+            'whatsapp_checkout_pay_code_enabled_countries',
+            $enabledPayCodeCountries,
+            'json',
+            'whatsapp',
+            'ISO country codes allowed to use Checkout WhatsApp Pay Code (customer-initiated checkout)'
         );
 
         $this->saveWhatsappRegionOverrides($request);

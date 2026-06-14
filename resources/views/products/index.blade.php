@@ -1,22 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.marketing-head', ['seoPath' => '/products'])
-@include('partials.tailwind-assets')
-</head>
-<body class="bg-white">
-    @include('partials.nav')
+@extends('layouts.marketing')
 
+@section('title')
+    @include('partials.marketing-head', ['seoPath' => '/products'])
+@endsection
+
+@section('content')
     <!-- Hero Section -->
-    <section class="bg-gradient-to-br from-primary/10 via-white to-primary/5 py-12 sm:py-16 md:py-20">
+    <section class="py-12 sm:py-16 md:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center">
-                <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
+                <div class="badge-brand mx-auto mb-6">Business solutions</div>
+                <h1 class="section-heading mb-4 sm:mb-6">
                     Business Solutions
                 </h1>
-                <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto">
+                <p class="section-subheading mx-auto mb-6 sm:mb-8">
                     WhatsApp Wallet. Payments. Dollar card. Invoices. Rentals. Tickets. Memberships.
                 </p>
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-3">
@@ -35,7 +32,7 @@
         </div>
     </section>
 
-    <x-dollar-card-marketing :virtual-card="$virtualCard ?? []" id="dollar-virtual-card" />
+    <x-marketing.virtual-card-section :virtual-card="$virtualCard ?? []" />
 
     <!-- Core Payment Products -->
     <section class="py-12 sm:py-16 md:py-20 bg-white">
@@ -449,6 +446,4 @@
         </div>
     </section>
 
-    @include('partials.footer')
-</body>
-</html>
+@endsection

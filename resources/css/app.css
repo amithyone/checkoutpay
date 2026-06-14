@@ -1,3 +1,68 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 5rem;
+    }
+}
+
+@layer components {
+    .marketing-grid-bg {
+        background-image:
+            linear-gradient(to right, rgba(128, 128, 128, 0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(128, 128, 128, 0.04) 1px, transparent 1px);
+        background-size: 14px 24px;
+    }
+
+    .card-marketing {
+        @apply bg-white rounded-2xl border border-slate-200/90 shadow-premium;
+    }
+
+    .glass-marketing {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+
+    .btn-brand {
+        @apply inline-flex items-center justify-center gap-2 bg-brand-primary text-white font-semibold text-sm px-8 py-4 rounded-xl shadow-premium hover:bg-brand-secondary hover:-translate-y-0.5 active:scale-[0.98] transition-all;
+    }
+
+    .btn-brand-outline {
+        @apply inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-semibold text-sm text-midnight-deep glass-marketing hover:bg-white/90 transition-all;
+    }
+
+    .badge-brand {
+        @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-container/10 border border-primary-container/20 text-brand-primary font-semibold text-xs;
+    }
+
+    .pricing-badge {
+        @apply inline-flex items-center px-3 py-1 rounded-full bg-brand-primary text-white font-bold text-sm shadow-brand;
+    }
+
+    .nav-link-marketing {
+        @apply text-sm font-medium text-slate-600 hover:text-brand-primary transition-colors relative py-2;
+    }
+
+    .group:hover .nav-link-marketing::after,
+    a.nav-link-marketing:hover::after {
+        @apply w-full;
+    }
+
+    .nav-link-marketing::after {
+        content: '';
+        @apply absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary transition-all duration-300;
+    }
+
+    .section-heading {
+        @apply text-3xl md:text-4xl lg:text-5xl font-black text-midnight-deep tracking-tight;
+    }
+
+    .section-subheading {
+        @apply text-slate-600 font-medium text-base md:text-lg max-w-2xl;
+    }
+}

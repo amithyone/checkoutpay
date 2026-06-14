@@ -346,7 +346,7 @@
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                         placeholder="Leave empty to use default"
                     >
-                    <p class="text-xs text-gray-500 mt-1">Default: ₦{{ number_format(\App\Models\Setting::get('default_charge_fixed', 100), 2) }}</p>
+                    <p class="text-xs text-gray-500 mt-1">Default: ₦{{ number_format(\App\Models\Setting::get('default_charge_fixed', 50), 2) }}</p>
                 </div>
                 
                 <div class="flex items-center space-x-3">

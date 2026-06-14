@@ -316,6 +316,7 @@ class SendWebhookNotification implements ShouldQueue
                 'business_receives' => $this->payment->business_receives ?? $this->payment->amount,
             ],
             'timestamp' => $this->payment->matched_at ? $this->payment->matched_at->toISOString() : now()->toISOString(),
+            'payment_method' => $this->payment->payment_method_used,
             'email_data' => $emailData, // Include sanitized email data
             'developer_program_partner_business_id' => $this->payment->developer_program_partner_business_id
                 ? (int) $this->payment->developer_program_partner_business_id

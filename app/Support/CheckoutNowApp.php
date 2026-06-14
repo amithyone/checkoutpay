@@ -48,4 +48,40 @@ final class CheckoutNowApp
     {
         return 'CheckoutNow';
     }
+
+    /**
+     * Google Play Store listing for CheckoutNow (APK download until listing is live).
+     */
+    public static function playStoreUrl(): string
+    {
+        $configured = rtrim((string) config('whatsapp.checkoutnow_play_store_url', ''), '/');
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        return self::androidApkDownloadUrl();
+    }
+
+    /**
+     * Apple App Store listing for CheckoutNow (web app until listing is live).
+     */
+    public static function appStoreUrl(): string
+    {
+        $configured = rtrim((string) config('whatsapp.checkoutnow_app_store_url', ''), '/');
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        return self::webUrl();
+    }
+
+    public static function hasConfiguredPlayStoreUrl(): bool
+    {
+        return rtrim((string) config('whatsapp.checkoutnow_play_store_url', ''), '/') !== '';
+    }
+
+    public static function hasConfiguredAppStoreUrl(): bool
+    {
+        return rtrim((string) config('whatsapp.checkoutnow_app_store_url', ''), '/') !== '';
+    }
 }

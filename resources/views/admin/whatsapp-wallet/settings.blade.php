@@ -292,6 +292,29 @@
                 </div>
             </div>
 
+            <div class="border border-green-200 bg-green-50/60 rounded-lg p-4 space-y-3">
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-900">Checkout Pay Code — allowed countries</h4>
+                    <p class="text-xs text-gray-600 mt-1">Customers in checked countries can send <code class="bg-white px-1 rounded">PAY CODE</code> on WhatsApp to pay merchant checkouts. Merchants must also have <strong>WhatsApp wallet API</strong> enabled. Default: Nigeria only.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    @php
+                        $enabledPayCode = old('whatsapp_checkout_pay_code_countries', $checkoutPayCodeEnabledCountries ?? ['NG']);
+                        if (! is_array($enabledPayCode)) {
+                            $enabledPayCode = ['NG'];
+                        }
+                    @endphp
+                    @foreach($checkoutPayCodeCountries ?? [] as $country)
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-800 bg-white border border-green-100 rounded-lg px-3 py-2">
+                            <input type="checkbox" name="whatsapp_checkout_pay_code_countries[]" value="{{ $country['country'] }}"
+                                {{ in_array($country['country'], $enabledPayCode, true) ? 'checked' : '' }}
+                                class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                            <span>{{ $country['label'] }} ({{ $country['country'] }})</span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+
             <div class="flex justify-end">
                 <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
                     <i class="fas fa-save mr-2"></i>Save WhatsApp settings

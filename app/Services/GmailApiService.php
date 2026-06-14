@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SiteBranding;
 use Google_Client;
 use Google_Service_Gmail;
 use Google_Service_Gmail_Message;
@@ -41,7 +42,7 @@ class GmailApiService
     protected function initializeClient(): void
     {
         $this->client = new Google_Client();
-        $this->client->setApplicationName('Email Payment Gateway');
+        $this->client->setApplicationName($this->googleApplicationName());
         $this->client->setScopes(Google_Service_Gmail::GMAIL_READONLY);
         $this->client->setAuthConfig($this->credentialsPath);
         $this->client->setAccessType('offline');
@@ -251,7 +252,7 @@ class GmailApiService
         }
 
         $this->client = new Google_Client();
-        $this->client->setApplicationName('Email Payment Gateway');
+        $this->client->setApplicationName($this->googleApplicationName());
         $this->client->setScopes(Google_Service_Gmail::GMAIL_READONLY);
         $this->client->setAuthConfig($this->credentialsPath);
         $this->client->setAccessType('offline');
@@ -271,7 +272,7 @@ class GmailApiService
         }
 
         $this->client = new Google_Client();
-        $this->client->setApplicationName('Email Payment Gateway');
+        $this->client->setApplicationName($this->googleApplicationName());
         $this->client->setScopes(Google_Service_Gmail::GMAIL_READONLY);
         $this->client->setAuthConfig($this->credentialsPath);
         $this->client->setAccessType('offline');
@@ -326,5 +327,10 @@ class GmailApiService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    private function googleApplicationName(): string
+    {
+        return SiteBranding::name();
     }
 }

@@ -122,4 +122,43 @@ class MevonPayFxRateTrackerServiceTest extends TestCase
         $this->assertTrue($payload['live_poll']);
         $this->assertSame(60, $payload['poll_seconds']);
     }
+
+    public function test_calculator_rates_match_tracker_current_sell_and_buy(): void
+    {
+        MevonPayFxRateSnapshot::query()->create([
+            'recorded_at' => now()->subMinutes(2),
+            'mevon_mid' => 1378.08,
+            'published_mid' => 1378.08,
+            'sell_rate' => 1393.08,
+            'buy_rate' => 1348.08,
+            'source' => 'mevon_live',
+        ]);
+
+        $tracker = app(MevonPayFxRateTrackerService::class);
+        $dashboard = $tracker->dashboard(request()->merge(['range' => '1h']));
+        $calculator = $tracker->calculatorRates(fetchFresh: false);
+
+        $this->assertTrue($calculator['ok']);
+        $this->assertEquals($dashboard['current']['sell_rate'], $calculator['sell_rate']);
+        $this->assertEquals($dashboard['current']['buy_rate'], $calculator['buy_rate']);
+        $this->assertSame(60, $calculator['poll_seconds']);
+    }
+
+    public function test_calculator_rates_compute_from_mid_when_snapshot_lacks_sell_buy(): void
+    {
+        \App\Models\Setting::set('virtual_card_fx_sell_profit_ngn', 15, 'float', 'virtual_card', 'test');
+        \App\Models\Setting::set('virtual_card_fx_buy_profit_ngn', 30, 'float', 'virtual_card', 'test');
+
+        MevonPayFxRateSnapshot::query()->create([
+            'recorded_at' => now()->subMinute(),
+            'mevon_mid' => 1400,
+            'published_mid' => 1400,
+            'source' => 'mevon_live',
+        ]);
+
+        $calculator = app(MevonPayFxRateTrackerService::class)->calculatorRates(fetchFresh: false);
+
+        $this->assertEquals(1415.0, $calculator['sell_rate']);
+        $this->assertEquals(1370.0, $calculator['buy_rate']);
+    }
 }

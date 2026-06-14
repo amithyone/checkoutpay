@@ -88,6 +88,23 @@ final class VirtualCardFxPublishService
     }
 
     /**
+     * Sell/buy rates for a given mid — same math as syncFromMevon publish.
+     *
+     * @return array{sell_rate: ?float, buy_rate: ?float}
+     */
+    public function ratesForMid(float $mid): array
+    {
+        if ($mid <= 0) {
+            return ['sell_rate' => null, 'buy_rate' => null];
+        }
+
+        return [
+            'sell_rate' => $this->resolveSellRate($mid),
+            'buy_rate' => $this->resolveBuyRate($mid),
+        ];
+    }
+
+    /**
      * @return array{mid: ?float, sell_rate: ?float, buy_rate: ?float, published_at: ?string, source: ?string}
      */
     public function publishedSnapshot(): array

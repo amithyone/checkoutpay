@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Email Payment Gateway</title>
+    <title>Admin Login - {{ \App\Support\SiteBranding::name() }}</title>
     
 @include('partials.tailwind-assets')
 </head>
@@ -18,7 +18,7 @@
                     Admin Login
                 </h2>
                 <p class="mt-2 text-center text-sm text-gray-600">
-                    Email Payment Gateway Admin Panel
+                    {{ \App\Support\SiteBranding::name() }} Admin Panel
                 </p>
             </div>
             <form class="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-sm border border-gray-200" action="{{ route('admin.login') }}" method="POST">

@@ -6,8 +6,10 @@ use App\Models\Business;
 use App\Models\BusinessLendingOffer;
 use App\Models\BusinessLoan;
 use App\Models\BusinessLoanLedgerEntry;
+use App\Models\BusinessLoanLedgerEntry;
 use App\Models\BusinessLoanSchedule;
 use App\Notifications\PeerLoanRepaymentCollectedNotification;
+use App\Services\Business\BusinessLoanTransactionService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -303,7 +305,7 @@ class BusinessPeerLoanService
                     'status' => $paidFull ? 'paid' : $schedule->status,
                 ]);
 
-                BusinessLoanLedgerEntry::create([
+                $ledgerEntry = BusinessLoanLedgerEntry::create([
                     'business_loan_id' => $loan->id,
                     'entry_type' => BusinessLoanLedgerEntry::TYPE_COLLECTION,
                     'amount' => $pay,
@@ -311,6 +313,8 @@ class BusinessPeerLoanService
                     'to_business_id' => $lenderLocked->id,
                     'metadata' => ['schedule_id' => $schedule->id],
                 ]);
+
+                app(BusinessLoanTransactionService::class)->recordRepayment($ledgerEntry);
 
                 $count++;
                 $paidThisRun = $pay;

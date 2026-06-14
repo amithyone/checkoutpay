@@ -25,6 +25,7 @@ class WhatsappInboundHandler
         private WhatsappWalletVtuFlowHandler $walletVtuFlow,
         private WhatsappWalletPinResetFlowHandler $pinResetFlow,
         private WhatsappWalletPendingP2pService $pendingP2p,
+        private WhatsappCheckoutPayCodeHandler $checkoutPayCode,
     ) {}
 
     public function handleRequest(Request $request): void
@@ -174,6 +175,10 @@ class WhatsappInboundHandler
 
         $session->save();
         $session = $session->fresh();
+
+        if ($this->checkoutPayCode->tryHandle($instance, $phone, $text)) {
+            return;
+        }
 
         $linkedRenter = Renter::query()
             ->where('whatsapp_phone_e164', $phone)

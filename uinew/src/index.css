@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800;900&display=swap');
+
+@theme {
+  --font-sans: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+  --color-brand-primary: #001bca;
+  --color-brand-secondary: #3045e6;
+  --color-brand-electric: #4D61FF;
+  --color-midnight-deep: #111827;
+  --color-success-green: #22C55E;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+}

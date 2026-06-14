@@ -1,35 +1,31 @@
-@php
-    use App\Support\WhatsappWalletMarketing as Wa;
-    $waContact = Wa::contactUrl();
-    $waBrand = Wa::brandName();
-@endphp
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+@extends('layouts.marketing')
+
+@section('title')
     @include('partials.marketing-head', [
         'seoPath' => '/whatsapp-wallet',
         'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('whatsapp-wallet'))],
     ])
-@include('partials.tailwind-assets')
-</head>
-<body class="bg-white">
-    @include('partials.nav')
+@endsection
+
+@section('content')
+    @php
+        use App\Support\WhatsappWalletMarketing as Wa;
+        $waContact = Wa::contactUrl();
+        $waBrand = Wa::brandName();
+    @endphp
 
     {{-- Hero --}}
-    <section class="relative overflow-hidden bg-gradient-to-br from-green-50 via-white to-primary/5 py-14 sm:py-20 md:py-24">
+    <section class="relative overflow-hidden py-14 sm:py-20 md:py-24">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                 <div>
-                    <div class="inline-flex items-center gap-2 bg-green-100 text-green-900 px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-5">
-                        <i class="fab fa-whatsapp"></i>
-                        Flagship service
+                    <div class="badge-brand mb-5 bg-emerald-50 border-emerald-200 text-emerald-800">
+                        <i class="fab fa-whatsapp"></i> Flagship service
                     </div>
-                    <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-5">
-                        Send money to <span class="text-wa-dark">anyone</span> — right from WhatsApp
+                    <h1 class="section-heading leading-tight mb-5">
+                        Send money to <span class="text-emerald-600">anyone</span> — right from WhatsApp
                     </h1>
-                    <p class="text-lg text-gray-600 mb-4 leading-relaxed">
+                    <p class="text-lg text-slate-600 font-medium mb-4 leading-relaxed">
                         Your WhatsApp number is your wallet. Pay a friend, send to any Nigerian bank, buy airtime, or move value across borders — without leaving the app where you already chat every day.
                     </p>
                     <p class="text-base text-gray-500 mb-8">
@@ -277,6 +273,4 @@ X-API-Key: pk_your_key
         </div>
     </section>
 
-    @include('partials.footer')
-</body>
-</html>
+@endsection

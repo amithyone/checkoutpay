@@ -3,36 +3,22 @@
 namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
+use App\Models\BusinessTransaction;
+use App\Services\Business\BusinessActivityFeedService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class TransactionController extends Controller
 {
+    public function __construct(
+        private BusinessActivityFeedService $activityFeed,
+    ) {}
+
     public function index(Request $request)
     {
         $business = Auth::guard('business')->user();
-
-        $query = $business->payments()->with('website')->latest();
-
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        // Search by transaction ID
-        if ($request->filled('search')) {
-            $query->where('transaction_id', 'like', '%' . $request->search . '%');
-        }
-
-        $transactions = $query->paginate(20);
+        $transactions = $this->activityFeed->paginate($business, $request);
 
         return view('business.transactions.index', compact('transactions'));
     }
@@ -42,6 +28,24 @@ class TransactionController extends Controller
         $business = Auth::guard('business')->user();
         $transaction = $business->payments()->with('website')->findOrFail($id);
 
-        return view('business.transactions.show', compact('transaction'));
+        return view('business.transactions.show', [
+            'transaction' => $transaction,
+            'kind' => 'payment',
+        ]);
+    }
+
+    public function showLoanRepayment(BusinessTransaction $loanTransaction): View
+    {
+        $business = Auth::guard('business')->user();
+
+        abort_unless((int) $loanTransaction->business_id === (int) $business->id, 404);
+        abort_unless($loanTransaction->business_loan_ledger_entry_id !== null, 404);
+
+        $loanTransaction->load(['counterparty', 'loanLedgerEntry.loan.borrower', 'loanLedgerEntry.loan.offer.lender']);
+
+        return view('business.transactions.show-loan-repayment', [
+            'transaction' => $loanTransaction,
+            'kind' => 'loan_repayment',
+        ]);
     }
 }

@@ -562,7 +562,7 @@
                         type="number" 
                         id="default_charge_fixed" 
                         name="default_charge_fixed" 
-                        value="{{ \App\Models\Setting::get('default_charge_fixed', 100) }}"
+                        value="{{ \App\Models\Setting::get('default_charge_fixed', 50) }}"
                         step="0.01"
                         min="0"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"

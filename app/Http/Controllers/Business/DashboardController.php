@@ -4,12 +4,17 @@ namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Services\Business\BusinessActivityFeedService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private BusinessActivityFeedService $activityFeed,
+    ) {}
+
     public function index()
     {
         $business = Auth::guard('business')->user();
@@ -127,12 +132,8 @@ class DashboardController extends Controller
             return $b['total_revenue'] <=> $a['total_revenue'];
         });
 
-        // Recent payments with website
-        $recentPayments = $business->payments()
-            ->with('website')
-            ->latest()
-            ->take(10)
-            ->get();
+        // Recent payments, loan repayments, and other balance activity
+        $recentActivity = $this->activityFeed->recent($business, 10);
 
         // Recent withdrawals
         $recentWithdrawals = $business->withdrawalRequests()
@@ -140,6 +141,6 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        return view('business.dashboard', compact('stats', 'websiteStats', 'recentPayments', 'recentWithdrawals'));
+        return view('business.dashboard', compact('stats', 'websiteStats', 'recentActivity', 'recentWithdrawals'));
     }
 }

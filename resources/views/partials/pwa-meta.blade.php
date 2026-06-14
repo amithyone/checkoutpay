@@ -12,7 +12,7 @@
 @endphp
 {{-- PWA: Web App Manifest (Android & desktop) --}}
 <link rel="manifest" href="{{ url('/manifest.json') }}">
-<meta name="theme-color" content="#3C50E0">
+<meta name="theme-color" content="#001bca">
 <meta name="mobile-web-app-capable" content="yes">
 
 {{-- PWA: iOS-specific meta and icons --}}

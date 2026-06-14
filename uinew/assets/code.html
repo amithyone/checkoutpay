@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CheckoutPay | Intelligent Payments for Modern Commerce</title>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-high": "#e7e8ed",
+                        "on-surface-variant": "#454655",
+                        "outline": "#757687",
+                        "on-tertiary-fixed": "#25005a",
+                        "secondary-fixed": "#dfe0ff",
+                        "surface-container-low": "#f2f3f8",
+                        "on-error-container": "#93000a",
+                        "inverse-primary": "#bdc2ff",
+                        "surface-dim": "#d8dadf",
+                        "on-secondary-fixed-variant": "#0c28d2",
+                        "primary-fixed": "#dfe0ff",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#eff0f5",
+                        "outline-variant": "#c5c5d8",
+                        "text-slate": "#475569",
+                        "tertiary-container": "#6c22dd",
+                        "midnight-deep": "#111827",
+                        "tertiary-fixed-dim": "#d2bbff",
+                        "on-background": "#191c1f",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-container": "#eceef3",
+                        "on-primary-fixed": "#000865",
+                        "surface-bright": "#f8f9fe",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-container": "#c5c9ff",
+                        "surface-variant": "#e1e2e7",
+                        "success-green": "#22C55E",
+                        "surface-tint": "#3748e7",
+                        "primary": "#001bca",
+                        "secondary-container": "#4e62ff",
+                        "surface": "#f8f9fe",
+                        "tertiary": "#5200b5",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed-variant": "#5a00c6",
+                        "on-surface": "#191c1f",
+                        "on-secondary-fixed": "#000a63",
+                        "on-primary-fixed-variant": "#1328d1",
+                        "secondary-fixed-dim": "#bcc2ff",
+                        "secondary": "#3045e6",
+                        "background": "#f8f9fe",
+                        "primary-fixed-dim": "#bdc2ff",
+                        "surface-container-highest": "#e1e2e7",
+                        "on-secondary-container": "#fffbff",
+                        "on-primary": "#ffffff",
+                        "inverse-surface": "#2e3134",
+                        "on-tertiary-container": "#d8c4ff",
+                        "tertiary-fixed": "#eaddff",
+                        "primary-container": "#2d3fe0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "32px",
+                        "margin-desktop": "32px",
+                        "container-max": "1280px",
+                        "gutter": "24px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "margin-mobile": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "label-xs": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "label-sm": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "800"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "500"}],
+                        "label-xs": ["12px", {"lineHeight": "16px", "fontWeight": "700"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "800"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "500"}],
+                        "label-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .dark-glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .token-electric-blue { color: #4D61FF; }
+        .bg-electric-blue { background-color: #4D61FF; }
+        .premium-shadow { box-shadow: 0px 10px 30px rgba(45, 63, 224, 0.05); }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- Header Navigation -->
+<header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-outline-variant/30 shadow-sm">
+<nav class="flex justify-between items-center h-20 px-margin-desktop max-w-container-max mx-auto">
+<div class="flex items-center gap-stack-lg">
+<a class="font-headline-md text-headline-md font-extrabold text-midnight-deep" href="#">CheckoutPay</a>
+<div class="hidden md:flex items-center gap-stack-md font-body-md text-body-md text-on-surface-variant">
+<a class="hover:text-primary transition-colors duration-200" href="#products">Products</a>
+<a class="hover:text-primary transition-colors duration-200" href="#developers">Developers</a>
+<a class="hover:text-primary transition-colors duration-200" href="#resources">Resources</a>
+<a class="hover:text-primary transition-colors duration-200" href="#pricing">Pricing</a>
+</div>
+</div>
+<div class="flex items-center gap-stack-md">
+<button class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors px-4 py-2">Login</button>
+<button class="bg-primary text-on-primary font-label-sm text-label-sm px-6 py-3 rounded-xl hover:opacity-90 transition-all">Create Account</button>
+</div>
+</nav>
+</header>
+<!-- Hero Section -->
+<section class="pt-32 pb-20 px-margin-desktop max-w-container-max mx-auto">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+<div class="space-y-stack-lg">
+<div class="inline-flex items-center px-4 py-1.5 rounded-full bg-primary-container/10 border border-primary-container/20 text-primary font-label-sm text-label-sm">
+<span class="mr-2 h-2 w-2 rounded-full bg-primary animate-pulse"></span> Built to stay out of the way.
+                </div>
+<h1 class="font-display-lg text-display-lg text-midnight-deep leading-tight">
+                    Intelligent <span class="text-primary">Payment Gateway</span> for Nigerian Business
+                </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-xl">
+                    Built to accept and process payments in Nigeria. Nothing more. 1% + ₦50 per transaction. The work should speak for itself.
+                </p>
+<div class="flex flex-wrap gap-stack-md pt-4">
+<button class="bg-primary text-on-primary font-label-sm text-label-sm px-8 py-4 rounded-xl flex items-center gap-2 premium-shadow hover:translate-y-[-2px] transition-all">
+                        Get started <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+<button class="glass text-midnight-deep font-label-sm text-label-sm px-8 py-4 rounded-xl hover:bg-white/90 transition-all border border-outline-variant/50">
+                        View pricing
+                    </button>
+</div>
+<div class="pt-8 flex items-center gap-2 text-on-surface-variant font-label-xs text-label-xs">
+<span class="material-symbols-outlined text-sm">shield</span>
+                    Powered by METRAVON INNOVATION LTD
+                </div>
+</div>
+<div class="relative group">
+<div class="absolute -inset-4 bg-gradient-to-tr from-primary/20 to-transparent blur-3xl opacity-50 group-hover:opacity-70 transition-opacity"></div>
+<div class="relative transform group-hover:rotate-1 group-hover:scale-[1.02] transition-transform duration-700">
+<img alt="Hero Payment Visual" class="w-full rounded-2xl premium-shadow" data-alt="A hyper-realistic close-up of a sleek, modern smartphone held by a business professional in a luminous, contemporary office environment. The screen displays a minimalist payment success interface with CheckoutPay's electric blue accents and a vibrant green success checkmark. The background features warm, soft-focus highlights of a Nigerian corporate lounge, reflecting a high-end Fintech 2.0 aesthetic." src="https://lh3.googleusercontent.com/aida/AP1WRLt1DEV1w8HkN3k9FCQDX6yid4L5cthZ7XQxVmIV0BC7W27EtotnocSzJsVcXzZx4-KTYsasE8kWjpNJu3DdeFA-L1l-A7G1i0PRHxQoP_0liq2LiQ0QCN4JbNL03onWqYftBAW0WRHoEVISje8Ofch18jzvD_jQOpsVRi4bvJHqtL7LoBFHoJ_XPfYkBwp9bwKJbSYZfdKbjUW5y7625DZhaoxAlpyypvk_scws0Dm-QHGAdPu9ut1Nhw"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Flagship: WhatsApp Wallet -->
+<section class="py-20 bg-surface-container-low/50">
+<div class="px-margin-desktop max-w-container-max mx-auto">
+<div class="bg-primary-container rounded-[2rem] overflow-hidden relative group">
+<div class="grid lg:grid-cols-2">
+<div class="p-12 md:p-16 space-y-stack-lg z-10">
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-on-primary-container/80">Flagship Feature</span>
+<h2 class="font-headline-lg text-headline-lg text-white">WhatsApp Wallet</h2>
+<p class="font-body-lg text-body-lg text-on-primary-container/90 max-w-md">
+                            Send money to bank accounts or WhatsApp contacts, buy airtime &amp; more from the app you already use. Frictionless commerce, right where your customers are.
+                        </p>
+<button class="bg-white text-primary font-label-sm text-label-sm px-8 py-4 rounded-xl hover:bg-opacity-95 transition-all">
+                            Learn more
+                        </button>
+</div>
+<div class="relative h-64 lg:h-auto min-h-[400px] flex items-center justify-center p-8">
+<!-- Simulated Conversation UI Card -->
+<div class="glass p-6 rounded-2xl w-full max-w-md shadow-2xl relative z-10 transform -rotate-2 group-hover:rotate-0 transition-transform duration-500">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-full bg-success-green/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-success-green">chat</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-midnight-deep">WhatsApp Wallet</p>
+<p class="text-[10px] text-on-surface-variant">Active now</p>
+</div>
+</div>
+<div class="space-y-3">
+<div class="bg-surface-container-high p-3 rounded-lg rounded-tl-none max-w-[80%] text-sm">
+                                    Send NGN 5,000 to John Doe?
+                                </div>
+<div class="bg-primary text-white p-3 rounded-lg rounded-tr-none ml-auto max-w-[80%] text-sm">
+                                    Yes, confirm payment.
+                                </div>
+<div class="bg-success-green/10 border border-success-green/20 p-3 rounded-lg text-sm text-success-green flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+                                    Transaction Successful!
+                                </div>
+</div>
+</div>
+<div class="absolute inset-0 overflow-hidden">
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle,_rgba(255,255,255,0.2)_0%,_transparent_70%)]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Dollar Virtual Card Section -->
+<section class="py-20 px-margin-desktop max-w-container-max mx-auto">
+<div class="mb-12">
+<span class="text-primary font-label-sm text-label-sm flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-sm">public</span> New in CheckoutPay
+            </span>
+<h2 class="font-headline-lg text-headline-lg text-midnight-deep">Dollar Virtual Card</h2>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Left Info Panel -->
+<div class="lg:col-span-5 space-y-8">
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                    Shop globally with a USD virtual card funded from your NGN wallet. Pay for subscriptions, ads, and international checkouts — then withdraw unused dollars back to naira when you are done.
+                </p>
+<ul class="space-y-4">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+<span class="font-body-md text-body-md">Instant card in the CheckoutNow app</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+<span class="font-body-md text-body-md">Fund, freeze, and withdraw from your phone</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+<span class="font-body-md text-body-md">Transparent USD sell/buy rates — no hidden FX spread</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary">check_circle</span>
+<span class="font-body-md text-body-md">Starting balance included when your card is issued</span>
+</li>
+</ul>
+<div class="flex gap-4">
+<button class="bg-primary text-white font-label-sm text-label-sm px-6 py-4 rounded-xl flex items-center gap-2">
+<span class="material-symbols-outlined">android</span> Get the app
+                    </button>
+<button class="border border-outline-variant font-label-sm text-label-sm px-6 py-4 rounded-xl flex items-center gap-2 hover:bg-surface-container-low transition-all">
+                        Open web app <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+</div>
+</div>
+<!-- Right Widget Panel -->
+<div class="lg:col-span-7">
+<div class="bg-white rounded-[2rem] border border-outline-variant/30 premium-shadow p-8">
+<div class="flex justify-between items-center mb-8">
+<h3 class="font-headline-md text-headline-md text-midnight-deep">USD rate calculator</h3>
+<div class="flex p-1 bg-surface-container-low rounded-lg">
+<button class="bg-primary text-white px-4 py-1.5 rounded-md text-sm font-medium">Fund card</button>
+<button class="px-4 py-1.5 text-on-surface-variant text-sm font-medium">Withdraw</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-on-surface-variant">USD amount</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">$</span>
+<input class="w-full pl-8 pr-4 py-4 rounded-xl border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all outline-none text-midnight-deep font-bold" type="text" value="10"/>
+</div>
+</div>
+<div class="space-y-2">
+<label class="font-label-sm text-label-sm text-on-surface-variant">NGN amount</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">₦</span>
+<input class="w-full pl-8 pr-4 py-4 rounded-xl border border-outline-variant bg-surface-container-low text-midnight-deep font-bold" readonly="" type="text" value="13931"/>
+</div>
+</div>
+</div>
+<div class="bg-primary/5 rounded-2xl p-6 border border-primary/10">
+<p class="text-sm text-on-surface-variant mb-4">Rate used: <span class="font-bold text-midnight-deep">₦1,393 per $1</span></p>
+<p class="text-on-surface text-sm">Funding $10.00 on your card costs about <span class="font-bold">₦13,931</span> from your NGN wallet.</p>
+<p class="text-xs text-on-surface-variant mt-2">Card setup today: <span class="font-bold">$7.50</span> (≈ ₦10,448 at the fund rate) — includes $5.00 starting balance.</p>
+</div>
+<!-- Rate Grid -->
+<div class="grid grid-cols-3 gap-4 mt-8">
+<div class="p-4 rounded-xl bg-surface-container-low text-center">
+<p class="text-[10px] uppercase font-bold text-on-surface-variant mb-1">Fund Card</p>
+<p class="font-headline-md text-headline-md text-midnight-deep">₦1,393</p>
+<p class="text-[10px] text-on-surface-variant">per $1 from NGN wallet</p>
+</div>
+<div class="p-4 rounded-xl bg-surface-container-low text-center">
+<p class="text-[10px] uppercase font-bold text-on-surface-variant mb-1">Withdraw</p>
+<p class="font-headline-md text-headline-md text-midnight-deep">₦1,348</p>
+<p class="text-[10px] text-on-surface-variant">per $1 to NGN wallet</p>
+</div>
+<div class="p-4 rounded-xl bg-surface-container-low text-center">
+<p class="text-[10px] uppercase font-bold text-on-surface-variant mb-1">Card Setup</p>
+<p class="font-headline-md text-headline-md text-midnight-deep">$7.50</p>
+<p class="text-[10px] text-on-surface-variant">incl. $5.00 load</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Unified Commerce Infrastructure -->
+<section class="py-20 bg-white" id="products">
+<div class="px-margin-desktop max-w-container-max mx-auto">
+<div class="text-center max-w-2xl mx-auto mb-16">
+<h2 class="font-headline-lg text-headline-lg text-midnight-deep mb-4">Unified Commerce Infrastructure</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">One platform to manage your entire financial ecosystem. From checkout to specialized collections.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- Online Payments -->
+<div class="group cursor-pointer">
+<div class="h-64 rounded-2xl overflow-hidden mb-6 relative">
+<img alt="Online Payments" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A sophisticated close-up of a high-end smartphone on a sleek workstation in a Lagos executive office, displaying a successful NGN transaction with the CheckoutPay logo. The atmosphere is professional and calm, with warm ambient light catching the polished surfaces." src="https://lh3.googleusercontent.com/aida/AP1WRLt1DEV1w8HkN3k9FCQDX6yid4L5cthZ7XQxVmIV0BC7W27EtotnocSzJsVcXzZx4-KTYsasE8kWjpNJu3DdeFA-L1l-A7G1i0PRHxQoP_0liq2LiQ0QCN4JbNL03onWqYftBAW0WRHoEVISje8Ofch18jzvD_jQOpsVRi4bvJHqtL7LoBFHoJ_XPfYkBwp9bwKJbSYZfdKbjUW5y7625DZhaoxAlpyypvk_scws0Dm-QHGAdPu9ut1Nhw"/>
+<div class="absolute top-4 left-4 glass p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary">payments</span>
+</div>
+</div>
+<h3 class="font-headline-md text-headline-md text-midnight-deep mb-2">Online Payments</h3>
+<p class="text-on-surface-variant text-sm mb-4">Receive NGN payments through bank transfers with reliable matching and virtual accounts.</p>
+<div class="flex gap-4 text-xs font-bold text-primary">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">bolt</span> Instant Reconciliation</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">webhook</span> Automated Webhooks</span>
+</div>
+</div>
+<!-- Smart Invoices -->
+<div class="group cursor-pointer">
+<div class="h-64 rounded-2xl overflow-hidden mb-6 relative">
+<img alt="Smart Invoices" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida/AP1WRLvLOXj5RAYne3JGzmoahFQoYy7JF0lB3HZnZ3yNT-l3Ayk2RWIfzQV1J9PM_2cBqy-IA-WzrTYdyv_4bTzicyT2MI2ezi34FNKG0ciyOlOk7nh8X0x_7brDLD9zrgQmA32qg-fUaOJS0z_5Nkg8x60TVjcKszoxtDhi-7XH_x_dwIFLQPmtO8KKqNL_v8IfiqkRleZWg7E81ytdCH-7HoKcxQUIddGRjTXEptr6p-sF4ar-iV1rUtOKH0M"/>
+<div class="absolute top-4 left-4 glass p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary">description</span>
+</div>
+</div>
+<h3 class="font-headline-md text-headline-md text-midnight-deep mb-2">Smart Invoices</h3>
+<p class="text-on-surface-variant text-sm mb-4">Generate and send professional invoices to customers in seconds. Track every payment in real-time.</p>
+</div>
+<!-- Event Tickets -->
+<div class="group cursor-pointer">
+<div class="h-64 rounded-2xl overflow-hidden mb-6 relative">
+<img alt="Event Tickets" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida/AP1WRLvp1I9XNQG35CXDfRzUvO_Zy5dp5uP7jbiO5kRHJir16TF9cvpDIrSLJmR51Jm0z09yQB5L6l1MRlJDvSRo49YKDFO7a-2nBEMbvSlZTXabdbP3c8yJMASqa_Qd5NGDVuPGid-s6tMPfykOnkVVOo5AjRR0sYRm_pGQ3kQhipEr9mABWV_9CtGudnOc4ZBTGr89yOmg-baWaDb7f0Z4fOO7_YIBwW9cU97BRmk0Y9v6KjCz5aTBc563f6s"/>
+<div class="absolute top-4 left-4 glass p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary">confirmation_number</span>
+</div>
+</div>
+<h3 class="font-headline-md text-headline-md text-midnight-deep mb-2">Event Tickets</h3>
+<p class="text-on-surface-variant text-sm mb-4">Create and manage event tickets with built-in QR scanning and validation features.</p>
+</div>
+<!-- Memberships -->
+<div class="bg-surface-container-low p-8 rounded-2xl group hover:shadow-lg transition-all">
+<span class="material-symbols-outlined text-primary text-3xl mb-6">group</span>
+<h3 class="font-headline-md text-headline-md text-midnight-deep mb-2">Memberships</h3>
+<p class="text-on-surface-variant text-sm">Automate recurring membership subscriptions with easy renewal management and customer portals.</p>
+</div>
+<!-- Rentals -->
+<div class="group cursor-pointer relative overflow-hidden rounded-2xl h-full min-h-[300px]">
+<img alt="Rentals" class="absolute inset-0 w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/AP1WRLupUCwDP74QdzHtMw8WOZMnvkYdegF8U9SwzcIkvt_K1bRdbk9doD7rK1nYoNLVoZiBr_XBGRvVIht7PavljZUuQXpy-9XTtUr5W7doKhJRqFVcV9UcdqHfpbRN6ZOeMnmvpO9RWrAeVy7-jOtaMIAvSEgaSXJHLKHt2IeSjdsdVVGscHCpR7-BcC2LQUskM38rEciRfQiLObA4Z1u3Oxp3f_uJonv7CKRjF1m4y_QkX57pYi1fTUtgTA"/>
+<div class="absolute inset-0 bg-gradient-to-t from-midnight-deep/80 via-midnight-deep/20 to-transparent p-8 flex flex-col justify-end">
+<h3 class="font-headline-md text-headline-md text-white mb-2">Rentals</h3>
+<p class="text-white/80 text-sm">Handle rental payments and deposits with security and ease.</p>
+</div>
+</div>
+<!-- Payouts & Collections -->
+<div class="bg-midnight-deep p-8 rounded-2xl group hover:bg-opacity-95 transition-all text-white">
+<span class="material-symbols-outlined text-white text-3xl mb-6">account_balance_wallet</span>
+<h3 class="font-headline-md text-headline-md mb-2">Payouts &amp; Collections</h3>
+<p class="text-white/70 text-sm">Global disbursements and unified collections for enterprises and high-growth startups.</p>
+<div class="mt-8 pt-8 border-t border-white/10 flex items-center gap-2 text-xs font-bold text-success-green">
+<span class="w-2 h-2 rounded-full bg-success-green animate-pulse"></span> PCI-DSS Certified
+                    </div>
+</div>
+</div>
+</div>
+</section>
+<!-- WordPress Plugin Section -->
+<section class="py-20 bg-surface-container-low/30">
+<div class="px-margin-desktop max-w-container-max mx-auto">
+<div class="grid lg:grid-cols-2 gap-16 items-center">
+<div class="relative">
+<div class="bg-midnight-deep rounded-2xl p-8 shadow-2xl relative z-10">
+<div class="flex items-center justify-between mb-8">
+<div class="flex gap-1.5">
+<div class="w-3 h-3 rounded-full bg-[#FF5F56]"></div>
+<div class="w-3 h-3 rounded-full bg-[#FFBD2E]"></div>
+<div class="w-3 h-3 rounded-full bg-[#27C93F]"></div>
+</div>
+<span class="text-xs text-white/50 font-mono">v1.4.6</span>
+</div>
+<div class="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+<div class="flex items-center gap-4 mb-4">
+<div class="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">terminal</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-white">CheckoutPay for WooCommerce</p>
+<p class="text-xs text-white/40">Official Payment Gateway Plugin</p>
+</div>
+</div>
+<div class="font-mono text-sm text-white/80 space-y-2">
+<p class="text-success-green">// Installation</p>
+<p>1. Upload &amp; Activate</p>
+<p>2. Enter API Key</p>
+<p>3. Start Accepting Payments</p>
+</div>
+</div>
+</div>
+<div class="absolute -top-6 -right-6 w-32 h-32 bg-primary/10 blur-3xl -z-0"></div>
+</div>
+<div class="space-y-stack-lg">
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-primary">WordPress Plugin</span>
+<h2 class="font-headline-lg text-headline-lg text-midnight-deep">Seamless Integration with WooCommerce</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Install the plugin, configure your API key, and you're live. Works with WordPress 5.8+ and WooCommerce 7.0+.</p>
+<div class="space-y-6">
+<div class="flex items-start gap-4">
+<div class="p-2 bg-primary/5 rounded-lg">
+<span class="material-symbols-outlined text-primary">download</span>
+</div>
+<div>
+<h4 class="font-label-sm text-label-sm text-midnight-deep">One-Click Install</h4>
+<p class="text-sm text-on-surface-variant">Download and activate directly from your dashboard.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="p-2 bg-primary/5 rounded-lg">
+<span class="material-symbols-outlined text-primary">settings_suggest</span>
+</div>
+<div>
+<h4 class="font-label-sm text-label-sm text-midnight-deep">Charge Management</h4>
+<p class="text-sm text-on-surface-variant">Choose who pays transaction fees — you or your customer.</p>
+</div>
+</div>
+</div>
+<div class="flex gap-4 pt-4">
+<button class="bg-midnight-deep text-white font-label-sm text-label-sm px-8 py-4 rounded-xl flex items-center gap-2 hover:opacity-90 transition-all">
+                            Download Plugin <span class="material-symbols-outlined text-sm">download</span>
+</button>
+<button class="border border-outline-variant font-label-sm text-label-sm px-8 py-4 rounded-xl hover:bg-surface-container-low transition-all">
+                            Plugin details
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Pricing Section -->
+<section class="py-24 bg-midnight-deep text-white overflow-hidden relative" id="pricing">
+<div class="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/10 to-transparent"></div>
+<div class="px-margin-desktop max-w-container-max mx-auto relative z-10">
+<div class="text-center mb-20">
+<h2 class="font-headline-lg text-headline-lg mb-4">Pricing</h2>
+<p class="text-white/60">Competitive rates. Clear charges. No surprises.</p>
+</div>
+<div class="grid lg:grid-cols-2 gap-16 items-start">
+<div class="space-y-8">
+<div class="inline-block px-4 py-2 bg-white/5 rounded-full text-xs font-bold uppercase tracking-widest text-primary-fixed-dim">Pay As You Go</div>
+<div class="flex items-end gap-3">
+<span class="text-7xl font-extrabold tracking-tighter">1% + ₦50</span>
+<span class="text-white/60 mb-3">per successful transaction</span>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex items-center gap-2 text-sm text-white/80">
+<span class="material-symbols-outlined text-success-green text-sm">check_circle</span> Unlimited transactions
+                        </div>
+<div class="flex items-center gap-2 text-sm text-white/80">
+<span class="material-symbols-outlined text-success-green text-sm">check_circle</span> API access
+                        </div>
+<div class="flex items-center gap-2 text-sm text-white/80">
+<span class="material-symbols-outlined text-success-green text-sm">check_circle</span> Hosted checkout
+                        </div>
+<div class="flex items-center gap-2 text-sm text-white/80">
+<span class="material-symbols-outlined text-success-green text-sm">check_circle</span> Real-time webhooks
+                        </div>
+</div>
+<p class="text-xs text-white/40 pt-4">No setup fees. No monthly fees. Pay only for successful transactions.</p>
+<button class="w-full bg-primary py-4 rounded-xl font-label-sm text-label-sm hover:opacity-90 transition-all premium-shadow">Get started</button>
+</div>
+<div class="bg-white/5 border border-white/10 rounded-2xl p-8">
+<h3 class="font-headline-md text-headline-md mb-8">Pricing Examples</h3>
+<div class="space-y-4">
+<div class="flex justify-between items-center py-4 border-b border-white/10">
+<span class="text-white/60">Amount: ₦1,000</span>
+<span class="font-bold">Fee: ₦60</span>
+</div>
+<div class="flex justify-between items-center py-4 border-b border-white/10">
+<span class="text-white/60">Amount: ₦10,000</span>
+<span class="font-bold">Fee: ₦150</span>
+</div>
+<div class="flex justify-between items-center py-4 border-b border-white/10">
+<span class="text-white/60">Amount: ₦50,000</span>
+<span class="font-bold">Fee: ₦550</span>
+</div>
+<div class="flex justify-between items-center py-4">
+<span class="text-white/60">Amount: ₦100,000</span>
+<span class="font-bold">Fee: ₦1,050</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- How it Works -->
+<section class="py-24 bg-white">
+<div class="px-margin-desktop max-w-container-max mx-auto">
+<h2 class="font-headline-lg text-headline-lg text-midnight-deep text-center mb-20">How it Works</h2>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-8 relative">
+<!-- Connectors -->
+<div class="hidden md:block absolute top-12 left-0 w-full h-[1px] bg-outline-variant/30 -z-0"></div>
+<!-- Step 1 -->
+<div class="relative z-10 text-center space-y-4">
+<div class="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center font-bold mx-auto">1</div>
+<h4 class="font-headline-md text-headline-md text-midnight-deep">Create Account</h4>
+<p class="text-on-surface-variant text-sm">Sign up for free in minutes.</p>
+</div>
+<!-- Step 2 -->
+<div class="relative z-10 text-center space-y-4">
+<div class="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center font-bold mx-auto">2</div>
+<h4 class="font-headline-md text-headline-md text-midnight-deep">Integrate</h4>
+<p class="text-on-surface-variant text-sm">Connect via API or Plugin.</p>
+</div>
+<!-- Step 3 -->
+<div class="relative z-10 text-center space-y-4">
+<div class="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center font-bold mx-auto">3</div>
+<h4 class="font-headline-md text-headline-md text-midnight-deep">Accept Payments</h4>
+<p class="text-on-surface-variant text-sm">Start receiving NGN instantly.</p>
+</div>
+<!-- Step 4 -->
+<div class="relative z-10 text-center space-y-4">
+<div class="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center font-bold mx-auto">4</div>
+<h4 class="font-headline-md text-headline-md text-midnight-deep">Get Paid</h4>
+<p class="text-on-surface-variant text-sm">Automated payouts to your bank.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Trust & FAQ -->
+<section class="py-24 bg-surface-container-low">
+<div class="px-margin-desktop max-w-container-max mx-auto grid lg:grid-cols-2 gap-20">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-midnight-deep mb-8">Trusted by Nigerian businesses of all sizes.</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-12">We are committed to providing the most reliable payment infrastructure in the market. In partnership with METRAVON INNOVATION LTD, licensed by the CBN.</p>
+<div class="space-y-4">
+<div class="bg-white p-6 rounded-xl premium-shadow border border-outline-variant/30 group cursor-pointer">
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-midnight-deep">Is CheckoutPay secure?</span>
+<span class="material-symbols-outlined text-primary group-hover:rotate-45 transition-transform">add</span>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl premium-shadow border border-outline-variant/30 group cursor-pointer">
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-midnight-deep">What are the settlement times?</span>
+<span class="material-symbols-outlined text-primary group-hover:rotate-45 transition-transform">add</span>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl premium-shadow border border-outline-variant/30 group cursor-pointer">
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-midnight-deep">Can I accept international payments?</span>
+<span class="material-symbols-outlined text-primary group-hover:rotate-45 transition-transform">add</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-center">
+<div class="relative w-full max-w-md aspect-video bg-midnight-deep rounded-2xl overflow-hidden shadow-2xl">
+<img alt="CheckoutPay Premium Card" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA6LWLPDrFrBnLz_JMh0KnyXPbGxkGk-BkcRCpnp_vpX8YSmrJk1NRMismJ16XbCeup8lB-qoG1StO5ySfhL3ghq1EEfRUU7A8Bj8La-0nrJJ0cgJjrWGBfjlHSNUBzgwXzg96VTrtx6HS5HzgnPr733nYV3EQWhQBqhIOiTPYaVhIsi32SFVfXJVBggKwvjyxQHh-ooXbWcgLPNeQGuNW0SgoTo9b2YKTzgq60ZmxwpAQDq0RxsTzmPZI8PF1lNSCIAF2alHsUibc"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-surface-container-low border-t border-outline-variant">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-stack-lg py-stack-lg px-margin-desktop max-w-container-max mx-auto font-body-md text-body-md text-on-surface">
+<div class="col-span-2 lg:col-span-1">
+<span class="font-headline-md text-headline-md font-extrabold text-primary block mb-4">CheckoutPay</span>
+<p class="text-xs text-on-surface-variant leading-relaxed mb-6">
+                    Intelligent Payment Gateway. Built for Nigerian businesses with reliable matching and virtual accounts. Powered by METRAVON INNOVATION LTD.
+                </p>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">language</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">shield</span>
+</div>
+</div>
+<div>
+<h5 class="font-label-sm text-label-sm text-midnight-deep mb-6 uppercase tracking-wider">Products</h5>
+<ul class="space-y-3 text-sm text-on-surface-variant">
+<li><a class="hover:text-secondary-container transition-colors" href="#">WhatsApp Wallet</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Invoices</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Rentals</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Memberships</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Tickets</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-label-sm text-label-sm text-midnight-deep mb-6 uppercase tracking-wider">Integrate</h5>
+<ul class="space-y-3 text-sm text-on-surface-variant">
+<li><a class="hover:text-secondary-container transition-colors" href="#">API Documentation</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">WooCommerce Plugin</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Developers</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Dev Program</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-label-sm text-label-sm text-midnight-deep mb-6 uppercase tracking-wider">Learn</h5>
+<ul class="space-y-3 text-sm text-on-surface-variant">
+<li><a class="hover:text-secondary-container transition-colors" href="#">FAQs</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Support</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Blog</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Status</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-label-sm text-label-sm text-midnight-deep mb-6 uppercase tracking-wider">Legal</h5>
+<ul class="space-y-3 text-sm text-on-surface-variant">
+<li><a class="hover:text-secondary-container transition-colors" href="#">Privacy Policy</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Terms &amp; Conditions</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">Security</a></li>
+<li><a class="hover:text-secondary-container transition-colors" href="#">ESG Policy</a></li>
+</ul>
+</div>
+</div>
+<div class="px-margin-desktop max-w-container-max mx-auto py-8 border-t border-outline-variant/30 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-on-surface-variant">
+<p>© 2024 CheckoutPay. A product of METRAVON INNOVATION LTD. Licensed by the CBN. PCI-DSS Certified.</p>
+<div class="flex gap-6">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">shield_lock</span> PCI DSS Compliant</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">lock</span> AES Encrypted</span>
+</div>
+</div>
+</footer>
+<script>
+        // Simple scroll reveal for cards
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-10');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.group.cursor-pointer, .bg-surface-container-low, .bg-midnight-deep').forEach(el => {
+            el.classList.add('transition-all', 'duration-700', 'opacity-0', 'translate-y-10');
+            observer.observe(el);
+        });
+    </script>
+</body></html>

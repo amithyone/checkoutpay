@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Admin Panel') - Email Payment Gateway</title>
+    <title>@yield('title', 'Admin Panel') - {{ $siteName ?? \App\Support\SiteBranding::name() }}</title>
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
         <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
@@ -58,12 +58,12 @@
                 @endphp
                 @if($adminLogoExists)
                     <img src="{{ asset('storage/' . $adminLogo) }}" alt="Logo" class="h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                    <h1 class="text-xl font-bold text-primary" style="display: none;">{{ \App\Models\Setting::get('site_name', 'Payment Gateway') }}</h1>
+                    <h1 class="text-xl font-bold text-primary" style="display: none;">{{ $siteName ?? \App\Support\SiteBranding::name() }}</h1>
                 @elseif($logoExists)
                     <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                    <h1 class="text-xl font-bold text-primary" style="display: none;">{{ \App\Models\Setting::get('site_name', 'Payment Gateway') }}</h1>
+                    <h1 class="text-xl font-bold text-primary" style="display: none;">{{ $siteName ?? \App\Support\SiteBranding::name() }}</h1>
                 @else
-                    <h1 class="text-xl font-bold text-primary">{{ \App\Models\Setting::get('site_name', 'Payment Gateway') }}</h1>
+                    <h1 class="text-xl font-bold text-primary">{{ $siteName ?? \App\Support\SiteBranding::name() }}</h1>
                 @endif
                 <button onclick="closeSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700">
                     <i class="fas fa-times text-xl"></i>

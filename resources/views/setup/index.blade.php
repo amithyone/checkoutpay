@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setup - Email Payment Gateway</title>
+    <title>Setup - {{ \App\Support\SiteBranding::name() }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 <style>
         .fade-in {
@@ -21,7 +21,7 @@
         <div class="bg-white rounded-lg shadow-xl p-8 fade-in">
             <div class="text-center mb-8">
                 <h1 class="text-3xl font-bold text-gray-800 mb-2">🚀 Setup Wizard</h1>
-                <p class="text-gray-600">Configure your Email Payment Gateway</p>
+                <p class="text-gray-600">Configure {{ \App\Support\SiteBranding::name() }}</p>
             </div>
 
             <!-- Step 1: Database Configuration -->

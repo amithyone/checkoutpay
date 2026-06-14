@@ -14,9 +14,9 @@ class ChargeService
     const DEFAULT_PERCENTAGE = 1.0;
 
     /**
-     * Default fixed charge (100)
+     * Default fixed charge (₦50 — matches platform standard pricing)
      */
-    const DEFAULT_FIXED = 100.0;
+    const DEFAULT_FIXED = 50.0;
 
     /**
      * Calculate charges for a payment amount (checkout / temp VA flows). Permanent business pay-in VA credits skip this in {@see Business::incrementBalanceWithCharges()}.
@@ -97,12 +97,12 @@ class ChargeService
             return (float) $website->charge_percentage;
         }
 
-        // Default: 1% (website-based charges, no fallback to business)
-        return (float) Setting::get('default_charge_percentage', self::DEFAULT_PERCENTAGE);
+        // Default from admin settings
+        return $this->numericSetting('default_charge_percentage', self::DEFAULT_PERCENTAGE);
     }
 
     /**
-     * Get fixed charge - website-based (default: 100), no fallback to business
+     * Get fixed charge - website-based (default: ₦50), no fallback to business
      *
      * @param  Business|null  $business  (kept for backward compatibility, not used)
      */
@@ -113,8 +113,21 @@ class ChargeService
             return (float) $website->charge_fixed;
         }
 
-        // Default: 100 (website-based charges, no fallback to business)
-        return (float) Setting::get('default_charge_fixed', self::DEFAULT_FIXED);
+        // Default from admin settings
+        return $this->numericSetting('default_charge_fixed', self::DEFAULT_FIXED);
+    }
+
+    /**
+     * Read a numeric admin setting; invalid stored values fall back to the default.
+     */
+    private function numericSetting(string $key, float $default): float
+    {
+        $value = Setting::get($key);
+        if ($value === null || $value === '' || ! is_numeric($value)) {
+            return $default;
+        }
+
+        return (float) $value;
     }
 
     /**

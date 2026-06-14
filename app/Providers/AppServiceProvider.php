@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Services\Admin\AdminSidebarMenu;
+use App\Support\SiteBranding;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -28,6 +30,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configurePublicUrlFromRequest();
+        $this->configureSiteBranding();
 
         // Register Telegram notification channel
         $this->app->make(ChannelManager::class)->extend('telegram', function ($app) {
@@ -62,6 +65,22 @@ class AppServiceProvider extends ServiceProvider
      * When APP_URL is still localhost on a live host (common after cPanel deploys),
      * generate route()/url() links from the domain the visitor actually used.
      */
+    protected function configureSiteBranding(): void
+    {
+        if ($this->app->runningInConsole() && ! $this->app->runningUnitTests()) {
+            return;
+        }
+
+        try {
+            $name = SiteBranding::name();
+            Config::set('app.name', $name);
+            Config::set('mail.from.name', $name);
+            View::share('siteName', $name);
+        } catch (\Throwable) {
+            // DB unavailable during early boot / migrate
+        }
+    }
+
     protected function configurePublicUrlFromRequest(): void
     {
         if ($this->app->runningInConsole() && ! $this->app->runningUnitTests()) {

@@ -2,8 +2,9 @@
 
 namespace App\Support;
 
+use App\Services\Admin\MevonPayFxRateTrackerService;
 use App\Services\Consumer\ConsumerVirtualCardService;
-use App\Services\Consumer\VirtualCardFxService;
+use App\Services\Consumer\VirtualCardFxPublishService;
 
 /**
  * Public-facing Dollar Virtual Card rates and fees for marketing pages.
@@ -17,9 +18,15 @@ final class MarketingVirtualCard
             return ['enabled' => false];
         }
 
-        $fx = app(VirtualCardFxService::class);
-        $sellRate = $fx->sellRate();
-        $buyRate = $fx->buyRate();
+        $publish = app(VirtualCardFxPublishService::class);
+        $published = $publish->publishedSnapshot();
+        if ($published['sell_rate'] === null || $published['buy_rate'] === null) {
+            $publish->syncFromMevon();
+        }
+
+        $rates = app(MevonPayFxRateTrackerService::class)->calculatorRates();
+        $sellRate = $rates['sell_rate'];
+        $buyRate = $rates['buy_rate'];
         $setupUsd = $cards->requestFeeUsd();
         $creationUsd = $cards->creationFeeUsd();
         $initialLoadUsd = $cards->initialLoadUsd();
@@ -42,7 +49,9 @@ final class MarketingVirtualCard
             'initial_load_usd' => $initialLoadUsd,
             'setup_fee_ngn' => $setupNgn,
             'setup_fee_ngn_label' => $setupNgn !== null ? MarketingPricing::formatNaira($setupNgn) : null,
-            'published_at' => $fx->publishedAt(),
+            'published_at' => $rates['published_at'],
+            'fx_rates_url' => route('virtual-card.fx-rates'),
+            'poll_seconds' => $rates['poll_seconds'],
         ];
     }
 }

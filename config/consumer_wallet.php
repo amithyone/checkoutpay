@@ -28,4 +28,10 @@ return [
     'inactive_reminder_min_balance' => (float) env('CONSUMER_WALLET_INACTIVE_REMINDER_MIN_BALANCE', 1),
     'inactive_reminder_push_title' => (string) env('CONSUMER_WALLET_INACTIVE_REMINDER_PUSH_TITLE', 'Hope your day is going well'),
     'inactive_reminder_push_channel' => 'wallet_alerts',
+
+    /** FCM when wallet is credited (bank top-up or P2P) for CheckoutNow app users. */
+    'credit_push_enabled' => (bool) env('CONSUMER_WALLET_CREDIT_PUSH_ENABLED', true),
+    'credit_push_title' => (string) env('CONSUMER_WALLET_CREDIT_PUSH_TITLE', 'Money received'),
+    'p2p_push_title' => (string) env('CONSUMER_WALLET_P2P_PUSH_TITLE', 'Money received'),
+    'credit_push_channel' => 'wallet_alerts',
 ];

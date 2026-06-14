@@ -1,54 +1,51 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+@extends('layouts.marketing')
+
+@section('title')
     <title>{{ $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay' }}</title>
+@endsection
+
+@section('seo')
     @include('partials.seo-head', ['seoOverrides' => [
         'title' => $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay',
         'description' => $page->meta_description ?? 'Transparent low fees for Nigerian merchants: competitive rates, no hidden charges. Compare CheckoutPay — a reliable, cost-effective payment gateway.',
         'path' => '/pricing',
     ], 'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('payment-gateway'))]])
-    @if(\App\Models\Setting::get('site_favicon'))
-        <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-        <link rel="shortcut icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
-    @endif
-    @include('partials.tailwind-assets')
-</head>
-<body class="bg-gray-50">
-    @include('partials.nav')
+@endsection
 
+@section('content')
     @php
+        use App\Support\MarketingPricing;
         $hero = $content['hero'] ?? [];
         $pricingCard = $content['pricing_card'] ?? [];
         $comparison = $content['comparison'] ?? [];
         $faq = $content['faq'] ?? [];
         $cta = $content['cta'] ?? [];
+        $pricingSnapshot = MarketingPricing::snapshot();
     @endphp
 
     <!-- Hero Section -->
-    <section class="bg-gradient-to-br from-primary via-primary/95 to-primary/90 py-12 sm:py-16 md:py-20">
+    <section class="bg-midnight-deep py-14 sm:py-20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             @if(isset($hero['badge_text']))
-            <div class="inline-block bg-white/20 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6 backdrop-blur-sm">
-                <i class="{{ $hero['badge_icon'] ?? 'fas fa-trophy' }} mr-1 sm:mr-2"></i> {{ $hero['badge_text'] }}
+            <div class="badge-brand mx-auto mb-6 bg-white/10 border-white/20 text-white">
+                <i class="{{ $hero['badge_icon'] ?? 'fas fa-trophy' }}"></i> {{ $hero['badge_text'] }}
             </div>
             @endif
-            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6 px-2">
+            <h1 class="section-heading text-white mb-4 px-2">
                 {{ $hero['title'] ?? 'Simple, Transparent Pricing' }}
             </h1>
             @if(isset($hero['description']))
-            <p class="text-base sm:text-lg md:text-xl text-primary-100 mb-4 max-w-3xl mx-auto px-2">
+            <p class="text-base sm:text-lg text-slate-300 font-medium mb-8 max-w-3xl mx-auto px-2">
                 {{ $hero['description'] }}
             </p>
             @endif
-            <div class="inline-block bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 mb-6 sm:mb-8">
-                <div class="flex items-center justify-center space-x-1 sm:space-x-2">
-                    <span class="text-3xl sm:text-4xl md:text-5xl font-bold text-white">{{ $hero['rate_percentage'] ?? '1%' }}</span>
-                    <span class="text-xl sm:text-2xl text-white/80">+</span>
-                    <span class="text-3xl sm:text-4xl md:text-5xl font-bold text-white">{{ $hero['rate_fixed'] ?? '₦100' }}</span>
+            <div class="inline-block card-marketing bg-slate-800/50 border-slate-700 rounded-2xl px-6 py-6 sm:px-10 sm:py-8">
+                <div class="flex items-center justify-center space-x-2 sm:space-x-3">
+                    <span class="text-4xl sm:text-5xl font-black text-brand-electric">{{ $pricingSnapshot['rate_percentage'] }}</span>
+                    <span class="text-2xl text-slate-400 font-bold">+</span>
+                    <span class="text-4xl sm:text-5xl font-black text-brand-electric">{{ $pricingSnapshot['rate_fixed'] }}</span>
                 </div>
-                <p class="text-white/90 mt-2 text-sm sm:text-base">{{ $hero['rate_description'] ?? 'per successful transaction' }}</p>
+                <p class="text-slate-400 mt-2 text-sm font-semibold">{{ $hero['rate_description'] ?? 'per successful transaction' }}</p>
             </div>
         </div>
     </section>
@@ -57,9 +54,9 @@
     @if(isset($pricingCard['plan_name']))
     <section class="py-12 sm:py-16 md:py-20 -mt-6 sm:-mt-8 md:-mt-10">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="bg-white rounded-2xl shadow-2xl border-2 border-primary overflow-hidden">
+            <div class="card-marketing border-2 border-brand-primary/20 overflow-hidden shadow-brand">
                 <!-- Header -->
-                <div class="bg-gradient-to-r from-primary to-primary/90 p-6 sm:p-8 md:p-12 text-center text-white">
+                <div class="bg-gradient-to-r from-brand-primary to-brand-secondary p-6 sm:p-8 md:p-12 text-center text-white">
                     @if(isset($pricingCard['badge_text']))
                     <div class="inline-block bg-white/20 backdrop-blur-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-3 sm:mb-4">
                         <i class="fas fa-check-circle mr-1 sm:mr-2"></i> {{ $pricingCard['badge_text'] }}
@@ -70,9 +67,9 @@
                     <p class="text-base sm:text-lg md:text-xl text-primary-100 mb-4 sm:mb-6 px-2">{{ $pricingCard['description'] }}</p>
                     @endif
                     <div class="flex items-center justify-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
-                        <span class="text-4xl sm:text-5xl md:text-6xl font-bold">{{ $pricingCard['rate_percentage'] ?? '1%' }}</span>
+                        <span class="text-4xl sm:text-5xl md:text-6xl font-bold">{{ $pricingSnapshot['rate_percentage'] }}</span>
                         <span class="text-2xl sm:text-3xl text-white/80">+</span>
-                        <span class="text-4xl sm:text-5xl md:text-6xl font-bold">{{ $pricingCard['rate_fixed'] ?? '₦100' }}</span>
+                        <span class="text-4xl sm:text-5xl md:text-6xl font-bold">{{ $pricingSnapshot['rate_fixed'] }}</span>
                     </div>
                     <p class="text-primary-100 text-sm sm:text-base">{{ $pricingCard['rate_description'] ?? 'per transaction' }}</p>
                 </div>
@@ -103,11 +100,16 @@
                         @endif
 
                         <!-- Pricing Examples -->
-                        @if(isset($pricingCard['examples']) && is_array($pricingCard['examples']))
+                        @php
+                            $pricingExamples = MarketingPricing::pricingPageExamples(
+                                $pricingSnapshot['percentage'],
+                                $pricingSnapshot['fixed']
+                            );
+                        @endphp
                         <div>
                             <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Pricing Examples</h3>
                             <div class="bg-gray-50 rounded-xl p-4 sm:p-6 space-y-4 sm:space-y-6">
-                                @foreach($pricingCard['examples'] as $example)
+                                @foreach($pricingExamples as $example)
                                 <div class="flex justify-between items-center pb-3 sm:pb-4 border-b border-gray-200 gap-2">
                                     <div class="flex-1 min-w-0">
                                         <p class="font-semibold text-sm sm:text-base text-gray-900 break-words">{{ $example['amount'] ?? '' }}</p>
@@ -124,25 +126,24 @@
                             </div>
 
                             <!-- Calculator -->
-                            <div class="mt-6 sm:mt-8 bg-primary/5 rounded-xl p-4 sm:p-6 border border-primary/20">
-                                <h4 class="font-semibold text-sm sm:text-base text-gray-900 mb-3 sm:mb-4">Calculate Your Fees</h4>
+                            <div class="mt-6 sm:mt-8 bg-brand-primary/5 rounded-xl p-4 sm:p-6 border border-brand-primary/20">
+                                <h4 class="font-bold text-sm sm:text-base text-midnight-deep mb-3 sm:mb-4">Calculate Your Fees</h4>
                                 <div class="space-y-2 sm:space-y-3">
                                     <input type="number" id="calc-amount" placeholder="Enter amount" 
-                                        class="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                                        class="w-full px-3 sm:px-4 py-2.5 text-sm sm:text-base border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary outline-none">
                                     <div class="flex justify-between items-center pt-2">
-                                        <span class="text-sm sm:text-base text-gray-700">Fee:</span>
-                                        <span id="calc-fee" class="text-xl sm:text-2xl font-bold text-primary">₦0</span>
+                                        <span class="text-sm sm:text-base text-slate-600 font-semibold">Fee:</span>
+                                        <span id="calc-fee" class="text-xl sm:text-2xl font-black text-brand-primary">₦0</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        @endif
                     </div>
 
                     <!-- CTA Button -->
                     <div class="text-center pt-6 sm:pt-8 border-t border-gray-200">
-                        <a href="{{ route('business.register') }}" class="w-full sm:w-auto inline-block bg-primary text-white px-6 sm:px-8 md:px-10 py-3 sm:py-4 rounded-lg hover:bg-primary/90 font-medium text-base sm:text-lg transition-colors shadow-lg mb-3 sm:mb-4">
-                            <i class="fas fa-rocket mr-2"></i> {{ $pricingCard['cta_text'] ?? 'Get Started Now' }}
+                        <a href="{{ route('business.register') }}" class="btn-brand">
+                            <i class="fas fa-rocket"></i> {{ $pricingCard['cta_text'] ?? 'Get Started Now' }}
                         </a>
                         @if(isset($pricingCard['cta_note']))
                         <p class="text-xs sm:text-sm text-gray-500 px-2">{{ $pricingCard['cta_note'] }}</p>
@@ -206,13 +207,13 @@
 
     <!-- CTA Section -->
     @if(isset($cta['title']))
-    <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">
+    <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-brand-primary to-brand-secondary">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4 px-2">{{ $cta['title'] }}</h2>
+            <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-3 sm:mb-4 px-2">{{ $cta['title'] }}</h2>
             @if(isset($cta['description']))
-            <p class="text-base sm:text-lg md:text-xl text-primary-100 mb-6 sm:mb-8 px-2">{{ $cta['description'] }}</p>
+            <p class="text-base sm:text-lg text-white/80 font-medium mb-6 sm:mb-8 px-2">{{ $cta['description'] }}</p>
             @endif
-            <a href="{{ route('business.register') }}" class="w-full sm:w-auto inline-block bg-white text-primary px-6 sm:px-8 md:px-10 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
+            <a href="{{ route('business.register') }}" class="inline-flex items-center bg-white text-brand-primary px-8 py-4 rounded-xl hover:bg-slate-50 font-bold text-base sm:text-lg transition-colors shadow-lg">
                 {{ $cta['cta_text'] ?? 'Create Your Account' }}
             </a>
         </div>
@@ -223,26 +224,25 @@
         'category' => 'payment-gateway',
         'title' => 'Payment gateway & pricing FAQs',
     ])
+@endsection
 
-    @include('partials.footer')
-
+@push('scripts')
     <script>
-
-        // Fee Calculator
         const calcInput = document.getElementById('calc-amount');
         const calcFee = document.getElementById('calc-fee');
+        const pct = {{ json_encode($pricingSnapshot['percentage']) }};
+        const fixed = {{ json_encode($pricingSnapshot['fixed']) }};
 
         if (calcInput && calcFee) {
             calcInput.addEventListener('input', function() {
                 const amount = parseFloat(this.value) || 0;
                 if (amount > 0) {
-                    const fee = Math.round((amount * 0.01) + 100);
-                    calcFee.textContent = '₦' + fee.toLocaleString();
+                    const fee = Math.round((amount * pct / 100) + fixed);
+                    calcFee.textContent = '₦' + fee.toLocaleString('en-NG');
                 } else {
                     calcFee.textContent = '₦0';
                 }
             });
         }
     </script>
-</body>
-</html>
+@endpush

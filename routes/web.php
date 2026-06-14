@@ -65,6 +65,10 @@ Route::post('/wallet/partner-pay/{token}', [\App\Http\Controllers\WhatsappWallet
 
 Route::get('/manifest.json', [\App\Http\Controllers\PwaController::class, 'manifest'])->name('pwa.manifest');
 
+Route::get('/virtual-card/fx-rates', [\App\Http\Controllers\Public\VirtualCardFxController::class, 'rates'])
+    ->middleware('throttle:60,1')
+    ->name('virtual-card.fx-rates');
+
 Route::get('/products', [\App\Http\Controllers\ProductsController::class, 'index'])->name('products.index');
 Route::get('/download/checkoutnow-android.apk', \App\Http\Controllers\Public\CheckoutNowApkDownloadController::class)
     ->name('checkoutnow.apk.download');

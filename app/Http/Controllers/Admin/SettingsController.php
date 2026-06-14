@@ -128,6 +128,10 @@ class SettingsController extends Controller
             );
         }
 
+        if ($request->has('default_charge_percentage') || $request->has('default_charge_fixed')) {
+            \Illuminate\Support\Facades\Cache::forget('page_home');
+        }
+
         // Update invoice charge settings
         if ($request->has('invoice_charge_threshold')) {
             Setting::set(

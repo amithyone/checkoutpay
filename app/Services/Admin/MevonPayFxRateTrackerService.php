@@ -51,6 +51,48 @@ final class MevonPayFxRateTrackerService
     }
 
     /**
+     * USD/NGN rates for the public marketing calculator — mirrors admin rate tracker hero cards.
+     *
+     * @return array{ok: bool, sell_rate: ?float, buy_rate: ?float, mid: ?float, mevon_mid: ?float, spread: ?float, published_at: ?string, updated_at: string, poll_seconds: int}
+     */
+    public function calculatorRates(bool $fetchFresh = false): array
+    {
+        if ($fetchFresh) {
+            try {
+                app(\App\Services\MevonPay\MevonPayExchangeRateService::class)->ngnPerUsdFresh();
+            } catch (\Throwable) {
+                // Poll must still return the latest stored rates.
+            }
+        }
+
+        $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
+        $published = $this->publishedCurrent();
+        $current = $this->currentSnapshot($latest, $published);
+
+        $mid = $current['published_mid'] ?? $current['mevon_mid'];
+        $sell = $current['sell_rate'];
+        $buy = $current['buy_rate'];
+
+        if ($mid !== null && ($sell === null || $buy === null)) {
+            $computed = app(\App\Services\Consumer\VirtualCardFxPublishService::class)->ratesForMid((float) $mid);
+            $sell ??= $computed['sell_rate'];
+            $buy ??= $computed['buy_rate'];
+        }
+
+        return [
+            'ok' => true,
+            'sell_rate' => $sell,
+            'buy_rate' => $buy,
+            'mid' => $mid,
+            'mevon_mid' => $current['mevon_mid'],
+            'spread' => ($sell !== null && $buy !== null) ? round($sell - $buy, 4) : null,
+            'published_at' => $current['published_at'],
+            'updated_at' => now()->toIso8601String(),
+            'poll_seconds' => 60,
+        ];
+    }
+
+    /**
      * Fresh Mevon read + chart payload for admin live polling.
      *
      * @return array<string, mixed>

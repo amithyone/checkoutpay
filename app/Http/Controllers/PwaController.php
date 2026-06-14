@@ -31,7 +31,7 @@ class PwaController extends Controller
                 'scope' => '/',
                 'display' => 'standalone',
                 'orientation' => 'portrait-primary',
-                'theme_color' => '#3C50E0',
+                'theme_color' => '#001bca',
                 'background_color' => '#ffffff',
                 'icons' => [
                     [
@@ -59,7 +59,7 @@ class PwaController extends Controller
                 'short_name' => 'CheckoutPay',
                 'start_url' => URL::to('/dashboard/login'),
                 'display' => 'standalone',
-                'theme_color' => '#3C50E0',
+                'theme_color' => '#001bca',
                 'background_color' => '#ffffff',
                 'icons' => [
                     ['src' => URL::asset('images/pwa/icon-192.png'), 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],

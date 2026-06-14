@@ -2,39 +2,35 @@
     $logo = \App\Models\Setting::get('site_logo');
     $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
 @endphp
-<nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+<nav class="fixed top-0 w-full z-50 bg-white/85 backdrop-blur-xl border-b border-slate-100 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-            <div class="flex items-center flex-1">
-                <div class="flex-shrink-0">
+        <div class="flex justify-between items-center h-20">
+            <div class="flex items-center flex-1 gap-6 lg:gap-10">
+                <a href="{{ route('home') }}" class="flex items-center gap-2.5 group shrink-0">
                     @if($logo && $logoPath && file_exists($logoPath))
-                        <a href="{{ route('home') }}">
-                            <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-8 sm:h-10 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                            <div class="h-8 w-8 sm:h-10 sm:w-10 bg-primary rounded-lg flex items-center justify-center" style="display: none;">
-                                <i class="fas fa-shield-alt text-white text-lg sm:text-xl"></i>
-                            </div>
-                        </a>
+                        <img src="{{ asset('storage/' . $logo) }}" alt="Logo" class="h-9 sm:h-10 object-contain group-hover:scale-105 transition-transform" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="h-10 w-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/25 group-hover:scale-105 transition-transform" style="display: none;">
+                            <i class="fas fa-shield-alt text-white text-lg"></i>
+                        </div>
                     @else
-                        <a href="{{ route('home') }}">
-                            <div class="h-8 w-8 sm:h-10 sm:w-10 bg-primary rounded-lg flex items-center justify-center">
-                                <i class="fas fa-shield-alt text-white text-lg sm:text-xl"></i>
-                            </div>
-                        </a>
+                        <div class="h-10 w-10 bg-brand-primary rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/25 group-hover:scale-105 transition-transform">
+                            <i class="fas fa-shield-alt text-white text-lg"></i>
+                        </div>
                     @endif
-                </div>
-                <div class="ml-2 sm:ml-3">
-                    <a href="{{ route('home') }}">
-                        <h1 class="text-base sm:text-xl font-bold text-gray-900">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</h1>
-                        <p class="text-xs text-gray-500 hidden sm:block">Intelligent Payment Gateway</p>
-                    </a>
-                </div>
+                    <div class="flex flex-col">
+                        <span class="font-sans text-lg sm:text-2xl font-black tracking-tight text-midnight-deep leading-none">
+                            {{ $siteName ?? \App\Support\SiteBranding::name() }}
+                        </span>
+                        <span class="text-[10px] font-semibold text-slate-400 tracking-wider uppercase hidden sm:block">Intelligent Payment Gateway</span>
+                    </div>
+                </a>
             </div>
-            <div class="hidden md:flex items-center space-x-3">
+            <div class="hidden md:flex items-center space-x-1 lg:space-x-2">
                 <div class="relative group">
-                    <a href="{{ route('products.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('products.*') || request()->routeIs('whatsapp-wallet.*') || request()->routeIs('rentals.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') || request()->routeIs('charity.*') ? 'text-primary border-b-2 border-primary' : '' }}">
-                        Products <i class="fas fa-chevron-down ml-1 text-xs"></i>
+                    <a href="{{ route('products.index') }}" class="nav-link-marketing flex items-center px-3 {{ request()->routeIs('products.*') || request()->routeIs('whatsapp-wallet.*') || request()->routeIs('rentals.*') || request()->routeIs('payout.*') || request()->routeIs('collections.*') || request()->routeIs('checkout-demo.*') || request()->routeIs('charity.*') ? '!text-brand-primary' : '' }}">
+                        Products <i class="fas fa-chevron-down ml-1 text-[10px] opacity-60"></i>
                     </a>
-                    <div class="absolute left-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div class="absolute left-0 mt-2 w-52 bg-white rounded-xl shadow-brand border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <a href="{{ route('whatsapp-wallet.index') }}" class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50 font-semibold border-b border-gray-100">
                             <i class="fab fa-whatsapp mr-2"></i>WhatsApp Wallet
                         </a>
@@ -49,12 +45,12 @@
                         <a href="{{ route('checkout-demo.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Checkout Demo</a>
                     </div>
                 </div>
-                <a href="{{ route('pricing') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('pricing') || request()->routeIs('about.*') ? 'text-primary border-b-2 border-primary' : '' }}">Pricing</a>
+                <a href="{{ route('pricing') }}" class="nav-link-marketing px-3 {{ request()->routeIs('pricing') || request()->routeIs('about.*') ? '!text-brand-primary' : '' }}">Pricing</a>
                 <div class="relative group">
-                    <a href="{{ route('developers.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('developers.*') ? 'text-primary border-b-2 border-primary' : '' }}">
-                        Developers <i class="fas fa-chevron-down ml-1 text-xs"></i>
+                    <a href="{{ route('developers.index') }}" class="nav-link-marketing flex items-center px-3 {{ request()->routeIs('developers.*') ? '!text-brand-primary' : '' }}">
+                        Developers <i class="fas fa-chevron-down ml-1 text-[10px] opacity-60"></i>
                     </a>
-                    <div class="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div class="absolute left-0 mt-2 w-56 bg-white rounded-xl shadow-brand border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <a href="{{ route('developers.program') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary font-semibold">Developer Program</a>
                         <a href="{{ url('/developers/program/apply') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Apply to program</a>
                         <div class="border-t border-gray-200 my-1"></div>
@@ -64,12 +60,12 @@
                         <a href="{{ route('business.api-documentation.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary">Full Documentation</a>
                     </div>
                 </div>
-                <a href="{{ route('support.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('support.*') ? 'text-primary border-b-2 border-primary' : '' }}">Support</a>
+                <a href="{{ route('support.index') }}" class="nav-link-marketing px-3 {{ request()->routeIs('support.*') ? '!text-brand-primary' : '' }}">Support</a>
                 <div class="relative group">
-                    <a href="{{ route('resources.index') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium flex items-center {{ request()->routeIs('resources.*') || request()->routeIs('blog.*') || request()->routeIs('status.*') || request()->routeIs('faqs.*') || request()->routeIs('api-docs') ? 'text-primary border-b-2 border-primary' : '' }}">
-                        Resources <i class="fas fa-chevron-down ml-1 text-xs"></i>
+                    <a href="{{ route('resources.index') }}" class="nav-link-marketing flex items-center px-3 {{ request()->routeIs('resources.*') || request()->routeIs('blog.*') || request()->routeIs('status.*') || request()->routeIs('faqs.*') || request()->routeIs('api-docs') ? '!text-brand-primary' : '' }}">
+                        Resources <i class="fas fa-chevron-down ml-1 text-[10px] opacity-60"></i>
                     </a>
-                    <div class="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div class="absolute left-0 mt-2 w-56 bg-white rounded-xl shadow-brand border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <a href="{{ route('api-docs') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary font-semibold">
                             <i class="fas fa-code mr-2 text-primary"></i>API Documentation
                         </a>
@@ -85,22 +81,23 @@
                     </div>
                 </div>
                 @auth('web')
-                    <a href="{{ route('user.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
+                    <a href="{{ route('user.dashboard') }}" class="nav-link-marketing px-3">My Account</a>
                 @elseauth('renter')
-                    <a href="{{ route('renter.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Rentals Dashboard</a>
+                    <a href="{{ route('renter.dashboard') }}" class="nav-link-marketing px-3">Rentals Dashboard</a>
                 @elseauth('business')
-                    <a href="{{ route('business.dashboard') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
+                    <a href="{{ route('business.dashboard') }}" class="nav-link-marketing px-3">Dashboard</a>
                 @else
-                    <a href="{{ route('account.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">My Account</a>
-                    <a href="{{ route('business.login') }}" class="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">Business</a>
-                    <a href="{{ route('business.register') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm font-medium transition-colors">Get Started</a>
+                    <a href="{{ route('business.login') }}" class="text-sm font-semibold text-slate-600 hover:text-brand-primary transition-colors px-4 py-2 hover:bg-slate-50 rounded-xl">Login</a>
+                    <a href="{{ route('business.register') }}" class="inline-flex items-center gap-2 bg-brand-primary text-white px-5 py-2.5 rounded-xl hover:bg-brand-secondary text-sm font-semibold shadow-lg shadow-brand-primary/20 transition-all">
+                        Get Started <i class="fas fa-arrow-right text-xs"></i>
+                    </a>
                 @endauth
             </div>
-            <button type="button" id="mobile-menu-btn" class="md:hidden p-2 rounded-md text-gray-700 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
+            <button type="button" id="mobile-menu-btn" class="md:hidden p-2.5 rounded-xl text-slate-600 hover:text-brand-primary hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-primary/30" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
                 <i class="fas fa-bars text-xl" id="mobile-menu-icon"></i>
             </button>
         </div>
-        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200 mt-2 relative z-[60] bg-white" role="menu" aria-label="Mobile navigation">
+        <div id="mobile-menu" class="hidden md:hidden border-t border-slate-100 relative z-[60] bg-white/95 backdrop-blur-xl pb-4" role="menu" aria-label="Mobile navigation">
             <div class="pt-3 pb-4 px-2">
                 <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
                     <a href="{{ route('whatsapp-wallet.index') }}" class="text-green-700 hover:text-green-800 hover:bg-green-50 px-2.5 py-2 rounded-lg font-semibold">WhatsApp Wallet</a>
@@ -141,6 +138,7 @@
         </div>
     </div>
 </nav>
+<div class="h-20 shrink-0" aria-hidden="true"></div>
 <script>
 (function() {
     function initMobileMenu() {

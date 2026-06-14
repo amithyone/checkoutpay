@@ -4,6 +4,7 @@ namespace App\Services\Whatsapp;
 
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
+use App\Services\Consumer\ConsumerWalletPushNotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -14,6 +15,7 @@ class WhatsappWalletTopupNotifier
 {
     public function __construct(
         private EvolutionWhatsAppClient $client,
+        private ConsumerWalletPushNotificationService $consumerPush,
     ) {}
 
     /**
@@ -37,6 +39,18 @@ class WhatsappWalletTopupNotifier
             return;
         }
 
+        $name = trim((string) $senderWalletDisplayName);
+        $fromWho = $name !== '' ? $name : 'Someone';
+        $creditCur = strtoupper($creditCurrency);
+
+        $this->consumerPush->notifyP2pReceived(
+            $recipientWallet,
+            $amount,
+            $fromWho,
+            $creditCur,
+            $crossBorderFx,
+        );
+
         $instance = $senderChatInstance !== ''
             ? $senderChatInstance
             : (string) (WhatsappSession::query()
@@ -55,14 +69,11 @@ class WhatsappWalletTopupNotifier
             return;
         }
 
-        $creditCur = strtoupper($creditCurrency);
         $amountStr = WhatsappWalletMoneyFormatter::format($amount, $creditCur);
         $at = $transferredAt ?? now();
         $when = $at->copy()->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A').
             ' ('.(string) config('app.timezone').')';
 
-        $name = trim((string) $senderWalletDisplayName);
-        $fromWho = $name !== '' ? $name : 'Someone';
         $masked = $this->maskPhoneForNotify($senderPhoneE164);
 
         $isFx = $this->isCrossBorderNotify($crossBorderFx, $creditCur);
@@ -150,6 +161,8 @@ class WhatsappWalletTopupNotifier
         if ($credited <= 0) {
             return;
         }
+
+        $this->consumerPush->notifyWalletCredited($wallet, $credited, $balanceAfter);
 
         $instance = WhatsappSession::query()
             ->where('phone_e164', $wallet->phone_e164)

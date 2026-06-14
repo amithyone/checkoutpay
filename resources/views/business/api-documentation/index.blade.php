@@ -230,6 +230,18 @@ Content-Type: application/json
         </div>
     </div>
 
+    <!-- WhatsApp Pay Code -->
+    <div class="bg-white rounded-xl shadow-sm border border-green-200 p-4 lg:p-6" id="whatsapp-pay-code">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fab fa-whatsapp mr-2 text-green-600"></i> WhatsApp Pay Code (checkout)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">
+            When WhatsApp wallet API is enabled on your business, <code class="bg-gray-100 px-1 rounded text-xs">POST /api/v1/payment-request</code> can return a <code class="bg-gray-100 px-1 rounded text-xs">whatsapp_pay</code> block alongside the bank account — same <code class="bg-gray-100 px-1 rounded text-xs">transaction_id</code>. Show both options on your thank-you page: transfer to the account number <strong>or</strong> “Pay on WhatsApp” using <code class="bg-gray-100 px-1 rounded text-xs">whatsapp_pay.wa_link</code>.
+        </p>
+        <p class="text-sm text-gray-600 mb-2">Customer sends <code class="bg-gray-100 px-1 rounded text-xs">PAY {CODE}</code>, receives a secure PIN link, and pays from their wallet. You get the same <code class="bg-gray-100 px-1 rounded text-xs">payment.approved</code> webhook with <code class="bg-gray-100 px-1 rounded text-xs">payment_method: whatsapp_wallet</code>.</p>
+        <p class="text-sm text-gray-600">Full reference: <a href="{{ route('api-docs') }}#whatsapp-pay-code" class="text-primary underline font-medium">public API docs — WhatsApp Pay Code</a>.</p>
+    </div>
+
     <!-- WhatsApp wallet merchant API -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6" id="whatsapp-wallet">
         <h3 class="text-lg font-semibold text-gray-900 mb-2">

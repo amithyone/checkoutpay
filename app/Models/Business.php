@@ -1003,7 +1003,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
         $amountForCharges = $receivedAmount ?? $amount;
 
         // Use website-based charges if payment has website, fallback to business
-        $website = $payment && $payment->relationLoaded('website') ? $payment->website : ($payment ? $payment->website()->first() : null);
+        $website = null;
+        if ($payment) {
+            if ($payment->relationLoaded('website')) {
+                $website = $payment->website;
+            } elseif ($payment->business_website_id) {
+                $website = $payment->website()->first();
+            }
+        }
 
         $emailData = ($payment && is_array($payment->email_data)) ? $payment->email_data : [];
         // Permanent merchant pay-in VA (Rubies business account): credit gross — no platform charges.

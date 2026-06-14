@@ -15,7 +15,8 @@ final class WhatsappWalletPartnerPayIntentService
 {
     public function __construct(
         private EvolutionWhatsAppClient $whatsapp,
-        private WhatsappWalletPartnerApiService $partnerApi
+        private WhatsappWalletPartnerApiService $partnerApi,
+        private WhatsappCheckoutPayCodeSettlementService $checkoutSettlement,
     ) {}
 
     /**
@@ -225,6 +226,10 @@ final class WhatsappWalletPartnerPayIntentService
             return ['ok' => false, 'message' => $pinResult['error'] ?? 'Incorrect PIN.'];
         }
 
+        if ($intent->payment_id) {
+            return $this->completeCheckoutPayCodeIntent($intent, $business, $wallet);
+        }
+
         $idem = hash('sha256', 'partner-pay|'.$intent->business_id.'|'.$intent->id.'|'.$intent->client_idempotency_key);
 
         $settle = $this->partnerApi->settlePartnerWalletDebit(
@@ -326,6 +331,59 @@ final class WhatsappWalletPartnerPayIntentService
                 'payer_name' => $intent->payer_name,
             ],
         ];
+    }
+
+    /**
+     * @return array{ok: bool, message?: string, data?: array<string, mixed>}
+     */
+    private function completeCheckoutPayCodeIntent(
+        WhatsappWalletPartnerPayIntent $intent,
+        Business $business,
+        WhatsappWallet $wallet
+    ): array {
+        if (! WhatsappCheckoutPayCodePolicy::customerCountryAllowed((string) $intent->phone_e164)) {
+            return ['ok' => false, 'message' => 'Checkout Pay Code is not available for your country.'];
+        }
+
+        $payment = $intent->payment;
+        if (! $payment || ! $payment->isPending()) {
+            return ['ok' => false, 'message' => 'This payment is no longer available.'];
+        }
+
+        $idem = hash('sha256', 'checkout-pay-code|'.$intent->business_id.'|'.$intent->payment_id.'|'.$intent->client_idempotency_key);
+
+        $settle = $this->checkoutSettlement->settle(
+            $payment,
+            $business,
+            $wallet,
+            $idem,
+            [
+                'partner_pay_intent_id' => $intent->id,
+                'channel' => 'checkout_pay_code_web_pin',
+            ]
+        );
+
+        if (! ($settle['ok'] ?? false)) {
+            $intent->update([
+                'status' => WhatsappWalletPartnerPayIntent::STATUS_FAILED,
+                'failure_reason' => (string) ($settle['message'] ?? 'Debit failed'),
+            ]);
+
+            return ['ok' => false, 'message' => (string) ($settle['message'] ?? 'Payment failed.')];
+        }
+
+        $data = $settle['data'] ?? [];
+        $paymentId = isset($data['payment_id']) ? (int) $data['payment_id'] : (int) $intent->payment_id;
+
+        $intent->update([
+            'status' => WhatsappWalletPartnerPayIntent::STATUS_COMPLETED,
+            'payment_id' => $paymentId,
+            'failure_reason' => null,
+        ]);
+
+        $this->notifyPartnerPaySuccessWhatsApp($intent, $business, $wallet, $data);
+
+        return ['ok' => true, 'data' => $data];
     }
 
     private function responsePayloadForIntent(WhatsappWalletPartnerPayIntent $intent, int $ttlMin): array

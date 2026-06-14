@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('business_id')->constrained('businesses')->onDelete('cascade');
             $table->foreignId('payment_id')->nullable()->constrained('payments')->onDelete('set null');
             $table->decimal('amount', 15, 2);
-            $table->enum('type', ['payment', 'withdrawal'])->default('payment');
+            $table->string('type', 40)->default('payment');
             $table->enum('status', ['pending', 'completed', 'failed', 'cancelled'])->default('completed');
             $table->dateTime('transaction_date');
             $table->timestamps();

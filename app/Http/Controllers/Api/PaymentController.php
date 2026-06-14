@@ -58,6 +58,10 @@ class PaymentController extends Controller
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);
 
+            $includeWhatsappPay = $request->boolean('include_whatsapp_pay', true);
+            $whatsappPay = app(\App\Services\Whatsapp\WhatsappCheckoutPayCodeService::class)
+                ->attachToPayment($payment, $business, $includeWhatsappPay);
+
             // Calculate charges (for API response - actual charges applied when payment is approved)
             // Use website-based charges, fallback to business
             $chargeService = app(\App\Services\ChargeService::class);
@@ -84,7 +88,7 @@ class PaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Payment request created successfully',
-                'data' => [
+                'data' => array_filter([
                     'transaction_id' => $payment->transaction_id,
                     'amount' => (float) $payment->amount,
                     'payer_name' => $payment->payer_name,
@@ -106,7 +110,8 @@ class PaymentController extends Controller
                         'id' => $payment->website->id,
                         'url' => $payment->website->website_url,
                     ] : null,
-                ],
+                    'whatsapp_pay' => $whatsappPay,
+                ], static fn ($value) => $value !== null),
             ], 201);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
@@ -173,9 +178,12 @@ class PaymentController extends Controller
             ], 404);
         }
 
+        $whatsappPay = app(\App\Services\Whatsapp\WhatsappCheckoutPayCodeService::class)
+            ->buildPayload($payment, $business);
+
         return response()->json([
             'success' => true,
-            'data' => [
+            'data' => array_filter([
                 'transaction_id' => $payment->transaction_id,
                 'amount' => (float) $payment->amount,
                 'payer_name' => $payment->payer_name,
@@ -190,6 +198,7 @@ class PaymentController extends Controller
                 'approved_at' => $payment->approved_at?->toISOString(),
                 'created_at' => $payment->created_at->toISOString(),
                 'updated_at' => $payment->updated_at->toISOString(),
+                'payment_method_used' => $payment->payment_method_used,
                 'charges' => [
                     'percentage' => (float) ($payment->charge_percentage ?? 0),
                     'fixed' => (float) ($payment->charge_fixed ?? 0),
@@ -201,7 +210,8 @@ class PaymentController extends Controller
                     'id' => $payment->website->id,
                     'url' => $payment->website->website_url,
                 ] : null,
-            ],
+                'whatsapp_pay' => $whatsappPay,
+            ], static fn ($value) => $value !== null),
         ]);
     }
 

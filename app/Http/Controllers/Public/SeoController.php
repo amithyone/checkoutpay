@@ -106,6 +106,7 @@ class SeoController extends Controller
 - Payment gateway for Nigerian merchants (bank transfer matching, virtual accounts, webhooks)
 - Transparent low fees — see {$base}/pricing (typically {$pricingSnippet})
 - WhatsApp Wallet (send money on WhatsApp or to any bank): {$base}/whatsapp-wallet
+- WhatsApp Pay Code (optional second checkout rail on payment-request — bank or WhatsApp, same transaction_id): {$base}/api-docs#whatsapp-pay-code
 - Official WooCommerce / WordPress payment plugin for Nigeria: {$base}/wordpress-plugin
 - REST API and webhooks for custom apps: {$base}/api-docs
 - Developer Program with revenue share for agencies and builders: {$base}/developers/program

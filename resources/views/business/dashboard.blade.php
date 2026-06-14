@@ -196,33 +196,43 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
-                        @forelse($recentPayments as $payment)
+                        @forelse($recentActivity as $row)
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 lg:px-6 py-3">
-                                <a href="{{ route('business.transactions.show', $payment) }}" class="text-xs sm:text-sm font-medium text-primary hover:underline break-words">
-                                    {{ Str::limit($payment->transaction_id, 20) }}
-                                </a>
+                                @if($row['kind'] === 'loan_repayment')
+                                    <a href="{{ route('business.transactions.loan.show', $row['loan_transaction']) }}" class="text-xs sm:text-sm font-medium text-primary hover:underline break-words">
+                                        {{ Str::limit($row['reference'], 20) }}
+                                    </a>
+                                @else
+                                    <a href="{{ route('business.transactions.show', $row['payment']) }}" class="text-xs sm:text-sm font-medium text-primary hover:underline break-words">
+                                        {{ Str::limit($row['reference'], 20) }}
+                                    </a>
+                                @endif
                             </td>
                             <td class="px-4 lg:px-6 py-3 text-xs sm:text-sm text-gray-600">
-                                @if($payment->website)
-                                    <span class="text-xs truncate block max-w-[150px]" title="{{ $payment->website->website_url }}">
-                                        {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
+                                @if($row['kind'] === 'loan_repayment')
+                                    <span class="text-xs">Loan repayment</span>
+                                @elseif($row['website'])
+                                    <span class="text-xs truncate block max-w-[150px]" title="{{ $row['website']->website_url }}">
+                                        {{ parse_url($row['website']->website_url, PHP_URL_HOST) }}
                                     </span>
                                 @else
                                     <span class="text-gray-400 text-xs">N/A</span>
                                 @endif
                             </td>
-                            <td class="px-4 lg:px-6 py-3 text-xs sm:text-sm text-gray-900 break-words min-w-0">₦{{ number_format($payment->amount, 2) }}</td>
+                            <td class="px-4 lg:px-6 py-3 text-xs sm:text-sm {{ $row['direction'] === 'out' ? 'text-red-700' : 'text-gray-900' }} break-words min-w-0">
+                                @if($row['direction'] === 'out')−@endif₦{{ number_format($row['amount'], 2) }}
+                            </td>
                             <td class="px-4 lg:px-6 py-3">
-                                @if($payment->status === 'approved')
-                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
-                                @elseif($payment->status === 'pending')
+                                @if(in_array($row['status'], ['approved', 'completed'], true))
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Completed</span>
+                                @elseif($row['status'] === 'pending')
                                     <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
                                 @else
                                     <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
                                 @endif
                             </td>
-                            <td class="px-4 lg:px-6 py-3 text-xs sm:text-sm text-gray-500 whitespace-nowrap">{{ $payment->created_at->format('M d, Y') }}</td>
+                            <td class="px-4 lg:px-6 py-3 text-xs sm:text-sm text-gray-500 whitespace-nowrap">{{ $row['occurred_at']->format('M d, Y') }}</td>
                         </tr>
                         @empty
                         <tr>
@@ -234,24 +244,33 @@
             </div>
             <!-- Mobile Card View -->
             <div class="lg:hidden divide-y divide-gray-200">
-                @forelse($recentPayments as $payment)
-                <a href="{{ route('business.transactions.show', $payment) }}" class="block p-4 hover:bg-gray-50 transition-colors">
+                @forelse($recentActivity as $row)
+                @php
+                    $rowUrl = $row['kind'] === 'loan_repayment'
+                        ? route('business.transactions.loan.show', $row['loan_transaction'])
+                        : route('business.transactions.show', $row['payment']);
+                @endphp
+                <a href="{{ $rowUrl }}" class="block p-4 hover:bg-gray-50 transition-colors">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-gray-900 truncate">{{ Str::limit($payment->transaction_id, 25) }}</p>
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ Str::limit($row['reference'], 25) }}</p>
                             <p class="text-xs text-gray-500 mt-1 break-words">
-                                @if($payment->website)
-                                    {{ parse_url($payment->website->website_url, PHP_URL_HOST) }} •
+                                @if($row['kind'] === 'loan_repayment')
+                                    Loan repayment •
+                                @elseif($row['website'])
+                                    {{ parse_url($row['website']->website_url, PHP_URL_HOST) }} •
                                 @endif
-                                {{ $payment->created_at->format('M d, Y') }}
+                                {{ $row['occurred_at']->format('M d, Y') }}
                             </p>
                         </div>
                         <div class="ml-4 text-right flex-shrink-0 min-w-0">
-                            <p class="text-sm sm:text-base font-semibold text-gray-900 break-words leading-tight">₦{{ number_format($payment->amount, 2) }}</p>
+                            <p class="text-sm sm:text-base font-semibold {{ $row['direction'] === 'out' ? 'text-red-700' : 'text-gray-900' }} break-words leading-tight">
+                                @if($row['direction'] === 'out')−@endif₦{{ number_format($row['amount'], 2) }}
+                            </p>
                             <div class="mt-1">
-                                @if($payment->status === 'approved')
-                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
-                                @elseif($payment->status === 'pending')
+                                @if(in_array($row['status'], ['approved', 'completed'], true))
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Completed</span>
+                                @elseif($row['status'] === 'pending')
                                     <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
                                 @else
                                     <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>

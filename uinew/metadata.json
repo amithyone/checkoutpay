@@ -1,0 +1,6 @@
+{
+  "name": "CheckoutPay",
+  "description": "Intelligent payment gateway for modern commerce in Nigeria, built in partnership with Metravon Innovation Ltd and offering WhatsApp Wallets, USD Virtual Cards, and seamless WooCommerce integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

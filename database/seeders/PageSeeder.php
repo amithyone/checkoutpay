@@ -58,11 +58,13 @@ class PageSeeder extends Seeder
         // Return as JSON string - Laravel will auto-cast to array when retrieved
         return json_encode([
             'hero' => [
-                'badge_text' => null,
-                'badge_icon' => null,
-                'title' => 'CheckoutPay',
-                'title_highlight' => null,
-                'description' => 'Built to stay out of the way while everything else continues.',
+                'badge_text' => 'Built to stay out of the way.',
+                'badge_icon' => 'fas fa-circle',
+                'title' => 'Intelligent ',
+                'title_highlight' => 'Payment Gateway',
+                'title_suffix' => ' for Nigerian Business',
+                'description' => 'Accept bank transfers and WhatsApp Pay Code on one checkout — virtual accounts, automated matching, and real-time webhooks for Nigerian merchants.',
+                'subtext' => 'Your customers can pay from the CheckoutNow app on Google Play and the App Store: NGN wallet, airtime, bill pay, P2P transfers, and dollar virtual cards.',
                 'pricing_text' => '1% + ₦100 per transaction',
                 'cta_primary' => 'Get started',
                 'cta_secondary' => 'View pricing',

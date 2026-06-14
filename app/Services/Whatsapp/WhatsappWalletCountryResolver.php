@@ -87,6 +87,36 @@ final class WhatsappWalletCountryResolver
         return $this->fallbackCurrency();
     }
 
+    public function countryIsoForPhoneE164(string $phoneE164): string
+    {
+        $d = preg_replace('/\D+/', '', $phoneE164) ?? '';
+        if ($d === '') {
+            return strtoupper((string) config('whatsapp_wallet_regions.unknown_instance_country', 'NG'));
+        }
+
+        $rows = WhatsappWalletRegionConfig::countryByDial();
+        if (! is_array($rows) || $rows === []) {
+            return strtoupper((string) config('whatsapp_wallet_regions.unknown_instance_country', 'NG'));
+        }
+
+        usort($rows, static fn ($a, $b): int => strlen((string) ($b['dial'] ?? '')) <=> strlen((string) ($a['dial'] ?? '')));
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $dial = (string) ($row['dial'] ?? '');
+            if ($dial === '' || ! str_starts_with($d, $dial)) {
+                continue;
+            }
+            $cc = strtoupper((string) ($row['country'] ?? ''));
+
+            return strlen($cc) === 2 ? $cc : strtoupper((string) config('whatsapp_wallet_regions.unknown_instance_country', 'NG'));
+        }
+
+        return strtoupper((string) config('whatsapp_wallet_regions.unknown_instance_country', 'NG'));
+    }
+
     private function currencyForNanpDigits(string $digitsStartingWith1): string
     {
         if (strlen($digitsStartingWith1) < 4) {
