@@ -5,445 +5,107 @@
 @endsection
 
 @section('content')
-    <!-- Hero Section -->
-    <section class="py-12 sm:py-16 md:py-20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center">
-                <div class="badge-brand mx-auto mb-6">Business solutions</div>
-                <h1 class="section-heading mb-4 sm:mb-6">
-                    Business Solutions
-                </h1>
-                <p class="section-subheading mx-auto mb-6 sm:mb-8">
-                    WhatsApp Wallet. Payments. Dollar card. Invoices. Rentals. Tickets. Memberships.
-                </p>
-                <div class="flex flex-col sm:flex-row justify-center items-center gap-3">
-                    <x-checkoutnow-apk-download
-                        label="Download CheckoutNow Android app"
-                        class="inline-flex items-center px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-semibold shadow-sm transition"
-                    />
-                    <a href="{{ \App\Support\CheckoutNowApp::webUrl() }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="inline-flex items-center px-6 py-3 border border-gray-300 text-gray-800 rounded-lg hover:bg-gray-50 font-medium transition">
-                        <i class="fas fa-external-link-alt mr-2"></i> Open web app
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
+    <x-marketing.product-hero
+        badge="Business solutions"
+        title="Business Solutions"
+        subtitle="WhatsApp Wallet. Payments. Dollar card. Invoices. Rentals. Tickets. Memberships."
+    >
+        <x-slot:actions>
+            <x-checkoutnow-apk-download label="Download CheckoutNow" class="btn-brand" />
+            <a href="{{ \App\Support\CheckoutNowApp::webUrl() }}" target="_blank" rel="noopener noreferrer" class="btn-brand-outline">
+                Open web app <i class="fas fa-external-link-alt text-xs" aria-hidden="true"></i>
+            </a>
+        </x-slot:actions>
+    </x-marketing.product-hero>
 
     <x-marketing.virtual-card-section :virtual-card="$virtualCard ?? []" />
+    <x-marketing.whatsapp-wallet-section />
+    <x-marketing.commerce-infrastructure />
 
-    <!-- Core Payment Products -->
-    <section class="py-12 sm:py-16 md:py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Payment Solutions</h2>
-                <p class="text-lg text-gray-600">Accept payments in NGN.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                <!-- CheckoutNow mobile app -->
-                <div id="checkoutnow-app" class="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-indigo-50 to-white rounded-xl shadow-lg border-2 border-indigo-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                        <div class="flex-1">
-                            <div class="inline-flex items-center gap-2 bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-xs font-semibold mb-3">
-                                <i class="fas fa-mobile-alt"></i> Consumer app
-                            </div>
-                            <h3 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">CheckoutNow app</h3>
-                            <p class="text-gray-600 mb-4 max-w-2xl">
-                                NGN wallet, bills, transfers, virtual dollar card, and support — in one Android app. Install the APK or use the web app in your browser.
-                            </p>
-                            <ul class="grid sm:grid-cols-2 gap-2 text-sm text-gray-600 mb-6">
-                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> Wallet, airtime &amp; bill pay</li>
-                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> Bank &amp; WhatsApp transfers</li>
-                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> Dollar virtual card</li>
-                                <li class="flex items-start"><i class="fas fa-check-circle text-indigo-500 mt-0.5 mr-2"></i> PIN &amp; biometric security</li>
-                            </ul>
-                            <div class="flex flex-col sm:flex-row flex-wrap gap-3">
-                                <x-checkoutnow-apk-download
-                                    label="Download Android APK"
-                                    class="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
-                                />
-                                <a href="{{ \App\Support\CheckoutNowApp::webUrl() }}"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   class="inline-flex items-center justify-center px-6 py-3 border border-indigo-300 text-indigo-800 rounded-lg hover:bg-indigo-50 font-semibold">
-                                    Open web app <i class="fas fa-external-link-alt ml-2"></i>
-                                </a>
-                            </div>
-                        </div>
-                        <div class="hidden sm:flex w-32 h-32 lg:w-40 lg:h-40 rounded-2xl bg-indigo-100 items-center justify-center shrink-0">
-                            <i class="fas fa-mobile-alt text-indigo-600 text-6xl lg:text-7xl"></i>
-                        </div>
-                    </div>
-                </div>
+    <x-marketing.product-section title="Payment integrations" subtitle="Accept NGN payments across channels." bg="muted">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            <x-marketing.product-card
+                href="{{ route('developers.index') }}"
+                icon="fa-code"
+                title="Payment Gateway API"
+                description="RESTful API with webhooks and real-time status tracking."
+            >
+                <x-slot:bullets>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-brand-primary mt-0.5"></i><span>Comprehensive documentation</span></li>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-brand-primary mt-0.5"></i><span>Webhook notifications</span></li>
+                </x-slot:bullets>
+                <x-slot:footer>
+                    <span class="text-brand-primary font-semibold text-sm group-hover:underline">View API docs <i class="fas fa-arrow-right ml-1 text-xs"></i></span>
+                </x-slot:footer>
+            </x-marketing.product-card>
 
-                <!-- WhatsApp Wallet (featured) -->
-                <div id="whatsapp-wallet" class="md:col-span-2 lg:col-span-3 bg-gradient-to-br from-green-50 to-white rounded-xl shadow-lg border-2 border-green-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                        <div class="flex-1">
-                            <div class="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold mb-3">
-                                <i class="fab fa-whatsapp"></i> Flagship service
-                            </div>
-                            <h3 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">WhatsApp Wallet</h3>
-                            <p class="text-gray-600 mb-4 max-w-2xl">
-                                Send money to <strong>any Nigerian bank</strong> or <strong>anyone on WhatsApp</strong> — P2P, airtime, cross-border conversion, and secure merchant payments. Your phone number is your wallet.
-                            </p>
-                            <ul class="grid sm:grid-cols-2 gap-2 text-sm text-gray-600 mb-6">
-                                <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-0.5 mr-2"></i> WhatsApp-to-WhatsApp transfers</li>
-                                <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-0.5 mr-2"></i> Pay any bank from chat</li>
-                                <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-0.5 mr-2"></i> PIN-secured confirmations</li>
-                                <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-0.5 mr-2"></i> Merchant API for businesses</li>
-                            </ul>
-                            <a href="{{ route('whatsapp-wallet.index') }}" class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
-                                Explore WhatsApp Wallet <i class="fas fa-arrow-right ml-2"></i>
-                            </a>
-                        </div>
-                        <div class="hidden sm:flex w-32 h-32 lg:w-40 lg:h-40 rounded-2xl bg-green-100 items-center justify-center shrink-0">
-                            <i class="fab fa-whatsapp text-green-600 text-6xl lg:text-7xl"></i>
-                        </div>
-                    </div>
-                </div>
+            <x-marketing.product-card
+                href="{{ route('checkout-demo.index') }}"
+                icon="fa-globe"
+                title="Hosted Checkout"
+                description="Redirect customers to a secure, mobile-optimized payment page."
+            >
+                <x-slot:bullets>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-brand-primary mt-0.5"></i><span>No coding required</span></li>
+                    <li class="flex items-start gap-2"><i class="fas fa-check-circle text-brand-primary mt-0.5"></i><span>Automatic reconciliation</span></li>
+                </x-slot:bullets>
+                <x-slot:footer>
+                    <span class="text-brand-primary font-semibold text-sm group-hover:underline">Try demo <i class="fas fa-arrow-right ml-1 text-xs"></i></span>
+                </x-slot:footer>
+            </x-marketing.product-card>
 
-                <!-- Payment Gateway API -->
-                <div id="api" class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-code text-primary text-2xl"></i>
+            <x-marketing.product-card
+                href="{{ route('wordpress-plugin.index') }}"
+                icon="fa-wordpress"
+                icon-bg="bg-violet-100"
+                icon-color="text-violet-600"
+                title="WordPress / WooCommerce"
+                description="Official plugin for WooCommerce bank-transfer checkout."
+            >
+                <x-slot:footer>
+                    <div class="flex flex-col gap-2">
+                        <span class="text-brand-primary font-semibold text-sm group-hover:underline">Plugin page <i class="fas fa-arrow-right ml-1 text-xs"></i></span>
+                        <x-checkoutpay-plugin-download :icon="false" class="text-brand-primary font-semibold text-sm hover:underline" />
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Payment Gateway API</h3>
-                    <p class="text-gray-600 mb-4">
-                        RESTful API for payment integration. Real-time webhooks included.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>RESTful API with comprehensive documentation</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Real-time webhook notifications</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Transaction status tracking</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('developers.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        View API Documentation <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-
-                <!-- Hosted Checkout -->
-                <div id="hosted-checkout" class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-globe text-primary text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Hosted Checkout Page</h3>
-                    <p class="text-gray-600 mb-4">
-                        Redirect to hosted payment page. No integration required.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>No coding required - simple redirect</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Secure payment processing</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Mobile-optimized checkout</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('checkout-demo.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        Try Demo <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-
-                <!-- WordPress Plugin -->
-                <div id="wordpress-plugin" class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fab fa-wordpress text-purple-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">WordPress / WooCommerce</h3>
-                    <p class="text-gray-600 mb-4">
-                        Plugin for WooCommerce stores. Install and configure.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>One-click installation</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Automatic charge calculation</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Compatible with {{ \App\Support\CheckoutPayWordPressPlugin::requirementsLabel() }}</span>
-                        </li>
-                    </ul>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <a href="{{ route('wordpress-plugin.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                            Plugin page <i class="fas fa-arrow-right ml-2"></i>
-                        </a>
-                        <x-checkoutpay-plugin-download :icon="false" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                            Download <i class="fas fa-download ml-2"></i>
-                        </x-checkoutpay-plugin-download>
-                    </div>
-                </div>
-            </div>
+                </x-slot:footer>
+            </x-marketing.product-card>
         </div>
-    </section>
+    </x-marketing.product-section>
 
-    <!-- Business Products -->
-    <section class="py-12 sm:py-16 md:py-20 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Business Products</h2>
-                <p class="text-lg text-gray-600">Available services.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                <!-- Invoices -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-file-invoice text-green-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Invoices</h3>
-                    <p class="text-gray-600 mb-4">
-                        Create invoices with payment links. PDF export included.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Professional invoice templates</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Integrated payment links</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>PDF export & email sending</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('products.invoices') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        View Details <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-
-                <!-- Rentals -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-box text-blue-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Rentals</h3>
-                    <p class="text-gray-600 mb-4">
-                        Rent equipment, vehicles, properties. Manage availability and bookings.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Category & city-based filtering</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Cart system for multiple items</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>KYC verification & secure payments</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('products.rentals-info') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        View Details <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-
-                <!-- Memberships -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-id-card text-purple-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Memberships</h3>
-                    <p class="text-gray-600 mb-4">
-                        Subscription memberships with digital cards. QR codes included.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Digital membership cards with QR codes</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Global or location-based memberships</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Member tracking & capacity management</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('products.memberships-info') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        View Details <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-
-                <!-- Tickets -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-ticket-alt text-orange-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Event Tickets</h3>
-                    <p class="text-gray-600 mb-4">
-                        Sell tickets for events. QR code verification. Digital delivery.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Multiple ticket types & pricing tiers</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>QR code verification & mobile scanner</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Digital PDF tickets via email</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('products.tickets-info') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        View Details <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-
-                <!-- Payout -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-money-bill-wave text-red-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Payout</h3>
-                    <p class="text-gray-600 mb-4">
-                        Withdraw earnings to bank account. Transaction history available.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Fast bank transfers</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Account verification & management</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Transaction history & tracking</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('payout.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        View Details <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-
-                <!-- Collections -->
-                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 sm:p-8 hover:shadow-xl transition-shadow">
-                    <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-wallet text-indigo-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Collections</h3>
-                    <p class="text-gray-600 mb-4">
-                        Track payment collections. View balances and transaction history.
-                    </p>
-                    <ul class="space-y-2 mb-6 text-sm text-gray-600">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Real-time balance tracking</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Transaction history & reports</span>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>
-                            <span>Analytics & insights</span>
-                        </li>
-                    </ul>
-                    <a href="{{ route('collections.index') }}" class="inline-flex items-center text-primary hover:text-primary/80 font-medium">
-                        View Details <i class="fas fa-arrow-right ml-2"></i>
-                    </a>
-                </div>
-            </div>
+    <x-marketing.product-section title="Business products" subtitle="Specialized tools for collections, billing, and operations.">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            @foreach([
+                ['route' => 'products.invoices', 'icon' => 'fa-file-invoice', 'bg' => 'bg-emerald-100', 'color' => 'text-emerald-600', 'title' => 'Invoices', 'desc' => 'Professional invoices with payment links and PDF export.'],
+                ['route' => 'products.rentals-info', 'icon' => 'fa-box', 'bg' => 'bg-blue-100', 'color' => 'text-blue-600', 'title' => 'Rentals', 'desc' => 'Equipment and property rentals with cart, KYC, and bookings.'],
+                ['route' => 'products.memberships-info', 'icon' => 'fa-id-card', 'bg' => 'bg-violet-100', 'color' => 'text-violet-600', 'title' => 'Memberships', 'desc' => 'Subscription memberships with digital cards and QR codes.'],
+                ['route' => 'products.tickets-info', 'icon' => 'fa-ticket-alt', 'bg' => 'bg-orange-100', 'color' => 'text-orange-600', 'title' => 'Event Tickets', 'desc' => 'Sell tickets with QR verification and digital delivery.'],
+                ['route' => 'payout.index', 'icon' => 'fa-money-bill-wave', 'bg' => 'bg-rose-100', 'color' => 'text-rose-600', 'title' => 'Payout', 'desc' => 'Withdraw earnings to your bank account quickly.'],
+                ['route' => 'collections.index', 'icon' => 'fa-wallet', 'bg' => 'bg-indigo-100', 'color' => 'text-indigo-600', 'title' => 'Collections', 'desc' => 'Track balances, history, and payment collections.'],
+            ] as $item)
+                <x-marketing.product-card
+                    href="{{ route($item['route']) }}"
+                    :icon="$item['icon']"
+                    :icon-bg="$item['bg']"
+                    :icon-color="$item['color']"
+                    :title="$item['title']"
+                    :description="$item['desc']"
+                >
+                    <x-slot:footer>
+                        <span class="text-brand-primary font-semibold text-sm group-hover:underline">View details <i class="fas fa-arrow-right ml-1 text-xs"></i></span>
+                    </x-slot:footer>
+                </x-marketing.product-card>
+            @endforeach
         </div>
-    </section>
+    </x-marketing.product-section>
 
-    <!-- Features Section -->
-    <section class="py-12 sm:py-16 md:py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-12">
-                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">How It Works</h2>
-                <p class="text-lg text-gray-600">Process payments.</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-bolt text-primary text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Integration</h3>
-                    <p class="text-gray-600 text-sm">API or hosted checkout page.</p>
-                </div>
-                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-shield-alt text-primary text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Security</h3>
-                    <p class="text-gray-600 text-sm">Automatic payment verification.</p>
-                </div>
-                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-chart-line text-primary text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Rates</h3>
-                    <p class="text-gray-600 text-sm">Competitive rates. 1% + ₦50 per transaction.</p>
-                </div>
-                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-mobile-alt text-primary text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Mobile</h3>
-                    <p class="text-gray-600 text-sm">Optimized for mobile devices.</p>
-                </div>
-                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-headset text-primary text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Support</h3>
-                    <p class="text-gray-600 text-sm">Documentation available.</p>
-                </div>
-                <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                        <i class="fas fa-cog text-primary text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-900 mb-2">Charges</h3>
-                    <p class="text-gray-600 text-sm">Choose who pays transaction fees.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+    <x-marketing.woocommerce-section />
 
-    <!-- CTA Section -->
-    <section class="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-primary to-primary/90">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">Get Started</h2>
-            <p class="text-lg md:text-xl text-primary-100 mb-8">Create an account.</p>
-            <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                <a href="{{ route('business.register') }}" class="w-full sm:w-auto bg-white text-primary px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-gray-100 font-medium text-base sm:text-lg transition-colors shadow-lg">
-                    Create Your Account
-                </a>
-                <a href="{{ route('pricing') }}" class="w-full sm:w-auto bg-transparent text-white border-2 border-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg hover:bg-white/10 font-medium text-base sm:text-lg transition-colors">
-                    View Pricing
-                </a>
-            </div>
-        </div>
-    </section>
-
+    <x-marketing.product-cta
+        title="Ready to grow your business?"
+        subtitle="Create an account and start accepting payments today."
+        :primary-url="route('business.register')"
+        primary-label="Create your account"
+        :secondary-url="route('pricing')"
+        secondary-label="View pricing"
+    />
 @endsection

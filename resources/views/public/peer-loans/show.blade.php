@@ -1,29 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @php
-        $seo = \App\Support\Seo::resolve([
-            'path' => '/business-loans/'.$offer->public_slug,
-            'title' => 'Business loan offer — CheckoutPay',
-            'description' => \Illuminate\Support\Str::limit(strip_tags((string) $offer->description), 155) ?: 'View this business loan offer on CheckoutPay.',
-        ]);
-    @endphp
+@extends('layouts.marketing')
+
+@section('title')
     @include('partials.marketing-head', ['seo' => $seo])
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-@include('partials.tailwind-assets')
-</head>
-<body class="bg-gray-50">
-@include('partials.nav')
+@endsection
+
+@section('content')
 <main class="max-w-lg mx-auto px-4 py-10">
     <a href="{{ route('peer-loans.index') }}" class="text-sm text-primary hover:underline">&larr; All offers</a>
     <div class="mt-4 bg-white rounded-lg border border-gray-200 p-6 space-y-3">
-        <h1 class="text-xl font-bold text-gray-900">₦{{ number_format($offer->amount, 2) }}</h1>
-        <p class="text-sm text-gray-600">Lender: <span class="font-medium text-gray-900">{{ $offer->lender->name }}</span></p>
+        <h1 class="text-xl font-bold text-midnight-deep">₦{{ number_format($offer->amount, 2) }}</h1>
+        <p class="text-sm text-slate-600">Lender: <span class="font-medium text-midnight-deep">{{ $offer->lender->name }}</span></p>
         @include('partials.peer-lending-interest-explainer', ['variant' => 'offer-detail', 'offer' => $offer])
-        <p class="text-sm text-gray-600">Term: <span class="font-medium">{{ $offer->term_days }} days</span></p>
-        <p class="text-sm text-gray-600">Repayment: <span class="font-medium block mt-1">{{ $offer->repaymentSummaryLine() }}</span></p>
+        <p class="text-sm text-slate-600">Term: <span class="font-medium">{{ $offer->term_days }} days</span></p>
+        <p class="text-sm text-slate-600">Repayment: <span class="font-medium block mt-1">{{ $offer->repaymentSummaryLine() }}</span></p>
     </div>
 
     @if(session('error'))
@@ -44,10 +33,9 @@
             <p class="mt-6 text-sm text-amber-700">Your business is not approved to borrow yet. Contact support or check your dashboard.</p>
         @endif
     @else
-        <p class="mt-6 text-sm text-gray-600">
+        <p class="mt-6 text-sm text-slate-600">
             <a href="{{ route('business.login') }}" class="text-primary font-medium hover:underline">Sign in to your business account</a> to apply.
         </p>
     @endauth
 </main>
-</body>
-</html>
+@endsection

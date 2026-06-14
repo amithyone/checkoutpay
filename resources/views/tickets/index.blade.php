@@ -1,19 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+@extends('layouts.marketing')
+
+@section('title')
     @include('partials.marketing-head', ['seoPath' => '/tickets'])
-<style>
+@endsection
+
+@push('head')
+    <style>
         .group:hover .tickets-card-btn { background-color: var(--tickets-accent) !important; color: white !important; }
     </style>
-    @include('partials.tailwind-assets')
-</head>
-<body class="bg-gray-50">
-    @php $ticketsColor = \App\Models\Setting::get('rentals_accent_color', '#000000'); @endphp
-    @include('partials.nav')
+@endpush
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-24 sm:pb-8">
+@section('content')
+<div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-24 sm:pb-8">
         {{-- Search + Filter (same pattern as rentals) --}}
         <form method="GET" action="{{ route('tickets.index') }}" class="space-y-4 mb-6" id="tickets-filter-form">
             {{-- Search bar --}}
@@ -23,8 +21,8 @@
                 </span>
                 <input type="text" name="search" value="{{ request('search') }}"
                     placeholder="Search events, venues or organisers..."
-                    class="w-full pl-11 pr-12 py-3 rounded-2xl border-0 bg-gray-200 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-gray-400 shadow-sm">
-                <button type="button" id="open-filter-modal" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-600 hover:text-gray-900 rounded-lg transition" title="Filter">
+                    class="w-full pl-11 pr-12 py-3 rounded-2xl border-0 bg-surface-container-low text-midnight-deep placeholder-gray-500 focus:ring-2 focus:ring-gray-400 shadow-sm">
+                <button type="button" id="open-filter-modal" class="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-600 hover:text-midnight-deep rounded-lg transition" title="Filter">
                     <i class="fas fa-filter"></i>
                 </button>
             </div>
@@ -54,17 +52,17 @@
             {{-- Date pills (All / Upcoming / Past) --}}
             <div class="flex gap-2 overflow-x-auto pb-1" style="scrollbar-width: thin;">
                 <a href="{{ route('tickets.index', array_filter(['search' => request('search'), 'sort' => request('sort')])) }}"
-                    class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ !request('date') ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+                    class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ !request('date') ? 'text-white' : 'bg-surface-container-low text-gray-700 hover:bg-gray-300' }}"
                     @if(!request('date')) style="background-color: {{ $ticketsColor }};" @endif>
                     All
                 </a>
                 <a href="{{ route('tickets.index', array_filter(['date' => 'upcoming', 'search' => request('search'), 'sort' => request('sort')])) }}"
-                    class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ request('date') == 'upcoming' ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+                    class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ request('date') == 'upcoming' ? 'text-white' : 'bg-surface-container-low text-gray-700 hover:bg-gray-300' }}"
                     @if(request('date') == 'upcoming') style="background-color: {{ $ticketsColor }};" @endif>
                     Upcoming
                 </a>
                 <a href="{{ route('tickets.index', array_filter(['date' => 'past', 'search' => request('search'), 'sort' => request('sort')])) }}"
-                    class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ request('date') == 'past' ? 'text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+                    class="flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-medium transition {{ request('date') == 'past' ? 'text-white' : 'bg-surface-container-low text-gray-700 hover:bg-gray-300' }}"
                     @if(request('date') == 'past') style="background-color: {{ $ticketsColor }};" @endif>
                     Past
                 </a>
@@ -76,7 +74,7 @@
             <div class="absolute inset-0 bg-black/50" id="filter-modal-backdrop"></div>
             <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-xl max-h-[85vh] overflow-hidden flex flex-col animate-slide-up">
                 <div class="flex items-center justify-between p-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Filter & sort</h3>
+                    <h3 class="text-lg font-semibold text-midnight-deep">Filter & sort</h3>
                     <button type="button" id="close-filter-modal" class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
                         <i class="fas fa-times text-xl"></i>
                     </button>
@@ -84,7 +82,7 @@
                 <div class="p-4 space-y-5 overflow-y-auto flex-1">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                        <select id="modal-date" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 focus:ring-2 focus:ring-gray-700 focus:border-gray-700">
+                        <select id="modal-date" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-surface-container-low/50 text-midnight-deep focus:ring-2 focus:ring-gray-700 focus:border-gray-700">
                             <option value="">All events</option>
                             <option value="upcoming" {{ request('date') == 'upcoming' ? 'selected' : '' }}>Upcoming</option>
                             <option value="past" {{ request('date') == 'past' ? 'selected' : '' }}>Past</option>
@@ -100,18 +98,18 @@
                                 'price_low' => ['Price: Low to High', 'fa-arrow-up'],
                                 'price_high' => ['Price: High to Low', 'fa-arrow-down'],
                             ] as $value => $label)
-                                <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer hover:bg-gray-50 {{ request('sort', 'upcoming') == $value ? 'border-2' : 'border-gray-200' }}"
+                                <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer hover:bg-surface-container-low/50 {{ request('sort', 'upcoming') == $value ? 'border-2' : 'border-gray-200' }}"
                                     @if(request('sort', 'upcoming') == $value) style="border-color: {{ $ticketsColor }}; background-color: {{ $ticketsColor }}15;" @endif>
                                     <input type="radio" name="modal-sort" value="{{ $value }}" {{ request('sort', 'upcoming') == $value ? 'checked' : '' }} class="focus:ring-gray-700">
                                     <i class="fas {{ $label[1] }} text-gray-500 w-5"></i>
-                                    <span class="text-gray-900">{{ $label[0] }}</span>
+                                    <span class="text-midnight-deep">{{ $label[0] }}</span>
                                 </label>
                             @endforeach
                         </div>
                     </div>
                 </div>
                 <div class="p-4 border-t border-gray-200 flex gap-3">
-                    <button type="button" id="filter-modal-clear" class="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">Clear</button>
+                    <button type="button" id="filter-modal-clear" class="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-surface-container-low/50">Clear</button>
                     <button type="button" id="filter-modal-apply" class="flex-1 py-3 rounded-xl text-white font-medium" style="background-color: {{ $ticketsColor }};">Show results</button>
                 </div>
             </div>
@@ -134,8 +132,8 @@
                             @if($event->start_date)
                                 <span class="text-xs font-medium text-primary">{{ $event->start_date->format('M d, Y') }}</span>
                             @endif
-                            <h3 class="font-semibold text-gray-900 mt-0.5 sm:mt-1 group-hover:text-primary transition text-sm sm:text-base line-clamp-2">{{ $event->title }}</h3>
-                            <p class="text-gray-600 text-xs sm:text-sm mt-1 line-clamp-2 hidden sm:block">{{ Str::limit($event->description, 90) }}</p>
+                            <h3 class="font-semibold text-midnight-deep mt-0.5 sm:mt-1 group-hover:text-primary transition text-sm sm:text-base line-clamp-2">{{ $event->title }}</h3>
+                            <p class="text-slate-600 text-xs sm:text-sm mt-1 line-clamp-2 hidden sm:block">{{ Str::limit($event->description, 90) }}</p>
                             <div class="flex justify-between items-center mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-100 gap-1">
                                 @if($event->ticketTypes && $event->ticketTypes->count() > 0)
                                     <span class="text-primary font-bold text-sm sm:text-base">₦{{ number_format($event->ticketTypes->min('price'), 0) }}<span class="text-gray-500 font-normal text-xs sm:text-sm"> from</span></span>
@@ -163,7 +161,7 @@
         @else
             <div class="rounded-2xl bg-white border border-gray-200 p-10 sm:p-12 text-center">
                 <i class="fas fa-calendar-times text-gray-300 text-5xl mb-4"></i>
-                <p class="text-gray-600 font-medium">No events found</p>
+                <p class="text-slate-600 font-medium">No events found</p>
                 <p class="text-sm text-gray-500 mt-1">Try changing your search or filters.</p>
                 <a href="{{ route('tickets.index') }}" class="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl text-white text-sm font-medium" style="background-color: {{ $ticketsColor }};">Clear filters</a>
             </div>
@@ -173,23 +171,23 @@
     {{-- Bottom nav (same as rentals) --}}
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 sm:hidden safe-area-pb">
         <div class="flex justify-around items-center h-16">
-            <a href="{{ route('tickets.index') }}" class="flex flex-col items-center justify-center flex-1 py-2 {{ request()->routeIs('tickets.index') ? 'text-primary' : 'text-gray-600 hover:text-primary' }} transition">
+            <a href="{{ route('tickets.index') }}" class="flex flex-col items-center justify-center flex-1 py-2 {{ request()->routeIs('tickets.index') ? 'text-primary' : 'text-slate-600 hover:text-primary' }} transition">
                 <i class="fas fa-home text-lg mb-0.5"></i>
                 <span class="text-xs">Home</span>
             </a>
-            <a href="{{ auth()->check() ? route('user.purchases') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition {{ request()->routeIs('user.purchases') ? 'text-primary' : '' }}">
+            <a href="{{ auth()->check() ? route('user.purchases') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-slate-600 hover:text-primary transition {{ request()->routeIs('user.purchases') ? 'text-primary' : '' }}">
                 <i class="fas fa-shopping-bag text-lg mb-0.5"></i>
                 <span class="text-xs">Purchases</span>
             </a>
-            <a href="{{ route('support.index') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition {{ request()->routeIs('support.*') ? 'text-primary' : '' }}">
+            <a href="{{ route('support.index') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-slate-600 hover:text-primary transition {{ request()->routeIs('support.*') ? 'text-primary' : '' }}">
                 <i class="fas fa-headset text-lg mb-0.5"></i>
                 <span class="text-xs">Support</span>
             </a>
-            <a href="{{ auth()->check() ? route('user.profile') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition {{ request()->routeIs('user.profile') ? 'text-primary' : '' }}">
+            <a href="{{ auth()->check() ? route('user.profile') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-slate-600 hover:text-primary transition {{ request()->routeIs('user.profile') ? 'text-primary' : '' }}">
                 <i class="fas fa-user text-lg mb-0.5"></i>
                 <span class="text-xs">Profile</span>
             </a>
-            <a href="{{ auth()->check() ? route('user.dashboard') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-gray-600 hover:text-primary transition {{ request()->routeIs('user.dashboard') ? 'text-primary' : '' }}">
+            <a href="{{ auth()->check() ? route('user.dashboard') : route('account.login') }}" class="flex flex-col items-center justify-center flex-1 py-2 text-slate-600 hover:text-primary transition {{ request()->routeIs('user.dashboard') ? 'text-primary' : '' }}">
                 <i class="fas fa-bars text-lg mb-0.5"></i>
                 <span class="text-xs">More</span>
             </a>
@@ -278,5 +276,4 @@
         })();
     </script>
     @endif
-</body>
-</html>
+@endsection

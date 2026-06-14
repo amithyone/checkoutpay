@@ -1,33 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @include('partials.marketing-head', ['seoPath' => '/marketplace'])
-@include('partials.tailwind-assets')
-</head>
-<body class="bg-gray-50">
-    @include('partials.nav')
+@extends('layouts.marketing')
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+@section('title')
+    @include('partials.marketing-head', ['seoPath' => '/marketplace'])
+@endsection
+
+@section('content')
+<div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">Marketplace</h1>
-            <p class="text-gray-600">Browse all available memberships and rentals in one place</p>
+            <h1 class="text-3xl font-bold text-midnight-deep mb-2">Marketplace</h1>
+            <p class="text-slate-600">Browse all available memberships and rentals in one place</p>
         </div>
 
         <!-- Type Tabs -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('marketplace.index', ['type' => 'all'] + request()->except('type')) }}" 
-                   class="px-4 py-2 rounded-lg {{ $type === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                   class="px-4 py-2 rounded-lg {{ $type === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-slate-700 hover:bg-gray-200' }}">
                     All
                 </a>
                 <a href="{{ route('marketplace.index', ['type' => 'memberships'] + request()->except('type')) }}" 
-                   class="px-4 py-2 rounded-lg {{ $type === 'memberships' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                   class="px-4 py-2 rounded-lg {{ $type === 'memberships' ? 'bg-primary text-white' : 'bg-gray-100 text-slate-700 hover:bg-gray-200' }}">
                     <i class="fas fa-id-card mr-2"></i> Memberships
                 </a>
                 <a href="{{ route('marketplace.index', ['type' => 'rentals'] + request()->except('type')) }}" 
-                   class="px-4 py-2 rounded-lg {{ $type === 'rentals' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                   class="px-4 py-2 rounded-lg {{ $type === 'rentals' ? 'bg-primary text-white' : 'bg-gray-100 text-slate-700 hover:bg-gray-200' }}">
                     <i class="fas fa-box mr-2"></i> Rentals
                 </a>
             </div>
@@ -38,11 +34,11 @@
             <form method="GET" action="{{ route('marketplace.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <input type="hidden" name="type" value="{{ $type }}">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Search</label>
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Search..." class="w-full border-gray-300 rounded-md">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Category</label>
                     <select name="category" class="w-full border-gray-300 rounded-md">
                         <option value="">All Categories</option>
                         @if($type === 'all' || $type === 'memberships')
@@ -66,7 +62,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">City</label>
                     <select name="city" class="w-full border-gray-300 rounded-md">
                         <option value="">All Cities</option>
                         @foreach($cities as $city)
@@ -88,7 +84,7 @@
         @if(($type === 'all' || $type === 'memberships') && $memberships->count() > 0)
             <div class="mb-12">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-900">
+                    <h2 class="text-2xl font-bold text-midnight-deep">
                         <i class="fas fa-id-card text-primary mr-2"></i> Memberships
                     </h2>
                     <a href="{{ route('memberships.index') }}" class="text-primary hover:underline text-sm">
@@ -114,21 +110,21 @@
                                 </div>
                                 <div class="flex items-center gap-2 mb-2">
                                     @if($membership->category)
-                                        <span class="text-sm text-gray-500">{{ $membership->category->name }}</span>
+                                        <span class="text-sm text-slate-500">{{ $membership->category->name }}</span>
                                     @endif
                                     @if($membership->is_global)
                                         <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Global</span>
                                     @elseif($membership->city)
-                                        <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                        <span class="text-xs bg-gray-100 text-slate-700 px-2 py-1 rounded">
                                             <i class="fas fa-map-marker-alt mr-1"></i>{{ $membership->city }}
                                         </span>
                                     @endif
                                 </div>
-                                <p class="text-gray-600 text-sm mb-4">{{ \Illuminate\Support\Str::limit($membership->description, 80) }}</p>
+                                <p class="text-slate-600 text-sm mb-4">{{ \Illuminate\Support\Str::limit($membership->description, 80) }}</p>
                                 <div class="flex justify-between items-center mb-4">
                                     <div>
                                         <span class="text-primary font-bold text-xl">₦{{ number_format($membership->price, 2) }}</span>
-                                        <span class="text-sm text-gray-500">/ {{ $membership->formatted_duration }}</span>
+                                        <span class="text-sm text-slate-500">/ {{ $membership->formatted_duration }}</span>
                                     </div>
                                 </div>
                                 <a href="{{ route('memberships.show', $membership->slug) }}" class="block w-full bg-primary text-white text-center py-2 rounded-md hover:bg-primary/90">
@@ -145,7 +141,7 @@
         @if(($type === 'all' || $type === 'rentals') && $rentals->count() > 0)
             <div class="mb-12">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-900">
+                    <h2 class="text-2xl font-bold text-midnight-deep">
                         <i class="fas fa-box text-primary mr-2"></i> Rentals
                     </h2>
                     <a href="{{ route('rentals.index') }}" class="text-primary hover:underline text-sm">
@@ -165,12 +161,12 @@
                             <div class="p-4">
                                 <h3 class="font-semibold text-lg mb-2">{{ $item->name }}</h3>
                                 @if($item->category)
-                                    <span class="text-sm text-gray-500 mb-2 block">{{ $item->category->name }}</span>
+                                    <span class="text-sm text-slate-500 mb-2 block">{{ $item->category->name }}</span>
                                 @endif
-                                <p class="text-gray-600 text-sm mb-4">{{ \Illuminate\Support\Str::limit($item->description, 80) }}</p>
+                                <p class="text-slate-600 text-sm mb-4">{{ \Illuminate\Support\Str::limit($item->description, 80) }}</p>
                                 <div class="flex justify-between items-center mb-4">
                                     <span class="text-primary font-bold">₦{{ number_format($item->daily_rate, 2) }}/day</span>
-                                    <span class="text-sm text-gray-500">{{ $item->city }}</span>
+                                    <span class="text-sm text-slate-500">{{ $item->city }}</span>
                                 </div>
                                 <a href="{{ route('rentals.show', $item->slug) }}" class="block w-full bg-primary text-white text-center py-2 rounded-md hover:bg-primary/90">
                                     View Details
@@ -188,12 +184,9 @@
             ($type === 'rentals' && $rentals->count() === 0))
             <div class="bg-white rounded-lg shadow p-12 text-center">
                 <i class="fas fa-search text-gray-400 text-5xl mb-4"></i>
-                <p class="text-gray-600 mb-4">No items found matching your criteria.</p>
+                <p class="text-slate-600 mb-4">No items found matching your criteria.</p>
                 <a href="{{ route('marketplace.index') }}" class="text-primary hover:underline">Clear filters</a>
             </div>
         @endif
     </div>
-
-    @include('partials.footer')
-</body>
-</html>
+@endsection

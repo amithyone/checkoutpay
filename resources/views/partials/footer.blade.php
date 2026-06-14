@@ -4,7 +4,7 @@
     $siteName = \App\Models\Setting::get('site_name', 'CheckoutPay');
 @endphp
 <footer class="bg-slate-50 border-t border-slate-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+    <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
             <div class="col-span-2 lg:col-span-2 space-y-4">
                 <div class="flex items-center gap-2">

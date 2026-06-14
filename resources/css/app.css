@@ -65,4 +65,19 @@
     .section-subheading {
         @apply text-slate-600 font-medium text-base md:text-lg max-w-2xl;
     }
+
+    .product-page-content h1,
+    .product-page-content h2,
+    .product-page-content h3 {
+        @apply text-midnight-deep font-bold;
+    }
+
+    .product-page-content p,
+    .product-page-content li {
+        @apply text-slate-600;
+    }
+
+    .product-page-content a:not([class]) {
+        @apply text-brand-primary font-semibold hover:underline;
+    }
 }

@@ -1,22 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @php
-        $seo = \App\Support\Seo::resolve([
-            'path' => '/memberships/'.$membership->slug,
-            'title' => $membership->name.' — Membership | CheckoutPay',
-            'description' => \Illuminate\Support\Str::limit(strip_tags((string) $membership->description), 155) ?: 'Join '.$membership->name.' with Nigerian bank transfer payments on CheckoutPay.',
-        ]);
-    @endphp
-    @include('partials.marketing-head', ['seo' => $seo])
-@include('partials.tailwind-assets')
-</head>
-<body class="bg-gray-50">
-    @include('partials.nav')
+@extends('layouts.marketing')
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+@section('title')
+    @include('partials.marketing-head', ['seo' => $seo])
+@endsection
+
+@section('content')
+<div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <a href="{{ route('memberships.index') }}" class="text-primary hover:underline mb-4 inline-block">
             <i class="fas fa-arrow-left"></i> Back to Memberships
         </a>
@@ -64,10 +53,10 @@
                     <div class="mb-6">
                         <h2 class="text-3xl font-bold text-primary mb-2">
                             {{ $membership->currency }} {{ number_format($membership->price, 2) }}
-                            <span class="text-lg text-gray-600 font-normal">/ {{ $membership->formatted_duration }}</span>
+                            <span class="text-lg text-slate-600 font-normal">/ {{ $membership->formatted_duration }}</span>
                         </h2>
                         @if($membership->max_members)
-                            <p class="text-sm text-gray-600">
+                            <p class="text-sm text-slate-600">
                                 <i class="fas fa-users"></i> {{ $membership->current_members }} / {{ $membership->max_members }} members
                             </p>
                         @endif
@@ -76,7 +65,7 @@
                     <!-- Who is it for Section -->
                     @if($membership->who_is_it_for || ($membership->who_is_it_for_suggestions && count($membership->who_is_it_for_suggestions) > 0))
                         <div class="mb-6 p-4 bg-blue-50 rounded-lg">
-                            <h3 class="font-semibold text-gray-900 mb-2">
+                            <h3 class="font-semibold text-midnight-deep mb-2">
                                 <i class="fas fa-user-check text-primary mr-2"></i>Who is it for?
                             </h3>
                             @if($membership->who_is_it_for)
@@ -119,19 +108,19 @@
                             <a href="{{ route('memberships.payment.show', $membership->slug) }}" class="block w-full bg-primary text-white text-center py-3 rounded-lg hover:bg-primary/90 font-medium text-lg">
                                 <i class="fas fa-id-card mr-2"></i> Join Now
                             </a>
-                            <p class="text-sm text-gray-600 text-center">Complete payment to activate your membership</p>
+                            <p class="text-sm text-slate-600 text-center">Complete payment to activate your membership</p>
                         @else
-                            <button disabled class="block w-full bg-gray-300 text-gray-600 text-center py-3 rounded-lg font-medium text-lg cursor-not-allowed">
+                            <button disabled class="block w-full bg-gray-300 text-slate-600 text-center py-3 rounded-lg font-medium text-lg cursor-not-allowed">
                                 Membership Full
                             </button>
-                            <p class="text-sm text-gray-600 text-center">This membership has reached its capacity limit</p>
+                            <p class="text-sm text-slate-600 text-center">This membership has reached its capacity limit</p>
                         @endif
                         
                         <!-- Find My Membership Button -->
                         <button onclick="openFindModal()" class="block w-full bg-gray-100 text-gray-700 text-center py-3 rounded-lg hover:bg-gray-200 font-medium text-lg border border-gray-300">
                             <i class="fas fa-search mr-2"></i> Find My Membership Card
                         </button>
-                        <p class="text-sm text-gray-600 text-center">Lost your card? Find and download it here</p>
+                        <p class="text-sm text-slate-600 text-center">Lost your card? Find and download it here</p>
                     </div>
                 </div>
             </div>
@@ -170,11 +159,7 @@
                 </div>
             </div>
         @endif
-    </div>
-
-    @include('partials.footer')
-
-    <!-- Find Membership Modal -->
+    </div><!-- Find Membership Modal -->
     <div id="findModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div class="p-6">
@@ -278,11 +263,11 @@
                             <div class="flex justify-between items-start mb-2">
                                 <div>
                                     <h4 class="font-semibold text-lg">${subscription.membership_name}</h4>
-                                    <p class="text-sm text-gray-600">${subscription.business_name}</p>
+                                    <p class="text-sm text-slate-600">${subscription.business_name}</p>
                                 </div>
                                 ${isExpired ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded font-semibold">EXPIRED</span>' : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-semibold">ACTIVE</span>'}
                             </div>
-                            <div class="text-sm text-gray-600 space-y-1 mb-3">
+                            <div class="text-sm text-slate-600 space-y-1 mb-3">
                                 <p><strong>Member:</strong> ${subscription.member_name}</p>
                                 <p><strong>Category:</strong> ${subscription.category}</p>
                                 <p><strong>Subscription #:</strong> ${subscription.subscription_number}</p>
@@ -326,5 +311,4 @@
             }
         });
     </script>
-</body>
-</html>
+@endsection

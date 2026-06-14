@@ -3,7 +3,7 @@
     $logoPath = $logo ? storage_path('app/public/' . $logo) : null;
 @endphp
 <nav class="fixed top-0 w-full z-50 bg-white/85 backdrop-blur-xl border-b border-slate-100 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-20">
             <div class="flex items-center flex-1 gap-6 lg:gap-10">
                 <a href="{{ route('home') }}" class="flex items-center gap-2.5 group shrink-0">

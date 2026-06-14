@@ -39,7 +39,7 @@
 
     <!-- Hero Section -->
     <section class="py-12 sm:py-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center">
                 <div class="badge-brand mx-auto mb-4"><i class="fas fa-code"></i> REST API</div>
                 <h1 class="section-heading mb-4">
@@ -62,7 +62,7 @@
 
     <!-- Main Content -->
     <section class="py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <!-- Sidebar Navigation -->
                 <div class="lg:col-span-1">

@@ -25,7 +25,7 @@
 
     <!-- Hero Section -->
     <section class="bg-midnight-deep py-14 sm:py-20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8 text-center">
             @if(isset($hero['badge_text']))
             <div class="badge-brand mx-auto mb-6 bg-white/10 border-white/20 text-white">
                 <i class="{{ $hero['badge_icon'] ?? 'fas fa-trophy' }}"></i> {{ $hero['badge_text'] }}
@@ -158,7 +158,7 @@
     <!-- Comparison Section -->
     @if(isset($comparison['title']))
     <section class="py-12 sm:py-16 md:py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-8 sm:mb-10 md:mb-12">
                 <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">{{ $comparison['title'] }}</h2>
                 @if(isset($comparison['subtitle']))

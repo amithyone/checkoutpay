@@ -1,18 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $item->name }} - Rentals</title>
-    
-@include('partials.tailwind-assets')
-</head>
-<body class="bg-gray-50">
-    @php $rentalsColor = \App\Models\Setting::get('rentals_accent_color', '#000000'); @endphp
-    @include('partials.nav')
+@extends('layouts.marketing')
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 sm:pb-8">
-        <a href="{{ route('rentals.index') }}" class="text-gray-700 hover:text-gray-900 mb-3 sm:mb-4 inline-flex items-center gap-1 text-sm sm:text-base">
+@section('title')
+    @include('partials.marketing-head', ['seoPath' => '/'])
+@endsection
+
+@section('content')
+<div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 sm:pb-8">
+        <a href="{{ route('rentals.index') }}" class="text-gray-700 hover:text-midnight-deep mb-3 sm:mb-4 inline-flex items-center gap-1 text-sm sm:text-base">
             <i class="fas fa-arrow-left"></i> Back to Rentals
         </a>
 
@@ -38,20 +32,20 @@
 
                 <!-- Details: smaller text on mobile -->
                 <div class="min-w-0">
-                    <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 sm:mb-4">{{ $item->name }}</h1>
+                    <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-midnight-deep mb-2 sm:mb-4">{{ $item->name }}</h1>
                     <div class="flex flex-wrap items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
                         @if($item->category)
                             <span class="text-xs sm:text-sm font-medium px-2.5 py-1 rounded-full" style="background-color: {{ $rentalsColor }}20; color: {{ $rentalsColor }};">{{ $item->category->name }}</span>
                         @endif
                         @if($item->city)
-                            <span class="text-gray-600 text-xs sm:text-sm"><i class="fas fa-map-marker-alt mr-0.5"></i> {{ $item->city }}</span>
+                            <span class="text-slate-600 text-xs sm:text-sm"><i class="fas fa-map-marker-alt mr-0.5"></i> {{ $item->city }}</span>
                         @endif
                     </div>
 
                     <div class="mb-4 sm:mb-6">
-                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">₦{{ number_format($item->daily_rate, 2) }} <span class="text-sm sm:text-base text-gray-600 font-normal">/ day</span></p>
+                        <p class="text-lg sm:text-xl lg:text-2xl font-bold text-midnight-deep">₦{{ number_format($item->daily_rate, 2) }} <span class="text-sm sm:text-base text-slate-600 font-normal">/ day</span></p>
                         @if($item->weekly_rate || $item->monthly_rate)
-                            <p class="text-gray-600 text-xs sm:text-sm mt-1">
+                            <p class="text-slate-600 text-xs sm:text-sm mt-1">
                                 @if($item->weekly_rate) Weekly: ₦{{ number_format($item->weekly_rate, 2) }}@endif
                                 @if($item->weekly_rate && $item->monthly_rate) · @endif
                                 @if($item->monthly_rate) Monthly: ₦{{ number_format($item->monthly_rate, 2) }}@endif
@@ -60,13 +54,13 @@
                     </div>
 
                     <div class="mb-4 sm:mb-6">
-                        <h3 class="text-sm sm:text-base font-semibold text-gray-900 mb-1 sm:mb-2">Description</h3>
+                        <h3 class="text-sm sm:text-base font-semibold text-midnight-deep mb-1 sm:mb-2">Description</h3>
                         <p class="text-gray-700 text-sm sm:text-base leading-relaxed">{{ $item->description }}</p>
                     </div>
 
                     @if($item->specifications && count($item->specifications) > 0)
                         <div class="mb-4 sm:mb-6">
-                            <h3 class="text-sm sm:text-base font-semibold text-gray-900 mb-1 sm:mb-2">Specifications</h3>
+                            <h3 class="text-sm sm:text-base font-semibold text-midnight-deep mb-1 sm:mb-2">Specifications</h3>
                             <ul class="list-disc list-inside text-gray-700 text-sm sm:text-base space-y-0.5">
                                 @foreach($item->specifications as $key => $value)
                                     <li><strong>{{ ucfirst(str_replace('_', ' ', $key)) }}:</strong> {{ $value }}</li>
@@ -76,7 +70,7 @@
                     @endif
 
                     <!-- Add to cart: dates are chosen on the cart/checkout page -->
-                    <form action="{{ route('rentals.cart.add') }}" method="POST" class="bg-gray-50 p-3 sm:p-4 rounded-xl" id="addToCartForm">
+                    <form action="{{ route('rentals.cart.add') }}" method="POST" class="bg-surface-container-low/50 p-3 sm:p-4 rounded-xl" id="addToCartForm">
                         @csrf
                         <input type="hidden" name="item_id" value="{{ $item->id }}">
                         <div class="mb-3 sm:mb-4">
@@ -89,7 +83,7 @@
                         </button>
                     </form>
 
-                    <div class="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600 space-y-1">
+                    <div class="mt-3 sm:mt-4 text-xs sm:text-sm text-slate-600 space-y-1">
                         <p><i class="fas fa-building w-4"></i> <strong>Business:</strong> {{ $item->business->name }}</p>
                         @if($item->business->phone)
                             <p><i class="fas fa-phone w-4"></i> <strong>Phone:</strong> {{ $item->business->phone }}</p>
@@ -235,5 +229,4 @@
         `;
         document.head.appendChild(style);
     </script>
-</body>
-</html>
+@endsection

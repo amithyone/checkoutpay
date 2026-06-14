@@ -23,8 +23,12 @@ class ProductsController extends Controller
             ->first();
 
         if ($page) {
-            // Use editable page content
-            return view('products.invoices-editable', compact('page'));
+            return view('marketing.editable-page', [
+                'page' => $page,
+                'seoPath' => '/products/invoices',
+                'contentClass' => 'invoices-page-content',
+                'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('invoices-billing'))],
+            ]);
         }
 
         // Fallback to static view
@@ -39,8 +43,11 @@ class ProductsController extends Controller
             ->first();
 
         if ($page) {
-            // Use editable page content
-            return view('products.memberships-editable', compact('page'));
+            return view('marketing.editable-page', [
+                'page' => $page,
+                'seoPath' => '/products/memberships',
+                'contentClass' => 'memberships-page-content',
+            ]);
         }
 
         return view('products.memberships');
@@ -53,7 +60,11 @@ class ProductsController extends Controller
             ->first();
 
         if ($page) {
-            return view('products.memberships-info-editable', compact('page'));
+            return view('marketing.editable-page', [
+                'page' => $page,
+                'seoPath' => '/products/memberships-info',
+                'contentClass' => 'memberships-info-page-content',
+            ]);
         }
 
         return view('products.memberships-info');
@@ -66,7 +77,11 @@ class ProductsController extends Controller
             ->first();
 
         if ($page) {
-            return view('products.rentals-info-editable', compact('page'));
+            return view('marketing.editable-page', [
+                'page' => $page,
+                'seoPath' => '/products/rentals-info',
+                'contentClass' => 'rentals-info-page-content',
+            ]);
         }
 
         return view('products.rentals-info');
@@ -79,7 +94,11 @@ class ProductsController extends Controller
             ->first();
 
         if ($page) {
-            return view('products.tickets-info-editable', compact('page'));
+            return view('marketing.editable-page', [
+                'page' => $page,
+                'seoPath' => '/products/tickets-info',
+                'contentClass' => 'tickets-info-page-content',
+            ]);
         }
 
         return view('products.tickets-info');

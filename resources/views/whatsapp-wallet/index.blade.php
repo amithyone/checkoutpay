@@ -16,7 +16,7 @@
 
     {{-- Hero --}}
     <section class="relative overflow-hidden py-14 sm:py-20 md:py-24">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                 <div>
                     <div class="badge-brand mb-5 bg-emerald-50 border-emerald-200 text-emerald-800">
@@ -92,7 +92,7 @@
 
     {{-- How it works --}}
     <section class="py-14 sm:py-16 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-4">How it works</h2>
             <p class="text-center text-gray-600 mb-12 max-w-2xl mx-auto">Three steps. No new social network — the same number you use for messages.</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -117,7 +117,7 @@
 
     {{-- What you can do --}}
     <section class="py-14 sm:py-16 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-12">What you can do with WhatsApp Wallet</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach([
@@ -143,7 +143,7 @@
 
     {{-- Tiers --}}
     <section class="py-14 sm:py-16 bg-gradient-to-br from-gray-50 to-green-50/30">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-4">Wallet tiers</h2>
             <p class="text-center text-gray-600 mb-10 max-w-2xl mx-auto">Start fast on WhatsApp. Upgrade when you need a permanent bank account number and higher limits.</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -173,7 +173,7 @@
 
     {{-- For businesses --}}
     <section class="py-14 sm:py-16 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                 <div>
                     <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">For businesses &amp; developers</h2>
@@ -221,7 +221,7 @@ X-API-Key: pk_your_key
 
     {{-- vs gateway --}}
     <section class="py-14 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-container mx-auto px-4 sm:px-6 lg:px-8">
             <h2 class="text-2xl font-bold text-gray-900 text-center mb-10">WhatsApp Wallet + payment gateway</h2>
             <div class="overflow-x-auto">
                 <table class="w-full max-w-3xl mx-auto text-sm bg-white rounded-xl border border-gray-200 overflow-hidden">
