@@ -9,6 +9,7 @@ use App\Models\Business;
 use App\Models\WhatsappCrossBorderFxRate;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappWalletRegionConfig;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +19,10 @@ use Illuminate\View\View;
 
 class WhatsappWalletAdminController extends Controller
 {
+    public function __construct(
+        private ConsumerBusinessWalletLedgerService $businessLedger,
+    ) {}
+
     public function index(): View
     {
         return view('admin.whatsapp-wallet.index', $this->dashboardMetrics());
@@ -116,9 +121,14 @@ class WhatsappWalletAdminController extends Controller
             'linked_business_id' => 'nullable|integer|exists:businesses,id',
         ]);
 
-        $wallet->update([
-            'linked_business_id' => $validated['linked_business_id'] ?? null,
-        ]);
+        $linkedBusinessId = $validated['linked_business_id'] ?? null;
+
+        if ($linkedBusinessId) {
+            $business = Business::query()->findOrFail((int) $linkedBusinessId);
+            $this->businessLedger->syncBalanceFromLinkedBusiness($wallet, $business);
+        } else {
+            $wallet->update(['linked_business_id' => null]);
+        }
 
         return redirect()
             ->route('admin.whatsapp-wallet.wallets.show', $wallet)

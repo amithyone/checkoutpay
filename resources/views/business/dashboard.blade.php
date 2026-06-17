@@ -64,7 +64,7 @@
                     @endif
                     <p class="text-xs text-gray-600 mt-2">
                         Business balance:
-                        <span class="font-semibold text-gray-900">₦{{ number_format((float) $linkedWhatsappWallet->business_balance, 2) }}</span>
+                        <span class="font-semibold text-gray-900">₦{{ number_format((float) ($stats['balance'] ?? 0), 2) }}</span>
                     </p>
                 </div>
             @endif

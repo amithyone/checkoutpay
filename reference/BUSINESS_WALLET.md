@@ -50,7 +50,7 @@ Fields: `wallet_phone`, `wallet_pin` (4 digits)
 Controller: `BusinessWhatsappWalletController`  
 Service: `BusinessWhatsappWalletLinkService`
 
-Verifies wallet PIN via `ConsumerWalletPinVerifier` before setting `linked_business_id`.
+Verifies wallet PIN via `ConsumerWalletPinVerifier` before setting `linked_business_id`. Copies the merchant `businesses.balance` onto the wallet and keeps it in sync on wallet API reads.
 
 ---
 
@@ -67,6 +67,5 @@ Includes withdrawals and non-website credits on `ledger_scope = business`.
 
 ## Not yet implemented
 
-- Webhook credit to `business_pay_in_account_number` → `business_balance`
+- Webhook credit to `business_pay_in_account_number` → `business_balance` (BNR-only wallets)
 - P2P from business ledger
-- Auto-sync merchant `Business.balance` with `business_balance`

@@ -4,6 +4,7 @@ namespace App\Services\Business;
 
 use App\Models\Business;
 use App\Models\WhatsappWallet;
+use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Whatsapp\PhoneNormalizer;
 
@@ -11,6 +12,7 @@ final class BusinessWhatsappWalletLinkService
 {
     public function __construct(
         private ConsumerWalletPinVerifier $pinVerifier,
+        private ConsumerBusinessWalletLedgerService $businessLedger,
     ) {}
 
     /**
@@ -52,7 +54,7 @@ final class BusinessWhatsappWalletLinkService
             return ['ok' => false, 'message' => 'Invalid wallet PIN.'];
         }
 
-        $wallet->update(['linked_business_id' => $business->id]);
+        $this->businessLedger->syncBalanceFromLinkedBusiness($wallet, $business);
 
         return [
             'ok' => true,

@@ -9,6 +9,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
+use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
@@ -50,6 +51,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerWalletPayQrService $payQr,
         private WhatsappWalletPendingPayoutReconciliationService $pendingPayoutReconcile,
         private ConsumerBusinessNameRegistrationService $businessNameRegistration,
+        private ConsumerBusinessWalletLedgerService $businessLedger,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -88,7 +90,8 @@ class ConsumerWalletApiController extends Controller
             // Best-effort; do not block wallet summary.
         }
 
-        $wallet = $wallet->fresh();
+        $wallet = $wallet->fresh(['linkedBusiness']);
+        $this->businessLedger->refreshLinkedBalanceCache($wallet);
         $payCode = $this->payCodes->ensureForWallet($wallet);
         $summary = $this->partnerApi->getWalletSummary((string) $wallet->phone_e164);
         $cur = $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);
@@ -180,7 +183,7 @@ class ConsumerWalletApiController extends Controller
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'pay_in' => $payIn,
                 'business_pay_in' => $this->businessNameRegistration->businessPayInPayload($wallet),
-                'business_balance' => (float) $wallet->business_balance,
+                'business_balance' => $this->businessLedger->resolvedBalance($wallet),
                 'business_wallet_enabled' => $wallet->hasBusinessWallet(),
                 'linked_business_id' => $wallet->linked_business_id,
                 'linked_business_name' => $wallet->linkedBusiness?->name,

@@ -134,7 +134,10 @@ class WhatsappWallet extends Model
         if ($amount <= 0) {
             return ['ok' => false, 'message' => 'Invalid amount.'];
         }
-        if ((float) $this->business_balance + 0.0001 < $amount) {
+
+        $available = app(\App\Services\Consumer\ConsumerBusinessWalletLedgerService::class)
+            ->resolvedBalance($this);
+        if ($available + 0.0001 < $amount) {
             return ['ok' => false, 'message' => 'Insufficient business balance.'];
         }
 

@@ -31,6 +31,7 @@ class ConsumerWalletTransferService
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
         private WhatsappWalletSelfBankTransferService $selfBankTransfer,
+        private ConsumerBusinessWalletLedgerService $businessLedger,
     ) {}
 
     private function evolutionInstance(): string
@@ -280,12 +281,11 @@ class ConsumerWalletTransferService
                     throw new \RuntimeException('wallet_missing');
                 }
                 if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
-                    $check = $w->canDebitBusiness($amount);
-                    if (! $check['ok']) {
-                        throw new \RuntimeException($check['message'] ?? 'cannot_debit');
+                    $debit = $this->businessLedger->debitLockedWallet($w, $amount);
+                    if (! $debit['ok']) {
+                        throw new \RuntimeException($debit['message'] ?? 'cannot_debit');
                     }
-                    $newBal = round((float) $w->business_balance - $amount, 2);
-                    $w->business_balance = $newBal;
+                    $newBal = (float) $debit['balance_after'];
                 } else {
                     $w->resetDailyTransferIfNeeded();
                     $check = $w->canDebit($amount);
@@ -356,7 +356,7 @@ class ConsumerWalletTransferService
         );
         $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
-        DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result) {
+        DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result, $ledgerScope) {
             $txn = WhatsappWalletTransaction::query()
                 ->where('external_reference', $reference)
                 ->where('whatsapp_wallet_id', $wallet->id)
@@ -365,8 +365,12 @@ class ConsumerWalletTransferService
                 Log::error('consumer_wallet.payout_txn_missing', ['reference' => $reference, 'wallet_id' => $wallet->id]);
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if ($w) {
-                    $w->balance = round((float) $w->balance + $amount, 2);
-                    $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
+                    if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+                        $this->businessLedger->creditLockedWallet($w, $amount);
+                    } else {
+                        $w->balance = round((float) $w->balance + $amount, 2);
+                        $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
+                    }
                     $w->save();
                 }
 
@@ -381,12 +385,17 @@ class ConsumerWalletTransferService
             );
 
             $refund = $bucket === MavonPayTransferService::BUCKET_FAILED;
+            $txnLedgerScope = ConsumerWalletTransactionScope::normalize((string) ($txn->ledger_scope ?? ConsumerWalletTransactionScope::SCOPE_PERSONAL));
 
             if ($refund) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if ($w) {
-                    $w->balance = round((float) $w->balance + $amount, 2);
-                    $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
+                    if ($txnLedgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+                        $this->businessLedger->creditLockedWallet($w, $amount);
+                    } else {
+                        $w->balance = round((float) $w->balance + $amount, 2);
+                        $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
+                    }
                     $w->save();
                 }
                 $meta['reversed_at'] = now()->toIso8601String();
@@ -405,13 +414,15 @@ class ConsumerWalletTransferService
 
         if ($bucket === MavonPayTransferService::BUCKET_FAILED) {
             $walletFresh = $wallet->fresh();
-            $this->walletNotifier->notifyMoneyReceived(
-                $walletFresh,
-                $amount,
-                (float) $walletFresh->balance,
-                null,
-                ['credit_source' => 'payout_refund'],
-            );
+            if ($ledgerScope !== ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+                $this->walletNotifier->notifyMoneyReceived(
+                    $walletFresh,
+                    $amount,
+                    (float) $walletFresh->balance,
+                    null,
+                    ['credit_source' => 'payout_refund'],
+                );
+            }
         }
 
         $wallet = $wallet->fresh();
@@ -419,6 +430,9 @@ class ConsumerWalletTransferService
         if ($receipt['reference'] === '') {
             $receipt['reference'] = (string) ($result['reference'] ?? $reference);
         }
+        $balanceAfter = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+            ? $this->businessLedger->resolvedBalance($wallet)
+            : (float) $wallet->balance;
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL || $bucket === MavonPayTransferService::BUCKET_PENDING) {
             return [
@@ -430,7 +444,8 @@ class ConsumerWalletTransferService
                     'reference' => $receipt['reference'],
                     'session_id' => $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
                     'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
-                    'balance_after' => (float) $wallet->balance,
+                    'balance_after' => $balanceAfter,
+                    'ledger_scope' => $ledgerScope,
                     'amount_debited' => $amount,
                     'payout_amount' => $payoutAmount,
                     'self_transfer' => $isSelf,
@@ -444,7 +459,8 @@ class ConsumerWalletTransferService
             'ok' => false,
             'message' => (string) ($result['response_message'] ?? 'Bank transfer not completed. Wallet refunded if applicable.'),
             'data' => [
-                'balance_after' => (float) $wallet->balance,
+                'balance_after' => $balanceAfter,
+                'ledger_scope' => $ledgerScope,
                 'bucket' => $bucket,
                 'session_id' => $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
                 'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
@@ -476,12 +492,11 @@ class ConsumerWalletTransferService
                     throw new \RuntimeException('wallet_missing');
                 }
                 if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
-                    $check = $w->canDebitBusiness($amount);
-                    if (! $check['ok']) {
-                        throw new \RuntimeException($check['message'] ?? 'cannot_debit');
+                    $debit = $this->businessLedger->debitLockedWallet($w, $amount);
+                    if (! $debit['ok']) {
+                        throw new \RuntimeException($debit['message'] ?? 'cannot_debit');
                     }
-                    $newBal = round((float) $w->business_balance - $amount, 2);
-                    $w->business_balance = $newBal;
+                    $newBal = (float) $debit['balance_after'];
                 } else {
                     $w->resetDailyTransferIfNeeded();
                     $check = $w->canDebit($amount);
@@ -534,7 +549,7 @@ class ConsumerWalletTransferService
             'message' => 'Transfer recorded (ledger-only until live payouts are enabled).',
             'data' => [
                 'balance_after' => (float) ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
-                    ? $walletFresh->business_balance
+                    ? $this->businessLedger->resolvedBalance($walletFresh)
                     : $walletFresh->balance),
                 'ledger_scope' => $ledgerScope,
                 'amount_debited' => $amount,
