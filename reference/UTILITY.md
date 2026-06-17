@@ -68,13 +68,28 @@ Statement export uses the same rules for **6mo** and **12mo**.
 
 ## Business ledger transaction types
 
-Included in `scope=business`:
+When `scope=business` and **`from` / `to`** are supplied, the API merges:
+
+1. Wallet business ledger rows (`ConsumerWalletTransactionScope`)
+2. Approved **merchant payments** (`payments` — website checkout, API, Rubies VA not already on wallet ledger)
+3. **Withdrawals** (`withdrawal_requests` — pending, approved, processed)
+
+Response `meta.includes_merchant_activity: true` and `meta.business_id` when merged.
+
+Without `from` / `to`, business scope returns wallet ledger rows only (legacy pagination for History).
+
+Included wallet types:
 
 - `bank_transfer_out`
 - `business_rubies_in` — linked merchant Rubies VA deposit
 - Other business-scoped credits not excluded by scope rules
 
-Excluded: BNR `topup`, website checkout credits (`partner_merchant_pay`, etc.).
+Synthetic types for merchant records:
+
+- `merchant_payment_in` — website / checkout credit (`meta.status`, `meta.website_url`, `meta.label`)
+- `merchant_withdrawal_out` — payout request (`meta.status`, `meta.status_label`)
+
+Excluded from wallet-only filter: BNR `topup`, duplicate website credits already recorded as `business_rubies_in`.
 
 ---
 
@@ -82,6 +97,7 @@ Excluded: BNR `topup`, website checkout credits (`partner_merchant_pay`, etc.).
 
 | Service | Role |
 |---------|------|
+| `ConsumerBusinessActivityService` | Merge merchant payments + withdrawals for Utility statements |
 | `ConsumerBusinessWalletLedgerService` | Linked balance, `business_pay_in`, deposit history |
 | `ConsumerWalletTransactionScope` | Personal vs business filter |
 | `BusinessWhatsappWalletLinkService` | Merchant dashboard wallet link |

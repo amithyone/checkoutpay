@@ -39,6 +39,26 @@ final class ConsumerBusinessWalletLedgerService
         return $this->businessNameRegistration->businessPayInPayload($wallet);
     }
 
+    /** Linked CheckoutPay merchant or phone-matched verified business. */
+    public function resolveLinkedOrMatchedBusiness(WhatsappWallet $wallet): ?Business
+    {
+        if ($wallet->linked_business_id) {
+            return $this->linkedBusiness($wallet);
+        }
+
+        return $this->findBusinessByWalletPhone($wallet);
+    }
+
+    /** Whether the app should expose business Utility / scoped history. */
+    public function walletHasBusinessActivity(WhatsappWallet $wallet): bool
+    {
+        if ($wallet->hasBusinessWallet()) {
+            return true;
+        }
+
+        return $this->resolveLinkedOrMatchedBusiness($wallet) !== null;
+    }
+
     /** Keep wallet.business_balance aligned with linked merchant account for admin UI. */
     public function refreshLinkedBalanceCache(WhatsappWallet $wallet): void
     {
@@ -327,6 +347,19 @@ final class ConsumerBusinessWalletLedgerService
      */
     private function phoneMatchedMerchantPermanentAccountPayload(WhatsappWallet $wallet): ?array
     {
+        $business = $this->findBusinessByWalletPhone($wallet, requireRubiesAccount: true);
+        if ($business === null) {
+            return null;
+        }
+
+        return $this->merchantPermanentAccountPayload(
+            $business,
+            $wallet->linked_business_id ? 'linked_merchant' : 'phone_matched',
+        );
+    }
+
+    private function findBusinessByWalletPhone(WhatsappWallet $wallet, bool $requireRubiesAccount = false): ?Business
+    {
         $walletPhone = PhoneNormalizer::digitsOnly((string) $wallet->phone_e164);
         if ($walletPhone === null) {
             return null;
@@ -346,27 +379,23 @@ final class ConsumerBusinessWalletLedgerService
 
         $baseQuery = Business::query()
             ->where('is_active', true)
-            ->whereNotNull('rubies_business_account_number')
-            ->where('rubies_business_account_number', '!=', '')
             ->whereIn('phone', $phoneCandidates);
+
+        if ($requireRubiesAccount) {
+            $baseQuery
+                ->whereNotNull('rubies_business_account_number')
+                ->where('rubies_business_account_number', '!=', '');
+        }
 
         if ($wallet->linked_business_id) {
             $preferred = (clone $baseQuery)
                 ->whereKey($wallet->linked_business_id)
                 ->first();
             if ($preferred !== null) {
-                return $this->merchantPermanentAccountPayload($preferred, 'linked_merchant');
+                return $preferred;
             }
         }
 
-        $business = $baseQuery->orderByDesc('id')->first();
-        if ($business === null) {
-            return null;
-        }
-
-        return $this->merchantPermanentAccountPayload(
-            $business,
-            $wallet->linked_business_id ? 'linked_merchant' : 'phone_matched',
-        );
+        return $baseQuery->orderByDesc('id')->first();
     }
 }

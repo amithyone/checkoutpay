@@ -8,6 +8,7 @@ use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Consumer\ConsumerBusinessActivityService;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
@@ -52,6 +53,7 @@ class ConsumerWalletApiController extends Controller
         private WhatsappWalletPendingPayoutReconciliationService $pendingPayoutReconcile,
         private ConsumerBusinessNameRegistrationService $businessNameRegistration,
         private ConsumerBusinessWalletLedgerService $businessLedger,
+        private ConsumerBusinessActivityService $businessActivity,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -184,7 +186,7 @@ class ConsumerWalletApiController extends Controller
                 'pay_in' => $payIn,
                 'business_pay_in' => $this->businessLedger->resolveBusinessPayInPayload($wallet),
                 'business_balance' => $this->businessLedger->resolvedBalance($wallet),
-                'business_wallet_enabled' => $wallet->hasBusinessWallet(),
+                'business_wallet_enabled' => $this->businessLedger->walletHasBusinessActivity($wallet),
                 'linked_business_id' => $wallet->linked_business_id,
                 'linked_business_name' => $wallet->linkedBusiness?->name,
                 'vtu' => [
@@ -276,17 +278,71 @@ class ConsumerWalletApiController extends Controller
 
     public function transactions(Request $request): JsonResponse
     {
-        $wallet = $this->walletFor($request);
+        $wallet = $this->walletFor($request)->fresh(['linkedBusiness']);
         $perPage = max(1, min(50, (int) $request->input('per_page', 20)));
         $scope = ConsumerWalletTransactionScope::normalize((string) $request->input('scope', 'personal'));
+
+        $from = trim((string) $request->input('from', ''));
+        $to = trim((string) $request->input('to', ''));
+        $tz = config('app.timezone', 'Africa/Lagos');
+        $page = max(1, (int) $request->input('page', 1));
+
+        if ($scope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+            $business = $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet);
+            if ($business !== null && $from !== '' && $to !== '') {
+                try {
+                    Carbon::parse($from, $tz)->startOfDay();
+                    Carbon::parse($to, $tz)->endOfDay();
+                } catch (\Throwable) {
+                    return response()->json(['success' => false, 'message' => 'Invalid from or to date. Use YYYY-MM-DD.'], 422);
+                }
+
+                $result = $this->businessActivity->paginate($wallet, $business, $from, $to, $page, $perPage);
+                $walletModels = [];
+                foreach ($result['items'] as $item) {
+                    if ($item['wallet_tx'] instanceof WhatsappWalletTransaction) {
+                        $walletModels[] = $item['wallet_tx'];
+                    }
+                }
+                $enriched = $this->enrichTransactionsWithCounterpartyNames($walletModels);
+                $byId = [];
+                foreach ($enriched as $row) {
+                    $byId[(int) ($row['id'] ?? 0)] = $row;
+                }
+                $data = [];
+                foreach ($result['items'] as $item) {
+                    if ($item['wallet_tx'] instanceof WhatsappWalletTransaction) {
+                        $data[] = $byId[(int) $item['wallet_tx']->id] ?? $item['row'];
+                    } else {
+                        $data[] = $item['row'];
+                    }
+                }
+
+                $lastPage = max(1, (int) ceil($result['total'] / $perPage));
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $data,
+                    'meta' => [
+                        'current_page' => $page,
+                        'last_page' => $lastPage,
+                        'per_page' => $perPage,
+                        'total' => $result['total'],
+                        'scope' => $scope,
+                        'from' => $from,
+                        'to' => $to,
+                        'timezone' => $tz,
+                        'business_id' => $business->id,
+                        'includes_merchant_activity' => true,
+                    ],
+                ]);
+            }
+        }
 
         $query = WhatsappWalletTransaction::query()
             ->where('whatsapp_wallet_id', $wallet->id);
         ConsumerWalletTransactionScope::apply($query, $scope);
 
-        $from = trim((string) $request->input('from', ''));
-        $to = trim((string) $request->input('to', ''));
-        $tz = config('app.timezone', 'Africa/Lagos');
         if ($from !== '') {
             try {
                 $query->where('created_at', '>=', Carbon::parse($from, $tz)->startOfDay());
