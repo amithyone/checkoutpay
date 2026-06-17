@@ -1267,7 +1267,7 @@ class ConsumerWalletApiController extends Controller
             'fname' => 'required|string|max:128',
             'lname' => 'required|string|max:128',
             'dob' => 'required|date_format:Y-m-d',
-            'gender' => 'nullable|string|in:male,female,M,F',
+            'gender' => 'required|string|in:male,female,M,F',
             'email' => 'required|email|max:255',
             'bvn' => 'required_without:nin|nullable|string|size:11',
             'nin' => 'required_without:bvn|nullable|string|size:11',

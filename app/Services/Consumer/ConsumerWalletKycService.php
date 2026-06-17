@@ -67,6 +67,11 @@ class ConsumerWalletKycService
             return ['ok' => false, 'message' => 'Could not read wallet phone number.'];
         }
 
+        $gender = strtolower(trim((string) ($input['gender'] ?? '')));
+        if (! in_array($gender, ['male', 'female'], true)) {
+            return ['ok' => false, 'message' => 'Gender is required (male or female).'];
+        }
+
         try {
             $created = strlen($bvn) === 11
                 ? $this->rubies->createRubiesPersonalAccount($fname, $lname, $apiPhone, $dob, $email, $bvn, null)
@@ -75,11 +80,6 @@ class ConsumerWalletKycService
             Log::warning('consumer_wallet.kyc.personal_failed', ['wallet_id' => $wallet->id, 'error' => $e->getMessage()]);
 
             return ['ok' => false, 'message' => $e->getMessage()];
-        }
-
-        $gender = strtolower(trim((string) ($input['gender'] ?? '')));
-        if (! in_array($gender, ['male', 'female'], true)) {
-            $gender = '';
         }
 
         $wallet->update([
