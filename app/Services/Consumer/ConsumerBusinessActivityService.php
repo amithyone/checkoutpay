@@ -13,8 +13,8 @@ use Illuminate\Support\Str;
 /**
  * Unified merchant business activity for Utility / business-scoped transaction history.
  *
- * Merges wallet business ledger rows with CheckoutPay merchant records (website payments,
- * API checkouts, withdrawals) so statements match the merchant Permanent Account activity.
+ * Merges **all** wallet `ledger_scope=business` rows with every CheckoutPay merchant
+ * payment and withdrawal on the linked / phone-matched business account.
  */
 final class ConsumerBusinessActivityService
 {
@@ -54,11 +54,13 @@ final class ConsumerBusinessActivityService
         Carbon $fromAt,
         Carbon $toAt,
     ): array {
-        $walletQuery = WhatsappWalletTransaction::query()
-            ->where('whatsapp_wallet_id', $wallet->id);
-        ConsumerWalletTransactionScope::apply($walletQuery, ConsumerWalletTransactionScope::SCOPE_BUSINESS);
-        $walletQuery->where('created_at', '>=', $fromAt)->where('created_at', '<=', $toAt);
-        $walletTxns = $walletQuery->orderByDesc('id')->get();
+        $walletTxns = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('ledger_scope', ConsumerWalletTransactionScope::SCOPE_BUSINESS)
+            ->where('created_at', '>=', $fromAt)
+            ->where('created_at', '<=', $toAt)
+            ->orderByDesc('id')
+            ->get();
 
         $coveredPaymentIds = [];
         $rows = [];
@@ -80,7 +82,6 @@ final class ConsumerBusinessActivityService
 
         $payments = Payment::query()
             ->where('business_id', $business->id)
-            ->where('status', Payment::STATUS_APPROVED)
             ->with('website:id,website_url')
             ->where(function ($query) use ($fromAt, $toAt) {
                 $query->whereBetween('matched_at', [$fromAt, $toAt])
@@ -100,6 +101,10 @@ final class ConsumerBusinessActivityService
             $occurredAt = $payment->matched_at ?? $payment->created_at;
             $amount = round((float) ($payment->business_receives ?? $payment->amount), 2);
             $label = $this->paymentActivityLabel($payment);
+            $status = (string) $payment->status;
+            if ($status !== Payment::STATUS_APPROVED) {
+                $label .= ' · '.ucfirst($status);
+            }
 
             $rows[] = [
                 'row' => [
@@ -115,7 +120,7 @@ final class ConsumerBusinessActivityService
                     'meta' => array_filter([
                         'payment_id' => (int) $payment->id,
                         'business_id' => (int) $business->id,
-                        'status' => (string) $payment->status,
+                        'status' => $status,
                         'payment_source' => (string) ($payment->payment_source ?? ''),
                         'website_url' => $payment->website?->website_url,
                         'label' => $label,
@@ -130,11 +135,6 @@ final class ConsumerBusinessActivityService
 
         $withdrawals = WithdrawalRequest::query()
             ->where('business_id', $business->id)
-            ->whereIn('status', [
-                WithdrawalRequest::STATUS_PENDING,
-                WithdrawalRequest::STATUS_APPROVED,
-                WithdrawalRequest::STATUS_PROCESSED,
-            ])
             ->whereBetween('created_at', [$fromAt, $toAt])
             ->orderByDesc('id')
             ->get();

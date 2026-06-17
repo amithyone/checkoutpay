@@ -68,28 +68,30 @@ Statement export uses the same rules for **6mo** and **12mo**.
 
 ## Business ledger transaction types
 
-When `scope=business` and **`from` / `to`** are supplied, the API merges:
+When `scope=business` and **`from` / `to`** are supplied, the API returns **all** business activity for Utility analysis:
 
-1. Wallet business ledger rows (`ConsumerWalletTransactionScope`)
-2. Approved **merchant payments** (`payments` — website checkout, API, Rubies VA not already on wallet ledger)
-3. **Withdrawals** (`withdrawal_requests` — pending, approved, processed)
+1. **Every** wallet row with `ledger_scope=business` (transfers, Rubies in, bills paid from business balance, fees, etc.)
+2. **Every** merchant `payments` row for that business (website, API, checkout — all statuses in `meta.status`)
+3. **Every** `withdrawal_requests` row (all statuses in `meta.status`)
+
+Only **approved** payments and **completed** withdrawals count toward money in/out totals on the app; pending/rejected rows still appear in the list and statements for status visibility.
 
 Response `meta.includes_merchant_activity: true` and `meta.business_id` when merged.
 
 Without `from` / `to`, business scope returns wallet ledger rows only (legacy pagination for History).
 
-Included wallet types:
-
-- `bank_transfer_out`
-- `business_rubies_in` — linked merchant Rubies VA deposit
-- Other business-scoped credits not excluded by scope rules
+When merged, wallet activity uses **all** rows with `ledger_scope=business` (no subset filter).
 
 Synthetic types for merchant records:
 
-- `merchant_payment_in` — website / checkout credit (`meta.status`, `meta.website_url`, `meta.label`)
-- `merchant_withdrawal_out` — payout request (`meta.status`, `meta.status_label`)
+| Type | Role |
+|------|------|
+| `merchant_payment_in` | All `payments` for the business (`meta.status`, `meta.website_url`, `meta.label`) |
+| `merchant_withdrawal_out` | All `withdrawal_requests` (`meta.status`, `meta.status_label`) |
 
-Excluded from wallet-only filter: BNR `topup`, duplicate website credits already recorded as `business_rubies_in`.
+Wallet examples: `bank_transfer_out`, `business_rubies_in`, business-scoped `vtu_*`, `business_name_registration_fee`.
+
+Dedup: payments already recorded as `business_rubies_in` on the wallet (same `meta.payment_id`) are omitted from the `payments` list.
 
 ---
 
