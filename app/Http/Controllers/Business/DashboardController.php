@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Business\BusinessActivityFeedService;
+use App\Services\Business\BusinessWhatsappWalletLinkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,7 @@ class DashboardController extends Controller
 {
     public function __construct(
         private BusinessActivityFeedService $activityFeed,
+        private BusinessWhatsappWalletLinkService $whatsappWalletLinks,
     ) {}
 
     public function index()
@@ -141,6 +143,14 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        return view('business.dashboard', compact('stats', 'websiteStats', 'recentActivity', 'recentWithdrawals'));
+        $linkedWhatsappWallet = $this->whatsappWalletLinks->linkedWallet($business);
+
+        return view('business.dashboard', compact(
+            'stats',
+            'websiteStats',
+            'recentActivity',
+            'recentWithdrawals',
+            'linkedWhatsappWallet',
+        ));
     }
 }

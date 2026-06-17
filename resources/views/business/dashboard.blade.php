@@ -41,6 +41,96 @@
         </div>
     </div>
 
+    <!-- CheckoutNow WhatsApp wallet -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 lg:p-6">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 lg:w-12 lg:h-12 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fab fa-whatsapp text-emerald-600 text-lg lg:text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base lg:text-lg font-semibold text-gray-900">CheckoutNow WhatsApp wallet</h3>
+                    <p class="text-xs lg:text-sm text-gray-600 mt-1 max-w-xl">
+                        Link your team’s CheckoutNow app wallet to this business account. Linked users can switch to a separate <strong>business wallet</strong> in the app for transfers and history.
+                    </p>
+                </div>
+            </div>
+            @if($linkedWhatsappWallet)
+                <div class="rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3 lg:min-w-[240px]">
+                    <p class="text-xs font-medium text-emerald-800 mb-1">Linked wallet</p>
+                    <p class="font-mono text-sm font-semibold text-gray-900">+{{ $linkedWhatsappWallet->phone_e164 }}</p>
+                    @if($linkedWhatsappWallet->displayName())
+                        <p class="text-xs text-gray-600 mt-0.5">{{ $linkedWhatsappWallet->displayName() }}</p>
+                    @endif
+                    <p class="text-xs text-gray-600 mt-2">
+                        Business balance:
+                        <span class="font-semibold text-gray-900">₦{{ number_format((float) $linkedWhatsappWallet->business_balance, 2) }}</span>
+                    </p>
+                </div>
+            @endif
+        </div>
+
+        @if($linkedWhatsappWallet)
+            <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3">
+                <p class="text-xs text-gray-600 flex-1 min-w-[200px]">
+                    Open CheckoutNow on the linked phone and use the building icon on Home to view the business wallet.
+                </p>
+                <form method="POST" action="{{ route('business.whatsapp-wallet.unlink') }}" onsubmit="return confirm('Unlink this CheckoutNow wallet from your business?');">
+                    @csrf
+                    <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium px-3 py-2 rounded-lg border border-red-200 hover:bg-red-50">
+                        Unlink wallet
+                    </button>
+                </form>
+            </div>
+        @else
+            <form method="POST" action="{{ route('business.whatsapp-wallet.link') }}" class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                @csrf
+                <div class="sm:col-span-2 lg:col-span-2">
+                    <label for="wallet_phone" class="block text-xs font-medium text-gray-700 mb-1">Wallet phone number</label>
+                    <input
+                        type="tel"
+                        name="wallet_phone"
+                        id="wallet_phone"
+                        value="{{ old('wallet_phone') }}"
+                        placeholder="08012345678"
+                        required
+                        autocomplete="tel"
+                        class="w-full rounded-lg border-gray-300 text-sm @error('wallet_phone') border-red-500 @enderror"
+                    >
+                    @error('wallet_phone')
+                        <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label for="wallet_pin" class="block text-xs font-medium text-gray-700 mb-1">Wallet PIN</label>
+                    <input
+                        type="password"
+                        name="wallet_pin"
+                        id="wallet_pin"
+                        inputmode="numeric"
+                        pattern="\d{4}"
+                        maxlength="4"
+                        placeholder="4 digits"
+                        required
+                        autocomplete="off"
+                        class="w-full rounded-lg border-gray-300 text-sm font-mono @error('wallet_pin') border-red-500 @enderror"
+                    >
+                    @error('wallet_pin')
+                        <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <button type="submit" class="w-full bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary/90 text-sm font-medium">
+                        Link wallet
+                    </button>
+                </div>
+            </form>
+            <p class="text-xs text-gray-500 mt-3">
+                Use the phone number registered on CheckoutNow and the same 4-digit PIN you use in the app. Only one business can be linked per wallet.
+            </p>
+        @endif
+    </div>
+
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         <!-- Daily Revenue -->

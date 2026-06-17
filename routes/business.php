@@ -11,6 +11,7 @@ use App\Http\Controllers\Business\TeamController;
 use App\Http\Controllers\Business\SettingsController;
 use App\Http\Controllers\Business\KeysController;
 use App\Http\Controllers\Business\WebsitesController;
+use App\Http\Controllers\Business\WhatsappWalletController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('dashboard')->name('business.')->group(function () {
@@ -41,6 +42,9 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     // Protected business routes
     Route::middleware([\App\Http\Middleware\AllowAdminImpersonation::class, 'auth:business'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        Route::post('/whatsapp-wallet/link', [WhatsappWalletController::class, 'link'])->name('whatsapp-wallet.link');
+        Route::post('/whatsapp-wallet/unlink', [WhatsappWalletController::class, 'unlink'])->name('whatsapp-wallet.unlink');
 
         // Transactions
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
