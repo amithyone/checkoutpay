@@ -36,6 +36,11 @@ class WhatsappWallet extends Model
         'mevon_bank_name',
         'mevon_bank_code',
         'mevon_reference',
+        'business_pay_in_account_number',
+        'business_pay_in_account_name',
+        'business_pay_in_bank_name',
+        'business_pay_in_bank_code',
+        'active_business_name_registration_id',
         'tier2_provisioned_at',
         'kyc_fname',
         'kyc_lname',
@@ -85,6 +90,21 @@ class WhatsappWallet extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(WhatsappWalletTransaction::class, 'whatsapp_wallet_id');
+    }
+
+    public function businessNameRegistrations(): HasMany
+    {
+        return $this->hasMany(BusinessNameRegistration::class, 'whatsapp_wallet_id');
+    }
+
+    public function activeBusinessNameRegistration(): BelongsTo
+    {
+        return $this->belongsTo(BusinessNameRegistration::class, 'active_business_name_registration_id');
+    }
+
+    public function hasBusinessPayIn(): bool
+    {
+        return trim((string) $this->business_pay_in_account_number) !== '';
     }
 
     public function consumerApiAccount(): \Illuminate\Database\Eloquent\Relations\HasOne

@@ -39,6 +39,8 @@ class WhatsappWalletTransaction extends Model
     /** Merchant X-API-Key partner API: wallet debit to pay the authenticated business. */
     public const TYPE_PARTNER_MERCHANT_PAY = 'partner_merchant_pay';
 
+    public const TYPE_BUSINESS_NAME_REGISTRATION_FEE = 'business_name_registration_fee';
+
     /** @deprecated Use TYPE_PARTNER_MERCHANT_PAY; kept for existing rows. */
     public const TYPE_TAGINE_MERCHANT_PAY = 'tagine_merchant_pay';
 

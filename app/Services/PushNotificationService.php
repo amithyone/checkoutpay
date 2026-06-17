@@ -39,31 +39,34 @@ class PushNotificationService
         $this->sendToTokens($tokens, $title, $body, $data, 'rentals_alerts');
     }
 
+    /**
+     * @return list<string> tokens that FCM rejected as invalid/unregistered
+     */
     public function sendToTokens(
         array $tokens,
         string $title,
         string $body,
         array $data = [],
         string $androidChannelId = 'rentals_alerts',
-    ): void
-    {
+    ): array {
         if (empty($tokens)) {
-            return;
+            return [];
         }
 
         $projectId = (string) config('services.firebase.project_id', '');
         $serviceAccount = (string) config('services.firebase.service_account_json', '');
         if ($projectId === '' || $serviceAccount === '') {
-            return;
+            return [];
         }
 
         $accessToken = $this->getAccessToken($serviceAccount);
         if (! $accessToken) {
-            return;
+            return [];
         }
 
         $endpoint = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
         $client = new Client(['timeout' => 10]);
+        $failedTokens = [];
 
         foreach ($tokens as $token) {
             $message = [
@@ -75,14 +78,22 @@ class PushNotificationService
                     ],
                     'data' => $this->normalizeData($data),
                     'android' => [
+                        'priority' => 'high',
                         'notification' => [
                             'sound' => 'default',
                             'channel_id' => $androidChannelId,
                         ],
                     ],
                     'apns' => [
+                        'headers' => [
+                            'apns-priority' => '10',
+                        ],
                         'payload' => [
                             'aps' => [
+                                'alert' => [
+                                    'title' => $title,
+                                    'body' => $body,
+                                ],
                                 'sound' => 'default',
                             ],
                         ],
@@ -91,20 +102,39 @@ class PushNotificationService
             ];
 
             try {
-                $client->post($endpoint, [
+                $response = $client->post($endpoint, [
                     'headers' => [
                         'Authorization' => "Bearer {$accessToken}",
                         'Content-Type' => 'application/json',
                     ],
                     'json' => $message,
                 ]);
+                if ($response->getStatusCode() >= 400) {
+                    $failedTokens[] = (string) $token;
+                }
             } catch (\Throwable $e) {
                 Log::warning('FCM push send failed', [
                     'token_suffix' => substr((string) $token, -12),
                     'error' => $e->getMessage(),
                 ]);
+                if ($this->isInvalidTokenError($e)) {
+                    $failedTokens[] = (string) $token;
+                }
             }
         }
+
+        return $failedTokens;
+    }
+
+    private function isInvalidTokenError(\Throwable $e): bool
+    {
+        $msg = strtolower($e->getMessage());
+
+        return str_contains($msg, 'notregistered')
+            || str_contains($msg, 'invalidregistration')
+            || str_contains($msg, 'unregistered')
+            || str_contains($msg, 'not found')
+            || str_contains($msg, 'requested entity was not found');
     }
 
     public function isConfigured(): bool

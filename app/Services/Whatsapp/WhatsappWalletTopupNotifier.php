@@ -154,6 +154,25 @@ class WhatsappWalletTopupNotifier
     }
 
     /**
+     * FCM push only — any wallet credit (refunds, card withdraw, etc.). No WhatsApp message.
+     *
+     * @param  array<string, string>  $extra
+     */
+    public function notifyMoneyReceived(
+        WhatsappWallet $wallet,
+        float $amount,
+        float $balanceAfter,
+        ?string $body = null,
+        array $extra = [],
+    ): void {
+        if ($amount <= 0) {
+            return;
+        }
+
+        $this->consumerPush->notifyMoneyReceived($wallet, $amount, $balanceAfter, $body, $extra);
+    }
+
+    /**
      * Notify the wallet owner after a successful credit. Runs outside DB transactions.
      */
     public function notifyCredited(WhatsappWallet $wallet, float $credited, float $balanceAfter): void

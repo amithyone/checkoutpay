@@ -19,8 +19,18 @@ final class ConsumerWalletPushNotificationService
         private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
-    public function notifyWalletCredited(WhatsappWallet $wallet, float $amount, float $balanceAfter): void
-    {
+    /**
+     * Push alert for any wallet credit (top-up, P2P, refund, card withdraw, etc.).
+     *
+     * @param  array<string, string>  $extra
+     */
+    public function notifyMoneyReceived(
+        WhatsappWallet $wallet,
+        float $amount,
+        float $balanceAfter,
+        ?string $body = null,
+        array $extra = [],
+    ): void {
         if (! $this->enabled() || $amount <= 0) {
             return;
         }
@@ -30,23 +40,33 @@ final class ConsumerWalletPushNotificationService
             return;
         }
 
-        $currency = $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);
+        $currency = strtoupper((string) ($extra['currency'] ?? ''));
+        if ($currency === '') {
+            $currency = $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);
+        }
+        unset($extra['currency']);
+
         $amountLabel = WhatsappWalletMoneyFormatter::format($amount, $currency);
         $balanceLabel = WhatsappWalletMoneyFormatter::format($balanceAfter, $currency);
 
         $title = (string) config('consumer_wallet.credit_push_title', 'Money received');
-        $body = sprintf(
+        $defaultBody = sprintf(
             '%s added to your wallet. New balance: %s.',
             $amountLabel,
             $balanceLabel,
         );
 
-        $this->send($token, $title, $body, [
-            'type' => 'wallet_credit',
-            'wallet_id' => (string) $wallet->id,
+        $this->send($token, $title, $body ?? $defaultBody, $this->moneyReceivedData($wallet, array_merge([
             'amount' => (string) $amount,
             'balance_after' => (string) $balanceAfter,
             'currency' => $currency,
+        ], $extra)));
+    }
+
+    public function notifyWalletCredited(WhatsappWallet $wallet, float $amount, float $balanceAfter): void
+    {
+        $this->notifyMoneyReceived($wallet, $amount, $balanceAfter, null, [
+            'credit_source' => 'top_up',
         ]);
     }
 
@@ -64,24 +84,16 @@ final class ConsumerWalletPushNotificationService
             return;
         }
 
-        $token = $this->resolveToken($recipientWallet);
-        if ($token === null) {
-            return;
-        }
-
         $creditCur = strtoupper($creditCurrency);
         $amountLabel = WhatsappWalletMoneyFormatter::format($amount, $creditCur);
         $fromWho = trim($senderDisplayName) !== '' ? trim($senderDisplayName) : 'Someone';
-
-        $title = (string) config('consumer_wallet.p2p_push_title', 'Money received');
         $body = $this->p2pBody($fromWho, $amountLabel, $crossBorderFx, $amount, $creditCur);
+        $balanceAfter = (float) $recipientWallet->fresh()->balance;
 
-        $this->send($token, $title, $body, [
-            'type' => 'wallet_p2p_received',
-            'wallet_id' => (string) $recipientWallet->id,
-            'amount' => (string) $amount,
-            'currency' => $creditCur,
+        $this->notifyMoneyReceived($recipientWallet, $amount, $balanceAfter, $body, [
+            'credit_source' => 'p2p_credit',
             'sender_name' => $fromWho,
+            'currency' => $creditCur,
         ]);
     }
 
@@ -116,6 +128,21 @@ final class ConsumerWalletPushNotificationService
     }
 
     /**
+     * FCM `data` payload for money-received alerts (all values must be strings).
+     *
+     * @param  array<string, string>  $extra
+     * @return array<string, string>
+     */
+    private function moneyReceivedData(WhatsappWallet $wallet, array $extra = []): array
+    {
+        return array_merge([
+            'type' => 'money_received',
+            'screen' => 'history',
+            'wallet_id' => (string) $wallet->id,
+        ], $extra);
+    }
+
+    /**
      * @param  array<string, string>  $data
      */
     private function send(string $token, string $title, string $body, array $data): void
@@ -125,13 +152,14 @@ final class ConsumerWalletPushNotificationService
         }
 
         try {
-            $this->push->sendToTokens(
+            $failed = $this->push->sendToTokens(
                 [$token],
                 $title,
                 $body,
                 $data,
-                (string) config('consumer_wallet.credit_push_channel', 'wallet_alerts'),
+                (string) config('consumer_wallet.credit_push_channel', 'money_received'),
             );
+            $this->clearTokenIfInvalid($token, $failed);
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.push_failed', [
                 'type' => $data['type'] ?? 'unknown',
@@ -146,6 +174,21 @@ final class ConsumerWalletPushNotificationService
         return (bool) config('consumer_wallet.credit_push_enabled', true);
     }
 
+    private function clearTokenIfInvalid(string $token, array $failedTokens): void
+    {
+        if (! in_array($token, $failedTokens, true)) {
+            return;
+        }
+
+        ConsumerWalletApiAccount::query()
+            ->where('fcm_token', $token)
+            ->update([
+                'fcm_token' => null,
+                'fcm_platform' => null,
+                'fcm_token_updated_at' => null,
+            ]);
+    }
+
     private function resolveToken(WhatsappWallet $wallet): ?string
     {
         $account = ConsumerWalletApiAccount::query()
@@ -153,6 +196,7 @@ final class ConsumerWalletPushNotificationService
             ->whereNotNull('fcm_token')
             ->where('fcm_token', '!=', '')
             ->where('fcm_platform', '!=', 'web')
+            ->orderByDesc('fcm_token_updated_at')
             ->first();
 
         if (! $account) {

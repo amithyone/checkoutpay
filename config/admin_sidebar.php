@@ -16,6 +16,7 @@ return [
         'whatsapp_wallet',
         'whatsapp_wallet_users',
         'whatsapp_wallet_transactions',
+        'business_name_registrations',
         'withdrawals',
         'overdraft',
         'peer_lending_offers',

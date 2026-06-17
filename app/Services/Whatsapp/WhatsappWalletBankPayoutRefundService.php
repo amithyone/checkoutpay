@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Log;
  */
 class WhatsappWalletBankPayoutRefundService
 {
+    public function __construct(
+        private WhatsappWalletTopupNotifier $walletNotifier,
+    ) {}
     /**
      * @return array{ok: bool, message: string}
      */
@@ -35,8 +38,10 @@ class WhatsappWalletBankPayoutRefundService
         }
 
         $refunded = false;
+        $balanceAfter = null;
+        $walletId = (int) $transaction->whatsapp_wallet_id;
 
-        DB::transaction(function () use ($transaction, $amount, $adminId, $reason, &$refunded): void {
+        DB::transaction(function () use ($transaction, $amount, $adminId, $reason, &$refunded, &$balanceAfter): void {
             $txn = WhatsappWalletTransaction::query()->lockForUpdate()->find($transaction->id);
             if (! $txn || $txn->isReversed()) {
                 return;
@@ -50,6 +55,7 @@ class WhatsappWalletBankPayoutRefundService
             $wallet->balance = round((float) $wallet->balance + $amount, 2);
             $wallet->daily_transfer_total = max(0, round((float) $wallet->daily_transfer_total - $amount, 2));
             $wallet->save();
+            $balanceAfter = (float) $wallet->balance;
 
             $meta = is_array($txn->meta) ? $txn->meta : [];
             $meta['reversed_at'] = now()->toIso8601String();
@@ -76,6 +82,15 @@ class WhatsappWalletBankPayoutRefundService
             'admin_id' => $adminId,
             'reason' => $reason,
         ]);
+
+        if ($balanceAfter !== null) {
+            $wallet = WhatsappWallet::query()->find($walletId);
+            if ($wallet) {
+                $this->walletNotifier->notifyMoneyReceived($wallet, $amount, $balanceAfter, null, [
+                    'credit_source' => 'payout_refund',
+                ]);
+            }
+        }
 
         return ['ok' => true, 'message' => 'Wallet credited and transaction marked as reversed.'];
     }

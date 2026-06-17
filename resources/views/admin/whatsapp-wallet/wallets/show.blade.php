@@ -186,6 +186,47 @@
         </div>
     </div>
 
+    @if(($businessNameRegistrations ?? collect())->isNotEmpty())
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Business name registrations</h3>
+                    @if(($businessNamePendingCount ?? 0) > 0)
+                        <p class="text-sm text-amber-800 mt-1">{{ $businessNamePendingCount }} pending review</p>
+                    @endif
+                </div>
+                <a href="{{ route('admin.business-name-registrations.index', ['wallet_id' => $wallet->id]) }}"
+                   class="text-sm text-primary hover:underline">View all</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-gray-600">Reference</th>
+                            <th class="px-4 py-2 text-left text-gray-600">Proposed name</th>
+                            <th class="px-4 py-2 text-left text-gray-600">Status</th>
+                            <th class="px-4 py-2 text-left text-gray-600">Progress</th>
+                            <th class="px-4 py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($businessNameRegistrations as $bnr)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2 font-mono text-xs">{{ $bnr->reference }}</td>
+                                <td class="px-4 py-2">{{ $bnr->proposed_name }}</td>
+                                <td class="px-4 py-2">{{ $bnr->statusDisplayLabel() }}</td>
+                                <td class="px-4 py-2">{{ (int) $bnr->progress_percent }}%</td>
+                                <td class="px-4 py-2 text-right">
+                                    <a href="{{ route('admin.business-name-registrations.show', $bnr) }}" class="text-primary hover:underline">Review</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-200">
             <h3 class="text-lg font-semibold text-gray-900">Recent transactions</h3>

@@ -10,6 +10,7 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayCardApiClient;
 use App\Services\MevonPay\MevonPayUsdAutoFundService;
 use App\Services\Whatsapp\PhoneNormalizer;
+use App\Services\Whatsapp\WhatsappWalletTopupNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -30,6 +31,7 @@ final class ConsumerVirtualCardService
         private VirtualCardRequestSupersedeService $supersede,
         private VirtualCardStoredDetailsService $storedDetails,
         private VirtualCardNotificationService $cardNotifier,
+        private WhatsappWalletTopupNotifier $walletNotifier,
     ) {}
 
     public function isEnabled(): bool
@@ -2133,6 +2135,11 @@ final class ConsumerVirtualCardService
             'credit',
             $reference,
         );
+
+        $walletFresh = $wallet->fresh();
+        $this->walletNotifier->notifyMoneyReceived($walletFresh, $amountNgn, (float) $walletFresh->balance, null, [
+            'credit_source' => 'card_withdraw',
+        ]);
 
         return [
             'ok' => true,

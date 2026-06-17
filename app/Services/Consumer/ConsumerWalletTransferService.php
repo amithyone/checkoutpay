@@ -387,6 +387,17 @@ class ConsumerWalletTransferService
             $txn->update(['meta' => $meta]);
         });
 
+        if ($bucket === MavonPayTransferService::BUCKET_FAILED) {
+            $walletFresh = $wallet->fresh();
+            $this->walletNotifier->notifyMoneyReceived(
+                $walletFresh,
+                $amount,
+                (float) $walletFresh->balance,
+                null,
+                ['credit_source' => 'payout_refund'],
+            );
+        }
+
         $wallet = $wallet->fresh();
         $receipt = WhatsappBankTransferReceiptDetails::fromPayoutResult($result, null);
         if ($receipt['reference'] === '') {

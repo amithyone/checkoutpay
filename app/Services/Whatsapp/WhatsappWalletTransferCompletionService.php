@@ -563,6 +563,16 @@ class WhatsappWalletTransferCompletionService
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $wallet = $wallet->fresh();
 
+        if ($bucket === MavonPayTransferService::BUCKET_FAILED) {
+            $this->walletNotifier->notifyMoneyReceived(
+                $wallet,
+                $amount,
+                (float) $wallet->balance,
+                null,
+                ['credit_source' => 'payout_refund'],
+            );
+        }
+
         $when = $this->transferNoticeTimeLine();
 
         $brand = $this->waBrand();

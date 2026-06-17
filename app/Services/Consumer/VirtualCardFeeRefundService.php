@@ -5,11 +5,15 @@ namespace App\Services\Consumer;
 use App\Models\VirtualCardRequest;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Whatsapp\WhatsappWalletTopupNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 final class VirtualCardFeeRefundService
 {
+    public function __construct(
+        private WhatsappWalletTopupNotifier $walletNotifier,
+    ) {}
     public function findFeeTransaction(int $walletId, string $reference): ?WhatsappWalletTransaction
     {
         return WhatsappWalletTransaction::query()
@@ -116,7 +120,8 @@ final class VirtualCardFeeRefundService
     {
         try {
             $alreadyRefunded = false;
-            DB::transaction(function () use ($walletId, $reference, $amount, $reason, &$alreadyRefunded) {
+            $balanceAfter = null;
+            DB::transaction(function () use ($walletId, $reference, $amount, $reason, &$alreadyRefunded, &$balanceAfter) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($walletId);
                 $txn = WhatsappWalletTransaction::query()
                     ->where('external_reference', $reference)
@@ -135,6 +140,7 @@ final class VirtualCardFeeRefundService
                 $w->balance = round((float) $w->balance + $amount, 2);
                 $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
                 $w->save();
+                $balanceAfter = (float) $w->balance;
                 $meta['refunded'] = true;
                 $meta['refund_reason'] = $reason;
                 $txn->update(['meta' => $meta]);
@@ -142,6 +148,15 @@ final class VirtualCardFeeRefundService
 
             if ($alreadyRefunded) {
                 return ['ok' => true, 'message' => 'Fee was already refunded.', 'already_refunded' => true];
+            }
+
+            if ($balanceAfter !== null) {
+                $wallet = WhatsappWallet::query()->find($walletId);
+                if ($wallet) {
+                    $this->walletNotifier->notifyMoneyReceived($wallet, $amount, $balanceAfter, null, [
+                        'credit_source' => 'refund',
+                    ]);
+                }
             }
 
             return ['ok' => true, 'message' => 'Fee refunded successfully.'];

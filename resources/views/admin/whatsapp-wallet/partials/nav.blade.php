@@ -36,6 +36,14 @@
             <span class="ml-2 bg-red-100 text-red-800 rounded-full px-2 py-0.5 text-xs font-bold">{{ $failedCount }}</span>
         @endif
     </a>
+    @php $bnrPending = \App\Models\BusinessNameRegistration::countPending(); @endphp
+    <a href="{{ route('admin.business-name-registrations.index') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.business-name-registrations.*']) }}">
+        <i class="fas fa-briefcase mr-2 text-green-600"></i> Business names
+        @if($bnrPending > 0)
+            <span class="ml-2 bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 text-xs font-bold">{{ $bnrPending }}</span>
+        @endif
+    </a>
     <a href="{{ route('admin.whatsapp-wallet.settings') }}"
        class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.settings', 'admin.whatsapp-wallet.update', 'admin.whatsapp-wallet.fx-rates.update']) }}">
         <i class="fas fa-cog mr-2 text-gray-600"></i> Settings &amp; FX

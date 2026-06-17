@@ -15,6 +15,7 @@ class WhatsappWalletVtuPurchaseService
 {
     public function __construct(
         private VtuProviderResolver $vtuResolver,
+        private WhatsappWalletTopupNotifier $walletNotifier,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -339,8 +340,11 @@ class WhatsappWalletVtuPurchaseService
 
     private function refundDebit(int $walletId, string $externalRef, float $amount, string $reason): void
     {
+        $credited = false;
+        $balanceAfter = null;
+
         try {
-            DB::transaction(function () use ($walletId, $externalRef, $amount, $reason) {
+            DB::transaction(function () use ($walletId, $externalRef, $amount, $reason, &$credited, &$balanceAfter) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($walletId);
                 $txn = WhatsappWalletTransaction::query()
                     ->where('external_reference', $externalRef)
@@ -361,6 +365,8 @@ class WhatsappWalletVtuPurchaseService
                     $w->balance = round((float) $w->balance + $amount, 2);
                     $w->daily_transfer_total = max(0, round((float) $w->daily_transfer_total - $amount, 2));
                     $w->save();
+                    $balanceAfter = (float) $w->balance;
+                    $credited = true;
 
                     WhatsappWalletTransaction::query()->create([
                         'whatsapp_wallet_id' => $w->id,
@@ -384,6 +390,15 @@ class WhatsappWalletVtuPurchaseService
                 $meta['vtu_refunded_at'] = now()->toIso8601String();
                 $txn->update(['meta' => $meta]);
             });
+
+            if ($credited && $balanceAfter !== null) {
+                $wallet = WhatsappWallet::query()->find($walletId);
+                if ($wallet) {
+                    $this->walletNotifier->notifyMoneyReceived($wallet, $amount, $balanceAfter, null, [
+                        'credit_source' => 'vtu_refund',
+                    ]);
+                }
+            }
         } catch (\Throwable $e) {
             Log::error('whatsapp.wallet.vtu_refund_failed', [
                 'error' => $e->getMessage(),

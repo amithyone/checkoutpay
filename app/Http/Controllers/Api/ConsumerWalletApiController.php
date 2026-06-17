@@ -8,6 +8,7 @@ use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
 use App\Services\Consumer\ConsumerWalletPayQrService;
@@ -47,6 +48,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerWalletPayCodeService $payCodes,
         private ConsumerWalletPayQrService $payQr,
         private WhatsappWalletPendingPayoutReconciliationService $pendingPayoutReconcile,
+        private ConsumerBusinessNameRegistrationService $businessNameRegistration,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -176,6 +178,7 @@ class ConsumerWalletApiController extends Controller
                 'mevon_bank_code' => $wallet->mevon_bank_code,
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'pay_in' => $payIn,
+                'business_pay_in' => $this->businessNameRegistration->businessPayInPayload($wallet),
                 'vtu' => [
                     'eligible' => $vtuEligible,
                     'configured' => $vtuConfigured,

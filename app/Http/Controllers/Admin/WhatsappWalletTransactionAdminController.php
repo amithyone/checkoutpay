@@ -187,6 +187,7 @@ class WhatsappWalletTransactionAdminController extends Controller
             WhatsappWalletTransaction::TYPE_VTU_AIRTIME => 'VTU airtime',
             WhatsappWalletTransaction::TYPE_VTU_DATA => 'VTU data',
             WhatsappWalletTransaction::TYPE_PARTNER_MERCHANT_PAY => 'Partner pay',
+            WhatsappWalletTransaction::TYPE_BUSINESS_NAME_REGISTRATION_FEE => 'Business name registration fee',
         ];
     }
 }

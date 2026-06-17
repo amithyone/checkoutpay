@@ -20,7 +20,7 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
 
         config([
             'consumer_wallet.credit_push_enabled' => true,
-            'consumer_wallet.credit_push_channel' => 'wallet_alerts',
+            'consumer_wallet.credit_push_channel' => 'money_received',
             'services.firebase.project_id' => 'test-project',
             'services.firebase.service_account_json' => '{"client_email":"x@y.z","private_key":"x"}',
         ]);
@@ -51,10 +51,13 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
                     && $title === 'Money received'
                     && str_contains($body, '₦5,000.00')
                     && str_contains($body, '₦15,000.00')
-                    && $data['type'] === 'wallet_credit'
+                    && $data['type'] === 'money_received'
+                    && $data['screen'] === 'history'
                     && $data['wallet_id'] === (string) $wallet->id
-                    && $channel === 'wallet_alerts';
-            });
+                    && ($data['credit_source'] ?? '') === 'top_up'
+                    && $channel === 'money_received';
+            })
+            ->andReturn([]);
         $this->app->instance(PushNotificationService::class, $push);
 
         $this->app->make(ConsumerWalletPushNotificationService::class)
@@ -84,9 +87,12 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
             ->withArgs(function ($tokens, $title, $body, $data) {
                 return $tokens === ['fcm-token-p2p']
                     && str_contains($body, 'Ada sent you ₦2,500.00')
-                    && $data['type'] === 'wallet_p2p_received'
-                    && $data['sender_name'] === 'Ada';
-            });
+                    && $data['type'] === 'money_received'
+                    && $data['screen'] === 'history'
+                    && $data['sender_name'] === 'Ada'
+                    && ($data['credit_source'] ?? '') === 'p2p_credit';
+            })
+            ->andReturn([]);
         $this->app->instance(PushNotificationService::class, $push);
 
         $this->app->make(ConsumerWalletPushNotificationService::class)

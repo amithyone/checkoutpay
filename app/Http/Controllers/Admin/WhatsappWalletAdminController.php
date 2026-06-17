@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Models\BusinessNameRegistration;
 use App\Models\WhatsappCrossBorderFxRate;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
@@ -86,10 +87,23 @@ class WhatsappWalletAdminController extends Controller
             ->where('created_at', '>=', now()->subHours(48))
             ->count();
 
+        $businessNameRegistrations = BusinessNameRegistration::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get();
+
+        $businessNamePendingCount = BusinessNameRegistration::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->pendingReview()
+            ->count();
+
         return view('admin.whatsapp-wallet.wallets.show', [
             'wallet' => $wallet,
             'recentTx' => $recentTx,
             'pendingPayouts' => $pendingPayouts,
+            'businessNameRegistrations' => $businessNameRegistrations,
+            'businessNamePendingCount' => $businessNamePendingCount,
         ]);
     }
 

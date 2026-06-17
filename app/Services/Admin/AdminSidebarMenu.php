@@ -3,6 +3,7 @@
 namespace App\Services\Admin;
 
 use App\Models\Admin;
+use App\Models\BusinessNameRegistration;
 use App\Models\Payment;
 use App\Models\WhatsappWalletTransaction;
 use App\Models\Renter;
@@ -163,6 +164,14 @@ class AdminSidebarMenu
                     'visible' => $admin->canManageSettings(),
                     'badge_count' => WhatsappWalletTransaction::countFailedBankPayoutsRecent(),
                     'badge_color' => 'red',
+                ]
+            ),
+            'business_name_registrations' => array_merge(
+                $this->link('Business names', 'admin.business-name-registrations.index', 'fas fa-briefcase text-green-600', ['admin.business-name-registrations.*']),
+                [
+                    'visible' => $admin->canManageSettings(),
+                    'badge_count' => BusinessNameRegistration::countPending(),
+                    'badge_color' => 'yellow',
                 ]
             ),
             'withdrawals' => $this->link('Withdrawals', 'admin.withdrawals.index', 'fas fa-hand-holding-usd', ['admin.withdrawals.*']),
