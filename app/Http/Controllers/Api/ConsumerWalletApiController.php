@@ -182,7 +182,7 @@ class ConsumerWalletApiController extends Controller
                 'mevon_bank_code' => $wallet->mevon_bank_code,
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'pay_in' => $payIn,
-                'business_pay_in' => $this->businessNameRegistration->businessPayInPayload($wallet),
+                'business_pay_in' => $this->businessLedger->resolveBusinessPayInPayload($wallet),
                 'business_balance' => $this->businessLedger->resolvedBalance($wallet),
                 'business_wallet_enabled' => $wallet->hasBusinessWallet(),
                 'linked_business_id' => $wallet->linked_business_id,
@@ -284,6 +284,24 @@ class ConsumerWalletApiController extends Controller
             ->where('whatsapp_wallet_id', $wallet->id);
         ConsumerWalletTransactionScope::apply($query, $scope);
 
+        $from = trim((string) $request->input('from', ''));
+        $to = trim((string) $request->input('to', ''));
+        $tz = config('app.timezone', 'Africa/Lagos');
+        if ($from !== '') {
+            try {
+                $query->where('created_at', '>=', Carbon::parse($from, $tz)->startOfDay());
+            } catch (\Throwable) {
+                return response()->json(['success' => false, 'message' => 'Invalid from date. Use YYYY-MM-DD.'], 422);
+            }
+        }
+        if ($to !== '') {
+            try {
+                $query->where('created_at', '<=', Carbon::parse($to, $tz)->endOfDay());
+            } catch (\Throwable) {
+                return response()->json(['success' => false, 'message' => 'Invalid to date. Use YYYY-MM-DD.'], 422);
+            }
+        }
+
         $paginator = $query->orderByDesc('id')->paginate($perPage);
 
         return response()->json([
@@ -295,6 +313,9 @@ class ConsumerWalletApiController extends Controller
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
                 'scope' => $scope,
+                'from' => $from !== '' ? $from : null,
+                'to' => $to !== '' ? $to : null,
+                'timezone' => $tz,
             ],
         ]);
     }

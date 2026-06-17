@@ -29,6 +29,7 @@ final class ConsumerWalletTransactionScope
                     $q->whereIn('type', [
                         WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
                         WhatsappWalletTransaction::TYPE_P2P_DEBIT,
+                        WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN,
                     ])
                         ->orWhere(function (Builder $q2) {
                             $q2->where('amount', '>', 0)

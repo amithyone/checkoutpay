@@ -23,7 +23,12 @@ Migrations:
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET | `/api/v1/consumer/wallet` | Adds `business_balance`, `business_wallet_enabled`, `linked_business_*` |
+| GET | `/api/v1/consumer/wallet` | Adds `business_balance`, `business_wallet_enabled`, `linked_business_*`, `business_pay_in` |
+
+`business_pay_in` resolution (`ConsumerBusinessWalletLedgerService::resolveBusinessPayInPayload`):
+
+1. Wallet BNR fields (`business_pay_in_*`) after business name registration approval
+2. Else linked merchant Rubies VA (`businesses.rubies_business_account_*`) when `linked_business_id` is set
 | GET | `/api/v1/consumer/wallet/transactions?scope=` | `ConsumerWalletTransactionScope` filter |
 | POST | `/api/v1/consumer/transfers/bank` | `from_ledger=personal\|business` |
 
@@ -61,11 +66,14 @@ Verifies wallet PIN via `ConsumerWalletPinVerifier` before setting `linked_busin
 - `type = topup` (business VA inflows)
 - `partner_merchant_pay` / website payment credits (`meta.payment_id`, etc.)
 
-Includes withdrawals and non-website credits on `ledger_scope = business`.
+Includes withdrawals, linked merchant Rubies VA deposits (`business_rubies_in`), and non-website credits on `ledger_scope = business`.
+
+Recorded when MevonPay credits a linked merchant Rubies VA (`BusinessRubiesFundingWebhookService` → `ConsumerBusinessWalletLedgerService::recordLinkedMerchantRubiesDeposit`).
 
 ---
 
 ## Not yet implemented
 
-- Webhook credit to `business_pay_in_account_number` → `business_balance` (BNR-only wallets)
+- Webhook credit to BNR-only `business_pay_in_account_number` → wallet `business_balance`
 - P2P from business ledger
+- Backfill of historical merchant VA deposits into app history

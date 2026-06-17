@@ -41,6 +41,9 @@ class WhatsappWalletTransaction extends Model
 
     public const TYPE_BUSINESS_NAME_REGISTRATION_FEE = 'business_name_registration_fee';
 
+    /** Linked CheckoutPay merchant Rubies VA bank transfer in. */
+    public const TYPE_BUSINESS_RUBIES_IN = 'business_rubies_in';
+
     /** @deprecated Use TYPE_PARTNER_MERCHANT_PAY; kept for existing rows. */
     public const TYPE_TAGINE_MERCHANT_PAY = 'tagine_merchant_pay';
 

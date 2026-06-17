@@ -6,6 +6,7 @@ use App\Events\PaymentApproved;
 use App\Models\Business;
 use App\Models\Payment;
 use App\Models\MevonPayLedgerEntry;
+use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use Illuminate\Http\Request;
@@ -18,6 +19,10 @@ use Illuminate\Support\Str;
  */
 class BusinessRubiesFundingWebhookService
 {
+    public function __construct(
+        private ConsumerBusinessWalletLedgerService $businessWalletLedger,
+    ) {}
+
     public function tryFulfillFromWebhook(
         string $accountNumber,
         float $amount,
@@ -162,6 +167,7 @@ class BusinessRubiesFundingWebhookService
             ['payment_id' => $payment->id, 'business_id' => $business->id],
         );
         $payment->load(['business.websites', 'website']);
+        $this->businessWalletLedger->recordLinkedMerchantRubiesDeposit($business, $payment, $amount, $webhookMeta);
         event(new PaymentApproved($payment));
 
         Log::info('business.rubies_funding_webhook.credited', [
