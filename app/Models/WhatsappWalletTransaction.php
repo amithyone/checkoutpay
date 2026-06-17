@@ -48,6 +48,7 @@ class WhatsappWalletTransaction extends Model
         'whatsapp_wallet_id',
         'sender_name',
         'type',
+        'ledger_scope',
         'amount',
         'balance_after',
         'counterparty_phone_e164',

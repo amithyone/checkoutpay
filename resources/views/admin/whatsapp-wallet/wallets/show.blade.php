@@ -39,10 +39,31 @@
                     @endif
                 </div>
                 <div class="text-right">
-                    <p class="text-sm text-gray-500">Balance</p>
+                    <p class="text-sm text-gray-500">Personal balance</p>
                     <p class="text-3xl font-bold text-gray-900">₦{{ number_format((float) $wallet->balance, 2) }}</p>
+                    <p class="text-sm text-gray-500 mt-2">Business balance</p>
+                    <p class="text-xl font-bold text-cyan-700">₦{{ number_format((float) $wallet->business_balance, 2) }}</p>
                 </div>
             </div>
+
+            <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.link-business', $wallet) }}" class="border border-gray-100 rounded-lg p-4 bg-gray-50 space-y-3">
+                @csrf
+                @method('PUT')
+                <p class="text-sm font-semibold text-gray-800">Link merchant business</p>
+                <p class="text-xs text-gray-500">Connect this WhatsApp wallet to a CheckoutPay business account for a separate business ledger in the app.</p>
+                <select name="linked_business_id" class="w-full rounded-lg border-gray-300 text-sm">
+                    <option value="">— No linked business —</option>
+                    @foreach($linkableBusinesses as $biz)
+                        <option value="{{ $biz->id }}" @selected($wallet->linked_business_id === $biz->id)>
+                            #{{ $biz->id }} · {{ $biz->name }} ({{ $biz->email }})
+                        </option>
+                    @endforeach
+                </select>
+                @if($wallet->linkedBusiness)
+                    <p class="text-xs text-gray-600">Linked: <strong>{{ $wallet->linkedBusiness->name }}</strong></p>
+                @endif
+                <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Save link</button>
+            </form>
 
             <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div><dt class="text-gray-500">Wallet ID</dt><dd class="font-mono">#{{ $wallet->id }}</dd></div>

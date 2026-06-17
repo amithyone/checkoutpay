@@ -9,6 +9,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
+use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
 use App\Services\Consumer\ConsumerWalletPayQrService;
@@ -179,6 +180,10 @@ class ConsumerWalletApiController extends Controller
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'pay_in' => $payIn,
                 'business_pay_in' => $this->businessNameRegistration->businessPayInPayload($wallet),
+                'business_balance' => (float) $wallet->business_balance,
+                'business_wallet_enabled' => $wallet->hasBusinessWallet(),
+                'linked_business_id' => $wallet->linked_business_id,
+                'linked_business_name' => $wallet->linkedBusiness?->name,
                 'vtu' => [
                     'eligible' => $vtuEligible,
                     'configured' => $vtuConfigured,
@@ -270,11 +275,13 @@ class ConsumerWalletApiController extends Controller
     {
         $wallet = $this->walletFor($request);
         $perPage = max(1, min(50, (int) $request->input('per_page', 20)));
+        $scope = ConsumerWalletTransactionScope::normalize((string) $request->input('scope', 'personal'));
 
-        $paginator = WhatsappWalletTransaction::query()
-            ->where('whatsapp_wallet_id', $wallet->id)
-            ->orderByDesc('id')
-            ->paginate($perPage);
+        $query = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id);
+        ConsumerWalletTransactionScope::apply($query, $scope);
+
+        $paginator = $query->orderByDesc('id')->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -284,6 +291,7 @@ class ConsumerWalletApiController extends Controller
                 'last_page' => $paginator->lastPage(),
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
+                'scope' => $scope,
             ],
         ]);
     }
@@ -760,6 +768,7 @@ class ConsumerWalletApiController extends Controller
             'bank_name' => 'required|string|max:120',
             'account_name' => 'required|string|max:120',
             'remark' => 'nullable|string|max:255',
+            'from_ledger' => 'nullable|string|in:personal,business',
         ]);
 
         $wallet = $this->walletFor($request)->fresh();
@@ -778,6 +787,7 @@ class ConsumerWalletApiController extends Controller
             (string) $request->input('bank_name'),
             (string) $request->input('account_name'),
             $request->filled('remark') ? (string) $request->input('remark') : null,
+            ConsumerWalletTransactionScope::normalize((string) $request->input('from_ledger', 'personal')),
         );
 
         $code = $result['ok'] ? 200 : 422;

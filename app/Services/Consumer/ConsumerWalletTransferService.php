@@ -4,6 +4,7 @@ namespace App\Services\Consumer;
 
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\MavonPayTransferService;
 use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
 use App\Services\Payout\BankPayoutNarration;
@@ -231,7 +232,12 @@ class ConsumerWalletTransferService
         string $bankName,
         string $beneficiaryName,
         ?string $remark = null,
+        string $ledgerScope = ConsumerWalletTransactionScope::SCOPE_PERSONAL,
     ): array {
+        $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+        if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS && ! $wallet->fresh()->hasBusinessWallet()) {
+            return ['ok' => false, 'message' => 'Business wallet is not linked yet.'];
+        }
         if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
             return ['ok' => false, 'message' => 'Bank transfers are only available for Nigeria wallet numbers.'];
         }
@@ -262,29 +268,38 @@ class ConsumerWalletTransferService
         $narration = BankPayoutNarration::forConsumerApp($remark);
 
         if (! $this->bankPayout->isConfigured()) {
-            return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $isSelf, $selfFee, $payoutAmount);
+            return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $isSelf, $selfFee, $payoutAmount, $ledgerScope);
         }
 
         $reference = $this->bankPayout->makeWalletPayoutReference();
 
         try {
-            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiaryName, $reference, $isSelf, $selfFee, $narration) {
+            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiaryName, $reference, $isSelf, $selfFee, $narration, $ledgerScope) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
                 }
-                $w->resetDailyTransferIfNeeded();
-                $check = $w->canDebit($amount);
+                if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+                    $check = $w->canDebitBusiness($amount);
+                    if (! $check['ok']) {
+                        throw new \RuntimeException($check['message'] ?? 'cannot_debit');
+                    }
+                    $newBal = round((float) $w->business_balance - $amount, 2);
+                    $w->business_balance = $newBal;
+                } else {
+                    $w->resetDailyTransferIfNeeded();
+                    $check = $w->canDebit($amount);
+                    if (! $check['ok']) {
+                        throw new \RuntimeException($check['message'] ?? 'cannot_debit');
+                    }
+                    $newBal = round((float) $w->balance - $amount, 2);
+                    $w->balance = $newBal;
+                    $w->daily_transfer_total = round((float) $w->daily_transfer_total + $amount, 2);
+                    $w->daily_transfer_for_date = now()->toDateString();
+                }
                 if (! $w->hasPin()) {
                     throw new \RuntimeException('PIN not set.');
                 }
-                if (! $check['ok']) {
-                    throw new \RuntimeException($check['message'] ?? 'cannot_debit');
-                }
-                $newBal = round((float) $w->balance - $amount, 2);
-                $w->balance = $newBal;
-                $w->daily_transfer_total = round((float) $w->daily_transfer_total + $amount, 2);
-                $w->daily_transfer_for_date = now()->toDateString();
                 $w->pin_failed_attempts = 0;
                 $w->save();
 
@@ -292,6 +307,7 @@ class ConsumerWalletTransferService
                     'whatsapp_wallet_id' => $w->id,
                     'sender_name' => $w->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
+                    'ledger_scope' => $ledgerScope,
                     'amount' => $amount,
                     'balance_after' => $newBal,
                     'counterparty_account_number' => $acct,
@@ -450,25 +466,36 @@ class ConsumerWalletTransferService
         bool $isSelf = false,
         float $selfFee = 0.0,
         float $payoutAmount = 0.0,
+        string $ledgerScope = ConsumerWalletTransactionScope::SCOPE_PERSONAL,
     ): array {
+        $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
         try {
-            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary, $isSelf, $selfFee, $payoutAmount) {
+            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary, $isSelf, $selfFee, $payoutAmount, $ledgerScope) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
                 }
-                $w->resetDailyTransferIfNeeded();
-                $check = $w->canDebit($amount);
+                if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+                    $check = $w->canDebitBusiness($amount);
+                    if (! $check['ok']) {
+                        throw new \RuntimeException($check['message'] ?? 'cannot_debit');
+                    }
+                    $newBal = round((float) $w->business_balance - $amount, 2);
+                    $w->business_balance = $newBal;
+                } else {
+                    $w->resetDailyTransferIfNeeded();
+                    $check = $w->canDebit($amount);
+                    if (! $check['ok']) {
+                        throw new \RuntimeException($check['message'] ?? 'cannot_debit');
+                    }
+                    $newBal = round((float) $w->balance - $amount, 2);
+                    $w->balance = $newBal;
+                    $w->daily_transfer_total = round((float) $w->daily_transfer_total + $amount, 2);
+                    $w->daily_transfer_for_date = now()->toDateString();
+                }
                 if (! $w->hasPin()) {
                     throw new \RuntimeException('PIN not set.');
                 }
-                if (! $check['ok']) {
-                    throw new \RuntimeException($check['message'] ?? 'cannot_debit');
-                }
-                $newBal = round((float) $w->balance - $amount, 2);
-                $w->balance = $newBal;
-                $w->daily_transfer_total = round((float) $w->daily_transfer_total + $amount, 2);
-                $w->daily_transfer_for_date = now()->toDateString();
                 $w->pin_failed_attempts = 0;
                 $w->save();
 
@@ -476,6 +503,7 @@ class ConsumerWalletTransferService
                     'whatsapp_wallet_id' => $w->id,
                     'sender_name' => $w->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
+                    'ledger_scope' => $ledgerScope,
                     'amount' => $amount,
                     'balance_after' => $newBal,
                     'counterparty_account_number' => $acct,
@@ -499,11 +527,16 @@ class ConsumerWalletTransferService
             return ['ok' => false, 'message' => 'Could not record transfer.'];
         }
 
+        $walletFresh = $wallet->fresh();
+
         return [
             'ok' => true,
             'message' => 'Transfer recorded (ledger-only until live payouts are enabled).',
             'data' => [
-                'balance_after' => (float) $wallet->fresh()->balance,
+                'balance_after' => (float) ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+                    ? $walletFresh->business_balance
+                    : $walletFresh->balance),
+                'ledger_scope' => $ledgerScope,
                 'amount_debited' => $amount,
                 'payout_amount' => $isSelf ? $payoutAmount : $amount,
                 'self_transfer' => $isSelf,

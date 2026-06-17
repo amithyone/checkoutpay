@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\BusinessNameRegistration;
+use App\Models\Business;
 use App\Models\WhatsappCrossBorderFxRate;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
@@ -75,6 +76,7 @@ class WhatsappWalletAdminController extends Controller
             'transactions as p2p_count' => fn ($q) => $q->p2p(),
             'transactions as topups_count' => fn ($q) => $q->where('type', WhatsappWalletTransaction::TYPE_TOPUP),
         ]);
+        $wallet->load('linkedBusiness');
 
         $recentTx = $wallet->transactions()
             ->orderByDesc('id')
@@ -104,7 +106,23 @@ class WhatsappWalletAdminController extends Controller
             'pendingPayouts' => $pendingPayouts,
             'businessNameRegistrations' => $businessNameRegistrations,
             'businessNamePendingCount' => $businessNamePendingCount,
+            'linkableBusinesses' => Business::query()->orderBy('name')->limit(200)->get(['id', 'name', 'email']),
         ]);
+    }
+
+    public function linkBusiness(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        $validated = $request->validate([
+            'linked_business_id' => 'nullable|integer|exists:businesses,id',
+        ]);
+
+        $wallet->update([
+            'linked_business_id' => $validated['linked_business_id'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', 'Business wallet link updated.');
     }
 
     public function updateWalletStatus(Request $request, WhatsappWallet $wallet): RedirectResponse

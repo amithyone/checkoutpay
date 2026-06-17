@@ -264,6 +264,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('whatsapp-wallet/wallets', [WhatsappWalletAdminController::class, 'wallets'])->name('whatsapp-wallet.wallets.index');
             Route::get('whatsapp-wallet/wallets/{wallet}', [WhatsappWalletAdminController::class, 'showWallet'])->name('whatsapp-wallet.wallets.show');
             Route::put('whatsapp-wallet/wallets/{wallet}/status', [WhatsappWalletAdminController::class, 'updateWalletStatus'])->name('whatsapp-wallet.wallets.status');
+            Route::put('whatsapp-wallet/wallets/{wallet}/link-business', [WhatsappWalletAdminController::class, 'linkBusiness'])->name('whatsapp-wallet.wallets.link-business');
             Route::put('whatsapp-wallet/wallets/{wallet}/bot-pause', [WhatsappWalletAdminController::class, 'updateWalletBotPause'])->name('whatsapp-wallet.wallets.bot-pause');
             Route::get('business-name-registrations', [BusinessNameRegistrationAdminController::class, 'index'])->name('business-name-registrations.index');
             Route::get('business-name-registrations/{registration}', [BusinessNameRegistrationAdminController::class, 'show'])->name('business-name-registrations.show');

@@ -23,6 +23,7 @@ class WhatsappWallet extends Model
         'renter_id',
         'tier',
         'balance',
+        'business_balance',
         'daily_transfer_total',
         'daily_transfer_for_date',
         'pin_hash',
@@ -41,6 +42,7 @@ class WhatsappWallet extends Model
         'business_pay_in_bank_name',
         'business_pay_in_bank_code',
         'active_business_name_registration_id',
+        'linked_business_id',
         'tier2_provisioned_at',
         'kyc_fname',
         'kyc_lname',
@@ -64,6 +66,7 @@ class WhatsappWallet extends Model
 
     protected $casts = [
         'balance' => 'decimal:2',
+        'business_balance' => 'decimal:2',
         'daily_transfer_total' => 'decimal:2',
         'daily_transfer_for_date' => 'date',
         'pin_set_at' => 'datetime',
@@ -102,9 +105,40 @@ class WhatsappWallet extends Model
         return $this->belongsTo(BusinessNameRegistration::class, 'active_business_name_registration_id');
     }
 
+    public function linkedBusiness(): BelongsTo
+    {
+        return $this->belongsTo(Business::class, 'linked_business_id');
+    }
+
     public function hasBusinessPayIn(): bool
     {
         return trim((string) $this->business_pay_in_account_number) !== '';
+    }
+
+    /** Consumer app can use a separate business ledger (linked merchant and/or BNR receive VA). */
+    public function hasBusinessWallet(): bool
+    {
+        return $this->linked_business_id !== null
+            || $this->hasBusinessPayIn()
+            || (float) $this->business_balance > 0;
+    }
+
+    /**
+     * @return array{ok: bool, message?: string}
+     */
+    public function canDebitBusiness(float $amount): array
+    {
+        if (! $this->hasBusinessWallet()) {
+            return ['ok' => false, 'message' => 'Business wallet is not linked yet.'];
+        }
+        if ($amount <= 0) {
+            return ['ok' => false, 'message' => 'Invalid amount.'];
+        }
+        if ((float) $this->business_balance + 0.0001 < $amount) {
+            return ['ok' => false, 'message' => 'Insufficient business balance.'];
+        }
+
+        return ['ok' => true];
     }
 
     public function consumerApiAccount(): \Illuminate\Database\Eloquent\Relations\HasOne
