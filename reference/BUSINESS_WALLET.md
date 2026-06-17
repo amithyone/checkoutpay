@@ -27,8 +27,8 @@ Migrations:
 
 `business_pay_in` resolution (`ConsumerBusinessWalletLedgerService::resolveBusinessPayInPayload`):
 
-1. Wallet BNR fields (`business_pay_in_*`) after business name registration approval
-2. Else linked merchant Rubies VA (`businesses.rubies_business_account_*`) when `linked_business_id` is set
+1. Merchant **Permanent Account** on `businesses` (`rubies_business_account_*`) when the wallet is linked or the merchant phone matches the wallet phone
+2. Wallet BNR fields (`business_pay_in_*`) after business name registration approval
 | GET | `/api/v1/consumer/wallet/transactions?scope=` | `ConsumerWalletTransactionScope` filter |
 | POST | `/api/v1/consumer/transfers/bank` | `from_ledger=personal\|business` |
 

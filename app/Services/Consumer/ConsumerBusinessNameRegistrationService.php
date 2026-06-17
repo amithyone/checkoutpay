@@ -263,6 +263,9 @@ final class ConsumerBusinessNameRegistrationService
             'account_name' => trim((string) ($wallet->business_pay_in_account_name ?? '')) !== ''
                 ? (string) $wallet->business_pay_in_account_name
                 : null,
+            'business_name' => trim((string) ($wallet->business_pay_in_account_name ?? '')) !== ''
+                ? (string) $wallet->business_pay_in_account_name
+                : null,
             'bank_name' => trim((string) ($wallet->business_pay_in_bank_name ?? '')) !== ''
                 ? (string) $wallet->business_pay_in_bank_name
                 : null,
@@ -270,6 +273,7 @@ final class ConsumerBusinessNameRegistrationService
                 ? (string) $wallet->business_pay_in_bank_code
                 : null,
             'expires_at' => null,
+            'source' => 'business_name_registration',
         ];
     }
 

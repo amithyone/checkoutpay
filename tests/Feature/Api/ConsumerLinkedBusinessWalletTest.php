@@ -50,9 +50,49 @@ class ConsumerLinkedBusinessWalletTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.business_pay_in.account_number', '9988776655')
             ->assertJsonPath('data.business_pay_in.account_name', 'Switch Merchant Ltd')
+            ->assertJsonPath('data.business_pay_in.business_name', 'Switch Merchant Ltd')
             ->assertJsonPath('data.business_pay_in.bank_name', 'Rubies MFB')
+            ->assertJsonPath('data.business_pay_in.source', 'linked_merchant')
             ->assertJsonPath('data.business_balance', 250000)
             ->assertJsonPath('data.linked_business_name', 'Switch Merchant Ltd');
+    }
+
+    public function test_wallet_includes_phone_matched_merchant_permanent_account(): void
+    {
+        Business::create([
+            'name' => 'I Teach Globally Enterprises LTD',
+            'email' => 'iteach@example.com',
+            'password' => Hash::make('secret'),
+            'business_id' => '1RK9Z',
+            'phone' => '08088876785',
+            'balance' => 10000,
+            'rubies_business_account_number' => '1000004772',
+            'rubies_business_account_name' => 'I Teach Globally Enterprises LTD',
+            'rubies_business_bank_name' => 'Rubies MFB',
+            'rubies_business_bank_code' => '090175',
+        ]);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '2348088876785',
+            'balance' => 5000,
+            'pin_hash' => Hash::make('2468'),
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'sender_name' => 'Owner',
+        ]);
+
+        $account = ConsumerWalletApiAccount::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'phone_e164' => $wallet->phone_e164,
+        ]);
+
+        Sanctum::actingAs($account, ['consumer']);
+
+        $this->getJson('/api/v1/consumer/wallet')
+            ->assertOk()
+            ->assertJsonPath('data.business_pay_in.account_number', '1000004772')
+            ->assertJsonPath('data.business_pay_in.business_name', 'I Teach Globally Enterprises LTD')
+            ->assertJsonPath('data.business_pay_in.source', 'phone_matched');
     }
 
     public function test_rubies_deposit_appears_in_business_transaction_history(): void

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
+use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,15 +16,18 @@ class ConsumerBusinessNameRegistrationController extends Controller
     public function __construct(
         private ConsumerBusinessNameRegistrationService $registrations,
         private ConsumerWalletPinVerifier $pinVerifier,
+        private ConsumerBusinessWalletLedgerService $businessLedger,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $wallet = $this->walletFor($request);
+        $wallet = $this->walletFor($request)->fresh(['linkedBusiness']);
+        $data = $this->registrations->index($wallet);
+        $data['business_account'] = $this->businessLedger->resolveBusinessPayInPayload($wallet);
 
         return response()->json([
             'success' => true,
-            'data' => $this->registrations->index($wallet),
+            'data' => $data,
         ]);
     }
 

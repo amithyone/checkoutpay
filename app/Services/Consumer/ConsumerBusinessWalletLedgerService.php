@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\Payment;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Whatsapp\PhoneNormalizer;
 
 final class ConsumerBusinessWalletLedgerService
 {
@@ -15,18 +16,27 @@ final class ConsumerBusinessWalletLedgerService
 
     /**
      * Business receive bank details for the app Receive Funds screen.
-     * Prefers BNR wallet VA, then linked CheckoutPay merchant Rubies VA.
+     *
+     * Merchant KYC permanent account (admin “Permanent Account”, `businesses.rubies_business_account_*`)
+     * is preferred over BNR wallet fields.
      *
      * @return array<string, mixed>|null
      */
     public function resolveBusinessPayInPayload(WhatsappWallet $wallet): ?array
     {
-        $bnr = $this->businessNameRegistration->businessPayInPayload($wallet);
-        if ($bnr !== null) {
-            return $bnr;
+        if ($wallet->linked_business_id) {
+            $linkedPermanent = $this->merchantPermanentAccountPayload($this->linkedBusiness($wallet), 'linked_merchant');
+            if ($linkedPermanent !== null) {
+                return $linkedPermanent;
+            }
         }
 
-        return $this->linkedMerchantPayInPayload($wallet);
+        $phoneMatched = $this->phoneMatchedMerchantPermanentAccountPayload($wallet);
+        if ($phoneMatched !== null) {
+            return $phoneMatched;
+        }
+
+        return $this->businessNameRegistration->businessPayInPayload($wallet);
     }
 
     /** Keep wallet.business_balance aligned with linked merchant account for admin UI. */
@@ -270,11 +280,12 @@ final class ConsumerBusinessWalletLedgerService
     }
 
     /**
+     * Merchant permanent Rubies pay-in account (same fields as admin “Permanent Account”).
+     *
      * @return array<string, mixed>|null
      */
-    private function linkedMerchantPayInPayload(WhatsappWallet $wallet): ?array
+    private function merchantPermanentAccountPayload(?Business $business, string $source): ?array
     {
-        $business = $this->linkedBusiness($wallet);
         if ($business === null) {
             return null;
         }
@@ -288,11 +299,16 @@ final class ConsumerBusinessWalletLedgerService
         if ($accountName === '') {
             $accountName = trim((string) ($business->name ?? ''));
         }
+        $businessName = trim((string) ($business->name ?? ''));
+        if ($businessName === '') {
+            $businessName = $accountName;
+        }
 
         return [
             'kind' => 'permanent',
             'account_number' => $acct,
             'account_name' => $accountName !== '' ? $accountName : null,
+            'business_name' => $businessName !== '' ? $businessName : null,
             'bank_name' => trim((string) ($business->rubies_business_bank_name ?? '')) !== ''
                 ? (string) $business->rubies_business_bank_name
                 : null,
@@ -300,6 +316,57 @@ final class ConsumerBusinessWalletLedgerService
                 ? (string) $business->rubies_business_bank_code
                 : null,
             'expires_at' => null,
+            'source' => $source,
         ];
+    }
+
+    /**
+     * Find merchant permanent account by wallet phone when dashboard link is not set yet.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function phoneMatchedMerchantPermanentAccountPayload(WhatsappWallet $wallet): ?array
+    {
+        $walletPhone = PhoneNormalizer::digitsOnly((string) $wallet->phone_e164);
+        if ($walletPhone === null) {
+            return null;
+        }
+
+        $local11 = PhoneNormalizer::e164DigitsToNgLocal11($walletPhone);
+        $national10 = str_starts_with($walletPhone, '234') && strlen($walletPhone) === 13
+            ? substr($walletPhone, 3)
+            : null;
+        $phoneCandidates = array_values(array_unique(array_filter([
+            $walletPhone,
+            '+'.$walletPhone,
+            $local11,
+            $national10,
+            $national10 ? '0'.$national10 : null,
+        ])));
+
+        $baseQuery = Business::query()
+            ->where('is_active', true)
+            ->whereNotNull('rubies_business_account_number')
+            ->where('rubies_business_account_number', '!=', '')
+            ->whereIn('phone', $phoneCandidates);
+
+        if ($wallet->linked_business_id) {
+            $preferred = (clone $baseQuery)
+                ->whereKey($wallet->linked_business_id)
+                ->first();
+            if ($preferred !== null) {
+                return $this->merchantPermanentAccountPayload($preferred, 'linked_merchant');
+            }
+        }
+
+        $business = $baseQuery->orderByDesc('id')->first();
+        if ($business === null) {
+            return null;
+        }
+
+        return $this->merchantPermanentAccountPayload(
+            $business,
+            $wallet->linked_business_id ? 'linked_merchant' : 'phone_matched',
+        );
     }
 }
