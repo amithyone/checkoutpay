@@ -121,7 +121,9 @@ final class WhatsappCheckoutPayCodeSettlementService
                 $emailData['skip_auto_match'] = true;
                 $emailData['checkout_pay_code'] = $payment->checkout_pay_code;
                 $payment->email_data = $emailData;
-                $payment->payment_method_used = Payment::METHOD_WHATSAPP_WALLET;
+                if (Payment::tracksPaymentMethodUsed()) {
+                    $payment->payment_method_used = Payment::METHOD_WHATSAPP_WALLET;
+                }
                 $payment->payment_source = Payment::SOURCE_WHATSAPP_WALLET;
                 $payment->save();
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 
 class Payment extends Model
 {
@@ -114,6 +115,17 @@ class Payment extends Model
     const METHOD_BANK_TRANSFER = 'bank_transfer';
 
     const METHOD_WHATSAPP_WALLET = 'whatsapp_wallet';
+
+    public static function tracksPaymentMethodUsed(): bool
+    {
+        static $tracks = null;
+
+        if ($tracks === null) {
+            $tracks = Schema::hasColumn((new static)->getTable(), 'payment_method_used');
+        }
+
+        return $tracks;
+    }
 
     /**
      * Get pending payments
@@ -293,7 +305,7 @@ class Payment extends Model
             'mismatch_reason' => $mismatchReason,
         ];
 
-        if (empty($this->payment_method_used)) {
+        if (self::tracksPaymentMethodUsed() && empty($this->payment_method_used)) {
             $updateData['payment_method_used'] = self::METHOD_BANK_TRANSFER;
         }
 
@@ -315,7 +327,7 @@ class Payment extends Model
         }
 
         $updated = $this->update($updateData);
-        if ($updated && $this->checkout_pay_code && $this->payment_method_used !== self::METHOD_WHATSAPP_WALLET) {
+        if ($updated && self::tracksPaymentMethodUsed() && $this->checkout_pay_code && $this->payment_method_used !== self::METHOD_WHATSAPP_WALLET) {
             app(\App\Services\Whatsapp\WhatsappCheckoutPayCodeService::class)->invalidateCode($this->fresh());
         }
         if ($updated && $this->user_id) {
