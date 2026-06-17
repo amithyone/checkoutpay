@@ -190,7 +190,7 @@ class ConsumerWalletTransferService
                     'counterparty_account_name' => $sender->displayName(),
                     'meta' => array_merge(['channel' => 'consumer_api'], $fxMeta),
                 ]);
-            ]);
+            });
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.p2p_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
 
