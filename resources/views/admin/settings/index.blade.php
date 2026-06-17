@@ -998,4 +998,58 @@
         </form>
     </div>
 </div>
+
+<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">Savings (CheckoutNow)</h2>
+    <p class="text-sm text-gray-600 mb-4">
+        Locked savings: spend-to-save, goals, lock period, and maturity interest bonus.
+    </p>
+    <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+        @csrf
+        @method('PUT')
+        <input type="hidden" name="settings_section" value="savings">
+
+        <label class="inline-flex items-center text-sm">
+            <input type="hidden" name="savings_enabled" value="0">
+            <input type="checkbox" name="savings_enabled" value="1" class="mr-2 rounded"
+                {{ \App\Models\Setting::get('savings_enabled', true) ? 'checked' : '' }}>
+            Savings enabled (CheckoutNow)
+        </label>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+            <div>
+                <label for="savings_lock_days" class="block text-sm font-medium text-gray-700 mb-2">Lock period (days)</label>
+                <input type="number" min="1" max="3650" id="savings_lock_days" name="savings_lock_days"
+                    value="{{ \App\Models\Setting::get('savings_lock_days', 60) }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                <p class="mt-1 text-xs text-gray-500">Default ~2 months before funds unlock with interest.</p>
+            </div>
+            <div>
+                <label for="savings_interest_rate_percent" class="block text-sm font-medium text-gray-700 mb-2">Maturity interest (%)</label>
+                <input type="number" step="0.01" min="0" max="100" id="savings_interest_rate_percent" name="savings_interest_rate_percent"
+                    value="{{ \App\Models\Setting::get('savings_interest_rate_percent', 5) }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                <p class="mt-1 text-xs text-gray-500">Flat bonus on principal when lock matures.</p>
+            </div>
+            <div>
+                <label for="savings_default_spend_to_save_percent" class="block text-sm font-medium text-gray-700 mb-2">Default spend-to-save (%)</label>
+                <input type="number" step="0.01" min="0" max="100" id="savings_default_spend_to_save_percent" name="savings_default_spend_to_save_percent"
+                    value="{{ \App\Models\Setting::get('savings_default_spend_to_save_percent', 10) }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+            <div>
+                <label for="savings_max_spend_to_save_percent" class="block text-sm font-medium text-gray-700 mb-2">Max spend-to-save (%)</label>
+                <input type="number" step="0.01" min="0" max="100" id="savings_max_spend_to_save_percent" name="savings_max_spend_to_save_percent"
+                    value="{{ \App\Models\Setting::get('savings_max_spend_to_save_percent', 25) }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded-lg hover:bg-emerald-700 flex items-center">
+                <i class="fas fa-save mr-2"></i> Save Savings Settings
+            </button>
+        </div>
+    </form>
+</div>
 @endsection

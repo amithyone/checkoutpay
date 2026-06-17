@@ -151,6 +151,15 @@ Route::prefix('v1')->group(function () {
         Route::post('wallet/conversation', [ConsumerWalletConversationController::class, 'store']);
         Route::post('wallet/transfer/confirm-web-token', [ConsumerWalletApiController::class, 'confirmTransferWebToken']);
 
+        Route::get('savings', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'show']);
+        Route::put('savings/settings', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'updateSettings']);
+        Route::get('savings/goals', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'goals']);
+        Route::post('savings/goals', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'storeGoal']);
+        Route::patch('savings/goals/{goalId}', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'patchGoal']);
+        Route::post('savings/deposit', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'deposit']);
+        Route::post('savings/withdraw', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'withdraw']);
+        Route::get('savings/locks', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'locks']);
+
         Route::prefix('support')->group(function () {
             Route::get('options', [ConsumerSupportController::class, 'options'])
                 ->middleware('throttle:support-options');

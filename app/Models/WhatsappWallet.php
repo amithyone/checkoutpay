@@ -24,6 +24,8 @@ class WhatsappWallet extends Model
         'tier',
         'balance',
         'business_balance',
+        'savings_balance',
+        'flexible_savings_balance',
         'daily_transfer_total',
         'daily_transfer_for_date',
         'pin_hash',
@@ -67,6 +69,8 @@ class WhatsappWallet extends Model
     protected $casts = [
         'balance' => 'decimal:2',
         'business_balance' => 'decimal:2',
+        'savings_balance' => 'decimal:2',
+        'flexible_savings_balance' => 'decimal:2',
         'daily_transfer_total' => 'decimal:2',
         'daily_transfer_for_date' => 'date',
         'pin_set_at' => 'datetime',
@@ -152,6 +156,21 @@ class WhatsappWallet extends Model
     public function inactiveReminders(): HasMany
     {
         return $this->hasMany(WhatsappWalletInactiveReminder::class, 'whatsapp_wallet_id');
+    }
+
+    public function savingsSettings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(WalletSavingsSetting::class, 'whatsapp_wallet_id');
+    }
+
+    public function savingsGoals(): HasMany
+    {
+        return $this->hasMany(WalletSavingsGoal::class, 'whatsapp_wallet_id');
+    }
+
+    public function savingsLocks(): HasMany
+    {
+        return $this->hasMany(WalletSavingsLock::class, 'whatsapp_wallet_id');
     }
 
     /**

@@ -32,6 +32,7 @@ class ConsumerWalletTransferService
         private WhatsappWalletCountryResolver $walletCountry,
         private WhatsappWalletSelfBankTransferService $selfBankTransfer,
         private ConsumerBusinessWalletLedgerService $businessLedger,
+        private ConsumerWalletSavingsService $savings,
     ) {}
 
     private function evolutionInstance(): string
@@ -82,6 +83,14 @@ class ConsumerWalletTransferService
             if (! ($hold['ok'] ?? false)) {
                 return ['ok' => false, 'message' => (string) ($hold['message'] ?? 'Send failed.')];
             }
+            if (isset($hold['debit_transaction_id'])) {
+                $this->savings->applySpendToSave(
+                    $wallet->fresh(),
+                    $debitAmount,
+                    (int) $hold['debit_transaction_id'],
+                    'p2p_pending',
+                );
+            }
 
             return [
                 'ok' => true,
@@ -94,7 +103,8 @@ class ConsumerWalletTransferService
         }
 
         try {
-            DB::transaction(function () use ($wallet, $recipient, $debitAmount, $creditAmount, $phone, $senderCur, $recvCur, $isFx) {
+            $debitTransactionId = null;
+            DB::transaction(function () use ($wallet, $recipient, $debitAmount, $creditAmount, $phone, $senderCur, $recvCur, $isFx, &$debitTransactionId) {
                 $recvId = WhatsappWallet::query()->where('phone_e164', $recipient)->value('id');
                 $ids = array_values(array_unique(array_filter([$wallet->id, $recvId])));
                 if (count($ids) < 2) {
@@ -158,7 +168,7 @@ class ConsumerWalletTransferService
 
                 $recipientDisplayName = $recv->displayName();
 
-                WhatsappWalletTransaction::query()->create([
+                $debitTxn = WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $sender->id,
                     'sender_name' => $sender->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_P2P_DEBIT,
@@ -168,6 +178,7 @@ class ConsumerWalletTransferService
                     'counterparty_account_name' => $recipientDisplayName,
                     'meta' => array_merge(['channel' => 'consumer_api'], $fxMeta),
                 ]);
+                $debitTransactionId = $debitTxn->id;
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $recv->id,
@@ -179,7 +190,7 @@ class ConsumerWalletTransferService
                     'counterparty_account_name' => $sender->displayName(),
                     'meta' => array_merge(['channel' => 'consumer_api'], $fxMeta),
                 ]);
-            });
+            ]);
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.p2p_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
 
@@ -189,6 +200,10 @@ class ConsumerWalletTransferService
             }
 
             return ['ok' => false, 'message' => 'Send failed (limits or availability).'];
+        }
+
+        if ($debitTransactionId) {
+            $this->savings->applySpendToSave($wallet->fresh(), $debitAmount, $debitTransactionId, 'p2p');
         }
 
         $sentAt = now();
@@ -435,6 +450,10 @@ class ConsumerWalletTransferService
             : (float) $wallet->balance;
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL || $bucket === MavonPayTransferService::BUCKET_PENDING) {
+            if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_PERSONAL && $txnRow) {
+                $this->savings->applySpendToSave($wallet->fresh(), $amount, (int) $txnRow->id, 'bank_transfer');
+            }
+
             return [
                 'ok' => true,
                 'message' => $bucket === MavonPayTransferService::BUCKET_PENDING
@@ -543,6 +562,16 @@ class ConsumerWalletTransferService
         }
 
         $walletFresh = $wallet->fresh();
+        if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_PERSONAL) {
+            $txn = WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $wallet->id)
+                ->where('type', WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT)
+                ->orderByDesc('id')
+                ->first();
+            if ($txn) {
+                $this->savings->applySpendToSave($walletFresh, $amount, (int) $txn->id, 'bank_transfer_ledger');
+            }
+        }
 
         return [
             'ok' => true,

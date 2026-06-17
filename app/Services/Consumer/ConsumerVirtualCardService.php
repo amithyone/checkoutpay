@@ -360,6 +360,15 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => $this->debitFailureMessage($e, 'Could not debit wallet for card fee. Check balance and limits.')];
         }
 
+        $feeTxn = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('external_reference', $reference)
+            ->first();
+        if ($feeTxn) {
+            app(\App\Services\Consumer\ConsumerWalletSavingsService::class)
+                ->applySpendToSave($wallet->fresh(), $feeNgn, (int) $feeTxn->id, 'virtual_card_fee');
+        }
+
         $payload = [
             'amount' => $initialLoadUsd,
             'firstName' => $fname,
@@ -602,6 +611,15 @@ final class ConsumerVirtualCardService
                 'debit',
                 $reference,
             );
+
+            $topupTxn = WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $wallet->id)
+                ->where('external_reference', $reference)
+                ->first();
+            if ($topupTxn) {
+                app(\App\Services\Consumer\ConsumerWalletSavingsService::class)
+                    ->applySpendToSave($wallet->fresh(), $amountNgn, (int) $topupTxn->id, 'virtual_card_topup');
+            }
 
             return [
                 'ok' => true,

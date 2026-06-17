@@ -71,6 +71,27 @@ final class ConsumerWalletPushNotificationService
     }
 
     /**
+     * @param  array<string, string>  $data
+     */
+    public function notifyGeneric(WhatsappWallet $wallet, string $title, string $body, array $data = []): void
+    {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        $token = $this->resolveToken($wallet);
+        if ($token === null) {
+            return;
+        }
+
+        $this->send($token, $title, $body, array_merge([
+            'type' => 'generic',
+            'screen' => 'saving',
+            'wallet_id' => (string) $wallet->id,
+        ], $data));
+    }
+
+    /**
      * @param  array{debit_amount: float, debit_currency: string, credit_amount: float, credit_currency: string}|null  $crossBorderFx
      */
     public function notifyP2pReceived(

@@ -61,6 +61,7 @@ class WhatsappWalletVtuPurchaseService
             'vtu_data' => $api['data'] ?? null,
             'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
+        $this->maybeApplySpendToSave($wallet, $amount, isset($debited['transaction_id']) ? (int) $debited['transaction_id'] : null);
         $w = $wallet->fresh();
 
         return [
@@ -115,6 +116,7 @@ class WhatsappWalletVtuPurchaseService
             'vtu_data' => $api['data'] ?? null,
             'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
+        $this->maybeApplySpendToSave($wallet, $amount, isset($debited['transaction_id']) ? (int) $debited['transaction_id'] : null);
         $w = $wallet->fresh();
 
         return [
@@ -168,6 +170,7 @@ class WhatsappWalletVtuPurchaseService
             'vtu_data' => $api['data'] ?? null,
             'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
+        $this->maybeApplySpendToSave($wallet, $amount, isset($debited['transaction_id']) ? (int) $debited['transaction_id'] : null);
         $w = $wallet->fresh();
 
         return [
@@ -219,6 +222,7 @@ class WhatsappWalletVtuPurchaseService
             'vtu_data' => $api['data'] ?? null,
             'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
+        $this->maybeApplySpendToSave($wallet, $amount, isset($debited['transaction_id']) ? (int) $debited['transaction_id'] : null);
         $w = $wallet->fresh();
 
         return [
@@ -271,6 +275,7 @@ class WhatsappWalletVtuPurchaseService
             'vtu_data' => $api['data'] ?? null,
             'vtu_provider_reference' => $this->extractProviderReference($api),
         ]);
+        $this->maybeApplySpendToSave($wallet, $amount, isset($debited['transaction_id']) ? (int) $debited['transaction_id'] : null);
         $w = $wallet->fresh();
 
         return [
@@ -291,8 +296,9 @@ class WhatsappWalletVtuPurchaseService
         string $externalRef,
         array $metaBase
     ): array {
+        $transactionId = null;
         try {
-            DB::transaction(function () use ($wallet, $amount, $type, $externalRef, $metaBase) {
+            DB::transaction(function () use ($wallet, $amount, $type, $externalRef, $metaBase, &$transactionId) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -323,6 +329,10 @@ class WhatsappWalletVtuPurchaseService
                         'vtu_pending' => true,
                     ]),
                 ]);
+                $transactionId = (int) WhatsappWalletTransaction::query()
+                    ->where('external_reference', $externalRef)
+                    ->where('whatsapp_wallet_id', $w->id)
+                    ->value('id');
             });
         } catch (\Throwable $e) {
             Log::warning('whatsapp.wallet.vtu_debit_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
@@ -335,7 +345,17 @@ class WhatsappWalletVtuPurchaseService
             return ['ok' => false, 'message' => $msg];
         }
 
-        return ['ok' => true];
+        return ['ok' => true, 'transaction_id' => $transactionId];
+    }
+
+    private function maybeApplySpendToSave(WhatsappWallet $wallet, float $amount, ?int $transactionId): void
+    {
+        if ($transactionId === null) {
+            return;
+        }
+
+        app(\App\Services\Consumer\ConsumerWalletSavingsService::class)
+            ->applySpendToSave($wallet->fresh(), $amount, $transactionId, 'vtu');
     }
 
     private function refundDebit(int $walletId, string $externalRef, float $amount, string $reason): void

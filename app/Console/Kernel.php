@@ -34,6 +34,14 @@ class Kernel extends ConsoleKernel
         $schedule->command('business-loans:collect-due --frequency=monthly')
             ->monthlyOn(1, '07:30')
             ->withoutOverlapping(180);
+        $schedule->command('savings:process-maturities')
+            ->dailyAt('02:00')
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping(30);
+        $schedule->command('savings:send-reminders')
+            ->hourly()
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping(15);
     }
 
     /**

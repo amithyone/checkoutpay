@@ -25,6 +25,7 @@ class SettingsController extends Controller
             'charges' => 'Charge Settings',
             'vtu' => 'VTU (Pay Bills)',
             'virtual_card' => 'Dollar Virtual Card',
+            'savings' => 'Savings (CheckoutNow)',
         ];
 
         $settings = [];
@@ -313,6 +314,52 @@ class SettingsController extends Controller
             }
 
             app(\App\Services\Consumer\VirtualCardFxPublishService::class)->syncFromMevon();
+        }
+
+        if ($request->input('settings_section') === 'savings') {
+            $validated = $request->validate([
+                'savings_enabled' => 'nullable|boolean',
+                'savings_lock_days' => 'required|integer|min:1|max:3650',
+                'savings_interest_rate_percent' => 'required|numeric|min:0|max:100',
+                'savings_default_spend_to_save_percent' => 'required|numeric|min:0|max:100',
+                'savings_max_spend_to_save_percent' => 'required|numeric|min:0|max:100',
+            ]);
+
+            Setting::set(
+                'savings_enabled',
+                $request->boolean('savings_enabled') ? 1 : 0,
+                'boolean',
+                'savings',
+                'Enable Savings product in CheckoutNow app'
+            );
+            Setting::set(
+                'savings_lock_days',
+                $validated['savings_lock_days'],
+                'integer',
+                'savings',
+                'Minimum lock period before savings unlock (days)'
+            );
+            Setting::set(
+                'savings_interest_rate_percent',
+                $validated['savings_interest_rate_percent'],
+                'float',
+                'savings',
+                'Flat interest bonus paid at maturity (% of principal)'
+            );
+            Setting::set(
+                'savings_default_spend_to_save_percent',
+                $validated['savings_default_spend_to_save_percent'],
+                'float',
+                'savings',
+                'Default spend-to-save percentage for new users'
+            );
+            Setting::set(
+                'savings_max_spend_to_save_percent',
+                $validated['savings_max_spend_to_save_percent'],
+                'float',
+                'savings',
+                'Maximum spend-to-save percentage users can choose'
+            );
         }
 
         return redirect()->route('admin.settings.index')

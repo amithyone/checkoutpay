@@ -44,6 +44,15 @@ class WhatsappWalletTransaction extends Model
     /** Linked CheckoutPay merchant Rubies VA bank transfer in. */
     public const TYPE_BUSINESS_RUBIES_IN = 'business_rubies_in';
 
+    /** Personal savings lock (funds moved to locked savings balance). */
+    public const TYPE_SAVINGS_LOCK = 'savings_lock';
+
+    /** Savings maturity payout (principal + interest back to spendable balance). */
+    public const TYPE_SAVINGS_MATURITY = 'savings_maturity';
+
+    /** Flexible savings withdrawal back to spendable balance. */
+    public const TYPE_SAVINGS_WITHDRAW = 'savings_withdraw';
+
     /** @deprecated Use TYPE_PARTNER_MERCHANT_PAY; kept for existing rows. */
     public const TYPE_TAGINE_MERCHANT_PAY = 'tagine_merchant_pay';
 

@@ -16,6 +16,7 @@ use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
 use App\Services\Consumer\ConsumerWalletPayQrService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
+use App\Services\Consumer\ConsumerWalletSavingsService;
 use App\Services\Consumer\ConsumerWalletTransferService;
 use App\Services\MavonPayTransferService;
 use App\Contracts\Vtu\VtuProviderContract;
@@ -54,6 +55,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerBusinessNameRegistrationService $businessNameRegistration,
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private ConsumerBusinessActivityService $businessActivity,
+        private ConsumerWalletSavingsService $savings,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -171,6 +173,7 @@ class ConsumerWalletApiController extends Controller
         $e164 = (string) $wallet->phone_e164;
         $vtuEligible = $this->walletCountry->isNigeriaPayInWallet($e164);
         $vtuConfigured = $this->vtu()->isConfigured();
+        $savingsSummary = $this->savings->getSummary($wallet);
 
         return response()->json([
             'success' => true,
@@ -208,6 +211,9 @@ class ConsumerWalletApiController extends Controller
                 'notify_card_transaction_whatsapp' => $wallet->wantsCardTransactionWhatsapp(),
                 'card_notify_has_email' => $wallet->resolveOtpEmail() !== null,
                 'pay_code' => $payCode,
+                'savings_balance' => (float) ($wallet->savings_balance ?? 0),
+                'savings_enabled' => (bool) ($savingsSummary['product_enabled'] ?? false),
+                'savings_next_maturity_at' => $savingsSummary['next_maturity_at'] ?? null,
             ]),
         ]);
     }

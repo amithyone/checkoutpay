@@ -107,7 +107,7 @@ class WhatsappWalletPendingP2pService
                 $pending->sender_debit_transaction_id = $debitTxn->id;
                 $pending->save();
 
-                return ['sender' => $sender->fresh()];
+                return ['sender' => $sender->fresh(), 'debit_transaction_id' => $debitTxn->id];
             });
 
             $senderFresh = $result['sender'];
@@ -134,7 +134,11 @@ class WhatsappWalletPendingP2pService
                 );
             });
 
-            return ['ok' => true, 'expires_at' => null];
+            return [
+                'ok' => true,
+                'expires_at' => null,
+                'debit_transaction_id' => $result['debit_transaction_id'] ?? null,
+            ];
         } catch (\RuntimeException $e) {
             $code = $e->getMessage();
             Log::warning('whatsapp.wallet.p2p_pending_hold_failed', ['error' => $code, 'wallet_id' => $senderWallet->id]);
