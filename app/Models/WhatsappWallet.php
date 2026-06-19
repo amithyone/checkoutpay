@@ -248,6 +248,14 @@ class WhatsappWallet extends Model
         return ! $this->hasPin() || $this->normalizedSenderName() === null;
     }
 
+    /** True until first name, last name, and email are saved at registration. */
+    public function needsRegistrationProfile(): bool
+    {
+        return trim((string) $this->kyc_fname) === ''
+            || trim((string) $this->kyc_lname) === ''
+            || trim((string) $this->kyc_email) === '';
+    }
+
     public function isTier2(): bool
     {
         return (int) $this->tier >= self::TIER_RUBIES_VA;

@@ -8,6 +8,7 @@ use App\Models\WhatsappWallet;
 use App\Services\Consumer\ConsumerWalletOtpService;
 use App\Services\Consumer\ConsumerWalletPinRecoveryService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
+use App\Services\Consumer\ConsumerWalletRegistrationService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,8 @@ class ConsumerWalletAuthController extends Controller
                 'email_masked' => $result['email_masked'] ?? null,
                 'otp_blocked' => (bool) ($result['otp_blocked'] ?? false),
                 'has_pin' => (bool) ($result['has_pin'] ?? false),
+                'wallet_exists' => (bool) ($result['wallet_exists'] ?? false),
+                'needs_registration' => (bool) ($result['needs_registration'] ?? false),
             ],
         ]);
     }
@@ -45,11 +48,13 @@ class ConsumerWalletAuthController extends Controller
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'channel' => 'nullable|string|in:whatsapp,email',
+            'email' => 'nullable|email|max:255',
         ]);
 
         $result = $otp->requestOtp(
             (string) $request->input('phone'),
             (string) $request->input('channel', 'whatsapp'),
+            $request->input('email') ? (string) $request->input('email') : null,
         );
 
         return response()->json([
@@ -69,6 +74,28 @@ class ConsumerWalletAuthController extends Controller
             'code' => 'required|string|max:12',
         ]);
 
+        $checked = $otp->checkOtp((string) $request->input('phone'), (string) $request->input('code'));
+        if (! $checked['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $checked['message'],
+            ], 422);
+        }
+
+        $e164 = (string) $checked['phone_e164'];
+
+        $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
+        if (! $wallet || $wallet->needsRegistrationProfile()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complete registration to create your wallet.',
+                'data' => [
+                    'needs_registration' => true,
+                    'phone_e164' => $e164,
+                ],
+            ], 422);
+        }
+
         $verified = $otp->verifyOtp((string) $request->input('phone'), (string) $request->input('code'));
         if (! $verified['ok']) {
             return response()->json([
@@ -76,17 +103,6 @@ class ConsumerWalletAuthController extends Controller
                 'message' => $verified['message'],
             ], 422);
         }
-
-        $e164 = (string) $verified['phone_e164'];
-
-        $wallet = WhatsappWallet::query()->firstOrCreate(
-            ['phone_e164' => $e164],
-            [
-                'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
-                'balance' => 0,
-                'status' => WhatsappWallet::STATUS_ACTIVE,
-            ]
-        );
 
         $account = ConsumerWalletApiAccount::query()->firstOrNew(['phone_e164' => $e164]);
         $account->whatsapp_wallet_id = $wallet->id;
@@ -105,6 +121,53 @@ class ConsumerWalletAuthController extends Controller
                 'token_type' => 'Bearer',
                 'phone_e164' => $e164,
                 'wallet_id' => $wallet->id,
+            ],
+        ]);
+    }
+
+    public function register(Request $request, ConsumerWalletRegistrationService $registration): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'code' => 'required|string|max:12',
+            'fname' => 'required|string|min:2|max:128',
+            'lname' => 'required|string|min:2|max:128',
+            'email' => 'required|email|max:255',
+            'bvn' => 'nullable|string|regex:/^(\d{11})?$/',
+            'nin' => 'nullable|string|regex:/^(\d{11})?$/',
+            'dob' => 'nullable|date_format:Y-m-d',
+            'gender' => 'nullable|string|in:male,female,M,F,m,f',
+        ]);
+
+        $result = $registration->register(
+            (string) $request->input('phone'),
+            (string) $request->input('code'),
+            [
+                'fname' => (string) $request->input('fname'),
+                'lname' => (string) $request->input('lname'),
+                'email' => (string) $request->input('email'),
+                'bvn' => $request->input('bvn'),
+                'nin' => $request->input('nin'),
+                'dob' => $request->input('dob'),
+                'gender' => $request->input('gender'),
+            ],
+        );
+
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'data' => [
+                'token' => $result['token'],
+                'token_type' => $result['token_type'],
+                'phone_e164' => $result['phone_e164'],
+                'wallet_id' => $result['wallet_id'],
             ],
         ]);
     }

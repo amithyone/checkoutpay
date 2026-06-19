@@ -92,6 +92,7 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/otp/options', [ConsumerWalletAuthController::class, 'otpOptions']);
         Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
         Route::post('auth/otp/verify', [ConsumerWalletAuthController::class, 'verifyOtp']);
+        Route::post('auth/register', [ConsumerWalletAuthController::class, 'register']);
         Route::post('auth/pin/verify', [ConsumerWalletAuthController::class, 'verifyPin']);
         Route::post('auth/recovery/options', [ConsumerWalletAuthController::class, 'recoveryOptions']);
         Route::post('auth/recovery/verify-p2p', [ConsumerWalletAuthController::class, 'recoveryVerifyP2p']);

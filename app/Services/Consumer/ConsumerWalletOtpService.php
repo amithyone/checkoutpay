@@ -73,22 +73,26 @@ class ConsumerWalletOtpService
         $email = $wallet?->resolveOtpEmail();
         $emailEligible = $wallet?->isTier2() === true && $email !== null;
         $otpBlocked = $this->isOtpBlocked($e164);
+        $walletExists = $wallet !== null;
+        $needsRegistration = $wallet === null || $wallet->needsRegistrationProfile();
 
         return [
             'ok' => true,
             'message' => 'OK',
             'whatsapp' => ! $otpBlocked,
-            'email' => $emailEligible && ! $otpBlocked,
+            'email' => ($emailEligible || $needsRegistration) && ! $otpBlocked,
             'email_masked' => $emailEligible ? $this->maskEmail($email) : null,
             'otp_blocked' => $otpBlocked,
             'has_pin' => $wallet?->hasPin() ?? false,
+            'wallet_exists' => $walletExists,
+            'needs_registration' => $needsRegistration,
         ];
     }
 
     /**
-     * @return array{ok: bool, message: string, channel?: string}
+     * @return array{ok: bool, message: string, channel?: string, otp_blocked?: bool}
      */
-    public function requestOtp(string $phoneInput, string $channel = 'whatsapp'): array
+    public function requestOtp(string $phoneInput, string $channel = 'whatsapp', ?string $registrationEmail = null): array
     {
         $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
         if ($e164 === null) {
@@ -121,7 +125,17 @@ class ConsumerWalletOtpService
         if ($channel === 'email') {
             $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
             $email = $wallet?->resolveOtpEmail();
-            if (! $wallet?->isTier2() || $email === null) {
+            $needsRegistration = $wallet === null || $wallet->needsRegistrationProfile();
+
+            if ($needsRegistration) {
+                $registrationEmail = strtolower(trim((string) $registrationEmail));
+                if ($registrationEmail === '' || ! filter_var($registrationEmail, FILTER_VALIDATE_EMAIL)) {
+                    Cache::forget($this->otpKey($e164));
+
+                    return ['ok' => false, 'message' => 'Enter a valid email address to receive your code.'];
+                }
+                $email = $registrationEmail;
+            } elseif (! $wallet?->isTier2() || $email === null) {
                 Cache::forget($this->otpKey($e164));
 
                 return ['ok' => false, 'message' => 'Email OTP is only available for verified Tier 2 wallets with a KYC email.'];
@@ -147,7 +161,7 @@ class ConsumerWalletOtpService
 
             return [
                 'ok' => true,
-                'message' => 'OTP sent to your KYC email.',
+                'message' => $needsRegistration ? 'OTP sent to your email.' : 'OTP sent to your KYC email.',
                 'channel' => 'email',
             ];
         }
@@ -192,9 +206,11 @@ class ConsumerWalletOtpService
     }
 
     /**
+     * Validate OTP without consuming it (for registration hand-off).
+     *
      * @return array{ok: bool, message: string, phone_e164?: string}
      */
-    public function verifyOtp(string $phoneInput, string $code): array
+    public function checkOtp(string $phoneInput, string $code): array
     {
         $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
         if ($e164 === null) {
@@ -222,8 +238,22 @@ class ConsumerWalletOtpService
             return ['ok' => false, 'message' => 'Invalid OTP.'];
         }
 
+        return ['ok' => true, 'message' => 'Valid.', 'phone_e164' => $e164];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, phone_e164?: string}
+     */
+    public function verifyOtp(string $phoneInput, string $code): array
+    {
+        $checked = $this->checkOtp($phoneInput, $code);
+        if (! $checked['ok']) {
+            return $checked;
+        }
+
+        $e164 = (string) $checked['phone_e164'];
         Cache::forget($this->otpKey($e164));
-        Cache::forget($attemptsKey);
+        Cache::forget($this->attemptsKey($e164));
         $this->clearUnusedOtpSends($e164);
 
         return ['ok' => true, 'message' => 'Verified.', 'phone_e164' => $e164];
