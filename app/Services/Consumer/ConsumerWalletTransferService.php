@@ -104,7 +104,11 @@ class ConsumerWalletTransferService
 
         try {
             $debitTransactionId = null;
-            DB::transaction(function () use ($wallet, $recipient, $debitAmount, $creditAmount, $phone, $senderCur, $recvCur, $isFx, &$debitTransactionId) {
+            $creditTransactionId = null;
+            $creditAmountHook = null;
+            $recvBalanceBefore = null;
+            $recvBalanceAfter = null;
+            DB::transaction(function () use ($wallet, $recipient, $debitAmount, $creditAmount, $phone, $senderCur, $recvCur, $isFx, &$debitTransactionId, &$creditTransactionId, &$creditAmountHook, &$recvBalanceBefore, &$recvBalanceAfter) {
                 $recvId = WhatsappWallet::query()->where('phone_e164', $recipient)->value('id');
                 $ids = array_values(array_unique(array_filter([$wallet->id, $recvId])));
                 if (count($ids) < 2) {
@@ -148,7 +152,8 @@ class ConsumerWalletTransferService
                 }
 
                 $newSenderBal = round((float) $sender->balance - $debitAmount, 2);
-                $newRecvBal = round((float) $recv->balance + $creditAmount, 2);
+                $recvBalanceBefore = round((float) $recv->balance, 2);
+                $newRecvBal = round($recvBalanceBefore + $creditAmount, 2);
 
                 $sender->balance = $newSenderBal;
                 $sender->daily_transfer_total = round((float) $sender->daily_transfer_total + $debitAmount, 2);
@@ -180,7 +185,7 @@ class ConsumerWalletTransferService
                 ]);
                 $debitTransactionId = $debitTxn->id;
 
-                WhatsappWalletTransaction::query()->create([
+                $creditTxn = WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $recv->id,
                     'sender_name' => $sender->normalizedSenderName(),
                     'type' => WhatsappWalletTransaction::TYPE_P2P_CREDIT,
@@ -190,6 +195,9 @@ class ConsumerWalletTransferService
                     'counterparty_account_name' => $sender->displayName(),
                     'meta' => array_merge(['channel' => 'consumer_api'], $fxMeta),
                 ]);
+                $creditTransactionId = $creditTxn->id;
+                $creditAmountHook = $creditAmount;
+                $recvBalanceAfter = $newRecvBal;
             });
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.p2p_failed', ['error' => $e->getMessage(), 'wallet_id' => $wallet->id]);
@@ -206,8 +214,20 @@ class ConsumerWalletTransferService
             $this->savings->applySpendToSave($wallet->fresh(), $debitAmount, $debitTransactionId, 'p2p');
         }
 
-        $sentAt = now();
         $recvFresh = WhatsappWallet::query()->where('phone_e164', $recipient)->first();
+        if ($creditTransactionId && $recvFresh && $creditAmountHook !== null && $recvBalanceBefore !== null && $recvBalanceAfter !== null) {
+            $this->savings->handleIncomingCredit(
+                $recvFresh,
+                $creditAmountHook,
+                $creditTransactionId,
+                'p2p',
+                ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+                $recvBalanceBefore,
+                $recvBalanceAfter,
+            );
+        }
+
+        $sentAt = now();
         if ($recvFresh) {
             $crossBorderFx = $isFx ? [
                 'debit_amount' => $debitAmount,

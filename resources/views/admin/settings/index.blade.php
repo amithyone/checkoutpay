@@ -1043,6 +1043,24 @@
                     value="{{ \App\Models\Setting::get('savings_max_spend_to_save_percent', 25) }}"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg">
             </div>
+            <div>
+                <label for="savings_default_strict_save_percent" class="block text-sm font-medium text-gray-700 mb-2">Default strict save (%)</label>
+                <input type="number" step="0.01" min="0" max="100" id="savings_default_strict_save_percent" name="savings_default_strict_save_percent"
+                    value="{{ \App\Models\Setting::get('savings_default_strict_save_percent', 5) }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+            <div>
+                <label for="savings_max_strict_save_percent" class="block text-sm font-medium text-gray-700 mb-2">Max strict save (%)</label>
+                <input type="number" step="0.01" min="0" max="100" id="savings_max_strict_save_percent" name="savings_max_strict_save_percent"
+                    value="{{ \App\Models\Setting::get('savings_max_strict_save_percent', 25) }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
+            <div>
+                <label for="savings_flexible_completion_bonus_percent" class="block text-sm font-medium text-gray-700 mb-2">Flexible completion bonus (%)</label>
+                <input type="number" step="0.01" min="0" max="100" id="savings_flexible_completion_bonus_percent" name="savings_flexible_completion_bonus_percent"
+                    value="{{ \App\Models\Setting::get('savings_flexible_completion_bonus_percent', 2) }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+            </div>
         </div>
 
         <div class="flex justify-end">

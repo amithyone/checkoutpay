@@ -14,10 +14,13 @@ class ProcessSavingsMaturitiesCommand extends Command
     public function handle(ConsumerWalletSavingsService $savings): int
     {
         $result = $savings->processDueMaturities();
+        $bonusResult = $savings->processDueFlexibleBonuses();
         $this->info(sprintf(
-            'Processed %d maturities (%d failed).',
+            'Processed %d maturities (%d failed), %d flexible bonuses (%d failed).',
             $result['processed'],
             $result['failed'],
+            $bonusResult['processed'],
+            $bonusResult['failed'],
         ));
 
         return self::SUCCESS;

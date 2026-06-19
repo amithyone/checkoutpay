@@ -183,13 +183,16 @@ final class ConsumerBusinessWalletLedgerService
             $bank = trim((string) ($payment->bank ?? ''));
         }
 
-        WhatsappWalletTransaction::query()->create([
+        $balanceAfter = round((float) $business->balance, 2);
+        $balanceBefore = round($balanceAfter - $creditAmount, 2);
+
+        $txn = WhatsappWalletTransaction::query()->create([
             'whatsapp_wallet_id' => $wallet->id,
             'sender_name' => $wallet->normalizedSenderName(),
             'type' => WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN,
             'ledger_scope' => ConsumerWalletTransactionScope::SCOPE_BUSINESS,
             'amount' => $creditAmount,
-            'balance_after' => round((float) $business->balance, 2),
+            'balance_after' => $balanceAfter,
             'counterparty_account_name' => $sender !== '' ? $sender : null,
             'external_reference' => trim((string) ($payment->external_reference ?? '')) !== ''
                 ? (string) $payment->external_reference
@@ -207,6 +210,16 @@ final class ConsumerBusinessWalletLedgerService
                     : null,
             ], static fn ($v) => $v !== null && $v !== ''),
         ]);
+
+        app(ConsumerWalletSavingsService::class)->handleIncomingCredit(
+            $wallet->fresh(),
+            $creditAmount,
+            (int) $txn->id,
+            'business_rubies_in',
+            ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+            $balanceBefore,
+            $balanceAfter,
+        );
     }
 
     /**

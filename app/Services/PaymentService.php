@@ -6,6 +6,7 @@ use App\Models\AccountNumber;
 use App\Models\Business;
 use App\Models\BusinessWebsite;
 use App\Models\Payment;
+use App\Support\InternalPaymentWebhookUrl;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -256,11 +257,16 @@ class PaymentService
      * - else compare to business-level webhook_url when set;
      * - else explicit URL does not match any saved site webhook → error.
      * Empty webhook_url skips here (filled from DB later in createPayment).
+     * Platform-internal callback URLs (invoice/ticket/membership routes, /internal/*) also skip.
      */
     protected function assertIncomingWebhookMatchesConfiguredWebsite(array $data, Business $business, ?BusinessWebsite $websiteFromId): void
     {
         $explicit = isset($data['webhook_url']) ? trim((string) $data['webhook_url']) : '';
         if ($explicit === '') {
+            return;
+        }
+
+        if (InternalPaymentWebhookUrl::isInternal($explicit)) {
             return;
         }
 

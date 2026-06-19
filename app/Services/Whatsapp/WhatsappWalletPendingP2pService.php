@@ -248,7 +248,17 @@ class WhatsappWalletPendingP2pService
                 $senderDebitFromMeta = isset($pendingMeta['sender_debit_amount']) && is_numeric($pendingMeta['sender_debit_amount'])
                     ? (float) $pendingMeta['sender_debit_amount']
                     : null;
-                DB::afterCommit(function () use ($recv, $amount, $senderId, $evolutionInstance, $senderDebitFromMeta) {
+                DB::afterCommit(function () use ($recv, $amount, $senderId, $evolutionInstance, $senderDebitFromMeta, $creditTxn, $newBal) {
+                    app(\App\Services\Consumer\ConsumerWalletSavingsService::class)->handleIncomingCredit(
+                        $recv->fresh(),
+                        $amount,
+                        (int) $creditTxn->id,
+                        'p2p_pending',
+                        \App\Services\Consumer\ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+                        round($newBal - $amount, 2),
+                        $newBal,
+                    );
+
                     $sender = WhatsappWallet::query()->find($senderId);
                     if ($sender) {
                         $resolver = app(WhatsappWalletCountryResolver::class);

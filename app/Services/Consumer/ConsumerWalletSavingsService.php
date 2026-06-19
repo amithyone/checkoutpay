@@ -9,11 +9,14 @@ use App\Models\WalletSavingsSetting;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 final class ConsumerWalletSavingsService
 {
+    private const SAVINGS_TZ = 'Africa/Lagos';
+
     public function __construct(
         private ConsumerBusinessWalletLedgerService $businessLedger,
     ) {}
@@ -43,6 +46,21 @@ final class ConsumerWalletSavingsService
         return max(0.0, (float) Setting::get('savings_max_spend_to_save_percent', 25.0));
     }
 
+    public function maxStrictSavePercent(): float
+    {
+        return max(0.0, (float) Setting::get('savings_max_strict_save_percent', 25.0));
+    }
+
+    public function defaultStrictSavePercent(): float
+    {
+        return max(0.0, (float) Setting::get('savings_default_strict_save_percent', 5.0));
+    }
+
+    public function flexibleCompletionBonusPercent(): float
+    {
+        return max(0.0, (float) Setting::get('savings_flexible_completion_bonus_percent', 2.0));
+    }
+
     public function minDepositAmount(): float
     {
         return 1.0;
@@ -59,6 +77,11 @@ final class ConsumerWalletSavingsService
             'whatsapp_wallet_id' => $wallet->id,
             'spend_to_save_enabled' => false,
             'spend_to_save_percent' => $this->defaultSpendToSavePercent(),
+            'strict_save_enabled' => false,
+            'strict_save_percent' => $this->defaultStrictSavePercent(),
+            'strict_ledger_scope' => WalletSavingsGoal::LEDGER_PERSONAL,
+            'strict_collection_mode' => WalletSavingsSetting::COLLECTION_PER_INCOMING,
+            'strict_balance_threshold' => null,
             'reminder_enabled' => false,
             'reminder_frequency' => WalletSavingsSetting::FREQUENCY_OFF,
         ]);
@@ -108,7 +131,11 @@ final class ConsumerWalletSavingsService
             'lock_days' => $this->lockDays(),
             'interest_rate_percent' => $this->interestRatePercent(),
             'max_spend_to_save_percent' => $this->maxSpendToSavePercent(),
+            'max_strict_save_percent' => $this->maxStrictSavePercent(),
+            'remaining_strict_percent' => $this->remainingStrictSavePercent($wallet),
             'default_spend_to_save_percent' => $this->defaultSpendToSavePercent(),
+            'default_strict_save_percent' => $this->defaultStrictSavePercent(),
+            'flexible_completion_bonus_percent' => $this->flexibleCompletionBonusPercent(),
             'business_wallet_enabled' => $wallet->hasBusinessWallet(),
             'next_maturity_at' => $nextMaturity?->matures_at?->toIso8601String(),
             'settings' => $this->formatSettings($settings),
@@ -164,37 +191,123 @@ final class ConsumerWalletSavingsService
             $settings->reminder_hour_local = $hour === null ? null : max(0, min(23, (int) $hour));
         }
 
+        $maxStrict = $this->maxStrictSavePercent();
+        if (array_key_exists('strict_save_enabled', $payload)) {
+            $settings->strict_save_enabled = (bool) $payload['strict_save_enabled'];
+        }
+        if (array_key_exists('strict_save_percent', $payload)) {
+            $percent = round((float) $payload['strict_save_percent'], 2);
+            if ($percent < 0 || $percent > $maxStrict + 0.0001) {
+                return ['ok' => false, 'message' => 'Strict save percentage must be between 0 and '.$maxStrict.'.'];
+            }
+            $settings->strict_save_percent = $percent;
+        }
+        if (array_key_exists('strict_ledger_scope', $payload)) {
+            $scope = (string) $payload['strict_ledger_scope'];
+            if (! in_array($scope, [
+                WalletSavingsGoal::LEDGER_PERSONAL,
+                WalletSavingsGoal::LEDGER_BUSINESS,
+                WalletSavingsGoal::LEDGER_BOTH,
+            ], true)) {
+                return ['ok' => false, 'message' => 'Invalid strict ledger scope.'];
+            }
+            $settings->strict_ledger_scope = $scope;
+        }
+        if (array_key_exists('strict_collection_mode', $payload)) {
+            $mode = (string) $payload['strict_collection_mode'];
+            if (! in_array($mode, [
+                WalletSavingsSetting::COLLECTION_PER_INCOMING,
+                WalletSavingsSetting::COLLECTION_BALANCE_THRESHOLD,
+            ], true)) {
+                return ['ok' => false, 'message' => 'Invalid strict collection mode.'];
+            }
+            $settings->strict_collection_mode = $mode;
+        }
+        if (array_key_exists('strict_balance_threshold', $payload)) {
+            $threshold = $payload['strict_balance_threshold'];
+            $settings->strict_balance_threshold = $threshold === null ? null : max(0, round((float) $threshold, 2));
+        }
+
         $settings->save();
 
         return ['ok' => true, 'settings' => $this->formatSettings($settings->fresh())];
     }
 
     /**
+     * @param  array<string, mixed>  $payload
      * @return array{ok: bool, message?: string, goal?: array<string, mixed>}
      */
-    public function createGoal(WhatsappWallet $wallet, string $name, float $targetAmount): array
+    public function createGoal(WhatsappWallet $wallet, array $payload): array
     {
         if (! $this->isProductEnabled()) {
             return ['ok' => false, 'message' => 'Savings is not available right now.'];
         }
 
-        $name = trim($name);
-        if ($name === '' || mb_strlen($name) > 120) {
-            return ['ok' => false, 'message' => 'Enter a goal name (max 120 characters).'];
-        }
-        if ($targetAmount < 100) {
-            return ['ok' => false, 'message' => 'Target amount must be at least ₦100.'];
+        $parsed = $this->parseGoalPayload($payload);
+        if (! ($parsed['ok'] ?? false)) {
+            return $parsed;
         }
 
-        $goal = WalletSavingsGoal::query()->create([
-            'whatsapp_wallet_id' => $wallet->id,
-            'name' => $name,
-            'target_amount' => round($targetAmount, 2),
-            'saved_amount' => 0,
-            'status' => WalletSavingsGoal::STATUS_ACTIVE,
-        ]);
+        /** @var array<string, mixed> $data */
+        $data = $parsed['data'];
+
+        if ($data['save_type'] === WalletSavingsGoal::SAVE_TYPE_STRICT && ($data['auto_save_enabled'] ?? false)) {
+            $cap = $this->validateStrictPercentCap($wallet, (float) ($data['auto_save_percent'] ?? 0));
+            if (! ($cap['ok'] ?? false)) {
+                return $cap;
+            }
+        }
+
+        $data['whatsapp_wallet_id'] = $wallet->id;
+        $data['saved_amount'] = 0;
+        $data['status'] = WalletSavingsGoal::STATUS_ACTIVE;
+        $data['completion_bonus_percent'] = $data['save_type'] === WalletSavingsGoal::SAVE_TYPE_FLEXIBLE
+            ? $this->flexibleCompletionBonusPercent()
+            : null;
+
+        if ($data['save_type'] === WalletSavingsGoal::SAVE_TYPE_FLEXIBLE && $data['target_date'] !== null) {
+            $data['soft_lock_until'] = Carbon::parse($data['target_date'], self::SAVINGS_TZ)->endOfDay();
+        }
+
+        $goal = WalletSavingsGoal::query()->create($data);
 
         return ['ok' => true, 'goal' => $this->formatGoal($goal)];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function previewGoalPlan(array $input): array
+    {
+        $targetAmount = round((float) ($input['target_amount'] ?? 0), 2);
+        $savedAmount = round((float) ($input['saved_amount'] ?? 0), 2);
+        $saveType = (string) ($input['save_type'] ?? WalletSavingsGoal::SAVE_TYPE_FLEXIBLE);
+        $targetDate = $this->resolveTargetDate($input);
+        $pace = $this->computeGoalPace(
+            $targetAmount,
+            $savedAmount,
+            $targetDate,
+            isset($input['created_at']) ? Carbon::parse($input['created_at'], self::SAVINGS_TZ) : $this->savingsNow(),
+        );
+
+        return [
+            'save_type' => $saveType,
+            'target_amount' => $targetAmount,
+            'saved_amount' => $savedAmount,
+            'target_date' => $targetDate?->toDateString(),
+            'duration_days' => $pace['duration_days'],
+            'pace' => $pace,
+            'projected_maturity_at' => $saveType === WalletSavingsGoal::SAVE_TYPE_STRICT
+                ? $targetDate?->copy()->endOfDay()->toIso8601String()
+                : null,
+            'flexible_completion_bonus_percent' => $saveType === WalletSavingsGoal::SAVE_TYPE_FLEXIBLE
+                ? $this->flexibleCompletionBonusPercent()
+                : null,
+            'strict_interest_rate_percent' => $saveType === WalletSavingsGoal::SAVE_TYPE_STRICT
+                ? $this->interestRatePercent()
+                : null,
+        ];
     }
 
     /**
@@ -231,6 +344,72 @@ final class ConsumerWalletSavingsService
                 return ['ok' => false, 'message' => 'Invalid goal status.'];
             }
             $goal->status = $status;
+        }
+        if (array_key_exists('save_type', $payload)) {
+            $saveType = (string) $payload['save_type'];
+            if (! in_array($saveType, [WalletSavingsGoal::SAVE_TYPE_FLEXIBLE, WalletSavingsGoal::SAVE_TYPE_STRICT], true)) {
+                return ['ok' => false, 'message' => 'Invalid save type.'];
+            }
+            $goal->save_type = $saveType;
+        }
+        if (array_key_exists('target_date', $payload) || array_key_exists('duration_days', $payload)) {
+            $targetDate = $this->resolveTargetDate(array_merge($goal->toArray(), $payload));
+            $goal->target_date = $targetDate;
+            $goal->duration_days = isset($payload['duration_days']) ? max(1, (int) $payload['duration_days']) : $goal->duration_days;
+            if ($goal->isFlexible() && $targetDate !== null) {
+                $goal->soft_lock_until = $targetDate->copy()->timezone(self::SAVINGS_TZ)->endOfDay();
+            }
+        }
+        if (array_key_exists('collection_mode', $payload)) {
+            $mode = (string) $payload['collection_mode'];
+            if (! in_array($mode, [
+                WalletSavingsGoal::COLLECTION_MANUAL,
+                WalletSavingsGoal::COLLECTION_PER_INCOMING,
+                WalletSavingsGoal::COLLECTION_BALANCE_THRESHOLD,
+            ], true)) {
+                return ['ok' => false, 'message' => 'Invalid collection mode.'];
+            }
+            $goal->collection_mode = $mode;
+        }
+        if (array_key_exists('auto_save_percent', $payload)) {
+            $percent = round((float) $payload['auto_save_percent'], 2);
+            $maxStrict = $this->maxStrictSavePercent();
+            if ($percent < 0 || $percent > $maxStrict + 0.0001) {
+                return ['ok' => false, 'message' => 'Auto-save percentage must be between 0 and '.$maxStrict.'.'];
+            }
+            $goal->auto_save_percent = $percent;
+        }
+        if (array_key_exists('balance_threshold', $payload)) {
+            $threshold = $payload['balance_threshold'];
+            $goal->balance_threshold = $threshold === null ? null : max(0, round((float) $threshold, 2));
+        }
+        if (array_key_exists('ledger_scope', $payload)) {
+            $scope = (string) $payload['ledger_scope'];
+            if (! in_array($scope, [
+                WalletSavingsGoal::LEDGER_PERSONAL,
+                WalletSavingsGoal::LEDGER_BUSINESS,
+                WalletSavingsGoal::LEDGER_BOTH,
+            ], true)) {
+                return ['ok' => false, 'message' => 'Invalid ledger scope.'];
+            }
+            $goal->ledger_scope = $scope;
+        }
+        if (array_key_exists('auto_save_enabled', $payload)) {
+            $goal->auto_save_enabled = (bool) $payload['auto_save_enabled'];
+        }
+
+        $isStrictActive = $goal->save_type === WalletSavingsGoal::SAVE_TYPE_STRICT
+            && $goal->status === WalletSavingsGoal::STATUS_ACTIVE
+            && $goal->auto_save_enabled;
+        if ($isStrictActive) {
+            $cap = $this->validateStrictPercentCap(
+                $wallet,
+                (float) ($goal->auto_save_percent ?? 0),
+                (int) $goal->id,
+            );
+            if (! ($cap['ok'] ?? false)) {
+                return $cap;
+            }
         }
 
         $goal->save();
@@ -269,7 +448,11 @@ final class ConsumerWalletSavingsService
         }
 
         if ($sourceTransactionId !== null) {
-            $exists = WalletSavingsLock::query()->where('source_transaction_id', $sourceTransactionId)->exists();
+            $exists = WalletSavingsLock::query()
+                ->where('source_transaction_id', $sourceTransactionId)
+                ->when($goalId !== null, fn ($q) => $q->where('wallet_savings_goal_id', $goalId))
+                ->when($goalId === null, fn ($q) => $q->whereNull('wallet_savings_goal_id'))
+                ->exists();
             if ($exists) {
                 return ['ok' => true, 'message' => 'Already saved for this transaction.'];
             }
@@ -303,9 +486,9 @@ final class ConsumerWalletSavingsService
 
                 $balanceAfterSpendable = $this->debitForSavings($w, $amount, $ledgerScope);
 
-                $now = now();
+                $now = $this->savingsNow();
                 $rate = $isFlexible ? 0.0 : $this->interestRatePercent();
-                $maturesAt = $isFlexible ? null : $now->copy()->addDays($this->lockDays());
+                $maturesAt = $isFlexible ? null : $this->resolveMaturityDate($goal, $now);
 
                 if ($isFlexible) {
                     $w->flexible_savings_balance = round((float) $w->flexible_savings_balance + $amount, 2);
@@ -313,6 +496,11 @@ final class ConsumerWalletSavingsService
                     $w->savings_balance = round((float) $w->savings_balance + $amount, 2);
                 }
                 $w->save();
+
+                $lockDaysMeta = null;
+                if (! $isFlexible && $maturesAt !== null) {
+                    $lockDaysMeta = max(1, $now->diffInDays($maturesAt));
+                }
 
                 $txn = WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $w->id,
@@ -326,12 +514,18 @@ final class ConsumerWalletSavingsService
                         'savings_source' => $source,
                         'lock_type' => $lockType,
                         'ledger_scope' => $ledgerScope,
-                        'lock_days' => $isFlexible ? null : $this->lockDays(),
+                        'lock_days' => $lockDaysMeta,
                         'interest_rate_percent' => $rate,
                         'matures_at' => $maturesAt?->toIso8601String(),
                         'goal_id' => $goal?->id,
                     ],
                 ]);
+
+                $lockMeta = ['wallet_transaction_id' => $txn->id];
+                if ($isFlexible && $goal !== null && $goal->target_date !== null) {
+                    $lockMeta['soft_lock_until'] = $goal->soft_lock_until?->toIso8601String();
+                    $lockMeta['completion_bonus_percent'] = (float) ($goal->completion_bonus_percent ?? 0);
+                }
 
                 $lock = WalletSavingsLock::query()->create([
                     'whatsapp_wallet_id' => $w->id,
@@ -345,7 +539,7 @@ final class ConsumerWalletSavingsService
                     'locked_at' => $now,
                     'matures_at' => $maturesAt,
                     'status' => WalletSavingsLock::STATUS_ACTIVE,
-                    'meta' => ['wallet_transaction_id' => $txn->id],
+                    'meta' => $lockMeta,
                 ]);
 
                 if ($goal) {
@@ -431,6 +625,7 @@ final class ConsumerWalletSavingsService
                 }
 
                 $creditsByScope = [];
+                $forfeitedBonus = false;
                 foreach ($locks as $lock) {
                     if ($remaining <= 0) {
                         break;
@@ -439,6 +634,13 @@ final class ConsumerWalletSavingsService
                     $scope = ConsumerWalletTransactionScope::normalize((string) $lock->ledger_scope);
                     $creditsByScope[$scope] = ($creditsByScope[$scope] ?? 0) + $take;
 
+                    $lockMeta = is_array($lock->meta) ? $lock->meta : [];
+                    $softUntil = isset($lockMeta['soft_lock_until']) ? Carbon::parse($lockMeta['soft_lock_until']) : null;
+                    if ($softUntil !== null && $softUntil->isFuture()) {
+                        $lockMeta['forfeited_bonus'] = true;
+                        $forfeitedBonus = true;
+                    }
+
                     $newLockAmount = round((float) $lock->amount - $take, 2);
                     if ($newLockAmount <= 0) {
                         $lock->status = WalletSavingsLock::STATUS_WITHDRAWN;
@@ -446,7 +648,15 @@ final class ConsumerWalletSavingsService
                     } else {
                         $lock->amount = $newLockAmount;
                     }
+                    $lock->meta = $lockMeta;
                     $lock->save();
+
+                    if ($forfeitedBonus && $lock->wallet_savings_goal_id) {
+                        WalletSavingsGoal::query()
+                            ->where('id', $lock->wallet_savings_goal_id)
+                            ->where('completion_bonus_paid', false)
+                            ->update(['completion_bonus_paid' => true]);
+                    }
 
                     $remaining = round($remaining - $take, 2);
                 }
@@ -481,17 +691,24 @@ final class ConsumerWalletSavingsService
                     'amount' => $amount,
                     'ledger_scope' => $primaryScope ?? ConsumerWalletTransactionScope::SCOPE_PERSONAL,
                     'balance_after' => $balanceAfter,
+                    'forfeited_bonus' => $forfeitedBonus,
                 ];
             });
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }
 
+        $message = 'Flexible savings withdrawn to your wallet.';
+        if ($result['forfeited_bonus'] ?? false) {
+            $message = 'Withdrawn early — completion bonus forfeited.';
+        }
+
         return [
             'ok' => true,
-            'message' => 'Flexible savings withdrawn to your wallet.',
+            'message' => $message,
             'amount' => $result['amount'],
             'ledger_scope' => $result['ledger_scope'],
+            'forfeited_bonus' => (bool) ($result['forfeited_bonus'] ?? false),
         ];
     }
 
@@ -594,6 +811,268 @@ final class ConsumerWalletSavingsService
                 'message' => $result['message'] ?? 'unknown',
             ]);
         }
+    }
+
+    public function handleIncomingCredit(
+        WhatsappWallet $wallet,
+        float $creditAmount,
+        int $sourceTransactionId,
+        string $sourceType,
+        string $ledgerScope,
+        float $balanceBefore,
+        float $balanceAfter,
+    ): void {
+        if ($creditAmount <= 0) {
+            return;
+        }
+
+        if (in_array($sourceType, ['savings_maturity', 'savings_withdraw', 'savings_lock'], true)) {
+            return;
+        }
+
+        $sourceTxn = WhatsappWalletTransaction::query()->find($sourceTransactionId);
+        if ($sourceTxn !== null && $sourceTxn->type === WhatsappWalletTransaction::TYPE_SAVINGS_MATURITY) {
+            return;
+        }
+
+        $this->applySaveOnIncoming($wallet, $creditAmount, $sourceTransactionId, $sourceType, $ledgerScope);
+        $this->applyBalanceThresholdSave($wallet, $creditAmount, $sourceTransactionId, $ledgerScope, $balanceAfter);
+    }
+
+    public function applySaveOnIncoming(
+        WhatsappWallet $wallet,
+        float $creditAmount,
+        int $sourceTransactionId,
+        string $sourceType,
+        string $ledgerScope,
+    ): void {
+        if (! $this->isProductEnabled() || $creditAmount <= 0) {
+            return;
+        }
+
+        $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+        $goals = WalletSavingsGoal::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('status', WalletSavingsGoal::STATUS_ACTIVE)
+            ->where('save_type', WalletSavingsGoal::SAVE_TYPE_STRICT)
+            ->where('auto_save_enabled', true)
+            ->where('collection_mode', WalletSavingsGoal::COLLECTION_PER_INCOMING)
+            ->get();
+
+        foreach ($goals as $goal) {
+            if (! $this->goalLedgerScopeMatches($goal, $ledgerScope)) {
+                continue;
+            }
+
+            $percent = (float) ($goal->auto_save_percent ?? 0);
+            if ($percent <= 0) {
+                continue;
+            }
+
+            $saveAmount = round($creditAmount * ($percent / 100), 2);
+            if ($saveAmount < $this->minDepositAmount()) {
+                continue;
+            }
+
+            $fresh = $wallet->fresh();
+            $available = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+                ? $this->businessLedger->resolvedBalance($fresh)
+                : (float) $fresh->balance;
+            if ($available + 0.0001 < $saveAmount) {
+                continue;
+            }
+
+            $result = $this->lockDeposit(
+                $fresh,
+                $saveAmount,
+                WalletSavingsLock::SOURCE_INCOMING,
+                (int) $goal->id,
+                $sourceTransactionId,
+                WalletSavingsLock::LOCK_TYPE_LOCKED,
+                $ledgerScope,
+            );
+
+            if (! ($result['ok'] ?? false) && ($result['message'] ?? '') !== 'Already saved for this transaction.') {
+                Log::info('consumer_savings.incoming_skipped', [
+                    'wallet_id' => $wallet->id,
+                    'goal_id' => $goal->id,
+                    'source_transaction_id' => $sourceTransactionId,
+                    'source_type' => $sourceType,
+                    'message' => $result['message'] ?? 'unknown',
+                ]);
+            }
+        }
+    }
+
+    public function applyBalanceThresholdSave(
+        WhatsappWallet $wallet,
+        float $creditAmount,
+        int $sourceTransactionId,
+        string $ledgerScope,
+        float $balanceAfter,
+    ): void {
+        if (! $this->isProductEnabled() || $creditAmount <= 0) {
+            return;
+        }
+
+        $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+        $goals = WalletSavingsGoal::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('status', WalletSavingsGoal::STATUS_ACTIVE)
+            ->where('save_type', WalletSavingsGoal::SAVE_TYPE_STRICT)
+            ->where('auto_save_enabled', true)
+            ->where('collection_mode', WalletSavingsGoal::COLLECTION_BALANCE_THRESHOLD)
+            ->whereNotNull('balance_threshold')
+            ->get();
+
+        foreach ($goals as $goal) {
+            if (! $this->goalLedgerScopeMatches($goal, $ledgerScope)) {
+                continue;
+            }
+
+            $threshold = (float) $goal->balance_threshold;
+            if ($threshold <= 0 || $balanceAfter + 0.0001 < $threshold) {
+                continue;
+            }
+
+            $percent = (float) ($goal->auto_save_percent ?? 0);
+            if ($percent <= 0) {
+                continue;
+            }
+
+            $saveAmount = round($creditAmount * ($percent / 100), 2);
+            if ($saveAmount < $this->minDepositAmount()) {
+                continue;
+            }
+
+            $fresh = $wallet->fresh();
+            $available = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+                ? $this->businessLedger->resolvedBalance($fresh)
+                : (float) $fresh->balance;
+            if ($available + 0.0001 < $saveAmount) {
+                continue;
+            }
+
+            $result = $this->lockDeposit(
+                $fresh,
+                $saveAmount,
+                WalletSavingsLock::SOURCE_BALANCE_THRESHOLD,
+                (int) $goal->id,
+                $sourceTransactionId,
+                WalletSavingsLock::LOCK_TYPE_LOCKED,
+                $ledgerScope,
+            );
+
+            if (! ($result['ok'] ?? false) && ($result['message'] ?? '') !== 'Already saved for this transaction.') {
+                Log::info('consumer_savings.threshold_skipped', [
+                    'wallet_id' => $wallet->id,
+                    'goal_id' => $goal->id,
+                    'source_transaction_id' => $sourceTransactionId,
+                    'message' => $result['message'] ?? 'unknown',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @return array{processed: int, failed: int}
+     */
+    public function processDueFlexibleBonuses(): array
+    {
+        $processed = 0;
+        $failed = 0;
+
+        WalletSavingsGoal::query()
+            ->where('save_type', WalletSavingsGoal::SAVE_TYPE_FLEXIBLE)
+            ->where('status', WalletSavingsGoal::STATUS_ACTIVE)
+            ->where('completion_bonus_paid', false)
+            ->whereNotNull('soft_lock_until')
+            ->where('soft_lock_until', '<=', now())
+            ->where('completion_bonus_percent', '>', 0)
+            ->chunkById(50, function ($goals) use (&$processed, &$failed) {
+                foreach ($goals as $goal) {
+                    try {
+                        if ($this->payFlexibleCompletionBonus($goal)) {
+                            $processed++;
+                        }
+                    } catch (\Throwable $e) {
+                        $failed++;
+                        Log::error('consumer_savings.flexible_bonus_failed', [
+                            'goal_id' => $goal->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            });
+
+        return ['processed' => $processed, 'failed' => $failed];
+    }
+
+    public function payFlexibleCompletionBonus(WalletSavingsGoal $goal): bool
+    {
+        return (bool) DB::transaction(function () use ($goal) {
+            $row = WalletSavingsGoal::query()->lockForUpdate()->find($goal->id);
+            if (! $row || $row->completion_bonus_paid || ! $row->isFlexible()) {
+                return false;
+            }
+            if ($row->soft_lock_until === null || $row->soft_lock_until->isFuture()) {
+                return false;
+            }
+
+            $flexibleTotal = (float) WalletSavingsLock::query()
+                ->where('wallet_savings_goal_id', $row->id)
+                ->where('status', WalletSavingsLock::STATUS_ACTIVE)
+                ->where('lock_type', WalletSavingsLock::LOCK_TYPE_FLEXIBLE)
+                ->sum('amount');
+
+            if ($flexibleTotal <= 0) {
+                $row->completion_bonus_paid = true;
+                $row->save();
+
+                return false;
+            }
+
+            $bonus = round($flexibleTotal * ((float) $row->completion_bonus_percent / 100), 2);
+            if ($bonus <= 0) {
+                $row->completion_bonus_paid = true;
+                $row->save();
+
+                return false;
+            }
+
+            $w = WhatsappWallet::query()->lockForUpdate()->find($row->whatsapp_wallet_id);
+            if (! $w) {
+                return false;
+            }
+
+            $ledgerScope = ConsumerWalletTransactionScope::normalize((string) ($row->ledger_scope ?? WalletSavingsGoal::LEDGER_PERSONAL));
+            if ($ledgerScope === WalletSavingsGoal::LEDGER_BOTH) {
+                $ledgerScope = ConsumerWalletTransactionScope::SCOPE_PERSONAL;
+            }
+
+            $w->flexible_savings_balance = round((float) $w->flexible_savings_balance + $bonus, 2);
+            $w->save();
+
+            WalletSavingsLock::query()->create([
+                'whatsapp_wallet_id' => $w->id,
+                'wallet_savings_goal_id' => $row->id,
+                'source' => WalletSavingsLock::SOURCE_GOAL,
+                'lock_type' => WalletSavingsLock::LOCK_TYPE_FLEXIBLE,
+                'ledger_scope' => $ledgerScope,
+                'amount' => $bonus,
+                'interest_rate_percent' => 0,
+                'locked_at' => now(),
+                'matures_at' => null,
+                'status' => WalletSavingsLock::STATUS_ACTIVE,
+                'meta' => ['completion_bonus' => true],
+            ]);
+
+            $row->saved_amount = round((float) $row->saved_amount + $bonus, 2);
+            $row->completion_bonus_paid = true;
+            $row->save();
+
+            return true;
+        });
     }
 
     /**
@@ -794,6 +1273,13 @@ final class ConsumerWalletSavingsService
         return [
             'spend_to_save_enabled' => (bool) $settings->spend_to_save_enabled,
             'spend_to_save_percent' => (float) $settings->spend_to_save_percent,
+            'strict_save_enabled' => (bool) ($settings->strict_save_enabled ?? false),
+            'strict_save_percent' => (float) ($settings->strict_save_percent ?? $this->defaultStrictSavePercent()),
+            'strict_ledger_scope' => (string) ($settings->strict_ledger_scope ?? WalletSavingsGoal::LEDGER_PERSONAL),
+            'strict_collection_mode' => (string) ($settings->strict_collection_mode ?? WalletSavingsSetting::COLLECTION_PER_INCOMING),
+            'strict_balance_threshold' => $settings->strict_balance_threshold !== null
+                ? (float) $settings->strict_balance_threshold
+                : null,
             'reminder_enabled' => (bool) $settings->reminder_enabled,
             'reminder_frequency' => (string) $settings->reminder_frequency,
             'reminder_weekday' => $settings->reminder_weekday,
@@ -808,6 +1294,7 @@ final class ConsumerWalletSavingsService
     {
         $target = (float) $goal->target_amount;
         $saved = (float) $goal->saved_amount;
+        $pace = $this->computeGoalPace($target, $saved, $goal->target_date, $goal->created_at);
 
         return [
             'id' => $goal->id,
@@ -816,8 +1303,251 @@ final class ConsumerWalletSavingsService
             'saved_amount' => $saved,
             'progress_percent' => $target > 0 ? min(100, round(($saved / $target) * 100, 1)) : 0,
             'status' => $goal->status,
+            'save_type' => $goal->save_type ?? WalletSavingsGoal::SAVE_TYPE_FLEXIBLE,
+            'target_date' => $goal->target_date?->toDateString(),
+            'duration_days' => $goal->duration_days,
+            'collection_mode' => $goal->collection_mode ?? WalletSavingsGoal::COLLECTION_MANUAL,
+            'auto_save_percent' => $goal->auto_save_percent !== null ? (float) $goal->auto_save_percent : null,
+            'balance_threshold' => $goal->balance_threshold !== null ? (float) $goal->balance_threshold : null,
+            'ledger_scope' => $goal->ledger_scope ?? WalletSavingsGoal::LEDGER_PERSONAL,
+            'auto_save_enabled' => (bool) ($goal->auto_save_enabled ?? false),
+            'soft_lock_until' => $goal->soft_lock_until?->toIso8601String(),
+            'completion_bonus_percent' => $goal->completion_bonus_percent !== null
+                ? (float) $goal->completion_bonus_percent
+                : null,
+            'completion_bonus_paid' => (bool) ($goal->completion_bonus_paid ?? false),
+            'pace' => $pace,
             'created_at' => $goal->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, message?: string, data?: array<string, mixed>}
+     */
+    private function parseGoalPayload(array $payload): array
+    {
+        $name = trim((string) ($payload['name'] ?? ''));
+        if ($name === '' || mb_strlen($name) > 120) {
+            return ['ok' => false, 'message' => 'Enter a goal name (max 120 characters).'];
+        }
+
+        $targetAmount = round((float) ($payload['target_amount'] ?? 0), 2);
+        if ($targetAmount < 100) {
+            return ['ok' => false, 'message' => 'Target amount must be at least ₦100.'];
+        }
+
+        $saveType = (string) ($payload['save_type'] ?? WalletSavingsGoal::SAVE_TYPE_FLEXIBLE);
+        if (! in_array($saveType, [WalletSavingsGoal::SAVE_TYPE_FLEXIBLE, WalletSavingsGoal::SAVE_TYPE_STRICT], true)) {
+            return ['ok' => false, 'message' => 'Invalid save type.'];
+        }
+
+        $targetDate = $this->resolveTargetDate($payload);
+        if ($targetDate === null) {
+            return ['ok' => false, 'message' => 'Provide a target date or duration in days.'];
+        }
+
+        $collectionMode = (string) ($payload['collection_mode'] ?? WalletSavingsGoal::COLLECTION_MANUAL);
+        if ($saveType === WalletSavingsGoal::SAVE_TYPE_STRICT && $collectionMode === WalletSavingsGoal::COLLECTION_MANUAL) {
+            $collectionMode = WalletSavingsSetting::COLLECTION_PER_INCOMING;
+        }
+        if (! in_array($collectionMode, [
+            WalletSavingsGoal::COLLECTION_MANUAL,
+            WalletSavingsGoal::COLLECTION_PER_INCOMING,
+            WalletSavingsGoal::COLLECTION_BALANCE_THRESHOLD,
+        ], true)) {
+            return ['ok' => false, 'message' => 'Invalid collection mode.'];
+        }
+
+        $autoSaveEnabled = (bool) ($payload['auto_save_enabled'] ?? ($saveType === WalletSavingsGoal::SAVE_TYPE_STRICT));
+        $autoSavePercent = array_key_exists('auto_save_percent', $payload)
+            ? round((float) $payload['auto_save_percent'], 2)
+            : $this->defaultStrictSavePercent();
+
+        if ($saveType === WalletSavingsGoal::SAVE_TYPE_STRICT) {
+            $maxStrict = $this->maxStrictSavePercent();
+            if ($autoSavePercent < 0 || $autoSavePercent > $maxStrict + 0.0001) {
+                return ['ok' => false, 'message' => 'Auto-save percentage must be between 0 and '.$maxStrict.'.'];
+            }
+        } else {
+            $autoSavePercent = null;
+            $autoSaveEnabled = false;
+            $collectionMode = WalletSavingsGoal::COLLECTION_MANUAL;
+        }
+
+        $ledgerScope = (string) ($payload['ledger_scope'] ?? WalletSavingsGoal::LEDGER_PERSONAL);
+        if (! in_array($ledgerScope, [
+            WalletSavingsGoal::LEDGER_PERSONAL,
+            WalletSavingsGoal::LEDGER_BUSINESS,
+            WalletSavingsGoal::LEDGER_BOTH,
+        ], true)) {
+            return ['ok' => false, 'message' => 'Invalid ledger scope.'];
+        }
+
+        $balanceThreshold = null;
+        if ($collectionMode === WalletSavingsGoal::COLLECTION_BALANCE_THRESHOLD) {
+            $balanceThreshold = round((float) ($payload['balance_threshold'] ?? 0), 2);
+            if ($balanceThreshold <= 0) {
+                return ['ok' => false, 'message' => 'Balance threshold is required for threshold auto-save.'];
+            }
+        }
+
+        $durationDays = isset($payload['duration_days']) ? max(1, (int) $payload['duration_days']) : null;
+        if ($durationDays === null && $targetDate !== null) {
+            $durationDays = max(1, $this->savingsNow()->startOfDay()->diffInDays($targetDate->copy()->startOfDay()));
+        }
+
+        return [
+            'ok' => true,
+            'data' => [
+                'name' => $name,
+                'target_amount' => $targetAmount,
+                'save_type' => $saveType,
+                'target_date' => $targetDate,
+                'duration_days' => $durationDays,
+                'collection_mode' => $collectionMode,
+                'auto_save_percent' => $autoSavePercent,
+                'balance_threshold' => $balanceThreshold,
+                'ledger_scope' => $ledgerScope,
+                'auto_save_enabled' => $autoSaveEnabled,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveTargetDate(array $payload): ?Carbon
+    {
+        if (! empty($payload['target_date'])) {
+            try {
+                return Carbon::parse((string) $payload['target_date'], self::SAVINGS_TZ)->startOfDay();
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        if (! empty($payload['duration_days'])) {
+            return $this->savingsNow()->copy()->startOfDay()->addDays(max(1, (int) $payload['duration_days']));
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function computeGoalPace(
+        float $targetAmount,
+        float $savedAmount,
+        $targetDate,
+        $createdAt = null,
+    ): array {
+        $remaining = max(0, round($targetAmount - $savedAmount, 2));
+        $targetEnd = null;
+        if ($targetDate instanceof Carbon) {
+            $targetEnd = $targetDate->copy()->timezone(self::SAVINGS_TZ)->endOfDay();
+        } elseif ($targetDate) {
+            $targetEnd = Carbon::parse($targetDate, self::SAVINGS_TZ)->endOfDay();
+        }
+
+        $daysLeft = $targetEnd ? max(1, $this->savingsNow()->startOfDay()->diffInDays($targetEnd, false)) : null;
+
+        $daily = $daysLeft ? round($remaining / $daysLeft, 2) : null;
+        $weekly = $daily !== null ? round($daily * 7, 2) : null;
+        $monthly = $daily !== null ? round($daily * 30, 2) : null;
+
+        $expectedByNow = 0.0;
+        $paceStatus = 'on_track';
+        if ($targetEnd && $createdAt) {
+            $start = $createdAt instanceof Carbon
+                ? $createdAt->copy()->timezone(self::SAVINGS_TZ)->startOfDay()
+                : Carbon::parse($createdAt, self::SAVINGS_TZ)->startOfDay();
+            $targetStart = $targetEnd->copy()->startOfDay();
+            $totalDays = max(1, $start->diffInDays($targetStart) + 1);
+            $elapsedDays = min($totalDays, max(0, $start->diffInDays($this->savingsNow()->startOfDay())));
+            $expectedByNow = round($targetAmount * ($elapsedDays / $totalDays), 2);
+            $paceStatus = $savedAmount + 0.0001 >= $expectedByNow ? 'on_track' : 'behind';
+            if ($savedAmount >= $targetAmount) {
+                $paceStatus = 'completed';
+            }
+        }
+
+        return [
+            'remaining' => $remaining,
+            'days_left' => $daysLeft,
+            'duration_days' => $targetEnd && $createdAt
+                ? max(1, ($createdAt instanceof Carbon ? $createdAt : Carbon::parse($createdAt, self::SAVINGS_TZ))
+                    ->timezone(self::SAVINGS_TZ)->startOfDay()->diffInDays($targetEnd->copy()->startOfDay()) + 1)
+                : ($daysLeft ?? null),
+            'daily' => $daily,
+            'weekly' => $weekly,
+            'monthly' => $monthly,
+            'expected_saved_by_now' => $expectedByNow,
+            'pace_status' => $paceStatus,
+        ];
+    }
+
+    private function resolveMaturityDate(?WalletSavingsGoal $goal, Carbon $now): Carbon
+    {
+        if ($goal !== null && $goal->target_date !== null) {
+            return Carbon::parse($goal->target_date, self::SAVINGS_TZ)->endOfDay();
+        }
+
+        if ($goal !== null && $goal->duration_days !== null) {
+            return $now->copy()->addDays(max(1, (int) $goal->duration_days))->endOfDay();
+        }
+
+        return $now->copy()->addDays($this->lockDays())->endOfDay();
+    }
+
+    public function sumActiveStrictSavePercent(WhatsappWallet $wallet, ?int $excludeGoalId = null): float
+    {
+        return (float) WalletSavingsGoal::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('status', WalletSavingsGoal::STATUS_ACTIVE)
+            ->where('save_type', WalletSavingsGoal::SAVE_TYPE_STRICT)
+            ->where('auto_save_enabled', true)
+            ->when($excludeGoalId !== null, fn ($q) => $q->where('id', '!=', $excludeGoalId))
+            ->sum('auto_save_percent');
+    }
+
+    public function remainingStrictSavePercent(WhatsappWallet $wallet, ?int $excludeGoalId = null): float
+    {
+        return max(0.0, round($this->maxStrictSavePercent() - $this->sumActiveStrictSavePercent($wallet, $excludeGoalId), 2));
+    }
+
+    /**
+     * @return array{ok: bool, message?: string}
+     */
+    public function validateStrictPercentCap(WhatsappWallet $wallet, float $newPercent, ?int $excludeGoalId = null): array
+    {
+        if ($newPercent <= 0) {
+            return ['ok' => true];
+        }
+
+        $total = round($this->sumActiveStrictSavePercent($wallet, $excludeGoalId) + $newPercent, 2);
+        $max = $this->maxStrictSavePercent();
+        if ($total > $max + 0.0001) {
+            return [
+                'ok' => false,
+                'message' => sprintf('Total strict auto-save would be %.1f%%; max is %.1f%%.', $total, $max),
+            ];
+        }
+
+        return ['ok' => true];
+    }
+
+    private function savingsNow(): Carbon
+    {
+        return now(self::SAVINGS_TZ);
+    }
+
+    private function goalLedgerScopeMatches(WalletSavingsGoal $goal, string $ledgerScope): bool
+    {
+        $goalScope = (string) ($goal->ledger_scope ?? WalletSavingsGoal::LEDGER_PERSONAL);
+
+        return $goalScope === WalletSavingsGoal::LEDGER_BOTH || $goalScope === $ledgerScope;
     }
 
     /**

@@ -10,6 +10,8 @@ use App\Models\MevonPayLedgerEntry;
 use App\Services\MevonPay\MevonPayInboundWebhookRecorder;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\MevonPayVirtualAccountService;
+use App\Services\Consumer\ConsumerWalletSavingsService;
+use App\Services\Consumer\ConsumerWalletTransactionScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +25,7 @@ class WhatsappWalletTier1TopupVaService
     public function __construct(
         private MevonPayVirtualAccountService $mevonPayVa,
         private WhatsappWalletTopupNotifier $topupNotifier,
+        private ConsumerWalletSavingsService $savings,
     ) {}
 
     public function isAvailable(): bool
@@ -251,6 +254,8 @@ class WhatsappWalletTier1TopupVaService
                     'wallet_id' => (int) $wallet->id,
                     'credited' => $credited,
                     'balance_after' => $newBal,
+                    'balance_before' => round($newBal - $credited, 2),
+                    'transaction_id' => (int) $txn->id,
                 ];
             }
 
@@ -279,6 +284,17 @@ class WhatsappWalletTier1TopupVaService
             $w = WhatsappWallet::query()->find($notify['wallet_id']);
             if ($w) {
                 $this->topupNotifier->notifyCredited($w, (float) $notify['credited'], (float) $notify['balance_after']);
+                if (! empty($notify['transaction_id']) && (float) $notify['credited'] > 0) {
+                    $this->savings->handleIncomingCredit(
+                        $w,
+                        (float) $notify['credited'],
+                        (int) $notify['transaction_id'],
+                        'topup',
+                        ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+                        (float) ($notify['balance_before'] ?? 0),
+                        (float) $notify['balance_after'],
+                    );
+                }
             }
         }
 
@@ -360,6 +376,8 @@ class WhatsappWalletTier1TopupVaService
                     'wallet_id' => (int) $wallet->id,
                     'credited' => $credited,
                     'balance_after' => $newBal,
+                    'balance_before' => round($newBal - $credited, 2),
+                    'transaction_id' => (int) $txn->id,
                 ];
             }
 
@@ -380,6 +398,17 @@ class WhatsappWalletTier1TopupVaService
             $w = WhatsappWallet::query()->find($notify['wallet_id']);
             if ($w) {
                 $this->topupNotifier->notifyCredited($w, (float) $notify['credited'], (float) $notify['balance_after']);
+                if (! empty($notify['transaction_id']) && (float) $notify['credited'] > 0) {
+                    $this->savings->handleIncomingCredit(
+                        $w,
+                        (float) $notify['credited'],
+                        (int) $notify['transaction_id'],
+                        'topup',
+                        ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+                        (float) ($notify['balance_before'] ?? 0),
+                        (float) $notify['balance_after'],
+                    );
+                }
             }
         }
 

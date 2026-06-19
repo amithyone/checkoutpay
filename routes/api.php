@@ -154,6 +154,7 @@ Route::prefix('v1')->group(function () {
         Route::get('savings', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'show']);
         Route::put('savings/settings', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'updateSettings']);
         Route::get('savings/goals', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'goals']);
+        Route::post('savings/goals/preview', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'previewGoal']);
         Route::post('savings/goals', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'storeGoal']);
         Route::patch('savings/goals/{goalId}', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'patchGoal']);
         Route::post('savings/deposit', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'deposit']);

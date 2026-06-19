@@ -323,6 +323,9 @@ class SettingsController extends Controller
                 'savings_interest_rate_percent' => 'required|numeric|min:0|max:100',
                 'savings_default_spend_to_save_percent' => 'required|numeric|min:0|max:100',
                 'savings_max_spend_to_save_percent' => 'required|numeric|min:0|max:100',
+                'savings_default_strict_save_percent' => 'required|numeric|min:0|max:100',
+                'savings_max_strict_save_percent' => 'required|numeric|min:0|max:100',
+                'savings_flexible_completion_bonus_percent' => 'required|numeric|min:0|max:100',
             ]);
 
             Setting::set(
@@ -359,6 +362,27 @@ class SettingsController extends Controller
                 'float',
                 'savings',
                 'Maximum spend-to-save percentage users can choose'
+            );
+            Setting::set(
+                'savings_default_strict_save_percent',
+                $validated['savings_default_strict_save_percent'],
+                'float',
+                'savings',
+                'Default strict auto-save percentage on incoming money'
+            );
+            Setting::set(
+                'savings_max_strict_save_percent',
+                $validated['savings_max_strict_save_percent'],
+                'float',
+                'savings',
+                'Maximum strict auto-save percentage users can choose'
+            );
+            Setting::set(
+                'savings_flexible_completion_bonus_percent',
+                $validated['savings_flexible_completion_bonus_percent'],
+                'float',
+                'savings',
+                'Flexible goal completion bonus if held until target date (%)'
             );
         }
 

@@ -9,6 +9,10 @@ class WalletSavingsLock extends Model
 {
     public const SOURCE_SPEND_TO_SAVE = 'spend_to_save';
 
+    public const SOURCE_INCOMING = 'incoming';
+
+    public const SOURCE_BALANCE_THRESHOLD = 'balance_threshold';
+
     public const SOURCE_MANUAL = 'manual';
 
     public const SOURCE_GOAL = 'goal';

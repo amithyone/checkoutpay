@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Consumer\StoreSavingsGoalRequest;
+use App\Http\Requests\Consumer\UpdateSavingsGoalRequest;
 use App\Models\ConsumerWalletApiAccount;
+use App\Models\WalletSavingsLock;
 use App\Models\WhatsappWallet;
 use App\Services\Consumer\ConsumerWalletSavingsService;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +34,11 @@ class ConsumerSavingsApiController extends Controller
         $validated = $request->validate([
             'spend_to_save_enabled' => 'sometimes|boolean',
             'spend_to_save_percent' => 'sometimes|numeric|min:0|max:100',
+            'strict_save_enabled' => 'sometimes|boolean',
+            'strict_save_percent' => 'sometimes|numeric|min:0|max:100',
+            'strict_ledger_scope' => 'sometimes|string|in:personal,business,both',
+            'strict_collection_mode' => 'sometimes|string|in:per_incoming,balance_threshold',
+            'strict_balance_threshold' => 'sometimes|nullable|numeric|min:0',
             'reminder_enabled' => 'sometimes|boolean',
             'reminder_frequency' => 'sometimes|string|in:off,weekly,after_spend',
             'reminder_weekday' => 'sometimes|nullable|integer|min:0|max:6',
@@ -63,15 +71,32 @@ class ConsumerSavingsApiController extends Controller
         ]);
     }
 
-    public function storeGoal(Request $request): JsonResponse
+    public function previewGoal(Request $request): JsonResponse
     {
-        $wallet = $this->walletFor($request);
+        $this->walletFor($request);
         $validated = $request->validate([
-            'name' => 'required|string|max:120',
+            'name' => 'sometimes|string|max:120',
             'target_amount' => 'required|numeric|min:100',
+            'saved_amount' => 'sometimes|numeric|min:0',
+            'save_type' => 'sometimes|string|in:flexible,strict',
+            'target_date' => 'sometimes|nullable|date',
+            'duration_days' => 'sometimes|nullable|integer|min:1|max:3650',
+            'collection_mode' => 'sometimes|string|in:manual,per_incoming,balance_threshold',
+            'auto_save_percent' => 'sometimes|nullable|numeric|min:0|max:100',
+            'balance_threshold' => 'sometimes|nullable|numeric|min:0',
+            'ledger_scope' => 'sometimes|string|in:personal,business,both',
         ]);
 
-        $result = $this->savings->createGoal($wallet, $validated['name'], (float) $validated['target_amount']);
+        return response()->json([
+            'ok' => true,
+            'data' => $this->savings->previewGoalPlan($validated),
+        ]);
+    }
+
+    public function storeGoal(StoreSavingsGoalRequest $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request);
+        $result = $this->savings->createGoal($wallet, $request->validated());
         if (! ($result['ok'] ?? false)) {
             return response()->json([
                 'ok' => false,
@@ -85,16 +110,10 @@ class ConsumerSavingsApiController extends Controller
         ], 201);
     }
 
-    public function patchGoal(Request $request, int $goalId): JsonResponse
+    public function patchGoal(UpdateSavingsGoalRequest $request, int $goalId): JsonResponse
     {
         $wallet = $this->walletFor($request);
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:120',
-            'target_amount' => 'sometimes|numeric|min:100',
-            'status' => 'sometimes|string|in:active,archived',
-        ]);
-
-        $result = $this->savings->updateGoal($wallet, $goalId, $validated);
+        $result = $this->savings->updateGoal($wallet, $goalId, $request->validated());
         if (! ($result['ok'] ?? false)) {
             return response()->json([
                 'ok' => false,
@@ -118,13 +137,13 @@ class ConsumerSavingsApiController extends Controller
             'ledger_scope' => 'sometimes|string|in:personal,business',
         ]);
 
-        $lockType = $validated['lock_type'] ?? \App\Models\WalletSavingsLock::LOCK_TYPE_LOCKED;
+        $lockType = $validated['lock_type'] ?? WalletSavingsLock::LOCK_TYPE_LOCKED;
         $ledgerScope = $validated['ledger_scope'] ?? 'personal';
 
         $result = $this->savings->lockDeposit(
             $wallet,
             (float) $validated['amount'],
-            \App\Models\WalletSavingsLock::SOURCE_MANUAL,
+            WalletSavingsLock::SOURCE_MANUAL,
             isset($validated['goal_id']) ? (int) $validated['goal_id'] : null,
             null,
             $lockType,
@@ -172,6 +191,7 @@ class ConsumerSavingsApiController extends Controller
             'data' => [
                 'amount' => $result['amount'],
                 'ledger_scope' => $result['ledger_scope'],
+                'forfeited_bonus' => (bool) ($result['forfeited_bonus'] ?? false),
             ],
         ]);
     }
