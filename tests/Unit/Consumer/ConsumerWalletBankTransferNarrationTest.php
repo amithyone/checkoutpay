@@ -4,6 +4,7 @@ namespace Tests\Unit\Consumer;
 
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\Consumer\ConsumerWalletTransferService;
 use App\Services\MavonPayTransferService;
 use App\Services\Payout\BankPayoutNarration;
@@ -71,7 +72,52 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
         $this->assertSame('Rent for May', $capturedNarration);
     }
 
-    private function mockPayout(?string &$capturedNarration): void
+    public function test_business_bank_transfer_uses_business_name_as_sender_and_narration(): void
+    {
+        $capturedNarration = null;
+        $capturedDebitName = null;
+        $this->mockPayout($capturedNarration, $capturedDebitName);
+
+        $business = \App\Models\Business::query()->create([
+            'name' => 'Acme Ventures Ltd',
+            'email' => 'acme@example.com',
+            'password' => bcrypt('secret'),
+            'business_id' => 'ACME99',
+            'phone' => '08012345678',
+            'balance' => 100000,
+        ]);
+
+        $wallet = $this->makeNigeriaWallet([
+            'linked_business_id' => $business->id,
+            'business_balance' => 100000,
+            'sender_name' => 'John Personal',
+        ]);
+
+        $service = app(ConsumerWalletTransferService::class);
+        $service->bankTransfer(
+            $wallet,
+            1000,
+            '0123456789',
+            '058',
+            'GTBank',
+            'Test Beneficiary',
+            null,
+            ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+        );
+
+        $this->assertSame('Acme Ventures Ltd', $capturedNarration);
+        $this->assertSame('Acme Ventures Ltd', $capturedDebitName);
+
+        $txn = WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+        $this->assertSame('Acme Ventures Ltd', $txn->sender_name);
+        $this->assertSame(ConsumerWalletTransactionScope::SCOPE_BUSINESS, $txn->ledger_scope);
+    }
+
+    private function mockPayout(?string &$capturedNarration, ?string &$capturedDebitName = null): void
     {
         $mock = Mockery::mock(WhatsappWalletBankPayoutService::class);
         $mock->shouldReceive('isConfigured')->andReturn(true);
@@ -79,8 +125,9 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
         $mock->shouldReceive('makeWalletPayoutReference')->andReturn('REF-TEST-001');
         $mock->shouldReceive('sendTransfer')
             ->once()
-            ->withArgs(function (...$args) use (&$capturedNarration) {
+            ->withArgs(function (...$args) use (&$capturedNarration, &$capturedDebitName) {
                 $capturedNarration = $args[6] ?? null;
+                $capturedDebitName = $args[9] ?? null;
 
                 return true;
             })
@@ -94,9 +141,9 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
         $this->app->instance(WhatsappWalletBankPayoutService::class, $mock);
     }
 
-    private function makeNigeriaWallet(): WhatsappWallet
+    private function makeNigeriaWallet(array $overrides = []): WhatsappWallet
     {
-        return WhatsappWallet::query()->create([
+        return WhatsappWallet::query()->create(array_merge([
             'phone_e164' => '2348012345678',
             'status' => WhatsappWallet::STATUS_ACTIVE,
             'balance' => 50000,
@@ -104,6 +151,6 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
             'tier' => 1,
             'daily_transfer_total' => 0,
             'daily_transfer_for_date' => now()->toDateString(),
-        ]);
+        ], $overrides));
     }
 }

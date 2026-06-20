@@ -22,7 +22,11 @@ Companion to `checkoutnow/docs/BUSINESS_UTILITY_API.md` (keep in sync).
 
 Without merchant link: wallet `ledger_scope=business` rows only.
 
-Default date window when `from`/`to` omitted: last 12 months (`ConsumerWalletApiController::resolveBusinessActivityDateRange`).
+Default date window when `from`/`to` omitted: last 12 months.
+
+## Business bank transfer sender
+
+`ConsumerBusinessWalletLedgerService::resolveLedgerSenderName()` — business name on `from_ledger=business` bank transfers (transaction `sender_name`, MevonPay `debitAccountName`, narration).
 
 ## Savings vs business utility
 

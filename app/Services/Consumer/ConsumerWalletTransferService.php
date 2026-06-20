@@ -301,16 +301,22 @@ class ConsumerWalletTransferService
 
         $payoutAmount = (float) ($quoted['payout_amount'] ?? $amount);
         $selfFee = (float) ($quoted['fee'] ?? 0);
-        $narration = BankPayoutNarration::forConsumerApp($remark);
+        $senderDisplayName = $this->businessLedger->resolveLedgerSenderName($wallet, $ledgerScope);
+        $business = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+            ? $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet)
+            : null;
+        $narration = $business !== null
+            ? BankPayoutNarration::forBusinessWithdrawal($business, $remark)
+            : BankPayoutNarration::forConsumerApp($remark);
 
         if (! $this->bankPayout->isConfigured()) {
-            return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $isSelf, $selfFee, $payoutAmount, $ledgerScope);
+            return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $isSelf, $selfFee, $payoutAmount, $ledgerScope, $senderDisplayName);
         }
 
         $reference = $this->bankPayout->makeWalletPayoutReference();
 
         try {
-            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiaryName, $reference, $isSelf, $selfFee, $narration, $ledgerScope) {
+            DB::transaction(function () use ($wallet, $amount, $payoutAmount, $acct, $bankName, $bankCode, $beneficiaryName, $reference, $isSelf, $selfFee, $narration, $ledgerScope, $senderDisplayName) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -340,7 +346,7 @@ class ConsumerWalletTransferService
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $w->id,
-                    'sender_name' => $w->normalizedSenderName(),
+                    'sender_name' => $senderDisplayName,
                     'type' => WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
                     'ledger_scope' => $ledgerScope,
                     'amount' => $amount,
@@ -378,6 +384,10 @@ class ConsumerWalletTransferService
             ->where('whatsapp_wallet_id', $wallet->id)
             ->first();
 
+        $debitAccountName = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+            ? $senderDisplayName
+            : null;
+
         $result = $this->bankPayout->sendTransfer(
             $payoutAmount,
             $bankCode,
@@ -388,6 +398,7 @@ class ConsumerWalletTransferService
             $narration,
             $walletFresh,
             $txnRow?->id,
+            $debitAccountName,
         );
         $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
@@ -522,10 +533,12 @@ class ConsumerWalletTransferService
         float $selfFee = 0.0,
         float $payoutAmount = 0.0,
         string $ledgerScope = ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+        ?string $senderDisplayName = null,
     ): array {
         $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+        $senderDisplayName ??= $this->businessLedger->resolveLedgerSenderName($wallet, $ledgerScope);
         try {
-            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary, $isSelf, $selfFee, $payoutAmount, $ledgerScope) {
+            DB::transaction(function () use ($wallet, $amount, $acct, $bankName, $bankCode, $beneficiary, $isSelf, $selfFee, $payoutAmount, $ledgerScope, $senderDisplayName) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -555,7 +568,7 @@ class ConsumerWalletTransferService
 
                 WhatsappWalletTransaction::query()->create([
                     'whatsapp_wallet_id' => $w->id,
-                    'sender_name' => $w->normalizedSenderName(),
+                    'sender_name' => $senderDisplayName,
                     'type' => WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
                     'ledger_scope' => $ledgerScope,
                     'amount' => $amount,

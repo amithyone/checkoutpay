@@ -49,6 +49,36 @@ final class ConsumerBusinessWalletLedgerService
         return $this->findBusinessByWalletPhone($wallet);
     }
 
+    /**
+     * Display / payout sender name for a ledger scope (business name when sending from business balance).
+     */
+    public function resolveLedgerSenderName(WhatsappWallet $wallet, string $ledgerScope): ?string
+    {
+        if (ConsumerWalletTransactionScope::normalize($ledgerScope) !== ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+            return $wallet->displayName();
+        }
+
+        $business = $this->resolveLinkedOrMatchedBusiness($wallet);
+        if ($business !== null) {
+            $name = trim((string) $business->name);
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        $payIn = $this->resolveBusinessPayInPayload($wallet);
+        if (is_array($payIn)) {
+            foreach (['business_name', 'account_name'] as $key) {
+                $candidate = trim((string) ($payIn[$key] ?? ''));
+                if ($candidate !== '') {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $wallet->displayName();
+    }
+
     /** Whether the app should expose business Utility / scoped history. */
     public function walletHasBusinessActivity(WhatsappWallet $wallet): bool
     {
