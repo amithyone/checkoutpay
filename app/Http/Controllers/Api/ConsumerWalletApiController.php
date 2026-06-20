@@ -17,6 +17,7 @@ use App\Services\Consumer\ConsumerWalletPayCodeService;
 use App\Services\Consumer\ConsumerWalletPayQrService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletSavingsService;
+use App\Services\Consumer\ConsumerWalletStatementService;
 use App\Services\Consumer\ConsumerWalletTransferService;
 use App\Services\MavonPayTransferService;
 use App\Contracts\Vtu\VtuProviderContract;
@@ -34,6 +35,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class ConsumerWalletApiController extends Controller
 {
@@ -56,6 +58,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private ConsumerBusinessActivityService $businessActivity,
         private ConsumerWalletSavingsService $savings,
+        private ConsumerWalletStatementService $statements,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -414,6 +417,41 @@ class ConsumerWalletApiController extends Controller
                 'timezone' => $tz,
             ],
         ]);
+    }
+
+    public function statementEmail(Request $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request);
+        $validated = $request->validate([
+            'format' => 'required|string|in:csv,pdf',
+            'ledger_scope' => 'required|string|in:personal,business',
+            'period' => 'nullable|string|in:6mo,12mo',
+            'from' => 'required|date_format:Y-m-d',
+            'to' => 'required|date_format:Y-m-d',
+        ]);
+
+        try {
+            $result = $this->statements->sendEmail($wallet, $validated);
+
+            return response()->json([
+                'success' => true,
+                'ok' => true,
+                'message' => 'Statement sent to your email.',
+                'data' => $result,
+            ]);
+        } catch (ValidationException $e) {
+            $message = collect($e->errors())->flatten()->first();
+            if (! is_string($message) || $message === '') {
+                $message = 'Could not send statement.';
+            }
+
+            return response()->json([
+                'success' => false,
+                'ok' => false,
+                'message' => $message,
+                'errors' => $e->errors(),
+            ], 422);
+        }
     }
 
     public function recipientLookup(Request $request): JsonResponse

@@ -106,6 +106,7 @@ Route::prefix('v1')->group(function () {
         Route::get('wallet', [ConsumerWalletApiController::class, 'showWallet']);
         Route::post('wallet/ensure', [ConsumerWalletApiController::class, 'ensure']);
         Route::get('wallet/transactions', [ConsumerWalletApiController::class, 'transactions']);
+        Route::post('wallet/statement/email', [ConsumerWalletApiController::class, 'statementEmail']);
         Route::get('wallet/recipient-lookup', [ConsumerWalletApiController::class, 'recipientLookup']);
         Route::get('wallet/receive-qr', [ConsumerWalletApiController::class, 'receiveQr']);
         Route::post('wallet/scan-resolve', [ConsumerWalletApiController::class, 'scanResolve']);

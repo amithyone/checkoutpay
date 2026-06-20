@@ -10,6 +10,7 @@ Companion to `checkoutnow/docs/UTILITY.md`.
 |--------|------|-------|
 | GET | `/api/v1/consumer/wallet` | Ledger context, balances, `business_pay_in` |
 | GET | `/api/v1/consumer/wallet/transactions` | `scope`, `from`, `to`, pagination |
+| POST | `/api/v1/consumer/wallet/statement/email` | Email CSV/PDF statement to `kyc_email` |
 
 No dedicated spending-summary endpoint — the app aggregates transaction rows client-side.
 
@@ -99,7 +100,8 @@ Dedup: payments already recorded as `business_rubies_in` on the wallet (same `me
 
 | Service | Role |
 |---------|------|
-| `ConsumerBusinessActivityService` | Merge merchant payments + withdrawals for Utility statements |
+| `ConsumerAccountStatementBuilder` | CSV/HTML matching shared `accountStatement.ts` |
+| `ConsumerWalletStatementService` | Load txs, build attachment, send mail |
 | `ConsumerBusinessWalletLedgerService` | Linked balance, `business_pay_in`, deposit history |
 | `ConsumerWalletTransactionScope` | Personal vs business filter |
 | `BusinessWhatsappWalletLinkService` | Merchant dashboard wallet link |
@@ -121,8 +123,18 @@ Tab id in nav remains `services`; label shown as **Utility**.
 
 ---
 
+## Email statement delivery
+
+`POST /api/v1/consumer/wallet/statement/email` (Sanctum consumer token).
+
+- Resolves wallet from token; requires `kyc_email` on `whatsapp_wallets` (422 if missing).
+- Loads transactions for `ledger_scope` + `from`/`to` (Lagos). Business uses `ConsumerBusinessActivityService::VIEW_FULL`.
+- Builds CSV via `ConsumerAccountStatementBuilder::statementCsvContent()` (same columns as `packages/shared/src/accountStatement.ts`) or PDF via DomPDF from matching HTML.
+- Sends `WalletStatementMail` with attachment; response includes masked email.
+
+---
+
 ## Not implemented
 
 - Backend `GET /consumer/wallet/spending-summary`
-- Email delivery of statements
 - Historical backfill of pre-deploy merchant deposits
