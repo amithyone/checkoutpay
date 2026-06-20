@@ -256,6 +256,7 @@ class WhatsappWalletTier1TopupVaService
                     'balance_after' => $newBal,
                     'balance_before' => round($newBal - $credited, 2),
                     'transaction_id' => (int) $txn->id,
+                    'payer_name' => $payerName !== '' ? $payerName : null,
                 ];
             }
 
@@ -283,7 +284,12 @@ class WhatsappWalletTier1TopupVaService
         if (is_array($notify)) {
             $w = WhatsappWallet::query()->find($notify['wallet_id']);
             if ($w) {
-                $this->topupNotifier->notifyCredited($w, (float) $notify['credited'], (float) $notify['balance_after']);
+                $this->topupNotifier->notifyCredited(
+                    $w,
+                    (float) $notify['credited'],
+                    (float) $notify['balance_after'],
+                    isset($notify['payer_name']) ? (string) $notify['payer_name'] : null,
+                );
                 if (! empty($notify['transaction_id']) && (float) $notify['credited'] > 0) {
                     $this->savings->handleIncomingCredit(
                         $w,
@@ -378,6 +384,7 @@ class WhatsappWalletTier1TopupVaService
                     'balance_after' => $newBal,
                     'balance_before' => round($newBal - $credited, 2),
                     'transaction_id' => (int) $txn->id,
+                    'payer_name' => $payerName !== '' ? $payerName : null,
                 ];
             }
 
@@ -397,7 +404,12 @@ class WhatsappWalletTier1TopupVaService
         if (is_array($notify)) {
             $w = WhatsappWallet::query()->find($notify['wallet_id']);
             if ($w) {
-                $this->topupNotifier->notifyCredited($w, (float) $notify['credited'], (float) $notify['balance_after']);
+                $this->topupNotifier->notifyCredited(
+                    $w,
+                    (float) $notify['credited'],
+                    (float) $notify['balance_after'],
+                    isset($notify['payer_name']) ? (string) $notify['payer_name'] : null,
+                );
                 if (! empty($notify['transaction_id']) && (float) $notify['credited'] > 0) {
                     $this->savings->handleIncomingCredit(
                         $w,

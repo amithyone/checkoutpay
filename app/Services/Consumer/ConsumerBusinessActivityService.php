@@ -22,7 +22,7 @@ final class ConsumerBusinessActivityService
     /** Utility / statements — all business ledger rows plus merchant payments and withdrawals. */
     public const VIEW_FULL = 'full';
 
-    /** History — direct business-account inflows (Rubies / site pay-ins) and merchant withdrawals only. */
+    /** History — business account inflows, app bank sends, and merchant withdrawals. */
     public const VIEW_ACCOUNT = 'account';
 
     public function __construct(
@@ -158,7 +158,10 @@ final class ConsumerBusinessActivityService
             ->where('created_at', '<=', $toAt);
 
         if ($accountView) {
-            $walletQuery->where('type', WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN);
+            $walletQuery->whereIn('type', [
+                WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN,
+                WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
+            ]);
         }
 
         $walletTxns = $walletQuery->orderByDesc('id')->get();

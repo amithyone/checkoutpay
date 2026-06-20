@@ -143,7 +143,7 @@ class ConsumerBusinessActivityTest extends TestCase
         $this->assertSame('account', $response->json('meta.business_view'));
     }
 
-    public function test_business_account_view_excludes_app_transfers_but_keeps_merchant_rows(): void
+    public function test_business_account_view_includes_app_bank_transfers_and_merchant_rows(): void
     {
         $business = Business::create([
             'name' => 'Acme Store',
@@ -211,7 +211,7 @@ class ConsumerBusinessActivityTest extends TestCase
         $accountTypes = collect($account->json('data'))->pluck('type')->all();
         $this->assertContains('merchant_payment_in', $accountTypes);
         $this->assertContains('merchant_withdrawal_out', $accountTypes);
-        $this->assertNotContains('bank_transfer_out', $accountTypes);
+        $this->assertContains('bank_transfer_out', $accountTypes);
 
         $full = $this->getJson('/api/v1/consumer/wallet/transactions?scope=business&business_view=full&from='.$from.'&to='.$to.'&per_page=50');
         $fullTypes = collect($full->json('data'))->pluck('type')->all();

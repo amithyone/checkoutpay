@@ -526,8 +526,19 @@ class ConsumerWalletApiController extends Controller
             }
 
             $sessionId = trim((string) ($meta['payout_session_id'] ?? $meta['session_id'] ?? ''));
-            if ($sessionId !== '') {
+            $mevonpay = is_array($meta['mevonpay'] ?? null) ? $meta['mevonpay'] : [];
+            $apiResponse = is_array($mevonpay['api_response'] ?? null) ? $mevonpay['api_response'] : [];
+            $apiSessionId = trim((string) ($apiResponse['sessionId'] ?? $apiResponse['session_id'] ?? ''));
+            $payoutSessionId = trim((string) ($meta['payout_session_id'] ?? ''));
+
+            if ($apiSessionId !== '') {
+                $row['api_session_id'] = $apiSessionId;
+                $row['session_id'] = $apiSessionId;
+            } elseif ($sessionId !== '') {
                 $row['session_id'] = $sessionId;
+            }
+            if ($payoutSessionId !== '') {
+                $row['payout_session_id'] = $payoutSessionId;
             }
 
             $narration = trim((string) ($meta['narration'] ?? ''));
@@ -592,13 +603,28 @@ class ConsumerWalletApiController extends Controller
         }
 
         $meta = is_array($row['meta'] ?? null) ? $row['meta'] : [];
-        $raw = is_array($meta['payout_raw_response'] ?? null) ? $meta['payout_raw_response'] : [];
-        foreach (['sessionId', 'session_id', 'SessionId'] as $key) {
-            $sessionId = trim((string) ($raw[$key] ?? ''));
-            if ($sessionId !== '') {
-                $row['session_id'] = $sessionId;
-                break;
+        $mevonpay = is_array($meta['mevonpay'] ?? null) ? $meta['mevonpay'] : [];
+        $apiResponse = is_array($mevonpay['api_response'] ?? null) ? $mevonpay['api_response'] : [];
+        $apiSessionId = trim((string) ($apiResponse['sessionId'] ?? $apiResponse['session_id'] ?? ''));
+        $payoutSessionId = trim((string) ($meta['payout_session_id'] ?? ''));
+
+        if ($apiSessionId === '') {
+            $raw = is_array($meta['payout_raw_response'] ?? null) ? $meta['payout_raw_response'] : [];
+            foreach (['sessionId', 'session_id', 'SessionId'] as $key) {
+                $v = trim((string) ($raw[$key] ?? ''));
+                if ($v !== '') {
+                    $apiSessionId = $v;
+                    break;
+                }
             }
+        }
+
+        if ($apiSessionId !== '') {
+            $row['api_session_id'] = $apiSessionId;
+            $row['session_id'] = $apiSessionId;
+        }
+        if ($payoutSessionId !== '') {
+            $row['payout_session_id'] = $payoutSessionId;
         }
 
         $narration = trim((string) ($meta['bank_narration'] ?? $meta['narration'] ?? ''));

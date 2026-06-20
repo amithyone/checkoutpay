@@ -179,4 +179,37 @@ final class MevonPayPayoutMetaNormalizer
             default => 'Transfer failed.',
         };
     }
+
+    /**
+     * Bank session id from MevonPay raw api_response only (not payout reference / sent session).
+     *
+     * @param  array<string, mixed>  $payoutResult
+     */
+    public static function apiSessionIdFromPayoutResult(array $payoutResult): string
+    {
+        $raw = $payoutResult['raw'] ?? null;
+        if (! is_array($raw)) {
+            return '';
+        }
+
+        $candidates = [];
+        if (isset($raw['api_response']) && is_array($raw['api_response'])) {
+            $candidates[] = $raw['api_response'];
+        }
+        if (isset($raw['details']) && is_array($raw['details'])) {
+            $candidates[] = $raw['details'];
+        }
+        $candidates[] = $raw;
+
+        foreach ($candidates as $api) {
+            foreach (['sessionId', 'session_id', 'SessionId'] as $key) {
+                $v = trim((string) ($api[$key] ?? ''));
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+
+        return '';
+    }
 }

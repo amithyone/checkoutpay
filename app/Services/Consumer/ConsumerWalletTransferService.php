@@ -476,6 +476,9 @@ class ConsumerWalletTransferService
         if ($receipt['reference'] === '') {
             $receipt['reference'] = (string) ($result['reference'] ?? $reference);
         }
+        $apiSessionId = MevonPayPayoutMetaNormalizer::apiSessionIdFromPayoutResult($result);
+        $payoutSessionId = trim((string) ($receipt['session_id'] ?? ''));
+        $primarySessionId = $apiSessionId !== '' ? $apiSessionId : ($payoutSessionId !== '' ? $payoutSessionId : null);
         $balanceAfter = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
             ? $this->businessLedger->resolvedBalance($wallet)
             : (float) $wallet->balance;
@@ -492,7 +495,9 @@ class ConsumerWalletTransferService
                     : 'Bank transfer sent.',
                 'data' => [
                     'reference' => $receipt['reference'],
-                    'session_id' => $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
+                    'session_id' => $primarySessionId,
+                    'api_session_id' => $apiSessionId !== '' ? $apiSessionId : null,
+                    'payout_session_id' => $payoutSessionId !== '' ? $payoutSessionId : null,
                     'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
                     'balance_after' => $balanceAfter,
                     'ledger_scope' => $ledgerScope,
@@ -512,7 +517,9 @@ class ConsumerWalletTransferService
                 'balance_after' => $balanceAfter,
                 'ledger_scope' => $ledgerScope,
                 'bucket' => $bucket,
-                'session_id' => $receipt['session_id'] !== '' ? $receipt['session_id'] : null,
+                'session_id' => $primarySessionId,
+                'api_session_id' => $apiSessionId !== '' ? $apiSessionId : null,
+                'payout_session_id' => $payoutSessionId !== '' ? $payoutSessionId : null,
                 'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
                 'reference' => $receipt['reference'] !== '' ? $receipt['reference'] : null,
             ],

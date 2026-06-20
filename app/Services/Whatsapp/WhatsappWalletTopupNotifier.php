@@ -174,14 +174,33 @@ class WhatsappWalletTopupNotifier
 
     /**
      * Notify the wallet owner after a successful credit. Runs outside DB transactions.
+     *
+     * @param  string|null  $payerName  Bank sender name from inbound webhook (when available).
      */
-    public function notifyCredited(WhatsappWallet $wallet, float $credited, float $balanceAfter): void
+    public function notifyCredited(WhatsappWallet $wallet, float $credited, float $balanceAfter, ?string $payerName = null): void
     {
         if ($credited <= 0) {
             return;
         }
 
-        $this->consumerPush->notifyWalletCredited($wallet, $credited, $balanceAfter);
+        $fromWho = trim((string) $payerName);
+        $amountStr = '₦'.number_format($credited, 2);
+        $balStr = '₦'.number_format($balanceAfter, 2);
+
+        if ($fromWho !== '') {
+            $this->consumerPush->notifyMoneyReceived(
+                $wallet,
+                $credited,
+                $balanceAfter,
+                sprintf('%s sent you %s.', $fromWho, $amountStr),
+                [
+                    'credit_source' => 'top_up',
+                    'sender_name' => $fromWho,
+                ],
+            );
+        } else {
+            $this->consumerPush->notifyWalletCredited($wallet, $credited, $balanceAfter);
+        }
 
         $instance = WhatsappSession::query()
             ->where('phone_e164', $wallet->phone_e164)
@@ -199,20 +218,21 @@ class WhatsappWalletTopupNotifier
             return;
         }
 
-        $amountStr = '₦'.number_format($credited, 2);
-        $balStr = '₦'.number_format($balanceAfter, 2);
+        $amountLine = $fromWho !== ''
+            ? "💸 *{$fromWho}* sent you *{$amountStr}*\n\nThat amount is now in your wallet.\n\n"
+            : "✅ *{$amountStr}* received\n";
 
         if ($wallet->needsQuickWalletSetup()) {
             $setup = $wallet->hasPin()
                 ? "Reply with *your name*, then *WALLET*.\n"
                 : "Send *WALLET* → *1* to register (*PIN* link, then your *name*).\n";
-            $text = "✅ *{$amountStr}* received\n".
+            $text = $amountLine.
                 "Balance: *{$balStr}*\n\n".
                 $setup.
                 '*MENU* — other services'.
                 WhatsappWalletAppLinkCopy::downloadBlock();
         } else {
-            $text = "✅ *{$amountStr}* received\n".
+            $text = $amountLine.
                 "Balance: *{$balStr}*\n\n".
                 '*WALLET* — your wallet · *MENU* — all services'.
                 WhatsappWalletAppLinkCopy::downloadBlock();
