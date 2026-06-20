@@ -88,4 +88,57 @@ class ConsumerBusinessActivityTest extends TestCase
         $this->assertContains('merchant_payment_in', $types);
         $this->assertContains('merchant_withdrawal_out', $types);
     }
+
+    public function test_business_scope_without_dates_includes_merchant_withdrawals(): void
+    {
+        $business = Business::create([
+            'name' => 'Acme Store',
+            'email' => 'acme2@example.com',
+            'password' => Hash::make('secret'),
+            'business_id' => 'ACME2',
+            'phone' => '08087654321',
+            'balance' => 50000,
+        ]);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '2348087654321',
+            'balance' => 1000,
+            'pin_hash' => Hash::make('2468'),
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'linked_business_id' => $business->id,
+            'business_balance' => 50000,
+        ]);
+
+        ConsumerWalletApiAccount::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'phone_e164' => $wallet->phone_e164,
+        ]);
+
+        WithdrawalRequest::query()->create([
+            'business_id' => $business->id,
+            'amount' => 1500,
+            'account_number' => '0123456789',
+            'account_name' => 'Acme Store',
+            'bank_name' => 'GTBank',
+            'status' => WithdrawalRequest::STATUS_PROCESSED,
+            'processed_at' => now(),
+        ]);
+
+        Sanctum::actingAs(
+            ConsumerWalletApiAccount::query()->where('whatsapp_wallet_id', $wallet->id)->first(),
+            ['consumer']
+        );
+
+        $response = $this->getJson('/api/v1/consumer/wallet/transactions?scope=business&per_page=50');
+
+        $response->assertOk()
+            ->assertJsonPath('meta.includes_merchant_activity', true)
+            ->assertJsonPath('meta.business_id', $business->id);
+
+        $types = collect($response->json('data'))->pluck('type')->all();
+        $this->assertContains('merchant_withdrawal_out', $types);
+        $this->assertNotEmpty($response->json('meta.from'));
+        $this->assertNotEmpty($response->json('meta.to'));
+    }
 }

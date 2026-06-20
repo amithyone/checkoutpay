@@ -295,7 +295,8 @@ class ConsumerWalletApiController extends Controller
 
         if ($scope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
             $business = $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet);
-            if ($business !== null && $from !== '' && $to !== '') {
+            if ($business !== null) {
+                [$from, $to] = $this->resolveBusinessActivityDateRange($from, $to, $tz);
                 try {
                     Carbon::parse($from, $tz)->startOfDay();
                     Carbon::parse($to, $tz)->endOfDay();
@@ -1408,5 +1409,37 @@ class ConsumerWalletApiController extends Controller
             'message' => $out['message'],
             'data' => $out['data'] ?? null,
         ], $out['ok'] ? 200 : 422);
+    }
+
+    /**
+     * Default business activity window when History omits from/to (last 12 months).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function resolveBusinessActivityDateRange(string $from, string $to, string $tz): array
+    {
+        $now = Carbon::now($tz);
+
+        if ($from === '' && $to === '') {
+            return [
+                $now->copy()->subMonths(12)->format('Y-m-d'),
+                $now->format('Y-m-d'),
+            ];
+        }
+
+        if ($from === '' && $to !== '') {
+            $toDate = Carbon::parse($to, $tz);
+
+            return [
+                $toDate->copy()->subMonths(12)->format('Y-m-d'),
+                $to,
+            ];
+        }
+
+        if ($from !== '' && $to === '') {
+            return [$from, $now->format('Y-m-d')];
+        }
+
+        return [$from, $to];
     }
 }
