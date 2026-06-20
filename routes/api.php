@@ -101,7 +101,7 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/recovery/reset-pin', [ConsumerWalletAuthController::class, 'recoveryResetPin']);
     });
 
-    Route::prefix('consumer')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+    Route::prefix('consumer')->middleware(['auth:sanctum', 'throttle:consumer_wallet'])->group(function () {
         Route::post('auth/logout', [ConsumerWalletAuthController::class, 'logout']);
         Route::get('wallet', [ConsumerWalletApiController::class, 'showWallet']);
         Route::post('wallet/ensure', [ConsumerWalletApiController::class, 'ensure']);

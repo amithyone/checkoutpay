@@ -35,6 +35,14 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(6)->by($key);
         });
 
+        /** Authenticated consumer app (wallet, history, utility pagination). */
+        RateLimiter::for('consumer_wallet', function (Request $request) {
+            $perMinute = max(60, (int) config('consumer_wallet.rate_limit_per_minute', 240));
+            $key = $request->user()?->id ? 'u:'.$request->user()->id : 'ip:'.($request->ip() ?? '0');
+
+            return Limit::perMinute($perMinute)->by('consumer-wallet:'.$key);
+        });
+
         RateLimiter::for('support-poll', function (Request $request) {
             $token = (string) $request->route('token', '');
             $userKey = $request->user()?->id ? 'u:'.$request->user()->id : null;
