@@ -482,6 +482,7 @@ class WhatsappWalletBankPayoutService
         ?WhatsappWallet $wallet = null,
         ?int $walletTransactionId = null,
         ?string $debitAccountNameOverride = null,
+        ?string $debitAccountNumberOverride = null,
     ): array {
         $bankCode = NigerianBankCodeNormalizer::toNipTransferCode($bankCode);
 
@@ -491,13 +492,17 @@ class WhatsappWalletBankPayoutService
             if ($debitName === '') {
                 $debitName = $wallet->mevonDebitAccountName();
             }
+            $debitNumber = trim((string) $debitAccountNumberOverride);
+            if ($debitNumber === '') {
+                $debitNumber = (string) $wallet->mevon_virtual_account_number;
+            }
             $result = $this->payout->createPayout([
                 'amount' => $amount,
                 'bankCode' => $bankCode,
                 'bankName' => $bankName,
                 'creditAccountName' => $accountName,
                 'creditAccountNumber' => $accountNumber,
-                'debitAccountNumber' => (string) $wallet->mevon_virtual_account_number,
+                'debitAccountNumber' => $debitNumber,
                 'debitAccountName' => $debitName,
                 'narration' => $narration,
                 'reference' => $reference,

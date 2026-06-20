@@ -79,6 +79,51 @@ final class ConsumerBusinessWalletLedgerService
         return $wallet->displayName();
     }
 
+    /**
+     * MevonPay payout API debit side — must not use personal VA/name for business-ledger sends.
+     *
+     * @return array{debit_account_name: string, debit_account_number: string}
+     */
+    public function resolveMevonPayoutDebitProfile(WhatsappWallet $wallet, string $ledgerScope): array
+    {
+        if (ConsumerWalletTransactionScope::normalize($ledgerScope) !== ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+            return [
+                'debit_account_name' => $wallet->mevonDebitAccountName(),
+                'debit_account_number' => trim((string) $wallet->mevon_virtual_account_number),
+            ];
+        }
+
+        $businessName = trim((string) ($this->resolveLedgerSenderName($wallet, $ledgerScope) ?? ''));
+        $payIn = $this->resolveBusinessPayInPayload($wallet);
+        $accountNumber = is_array($payIn)
+            ? trim((string) ($payIn['account_number'] ?? ''))
+            : '';
+
+        if ($accountNumber !== '') {
+            return [
+                'debit_account_name' => $businessName !== '' ? $businessName : $this->checkoutPoolDebitName(),
+                'debit_account_number' => $accountNumber,
+            ];
+        }
+
+        return [
+            'debit_account_name' => $this->checkoutPoolDebitName(),
+            'debit_account_number' => $this->checkoutPoolDebitNumber(),
+        ];
+    }
+
+    private function checkoutPoolDebitName(): string
+    {
+        $configured = trim((string) config('services.mevonpay.debit_account_name', ''));
+
+        return $configured !== '' ? $configured : 'Checkout';
+    }
+
+    private function checkoutPoolDebitNumber(): string
+    {
+        return trim((string) config('services.mevonpay.debit_account_number', ''));
+    }
+
     /** Whether the app should expose business Utility / scoped history. */
     public function walletHasBusinessActivity(WhatsappWallet $wallet): bool
     {

@@ -382,9 +382,7 @@ class ConsumerWalletTransferService
             ->where('whatsapp_wallet_id', $wallet->id)
             ->first();
 
-        $debitAccountName = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
-            ? $senderDisplayName
-            : null;
+        $debitProfile = $this->businessLedger->resolveMevonPayoutDebitProfile($walletFresh, $ledgerScope);
 
         $result = $this->bankPayout->sendTransfer(
             $payoutAmount,
@@ -396,7 +394,8 @@ class ConsumerWalletTransferService
             $narration,
             $walletFresh,
             $txnRow?->id,
-            $debitAccountName,
+            $debitProfile['debit_account_name'],
+            $debitProfile['debit_account_number'],
         );
         $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
