@@ -53,6 +53,7 @@ class WhatsappCheckoutPayCodeTest extends TestCase
 
         $this->assertNotNull($payload);
         $this->assertSame('PAY '.$payload['code'], $payload['message']);
+        $this->assertMatchesRegularExpression('/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/', $payload['code']);
         $this->assertStringContainsString('wa.me/2348012345678', (string) $payload['wa_link']);
         $this->assertSame(['NG'], $payload['enabled_countries']);
         $payment->refresh();
@@ -174,6 +175,28 @@ class WhatsappCheckoutPayCodeTest extends TestCase
         $this->assertSame(['NG'], WhatsappCheckoutPayCodePolicy::enabledCountries());
         $this->assertTrue(WhatsappCheckoutPayCodePolicy::customerCountryAllowed('2348012345678'));
         $this->assertFalse(WhatsappCheckoutPayCodePolicy::customerCountryAllowed('264811234567'));
+    }
+
+    /** @test */
+    public function find_active_payment_accepts_legacy_five_char_code(): void
+    {
+        $business = $this->businessWithWalletApi(true);
+
+        $payment = Payment::create([
+            'transaction_id' => 'TXN-LEGACY5',
+            'amount' => 5000,
+            'payer_name' => 'ada',
+            'business_id' => $business->id,
+            'status' => Payment::STATUS_PENDING,
+            'account_number' => '0123456789',
+            'checkout_pay_code' => 'ABC12',
+            'checkout_pay_code_expires_at' => now()->addMinutes(30),
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $found = app(WhatsappCheckoutPayCodeService::class)->findActivePaymentByCode('abc12');
+        $this->assertNotNull($found);
+        $this->assertSame($payment->id, $found->id);
     }
 
     /** @test */

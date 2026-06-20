@@ -23,7 +23,7 @@ class ConsumerWalletPayQrServiceTest extends TestCase
         Schema::create('whatsapp_wallets', function (Blueprint $table) {
             $table->id();
             $table->string('phone_e164', 32)->unique();
-            $table->char('pay_code', 5)->nullable()->unique();
+            $table->char('pay_code', 6)->nullable()->unique();
             $table->unsignedTinyInteger('tier')->default(1);
             $table->decimal('balance', 14, 2)->default(0);
             $table->string('sender_name')->nullable();
@@ -46,7 +46,7 @@ class ConsumerWalletPayQrServiceTest extends TestCase
         $qr = app(ConsumerWalletPayQrService::class)->buildReceiveQr($wallet);
 
         $this->assertStringContainsString('/pay/', $qr['qr_url']);
-        $this->assertMatchesRegularExpression('/^\d{5}$/', $qr['pay_code']);
+        $this->assertMatchesRegularExpression('/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/', $qr['pay_code']);
 
         $resolved = app(ConsumerWalletPayQrService::class)->resolveScanInput($qr['qr_url']);
         $this->assertTrue($resolved['ok']);
@@ -66,7 +66,7 @@ class ConsumerWalletPayQrServiceTest extends TestCase
     }
 
     /** @test */
-    public function pay_code_service_assigns_unique_code(): void
+    public function pay_code_service_assigns_unique_six_char_code(): void
     {
         $wallet = WhatsappWallet::query()->create([
             'phone_e164' => '2348033333333',
@@ -76,8 +76,46 @@ class ConsumerWalletPayQrServiceTest extends TestCase
         ]);
 
         $code = app(ConsumerWalletPayCodeService::class)->ensureForWallet($wallet);
-        $this->assertMatchesRegularExpression('/^\d{5}$/', $code);
+        $this->assertMatchesRegularExpression('/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/', $code);
         $wallet->refresh();
         $this->assertSame($code, $wallet->pay_code);
+    }
+
+    /** @test */
+    public function legacy_five_digit_pay_code_is_preserved_and_resolves(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '2348044444444',
+            'pay_code' => '12345',
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+            'balance' => 0,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'sender_name' => 'Legacy User',
+        ]);
+
+        $code = app(ConsumerWalletPayCodeService::class)->ensureForWallet($wallet);
+        $this->assertSame('12345', $code);
+
+        $resolved = app(ConsumerWalletPayQrService::class)->resolveScanInput('12345');
+        $this->assertTrue($resolved['ok']);
+        $this->assertSame('2348044444444', $resolved['phone_e164']);
+        $this->assertSame('Legacy User', $resolved['display_name']);
+    }
+
+    /** @test */
+    public function alphanumeric_six_char_pay_code_resolves(): void
+    {
+        WhatsappWallet::query()->create([
+            'phone_e164' => '2348055555555',
+            'pay_code' => 'K7MX2P',
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+            'balance' => 0,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'sender_name' => 'Alpha User',
+        ]);
+
+        $resolved = app(ConsumerWalletPayQrService::class)->resolveScanInput('k7mx2p');
+        $this->assertTrue($resolved['ok']);
+        $this->assertSame('2348055555555', $resolved['phone_e164']);
     }
 }

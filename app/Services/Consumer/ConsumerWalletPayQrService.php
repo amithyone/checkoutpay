@@ -56,7 +56,7 @@ final class ConsumerWalletPayQrService
             return ['ok' => false, 'message' => 'Empty scan payload.'];
         }
 
-        if (preg_match('/^\d{5}$/', $raw)) {
+        if (preg_match('/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5,6}$/i', $raw) || preg_match('/^\d{5}$/', $raw)) {
             return $this->resolvePayCode($raw);
         }
 

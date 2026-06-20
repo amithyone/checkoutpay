@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
  */
 final class WhatsappCheckoutPayCodeService
 {
-    private const CODE_LENGTH = 5;
+    private const CODE_LENGTH = 6;
 
     private const CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -122,7 +122,7 @@ final class WhatsappCheckoutPayCodeService
     public function findActivePaymentByCode(string $code): ?Payment
     {
         $code = strtoupper(preg_replace('/\s+/', '', $code) ?? '');
-        if (! preg_match('/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}$/', $code)) {
+        if (! preg_match('/^[A-Z0-9]{5,6}$/', $code)) {
             return null;
         }
 

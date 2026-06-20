@@ -313,7 +313,7 @@ class ConsumerWalletApiController extends Controller
                         $walletModels[] = $item['wallet_tx'];
                     }
                 }
-                $enriched = $this->enrichTransactionsWithCounterpartyNames($walletModels);
+                $enriched = $this->enrichTransactionsWithCounterpartyNames($walletModels, $wallet);
                 $byId = [];
                 foreach ($enriched as $row) {
                     $byId[(int) ($row['id'] ?? 0)] = $row;
@@ -323,7 +323,7 @@ class ConsumerWalletApiController extends Controller
                     if ($item['wallet_tx'] instanceof WhatsappWalletTransaction) {
                         $data[] = $byId[(int) $item['wallet_tx']->id] ?? $item['row'];
                     } else {
-                        $data[] = $item['row'];
+                        $data[] = $this->enrichSyntheticActivityRow($item['row'], $wallet);
                     }
                 }
 
@@ -363,7 +363,7 @@ class ConsumerWalletApiController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $this->enrichTransactionsWithCounterpartyNames($walletBusinessPaginator->items()),
+                'data' => $this->enrichTransactionsWithCounterpartyNames($walletBusinessPaginator->items(), $wallet),
                 'meta' => [
                     'current_page' => $walletBusinessPaginator->currentPage(),
                     'last_page' => $walletBusinessPaginator->lastPage(),
@@ -402,7 +402,7 @@ class ConsumerWalletApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->enrichTransactionsWithCounterpartyNames($paginator->items()),
+            'data' => $this->enrichTransactionsWithCounterpartyNames($paginator->items(), $wallet),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),
@@ -457,7 +457,7 @@ class ConsumerWalletApiController extends Controller
      * @param  list<WhatsappWalletTransaction>  $items
      * @return list<array<string, mixed>>
      */
-    private function enrichTransactionsWithCounterpartyNames(array $items): array
+    private function enrichTransactionsWithCounterpartyNames(array $items, WhatsappWallet $wallet): array
     {
         $phones = [];
         foreach ($items as $tx) {
@@ -482,7 +482,7 @@ class ConsumerWalletApiController extends Controller
                 ->all();
         }
 
-        return array_map(function (WhatsappWalletTransaction $tx) use ($byPhone) {
+        return array_map(function (WhatsappWalletTransaction $tx) use ($byPhone, $wallet) {
             $row = $tx->toArray();
             $phone = trim((string) ($row['counterparty_phone_e164'] ?? ''));
             if ($phone !== '') {
@@ -502,7 +502,7 @@ class ConsumerWalletApiController extends Controller
                 }
             }
 
-            return $this->enrichTransactionRow($tx, $row);
+            return $this->enrichTransactionRow($tx, $row, $wallet);
         }, $items);
     }
 
@@ -510,7 +510,7 @@ class ConsumerWalletApiController extends Controller
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
-    private function enrichTransactionRow(WhatsappWalletTransaction $tx, array $row): array
+    private function enrichTransactionRow(WhatsappWalletTransaction $tx, array $row, WhatsappWallet $wallet): array
     {
         $meta = is_array($row['meta'] ?? null) ? $row['meta'] : [];
 
@@ -523,6 +523,21 @@ class ConsumerWalletApiController extends Controller
             }
             if ($bankName !== '') {
                 $row['counterparty_bank_name'] = $bankName;
+            }
+
+            $sessionId = trim((string) ($meta['payout_session_id'] ?? $meta['session_id'] ?? ''));
+            if ($sessionId !== '') {
+                $row['session_id'] = $sessionId;
+            }
+
+            $narration = trim((string) ($meta['narration'] ?? ''));
+            if ($narration !== '') {
+                $row['narration'] = $narration;
+            }
+
+            $senderAcct = $this->resolveSenderAccountForReceipt($wallet, (string) ($row['ledger_scope'] ?? ConsumerWalletTransactionScope::SCOPE_PERSONAL));
+            if ($senderAcct !== null) {
+                $row['sender_account_number'] = $senderAcct;
             }
         }
 
@@ -567,6 +582,56 @@ class ConsumerWalletApiController extends Controller
         }
 
         return $row;
+    }
+
+    private function enrichSyntheticActivityRow(array $row, WhatsappWallet $wallet): array
+    {
+        $type = (string) ($row['type'] ?? '');
+        if ($type !== 'merchant_withdrawal_out') {
+            return $row;
+        }
+
+        $meta = is_array($row['meta'] ?? null) ? $row['meta'] : [];
+        $raw = is_array($meta['payout_raw_response'] ?? null) ? $meta['payout_raw_response'] : [];
+        foreach (['sessionId', 'session_id', 'SessionId'] as $key) {
+            $sessionId = trim((string) ($raw[$key] ?? ''));
+            if ($sessionId !== '') {
+                $row['session_id'] = $sessionId;
+                break;
+            }
+        }
+
+        $narration = trim((string) ($meta['bank_narration'] ?? $meta['narration'] ?? ''));
+        if ($narration !== '') {
+            $row['narration'] = $narration;
+        }
+
+        $senderName = trim((string) ($wallet->sender_name ?? ''));
+        if ($senderName !== '') {
+            $row['sender_name'] = $senderName;
+        }
+
+        $senderAcct = $this->resolveSenderAccountForReceipt($wallet, ConsumerWalletTransactionScope::SCOPE_BUSINESS);
+        if ($senderAcct !== null) {
+            $row['sender_account_number'] = $senderAcct;
+        }
+
+        return $row;
+    }
+
+    private function resolveSenderAccountForReceipt(WhatsappWallet $wallet, string $ledgerScope): ?string
+    {
+        $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+        if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+            $payIn = $this->businessLedger->resolveBusinessPayInPayload($wallet);
+            $acct = trim((string) ($payIn['account_number'] ?? ''));
+
+            return $acct !== '' ? $acct : null;
+        }
+
+        $acct = trim((string) $wallet->mevon_virtual_account_number);
+
+        return $acct !== '' ? $acct : null;
     }
 
     public function issueTopupVirtualAccount(Request $request): JsonResponse

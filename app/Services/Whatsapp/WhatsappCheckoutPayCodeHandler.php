@@ -137,7 +137,7 @@ final class WhatsappCheckoutPayCodeHandler
     private function extractCode(string $text): ?string
     {
         $normalized = strtoupper(trim(preg_replace('/\s+/', ' ', $text) ?? ''));
-        if (preg_match('/^PAY\s+([23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5})$/', $normalized, $m)) {
+        if (preg_match('/^PAY\s+([A-Z0-9]{5,6})$/', $normalized, $m)) {
             return $m[1];
         }
 
