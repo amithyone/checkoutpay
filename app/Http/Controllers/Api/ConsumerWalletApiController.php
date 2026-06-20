@@ -542,11 +542,22 @@ class ConsumerWalletApiController extends Controller
             }
 
             $narration = trim((string) ($meta['narration'] ?? ''));
-            if ($narration !== '') {
+            $apiNarration = trim((string) ($apiResponse['narration'] ?? $apiResponse['Narration'] ?? ''));
+            if ($apiNarration !== '') {
+                $row['narration'] = $apiNarration;
+            } elseif ($narration !== '') {
                 $row['narration'] = $narration;
             }
 
-            $senderAcct = $this->resolveSenderAccountForReceipt($wallet, (string) ($row['ledger_scope'] ?? ConsumerWalletTransactionScope::SCOPE_PERSONAL));
+            $ledgerScope = ConsumerWalletTransactionScope::normalize((string) ($row['ledger_scope'] ?? ConsumerWalletTransactionScope::SCOPE_PERSONAL));
+            if (trim((string) ($row['sender_name'] ?? '')) === '') {
+                $resolvedSender = $this->businessLedger->resolveLedgerSenderName($wallet, $ledgerScope);
+                if ($resolvedSender !== null && trim($resolvedSender) !== '') {
+                    $row['sender_name'] = trim($resolvedSender);
+                }
+            }
+
+            $senderAcct = $this->resolveSenderAccountForReceipt($wallet, $ledgerScope);
             if ($senderAcct !== null) {
                 $row['sender_account_number'] = $senderAcct;
             }
@@ -632,9 +643,9 @@ class ConsumerWalletApiController extends Controller
             $row['narration'] = $narration;
         }
 
-        $senderName = trim((string) ($wallet->sender_name ?? ''));
-        if ($senderName !== '') {
-            $row['sender_name'] = $senderName;
+        $senderName = $this->businessLedger->resolveLedgerSenderName($wallet, ConsumerWalletTransactionScope::SCOPE_BUSINESS);
+        if ($senderName !== null && trim($senderName) !== '') {
+            $row['sender_name'] = trim($senderName);
         }
 
         $senderAcct = $this->resolveSenderAccountForReceipt($wallet, ConsumerWalletTransactionScope::SCOPE_BUSINESS);

@@ -305,9 +305,7 @@ class ConsumerWalletTransferService
         $business = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
             ? $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet)
             : null;
-        $narration = $business !== null
-            ? BankPayoutNarration::forBusinessWithdrawal($business, $remark)
-            : BankPayoutNarration::forConsumerApp($remark);
+        $narration = BankPayoutNarration::forConsumerApp($remark);
 
         if (! $this->bankPayout->isConfigured()) {
             return $this->ledgerOnlyBankTransfer($wallet, $amount, $acct, $bankName, $bankCode, $beneficiaryName, $isSelf, $selfFee, $payoutAmount, $ledgerScope, $senderDisplayName);

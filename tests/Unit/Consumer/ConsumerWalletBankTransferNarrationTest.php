@@ -72,7 +72,7 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
         $this->assertSame('Rent for May', $capturedNarration);
     }
 
-    public function test_business_bank_transfer_uses_business_name_as_sender_and_narration(): void
+    public function test_business_bank_transfer_uses_business_name_as_sender_and_checkout_app_narration(): void
     {
         $capturedNarration = null;
         $capturedDebitName = null;
@@ -105,7 +105,7 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
             ConsumerWalletTransactionScope::SCOPE_BUSINESS,
         );
 
-        $this->assertSame('Acme Ventures Ltd', $capturedNarration);
+        $this->assertSame(BankPayoutNarration::CONSUMER_APP_DEFAULT, $capturedNarration);
         $this->assertSame('Acme Ventures Ltd', $capturedDebitName);
 
         $txn = WhatsappWalletTransaction::query()
@@ -114,6 +114,7 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
             ->first();
         $this->assertNotNull($txn);
         $this->assertSame('Acme Ventures Ltd', $txn->sender_name);
+        $this->assertSame(BankPayoutNarration::CONSUMER_APP_DEFAULT, $txn->meta['narration'] ?? null);
         $this->assertSame(ConsumerWalletTransactionScope::SCOPE_BUSINESS, $txn->ledger_scope);
     }
 
