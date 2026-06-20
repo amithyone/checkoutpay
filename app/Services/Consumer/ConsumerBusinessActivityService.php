@@ -18,9 +18,22 @@ use Illuminate\Support\Str;
  */
 final class ConsumerBusinessActivityService
 {
+    /** Utility / statements — all business ledger rows plus merchant payments and withdrawals. */
+    public const VIEW_FULL = 'full';
+
+    /** History — direct business-account inflows (Rubies / site pay-ins) and merchant withdrawals only. */
+    public const VIEW_ACCOUNT = 'account';
+
     public function __construct(
         private ConsumerBusinessWalletLedgerService $businessLedger,
     ) {}
+
+    public static function normalizeView(?string $view): string
+    {
+        return strtolower(trim((string) $view)) === self::VIEW_ACCOUNT
+            ? self::VIEW_ACCOUNT
+            : self::VIEW_FULL;
+    }
 
     /**
      * @return array{items: list<array{row: array<string, mixed>, wallet_tx: WhatsappWalletTransaction|null}>, total: int}
@@ -32,12 +45,13 @@ final class ConsumerBusinessActivityService
         string $to,
         int $page,
         int $perPage,
+        string $view = self::VIEW_FULL,
     ): array {
         $tz = (string) config('app.timezone', 'Africa/Lagos');
         $fromAt = $this->parseBoundary($from, $tz, startOfDay: true);
         $toAt = $this->parseBoundary($to, $tz, startOfDay: false);
 
-        $merged = $this->collectRows($wallet, $business, $fromAt, $toAt);
+        $merged = $this->collectRows($wallet, $business, $fromAt, $toAt, self::normalizeView($view));
         $total = count($merged);
         $offset = max(0, ($page - 1) * $perPage);
         $items = array_slice($merged, $offset, $perPage);
@@ -53,14 +67,22 @@ final class ConsumerBusinessActivityService
         Business $business,
         Carbon $fromAt,
         Carbon $toAt,
+        string $view = self::VIEW_FULL,
     ): array {
-        $walletTxns = WhatsappWalletTransaction::query()
+        $view = self::normalizeView($view);
+        $accountView = $view === self::VIEW_ACCOUNT;
+
+        $walletQuery = WhatsappWalletTransaction::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->where('ledger_scope', ConsumerWalletTransactionScope::SCOPE_BUSINESS)
             ->where('created_at', '>=', $fromAt)
-            ->where('created_at', '<=', $toAt)
-            ->orderByDesc('id')
-            ->get();
+            ->where('created_at', '<=', $toAt);
+
+        if ($accountView) {
+            $walletQuery->where('type', WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN);
+        }
+
+        $walletTxns = $walletQuery->orderByDesc('id')->get();
 
         $coveredPaymentIds = [];
         $rows = [];

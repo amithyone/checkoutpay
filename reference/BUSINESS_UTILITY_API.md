@@ -14,11 +14,14 @@ Companion to `checkoutnow/docs/BUSINESS_UTILITY_API.md` (keep in sync).
 
 ## Business transactions merge
 
-`ConsumerBusinessActivityService` when `scope=business` and merchant resolved:
+Query param `business_view`:
 
-- Wallet `ledger_scope=business` rows
-- All `payments` for `business_id`
-- All `withdrawal_requests` for `business_id`
+| Value | Use |
+|-------|-----|
+| `full` (default) | Utility — all wallet business ledger + merchant payments + withdrawals |
+| `account` | History — `merchant_payment_in`, `business_rubies_in`, `merchant_withdrawal_out` only |
+
+`ConsumerBusinessActivityService` when `scope=business` and merchant resolved.
 
 Without merchant link: wallet `ledger_scope=business` rows only.
 

@@ -130,7 +130,7 @@ class ConsumerBusinessActivityTest extends TestCase
             ['consumer']
         );
 
-        $response = $this->getJson('/api/v1/consumer/wallet/transactions?scope=business&per_page=50');
+        $response = $this->getJson('/api/v1/consumer/wallet/transactions?scope=business&business_view=account&per_page=50');
 
         $response->assertOk()
             ->assertJsonPath('meta.includes_merchant_activity', true)
@@ -140,5 +140,81 @@ class ConsumerBusinessActivityTest extends TestCase
         $this->assertContains('merchant_withdrawal_out', $types);
         $this->assertNotEmpty($response->json('meta.from'));
         $this->assertNotEmpty($response->json('meta.to'));
+        $this->assertSame('account', $response->json('meta.business_view'));
+    }
+
+    public function test_business_account_view_excludes_app_transfers_but_keeps_merchant_rows(): void
+    {
+        $business = Business::create([
+            'name' => 'Acme Store',
+            'email' => 'acme3@example.com',
+            'password' => Hash::make('secret'),
+            'business_id' => 'ACME3',
+            'phone' => '08011112222',
+            'balance' => 50000,
+        ]);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '2348011112222',
+            'balance' => 1000,
+            'pin_hash' => Hash::make('2468'),
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'linked_business_id' => $business->id,
+            'business_balance' => 50000,
+        ]);
+
+        ConsumerWalletApiAccount::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'phone_e164' => $wallet->phone_e164,
+        ]);
+
+        \App\Models\WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'type' => \App\Models\WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
+            'ledger_scope' => 'business',
+            'amount' => 3000,
+            'balance_after' => 47000,
+            'counterparty_account_name' => 'Someone',
+            'created_at' => now(),
+        ]);
+
+        Payment::query()->create([
+            'transaction_id' => 'TX-ACC-001',
+            'amount' => 5000,
+            'business_receives' => 5000,
+            'business_id' => $business->id,
+            'status' => Payment::STATUS_APPROVED,
+            'payment_source' => Payment::SOURCE_INTERNAL,
+            'matched_at' => now(),
+        ]);
+
+        WithdrawalRequest::query()->create([
+            'business_id' => $business->id,
+            'amount' => 1000,
+            'account_number' => '0123456789',
+            'account_name' => 'Acme Store',
+            'bank_name' => 'GTBank',
+            'status' => WithdrawalRequest::STATUS_PROCESSED,
+            'processed_at' => now(),
+        ]);
+
+        Sanctum::actingAs(
+            ConsumerWalletApiAccount::query()->where('whatsapp_wallet_id', $wallet->id)->first(),
+            ['consumer']
+        );
+
+        $from = now()->subDays(7)->format('Y-m-d');
+        $to = now()->format('Y-m-d');
+
+        $account = $this->getJson('/api/v1/consumer/wallet/transactions?scope=business&business_view=account&from='.$from.'&to='.$to.'&per_page=50');
+        $accountTypes = collect($account->json('data'))->pluck('type')->all();
+        $this->assertContains('merchant_payment_in', $accountTypes);
+        $this->assertContains('merchant_withdrawal_out', $accountTypes);
+        $this->assertNotContains('bank_transfer_out', $accountTypes);
+
+        $full = $this->getJson('/api/v1/consumer/wallet/transactions?scope=business&business_view=full&from='.$from.'&to='.$to.'&per_page=50');
+        $fullTypes = collect($full->json('data'))->pluck('type')->all();
+        $this->assertContains('bank_transfer_out', $fullTypes);
     }
 }

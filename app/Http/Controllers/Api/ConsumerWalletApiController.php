@@ -292,6 +292,7 @@ class ConsumerWalletApiController extends Controller
         $to = trim((string) $request->input('to', ''));
         $tz = config('app.timezone', 'Africa/Lagos');
         $page = max(1, (int) $request->input('page', 1));
+        $businessView = ConsumerBusinessActivityService::normalizeView($request->input('business_view'));
 
         if ($scope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
             $business = $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet);
@@ -304,7 +305,7 @@ class ConsumerWalletApiController extends Controller
             }
 
             if ($business !== null) {
-                $result = $this->businessActivity->paginate($wallet, $business, $from, $to, $page, $perPage);
+                $result = $this->businessActivity->paginate($wallet, $business, $from, $to, $page, $perPage, $businessView);
                 $walletModels = [];
                 foreach ($result['items'] as $item) {
                     if ($item['wallet_tx'] instanceof WhatsappWalletTransaction) {
@@ -341,6 +342,7 @@ class ConsumerWalletApiController extends Controller
                         'timezone' => $tz,
                         'business_id' => $business->id,
                         'includes_merchant_activity' => true,
+                        'business_view' => $businessView,
                     ],
                 ]);
             }
@@ -350,6 +352,10 @@ class ConsumerWalletApiController extends Controller
                 ->where('ledger_scope', ConsumerWalletTransactionScope::SCOPE_BUSINESS)
                 ->where('created_at', '>=', $fromAt)
                 ->where('created_at', '<=', $toAt);
+
+            if ($businessView === ConsumerBusinessActivityService::VIEW_ACCOUNT) {
+                $walletBusinessQuery->where('type', WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN);
+            }
 
             $walletBusinessPaginator = $walletBusinessQuery->orderByDesc('id')->paginate($perPage);
 
@@ -366,6 +372,7 @@ class ConsumerWalletApiController extends Controller
                     'to' => $to,
                     'timezone' => $tz,
                     'includes_merchant_activity' => false,
+                    'business_view' => $businessView,
                 ],
             ]);
         }
