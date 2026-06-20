@@ -295,15 +295,15 @@ class ConsumerWalletApiController extends Controller
 
         if ($scope === ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
             $business = $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet);
-            if ($business !== null) {
-                [$from, $to] = $this->resolveBusinessActivityDateRange($from, $to, $tz);
-                try {
-                    Carbon::parse($from, $tz)->startOfDay();
-                    Carbon::parse($to, $tz)->endOfDay();
-                } catch (\Throwable) {
-                    return response()->json(['success' => false, 'message' => 'Invalid from or to date. Use YYYY-MM-DD.'], 422);
-                }
+            [$from, $to] = $this->resolveBusinessActivityDateRange($from, $to, $tz);
+            try {
+                $fromAt = Carbon::parse($from, $tz)->startOfDay();
+                $toAt = Carbon::parse($to, $tz)->endOfDay();
+            } catch (\Throwable) {
+                return response()->json(['success' => false, 'message' => 'Invalid from or to date. Use YYYY-MM-DD.'], 422);
+            }
 
+            if ($business !== null) {
                 $result = $this->businessActivity->paginate($wallet, $business, $from, $to, $page, $perPage);
                 $walletModels = [];
                 foreach ($result['items'] as $item) {
@@ -344,6 +344,30 @@ class ConsumerWalletApiController extends Controller
                     ],
                 ]);
             }
+
+            $walletBusinessQuery = WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $wallet->id)
+                ->where('ledger_scope', ConsumerWalletTransactionScope::SCOPE_BUSINESS)
+                ->where('created_at', '>=', $fromAt)
+                ->where('created_at', '<=', $toAt);
+
+            $walletBusinessPaginator = $walletBusinessQuery->orderByDesc('id')->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $this->enrichTransactionsWithCounterpartyNames($walletBusinessPaginator->items()),
+                'meta' => [
+                    'current_page' => $walletBusinessPaginator->currentPage(),
+                    'last_page' => $walletBusinessPaginator->lastPage(),
+                    'per_page' => $walletBusinessPaginator->perPage(),
+                    'total' => $walletBusinessPaginator->total(),
+                    'scope' => $scope,
+                    'from' => $from,
+                    'to' => $to,
+                    'timezone' => $tz,
+                    'includes_merchant_activity' => false,
+                ],
+            ]);
         }
 
         $query = WhatsappWalletTransaction::query()
