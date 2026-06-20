@@ -305,7 +305,8 @@ class ConsumerWalletApiController extends Controller
             }
 
             if ($business !== null) {
-                $result = $this->businessActivity->paginate($wallet, $business, $from, $to, $page, $perPage, $businessView);
+                $refresh = $request->boolean('refresh');
+                $result = $this->businessActivity->paginate($wallet, $business, $from, $to, $page, $perPage, $businessView, $refresh);
                 $walletModels = [];
                 foreach ($result['items'] as $item) {
                     if ($item['wallet_tx'] instanceof WhatsappWalletTransaction) {
@@ -343,6 +344,7 @@ class ConsumerWalletApiController extends Controller
                         'business_id' => $business->id,
                         'includes_merchant_activity' => true,
                         'business_view' => $businessView,
+                        'refreshed' => $refresh,
                     ],
                 ]);
             }

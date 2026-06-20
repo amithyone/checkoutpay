@@ -8,6 +8,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Models\WithdrawalRequest;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -46,17 +47,95 @@ final class ConsumerBusinessActivityService
         int $page,
         int $perPage,
         string $view = self::VIEW_FULL,
+        bool $refresh = false,
     ): array {
-        $tz = (string) config('app.timezone', 'Africa/Lagos');
-        $fromAt = $this->parseBoundary($from, $tz, startOfDay: true);
-        $toAt = $this->parseBoundary($to, $tz, startOfDay: false);
-
-        $merged = $this->collectRows($wallet, $business, $fromAt, $toAt, self::normalizeView($view));
-        $total = count($merged);
+        $view = self::normalizeView($view);
+        $serialized = $this->mergedRowsSerialized($wallet, $business, $from, $to, $view, $refresh);
+        $total = count($serialized);
         $offset = max(0, ($page - 1) * $perPage);
-        $items = array_slice($merged, $offset, $perPage);
+        $pageSlice = array_slice($serialized, $offset, $perPage);
+        $items = $this->hydratePageItems($pageSlice, (int) $wallet->id);
 
         return ['items' => $items, 'total' => $total];
+    }
+
+    /**
+     * @return list<array{row: array<string, mixed>, wallet_tx_id: int|null}>
+     */
+    private function mergedRowsSerialized(
+        WhatsappWallet $wallet,
+        Business $business,
+        string $from,
+        string $to,
+        string $view,
+        bool $refresh,
+    ): array {
+        $key = sprintf(
+            'consumer_biz_activity:v1:%d:%d:%s:%s:%s',
+            (int) $wallet->id,
+            (int) $business->id,
+            $from,
+            $to,
+            $view,
+        );
+
+        if ($refresh) {
+            Cache::forget($key);
+        }
+
+        $ttlSeconds = $view === self::VIEW_ACCOUNT
+            ? max(60, (int) config('consumer_wallet.business_activity_cache_ttl_account', 600))
+            : max(60, (int) config('consumer_wallet.business_activity_cache_ttl_full', 1800));
+
+        return Cache::remember($key, $ttlSeconds, function () use ($wallet, $business, $from, $to, $view) {
+            $tz = (string) config('app.timezone', 'Africa/Lagos');
+            $fromAt = $this->parseBoundary($from, $tz, startOfDay: true);
+            $toAt = $this->parseBoundary($to, $tz, startOfDay: false);
+            $merged = $this->collectRows($wallet, $business, $fromAt, $toAt, $view);
+
+            return array_map(static function (array $item): array {
+                return [
+                    'row' => $item['row'],
+                    'wallet_tx_id' => $item['wallet_tx'] instanceof WhatsappWalletTransaction
+                        ? (int) $item['wallet_tx']->id
+                        : null,
+                ];
+            }, $merged);
+        });
+    }
+
+    /**
+     * @param  list<array{row: array<string, mixed>, wallet_tx_id: int|null}>  $serializedPage
+     * @return list<array{row: array<string, mixed>, wallet_tx: WhatsappWalletTransaction|null}>
+     */
+    private function hydratePageItems(array $serializedPage, int $walletId): array
+    {
+        $ids = [];
+        foreach ($serializedPage as $item) {
+            $txId = (int) ($item['wallet_tx_id'] ?? 0);
+            if ($txId > 0) {
+                $ids[] = $txId;
+            }
+        }
+
+        $models = $ids === []
+            ? collect()
+            : WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $walletId)
+                ->whereIn('id', array_values(array_unique($ids)))
+                ->get()
+                ->keyBy('id');
+
+        $items = [];
+        foreach ($serializedPage as $item) {
+            $txId = (int) ($item['wallet_tx_id'] ?? 0);
+            $items[] = [
+                'row' => $item['row'],
+                'wallet_tx' => $txId > 0 ? ($models->get($txId) instanceof WhatsappWalletTransaction ? $models->get($txId) : null) : null,
+            ];
+        }
+
+        return $items;
     }
 
     /**
