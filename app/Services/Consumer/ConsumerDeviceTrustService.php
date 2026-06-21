@@ -10,13 +10,10 @@ use App\Models\WhatsappWallet;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Webauthn\AttestationStatement\AttestationStatementSupportManager;
 
 class ConsumerDeviceTrustService
 {
-    public function __construct(
-        private ConsumerWebAuthnService $webauthn,
-    ) {}
-
     public function isEnabled(): bool
     {
         return (bool) config('consumer_wallet.device_trust_enabled', true);
@@ -112,7 +109,7 @@ class ConsumerDeviceTrustService
                 $this->applyTransferLock($account);
             }
 
-            $verify = $this->webauthn->registerVerify($account, $credentialPayload, $platform, $deviceName);
+            $verify = $this->webauthn()->registerVerify($account, $credentialPayload, $platform, $deviceName);
             if (! $verify['ok']) {
                 return $verify;
             }
@@ -288,5 +285,16 @@ class ConsumerDeviceTrustService
             ->first();
 
         return $passkey?->device;
+    }
+
+    private function webauthn(): ConsumerWebAuthnService
+    {
+        if (! class_exists(AttestationStatementSupportManager::class)) {
+            throw new \RuntimeException(
+                'WebAuthn library missing. Run composer install on the server (web-auth/webauthn-lib).'
+            );
+        }
+
+        return app(ConsumerWebAuthnService::class);
     }
 }
