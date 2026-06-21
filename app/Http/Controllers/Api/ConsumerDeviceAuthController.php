@@ -1,0 +1,348 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\ConsumerWalletApiAccount;
+use App\Services\Consumer\ConsumerDeviceStepupService;
+use App\Services\Consumer\ConsumerDeviceTrustService;
+use App\Services\Consumer\ConsumerWebAuthnService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class ConsumerDeviceAuthController extends Controller
+{
+    public function passkeyRegisterOptions(Request $request, ConsumerWebAuthnService $webauthn): JsonResponse
+    {
+        $request->validate([
+            'device_name' => 'nullable|string|max:120',
+        ]);
+
+        $account = $this->accountFor($request);
+        $result = $webauthn->registerOptions($account, $request->input('device_name'));
+
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['options'],
+        ]);
+    }
+
+    public function passkeyRegisterVerify(Request $request, ConsumerWebAuthnService $webauthn): JsonResponse
+    {
+        $request->validate([
+            'credential' => 'required|array',
+            'platform' => 'required|string|max:32',
+            'device_name' => 'nullable|string|max:120',
+        ]);
+
+        $account = $this->accountFor($request);
+        $result = $webauthn->registerVerify(
+            $account,
+            (array) $request->input('credential'),
+            (string) $request->input('platform'),
+            $request->input('device_name') ? (string) $request->input('device_name') : null,
+        );
+
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'ok' => true,
+                'credential_id' => $result['credential_id'],
+                'device_id' => $result['device_id'],
+            ],
+        ]);
+    }
+
+    public function passkeyLoginOptions(Request $request, ConsumerWebAuthnService $webauthn): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+        ]);
+
+        $result = $webauthn->loginOptions((string) $request->input('phone'));
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['options'],
+        ]);
+    }
+
+    public function passkeyLoginVerify(Request $request, ConsumerWebAuthnService $webauthn, ConsumerDeviceTrustService $trust): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'credential' => 'required|array',
+        ]);
+
+        $result = $webauthn->loginVerify(
+            (string) $request->input('phone'),
+            (array) $request->input('credential'),
+        );
+
+        if (! $result['ok'] || ! isset($result['account'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Passkey login failed.',
+            ], 422);
+        }
+
+        $login = $trust->issueLoginToken($result['account'], resetTransferLock: false);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Signed in.',
+            'data' => [
+                'token' => $login['token'],
+                'token_type' => 'Bearer',
+                'phone_e164' => $login['phone_e164'],
+                'wallet_id' => $login['wallet_id'],
+                'transfer_lock_until' => $login['transfer_lock_until'],
+            ],
+        ]);
+    }
+
+    public function stepupStart(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'pin' => ['nullable', 'regex:/^\d{4}$/', 'required_without:otp_code'],
+            'otp_code' => ['nullable', 'string', 'max:12', 'required_without:pin'],
+        ]);
+
+        $result = $stepup->start(
+            (string) $request->input('phone'),
+            $request->filled('pin') ? (string) $request->input('pin') : null,
+            $request->filled('otp_code') ? (string) $request->input('otp_code') : null,
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not start step-up.',
+            ], 422);
+        }
+
+        if (! ($result['stepup_required'] ?? false)) {
+            return response()->json([
+                'success' => true,
+                'message' => $result['message'] ?? 'No step-up required.',
+                'data' => ['stepup_required' => false],
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'stepup_required' => true,
+                'stepup_session' => $result['stepup_session'],
+                'other_device_label' => $result['other_device_label'] ?? null,
+                'channels' => $result['channels'] ?? ['whatsapp'],
+            ],
+        ]);
+    }
+
+    public function stepupBvn(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+            'bvn' => 'required|string|size:11',
+        ]);
+
+        $result = $stepup->verifyBvn(
+            (string) $request->input('stepup_session'),
+            (string) $request->input('bvn'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'] ?? null,
+            'data' => $result['ok'] ? ['bvn_verified' => true] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function stepupOtpRequest(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+            'channel' => 'required|string|in:whatsapp,email',
+        ]);
+
+        $result = $stepup->requestOtp(
+            (string) $request->input('stepup_session'),
+            (string) $request->input('channel'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'] ?? null,
+            'data' => $result['ok'] ? ['sent' => true] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function stepupOtpVerify(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+            'code' => 'required|string|max:12',
+        ]);
+
+        $result = $stepup->verifyOtp(
+            (string) $request->input('stepup_session'),
+            (string) $request->input('code'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'] ?? null,
+            'data' => $result['ok'] ? ['stepup_token' => $result['stepup_token']] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function bindOptions(Request $request, ConsumerDeviceStepupService $stepup, ConsumerWebAuthnService $webauthn): JsonResponse
+    {
+        $request->validate([
+            'stepup_token' => 'required|string|max:128',
+            'device_name' => 'nullable|string|max:120',
+        ]);
+
+        $session = $stepup->findSessionByStepupToken((string) $request->input('stepup_token'));
+        if ($session === null || ! $session->isStepupTokenValid((string) $request->input('stepup_token'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired step-up token.',
+            ], 422);
+        }
+
+        $account = $session->account;
+        if ($account === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Account not found.',
+            ], 422);
+        }
+
+        $result = $webauthn->registerOptions(
+            $account,
+            $request->input('device_name') ? (string) $request->input('device_name') : null,
+        );
+
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not start passkey setup.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['options'],
+        ]);
+    }
+
+    public function bindDevice(Request $request, ConsumerDeviceStepupService $stepup, ConsumerDeviceTrustService $trust): JsonResponse
+    {
+        $request->validate([
+            'stepup_token' => 'required|string|max:128',
+            'revoke_others' => 'required|boolean',
+            'credential' => 'required|array',
+            'platform' => 'required|string|max:32',
+            'device_name' => 'nullable|string|max:120',
+        ]);
+
+        $session = $stepup->findSessionByStepupToken((string) $request->input('stepup_token'));
+        if ($session === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired step-up token.',
+            ], 422);
+        }
+
+        $result = $trust->bindDevice(
+            $session,
+            (string) $request->input('stepup_token'),
+            (bool) $request->boolean('revoke_others'),
+            (array) $request->input('credential'),
+            (string) $request->input('platform'),
+            $request->input('device_name') ? (string) $request->input('device_name') : null,
+        );
+
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not bind device.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device bound.',
+            'data' => [
+                'token' => $result['token'],
+                'token_type' => 'Bearer',
+                'wallet_id' => $result['wallet_id'],
+                'devices_revoked' => $result['devices_revoked'] ?? 0,
+                'transfer_lock_until' => $result['transfer_lock_until'] ?? null,
+            ],
+        ]);
+    }
+
+    public function listDevices(Request $request, ConsumerDeviceTrustService $trust): JsonResponse
+    {
+        $account = $this->accountFor($request);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'devices' => $trust->listDevices($account),
+            ],
+        ]);
+    }
+
+    public function revokeDevice(Request $request, int $id, ConsumerDeviceTrustService $trust): JsonResponse
+    {
+        $account = $this->accountFor($request);
+        $ok = $trust->revokeDevice($account, $id);
+
+        if (! $ok) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Device not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device revoked.',
+        ]);
+    }
+
+    private function accountFor(Request $request): ConsumerWalletApiAccount
+    {
+        $user = $request->user();
+        if (! $user instanceof ConsumerWalletApiAccount) {
+            abort(401);
+        }
+
+        return $user;
+    }
+}

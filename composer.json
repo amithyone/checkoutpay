@@ -12,8 +12,13 @@
         "laravel/framework": "^10.10",
         "laravel/sanctum": "^3.2",
         "laravel/tinker": "^2.8",
+        "phpdocumentor/reflection-docblock": "^6.0",
         "pragmarx/google2fa": "^9.0",
         "simplesoftwareio/simple-qrcode": "^4.2",
+        "symfony/property-info": "^7.4",
+        "symfony/serializer": "^7.4",
+        "web-auth/cose-lib": "^4.5",
+        "web-auth/webauthn-lib": "^5.3",
         "webklex/laravel-imap": "^4.0"
     },
     "require-dev": {

@@ -9,6 +9,8 @@ use App\Services\Consumer\ConsumerWalletOtpService;
 use App\Services\Consumer\ConsumerWalletPinRecoveryService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletRegistrationService;
+use App\Services\Consumer\ConsumerDeviceStepupService;
+use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -67,7 +69,7 @@ class ConsumerWalletAuthController extends Controller
         ], $result['ok'] ? 200 : ($result['otp_blocked'] ?? false ? 429 : 422));
     }
 
-    public function verifyOtp(Request $request, ConsumerWalletOtpService $otp): JsonResponse
+    public function verifyOtp(Request $request, ConsumerWalletOtpService $otp, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -108,6 +110,16 @@ class ConsumerWalletAuthController extends Controller
         $account->whatsapp_wallet_id = $wallet->id;
         $account->phone_e164 = $e164;
         $account->save();
+
+        if ($trust->requiresStepUp($account)) {
+            $session = $stepup->createSession($account, $wallet);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Verify this device to continue',
+                'data' => $trust->stepUpPayload($session, $wallet),
+            ], 403);
+        }
 
         $account->tokens()->delete();
         $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');
@@ -172,7 +184,7 @@ class ConsumerWalletAuthController extends Controller
         ]);
     }
 
-    public function verifyPin(Request $request, ConsumerWalletPinVerifier $pinVerifier): JsonResponse
+    public function verifyPin(Request $request, ConsumerWalletPinVerifier $pinVerifier, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -236,6 +248,16 @@ class ConsumerWalletAuthController extends Controller
         $account->whatsapp_wallet_id = $wallet->id;
         $account->phone_e164 = $e164;
         $account->save();
+
+        if ($trust->requiresStepUp($account)) {
+            $session = $stepup->createSession($account, $wallet);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Verify this device to continue',
+                'data' => $trust->stepUpPayload($session, $wallet),
+            ], 403);
+        }
 
         $account->tokens()->delete();
         $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');

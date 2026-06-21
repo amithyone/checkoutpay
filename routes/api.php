@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ConsumerChatController;
 use App\Http\Controllers\Api\PublicSupportController;
 use App\Http\Controllers\Api\ConsumerChatInternalController;
 use App\Http\Controllers\Api\ConsumerVirtualCardController;
+use App\Http\Controllers\Api\ConsumerDeviceAuthController;
 use App\Http\Controllers\Api\ConsumerWalletApiController;
 use App\Http\Controllers\Api\ConsumerWalletAuthController;
 use App\Http\Controllers\Api\ConsumerWalletConversationController;
@@ -99,10 +100,22 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/recovery/verify-bvn', [ConsumerWalletAuthController::class, 'recoveryVerifyBvn']);
         Route::post('auth/recovery/verify-name', [ConsumerWalletAuthController::class, 'recoveryVerifyName']);
         Route::post('auth/recovery/reset-pin', [ConsumerWalletAuthController::class, 'recoveryResetPin']);
+        Route::post('auth/passkey/login/options', [ConsumerDeviceAuthController::class, 'passkeyLoginOptions']);
+        Route::post('auth/passkey/login/verify', [ConsumerDeviceAuthController::class, 'passkeyLoginVerify']);
+        Route::post('auth/device/stepup/start', [ConsumerDeviceAuthController::class, 'stepupStart']);
+        Route::post('auth/device/stepup/bvn', [ConsumerDeviceAuthController::class, 'stepupBvn']);
+        Route::post('auth/device/stepup/otp/request', [ConsumerDeviceAuthController::class, 'stepupOtpRequest']);
+        Route::post('auth/device/stepup/otp/verify', [ConsumerDeviceAuthController::class, 'stepupOtpVerify']);
+        Route::post('auth/device/bind/options', [ConsumerDeviceAuthController::class, 'bindOptions']);
+        Route::post('auth/device/bind', [ConsumerDeviceAuthController::class, 'bindDevice']);
     });
 
     Route::prefix('consumer')->middleware(['auth:sanctum', 'throttle:consumer_wallet'])->group(function () {
         Route::post('auth/logout', [ConsumerWalletAuthController::class, 'logout']);
+        Route::post('auth/passkey/register/options', [ConsumerDeviceAuthController::class, 'passkeyRegisterOptions']);
+        Route::post('auth/passkey/register/verify', [ConsumerDeviceAuthController::class, 'passkeyRegisterVerify']);
+        Route::get('auth/devices', [ConsumerDeviceAuthController::class, 'listDevices']);
+        Route::delete('auth/devices/{id}', [ConsumerDeviceAuthController::class, 'revokeDevice']);
         Route::get('wallet', [ConsumerWalletApiController::class, 'showWallet']);
         Route::post('wallet/ensure', [ConsumerWalletApiController::class, 'ensure']);
         Route::get('wallet/transactions', [ConsumerWalletApiController::class, 'transactions']);

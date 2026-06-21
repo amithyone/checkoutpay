@@ -6,6 +6,7 @@ use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -22,16 +23,28 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
         'fcm_token',
         'fcm_platform',
         'last_app_active_at',
+        'transfer_lock_until',
     ];
 
     protected $casts = [
         'fcm_token_updated_at' => 'datetime',
         'last_app_active_at' => 'datetime',
+        'transfer_lock_until' => 'datetime',
     ];
 
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(WhatsappWallet::class, 'whatsapp_wallet_id');
+    }
+
+    public function trustedDevices(): HasMany
+    {
+        return $this->hasMany(ConsumerTrustedDevice::class, 'consumer_wallet_api_account_id');
+    }
+
+    public function isTransferLocked(): bool
+    {
+        return $this->transfer_lock_until !== null && $this->transfer_lock_until->isFuture();
     }
 
     /**

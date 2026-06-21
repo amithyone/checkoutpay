@@ -1,6 +1,24 @@
 <?php
 
 return [
+    /** Enable passkey device trust, step-up, and transfer lock enforcement. */
+    'device_trust_enabled' => filter_var(env('CONSUMER_DEVICE_TRUST_ENABLED', true), FILTER_VALIDATE_BOOL),
+
+    /** WebAuthn relying party ID (must match associated domains / asset links). */
+    'webauthn_rp_id' => env('CONSUMER_WEBAUTHN_RP_ID', 'check-outpay.com'),
+
+    /** WebAuthn relying party display name. */
+    'webauthn_rp_name' => env('CONSUMER_WEBAUTHN_RP_NAME', 'CheckoutNow'),
+
+    /** Max single transfer amount (NGN) while transfer lock is active. */
+    'high_value_single_transfer_cap' => (int) env('CONSUMER_HIGH_VALUE_SINGLE_TRANSFER_CAP', 10000),
+
+    /** Hours to lock high-value transfers after binding a new trusted device. */
+    'transfer_lock_hours' => (int) env('CONSUMER_TRANSFER_LOCK_HOURS', 24),
+
+    /** Sanctum token name for consumer mobile sessions. */
+    'token_name' => env('CONSUMER_WALLET_TOKEN_NAME', 'consumer_mobile'),
+
     /** Per-wallet API budget for authenticated consumer routes (history/utility paginate in bursts). */
     'rate_limit_per_minute' => (int) env('CONSUMER_WALLET_RATE_LIMIT_PER_MINUTE', 240),
 

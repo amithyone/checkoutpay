@@ -11,6 +11,7 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessActivityService;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
+use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
@@ -59,6 +60,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerBusinessActivityService $businessActivity,
         private ConsumerWalletSavingsService $savings,
         private ConsumerWalletStatementService $statements,
+        private ConsumerDeviceTrustService $deviceTrust,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -178,6 +180,14 @@ class ConsumerWalletApiController extends Controller
         $vtuConfigured = $this->vtu()->isConfigured();
         $savingsSummary = $this->savings->getSummary($wallet);
 
+        $transferLock = $user instanceof ConsumerWalletApiAccount
+            ? $this->deviceTrust->transferLockMeta($user)
+            : [
+                'transfer_lock_until' => null,
+                'high_value_single_transfer_cap' => $this->deviceTrust->highValueCap(),
+                'high_value_transfer_blocked' => false,
+            ];
+
         return response()->json([
             'success' => true,
             'data' => array_merge($base, [
@@ -217,7 +227,7 @@ class ConsumerWalletApiController extends Controller
                 'savings_balance' => (float) ($wallet->savings_balance ?? 0),
                 'savings_enabled' => (bool) ($savingsSummary['product_enabled'] ?? false),
                 'savings_next_maturity_at' => $savingsSummary['next_maturity_at'] ?? null,
-            ]),
+            ], $transferLock),
         ]);
     }
 
@@ -997,6 +1007,14 @@ class ConsumerWalletApiController extends Controller
             'amount' => 'required|numeric|min:1',
         ]);
 
+        $user = $request->user();
+        if ($user instanceof ConsumerWalletApiAccount) {
+            $lockResponse = $this->deviceTrust->transferLockJsonResponse($user, (float) $request->input('amount'));
+            if ($lockResponse !== null) {
+                return $lockResponse;
+            }
+        }
+
         $wallet = $this->walletFor($request)->fresh();
         if ($wallet->isPinLocked()) {
             return response()->json(['success' => false, 'message' => 'PIN locked. Try later.'], 423);
@@ -1030,6 +1048,14 @@ class ConsumerWalletApiController extends Controller
             'remark' => 'nullable|string|max:255',
             'from_ledger' => 'nullable|string|in:personal,business',
         ]);
+
+        $user = $request->user();
+        if ($user instanceof ConsumerWalletApiAccount) {
+            $lockResponse = $this->deviceTrust->transferLockJsonResponse($user, (float) $request->input('amount'));
+            if ($lockResponse !== null) {
+                return $lockResponse;
+            }
+        }
 
         $wallet = $this->walletFor($request)->fresh();
         if ($wallet->isPinLocked()) {
