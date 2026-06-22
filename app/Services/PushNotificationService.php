@@ -109,8 +109,23 @@ class PushNotificationService
                     ],
                     'json' => $message,
                 ]);
-                if ($response->getStatusCode() >= 400) {
+                $status = $response->getStatusCode();
+                if ($status >= 400) {
                     $failedTokens[] = (string) $token;
+                    Log::warning('FCM push rejected', [
+                        'status' => $status,
+                        'project_id' => $projectId,
+                        'token_suffix' => substr((string) $token, -12),
+                        'body' => substr((string) $response->getBody(), 0, 500),
+                    ]);
+                } else {
+                    $responseBody = json_decode((string) $response->getBody(), true);
+                    Log::info('FCM push accepted', [
+                        'project_id' => $projectId,
+                        'fcm_message' => is_array($responseBody) ? ($responseBody['name'] ?? null) : null,
+                        'token_suffix' => substr((string) $token, -12),
+                        'type' => $data['type'] ?? null,
+                    ]);
                 }
             } catch (\Throwable $e) {
                 Log::warning('FCM push send failed', [

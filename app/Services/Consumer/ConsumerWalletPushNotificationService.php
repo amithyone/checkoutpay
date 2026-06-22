@@ -141,7 +141,7 @@ final class ConsumerWalletPushNotificationService
                 ];
             }
 
-            return ['ok' => true, 'message' => 'Push notification sent.'];
+            return ['ok' => true, 'message' => 'Push notification sent. Check laravel.log for "FCM push accepted" with an fcm_message id.'];
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.admin_push_failed', [
                 'wallet_id' => $wallet->id,
@@ -167,7 +167,33 @@ final class ConsumerWalletPushNotificationService
             'has_token' => $account !== null,
             'platform' => $account?->fcm_platform,
             'updated_at' => $account?->fcm_token_updated_at?->toIso8601String(),
+            'fcm_project_id' => (string) config('services.firebase.project_id', ''),
+            'service_account_project_id' => $this->serviceAccountProjectId(),
+            'projects_match' => $this->firebaseProjectsMatch(),
         ];
+    }
+
+    private function serviceAccountProjectId(): ?string
+    {
+        $path = (string) config('services.firebase.service_account_json', '');
+        if ($path === '') {
+            return null;
+        }
+        $resolved = is_file($path) ? $path : base_path($path);
+        if (! is_file($resolved)) {
+            return null;
+        }
+        $json = json_decode((string) file_get_contents($resolved), true);
+
+        return is_array($json) ? ($json['project_id'] ?? null) : null;
+    }
+
+    private function firebaseProjectsMatch(): bool
+    {
+        $env = (string) config('services.firebase.project_id', '');
+        $sa = (string) ($this->serviceAccountProjectId() ?? '');
+
+        return $env !== '' && $sa !== '' && $env === $sa;
     }
 
     /**

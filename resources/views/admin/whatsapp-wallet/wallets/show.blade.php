@@ -182,6 +182,19 @@
                 </p>
                 <dl class="text-xs text-gray-600 space-y-1 mb-4">
                     <div class="flex justify-between gap-2">
+                        <dt>FCM project (.env)</dt>
+                        <dd class="font-mono text-xs">{{ $pushStatus['fcm_project_id'] ?: '—' }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt>Service account project</dt>
+                        <dd class="font-mono text-xs {{ ($pushStatus['projects_match'] ?? false) ? 'text-green-700' : 'text-red-700' }}">
+                            {{ $pushStatus['service_account_project_id'] ?? '—' }}
+                            @if(!($pushStatus['projects_match'] ?? true) && ($pushStatus['fcm_project_id'] ?? '') !== '')
+                                <span class="block text-red-600 font-normal">Must match mobile app: checkout-now-a2b2f</span>
+                            @endif
+                        </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
                         <dt>Firebase configured</dt>
                         <dd class="{{ ($pushStatus['configured'] ?? false) ? 'text-green-700 font-medium' : 'text-red-700 font-medium' }}">
                             {{ ($pushStatus['configured'] ?? false) ? 'Yes' : 'No' }}
