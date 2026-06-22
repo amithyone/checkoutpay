@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "954869468807",
+    "project_id": "checkout-now-a2b2f",
+    "storage_bucket": "checkout-now-a2b2f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954869468807:android:bcb2d8f6df97e98d143222",
+        "android_client_info": {
+          "package_name": "com.checkoutnow.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDul7jAMuG9I6r3nv98GD0bqB84rvT5ga8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
