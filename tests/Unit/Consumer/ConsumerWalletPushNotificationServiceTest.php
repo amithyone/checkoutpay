@@ -21,8 +21,8 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
         config([
             'consumer_wallet.credit_push_enabled' => true,
             'consumer_wallet.credit_push_channel' => 'money_received',
-            'services.firebase.project_id' => 'test-project',
-            'services.firebase.service_account_json' => '{"client_email":"x@y.z","private_key":"x"}',
+            'services.firebase.checkoutnow.project_id' => 'test-project',
+            'services.firebase.checkoutnow.service_account_json' => '{"client_email":"x@y.z","private_key":"x"}',
         ]);
     }
 
@@ -43,11 +43,12 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
         ]);
 
         $push = Mockery::mock(PushNotificationService::class);
-        $push->shouldReceive('isConfigured')->andReturn(true);
+        $push->shouldReceive('isConfigured')->with(PushNotificationService::PROFILE_CHECKOUTNOW)->andReturn(true);
         $push->shouldReceive('sendToTokens')
             ->once()
-            ->withArgs(function ($tokens, $title, $body, $data, $channel) use ($wallet) {
+            ->withArgs(function ($tokens, $title, $body, $data, $channel, $profile) use ($wallet) {
                 return $tokens === ['fcm-token-wallet-credit']
+                    && $profile === PushNotificationService::PROFILE_CHECKOUTNOW
                     && $title === 'Money received'
                     && str_contains($body, '₦5,000.00')
                     && str_contains($body, '₦15,000.00')
@@ -81,11 +82,12 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
         ]);
 
         $push = Mockery::mock(PushNotificationService::class);
-        $push->shouldReceive('isConfigured')->andReturn(true);
+        $push->shouldReceive('isConfigured')->with(PushNotificationService::PROFILE_CHECKOUTNOW)->andReturn(true);
         $push->shouldReceive('sendToTokens')
             ->once()
-            ->withArgs(function ($tokens, $title, $body, $data) {
+            ->withArgs(function ($tokens, $title, $body, $data, $channel, $profile) {
                 return $tokens === ['fcm-token-p2p']
+                    && $profile === PushNotificationService::PROFILE_CHECKOUTNOW
                     && str_contains($body, 'Ada sent you ₦2,500.00')
                     && $data['type'] === 'money_received'
                     && $data['screen'] === 'history'

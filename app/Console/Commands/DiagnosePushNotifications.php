@@ -17,27 +17,24 @@ class DiagnosePushNotifications extends Command
 
     public function handle(PushNotificationService $push, ConsumerWalletPushNotificationService $consumerPush): int
     {
-        $projectId = (string) config('services.firebase.project_id', '');
-        $saPath = (string) config('services.firebase.service_account_json', '');
-        $saProject = $this->serviceAccountProjectId($saPath);
+        $this->line('── CheckoutNow Firebase (wallet app) ──');
+        $this->reportProfile(
+            PushNotificationService::PROFILE_CHECKOUTNOW,
+            'CHECKOUTNOW_FCM_PROJECT_ID',
+            'CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON',
+            'checkout-now-a2b2f',
+            $push,
+        );
 
-        $this->line('── Firebase / FCM ──');
-        $this->line('FCM_PROJECT_ID (.env): '.($projectId !== '' ? $projectId : '<empty>'));
-        $this->line('FCM_SERVICE_ACCOUNT_JSON: '.($saPath !== '' ? $saPath : '<empty>'));
-        $this->line('Service account project_id: '.($saProject ?? '<unreadable>'));
-        $this->line('App mobile Firebase project (expected): checkout-now-a2b2f');
-
-        if ($projectId !== '' && $saProject !== null && $projectId !== $saProject) {
-            $this->error('MISMATCH: FCM_PROJECT_ID must match the service account project_id.');
-        } elseif ($projectId === 'checkout-now-a2b2f' || $saProject === 'checkout-now-a2b2f') {
-            $this->info('Project aligns with CheckoutNow mobile app (checkout-now-a2b2f).');
-        } elseif ($projectId !== '' && $saProject !== null) {
-            $this->warn('Project may not match the mobile app — tokens from checkout-now-a2b2f will not receive pushes from another Firebase project.');
-        }
-
-        $this->line('isConfigured(): '.($push->isConfigured() ? 'yes' : 'no'));
-        $this->line('Can obtain FCM access token: '.($this->canObtainAccessToken($saPath) ? 'yes' : 'no'));
-        $this->line('credit_push_enabled: '.(config('consumer_wallet.credit_push_enabled', true) ? 'true' : 'false'));
+        $this->newLine();
+        $this->line('── Rentals Firebase (ABJ Cam Rentals — separate app) ──');
+        $this->reportProfile(
+            PushNotificationService::PROFILE_RENTALS,
+            'RENTALS_FCM_PROJECT_ID',
+            'RENTALS_FCM_SERVICE_ACCOUNT_JSON',
+            'abjrentals-ef416',
+            $push,
+        );
 
         $tokenCount = ConsumerWalletApiAccount::query()
             ->whereNotNull('fcm_token')
@@ -47,6 +44,7 @@ class DiagnosePushNotifications extends Command
         $this->newLine();
         $this->line('── Consumer app tokens ──');
         $this->line('Registered FCM tokens (all wallets): '.$tokenCount);
+        $this->line('credit_push_enabled: '.(config('consumer_wallet.credit_push_enabled', true) ? 'true' : 'false'));
 
         $walletId = (int) $this->option('wallet');
         if ($walletId > 0) {
@@ -58,51 +56,69 @@ class DiagnosePushNotifications extends Command
             }
             $status = $consumerPush->tokenStatus($wallet);
             $this->line("Wallet #{$walletId} ({$wallet->phone_e164}):");
+            $this->line('  checkoutnow_configured: '.($status['configured'] ? 'yes' : 'no'));
             $this->line('  has_token: '.($status['has_token'] ? 'yes' : 'no'));
             $this->line('  platform: '.($status['platform'] ?? '—'));
             $this->line('  token_updated: '.($status['updated_at'] ?? '—'));
         }
 
         $this->newLine();
-        $this->line('── How to interpret admin “Push sent” ──');
-        $this->line('Success = FCM HTTP API accepted the message (2xx).');
-        $this->line('It does NOT guarantee the phone displayed it (permissions, wrong Firebase project, iOS APNs missing, app killed battery saver, etc.).');
-        $this->line('Check storage/logs/laravel.log for lines: FCM push accepted | FCM push send failed');
-        $this->line('Test send: php artisan push:test --wallet=ID --title="Test" --body="Hello"');
+        $this->line('── Notes ──');
+        $this->line('google-services.json is for the mobile app build only.');
+        $this->line('Server push needs a service account JSON per Firebase project (not google-services.json).');
+        $this->line('Admin “Push sent” = FCM HTTP 2xx. Check laravel.log for: FCM push accepted | FCM push send failed');
+        $this->line('Test: php artisan push:test --wallet=ID --title="Test" --body="Hello"');
 
         return self::SUCCESS;
     }
 
+    private function reportProfile(
+        string $profile,
+        string $projectEnvKey,
+        string $serviceAccountEnvKey,
+        string $expectedProject,
+        PushNotificationService $push,
+    ): void {
+        $projectId = (string) config("services.firebase.{$profile}.project_id", '');
+        $saPath = (string) config("services.firebase.{$profile}.service_account_json", '');
+        $saProject = $this->serviceAccountProjectId($saPath);
+
+        $this->line("{$projectEnvKey}: ".($projectId !== '' ? $projectId : '<empty>'));
+        $this->line("{$serviceAccountEnvKey}: ".($saPath !== '' ? $saPath : '<empty>'));
+        $this->line('Service account project_id: '.($saProject ?? '<missing file>'));
+        $this->line('Expected mobile project: '.$expectedProject);
+        $this->line('isConfigured(): '.($push->isConfigured($profile) ? 'yes' : 'no'));
+
+        if ($projectId !== '' && $saProject !== null && $projectId !== $saProject) {
+            $this->error('MISMATCH: project id and service account must be from the same Firebase project.');
+        } elseif ($projectId === $expectedProject && $saProject === $expectedProject) {
+            $this->info('Project and service account align.');
+        } elseif ($saPath === '' || ! is_file($this->resolvePath($saPath))) {
+            $this->warn('Service account file missing — push for this app will not send until you add it.');
+        }
+    }
+
     private function serviceAccountProjectId(string $path): ?string
     {
-        if ($path === '') {
+        $resolved = $this->resolvePath($path);
+        if ($resolved === null) {
             return null;
-        }
-        $resolved = $path;
-        if (! is_file($resolved)) {
-            $candidate = base_path($path);
-            if (is_file($candidate)) {
-                $resolved = $candidate;
-            } else {
-                return null;
-            }
         }
         $json = json_decode((string) file_get_contents($resolved), true);
 
         return is_array($json) && isset($json['project_id']) ? (string) $json['project_id'] : null;
     }
 
-    private function canObtainAccessToken(string $path): bool
+    private function resolvePath(string $path): ?string
     {
         if ($path === '') {
-            return false;
+            return null;
         }
-        try {
-            $push = app(PushNotificationService::class);
+        if (is_file($path)) {
+            return $path;
+        }
+        $candidate = base_path($path);
 
-            return $push->isConfigured();
-        } catch (\Throwable) {
-            return false;
-        }
+        return is_file($candidate) ? $candidate : null;
     }
 }

@@ -150,6 +150,7 @@ class ConsumerWalletInactiveReminderService
                 'wallet_id' => (string) $wallet->id,
             ],
             (string) config('consumer_wallet.inactive_reminder_push_channel', 'wallet_alerts'),
+            PushNotificationService::PROFILE_CHECKOUTNOW,
         );
 
         return true;

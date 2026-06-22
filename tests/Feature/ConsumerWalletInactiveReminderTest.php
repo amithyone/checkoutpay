@@ -59,8 +59,9 @@ class ConsumerWalletInactiveReminderTest extends TestCase
         $push = Mockery::mock(PushNotificationService::class);
         $push->shouldReceive('sendToTokens')
             ->once()
-            ->withArgs(function ($tokens, $title, $body, $data, $channel) {
+            ->withArgs(function ($tokens, $title, $body, $data, $channel, $profile) {
                 return $tokens === ['test-fcm-token-abc']
+                    && $profile === PushNotificationService::PROFILE_CHECKOUTNOW
                     && $channel === 'wallet_alerts'
                     && str_contains($body, '₦5,000.00');
             });

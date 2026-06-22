@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Log;
 
 class PushNotificationService
 {
+    public const PROFILE_RENTALS = 'rentals';
+
+    public const PROFILE_CHECKOUTNOW = 'checkoutnow';
+
     public function notifyRenter(
         int $renterId,
         string $title,
@@ -36,7 +40,7 @@ class PushNotificationService
             ->pluck('token')
             ->all();
 
-        $this->sendToTokens($tokens, $title, $body, $data, 'rentals_alerts');
+        $this->sendToTokens($tokens, $title, $body, $data, 'rentals_alerts', self::PROFILE_RENTALS);
     }
 
     /**
@@ -48,13 +52,13 @@ class PushNotificationService
         string $body,
         array $data = [],
         string $androidChannelId = 'rentals_alerts',
+        string $profile = self::PROFILE_RENTALS,
     ): array {
         if (empty($tokens)) {
             return [];
         }
 
-        $projectId = (string) config('services.firebase.project_id', '');
-        $serviceAccount = (string) config('services.firebase.service_account_json', '');
+        [$projectId, $serviceAccount] = $this->resolveCredentials($profile);
         if ($projectId === '' || $serviceAccount === '') {
             return [];
         }
@@ -114,6 +118,7 @@ class PushNotificationService
                     $failedTokens[] = (string) $token;
                     Log::warning('FCM push rejected', [
                         'status' => $status,
+                        'profile' => $profile,
                         'project_id' => $projectId,
                         'token_suffix' => substr((string) $token, -12),
                         'body' => substr((string) $response->getBody(), 0, 500),
@@ -121,6 +126,7 @@ class PushNotificationService
                 } else {
                     $responseBody = json_decode((string) $response->getBody(), true);
                     Log::info('FCM push accepted', [
+                        'profile' => $profile,
                         'project_id' => $projectId,
                         'fcm_message' => is_array($responseBody) ? ($responseBody['name'] ?? null) : null,
                         'token_suffix' => substr((string) $token, -12),
@@ -129,6 +135,7 @@ class PushNotificationService
                 }
             } catch (\Throwable $e) {
                 Log::warning('FCM push send failed', [
+                    'profile' => $profile,
                     'token_suffix' => substr((string) $token, -12),
                     'error' => $e->getMessage(),
                 ]);
@@ -152,14 +159,18 @@ class PushNotificationService
             || str_contains($msg, 'requested entity was not found');
     }
 
-    public function isConfigured(): bool
+    public function isConfigured(string $profile = self::PROFILE_RENTALS): bool
     {
-        $projectId = (string) config('services.firebase.project_id', '');
-        $serviceAccount = (string) config('services.firebase.service_account_json', '');
-        return $projectId !== '' && $serviceAccount !== '';
+        [$projectId, $serviceAccount] = $this->resolveCredentials($profile);
+
+        if ($projectId === '' || $serviceAccount === '') {
+            return false;
+        }
+
+        return $this->resolveServiceAccountJson($serviceAccount) !== null;
     }
 
-    private function getAccessToken(string $serviceAccountValue): ?string
+    private function resolveServiceAccountJson(string $serviceAccountValue): ?array
     {
         try {
             $json = $serviceAccountValue;
@@ -178,7 +189,29 @@ class PushNotificationService
                 $json = (string) file_get_contents($path);
             }
             $decoded = json_decode($json, true);
-            if (! is_array($decoded)) {
+
+            return is_array($decoded) ? $decoded : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function resolveCredentials(string $profile): array
+    {
+        $projectId = (string) config("services.firebase.{$profile}.project_id", '');
+        $serviceAccount = (string) config("services.firebase.{$profile}.service_account_json", '');
+
+        return [$projectId, $serviceAccount];
+    }
+
+    private function getAccessToken(string $serviceAccountValue): ?string
+    {
+        try {
+            $decoded = $this->resolveServiceAccountJson($serviceAccountValue);
+            if ($decoded === null) {
                 return null;
             }
 

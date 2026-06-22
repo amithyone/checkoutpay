@@ -24,13 +24,6 @@ class SendTestPushNotification extends Command
 
     public function handle(PushNotificationService $push): int
     {
-        $projectId = (string) config('services.firebase.project_id', '');
-        $serviceAccount = (string) config('services.firebase.service_account_json', '');
-        if ($projectId === '' || $serviceAccount === '') {
-            $this->error('Missing Firebase config. Set FCM_PROJECT_ID and FCM_SERVICE_ACCOUNT_JSON (file path or single-line JSON; never multi-line JSON in .env).');
-            return self::FAILURE;
-        }
-
         $tokens = [];
         $single = trim((string) $this->option('token'));
         $renterId = (int) $this->option('renter');
@@ -73,6 +66,20 @@ class SendTestPushNotification extends Command
         $tokens = array_values(array_unique(array_filter($tokens)));
         if (count($tokens) < 1) {
             $this->error('No target token found. Use --token, --wallet, --renter, or --business.');
+
+            return self::FAILURE;
+        }
+
+        $profile = $walletId > 0
+            ? PushNotificationService::PROFILE_CHECKOUTNOW
+            : PushNotificationService::PROFILE_RENTALS;
+
+        if (! $push->isConfigured($profile)) {
+            $envHint = $profile === PushNotificationService::PROFILE_CHECKOUTNOW
+                ? 'CHECKOUTNOW_FCM_PROJECT_ID and CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON'
+                : 'RENTALS_FCM_PROJECT_ID and RENTALS_FCM_SERVICE_ACCOUNT_JSON';
+            $this->error("Missing Firebase config for {$profile}. Set {$envHint}.");
+
             return self::FAILURE;
         }
 
@@ -86,13 +93,14 @@ class SendTestPushNotification extends Command
             $data['screen'] = $screen;
         }
 
-        $channel = $type === 'test_push'
-            ? 'rentals_alerts'
-            : (string) config('consumer_wallet.credit_push_channel', 'money_received');
+        $channel = $profile === PushNotificationService::PROFILE_CHECKOUTNOW
+            ? (string) config('consumer_wallet.credit_push_channel', 'money_received')
+            : 'rentals_alerts';
 
-        $push->sendToTokens($tokens, $title, $body, $data, $channel);
+        $push->sendToTokens($tokens, $title, $body, $data, $channel, $profile);
 
         $this->info('Push request sent to FCM.');
+        $this->line('Profile: '.$profile);
         $this->line('Tokens targeted: '.count($tokens));
         $this->line('Title: '.$title);
         $this->line('Body: '.$body);
@@ -100,4 +108,3 @@ class SendTestPushNotification extends Command
         return self::SUCCESS;
     }
 }
-

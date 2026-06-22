@@ -102,10 +102,10 @@ final class ConsumerWalletPushNotificationService
         string $body,
         ?string $screen = null,
     ): array {
-        if (! $this->push->isConfigured()) {
+        if (! $this->push->isConfigured(PushNotificationService::PROFILE_CHECKOUTNOW)) {
             return [
                 'ok' => false,
-                'message' => 'Firebase is not configured. Set FCM_PROJECT_ID and FCM_SERVICE_ACCOUNT_JSON on the server.',
+                'message' => 'CheckoutNow Firebase is not configured. Set CHECKOUTNOW_FCM_PROJECT_ID and CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON on the server.',
             ];
         }
 
@@ -132,6 +132,7 @@ final class ConsumerWalletPushNotificationService
                 $body,
                 $data,
                 (string) config('consumer_wallet.credit_push_channel', 'money_received'),
+                PushNotificationService::PROFILE_CHECKOUTNOW,
             );
             $this->clearTokenIfInvalid($token, $failed);
             if (in_array($token, $failed, true)) {
@@ -163,11 +164,11 @@ final class ConsumerWalletPushNotificationService
         $account = $this->resolveAccount($wallet);
 
         return [
-            'configured' => $this->push->isConfigured(),
+            'configured' => $this->push->isConfigured(PushNotificationService::PROFILE_CHECKOUTNOW),
             'has_token' => $account !== null,
             'platform' => $account?->fcm_platform,
             'updated_at' => $account?->fcm_token_updated_at?->toIso8601String(),
-            'fcm_project_id' => (string) config('services.firebase.project_id', ''),
+            'fcm_project_id' => (string) config('services.firebase.checkoutnow.project_id', ''),
             'service_account_project_id' => $this->serviceAccountProjectId(),
             'projects_match' => $this->firebaseProjectsMatch(),
         ];
@@ -175,7 +176,7 @@ final class ConsumerWalletPushNotificationService
 
     private function serviceAccountProjectId(): ?string
     {
-        $path = (string) config('services.firebase.service_account_json', '');
+        $path = (string) config('services.firebase.checkoutnow.service_account_json', '');
         if ($path === '') {
             return null;
         }
@@ -190,7 +191,7 @@ final class ConsumerWalletPushNotificationService
 
     private function firebaseProjectsMatch(): bool
     {
-        $env = (string) config('services.firebase.project_id', '');
+        $env = (string) config('services.firebase.checkoutnow.project_id', '');
         $sa = (string) ($this->serviceAccountProjectId() ?? '');
 
         return $env !== '' && $sa !== '' && $env === $sa;
@@ -273,7 +274,7 @@ final class ConsumerWalletPushNotificationService
      */
     private function send(string $token, string $title, string $body, array $data): void
     {
-        if (! $this->push->isConfigured()) {
+        if (! $this->push->isConfigured(PushNotificationService::PROFILE_CHECKOUTNOW)) {
             return;
         }
 
@@ -284,6 +285,7 @@ final class ConsumerWalletPushNotificationService
                 $body,
                 $data,
                 (string) config('consumer_wallet.credit_push_channel', 'money_received'),
+                PushNotificationService::PROFILE_CHECKOUTNOW,
             );
             $this->clearTokenIfInvalid($token, $failed);
         } catch (\Throwable $e) {

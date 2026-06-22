@@ -82,13 +82,21 @@ return [
     ],
 
     'firebase' => [
-        'project_id' => env('FCM_PROJECT_ID', ''),
         /*
-         * Service account: single-line minified JSON, OR path to a .json file.
-         * Do not put multi-line JSON in .env — it invalidates the entire .env for Laravel/dotenv.
-         * Relative paths are resolved from the project base path (see PushNotificationService).
+         * Two Firebase projects: CheckoutNow wallet app vs ABJ Cam Rentals app.
+         * Each needs its own project_id + service account JSON (not google-services.json).
          */
-        'service_account_json' => env('FCM_SERVICE_ACCOUNT_JSON', ''),
+        'rentals' => [
+            'project_id' => env('RENTALS_FCM_PROJECT_ID', env('FCM_PROJECT_ID', '')),
+            'service_account_json' => env(
+                'RENTALS_FCM_SERVICE_ACCOUNT_JSON',
+                env('FCM_SERVICE_ACCOUNT_JSON', 'storage/app/fcm-service-account.json')
+            ),
+        ],
+        'checkoutnow' => [
+            'project_id' => env('CHECKOUTNOW_FCM_PROJECT_ID', 'checkout-now-a2b2f'),
+            'service_account_json' => env('CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON', ''),
+        ],
     ],
 
     /*

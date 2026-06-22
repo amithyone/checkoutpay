@@ -182,20 +182,20 @@
                 </p>
                 <dl class="text-xs text-gray-600 space-y-1 mb-4">
                     <div class="flex justify-between gap-2">
-                        <dt>FCM project (.env)</dt>
+                        <dt>CheckoutNow FCM project</dt>
                         <dd class="font-mono text-xs">{{ $pushStatus['fcm_project_id'] ?: '—' }}</dd>
                     </div>
                     <div class="flex justify-between gap-2">
-                        <dt>Service account project</dt>
+                        <dt>CheckoutNow service account</dt>
                         <dd class="font-mono text-xs {{ ($pushStatus['projects_match'] ?? false) ? 'text-green-700' : 'text-red-700' }}">
                             {{ $pushStatus['service_account_project_id'] ?? '—' }}
                             @if(!($pushStatus['projects_match'] ?? true) && ($pushStatus['fcm_project_id'] ?? '') !== '')
-                                <span class="block text-red-600 font-normal">Must match mobile app: checkout-now-a2b2f</span>
+                                <span class="block text-red-600 font-normal">Upload service account from checkout-now-a2b2f (CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON)</span>
                             @endif
                         </dd>
                     </div>
                     <div class="flex justify-between gap-2">
-                        <dt>Firebase configured</dt>
+                        <dt>CheckoutNow push configured</dt>
                         <dd class="{{ ($pushStatus['configured'] ?? false) ? 'text-green-700 font-medium' : 'text-red-700 font-medium' }}">
                             {{ ($pushStatus['configured'] ?? false) ? 'Yes' : 'No' }}
                         </dd>
@@ -250,7 +250,7 @@
                         <i class="fas fa-bell mr-1"></i> Send push
                     </button>
                     @if(!($pushStatus['configured'] ?? false))
-                        <p class="text-xs text-red-700">Set <code class="bg-red-50 px-1 rounded">FCM_PROJECT_ID</code> and <code class="bg-red-50 px-1 rounded">FCM_SERVICE_ACCOUNT_JSON</code> in server <code class="bg-red-50 px-1 rounded">.env</code>.</p>
+                        <p class="text-xs text-red-700">Set <code class="bg-red-50 px-1 rounded">CHECKOUTNOW_FCM_PROJECT_ID</code> and <code class="bg-red-50 px-1 rounded">CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON</code> in server <code class="bg-red-50 px-1 rounded">.env</code> (service account from Firebase project checkout-now-a2b2f).</p>
                     @elseif(!($pushStatus['has_token'] ?? false))
                         <p class="text-xs text-amber-800">User must sign in on the mobile app and allow notifications.</p>
                     @endif
