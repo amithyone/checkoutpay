@@ -68,6 +68,6 @@ class Kernel extends HttpKernel
         'renter_active' => \App\Http\Middleware\EnsureRenterIsActive::class,
         'tax_admin_redirect' => \App\Http\Middleware\RedirectTaxAdminFromCheckoutPanel::class,
         'tax_admin_api' => \App\Http\Middleware\EnsureTaxAdminApi::class,
-        'tagine.otp.secret' => \App\Http\Middleware\VerifyTagineOtpSecret::class,
+        'touch.consumer.app.session' => \App\Http\Middleware\TouchConsumerAppSession::class,
     ];
 }

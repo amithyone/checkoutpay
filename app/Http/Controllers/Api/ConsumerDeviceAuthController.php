@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ConsumerAppSession;
+use App\Models\ConsumerAppSessionEvent;
 use App\Models\ConsumerWalletApiAccount;
+use App\Services\Consumer\ConsumerAppSessionService;
 use App\Services\Consumer\ConsumerDeviceStepupService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWebAuthnService;
@@ -34,7 +37,7 @@ class ConsumerDeviceAuthController extends Controller
         ]);
     }
 
-    public function passkeyRegisterVerify(Request $request, ConsumerWebAuthnService $webauthn): JsonResponse
+    public function passkeyRegisterVerify(Request $request, ConsumerWebAuthnService $webauthn, ConsumerAppSessionService $sessions): JsonResponse
     {
         $request->validate([
             'credential' => 'required|array',
@@ -56,6 +59,17 @@ class ConsumerDeviceAuthController extends Controller
                 'message' => $result['message'],
             ], 422);
         }
+
+        $sessions->recordForAccount(
+            $account,
+            $request,
+            ConsumerAppSessionEvent::TYPE_PASSKEY_REGISTER,
+            'Passkey registered on this device',
+            [
+                'device_id' => $result['device_id'] ?? null,
+                'credential_id' => $result['credential_id'] ?? null,
+            ],
+        );
 
         return response()->json([
             'success' => true,
@@ -87,7 +101,7 @@ class ConsumerDeviceAuthController extends Controller
         ]);
     }
 
-    public function passkeyLoginVerify(Request $request, ConsumerWebAuthnService $webauthn, ConsumerDeviceTrustService $trust): JsonResponse
+    public function passkeyLoginVerify(Request $request, ConsumerWebAuthnService $webauthn, ConsumerDeviceTrustService $trust, ConsumerAppSessionService $sessions): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -107,6 +121,11 @@ class ConsumerDeviceAuthController extends Controller
         }
 
         $login = $trust->issueLoginToken($result['account'], resetTransferLock: false);
+        $appSessionId = $sessions->afterPlainTokenIssued(
+            $result['account'],
+            ConsumerAppSession::LOGIN_PASSKEY,
+            $request,
+        );
 
         return response()->json([
             'success' => true,
@@ -117,6 +136,7 @@ class ConsumerDeviceAuthController extends Controller
                 'phone_e164' => $login['phone_e164'],
                 'wallet_id' => $login['wallet_id'],
                 'transfer_lock_until' => $login['transfer_lock_until'],
+                'app_session_id' => $appSessionId,
             ],
         ]);
     }
@@ -259,7 +279,7 @@ class ConsumerDeviceAuthController extends Controller
         ]);
     }
 
-    public function bindDevice(Request $request, ConsumerDeviceStepupService $stepup, ConsumerDeviceTrustService $trust): JsonResponse
+    public function bindDevice(Request $request, ConsumerDeviceStepupService $stepup, ConsumerDeviceTrustService $trust, ConsumerAppSessionService $sessions): JsonResponse
     {
         $request->validate([
             'stepup_token' => 'required|string|max:128',
@@ -293,16 +313,38 @@ class ConsumerDeviceAuthController extends Controller
             ], 422);
         }
 
+        $account = $session->account;
+        $appSessionId = null;
+        if ($account instanceof ConsumerWalletApiAccount) {
+            $appSessionId = $sessions->afterPlainTokenIssued(
+                $account,
+                ConsumerAppSession::LOGIN_DEVICE_BIND,
+                $request,
+            );
+            $sessions->recordForAccount(
+                $account,
+                $request,
+                ConsumerAppSessionEvent::TYPE_DEVICE_STEPUP,
+                'New trusted device bound after step-up',
+                [
+                    'devices_revoked' => $result['devices_revoked'] ?? 0,
+                    'platform' => (string) $request->input('platform'),
+                ],
+            );
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Device bound.',
-            'data' => [
+            'data' => array_filter([
                 'token' => $result['token'],
                 'token_type' => 'Bearer',
+                'phone_e164' => $account?->phone_e164,
                 'wallet_id' => $result['wallet_id'],
                 'devices_revoked' => $result['devices_revoked'] ?? 0,
                 'transfer_lock_until' => $result['transfer_lock_until'] ?? null,
-            ],
+                'app_session_id' => $appSessionId,
+            ], fn ($v) => $v !== null),
         ]);
     }
 

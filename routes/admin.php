@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\RenterController;
 use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\VirtualCardAdminController;
+use App\Http\Controllers\Admin\ConsumerAppSessionAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletTransactionAdminController;
 use App\Http\Controllers\Admin\WithdrawalController;
@@ -271,6 +272,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('business-name-registrations/{registration}/id-document', [BusinessNameRegistrationAdminController::class, 'idDocument'])->name('business-name-registrations.id-document');
             Route::put('business-name-registrations/{registration}/status', [BusinessNameRegistrationAdminController::class, 'updateStatus'])
                 ->name('business-name-registrations.status');
+
+            Route::get('app-sessions', [ConsumerAppSessionAdminController::class, 'index'])->name('app-sessions.index');
+            Route::get('app-sessions/events', [ConsumerAppSessionAdminController::class, 'events'])->name('app-sessions.events');
+            Route::get('app-sessions/{appSession}', [ConsumerAppSessionAdminController::class, 'show'])->name('app-sessions.show');
 
             Route::get('whatsapp-wallet/transactions', [WhatsappWalletTransactionAdminController::class, 'index'])->name('whatsapp-wallet.transactions.index');
             Route::get('whatsapp-wallet/transactions/p2p', [WhatsappWalletTransactionAdminController::class, 'p2p'])->name('whatsapp-wallet.transactions.p2p');

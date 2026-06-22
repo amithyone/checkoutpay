@@ -15,6 +15,7 @@ return [
         'rentals',
         'whatsapp_wallet',
         'whatsapp_wallet_users',
+        'app_sessions',
         'whatsapp_wallet_transactions',
         'business_name_registrations',
         'withdrawals',

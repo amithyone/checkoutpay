@@ -110,7 +110,7 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/device/bind', [ConsumerDeviceAuthController::class, 'bindDevice']);
     });
 
-    Route::prefix('consumer')->middleware(['auth:sanctum', 'throttle:consumer_wallet'])->group(function () {
+    Route::prefix('consumer')->middleware(['auth:sanctum', 'touch.consumer.app.session', 'throttle:consumer_wallet'])->group(function () {
         Route::post('auth/logout', [ConsumerWalletAuthController::class, 'logout']);
         Route::post('auth/passkey/register/options', [ConsumerDeviceAuthController::class, 'passkeyRegisterOptions']);
         Route::post('auth/passkey/register/verify', [ConsumerDeviceAuthController::class, 'passkeyRegisterVerify']);

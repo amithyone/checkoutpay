@@ -3,6 +3,7 @@
 namespace App\Services\Admin;
 
 use App\Models\Admin;
+use App\Models\ConsumerAppSession;
 use App\Models\BusinessNameRegistration;
 use App\Models\Payment;
 use App\Models\WhatsappWalletTransaction;
@@ -157,6 +158,14 @@ class AdminSidebarMenu
             'whatsapp_wallet_users' => array_merge(
                 $this->link('Wallet users', 'admin.whatsapp-wallet.wallets.index', 'fas fa-users text-green-600', ['admin.whatsapp-wallet.wallets.*']),
                 ['visible' => $admin->canManageSettings()]
+            ),
+            'app_sessions' => array_merge(
+                $this->link('App sessions', 'admin.app-sessions.index', 'fas fa-mobile-alt text-green-600', ['admin.app-sessions.*']),
+                [
+                    'visible' => $admin->canManageSettings(),
+                    'badge_count' => ConsumerAppSession::query()->whereNull('ended_at')->count(),
+                    'badge_color' => 'green',
+                ]
             ),
             'whatsapp_wallet_transactions' => array_merge(
                 $this->link('Wallet transactions', 'admin.whatsapp-wallet.transactions.index', 'fas fa-exchange-alt text-green-600', ['admin.whatsapp-wallet.transactions.*']),

@@ -8,7 +8,8 @@ use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
-use App\Services\Consumer\ConsumerBusinessActivityService;
+use App\Services\Consumer\ConsumerAppSessionService;
+use App\Models\ConsumerAppSessionEvent;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
@@ -61,6 +62,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerWalletSavingsService $savings,
         private ConsumerWalletStatementService $statements,
         private ConsumerDeviceTrustService $deviceTrust,
+        private ConsumerAppSessionService $appSessions,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -1029,6 +1031,20 @@ class ConsumerWalletApiController extends Controller
             (float) $request->input('amount')
         );
 
+        if ($result['ok'] && $user instanceof ConsumerWalletApiAccount) {
+            $this->appSessions->recordForAccount(
+                $user,
+                $request,
+                ConsumerAppSessionEvent::TYPE_TRANSFER_P2P,
+                'P2P transfer to '.(string) $request->input('to_phone'),
+                [
+                    'amount' => (float) $request->input('amount'),
+                    'to_phone' => (string) $request->input('to_phone'),
+                    'reference' => $result['data']['reference'] ?? null,
+                ],
+            );
+        }
+
         return response()->json([
             'success' => $result['ok'],
             'message' => $result['message'],
@@ -1079,6 +1095,21 @@ class ConsumerWalletApiController extends Controller
         $code = $result['ok'] ? 200 : 422;
         if ($result['ok'] === false && ($result['data']['bucket'] ?? '') === MavonPayTransferService::BUCKET_FAILED) {
             $code = 502;
+        }
+
+        if ($result['ok'] && $user instanceof ConsumerWalletApiAccount) {
+            $this->appSessions->recordForAccount(
+                $user,
+                $request,
+                ConsumerAppSessionEvent::TYPE_TRANSFER_BANK,
+                'Bank transfer to '.(string) $request->input('account_name'),
+                [
+                    'amount' => (float) $request->input('amount'),
+                    'bank_name' => (string) $request->input('bank_name'),
+                    'account_number' => (string) $request->input('account_number'),
+                    'reference' => $result['data']['reference'] ?? null,
+                ],
+            );
         }
 
         return response()->json([

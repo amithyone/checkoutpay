@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ConsumerAppSession;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
+use App\Services\Consumer\ConsumerAppSessionService;
 use App\Services\Consumer\ConsumerWalletOtpService;
 use App\Services\Consumer\ConsumerWalletPinRecoveryService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
@@ -69,7 +71,7 @@ class ConsumerWalletAuthController extends Controller
         ], $result['ok'] ? 200 : ($result['otp_blocked'] ?? false ? 429 : 422));
     }
 
-    public function verifyOtp(Request $request, ConsumerWalletOtpService $otp, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup): JsonResponse
+    public function verifyOtp(Request $request, ConsumerWalletOtpService $otp, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -123,16 +125,18 @@ class ConsumerWalletAuthController extends Controller
 
         $account->tokens()->delete();
         $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');
-        $plain = $account->createToken($tokenName)->plainTextToken;
+        $accessToken = $account->createToken($tokenName);
+        $appSessionId = $sessions->afterTokenIssued($account, ConsumerAppSession::LOGIN_OTP, $request, $accessToken);
 
         return response()->json([
             'success' => true,
             'message' => 'Signed in.',
             'data' => [
-                'token' => $plain,
+                'token' => $accessToken->plainTextToken,
                 'token_type' => 'Bearer',
                 'phone_e164' => $e164,
                 'wallet_id' => $wallet->id,
+                'app_session_id' => $appSessionId,
             ],
         ]);
     }
@@ -172,19 +176,30 @@ class ConsumerWalletAuthController extends Controller
             ], 422);
         }
 
+        $account = ConsumerWalletApiAccount::query()->where('phone_e164', $result['phone_e164'])->first();
+        $appSessionId = null;
+        if ($account instanceof ConsumerWalletApiAccount) {
+            $appSessionId = app(ConsumerAppSessionService::class)->afterPlainTokenIssued(
+                $account,
+                ConsumerAppSession::LOGIN_REGISTER,
+                $request,
+            );
+        }
+
         return response()->json([
             'success' => true,
             'message' => $result['message'],
-            'data' => [
+            'data' => array_filter([
                 'token' => $result['token'],
                 'token_type' => $result['token_type'],
                 'phone_e164' => $result['phone_e164'],
                 'wallet_id' => $result['wallet_id'],
-            ],
+                'app_session_id' => $appSessionId,
+            ], fn ($v) => $v !== null),
         ]);
     }
 
-    public function verifyPin(Request $request, ConsumerWalletPinVerifier $pinVerifier, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup): JsonResponse
+    public function verifyPin(Request $request, ConsumerWalletPinVerifier $pinVerifier, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -261,16 +276,18 @@ class ConsumerWalletAuthController extends Controller
 
         $account->tokens()->delete();
         $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');
-        $plain = $account->createToken($tokenName)->plainTextToken;
+        $accessToken = $account->createToken($tokenName);
+        $appSessionId = $sessions->afterTokenIssued($account, ConsumerAppSession::LOGIN_PIN, $request, $accessToken);
 
         return response()->json([
             'success' => true,
             'message' => 'Signed in.',
             'data' => [
-                'token' => $plain,
+                'token' => $accessToken->plainTextToken,
                 'token_type' => 'Bearer',
                 'phone_e164' => $e164,
                 'wallet_id' => $wallet->id,
+                'app_session_id' => $appSessionId,
             ],
         ]);
     }
@@ -374,9 +391,13 @@ class ConsumerWalletAuthController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
-    public function logout(Request $request): JsonResponse
+    public function logout(Request $request, ConsumerAppSessionService $sessions): JsonResponse
     {
         $user = $request->user();
+        if ($user instanceof ConsumerWalletApiAccount) {
+            $sessions->endSession($request, $user);
+        }
+
         if ($user && method_exists($user, 'currentAccessToken')) {
             $token = $user->currentAccessToken();
             if ($token) {

@@ -14,6 +14,10 @@
        class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.wallets.*']) }}">
         <i class="fas fa-users mr-2 text-green-600"></i> Wallet users
     </a>
+    <a href="{{ route('admin.app-sessions.index') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.app-sessions.*']) }}">
+        <i class="fas fa-mobile-alt mr-2 text-green-600"></i> App sessions
+    </a>
     <a href="{{ route('admin.whatsapp-wallet.transactions.index') }}"
        class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.index', 'admin.whatsapp-wallet.transactions.show']) }}">
         <i class="fas fa-list mr-2 text-green-600"></i> All transactions
