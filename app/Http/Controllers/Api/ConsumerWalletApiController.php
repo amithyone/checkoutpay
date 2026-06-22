@@ -10,6 +10,7 @@ use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerAppSessionService;
 use App\Models\ConsumerAppSessionEvent;
+use App\Services\Consumer\ConsumerBusinessActivityService;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
