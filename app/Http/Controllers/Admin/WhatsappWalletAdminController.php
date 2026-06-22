@@ -10,6 +10,7 @@ use App\Models\WhatsappCrossBorderFxRate;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
+use App\Services\Consumer\ConsumerWalletPushNotificationService;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappWalletRegionConfig;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +22,7 @@ class WhatsappWalletAdminController extends Controller
 {
     public function __construct(
         private ConsumerBusinessWalletLedgerService $businessLedger,
+        private ConsumerWalletPushNotificationService $walletPush,
     ) {}
 
     public function index(): View
@@ -112,7 +114,28 @@ class WhatsappWalletAdminController extends Controller
             'businessNameRegistrations' => $businessNameRegistrations,
             'businessNamePendingCount' => $businessNamePendingCount,
             'linkableBusinesses' => Business::query()->orderBy('name')->limit(200)->get(['id', 'name', 'email']),
+            'pushStatus' => $this->walletPush->tokenStatus($wallet),
         ]);
+    }
+
+    public function sendPushNotification(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:120',
+            'body' => 'required|string|max:500',
+            'screen' => 'nullable|string|max:32|in:home,history,saving,card,profile,support',
+        ]);
+
+        $result = $this->walletPush->sendAdminMessage(
+            $wallet,
+            (string) $validated['title'],
+            (string) $validated['body'],
+            isset($validated['screen']) ? (string) $validated['screen'] : null,
+        );
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
     public function linkBusiness(Request $request, WhatsappWallet $wallet): RedirectResponse

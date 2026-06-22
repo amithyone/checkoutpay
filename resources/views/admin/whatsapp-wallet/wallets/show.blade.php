@@ -176,6 +176,75 @@
             </div>
 
             <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+                <h3 class="font-semibold text-gray-900 mb-2">App push notification</h3>
+                <p class="text-sm text-gray-600 mb-3">
+                    Send a Firebase (FCM) alert to this user&apos;s CheckoutNow app.
+                </p>
+                <dl class="text-xs text-gray-600 space-y-1 mb-4">
+                    <div class="flex justify-between gap-2">
+                        <dt>Firebase configured</dt>
+                        <dd class="{{ ($pushStatus['configured'] ?? false) ? 'text-green-700 font-medium' : 'text-red-700 font-medium' }}">
+                            {{ ($pushStatus['configured'] ?? false) ? 'Yes' : 'No' }}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt>Device token</dt>
+                        <dd class="{{ ($pushStatus['has_token'] ?? false) ? 'text-green-700 font-medium' : 'text-amber-700 font-medium' }}">
+                            {{ ($pushStatus['has_token'] ?? false) ? 'Registered' : 'None' }}
+                        </dd>
+                    </div>
+                    @if(($pushStatus['has_token'] ?? false))
+                        <div class="flex justify-between gap-2">
+                            <dt>Platform</dt>
+                            <dd class="capitalize">{{ $pushStatus['platform'] ?? '—' }}</dd>
+                        </div>
+                        @if(!empty($pushStatus['updated_at']))
+                            <div class="flex justify-between gap-2">
+                                <dt>Token updated</dt>
+                                <dd>{{ \Illuminate\Support\Carbon::parse($pushStatus['updated_at'])->diffForHumans() }}</dd>
+                            </div>
+                        @endif
+                    @endif
+                </dl>
+                <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.push', $wallet) }}" class="space-y-3">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                        <input type="text" name="title" value="{{ old('title', 'CheckoutNow') }}" maxlength="120" required
+                            class="w-full rounded-lg border-gray-300 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Message</label>
+                        <textarea name="body" rows="3" maxlength="500" required
+                            class="w-full rounded-lg border-gray-300 text-sm"
+                            placeholder="Short message the user will see on their phone">{{ old('body') }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Open screen (optional)</label>
+                        <select name="screen" class="w-full rounded-lg border-gray-300 text-sm">
+                            <option value="">Default</option>
+                            <option value="home" @selected(old('screen') === 'home')>Home</option>
+                            <option value="history" @selected(old('screen') === 'history')>Transaction history</option>
+                            <option value="saving" @selected(old('screen') === 'saving')>Savings</option>
+                            <option value="card" @selected(old('screen') === 'card')>Virtual card</option>
+                            <option value="profile" @selected(old('screen') === 'profile')>Profile</option>
+                            <option value="support" @selected(old('screen') === 'support')>Support</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
+                        @disabled(!($pushStatus['configured'] ?? false) || !($pushStatus['has_token'] ?? false))
+                        onclick="return confirm('Send this push notification to {{ $wallet->phone_e164 }}?')">
+                        <i class="fas fa-bell mr-1"></i> Send push
+                    </button>
+                    @if(!($pushStatus['configured'] ?? false))
+                        <p class="text-xs text-red-700">Set <code class="bg-red-50 px-1 rounded">FCM_PROJECT_ID</code> and <code class="bg-red-50 px-1 rounded">FCM_SERVICE_ACCOUNT_JSON</code> in server <code class="bg-red-50 px-1 rounded">.env</code>.</p>
+                    @elseif(!($pushStatus['has_token'] ?? false))
+                        <p class="text-xs text-amber-800">User must sign in on the mobile app and allow notifications.</p>
+                    @endif
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
                 <h3 class="font-semibold text-gray-900 mb-2">Manual chat mode</h3>
                 <p class="text-sm text-gray-600 mb-4">
                     Pause automated bot replies so you can message this user directly on WhatsApp.

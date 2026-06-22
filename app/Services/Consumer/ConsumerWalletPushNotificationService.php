@@ -92,6 +92,85 @@ final class ConsumerWalletPushNotificationService
     }
 
     /**
+     * Manual push from admin (not gated by credit_push_enabled).
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function sendAdminMessage(
+        WhatsappWallet $wallet,
+        string $title,
+        string $body,
+        ?string $screen = null,
+    ): array {
+        if (! $this->push->isConfigured()) {
+            return [
+                'ok' => false,
+                'message' => 'Firebase is not configured. Set FCM_PROJECT_ID and FCM_SERVICE_ACCOUNT_JSON on the server.',
+            ];
+        }
+
+        $token = $this->resolveToken($wallet);
+        if ($token === null) {
+            return [
+                'ok' => false,
+                'message' => 'No mobile push token for this wallet. The user must open the CheckoutNow app and allow notifications while signed in.',
+            ];
+        }
+
+        $data = [
+            'type' => 'admin_message',
+            'wallet_id' => (string) $wallet->id,
+        ];
+        if ($screen !== null && $screen !== '') {
+            $data['screen'] = $screen;
+        }
+
+        try {
+            $failed = $this->push->sendToTokens(
+                [$token],
+                $title,
+                $body,
+                $data,
+                (string) config('consumer_wallet.credit_push_channel', 'money_received'),
+            );
+            $this->clearTokenIfInvalid($token, $failed);
+            if (in_array($token, $failed, true)) {
+                return [
+                    'ok' => false,
+                    'message' => 'FCM rejected the device token (expired or unregistered). Ask the user to open the app again.',
+                ];
+            }
+
+            return ['ok' => true, 'message' => 'Push notification sent.'];
+        } catch (\Throwable $e) {
+            Log::warning('consumer_wallet.admin_push_failed', [
+                'wallet_id' => $wallet->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'ok' => false,
+                'message' => 'Could not send push: '.$e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * @return array{configured: bool, has_token: bool, platform: ?string, updated_at: ?string}
+     */
+    public function tokenStatus(WhatsappWallet $wallet): array
+    {
+        $account = $this->resolveAccount($wallet);
+
+        return [
+            'configured' => $this->push->isConfigured(),
+            'has_token' => $account !== null,
+            'platform' => $account?->fcm_platform,
+            'updated_at' => $account?->fcm_token_updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
      * @param  array{debit_amount: float, debit_currency: string, credit_amount: float, credit_currency: string}|null  $crossBorderFx
      */
     public function notifyP2pReceived(
@@ -212,18 +291,23 @@ final class ConsumerWalletPushNotificationService
 
     private function resolveToken(WhatsappWallet $wallet): ?string
     {
-        $account = ConsumerWalletApiAccount::query()
-            ->where('whatsapp_wallet_id', $wallet->id)
-            ->whereNotNull('fcm_token')
-            ->where('fcm_token', '!=', '')
-            ->where('fcm_platform', '!=', 'web')
-            ->orderByDesc('fcm_token_updated_at')
-            ->first();
+        $account = $this->resolveAccount($wallet);
 
         if (! $account) {
             return null;
         }
 
         return (string) $account->fcm_token;
+    }
+
+    private function resolveAccount(WhatsappWallet $wallet): ?ConsumerWalletApiAccount
+    {
+        return ConsumerWalletApiAccount::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->whereNotNull('fcm_token')
+            ->where('fcm_token', '!=', '')
+            ->where('fcm_platform', '!=', 'web')
+            ->orderByDesc('fcm_token_updated_at')
+            ->first();
     }
 }
