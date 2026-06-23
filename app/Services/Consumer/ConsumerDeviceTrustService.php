@@ -41,16 +41,18 @@ class ConsumerDeviceTrustService
     }
 
     /**
-     * @return array{stepup_required: bool, stepup_session: string, other_device_label: string|null, channels: string[]}
+     * @return array{stepup_required: bool, stepup_session: string, other_device_label: string|null, channels: string[], push_approval_available: bool, push_approval_expires_at: string|null}
      */
     public function stepUpPayload(ConsumerDeviceStepupSession $session, WhatsappWallet $wallet): array
     {
-        return [
+        $pushMeta = app(ConsumerDeviceStepupPushService::class)->metaForSession($session);
+
+        return array_merge([
             'stepup_required' => true,
             'stepup_session' => $session->session_token,
             'other_device_label' => $this->otherDeviceLabel($session->account),
             'channels' => $this->stepUpChannels($wallet),
-        ];
+        ], $pushMeta);
     }
 
     public function otherDeviceLabel(?ConsumerWalletApiAccount $account): ?string

@@ -103,6 +103,8 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/passkey/login/options', [ConsumerDeviceAuthController::class, 'passkeyLoginOptions']);
         Route::post('auth/passkey/login/verify', [ConsumerDeviceAuthController::class, 'passkeyLoginVerify']);
         Route::post('auth/device/stepup/start', [ConsumerDeviceAuthController::class, 'stepupStart']);
+        Route::post('auth/device/stepup/push/request', [ConsumerDeviceAuthController::class, 'stepupPushRequest']);
+        Route::get('auth/device/stepup/push/status', [ConsumerDeviceAuthController::class, 'stepupPushStatus']);
         Route::post('auth/device/stepup/bvn', [ConsumerDeviceAuthController::class, 'stepupBvn']);
         Route::post('auth/device/stepup/otp/request', [ConsumerDeviceAuthController::class, 'stepupOtpRequest']);
         Route::post('auth/device/stepup/otp/verify', [ConsumerDeviceAuthController::class, 'stepupOtpVerify']);
@@ -114,6 +116,8 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/logout', [ConsumerWalletAuthController::class, 'logout']);
         Route::post('auth/passkey/register/options', [ConsumerDeviceAuthController::class, 'passkeyRegisterOptions']);
         Route::post('auth/passkey/register/verify', [ConsumerDeviceAuthController::class, 'passkeyRegisterVerify']);
+        Route::post('auth/device/stepup/push/approve', [ConsumerDeviceAuthController::class, 'stepupPushApprove']);
+        Route::post('auth/device/stepup/push/deny', [ConsumerDeviceAuthController::class, 'stepupPushDeny']);
         Route::get('auth/devices', [ConsumerDeviceAuthController::class, 'listDevices']);
         Route::delete('auth/devices/{id}', [ConsumerDeviceAuthController::class, 'revokeDevice']);
         Route::get('wallet', [ConsumerWalletApiController::class, 'showWallet']);

@@ -27,4 +27,11 @@ return [
 
     /** Server cache for business account history (pay-ins + withdrawals). */
     'business_activity_cache_ttl_account' => (int) env('CONSUMER_BUSINESS_ACTIVITY_CACHE_TTL_ACCOUNT', 600),
+
+    /** FCM push approval for new-device step-up (trusted device approves sign-in). */
+    'device_stepup_push_enabled' => filter_var(env('CONSUMER_DEVICE_STEPUP_PUSH_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'device_stepup_push_ttl_minutes' => (int) env('CONSUMER_DEVICE_STEPUP_PUSH_TTL_MINUTES', 5),
+    'device_stepup_push_poll_seconds' => (int) env('CONSUMER_DEVICE_STEPUP_PUSH_POLL_SECONDS', 3),
+    'device_stepup_push_title' => env('CONSUMER_DEVICE_STEPUP_PUSH_TITLE', 'New sign-in attempt'),
+    'device_stepup_push_channel' => env('CONSUMER_DEVICE_STEPUP_PUSH_CHANNEL', 'wallet_alerts'),
 ];

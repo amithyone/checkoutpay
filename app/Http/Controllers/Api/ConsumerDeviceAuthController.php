@@ -7,6 +7,7 @@ use App\Models\ConsumerAppSession;
 use App\Models\ConsumerAppSessionEvent;
 use App\Models\ConsumerWalletApiAccount;
 use App\Services\Consumer\ConsumerAppSessionService;
+use App\Services\Consumer\ConsumerDeviceStepupPushService;
 use App\Services\Consumer\ConsumerDeviceStepupService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWebAuthnService;
@@ -172,13 +173,83 @@ class ConsumerDeviceAuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
+            'data' => array_merge([
                 'stepup_required' => true,
                 'stepup_session' => $result['stepup_session'],
                 'other_device_label' => $result['other_device_label'] ?? null,
                 'channels' => $result['channels'] ?? ['whatsapp'],
-            ],
+            ], [
+                'push_approval_available' => (bool) ($result['push_approval_available'] ?? false),
+                'push_approval_expires_at' => $result['push_approval_expires_at'] ?? null,
+            ]),
         ]);
+    }
+
+    public function stepupPushRequest(Request $request, ConsumerDeviceStepupPushService $push): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+        ]);
+
+        $result = $push->requestApproval((string) $request->input('stepup_session'));
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'] ?? null,
+            'data' => $result['ok'] ? [
+                'sent' => true,
+                'approval_id' => $result['approval_id'] ?? null,
+                'expires_at' => $result['expires_at'] ?? null,
+                'polling_interval_seconds' => $result['polling_interval_seconds'] ?? 3,
+            ] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function stepupPushStatus(Request $request, ConsumerDeviceStepupPushService $push): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+        ]);
+
+        $status = $push->approvalStatus((string) $request->input('stepup_session'));
+
+        return response()->json([
+            'success' => true,
+            'data' => $status,
+        ]);
+    }
+
+    public function stepupPushApprove(Request $request, ConsumerDeviceStepupPushService $push): JsonResponse
+    {
+        $request->validate([
+            'approval_id' => 'required|string|max:64',
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+        ]);
+
+        $account = $this->accountFor($request);
+        $result = $push->approve($account, (string) $request->input('approval_id'), (string) $request->input('pin'));
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'] ?? null,
+            'data' => $result['ok'] ? ['ok' => true] : null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function stepupPushDeny(Request $request, ConsumerDeviceStepupPushService $push): JsonResponse
+    {
+        $request->validate([
+            'approval_id' => 'required|string|max:64',
+        ]);
+
+        $account = $this->accountFor($request);
+        $result = $push->deny($account, (string) $request->input('approval_id'));
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'] ?? null,
+            'data' => $result['ok'] ? ['ok' => true] : null,
+        ], $result['ok'] ? 200 : 422);
     }
 
     public function stepupBvn(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse

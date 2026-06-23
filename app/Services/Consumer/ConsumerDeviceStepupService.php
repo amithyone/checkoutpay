@@ -16,6 +16,7 @@ class ConsumerDeviceStepupService
         private ConsumerWalletPinVerifier $pinVerifier,
         private WhatsappWalletPinResetService $pinReset,
         private ConsumerDeviceTrustService $trust,
+        private ConsumerDeviceStepupPushService $stepupPush,
     ) {}
 
     /**
@@ -66,13 +67,13 @@ class ConsumerDeviceStepupService
 
         $session = $this->createSession($account, $wallet);
 
-        return [
+        return array_merge([
             'ok' => true,
             'stepup_required' => true,
             'stepup_session' => $session->session_token,
             'other_device_label' => $this->trust->otherDeviceLabel($account),
             'channels' => $this->trust->stepUpChannels($wallet),
-        ];
+        ], $this->stepupPush->metaForSession($session));
     }
 
     /**
