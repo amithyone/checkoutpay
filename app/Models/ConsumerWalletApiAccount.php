@@ -54,4 +54,22 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
     {
         return '';
     }
+
+    /**
+     * @param  list<string>  $failedTokens
+     */
+    public static function clearFcmTokenIfInvalid(string $token, array $failedTokens): void
+    {
+        if ($token === '' || ! in_array($token, $failedTokens, true)) {
+            return;
+        }
+
+        static::query()
+            ->where('fcm_token', $token)
+            ->update([
+                'fcm_token' => null,
+                'fcm_platform' => null,
+                'fcm_token_updated_at' => null,
+            ]);
+    }
 }

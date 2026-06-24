@@ -304,17 +304,7 @@ final class ConsumerWalletPushNotificationService
 
     private function clearTokenIfInvalid(string $token, array $failedTokens): void
     {
-        if (! in_array($token, $failedTokens, true)) {
-            return;
-        }
-
-        ConsumerWalletApiAccount::query()
-            ->where('fcm_token', $token)
-            ->update([
-                'fcm_token' => null,
-                'fcm_platform' => null,
-                'fcm_token_updated_at' => null,
-            ]);
+        ConsumerWalletApiAccount::clearFcmTokenIfInvalid($token, $failedTokens);
     }
 
     private function resolveToken(WhatsappWallet $wallet): ?string

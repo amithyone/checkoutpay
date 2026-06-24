@@ -155,6 +155,9 @@ class PushNotificationService
         return str_contains($msg, 'notregistered')
             || str_contains($msg, 'invalidregistration')
             || str_contains($msg, 'unregistered')
+            || str_contains($msg, 'not a valid fcm registration token')
+            || str_contains($msg, 'invalid registration token')
+            || str_contains($msg, 'invalid_argument')
             || str_contains($msg, 'not found')
             || str_contains($msg, 'requested entity was not found');
     }

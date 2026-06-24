@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Utf8Sanitizer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,33 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProcessedEmail extends Model
 {
     use HasFactory;
+
+    /** @var list<string> */
+    private const UTF8_FIELDS = [
+        'subject',
+        'from_email',
+        'from_name',
+        'text_body',
+        'html_body',
+        'sender_name',
+        'account_number',
+        'description_field',
+        'processing_notes',
+        'last_match_reason',
+        'extraction_method',
+    ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $email): void {
+            foreach (self::UTF8_FIELDS as $field) {
+                $value = $email->{$field};
+                if (is_string($value)) {
+                    $email->{$field} = Utf8Sanitizer::clean($value);
+                }
+            }
+        });
+    }
 
     protected $fillable = [
         'email_account_id',

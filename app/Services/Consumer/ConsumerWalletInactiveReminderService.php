@@ -141,8 +141,10 @@ class ConsumerWalletInactiveReminderService
         $title = (string) config('consumer_wallet.inactive_reminder_push_title', 'Hope your day is going well');
         $body = $this->pushBody($displayName, $balanceLabel);
 
-        $this->push->sendToTokens(
-            [(string) $account->fcm_token],
+        $token = (string) $account->fcm_token;
+
+        $failed = $this->push->sendToTokens(
+            [$token],
             $title,
             $body,
             [
@@ -152,6 +154,7 @@ class ConsumerWalletInactiveReminderService
             (string) config('consumer_wallet.inactive_reminder_push_channel', 'wallet_alerts'),
             PushNotificationService::PROFILE_CHECKOUTNOW,
         );
+        ConsumerWalletApiAccount::clearFcmTokenIfInvalid($token, $failed);
 
         return true;
     }

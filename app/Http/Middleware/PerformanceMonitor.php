@@ -149,6 +149,11 @@ class PerformanceMonitor
             }
         }
 
+        // Cron endpoints are expected to run long; logging them as errors adds noise.
+        if (str_starts_with($path, 'cron/') || str_starts_with($path, 'api/cron/')) {
+            return true;
+        }
+
         return false;
     }
 

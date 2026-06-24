@@ -93,8 +93,10 @@ class ConsumerDeviceStepupPushService
             'Someone is trying to sign in to CheckoutNow on a new device. Open the app to approve or deny.',
         );
 
-        $this->push->sendToTokens(
-            [(string) $account->fcm_token],
+        $token = (string) $account->fcm_token;
+
+        $failed = $this->push->sendToTokens(
+            [$token],
             $title,
             $body,
             [
@@ -106,6 +108,7 @@ class ConsumerDeviceStepupPushService
             (string) config('consumer_wallet.device_stepup_push_channel', 'wallet_alerts'),
             PushNotificationService::PROFILE_CHECKOUTNOW,
         );
+        ConsumerWalletApiAccount::clearFcmTokenIfInvalid($token, $failed);
 
         return [
             'ok' => true,
