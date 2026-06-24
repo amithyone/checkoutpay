@@ -10,7 +10,6 @@ use App\Models\WhatsappWallet;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Webauthn\AttestationStatement\AttestationStatementSupportManager;
 
 class ConsumerDeviceTrustService
 {
@@ -291,12 +290,6 @@ class ConsumerDeviceTrustService
 
     private function webauthn(): ConsumerWebAuthnService
     {
-        if (! class_exists(AttestationStatementSupportManager::class)) {
-            throw new \RuntimeException(
-                'WebAuthn library missing. Run composer install on the server (web-auth/webauthn-lib).'
-            );
-        }
-
         return app(ConsumerWebAuthnService::class);
     }
 }

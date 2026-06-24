@@ -26,10 +26,7 @@ class ConsumerDeviceAuthController extends Controller
         $result = $webauthn->registerOptions($account, $request->input('device_name'));
 
         if (! $result['ok']) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['message'],
-            ], 422);
+            return $this->webauthnFailureResponse($result);
         }
 
         return response()->json([
@@ -55,10 +52,7 @@ class ConsumerDeviceAuthController extends Controller
         );
 
         if (! $result['ok']) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['message'],
-            ], 422);
+            return $this->webauthnFailureResponse($result);
         }
 
         $sessions->recordForAccount(
@@ -90,10 +84,7 @@ class ConsumerDeviceAuthController extends Controller
 
         $result = $webauthn->loginOptions((string) $request->input('phone'));
         if (! $result['ok']) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['message'],
-            ], 422);
+            return $this->webauthnFailureResponse($result);
         }
 
         return response()->json([
@@ -115,10 +106,7 @@ class ConsumerDeviceAuthController extends Controller
         );
 
         if (! $result['ok'] || ! isset($result['account'])) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['message'] ?? 'Passkey login failed.',
-            ], 422);
+            return $this->webauthnFailureResponse($result);
         }
 
         $login = $trust->issueLoginToken($result['account'], resetTransferLock: false);
@@ -338,10 +326,7 @@ class ConsumerDeviceAuthController extends Controller
         );
 
         if (! $result['ok']) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['message'] ?? 'Could not start passkey setup.',
-            ], 422);
+            return $this->webauthnFailureResponse($result);
         }
 
         return response()->json([
@@ -378,6 +363,10 @@ class ConsumerDeviceAuthController extends Controller
         );
 
         if (! $result['ok']) {
+            if ($result['unavailable'] ?? false) {
+                return $this->webauthnFailureResponse($result);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => $result['message'] ?? 'Could not bind device.',
@@ -447,6 +436,19 @@ class ConsumerDeviceAuthController extends Controller
             'success' => true,
             'message' => 'Device revoked.',
         ]);
+    }
+
+    /**
+     * @param  array{ok: bool, message?: string, unavailable?: bool}  $result
+     */
+    private function webauthnFailureResponse(array $result): JsonResponse
+    {
+        $status = ($result['unavailable'] ?? false) ? 503 : 422;
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'] ?? 'Passkey request failed.',
+        ], $status);
     }
 
     private function accountFor(Request $request): ConsumerWalletApiAccount

@@ -2,6 +2,7 @@
 
 namespace App\Services\Consumer;
 
+use App\Exceptions\WebAuthnNotConfiguredException;
 use App\Models\ConsumerPasskeyCredential;
 use App\Models\ConsumerTrustedDevice;
 use App\Models\ConsumerWalletApiAccount;
@@ -10,7 +11,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Symfony\Component\Serializer\SerializerInterface;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;
-use Webauthn\AttestationStatement\NoneAttestationStatementSupport;
 use Webauthn\AuthenticatorAssertionResponse;
 use Webauthn\AuthenticatorAssertionResponseValidator;
 use Webauthn\AuthenticatorAttestationResponse;
@@ -35,28 +35,17 @@ class ConsumerWebAuthnService
 
     private const CACHE_LOGIN = 'consumer_webauthn_login:';
 
-    private SerializerInterface $serializer;
+    private ?SerializerInterface $serializer = null;
 
-    private AuthenticatorAttestationResponseValidator $attestationValidator;
+    private ?AuthenticatorAttestationResponseValidator $attestationValidator = null;
 
-    private AuthenticatorAssertionResponseValidator $assertionValidator;
+    private ?AuthenticatorAssertionResponseValidator $assertionValidator = null;
 
-    public function __construct()
+    public static function isAvailable(): bool
     {
-        $attestationManager = AttestationStatementSupportManager::create();
-        $attestationManager->add(NoneAttestationStatementSupport::create());
-
-        $this->serializer = (new WebauthnSerializerFactory($attestationManager))->create();
-
-        $ceremonyFactory = new CeremonyStepManagerFactory();
-        $ceremonyFactory->setSecuredRelyingPartyId([$this->rpId()]);
-
-        $this->attestationValidator = AuthenticatorAttestationResponseValidator::create(
-            $ceremonyFactory->creationCeremony()
-        );
-        $this->assertionValidator = AuthenticatorAssertionResponseValidator::create(
-            $ceremonyFactory->requestCeremony()
-        );
+        return class_exists(AttestationStatementSupportManager::class)
+            && class_exists(WebauthnSerializerFactory::class)
+            && class_exists(Algorithms::class);
     }
 
     public function isEnabled(): bool
@@ -71,6 +60,12 @@ class ConsumerWebAuthnService
     {
         if (! $this->isEnabled()) {
             return ['ok' => false, 'message' => 'Device trust is disabled.'];
+        }
+
+        try {
+            $this->ensureInitialized();
+        } catch (WebAuthnNotConfiguredException $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'unavailable' => true];
         }
 
         $account->loadMissing('wallet');
@@ -129,6 +124,12 @@ class ConsumerWebAuthnService
             return ['ok' => false, 'message' => 'Device trust is disabled.'];
         }
 
+        try {
+            $this->ensureInitialized();
+        } catch (WebAuthnNotConfiguredException $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'unavailable' => true];
+        }
+
         $cached = Cache::get($this->regCacheKey($account->id));
         if (! is_array($cached) || ! isset($cached['challenge'])) {
             return ['ok' => false, 'message' => 'Registration session expired. Request new options.'];
@@ -136,7 +137,7 @@ class ConsumerWebAuthnService
 
         try {
             /** @var PublicKeyCredential $publicKeyCredential */
-            $publicKeyCredential = $this->serializer->denormalize(
+            $publicKeyCredential = $this->serializer()->denormalize(
                 $credentialPayload,
                 PublicKeyCredential::class,
                 'json'
@@ -156,7 +157,7 @@ class ConsumerWebAuthnService
                 (string) $cached['challenge'],
             );
 
-            $record = $this->attestationValidator->check($response, $options, $this->rpId());
+            $record = $this->attestationValidator()->check($response, $options, $this->rpId());
             Cache::forget($this->regCacheKey($account->id));
 
             $label = trim((string) ($deviceName ?: ($cached['device_name'] ?? '')));
@@ -184,7 +185,7 @@ class ConsumerWebAuthnService
                 'credential_id' => base64_encode($record->publicKeyCredentialId),
                 'device_id' => $device->id,
             ];
-        } catch (AuthenticatorResponseVerificationException $e) {
+        } catch (AuthenticatorResponseVerificationException) {
             return ['ok' => false, 'message' => 'Passkey verification failed.'];
         } catch (\Throwable) {
             return ['ok' => false, 'message' => 'Could not register passkey.'];
@@ -198,6 +199,12 @@ class ConsumerWebAuthnService
     {
         if (! $this->isEnabled()) {
             return ['ok' => false, 'message' => 'Device trust is disabled.'];
+        }
+
+        try {
+            $this->ensureInitialized();
+        } catch (WebAuthnNotConfiguredException $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'unavailable' => true];
         }
 
         $account = app(ConsumerDeviceTrustService::class)->accountForPhone($phoneInput);
@@ -240,6 +247,12 @@ class ConsumerWebAuthnService
             return ['ok' => false, 'message' => 'Device trust is disabled.'];
         }
 
+        try {
+            $this->ensureInitialized();
+        } catch (WebAuthnNotConfiguredException $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'unavailable' => true];
+        }
+
         $account = app(ConsumerDeviceTrustService::class)->accountForPhone($phoneInput);
         if (! $account) {
             return ['ok' => false, 'message' => 'No passkey registered for this number.'];
@@ -252,7 +265,7 @@ class ConsumerWebAuthnService
 
         try {
             /** @var PublicKeyCredential $publicKeyCredential */
-            $publicKeyCredential = $this->serializer->denormalize(
+            $publicKeyCredential = $this->serializer()->denormalize(
                 $credentialPayload,
                 PublicKeyCredential::class,
                 'json'
@@ -275,7 +288,7 @@ class ConsumerWebAuthnService
                 PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_REQUIRED,
             );
 
-            $updated = $this->assertionValidator->check(
+            $updated = $this->assertionValidator()->check(
                 $record,
                 $response,
                 $options,
@@ -329,13 +342,58 @@ class ConsumerWebAuthnService
         return $this->loginVerify((string) $account->phone_e164, $credentialPayload);
     }
 
+    private function ensureInitialized(): void
+    {
+        if ($this->serializer !== null) {
+            return;
+        }
+
+        if (! self::isAvailable()) {
+            throw WebAuthnNotConfiguredException::missingPackages();
+        }
+
+        $attestationManager = AttestationStatementSupportManager::create();
+        $this->serializer = (new WebauthnSerializerFactory($attestationManager))->create();
+
+        $ceremonyFactory = new CeremonyStepManagerFactory();
+        $ceremonyFactory->setSecuredRelyingPartyId([$this->rpId()]);
+
+        $this->attestationValidator = AuthenticatorAttestationResponseValidator::create(
+            $ceremonyFactory->creationCeremony()
+        );
+        $this->assertionValidator = AuthenticatorAssertionResponseValidator::create(
+            $ceremonyFactory->requestCeremony()
+        );
+    }
+
+    private function serializer(): SerializerInterface
+    {
+        $this->ensureInitialized();
+
+        return $this->serializer;
+    }
+
+    private function attestationValidator(): AuthenticatorAttestationResponseValidator
+    {
+        $this->ensureInitialized();
+
+        return $this->attestationValidator;
+    }
+
+    private function assertionValidator(): AuthenticatorAssertionResponseValidator
+    {
+        $this->ensureInitialized();
+
+        return $this->assertionValidator;
+    }
+
     /**
      * @return array<string, mixed>
      */
     private function optionsToArray(PublicKeyCredentialCreationOptions|PublicKeyCredentialRequestOptions $options): array
     {
         /** @var array<string, mixed> $encoded */
-        $encoded = $this->serializer->normalize($options, 'json');
+        $encoded = $this->serializer()->normalize($options, 'json');
 
         return $encoded;
     }
@@ -378,7 +436,7 @@ class ConsumerWebAuthnService
     private function credentialRecordToStorage(CredentialRecord $record): array
     {
         /** @var array<string, mixed> $data */
-        $data = $this->serializer->normalize($record, 'json');
+        $data = $this->serializer()->normalize($record, 'json');
 
         return $data;
     }
@@ -389,7 +447,7 @@ class ConsumerWebAuthnService
     private function credentialRecordFromStorage(array $storage): CredentialRecord
     {
         /** @var CredentialRecord $record */
-        $record = $this->serializer->denormalize($storage, CredentialRecord::class, 'json');
+        $record = $this->serializer()->denormalize($storage, CredentialRecord::class, 'json');
 
         return $record;
     }

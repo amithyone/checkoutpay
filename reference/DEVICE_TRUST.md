@@ -97,10 +97,13 @@ Env: `CONSUMER_DEVICE_TRUST_ENABLED`, `CONSUMER_WEBAUTHN_RP_ID`, `CONSUMER_WEBAU
 ## Deploy
 
 ```bash
-composer install --no-dev -o
+composer install --no-dev -o   # web-auth/webauthn-lib must be in vendor/
 php artisan migrate --force
 php artisan config:clear
+php artisan cache:clear
 ```
+
+Passkey **500** on production almost always means `composer install` was skipped — see [PASSKEY_WEBAUTHN.md](./PASSKEY_WEBAUTHN.md).
 
 Set `CONSUMER_WEBAUTHN_RP_ID=check-outpay.com` to match app associated domains / asset links.
 
