@@ -42,7 +42,31 @@ Required packages (already in `composer.json`):
 CONSUMER_DEVICE_TRUST_ENABLED=true
 CONSUMER_WEBAUTHN_RP_ID=check-outpay.com
 CONSUMER_WEBAUTHN_RP_NAME=CheckoutNow
+CONSUMER_WEBAUTHN_ALLOWED_ORIGINS=https://check-outpay.com,android:apk-key-hash:YOUR_BASE64URL_SHA256
 ```
+
+### “Passkey verification failed” after composer install
+
+Mobile native passkeys send a **platform-specific origin** in the signed payload. The server must allow it.
+
+| Platform | Typical `clientDataJSON.origin` |
+|----------|----------------------------------|
+| **iOS** | `https://check-outpay.com` |
+| **Android** | `android:apk-key-hash:…` (SHA-256 of app signing cert, Base64URL) |
+
+1. Try passkey again, then check `storage/logs/laravel.log` for `consumer_webauthn.verification_failed` — it logs `client_origin` and `allowed_origins`.
+2. Add the logged `client_origin` to `CONSUMER_WEBAUTHN_ALLOWED_ORIGINS` (comma-separated).
+3. `php artisan config:clear`
+
+Host association files (required for mobile passkeys):
+
+- `public/.well-known/apple-app-site-association` — iOS webcredentials
+- `public/.well-known/assetlinks.json` — Android (replace SHA256 fingerprint)
+
+Verify URLs:
+
+- https://check-outpay.com/.well-known/apple-app-site-association
+- https://check-outpay.com/.well-known/assetlinks.json
 
 ---
 

@@ -8,7 +8,9 @@ use App\Models\ConsumerTrustedDevice;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use ParagonIE\ConstantTime\Base64UrlSafe;
 use Symfony\Component\Serializer\SerializerInterface;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;
 use Webauthn\AuthenticatorAssertionResponse;
@@ -100,7 +102,7 @@ class ConsumerWebAuthnService
         );
 
         Cache::put($this->regCacheKey($account->id), [
-            'challenge' => $options->challenge,
+            'options' => $this->optionsToArray($options),
             'device_name' => $deviceName,
         ], now()->addMinutes(5));
 
@@ -131,11 +133,12 @@ class ConsumerWebAuthnService
         }
 
         $cached = Cache::get($this->regCacheKey($account->id));
-        if (! is_array($cached) || ! isset($cached['challenge'])) {
+        if (! is_array($cached) || ! isset($cached['options']) || ! is_array($cached['options'])) {
             return ['ok' => false, 'message' => 'Registration session expired. Request new options.'];
         }
 
         try {
+            $credentialPayload = $this->normalizeCredentialPayload($credentialPayload);
             /** @var PublicKeyCredential $publicKeyCredential */
             $publicKeyCredential = $this->serializer()->denormalize(
                 $credentialPayload,
@@ -147,14 +150,11 @@ class ConsumerWebAuthnService
                 return ['ok' => false, 'message' => 'Invalid passkey response.'];
             }
 
-            $options = PublicKeyCredentialCreationOptions::create(
-                PublicKeyCredentialRpEntity::create($this->rpName(), $this->rpId()),
-                PublicKeyCredentialUserEntity::create(
-                    (string) $account->phone_e164,
-                    $this->userHandleForAccount($account),
-                    $this->displayNameForWallet($account->wallet),
-                ),
-                (string) $cached['challenge'],
+            /** @var PublicKeyCredentialCreationOptions $options */
+            $options = $this->serializer()->denormalize(
+                $cached['options'],
+                PublicKeyCredentialCreationOptions::class,
+                'json'
             );
 
             $record = $this->attestationValidator()->check($response, $options, $this->rpId());
@@ -185,9 +185,16 @@ class ConsumerWebAuthnService
                 'credential_id' => base64_encode($record->publicKeyCredentialId),
                 'device_id' => $device->id,
             ];
-        } catch (AuthenticatorResponseVerificationException) {
+        } catch (AuthenticatorResponseVerificationException $e) {
+            $this->logVerificationFailure('register', $account->id, $e, $credentialPayload);
+
             return ['ok' => false, 'message' => 'Passkey verification failed.'];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::warning('consumer_webauthn.register_verify_error', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return ['ok' => false, 'message' => 'Could not register passkey.'];
         }
     }
@@ -227,7 +234,7 @@ class ConsumerWebAuthnService
         );
 
         Cache::put($this->loginCacheKey((string) $account->phone_e164), [
-            'challenge' => $options->challenge,
+            'options' => $this->optionsToArray($options),
             'account_id' => $account->id,
         ], now()->addMinutes(5));
 
@@ -259,11 +266,12 @@ class ConsumerWebAuthnService
         }
 
         $cached = Cache::get($this->loginCacheKey((string) $account->phone_e164));
-        if (! is_array($cached) || ! isset($cached['challenge'])) {
+        if (! is_array($cached) || ! isset($cached['options']) || ! is_array($cached['options'])) {
             return ['ok' => false, 'message' => 'Login session expired. Request new options.'];
         }
 
         try {
+            $credentialPayload = $this->normalizeCredentialPayload($credentialPayload);
             /** @var PublicKeyCredential $publicKeyCredential */
             $publicKeyCredential = $this->serializer()->denormalize(
                 $credentialPayload,
@@ -281,11 +289,11 @@ class ConsumerWebAuthnService
             }
 
             $record = $this->credentialRecordFromStorage($storedCredential->credential_record);
-            $options = PublicKeyCredentialRequestOptions::create(
-                (string) $cached['challenge'],
-                $this->rpId(),
-                [$record->getPublicKeyCredentialDescriptor()],
-                PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_REQUIRED,
+            /** @var PublicKeyCredentialRequestOptions $options */
+            $options = $this->serializer()->denormalize(
+                $cached['options'],
+                PublicKeyCredentialRequestOptions::class,
+                'json'
             );
 
             $updated = $this->assertionValidator()->check(
@@ -313,9 +321,16 @@ class ConsumerWebAuthnService
                 'account' => $account->fresh(),
                 'same_device' => true,
             ];
-        } catch (AuthenticatorResponseVerificationException) {
+        } catch (AuthenticatorResponseVerificationException $e) {
+            $this->logVerificationFailure('login', $account->id, $e, $credentialPayload);
+
             return ['ok' => false, 'message' => 'Passkey verification failed.'];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            Log::warning('consumer_webauthn.login_verify_error', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+
             return ['ok' => false, 'message' => 'Could not verify passkey.'];
         }
     }
@@ -356,7 +371,12 @@ class ConsumerWebAuthnService
         $this->serializer = (new WebauthnSerializerFactory($attestationManager))->create();
 
         $ceremonyFactory = new CeremonyStepManagerFactory();
-        $ceremonyFactory->setSecuredRelyingPartyId([$this->rpId()]);
+        $allowedOrigins = $this->allowedOrigins();
+        if ($allowedOrigins !== []) {
+            $ceremonyFactory->setAllowedOrigins($allowedOrigins, false, [$this->rpId()]);
+        } else {
+            $ceremonyFactory->setSecuredRelyingPartyId([$this->rpId()]);
+        }
 
         $this->attestationValidator = AuthenticatorAttestationResponseValidator::create(
             $ceremonyFactory->creationCeremony()
@@ -489,5 +509,67 @@ class ConsumerWebAuthnService
     private function loginCacheKey(string $phoneE164): string
     {
         return self::CACHE_LOGIN.hash('sha256', $phoneE164);
+    }
+
+    /**
+     * @return string[]
+     */
+    private function allowedOrigins(): array
+    {
+        $origins = config('consumer_wallet.webauthn_allowed_origins', []);
+
+        return is_array($origins) ? array_values(array_filter($origins)) : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $credentialPayload
+     * @return array<string, mixed>
+     */
+    private function normalizeCredentialPayload(array $credentialPayload): array
+    {
+        if (! isset($credentialPayload['type'])) {
+            $credentialPayload['type'] = 'public-key';
+        }
+
+        return $credentialPayload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $credentialPayload
+     */
+    private function logVerificationFailure(
+        string $flow,
+        int $accountId,
+        AuthenticatorResponseVerificationException $e,
+        array $credentialPayload,
+    ): void {
+        Log::warning('consumer_webauthn.verification_failed', [
+            'flow' => $flow,
+            'account_id' => $accountId,
+            'reason' => $e->getMessage(),
+            'client_origin' => $this->clientOriginFromPayload($credentialPayload),
+            'allowed_origins' => $this->allowedOrigins(),
+            'rp_id' => $this->rpId(),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $credentialPayload
+     */
+    private function clientOriginFromPayload(array $credentialPayload): ?string
+    {
+        try {
+            $response = $credentialPayload['response'] ?? null;
+            if (! is_array($response) || ! isset($response['clientDataJSON']) || ! is_string($response['clientDataJSON'])) {
+                return null;
+            }
+
+            $decoded = Base64UrlSafe::decodeNoPadding($response['clientDataJSON']);
+            $json = json_decode($decoded, true);
+
+            return is_array($json) && is_string($json['origin'] ?? null) ? $json['origin'] : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

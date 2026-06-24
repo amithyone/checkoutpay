@@ -10,6 +10,19 @@ return [
     /** WebAuthn relying party display name. */
     'webauthn_rp_name' => env('CONSUMER_WEBAUTHN_RP_NAME', 'CheckoutNow'),
 
+    /**
+     * Allowed clientDataJSON origins for native passkeys (comma-separated).
+     * iOS: https://check-outpay.com
+     * Android: android:apk-key-hash:BASE64URL_SHA256_OF_SIGNING_CERT
+     */
+    'webauthn_allowed_origins' => array_values(array_filter(array_map(
+        static fn (string $origin): string => trim($origin),
+        explode(',', (string) env(
+            'CONSUMER_WEBAUTHN_ALLOWED_ORIGINS',
+            'https://check-outpay.com'
+        ))
+    ))),
+
     /** Max single transfer amount (NGN) while transfer lock is active. */
     'high_value_single_transfer_cap' => (int) env('CONSUMER_HIGH_VALUE_SINGLE_TRANSFER_CAP', 10000),
 
