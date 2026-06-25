@@ -47,4 +47,25 @@ return [
     'device_stepup_push_poll_seconds' => (int) env('CONSUMER_DEVICE_STEPUP_PUSH_POLL_SECONDS', 3),
     'device_stepup_push_title' => env('CONSUMER_DEVICE_STEPUP_PUSH_TITLE', 'New sign-in attempt'),
     'device_stepup_push_channel' => env('CONSUMER_DEVICE_STEPUP_PUSH_CHANNEL', 'wallet_alerts'),
+
+    /** CAC business name registration + business receive account (CheckoutNow Receive Funds). */
+    'business_name_registration' => [
+        'enabled' => filter_var(env('CONSUMER_BUSINESS_NAME_REGISTRATION_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'fee_amount' => (float) env('CONSUMER_BUSINESS_NAME_REGISTRATION_FEE', 15000),
+        'fee_currency' => env('CONSUMER_BUSINESS_NAME_REGISTRATION_FEE_CURRENCY', 'NGN'),
+        'coming_soon_message' => env(
+            'CONSUMER_BUSINESS_NAME_REGISTRATION_COMING_SOON',
+            'Business name registration coming soon.'
+        ),
+        'estimated_completion_hours_min' => (int) env('CONSUMER_BUSINESS_NAME_REGISTRATION_HOURS_MIN', 12),
+        'estimated_completion_hours_max' => (int) env('CONSUMER_BUSINESS_NAME_REGISTRATION_HOURS_MAX', 24),
+        'requirements' => [
+            'Two business name options in order of preference',
+            'Owner/director full legal name',
+            'Government ID upload — NIN preferred (passport or driver\'s licence also accepted)',
+            'Registered business address in Nigeria',
+            'Short description of what the business does',
+            'Registration fee debited from your wallet balance',
+        ],
+    ],
 ];

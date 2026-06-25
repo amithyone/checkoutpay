@@ -47,6 +47,29 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
+        View::composer([
+            'rentals.index',
+            'rentals.show',
+            'tickets.index',
+            'memberships.index',
+        ], function ($view): void {
+            try {
+                $default = '#000000';
+                $rentalsColor = (string) \App\Models\Setting::get('rentals_accent_color', $default);
+                $view->with([
+                    'rentalsColor' => $rentalsColor,
+                    'ticketsColor' => (string) \App\Models\Setting::get('tickets_accent_color', $rentalsColor),
+                    'membershipsColor' => (string) \App\Models\Setting::get('memberships_accent_color', $rentalsColor),
+                ]);
+            } catch (\Throwable) {
+                $view->with([
+                    'rentalsColor' => '#000000',
+                    'ticketsColor' => '#000000',
+                    'membershipsColor' => '#000000',
+                ]);
+            }
+        });
+
         // Warm up critical caches on application boot (for fast server)
         // This ensures caches are populated immediately, reducing first-request latency
         if (app()->environment('production')) {
