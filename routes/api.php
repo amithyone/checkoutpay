@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ConsumerBusinessNameRegistrationController;
+use App\Http\Controllers\Api\ConsumerBusinessAccountOnboardingController;
 use App\Http\Controllers\Api\ConsumerSupportController;
 use App\Http\Controllers\Api\ConsumerChatController;
 use App\Http\Controllers\Api\PublicSupportController;
@@ -164,6 +165,9 @@ Route::prefix('v1')->group(function () {
         Route::post('kyc/tier2/business', [ConsumerWalletApiController::class, 'kycTier2Business']);
         Route::get('business-name-registration', [ConsumerBusinessNameRegistrationController::class, 'index']);
         Route::post('business-name-registration', [ConsumerBusinessNameRegistrationController::class, 'store']);
+        Route::get('business-account/onboarding', [ConsumerBusinessAccountOnboardingController::class, 'index']);
+        Route::post('business-account/onboarding', [ConsumerBusinessAccountOnboardingController::class, 'store']);
+        Route::post('business-account/onboarding/password', [ConsumerBusinessAccountOnboardingController::class, 'setPassword']);
         /** @deprecated Prefer POST consumer/wallet/conversation; kept for older app bundles. */
         Route::get('chat/messages', [ConsumerChatController::class, 'index']);
         Route::post('chat/messages', [ConsumerChatController::class, 'store']);

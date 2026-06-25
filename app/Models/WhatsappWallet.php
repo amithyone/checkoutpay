@@ -44,6 +44,7 @@ class WhatsappWallet extends Model
         'business_pay_in_bank_name',
         'business_pay_in_bank_code',
         'active_business_name_registration_id',
+        'active_business_account_application_id',
         'linked_business_id',
         'tier2_provisioned_at',
         'kyc_fname',
@@ -107,6 +108,16 @@ class WhatsappWallet extends Model
     public function activeBusinessNameRegistration(): BelongsTo
     {
         return $this->belongsTo(BusinessNameRegistration::class, 'active_business_name_registration_id');
+    }
+
+    public function businessAccountApplications(): HasMany
+    {
+        return $this->hasMany(BusinessAccountApplication::class, 'whatsapp_wallet_id');
+    }
+
+    public function activeBusinessAccountApplication(): BelongsTo
+    {
+        return $this->belongsTo(BusinessAccountApplication::class, 'active_business_account_application_id');
     }
 
     public function linkedBusiness(): BelongsTo

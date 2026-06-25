@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\Admin;
 use App\Models\ConsumerAppSession;
+use App\Models\BusinessAccountApplication;
 use App\Models\BusinessNameRegistration;
 use App\Models\Payment;
 use App\Models\WhatsappWalletTransaction;
@@ -180,6 +181,14 @@ class AdminSidebarMenu
                 [
                     'visible' => $admin->canManageSettings(),
                     'badge_count' => BusinessNameRegistration::countPending(),
+                    'badge_color' => 'yellow',
+                ]
+            ),
+            'business_account_applications' => array_merge(
+                $this->link('Business accounts', 'admin.business-account-applications.index', 'fas fa-store text-green-600', ['admin.business-account-applications.*']),
+                [
+                    'visible' => $admin->canManageSettings(),
+                    'badge_count' => BusinessAccountApplication::countPending(),
                     'badge_color' => 'yellow',
                 ]
             ),

@@ -22,6 +22,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'phone',
         'address',
         'website',
+        'service_categories',
         'website_approved',
         'api_key',
         'webhook_url',
@@ -108,6 +109,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
 
     protected $casts = [
         'is_active' => 'boolean',
+        'service_categories' => 'array',
         'rental_auto_approve' => 'boolean',
         'website_approved' => 'boolean',
         'balance' => 'decimal:2',

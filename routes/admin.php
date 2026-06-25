@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\MevonPayAuditController;
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
 use App\Http\Controllers\Admin\BusinessNameRegistrationAdminController;
+use App\Http\Controllers\Admin\BusinessAccountApplicationAdminController;
 use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\BusinessKycController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -273,6 +274,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('business-name-registrations/{registration}/id-document', [BusinessNameRegistrationAdminController::class, 'idDocument'])->name('business-name-registrations.id-document');
             Route::put('business-name-registrations/{registration}/status', [BusinessNameRegistrationAdminController::class, 'updateStatus'])
                 ->name('business-name-registrations.status');
+
+            Route::get('business-account-applications', [BusinessAccountApplicationAdminController::class, 'index'])->name('business-account-applications.index');
+            Route::get('business-account-applications/{application}', [BusinessAccountApplicationAdminController::class, 'show'])->name('business-account-applications.show');
+            Route::get('business-account-applications/{application}/cac-document', [BusinessAccountApplicationAdminController::class, 'cacDocument'])->name('business-account-applications.cac-document');
+            Route::put('business-account-applications/{application}/status', [BusinessAccountApplicationAdminController::class, 'updateStatus'])
+                ->name('business-account-applications.status');
 
             Route::get('app-sessions', [ConsumerAppSessionAdminController::class, 'index'])->name('app-sessions.index');
             Route::get('app-sessions/events', [ConsumerAppSessionAdminController::class, 'events'])->name('app-sessions.events');

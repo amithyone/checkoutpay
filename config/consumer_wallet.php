@@ -68,4 +68,24 @@ return [
             'Registration fee debited from your wallet balance',
         ],
     ],
+
+    /** CheckoutPay merchant business account onboarding from CheckoutNow app. */
+    'business_account_onboarding' => [
+        'enabled' => filter_var(env('CONSUMER_BUSINESS_ACCOUNT_ONBOARDING_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'fee_amount' => (float) env('CONSUMER_BUSINESS_ACCOUNT_ONBOARDING_FEE', 0),
+        'fee_currency' => env('CONSUMER_BUSINESS_ACCOUNT_ONBOARDING_FEE_CURRENCY', 'NGN'),
+        'coming_soon_message' => env(
+            'CONSUMER_BUSINESS_ACCOUNT_ONBOARDING_COMING_SOON',
+            'Business account onboarding coming soon.'
+        ),
+        'dashboard_login_url' => env('CONSUMER_BUSINESS_ACCOUNT_DASHBOARD_LOGIN_URL', '/dashboard/login'),
+        'service_categories' => [
+            ['id' => 'payments', 'label' => 'Payments & checkout'],
+            ['id' => 'rentals', 'label' => 'Rentals'],
+            ['id' => 'memberships', 'label' => 'Memberships'],
+            ['id' => 'tickets', 'label' => 'Event tickets'],
+            ['id' => 'charity', 'label' => 'Charity & donations'],
+            ['id' => 'invoices', 'label' => 'Invoices'],
+        ],
+    ],
 ];

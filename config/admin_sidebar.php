@@ -18,6 +18,7 @@ return [
         'app_sessions',
         'whatsapp_wallet_transactions',
         'business_name_registrations',
+        'business_account_applications',
         'withdrawals',
         'overdraft',
         'peer_lending_offers',
