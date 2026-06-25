@@ -138,13 +138,16 @@ class ConsumerWalletInactiveReminderService
             return false;
         }
 
+        $target = $account->pushDeliveryTarget();
+        if ($target === null) {
+            return false;
+        }
+
         $title = (string) config('consumer_wallet.inactive_reminder_push_title', 'Hope your day is going well');
         $body = $this->pushBody($displayName, $balanceLabel);
 
-        $token = (string) $account->fcm_token;
-
         $failed = $this->push->sendToTokens(
-            [$token],
+            [$target],
             $title,
             $body,
             [
@@ -154,7 +157,7 @@ class ConsumerWalletInactiveReminderService
             (string) config('consumer_wallet.inactive_reminder_push_channel', 'wallet_alerts'),
             PushNotificationService::PROFILE_CHECKOUTNOW,
         );
-        ConsumerWalletApiAccount::clearFcmTokenIfInvalid($token, $failed);
+        ConsumerWalletApiAccount::clearFcmTokenIfInvalid($target['token'], $failed);
 
         return true;
     }

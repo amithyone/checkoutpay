@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\RentalDeviceToken;
+use App\Services\Push\ApnsPushNotificationService;
+use App\Services\Push\PushTokenDeliveryClassifier;
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +14,10 @@ class PushNotificationService
     public const PROFILE_RENTALS = 'rentals';
 
     public const PROFILE_CHECKOUTNOW = 'checkoutnow';
+
+    public function __construct(
+        private ApnsPushNotificationService $apns,
+    ) {}
 
     public function notifyRenter(
         int $renterId,
@@ -44,7 +50,8 @@ class PushNotificationService
     }
 
     /**
-     * @return list<string> tokens that FCM rejected as invalid/unregistered
+     * @param  array<int, string|array{token: string, platform?: ?string}>  $tokens
+     * @return list<string> tokens rejected as invalid/unregistered
      */
     public function sendToTokens(
         array $tokens,
@@ -58,6 +65,70 @@ class PushNotificationService
             return [];
         }
 
+        $failedTokens = [];
+        foreach ($this->normalizeTokenTargets($tokens) as $target) {
+            $token = $target['token'];
+            if ($this->shouldDeliverViaApns($target['platform'], $token, $profile)) {
+                $failedTokens = array_merge(
+                    $failedTokens,
+                    $this->apns->sendToDevice($token, $title, $body, $data, $profile),
+                );
+                continue;
+            }
+
+            $failedTokens = array_merge(
+                $failedTokens,
+                $this->sendSingleFcmToken($token, $title, $body, $data, $androidChannelId, $profile),
+            );
+        }
+
+        return array_values(array_unique(array_filter($failedTokens)));
+    }
+
+    /**
+     * @param  array<int, string|array{token: string, platform?: ?string}>  $tokens
+     * @return list<array{token: string, platform: ?string}>
+     */
+    private function normalizeTokenTargets(array $tokens): array
+    {
+        $targets = [];
+        foreach ($tokens as $item) {
+            if (is_string($item)) {
+                $targets[] = ['token' => $item, 'platform' => null];
+                continue;
+            }
+
+            if (is_array($item) && isset($item['token'])) {
+                $targets[] = [
+                    'token' => (string) $item['token'],
+                    'platform' => isset($item['platform']) ? (string) $item['platform'] : null,
+                ];
+            }
+        }
+
+        return $targets;
+    }
+
+    private function shouldDeliverViaApns(?string $platform, string $token, string $profile): bool
+    {
+        if ($profile !== self::PROFILE_CHECKOUTNOW || ! $this->apns->isConfigured($profile)) {
+            return false;
+        }
+
+        return PushTokenDeliveryClassifier::shouldDeliverViaApns($platform, $token);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function sendSingleFcmToken(
+        string $token,
+        string $title,
+        string $body,
+        array $data,
+        string $androidChannelId,
+        string $profile,
+    ): array {
         [$projectId, $serviceAccount] = $this->resolveCredentials($profile);
         if ($projectId === '' || $serviceAccount === '') {
             return [];
@@ -70,82 +141,82 @@ class PushNotificationService
 
         $endpoint = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
         $client = new Client(['timeout' => 10]);
-        $failedTokens = [];
 
-        foreach ($tokens as $token) {
-            $message = [
-                'message' => [
-                    'token' => $token,
+        $message = [
+            'message' => [
+                'token' => $token,
+                'notification' => [
+                    'title' => $title,
+                    'body' => $body,
+                ],
+                'data' => $this->normalizeData($data),
+                'android' => [
+                    'priority' => 'high',
                     'notification' => [
-                        'title' => $title,
-                        'body' => $body,
+                        'sound' => 'default',
+                        'channel_id' => $androidChannelId,
                     ],
-                    'data' => $this->normalizeData($data),
-                    'android' => [
-                        'priority' => 'high',
-                        'notification' => [
-                            'sound' => 'default',
-                            'channel_id' => $androidChannelId,
-                        ],
+                ],
+                'apns' => [
+                    'headers' => [
+                        'apns-priority' => '10',
                     ],
-                    'apns' => [
-                        'headers' => [
-                            'apns-priority' => '10',
-                        ],
-                        'payload' => [
-                            'aps' => [
-                                'alert' => [
-                                    'title' => $title,
-                                    'body' => $body,
-                                ],
-                                'sound' => 'default',
+                    'payload' => [
+                        'aps' => [
+                            'alert' => [
+                                'title' => $title,
+                                'body' => $body,
                             ],
+                            'sound' => 'default',
                         ],
                     ],
                 ],
-            ];
+            ],
+        ];
 
-            try {
-                $response = $client->post($endpoint, [
-                    'headers' => [
-                        'Authorization' => "Bearer {$accessToken}",
-                        'Content-Type' => 'application/json',
-                    ],
-                    'json' => $message,
-                ]);
-                $status = $response->getStatusCode();
-                if ($status >= 400) {
-                    $failedTokens[] = (string) $token;
-                    Log::warning('FCM push rejected', [
-                        'status' => $status,
-                        'profile' => $profile,
-                        'project_id' => $projectId,
-                        'token_suffix' => substr((string) $token, -12),
-                        'body' => substr((string) $response->getBody(), 0, 500),
-                    ]);
-                } else {
-                    $responseBody = json_decode((string) $response->getBody(), true);
-                    Log::info('FCM push accepted', [
-                        'profile' => $profile,
-                        'project_id' => $projectId,
-                        'fcm_message' => is_array($responseBody) ? ($responseBody['name'] ?? null) : null,
-                        'token_suffix' => substr((string) $token, -12),
-                        'type' => $data['type'] ?? null,
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('FCM push send failed', [
+        try {
+            $response = $client->post($endpoint, [
+                'headers' => [
+                    'Authorization' => "Bearer {$accessToken}",
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $message,
+            ]);
+            $status = $response->getStatusCode();
+            if ($status >= 400) {
+                Log::warning('FCM push rejected', [
+                    'status' => $status,
                     'profile' => $profile,
-                    'token_suffix' => substr((string) $token, -12),
-                    'error' => $e->getMessage(),
+                    'project_id' => $projectId,
+                    'token_suffix' => substr($token, -12),
+                    'body' => substr((string) $response->getBody(), 0, 500),
                 ]);
-                if ($this->isInvalidTokenError($e)) {
-                    $failedTokens[] = (string) $token;
-                }
-            }
-        }
 
-        return $failedTokens;
+                return [$token];
+            }
+
+            $responseBody = json_decode((string) $response->getBody(), true);
+            Log::info('FCM push accepted', [
+                'profile' => $profile,
+                'project_id' => $projectId,
+                'fcm_message' => is_array($responseBody) ? ($responseBody['name'] ?? null) : null,
+                'token_suffix' => substr($token, -12),
+                'type' => $data['type'] ?? null,
+            ]);
+
+            return [];
+        } catch (\Throwable $e) {
+            Log::warning('FCM push send failed', [
+                'profile' => $profile,
+                'token_suffix' => substr($token, -12),
+                'error' => $e->getMessage(),
+            ]);
+            if ($this->isInvalidTokenError($e)) {
+                return [$token];
+            }
+
+            return [];
+        }
     }
 
     private function isInvalidTokenError(\Throwable $e): bool
@@ -164,6 +235,15 @@ class PushNotificationService
 
     public function isConfigured(string $profile = self::PROFILE_RENTALS): bool
     {
+        if ($profile === self::PROFILE_CHECKOUTNOW && $this->apns->isConfigured($profile)) {
+            return true;
+        }
+
+        return $this->isFcmConfigured($profile);
+    }
+
+    public function isFcmConfigured(string $profile = self::PROFILE_RENTALS): bool
+    {
         [$projectId, $serviceAccount] = $this->resolveCredentials($profile);
 
         if ($projectId === '' || $serviceAccount === '') {
@@ -171,6 +251,11 @@ class PushNotificationService
         }
 
         return $this->resolveServiceAccountJson($serviceAccount) !== null;
+    }
+
+    public function isApnsConfigured(string $profile = self::PROFILE_CHECKOUTNOW): bool
+    {
+        return $this->apns->isConfigured($profile);
     }
 
     private function resolveServiceAccountJson(string $serviceAccountValue): ?array
@@ -221,9 +306,11 @@ class PushNotificationService
             $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
             $credentials = new ServiceAccountCredentials($scopes, $decoded);
             $auth = $credentials->fetchAuthToken();
+
             return $auth['access_token'] ?? null;
         } catch (\Throwable $e) {
             Log::warning('FCM auth token fetch failed', ['error' => $e->getMessage()]);
+
             return null;
         }
     }
@@ -234,7 +321,7 @@ class PushNotificationService
         foreach ($data as $key => $value) {
             $normalized[(string) $key] = is_scalar($value) ? (string) $value : json_encode($value);
         }
+
         return $normalized;
     }
 }
-

@@ -47,7 +47,7 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
         $push->shouldReceive('sendToTokens')
             ->once()
             ->withArgs(function ($tokens, $title, $body, $data, $channel, $profile) use ($wallet) {
-                return $tokens === ['fcm-token-wallet-credit']
+                return $tokens === [['token' => 'fcm-token-wallet-credit', 'platform' => 'android']]
                     && $profile === PushNotificationService::PROFILE_CHECKOUTNOW
                     && $title === 'Money received'
                     && str_contains($body, '₦5,000.00')
@@ -86,7 +86,7 @@ class ConsumerWalletPushNotificationServiceTest extends TestCase
         $push->shouldReceive('sendToTokens')
             ->once()
             ->withArgs(function ($tokens, $title, $body, $data, $channel, $profile) {
-                return $tokens === ['fcm-token-p2p']
+                return $tokens === [['token' => 'fcm-token-p2p', 'platform' => 'ios']]
                     && $profile === PushNotificationService::PROFILE_CHECKOUTNOW
                     && str_contains($body, 'Ada sent you ₦2,500.00')
                     && $data['type'] === 'money_received'

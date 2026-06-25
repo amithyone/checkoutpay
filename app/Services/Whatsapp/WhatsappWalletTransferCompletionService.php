@@ -6,6 +6,7 @@ use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
+use App\Services\MevonPay\MevonPayPayoutPreRefundStatusService;
 use App\Services\MavonPayTransferService;
 use App\Services\Payout\BankPayoutNarration;
 use App\Services\Vtu\VtuProviderResolver;
@@ -28,6 +29,7 @@ class WhatsappWalletTransferCompletionService
         private VtuProviderResolver $vtuResolver,
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
+        private MevonPayPayoutPreRefundStatusService $preRefundStatus,
     ) {}
 
     private function waBrand(): string
@@ -511,9 +513,12 @@ class WhatsappWalletTransferCompletionService
             $walletFresh,
             $txnRow?->id,
         );
-        $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
+        $resolved = $this->preRefundStatus->resolveBeforeRefund($result, $reference);
+        $bucket = $resolved['bucket'];
+        $result = $resolved['result'];
+        $refundAllowed = $resolved['refund_allowed'];
 
-        DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result) {
+        DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result, $refundAllowed) {
             $txn = WhatsappWalletTransaction::query()
                 ->where('external_reference', $reference)
                 ->where('whatsapp_wallet_id', $wallet->id)
@@ -537,7 +542,7 @@ class WhatsappWalletTransferCompletionService
                 $result,
             );
 
-            $refund = $bucket === MavonPayTransferService::BUCKET_FAILED;
+            $refund = $refundAllowed;
 
             if ($refund) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
@@ -563,7 +568,7 @@ class WhatsappWalletTransferCompletionService
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $wallet = $wallet->fresh();
 
-        if ($bucket === MavonPayTransferService::BUCKET_FAILED) {
+        if ($refundAllowed) {
             $this->walletNotifier->notifyMoneyReceived(
                 $wallet,
                 $amount,

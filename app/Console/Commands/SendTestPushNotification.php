@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\RentalDeviceToken;
 use App\Models\WhatsappWallet;
+use App\Services\Push\PushTokenDeliveryClassifier;
 use App\Services\PushNotificationService;
 use Illuminate\Console\Command;
 
@@ -12,26 +13,32 @@ class SendTestPushNotification extends Command
 {
     protected $signature = 'push:test
         {--token= : Send to a specific device token}
+        {--platform= : android or ios (required with --token when testing CheckoutNow routing)}
         {--renter= : Send to all native tokens for a renter id}
         {--business= : Send to all native tokens for a business id}
-        {--wallet= : Send to FCM token for a consumer wallet id (whatsapp_wallets.id)}
+        {--wallet= : Send to push token for a consumer wallet id (whatsapp_wallets.id)}
         {--title=Test notification : Push title}
         {--body=Push setup is working. : Push body}
         {--type=test_push : data.type payload value}
         {--screen= : Optional data.screen (e.g. history for money alerts)}';
 
-    protected $description = 'Send a test FCM push notification to token(s).';
+    protected $description = 'Send a test push notification to token(s).';
 
     public function handle(PushNotificationService $push): int
     {
         $tokens = [];
         $single = trim((string) $this->option('token'));
+        $singlePlatform = strtolower(trim((string) $this->option('platform')));
         $renterId = (int) $this->option('renter');
         $businessId = (int) $this->option('business');
         $walletId = (int) $this->option('wallet');
 
         if ($single !== '') {
-            $tokens[] = $single;
+            if ($singlePlatform !== '') {
+                $tokens[] = ['token' => $single, 'platform' => $singlePlatform];
+            } else {
+                $tokens[] = $single;
+            }
         }
 
         if ($walletId > 0) {
@@ -42,8 +49,9 @@ class SendTestPushNotification extends Command
                 ->where('fcm_platform', '!=', 'web')
                 ->orderByDesc('fcm_token_updated_at')
                 ->first();
-            if ($account) {
-                $tokens[] = (string) $account->fcm_token;
+            $target = $account?->pushDeliveryTarget();
+            if ($target !== null) {
+                $tokens[] = $target;
             }
         }
 
@@ -63,7 +71,6 @@ class SendTestPushNotification extends Command
                 ->all());
         }
 
-        $tokens = array_values(array_unique(array_filter($tokens)));
         if (count($tokens) < 1) {
             $this->error('No target token found. Use --token, --wallet, --renter, or --business.');
 
@@ -76,9 +83,9 @@ class SendTestPushNotification extends Command
 
         if (! $push->isConfigured($profile)) {
             $envHint = $profile === PushNotificationService::PROFILE_CHECKOUTNOW
-                ? 'CHECKOUTNOW_FCM_PROJECT_ID and CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON'
+                ? 'CHECKOUTNOW_FCM_* (Android) and/or CHECKOUTNOW_APNS_* (iOS)'
                 : 'RENTALS_FCM_PROJECT_ID and RENTALS_FCM_SERVICE_ACCOUNT_JSON';
-            $this->error("Missing Firebase config for {$profile}. Set {$envHint}.");
+            $this->error("Missing push config for {$profile}. Set {$envHint}.");
 
             return self::FAILURE;
         }
@@ -97,13 +104,20 @@ class SendTestPushNotification extends Command
             ? (string) config('consumer_wallet.credit_push_channel', 'money_received')
             : 'rentals_alerts';
 
-        $push->sendToTokens($tokens, $title, $body, $data, $channel, $profile);
+        $failed = $push->sendToTokens($tokens, $title, $body, $data, $channel, $profile);
 
-        $this->info('Push request sent to FCM.');
+        $this->info('Push request sent.');
         $this->line('Profile: '.$profile);
         $this->line('Tokens targeted: '.count($tokens));
+        if ($failed !== []) {
+            $this->warn('Rejected tokens: '.count($failed));
+        }
         $this->line('Title: '.$title);
         $this->line('Body: '.$body);
+        if ($walletId > 0 && isset($target)) {
+            $via = PushTokenDeliveryClassifier::shouldDeliverViaApns($target['platform'], $target['token']) ? 'APNs' : 'FCM';
+            $this->line('Delivery path: '.$via);
+        }
 
         return self::SUCCESS;
     }

@@ -25,6 +25,8 @@ class DiagnosePushNotifications extends Command
             'checkout-now-a2b2f',
             $push,
         );
+        $this->line('APNs (CheckoutNow iOS): '.($push->isApnsConfigured(PushNotificationService::PROFILE_CHECKOUTNOW) ? 'configured' : 'not configured'));
+        $this->line('  CHECKOUTNOW_APNS_KEY_ID / TEAM_ID / PRIVATE_KEY / BUNDLE_ID / ENVIRONMENT');
 
         $this->newLine();
         $this->line('── Rentals Firebase (ABJ Cam Rentals — separate app) ──');
@@ -59,6 +61,9 @@ class DiagnosePushNotifications extends Command
             $this->line('  checkoutnow_configured: '.($status['configured'] ? 'yes' : 'no'));
             $this->line('  has_token: '.($status['has_token'] ? 'yes' : 'no'));
             $this->line('  platform: '.($status['platform'] ?? '—'));
+            $this->line('  delivery_channel: '.($status['delivery_channel'] ?? '—'));
+            $this->line('  fcm_configured: '.(($status['fcm_configured'] ?? false) ? 'yes' : 'no'));
+            $this->line('  apns_configured: '.(($status['apns_configured'] ?? false) ? 'yes' : 'no'));
             $this->line('  token_updated: '.($status['updated_at'] ?? '—'));
         }
 
@@ -66,7 +71,7 @@ class DiagnosePushNotifications extends Command
         $this->line('── Notes ──');
         $this->line('google-services.json is for the mobile app build only.');
         $this->line('Server push needs a service account JSON per Firebase project (not google-services.json).');
-        $this->line('Admin “Push sent” = FCM HTTP 2xx. Check laravel.log for: FCM push accepted | FCM push send failed');
+        $this->line('Admin “Push sent” = FCM/APNs HTTP 2xx. Check laravel.log for: FCM push accepted | APNs push accepted | push send failed');
         $this->line('Test: php artisan push:test --wallet=ID --title="Test" --body="Hello"');
 
         return self::SUCCESS;

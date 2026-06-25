@@ -48,6 +48,24 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
     }
 
     /**
+     * @return array{token: string, platform: ?string}|null
+     */
+    public function pushDeliveryTarget(): ?array
+    {
+        $token = trim((string) ($this->fcm_token ?? ''));
+        $platform = trim((string) ($this->fcm_platform ?? ''));
+
+        if ($token === '' || $platform === '' || $platform === 'web') {
+            return null;
+        }
+
+        return [
+            'token' => $token,
+            'platform' => $platform,
+        ];
+    }
+
+    /**
      * Token-only accounts have no password; satisfy the contract for middleware (e.g. throttle) safely.
      */
     public function getAuthPassword(): string

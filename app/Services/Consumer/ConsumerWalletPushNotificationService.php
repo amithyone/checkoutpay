@@ -35,8 +35,8 @@ final class ConsumerWalletPushNotificationService
             return;
         }
 
-        $token = $this->resolveToken($wallet);
-        if ($token === null) {
+        $target = $this->resolvePushTarget($wallet);
+        if ($target === null) {
             return;
         }
 
@@ -56,7 +56,7 @@ final class ConsumerWalletPushNotificationService
             $balanceLabel,
         );
 
-        $this->send($token, $title, $body ?? $defaultBody, $this->moneyReceivedData($wallet, array_merge([
+        $this->send($target, $title, $body ?? $defaultBody, $this->moneyReceivedData($wallet, array_merge([
             'amount' => (string) $amount,
             'balance_after' => (string) $balanceAfter,
             'currency' => $currency,
@@ -79,12 +79,12 @@ final class ConsumerWalletPushNotificationService
             return;
         }
 
-        $token = $this->resolveToken($wallet);
-        if ($token === null) {
+        $target = $this->resolvePushTarget($wallet);
+        if ($target === null) {
             return;
         }
 
-        $this->send($token, $title, $body, array_merge([
+        $this->send($target, $title, $body, array_merge([
             'type' => 'generic',
             'screen' => 'saving',
             'wallet_id' => (string) $wallet->id,
@@ -109,8 +109,8 @@ final class ConsumerWalletPushNotificationService
             ];
         }
 
-        $token = $this->resolveToken($wallet);
-        if ($token === null) {
+        $target = $this->resolvePushTarget($wallet);
+        if ($target === null) {
             return [
                 'ok' => false,
                 'message' => 'No mobile push token for this wallet. The user must open the CheckoutNow app and allow notifications while signed in.',
@@ -127,18 +127,18 @@ final class ConsumerWalletPushNotificationService
 
         try {
             $failed = $this->push->sendToTokens(
-                [$token],
+                [$target],
                 $title,
                 $body,
                 $data,
                 (string) config('consumer_wallet.credit_push_channel', 'money_received'),
                 PushNotificationService::PROFILE_CHECKOUTNOW,
             );
-            $this->clearTokenIfInvalid($token, $failed);
-            if (in_array($token, $failed, true)) {
+            $this->clearTokenIfInvalid($target['token'], $failed);
+            if (in_array($target['token'], $failed, true)) {
                 return [
                     'ok' => false,
-                    'message' => 'FCM rejected the device token (expired or unregistered). Ask the user to open the app again.',
+                    'message' => 'Push rejected the device token (expired or unregistered). Ask the user to open the app again.',
                 ];
             }
 
@@ -165,8 +165,13 @@ final class ConsumerWalletPushNotificationService
 
         return [
             'configured' => $this->push->isConfigured(PushNotificationService::PROFILE_CHECKOUTNOW),
+            'fcm_configured' => $this->push->isFcmConfigured(PushNotificationService::PROFILE_CHECKOUTNOW),
+            'apns_configured' => $this->push->isApnsConfigured(PushNotificationService::PROFILE_CHECKOUTNOW),
             'has_token' => $account !== null,
             'platform' => $account?->fcm_platform,
+            'delivery_channel' => $account !== null
+                ? (\App\Services\Push\PushTokenDeliveryClassifier::shouldDeliverViaApns($account->fcm_platform, (string) $account->fcm_token) ? 'apns' : 'fcm')
+                : null,
             'updated_at' => $account?->fcm_token_updated_at?->toIso8601String(),
             'fcm_project_id' => (string) config('services.firebase.checkoutnow.project_id', ''),
             'service_account_project_id' => $this->serviceAccountProjectId(),
@@ -270,9 +275,10 @@ final class ConsumerWalletPushNotificationService
     }
 
     /**
+     * @param  array{token: string, platform: ?string}  $target
      * @param  array<string, string>  $data
      */
-    private function send(string $token, string $title, string $body, array $data): void
+    private function send(array $target, string $title, string $body, array $data): void
     {
         if (! $this->push->isConfigured(PushNotificationService::PROFILE_CHECKOUTNOW)) {
             return;
@@ -280,14 +286,14 @@ final class ConsumerWalletPushNotificationService
 
         try {
             $failed = $this->push->sendToTokens(
-                [$token],
+                [$target],
                 $title,
                 $body,
                 $data,
                 (string) config('consumer_wallet.credit_push_channel', 'money_received'),
                 PushNotificationService::PROFILE_CHECKOUTNOW,
             );
-            $this->clearTokenIfInvalid($token, $failed);
+            $this->clearTokenIfInvalid($target['token'], $failed);
         } catch (\Throwable $e) {
             Log::warning('consumer_wallet.push_failed', [
                 'type' => $data['type'] ?? 'unknown',
@@ -307,15 +313,12 @@ final class ConsumerWalletPushNotificationService
         ConsumerWalletApiAccount::clearFcmTokenIfInvalid($token, $failedTokens);
     }
 
-    private function resolveToken(WhatsappWallet $wallet): ?string
+    /**
+     * @return array{token: string, platform: ?string}|null
+     */
+    private function resolvePushTarget(WhatsappWallet $wallet): ?array
     {
-        $account = $this->resolveAccount($wallet);
-
-        if (! $account) {
-            return null;
-        }
-
-        return (string) $account->fcm_token;
+        return $this->resolveAccount($wallet)?->pushDeliveryTarget();
     }
 
     private function resolveAccount(WhatsappWallet $wallet): ?ConsumerWalletApiAccount

@@ -987,6 +987,7 @@ class ConsumerWalletApiController extends Controller
         $request->validate([
             'token' => 'required|string|max:512',
             'platform' => 'required|string|in:android,ios,web',
+            'push_channel' => 'nullable|string|in:fcm,apns',
         ]);
 
         $user = $request->user();

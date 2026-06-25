@@ -100,6 +100,21 @@ return [
     ],
 
     /*
+    | CheckoutNow iOS — direct APNs HTTP/2 (device tokens from Expo/Capacitor on iOS).
+    | Use the same .p8 Auth Key uploaded to Firebase Cloud Messaging for the iOS app.
+    */
+    'apns' => [
+        'checkoutnow' => [
+            'key_id' => env('CHECKOUTNOW_APNS_KEY_ID', ''),
+            'team_id' => env('CHECKOUTNOW_APNS_TEAM_ID', ''),
+            'bundle_id' => env('CHECKOUTNOW_APNS_BUNDLE_ID', 'com.checkoutnow.mobile'),
+            'private_key' => env('CHECKOUTNOW_APNS_PRIVATE_KEY', ''),
+            /** production (TestFlight/App Store) or sandbox (Xcode debug builds) */
+            'environment' => env('CHECKOUTNOW_APNS_ENVIRONMENT', 'production'),
+        ],
+    ],
+
+    /*
     | NigTax certified reports: virtual-account payments are created under this Business.
     | Must have at least one website (webhook domain). Optional override for webhook_url.
     */

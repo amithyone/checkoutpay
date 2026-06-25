@@ -87,16 +87,23 @@ class ConsumerDeviceStepupPushService
             'expires_at' => now()->addMinutes($ttlMinutes),
         ]);
 
+        $target = $account->pushDeliveryTarget();
+        if ($target === null) {
+            return [
+                'ok' => false,
+                'sent' => false,
+                'message' => 'Trusted device has no push token.',
+            ];
+        }
+
         $wallet = $session->wallet;
         $title = (string) config('consumer_wallet.device_stepup_push_title', 'New sign-in attempt');
         $body = sprintf(
             'Someone is trying to sign in to CheckoutNow on a new device. Open the app to approve or deny.',
         );
 
-        $token = (string) $account->fcm_token;
-
         $failed = $this->push->sendToTokens(
-            [$token],
+            [$target],
             $title,
             $body,
             [
@@ -108,7 +115,7 @@ class ConsumerDeviceStepupPushService
             (string) config('consumer_wallet.device_stepup_push_channel', 'wallet_alerts'),
             PushNotificationService::PROFILE_CHECKOUTNOW,
         );
-        ConsumerWalletApiAccount::clearFcmTokenIfInvalid($token, $failed);
+        ConsumerWalletApiAccount::clearFcmTokenIfInvalid($target['token'], $failed);
 
         return [
             'ok' => true,

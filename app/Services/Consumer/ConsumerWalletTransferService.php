@@ -7,6 +7,7 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\MavonPayTransferService;
 use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
+use App\Services\MevonPay\MevonPayPayoutPreRefundStatusService;
 use App\Services\Payout\BankPayoutNarration;
 use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
@@ -33,6 +34,7 @@ class ConsumerWalletTransferService
         private WhatsappWalletSelfBankTransferService $selfBankTransfer,
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private ConsumerWalletSavingsService $savings,
+        private MevonPayPayoutPreRefundStatusService $preRefundStatus,
     ) {}
 
     private function evolutionInstance(): string
@@ -397,9 +399,12 @@ class ConsumerWalletTransferService
             $debitProfile['debit_account_name'],
             $debitProfile['debit_account_number'],
         );
-        $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
+        $resolved = $this->preRefundStatus->resolveBeforeRefund($result, $reference);
+        $bucket = $resolved['bucket'];
+        $result = $resolved['result'];
+        $refundAllowed = $resolved['refund_allowed'];
 
-        DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result, $ledgerScope) {
+        DB::transaction(function () use ($wallet, $amount, $reference, $bucket, $result, $ledgerScope, $refundAllowed) {
             $txn = WhatsappWalletTransaction::query()
                 ->where('external_reference', $reference)
                 ->where('whatsapp_wallet_id', $wallet->id)
@@ -427,7 +432,7 @@ class ConsumerWalletTransferService
                 $result,
             );
 
-            $refund = $bucket === MavonPayTransferService::BUCKET_FAILED;
+            $refund = $refundAllowed;
             $txnLedgerScope = ConsumerWalletTransactionScope::normalize((string) ($txn->ledger_scope ?? ConsumerWalletTransactionScope::SCOPE_PERSONAL));
 
             if ($refund) {
@@ -455,7 +460,7 @@ class ConsumerWalletTransferService
             $txn->update(['meta' => $meta]);
         });
 
-        if ($bucket === MavonPayTransferService::BUCKET_FAILED) {
+        if ($refundAllowed) {
             $walletFresh = $wallet->fresh();
             if ($ledgerScope !== ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
                 $this->walletNotifier->notifyMoneyReceived(
