@@ -76,15 +76,20 @@ class MevonPayTransferStatusService
                 'message' => (string) ($json['message'] ?? 'Provider status retrieved.'),
             ], $normalized);
         } catch (\Throwable $e) {
+            $ambiguous = MevonPayTransportErrorClassifier::isAmbiguousTransportFailure($e);
+
             Log::warning('MevonPay transfer status check failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
+                'ambiguous_transport' => $ambiguous,
             ]);
 
             return [
-                'available' => true,
-                'message' => $e->getMessage(),
-                'bucket' => MavonPayTransferService::BUCKET_FAILED,
+                'available' => false,
+                'skipped' => true,
+                'message' => $ambiguous
+                    ? 'Provider status check timed out. Will retry later.'
+                    : $e->getMessage(),
                 'response_code' => null,
                 'response_message' => $e->getMessage(),
                 'transaction_status' => null,

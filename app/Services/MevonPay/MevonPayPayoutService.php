@@ -109,15 +109,26 @@ class MevonPayPayoutService
 
             return $this->normalizeResponse($resp->json(), (string) $resp->body(), $resp->status(), (string) ($payload['reference'] ?? ''));
         } catch (\Throwable $e) {
-            Log::error('MevonPay payout error', ['message' => $e->getMessage(), 'reference' => $payload['reference']]);
+            $ambiguous = MevonPayTransportErrorClassifier::isAmbiguousTransportFailure($e);
+
+            Log::error('MevonPay payout error', [
+                'message' => $e->getMessage(),
+                'reference' => $payload['reference'],
+                'ambiguous_transport' => $ambiguous,
+            ]);
 
             return [
-                'bucket' => MavonPayTransferService::BUCKET_FAILED,
+                'bucket' => $ambiguous
+                    ? MavonPayTransferService::BUCKET_PENDING
+                    : MavonPayTransferService::BUCKET_FAILED,
                 'response_code' => null,
-                'response_message' => $e->getMessage(),
+                'response_message' => $ambiguous
+                    ? 'Transfer status unknown (provider timeout). We will confirm with the bank before updating your wallet.'
+                    : $e->getMessage(),
                 'reference' => $payload['reference'],
                 'raw' => null,
                 'http_status' => null,
+                'provider_response_unknown' => $ambiguous,
             ];
         }
     }

@@ -180,6 +180,28 @@ class WhatsappWalletPendingPayoutReconciliationServiceTest extends TestCase
         $this->assertSame(5000.0, (float) $wallet->balance);
     }
 
+    public function test_reconcile_transaction_skips_refund_when_tsq_times_out(): void
+    {
+        Http::fake(function () {
+            throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: Operation timed out');
+        });
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348012345699',
+            'balance' => 4000,
+        ]);
+        $txn = $this->pendingTxn($wallet, 'waw_tsq_timeout');
+
+        $service = app(WhatsappWalletPendingPayoutReconciliationService::class);
+        $result = $service->reconcileTransaction($txn, null, onlyIfPending: false);
+
+        $this->assertFalse($result['available'] ?? true);
+        $this->assertTrue($result['skipped'] ?? false);
+        $wallet->refresh();
+        $this->assertSame(4000.0, (float) $wallet->balance);
+        $this->assertFalse($txn->fresh()->isReversed());
+    }
+
     public function test_reconcile_transaction_skips_refund_when_already_reversed(): void
     {
         Http::fake([

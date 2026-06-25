@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\MevonPay\MevonPayTransportErrorClassifier;
 use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -155,9 +156,11 @@ class MavonPayTransferService
             ];
         } catch (\Throwable $e) {
             $message = $e->getMessage();
+            $ambiguous = MevonPayTransportErrorClassifier::isAmbiguousTransportFailure($e);
 
             Log::error('MavonPay createtransfer error', [
                 'message' => $message,
+                'ambiguous_transport' => $ambiguous,
             ]);
 
             $sessionId = WhatsappBankTransferReceiptDetails::resolveSessionId(
@@ -166,13 +169,16 @@ class MavonPayTransferService
             );
 
             return [
-                'bucket' => self::BUCKET_FAILED,
+                'bucket' => $ambiguous ? self::BUCKET_PENDING : self::BUCKET_FAILED,
                 'response_code' => null,
-                'response_message' => $message,
+                'response_message' => $ambiguous
+                    ? 'Transfer status unknown (provider timeout). We will confirm with the bank before updating your wallet.'
+                    : $message,
                 'reference' => $payload['reference'],
                 'session_id' => $sessionId !== '' ? $sessionId : null,
                 'raw' => null,
                 'http_status' => null,
+                'provider_response_unknown' => $ambiguous,
             ];
         }
     }
