@@ -273,6 +273,29 @@ class VtuNgApiClient
     /**
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
+    public function requeryOrder(string $requestId): array
+    {
+        if (! $this->isConfigured()) {
+            return ['ok' => false, 'message' => 'Bill payments are not configured.'];
+        }
+
+        $requestId = trim($requestId);
+        if ($requestId === '') {
+            return ['ok' => false, 'message' => 'Missing request_id.'];
+        }
+
+        $response = $this->requestPostJson('/requery', [
+            'request_id' => $requestId,
+        ]);
+
+        return $this->parseResponse($response, 'requery', [
+            'request_id' => $requestId,
+        ]);
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
+     */
     public function purchaseBetting(string $serviceId, string $customerId, float $amount): array
     {
         if (! $this->isConfigured()) {

@@ -20,6 +20,14 @@ return [
     'webhook_secret' => (string) env('VTU_NG_WEBHOOK_SECRET', ''),
     'webhook_allowed_ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('VTU_NG_WEBHOOK_ALLOWED_IPS', ''))))),
     'refund_statuses' => array_values(array_filter(array_map('trim', explode(',', (string) env('VTU_NG_REFUND_STATUSES', 'refund,refunded,reversed,reversal,failed'))))),
+    /** VTU.ng async electricity statuses (token usually arrives after requery/webhook). */
+    'electricity_processing_statuses' => array_values(array_filter(array_map('trim', explode(',', (string) env('VTU_NG_ELECTRICITY_PROCESSING_STATUSES', 'processing-api,queued-api,processing,pending,queued'))))),
+    'electricity_completed_statuses' => array_values(array_filter(array_map('trim', explode(',', (string) env('VTU_NG_ELECTRICITY_COMPLETED_STATUSES', 'completed-api,completed,success,successful'))))),
+    'electricity_reconcile_hours' => max(1, (int) env('VTU_NG_ELECTRICITY_RECONCILE_HOURS', 48)),
+    'electricity_reconcile_batch_size' => max(1, (int) env('VTU_NG_ELECTRICITY_RECONCILE_BATCH', 20)),
+    'electricity_reconcile_max_per_wallet' => max(1, (int) env('VTU_NG_ELECTRICITY_RECONCILE_MAX_PER_WALLET', 3)),
+    'electricity_reconcile_min_age_minutes' => max(0, (int) env('VTU_NG_ELECTRICITY_RECONCILE_MIN_AGE', 2)),
+    'electricity_reconcile_min_interval_minutes' => max(1, (int) env('VTU_NG_ELECTRICITY_RECONCILE_INTERVAL', 3)),
 
     /** VTU.ng `network_id` / data `service_id` values */
     'networks' => [

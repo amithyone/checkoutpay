@@ -49,6 +49,7 @@ class WhatsappWaWalletMenuHandler
         private WhatsappWalletCountryResolver $walletCountry,
         private WhatsappWalletSelfBankTransferService $selfBankTransfer,
         private WhatsappWalletPendingPayoutReconciliationService $pendingPayoutReconcile,
+        private WhatsappWalletVtuElectricityReconciliationService $pendingVtuElectricityReconcile,
     ) {}
 
     public function openMenu(WhatsappSession $session, string $instance, string $phone, ?Renter $renter): void
@@ -390,6 +391,15 @@ class WhatsappWaWalletMenuHandler
             $refunds = $this->pendingPayoutReconcile->reconcileWallet($wallet)['refunds'] ?? [];
         } catch (\Throwable $e) {
             Log::warning('whatsapp.wallet.pending_payout_reconcile_failed', [
+                'wallet_id' => $wallet->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->pendingVtuElectricityReconcile->reconcileWallet($wallet);
+        } catch (\Throwable $e) {
+            Log::warning('whatsapp.wallet.pending_vtu_electricity_reconcile_failed', [
                 'wallet_id' => $wallet->id,
                 'error' => $e->getMessage(),
             ]);
@@ -2543,10 +2553,31 @@ class WhatsappWaWalletMenuHandler
     {
         $meta = is_array($t->meta) ? $t->meta : [];
         $extra = trim((string) ($meta['network_id'] ?? $meta['service_id'] ?? ''));
+        $token = trim((string) ($meta['electricity_token'] ?? ''));
+        $pending = (bool) ($meta['vtu_pending'] ?? false);
 
-        return $extra !== ''
+        $suffix = '';
+        if ($token !== '') {
+            $suffix = ' · token *'.$this->maskElectricityToken($token).'*';
+        } elseif ($pending) {
+            $suffix = ' · *processing*';
+        }
+
+        $base = $extra !== ''
             ? "• {$label} ({$extra}) · *₦{$amt}* · {$when}"
             : "• {$label} · *₦{$amt}* · {$when}";
+
+        return $base.$suffix;
+    }
+
+    private function maskElectricityToken(string $token): string
+    {
+        $token = trim($token);
+        if (strlen($token) <= 10) {
+            return $token;
+        }
+
+        return substr($token, 0, 4).'…'.substr($token, -4);
     }
 
     private function formatP2pDebitHistoryLine(WhatsappWalletTransaction $t, string $amt, string $when): string

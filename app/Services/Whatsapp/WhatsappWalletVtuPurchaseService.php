@@ -6,6 +6,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Contracts\Vtu\VtuProviderContract;
 use App\Services\Vtu\VtuProviderResolver;
+use App\Services\VtuNg\VtuNgElectricityOrderParser;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -163,20 +164,55 @@ class WhatsappWalletVtuPurchaseService
             return ['ok' => false, 'message' => (string) ($api['message'] ?? 'Purchase failed.')];
         }
 
-        $this->finalizeTxnMeta($ref, [
+        $parsed = VtuNgElectricityOrderParser::parse($api);
+        $providerRef = $parsed['request_id'] ?? $this->extractProviderReference($api);
+        $stillPending = VtuNgElectricityOrderParser::shouldStayPending($parsed);
+        $metaExtra = [
             'vtu_ok' => true,
-            'vtu_status' => 'success',
+            'vtu_status' => (string) ($parsed['status'] ?? 'processing-api'),
             'vtu_message' => $api['message'] ?? null,
             'vtu_data' => $api['data'] ?? null,
-            'vtu_provider_reference' => $this->extractProviderReference($api),
-        ]);
+            'vtu_provider_reference' => $providerRef,
+            'vtu_request_id' => $providerRef,
+            'vtu_order_id' => $parsed['order_id'] ?? null,
+        ];
+        if ($parsed['electricity_token'] !== null) {
+            $metaExtra['electricity_token'] = $parsed['electricity_token'];
+        }
+        if ($parsed['units'] !== null) {
+            $metaExtra['electricity_units'] = $parsed['units'];
+        }
+        if ($parsed['meter_number'] !== null) {
+            $metaExtra['meter_number'] = $parsed['meter_number'];
+        }
+
+        if ($stillPending) {
+            $this->updateTxnMeta($ref, array_merge($metaExtra, ['vtu_pending' => true]));
+        } else {
+            $this->finalizeTxnMeta($ref, $metaExtra);
+            $txn = WhatsappWalletTransaction::query()->where('external_reference', $ref)->first();
+            if ($txn && $parsed['electricity_token'] !== null) {
+                app(WhatsappWalletVtuElectricityReconciliationService::class)
+                    ->applyParsedStatus($txn, $parsed, ['source' => 'purchase', 'provider_payload' => $api['raw'] ?? null]);
+            }
+        }
+
         $this->maybeApplySpendToSave($wallet, $amount, isset($debited['transaction_id']) ? (int) $debited['transaction_id'] : null);
         $w = $wallet->fresh();
 
+        $message = $stillPending
+            ? 'Electricity payment submitted. Your token will arrive here in a few minutes (usually 2–5 min).'
+            : (string) ($api['message'] ?? 'Electricity payment completed.');
+
+        if (! $stillPending && $parsed['electricity_token'] !== null) {
+            $message = 'Electricity payment completed. Token: '.$parsed['electricity_token'];
+        }
+
         return [
             'ok' => true,
-            'message' => (string) ($api['message'] ?? 'Electricity payment submitted.'),
+            'message' => $message,
             'balance_after' => $w ? (float) $w->balance : null,
+            'pending_token' => $stillPending,
         ];
     }
 
@@ -431,6 +467,19 @@ class WhatsappWalletVtuPurchaseService
     /**
      * @param  array<string, mixed>  $extra
      */
+    private function updateTxnMeta(string $externalRef, array $extra): void
+    {
+        $txn = WhatsappWalletTransaction::query()->where('external_reference', $externalRef)->first();
+        if (! $txn) {
+            return;
+        }
+        $meta = is_array($txn->meta) ? $txn->meta : [];
+        $txn->update(['meta' => array_merge($meta, $extra)]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
     private function finalizeTxnMeta(string $externalRef, array $extra): void
     {
         $txn = WhatsappWalletTransaction::query()->where('external_reference', $externalRef)->first();
@@ -493,6 +542,16 @@ class WhatsappWalletVtuPurchaseService
             return ['ok' => true, 'message' => 'Wallet refunded for VTU reversal.'];
         }
 
+        if ($txn->type === WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY) {
+            $result = app(WhatsappWalletVtuElectricityReconciliationService::class)
+                ->applyWebhookPayload($txn, $payload);
+
+            return [
+                'ok' => true,
+                'message' => (string) ($result['message'] ?? 'Electricity status updated.'),
+            ];
+        }
+
         $meta = is_array($txn->meta) ? $txn->meta : [];
         $meta['vtu_status'] = $status !== '' ? $status : 'unknown';
         $meta['vtu_status_payload'] = Arr::only($payload, ['status', 'event', 'code', 'message', 'data']);
@@ -501,6 +560,31 @@ class WhatsappWalletVtuPurchaseService
         $txn->update(['meta' => $meta]);
 
         return ['ok' => true, 'message' => 'VTU status updated.'];
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    public function refundElectricityTransaction(WhatsappWalletTransaction $transaction, string $reason): array
+    {
+        if ($transaction->type !== WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY) {
+            return ['ok' => false, 'message' => 'Not an electricity transaction.'];
+        }
+
+        $meta = is_array($transaction->meta) ? $transaction->meta : [];
+        if (! empty($meta['vtu_refunded'])) {
+            return ['ok' => true, 'message' => 'Already refunded.'];
+        }
+
+        $amount = (float) $transaction->amount;
+        $this->refundDebit(
+            (int) $transaction->whatsapp_wallet_id,
+            (string) $transaction->external_reference,
+            $amount,
+            $reason,
+        );
+
+        return ['ok' => true, 'message' => 'Electricity payment refunded.'];
     }
 
     /**
@@ -539,7 +623,7 @@ class WhatsappWalletVtuPurchaseService
 
         foreach ($candidates as $candidate) {
             $meta = is_array($candidate->meta) ? $candidate->meta : [];
-            $providerRef = trim((string) ($meta['vtu_provider_reference'] ?? ''));
+            $providerRef = trim((string) ($meta['vtu_provider_reference'] ?? $meta['vtu_request_id'] ?? ''));
             if ($providerRef !== '' && in_array($providerRef, $references, true)) {
                 return $candidate;
             }
@@ -554,8 +638,10 @@ class WhatsappWalletVtuPurchaseService
     private function extractProviderReference(array $api): ?string
     {
         $ref = (string) (
-            Arr::get($api, 'data.reference')
-            ?? Arr::get($api, 'data.request_id')
+            Arr::get($api, 'data.request_id')
+            ?? Arr::get($api, 'data.reference')
+            ?? Arr::get($api, 'raw.request_id')
+            ?? Arr::get($api, 'raw.data.request_id')
             ?? Arr::get($api, 'data.transaction_id')
             ?? Arr::get($api, 'data.id')
             ?? ''

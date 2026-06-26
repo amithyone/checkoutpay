@@ -14,6 +14,7 @@ use App\Services\Consumer\ConsumerBusinessActivityService;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
+use App\Services\Consumer\ConsumerWalletElectricityReceiptEnricher;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
@@ -64,6 +65,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerWalletStatementService $statements,
         private ConsumerDeviceTrustService $deviceTrust,
         private ConsumerAppSessionService $appSessions,
+        private ConsumerWalletElectricityReceiptEnricher $electricityReceiptEnricher,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -652,6 +654,10 @@ class ConsumerWalletApiController extends Controller
             if ($reported !== null && is_numeric($reported) && (float) $reported > 0) {
                 $row['topup_reported_amount'] = (float) $reported;
             }
+        }
+
+        if ($tx->type === WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY) {
+            return $this->electricityReceiptEnricher->enrich($tx, $row);
         }
 
         return $row;

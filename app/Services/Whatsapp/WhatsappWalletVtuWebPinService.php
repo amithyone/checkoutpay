@@ -324,10 +324,12 @@ class WhatsappWalletVtuWebPinService
             $w->pin_failed_attempts = 0;
             $w->save();
             $bal = isset($result['balance_after']) ? (float) $result['balance_after'] : (float) $w->balance;
+            $pendingToken = (bool) ($result['pending_token'] ?? false);
+            $headline = $pendingToken ? '*Submitted* ✅' : '*Done* ✅';
             $this->client->sendText(
                 $instance,
                 $phone,
-                "*Done* ✅\n\n".
+                "{$headline}\n\n".
                 ($result['message'] ?? 'Success')."\n\n".
                 '💰 New balance: *₦'.number_format($bal, 2).'*'
             );

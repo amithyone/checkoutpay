@@ -14,6 +14,9 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('banks:sync')->weekly();
         $schedule->command('whatsapp-wallet:expire-pending-p2p')->everyFiveMinutes();
+        $schedule->command('vtu:reconcile-pending-electricity')
+            ->everyThreeMinutes()
+            ->withoutOverlapping(10);
         $schedule->command('wallet:send-inactive-reminders --slot=morning')
             ->dailyAt('09:00')
             ->timezone('Africa/Lagos')
