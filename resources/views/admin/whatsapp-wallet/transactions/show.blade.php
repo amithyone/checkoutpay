@@ -14,6 +14,23 @@
         'successful' => 'bg-green-100 text-green-800',
         default => 'bg-gray-100 text-gray-700',
     };
+    $vtuPending = (bool) ($electricityMeta['vtu_pending'] ?? false);
+    $vtuRefunded = (bool) ($electricityMeta['vtu_refunded'] ?? false);
+    $electricityToken = trim((string) ($electricityMeta['electricity_token'] ?? ''));
+    $vtuStatusClass = match (true) {
+        $vtuRefunded => 'bg-red-100 text-red-800',
+        $vtuPending => 'bg-amber-100 text-amber-800',
+        $electricityToken !== '' => 'bg-green-100 text-green-800',
+        default => 'bg-gray-100 text-gray-700',
+    };
+    $vtuStatusLabel = match (true) {
+        $vtuRefunded => 'Refunded',
+        $vtuPending => 'Pending token',
+        $electricityToken !== '' => 'Token delivered',
+        default => trim((string) ($electricityMeta['vtu_status'] ?? '')) !== ''
+            ? ucfirst(str_replace('-', ' ', (string) $electricityMeta['vtu_status']))
+            : 'Unknown',
+    };
 @endphp
 <div class="space-y-6">
     @include('admin.whatsapp-wallet.partials.nav')
@@ -47,10 +64,17 @@
             <p class="text-lg font-semibold text-gray-900">{{ str_replace('_', ' ', $transaction->type) }}</p>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-            <p class="text-xs text-gray-500">Payout status</p>
-            <p class="mt-1"><span class="inline-flex px-2 py-1 rounded text-sm font-medium {{ $bucketClass }}">{{ ucfirst($payoutBucket) }}</span></p>
-            @if($transaction->isReversed())
-                <p class="text-xs text-red-600 mt-1">Reversed {{ $meta['reversed_at'] ?? '' }}</p>
+            <p class="text-xs text-gray-500">@if($isElectricity) VTU status @else Payout status @endif</p>
+            @if($isElectricity)
+                <p class="mt-1"><span class="inline-flex px-2 py-1 rounded text-sm font-medium {{ $vtuStatusClass }}">{{ $vtuStatusLabel }}</span></p>
+                @if($electricityToken !== '')
+                    <p class="text-xs text-gray-600 mt-1 font-mono break-all">{{ $electricityToken }}</p>
+                @endif
+            @else
+                <p class="mt-1"><span class="inline-flex px-2 py-1 rounded text-sm font-medium {{ $bucketClass }}">{{ ucfirst($payoutBucket) }}</span></p>
+                @if($transaction->isReversed())
+                    <p class="text-xs text-red-600 mt-1">Reversed {{ $meta['reversed_at'] ?? '' }}</p>
+                @endif
             @endif
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
@@ -74,10 +98,46 @@
                 <dt class="text-gray-500">External reference</dt>
                 <dd class="font-mono text-gray-900 break-all">{{ $transaction->external_reference ?: '—' }}</dd>
             </div>
+            @if($isElectricity)
+            <div>
+                <dt class="text-gray-500">VTU request ID</dt>
+                <dd class="font-mono text-gray-900 break-all">{{ $electricityMeta['vtu_request_id'] ?? $electricityMeta['vtu_provider_reference'] ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">VTU order ID</dt>
+                <dd class="font-mono text-gray-900 break-all">{{ $electricityMeta['vtu_order_id'] ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">Disco / service</dt>
+                <dd class="text-gray-900">{{ $electricityMeta['service_id'] ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">Meter number</dt>
+                <dd class="font-mono text-gray-900 break-all">{{ $electricityMeta['meter_number'] ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">Customer name</dt>
+                <dd class="text-gray-900">{{ $electricityMeta['customer_name'] ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">Units</dt>
+                <dd class="text-gray-900">{{ $electricityMeta['electricity_units'] ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">Electricity token</dt>
+                <dd class="font-mono text-gray-900 break-all">{{ $electricityToken !== '' ? $electricityToken : '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">Provider status</dt>
+                <dd class="text-gray-900">{{ $electricityMeta['vtu_status'] ?? '—' }}</dd>
+            </div>
+            @else
             <div>
                 <dt class="text-gray-500">Session ID</dt>
                 <dd class="font-mono text-gray-900 break-all">{{ $mevonApi['sessionId'] ?? $meta['payout_session_id'] ?? '—' }}</dd>
             </div>
+            @endif
+            @if(!$isElectricity)
             <div>
                 <dt class="text-gray-500">Mevon response</dt>
                 <dd class="text-gray-900">
@@ -92,6 +152,8 @@
                 <dd class="font-mono text-gray-900 break-all">{{ $mevonApi['contractReference'] }}</dd>
             </div>
             @endif
+            @endif
+            @if(!$isElectricity)
             <div>
                 <dt class="text-gray-500">Beneficiary</dt>
                 <dd class="text-gray-900">{{ $transaction->counterparty_account_name ?: '—' }}</dd>
@@ -100,14 +162,17 @@
                 <dt class="text-gray-500">Account / bank</dt>
                 <dd class="text-gray-900">{{ $transaction->counterparty_account_number ?: '—' }} / {{ $meta['bank_name'] ?? $transaction->counterparty_bank_code ?? '—' }}</dd>
             </div>
+            @endif
             <div>
                 <dt class="text-gray-500">Created</dt>
                 <dd class="text-gray-900">{{ $transaction->created_at?->format('M j, Y H:i:s') }}</dd>
             </div>
+            @if(!$isElectricity)
             <div>
                 <dt class="text-gray-500">Payout API</dt>
                 <dd class="text-gray-900">{{ $meta['payout_api'] ?? '—' }}</dd>
             </div>
+            @endif
         </dl>
     </div>
 
@@ -116,10 +181,17 @@
             <h3 class="text-lg font-semibold text-gray-900">Actions</h3>
         </div>
         <div class="flex flex-wrap gap-3">
-            <button type="button" id="btn-check-mevon-status"
-                class="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:opacity-90">
-                Check MevonPay status
-            </button>
+            @if($isElectricity)
+                <button type="button" id="btn-check-vtu-electricity-status"
+                    class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700">
+                    Check VTU electricity status
+                </button>
+            @elseif($transaction->type === \App\Models\WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT)
+                <button type="button" id="btn-check-mevon-status"
+                    class="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:opacity-90">
+                    Check MevonPay status
+                </button>
+            @endif
             @if($canManualRefund && auth('admin')->user()?->isSuperAdmin())
                 <form method="POST" action="{{ route('admin.whatsapp-wallet.transactions.manual-refund', $transaction) }}"
                     onsubmit="return confirm('Credit the customer wallet and mark this payout as reversed?');">
@@ -131,9 +203,13 @@
             @endif
         </div>
         <p id="status-check-message" class="mt-3 text-sm text-gray-600 hidden"></p>
-        @unless($statusCheckAvailable)
+        @if($isElectricity)
+            @unless($electricityStatusCheckAvailable ?? false)
+                <p class="mt-2 text-xs text-amber-700">VTU.ng is not configured (<code>VTU_NG_*</code>). Stored meta below still applies.</p>
+            @endunless
+        @elseif(!$statusCheckAvailable)
             <p class="mt-2 text-xs text-amber-700">Provider status API is not configured (<code>MEVONPAY_TRANSFER_STATUS_PATH</code>). Stored meta and ledger entries below still apply.</p>
-        @endunless
+        @endif
     </div>
 
     @if($transaction->mevonLedgerEntries->isNotEmpty())
@@ -185,50 +261,75 @@
 @push('scripts')
 <script>
 (function () {
-    var btn = document.getElementById('btn-check-mevon-status');
-    var msg = document.getElementById('status-check-message');
-    if (!btn || !msg) return;
+    function wireStatusCheck(btnId, url, reloadOnSuccess) {
+        var btn = document.getElementById(btnId);
+        var msg = document.getElementById('status-check-message');
+        if (!btn || !msg) return;
 
-    btn.addEventListener('click', function () {
-        btn.disabled = true;
-        msg.classList.remove('hidden');
-        msg.textContent = 'Checking…';
+        btn.addEventListener('click', function () {
+            btn.disabled = true;
+            msg.classList.remove('hidden');
+            msg.textContent = 'Checking…';
 
-        fetch(@json(route('admin.whatsapp-wallet.transactions.check-status', $transaction)), {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': @json(csrf_token()),
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-            },
-        })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                var text = data.message || 'Done.';
-                if (data.available && data.bucket) {
-                    text += ' Bucket: ' + data.bucket + '.';
-                }
-                if (data.transaction_status) {
-                    text += ' Provider status: ' + data.transaction_status + '.';
-                }
-                if (data.response_code) {
-                    text += ' Code: ' + data.response_code + '.';
-                }
-                if (data.auto_refund && data.auto_refund.message) {
-                    text += ' ' + data.auto_refund.message;
-                }
-                msg.textContent = text;
-                if (data.available && data.bucket) {
-                    setTimeout(function () { window.location.reload(); }, 1500);
-                }
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': @json(csrf_token()),
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
             })
-            .catch(function () {
-                msg.textContent = 'Request failed.';
-            })
-            .finally(function () {
-                btn.disabled = false;
-            });
-    });
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var text = data.message || 'Done.';
+                    if (data.vtu_status) {
+                        text += ' Status: ' + data.vtu_status + '.';
+                    }
+                    if (data.electricity_token) {
+                        text += ' Token: ' + data.electricity_token + '.';
+                    }
+                    if (data.bucket) {
+                        text += ' Bucket: ' + data.bucket + '.';
+                    }
+                    if (data.transaction_status) {
+                        text += ' Provider status: ' + data.transaction_status + '.';
+                    }
+                    if (data.response_code) {
+                        text += ' Code: ' + data.response_code + '.';
+                    }
+                    if (data.notified) {
+                        text += ' Customer notified on WhatsApp.';
+                    }
+                    if (data.auto_refund && data.auto_refund.message) {
+                        text += ' ' + data.auto_refund.message;
+                    }
+                    msg.textContent = text;
+                    if (reloadOnSuccess(data)) {
+                        setTimeout(function () { window.location.reload(); }, 1500);
+                    }
+                })
+                .catch(function () {
+                    msg.textContent = 'Request failed.';
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                });
+        });
+    }
+
+    wireStatusCheck(
+        'btn-check-mevon-status',
+        @json(route('admin.whatsapp-wallet.transactions.check-status', $transaction)),
+        function (data) { return data.available && data.bucket; }
+    );
+
+    wireStatusCheck(
+        'btn-check-vtu-electricity-status',
+        @json(route('admin.whatsapp-wallet.transactions.check-electricity-status', $transaction)),
+        function (data) {
+            return (data.completed || data.failed || (data.requery_ok && data.vtu_status)) && !(data.skipped);
+        }
+    );
 })();
 </script>
 @endpush

@@ -138,7 +138,7 @@ class WhatsappWalletVtuElectricityReconciliationService
     /**
      * @return array<string, mixed>
      */
-    public function reconcileTransaction(WhatsappWalletTransaction $transaction): array
+    public function reconcileTransaction(WhatsappWalletTransaction $transaction, bool $forceAdminCheck = false): array
     {
         if (! $this->isAvailable()) {
             return ['available' => false, 'message' => 'VTU.ng is not configured.', 'skipped' => true];
@@ -149,7 +149,7 @@ class WhatsappWalletVtuElectricityReconciliationService
         }
 
         $meta = is_array($transaction->meta) ? $transaction->meta : [];
-        if (! ($meta['vtu_pending'] ?? false)) {
+        if (! $forceAdminCheck && ! ($meta['vtu_pending'] ?? false)) {
             return ['available' => true, 'message' => 'Not pending.', 'skipped' => true];
         }
 
@@ -163,13 +163,31 @@ class WhatsappWalletVtuElectricityReconciliationService
         }
 
         $api = $this->vtuClient->requeryOrder($requestId);
-        $parsed = VtuNgElectricityOrderParser::parse($api);
+        if (! ($api['ok'] ?? false)) {
+            return [
+                'available' => true,
+                'checked' => false,
+                'skipped' => false,
+                'message' => (string) ($api['message'] ?? 'VTU requery failed.'),
+                'request_id' => $requestId,
+                'requery_ok' => false,
+            ];
+        }
 
-        return $this->applyParsedStatus($transaction->fresh() ?? $transaction, $parsed, [
-            'source' => 'requery',
-            'requery_ok' => (bool) ($api['ok'] ?? false),
+        $parsed = VtuNgElectricityOrderParser::parse($api);
+        $result = $this->applyParsedStatus($transaction->fresh() ?? $transaction, $parsed, [
+            'source' => $forceAdminCheck ? 'admin_requery' : 'requery',
+            'requery_ok' => true,
             'requery_message' => (string) ($api['message'] ?? ''),
             'provider_payload' => $api['raw'] ?? $api['data'] ?? null,
+        ]);
+
+        return array_merge($result, [
+            'available' => true,
+            'request_id' => $requestId,
+            'vtu_status' => (string) ($parsed['status'] ?? ''),
+            'electricity_token' => $parsed['electricity_token'] ?? null,
+            'requery_ok' => true,
         ]);
     }
 

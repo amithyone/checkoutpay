@@ -119,14 +119,21 @@
                         <th class="px-4 py-3 text-left font-medium text-gray-600">Phone</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
                         <th class="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-600">Payout</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-600">Payout / VTU</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-600">Reference</th>
                         <th class="px-4 py-3 text-right font-medium text-gray-600"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse($transactions as $txn)
-                        @php $bucket = $txn->payoutBucketLabel(); @endphp
+                        @php
+                            $bucket = $txn->payoutBucketLabel();
+                            $txnMeta = is_array($txn->meta) ? $txn->meta : [];
+                            $isElec = $txn->type === \App\Models\WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY;
+                            $elecPending = (bool) ($txnMeta['vtu_pending'] ?? false);
+                            $elecToken = trim((string) ($txnMeta['electricity_token'] ?? ''));
+                            $elecRefunded = (bool) ($txnMeta['vtu_refunded'] ?? false);
+                        @endphp
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-3 text-gray-900">#{{ $txn->id }}</td>
                             <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ $txn->created_at?->format('M j, Y H:i') }}</td>
@@ -134,7 +141,17 @@
                             <td class="px-4 py-3 text-gray-600">{{ str_replace('_', ' ', $txn->type) }}</td>
                             <td class="px-4 py-3 text-right font-medium text-gray-900">₦{{ number_format((float) $txn->amount, 2) }}</td>
                             <td class="px-4 py-3">
-                                @if($txn->type === \App\Models\WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT)
+                                @if($isElec)
+                                    @if($elecRefunded)
+                                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Refunded</span>
+                                    @elseif($elecPending)
+                                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Pending token</span>
+                                    @elseif($elecToken !== '')
+                                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Token ready</span>
+                                    @else
+                                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{{ $txnMeta['vtu_status'] ?? '—' }}</span>
+                                    @endif
+                                @elseif($txn->type === \App\Models\WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT)
                                     <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium {{ $bucketBadge($bucket) }}">{{ ucfirst($bucket) }}</span>
                                     @if($txn->isReversed())
                                         <span class="text-xs text-gray-500 block">Reversed</span>
@@ -146,7 +163,14 @@
                             <td class="px-4 py-3 text-gray-600 font-mono text-xs max-w-[10rem] truncate" title="{{ $txn->external_reference }}">
                                 {{ $txn->external_reference ?: '—' }}
                             </td>
-                            <td class="px-4 py-3 text-right">
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                @if($isElec)
+                                    <button type="button"
+                                        class="text-amber-700 hover:underline mr-3 js-check-vtu-electricity"
+                                        data-url="{{ route('admin.whatsapp-wallet.transactions.check-electricity-status', $txn) }}">
+                                        Check VTU
+                                    </button>
+                                @endif
                                 <a href="{{ route('admin.whatsapp-wallet.transactions.show', $txn) }}" class="text-primary hover:underline">View</a>
                             </td>
                         </tr>
@@ -163,4 +187,45 @@
         @endif
     </div>
 </div>
+
+@push('scripts')
+<script>
+(function () {
+    document.querySelectorAll('.js-check-vtu-electricity').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var url = btn.getAttribute('data-url');
+            if (!url) return;
+            var original = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Checking…';
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': @json(csrf_token()),
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var parts = [data.message || 'Done.'];
+                    if (data.vtu_status) parts.push('Status: ' + data.vtu_status);
+                    if (data.electricity_token) parts.push('Token: ' + data.electricity_token);
+                    alert(parts.join('\n'));
+                    if ((data.completed || data.failed || data.requery_ok) && !data.skipped) {
+                        window.location.reload();
+                    }
+                })
+                .catch(function () {
+                    alert('Request failed.');
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.textContent = original;
+                });
+        });
+    });
+})();
+</script>
+@endpush
 @endsection

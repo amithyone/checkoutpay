@@ -9,6 +9,7 @@ use App\Services\MevonPay\MevonPayTransferStatusService;
 use App\Services\MavonPayTransferService;
 use App\Services\Whatsapp\WhatsappWalletBankPayoutRefundService;
 use App\Services\Whatsapp\WhatsappWalletPendingPayoutReconciliationService;
+use App\Services\Whatsapp\WhatsappWalletVtuElectricityReconciliationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +23,7 @@ class WhatsappWalletTransactionAdminController extends Controller
         private MevonPayTransferStatusService $transferStatus,
         private WhatsappWalletPendingPayoutReconciliationService $payoutReconciliation,
         private WhatsappWalletBankPayoutRefundService $refundService,
+        private WhatsappWalletVtuElectricityReconciliationService $electricityReconciliation,
     ) {}
 
     public function index(Request $request): View
@@ -63,10 +65,16 @@ class WhatsappWalletTransactionAdminController extends Controller
             'to' => $transaction->created_at?->copy()->addDays(7)->toDateString(),
         ]));
 
+        $isElectricity = $transaction->type === WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY;
+        $electricityMeta = $isElectricity && is_array($transaction->meta) ? $transaction->meta : [];
+
         return view('admin.whatsapp-wallet.transactions.show', [
             'transaction' => $transaction,
             'payoutBucket' => $transaction->payoutBucketLabel(),
             'statusCheckAvailable' => $this->transferStatus->isAvailable(),
+            'electricityStatusCheckAvailable' => $this->electricityReconciliation->isAvailable(),
+            'isElectricity' => $isElectricity,
+            'electricityMeta' => $electricityMeta,
             'canManualRefund' => $transaction->canManualRefund(),
             'auditUrl' => $auditUrl,
         ]);
@@ -80,6 +88,13 @@ class WhatsappWalletTransactionAdminController extends Controller
             is_int($adminId) ? $adminId : null,
             onlyIfPending: false,
         );
+
+        return response()->json($result);
+    }
+
+    public function checkElectricityStatus(WhatsappWalletTransaction $transaction): JsonResponse
+    {
+        $result = $this->electricityReconciliation->reconcileTransaction($transaction, forceAdminCheck: true);
 
         return response()->json($result);
     }
@@ -186,6 +201,7 @@ class WhatsappWalletTransactionAdminController extends Controller
             WhatsappWalletTransaction::TYPE_P2P_CREDIT => 'P2P credit only',
             WhatsappWalletTransaction::TYPE_VTU_AIRTIME => 'VTU airtime',
             WhatsappWalletTransaction::TYPE_VTU_DATA => 'VTU data',
+            WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY => 'VTU electricity',
             WhatsappWalletTransaction::TYPE_PARTNER_MERCHANT_PAY => 'Partner pay',
             WhatsappWalletTransaction::TYPE_BUSINESS_NAME_REGISTRATION_FEE => 'Business name registration fee',
         ];
