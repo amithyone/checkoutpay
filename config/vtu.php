@@ -28,6 +28,8 @@ return [
     'electricity_reconcile_max_per_wallet' => max(1, (int) env('VTU_NG_ELECTRICITY_RECONCILE_MAX_PER_WALLET', 3)),
     'electricity_reconcile_min_age_minutes' => max(0, (int) env('VTU_NG_ELECTRICITY_RECONCILE_MIN_AGE', 2)),
     'electricity_reconcile_min_interval_minutes' => max(1, (int) env('VTU_NG_ELECTRICITY_RECONCILE_INTERVAL', 3)),
+    /** How long to cache VTU.ng JWT before re-login (VTU may invalidate sooner on new sessions). */
+    'jwt_cache_minutes' => max(5, min(720, (int) env('VTU_NG_JWT_CACHE_MINUTES', 50))),
 
     /** VTU.ng `network_id` / data `service_id` values */
     'networks' => [

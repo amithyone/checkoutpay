@@ -350,8 +350,9 @@ class VtuNgApiClient
             return null;
         }
         $cacheKey = 'vtu.ng.jwt.'.sha1($user);
+        $cacheMinutes = max(5, (int) config('vtu.jwt_cache_minutes', 50));
         try {
-            return Cache::remember($cacheKey, now()->addHours(12), function () use ($user, $pass) {
+            return Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($user, $pass) {
                 $res = Http::timeout((int) config('vtu.timeout', 60))
                     ->acceptJson()
                     ->asJson()
@@ -392,28 +393,85 @@ class VtuNgApiClient
         return Http::timeout((int) config('vtu.timeout', 60))->acceptJson();
     }
 
+    private function shouldRefreshJwt(Response $response): bool
+    {
+        if ($response->status() === 401) {
+            return true;
+        }
+
+        $json = $response->json();
+        if (! is_array($json)) {
+            return str_contains(strtolower($response->body()), 'invalidated')
+                && str_contains(strtolower($response->body()), 'jwt');
+        }
+
+        $parts = array_filter([
+            $json['message'] ?? null,
+            $json['error'] ?? null,
+            $json['data']['message'] ?? null,
+        ], static fn ($v) => is_string($v) && trim($v) !== '');
+
+        foreach ($parts as $part) {
+            $lower = strtolower($part);
+            if (str_contains($lower, 'invalidated') && str_contains($lower, 'jwt')) {
+                return true;
+            }
+            if (str_contains($lower, 'generate a new jwt')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  callable(PendingRequest): Response  $send
+     */
+    private function sendWithJwtRetry(callable $send, callable $fallback): Response
+    {
+        $http = $this->authedHttp();
+        if ($http === null) {
+            return $fallback();
+        }
+
+        $response = $send($http);
+        if (! $this->shouldRefreshJwt($response)) {
+            return $response;
+        }
+
+        Log::info('vtu.ng.jwt_refresh', [
+            'http_status' => $response->status(),
+            'reason' => 'expired_or_invalidated',
+        ]);
+
+        $this->forgetJwtCache();
+        $http = $this->authedHttp();
+        if ($http === null) {
+            return $fallback();
+        }
+
+        $retry = $send($http);
+        if ($this->shouldRefreshJwt($retry)) {
+            Log::warning('vtu.ng.jwt_refresh_failed', [
+                'http_status' => $retry->status(),
+                'body_preview' => substr($retry->body(), 0, 300),
+            ]);
+
+            return $fallback();
+        }
+
+        return $retry;
+    }
+
     /**
      * @param  array<string, string>  $query
      */
     private function requestGet(string $path, array $query): Response
     {
-        $http = $this->authedHttp();
-        if ($http !== null) {
-            $response = $http->get($this->url($path), $query);
-            if ($response->status() !== 401) {
-                return $response;
-            }
-            $this->forgetJwtCache();
-            $http = $this->authedHttp();
-            if ($http !== null) {
-                $response = $http->get($this->url($path), $query);
-                if ($response->status() !== 401) {
-                    return $response;
-                }
-            }
-        }
-
-        return $this->baseHttp()->get($this->url($path), array_merge($this->authQuery(), $query));
+        return $this->sendWithJwtRetry(
+            fn (PendingRequest $http) => $http->get($this->url($path), $query),
+            fn () => $this->baseHttp()->get($this->url($path), array_merge($this->authQuery(), $query)),
+        );
     }
 
     /**
@@ -421,26 +479,14 @@ class VtuNgApiClient
      */
     private function requestPostForm(string $path, array $formFields): Response
     {
-        $http = $this->authedHttp();
-        if ($http !== null) {
-            $body = array_merge($this->pinOnlyForm(), $formFields);
-            $response = $http->asForm()->post($this->url($path), $body);
-            if ($response->status() !== 401) {
-                return $response;
-            }
-            $this->forgetJwtCache();
-            $http = $this->authedHttp();
-            if ($http !== null) {
-                $response = $http->asForm()->post($this->url($path), $body);
-                if ($response->status() !== 401) {
-                    return $response;
-                }
-            }
-        }
+        $body = array_merge($this->pinOnlyForm(), $formFields);
 
-        return $this->baseHttp()
-            ->asForm()
-            ->post($this->url($path), array_merge($this->authForm(), $formFields));
+        return $this->sendWithJwtRetry(
+            fn (PendingRequest $http) => $http->asForm()->post($this->url($path), $body),
+            fn () => $this->baseHttp()
+                ->asForm()
+                ->post($this->url($path), array_merge($this->authForm(), $formFields)),
+        );
     }
 
     /**
@@ -451,28 +497,16 @@ class VtuNgApiClient
     private function requestPostJson(string $path, array $payload): Response
     {
         $body = array_merge($payload, $this->pinOnlyForm());
-        $http = $this->authedHttp();
-        if ($http !== null) {
-            $response = $http->asJson()->post($this->url($path), $body);
-            if ($response->status() !== 401) {
-                return $response;
-            }
-            $this->forgetJwtCache();
-            $http = $this->authedHttp();
-            if ($http !== null) {
-                $response = $http->asJson()->post($this->url($path), $body);
-                if ($response->status() !== 401) {
-                    return $response;
-                }
-            }
-        }
 
-        return $this->baseHttp()
-            ->asJson()
-            ->post($this->url($path), array_merge($body, [
-                'username' => (string) config('vtu.username'),
-                'password' => (string) config('vtu.password'),
-            ]));
+        return $this->sendWithJwtRetry(
+            fn (PendingRequest $http) => $http->asJson()->post($this->url($path), $body),
+            fn () => $this->baseHttp()
+                ->asJson()
+                ->post($this->url($path), array_merge($body, [
+                    'username' => (string) config('vtu.username'),
+                    'password' => (string) config('vtu.password'),
+                ])),
+        );
     }
 
     /**
