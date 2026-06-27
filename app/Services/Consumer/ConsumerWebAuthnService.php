@@ -45,9 +45,10 @@ class ConsumerWebAuthnService
 
     public static function isAvailable(): bool
     {
-        return class_exists(AttestationStatementSupportManager::class)
-            && class_exists(WebauthnSerializerFactory::class)
-            && class_exists(Algorithms::class);
+        return class_exists('Webauthn\\AttestationStatement\\AttestationStatementSupportManager')
+            && class_exists('Webauthn\\Denormalizer\\WebauthnSerializerFactory')
+            && class_exists('Cose\\Algorithms')
+            && class_exists('Symfony\\Component\\Serializer\\Serializer');
     }
 
     public function isEnabled(): bool
@@ -363,7 +364,7 @@ class ConsumerWebAuthnService
             return;
         }
 
-        if (! self::isAvailable()) {
+        if (! static::isAvailable()) {
             throw WebAuthnNotConfiguredException::missingPackages();
         }
 
@@ -371,12 +372,8 @@ class ConsumerWebAuthnService
         $this->serializer = (new WebauthnSerializerFactory($attestationManager))->create();
 
         $ceremonyFactory = new CeremonyStepManagerFactory();
-        $allowedOrigins = $this->allowedOrigins();
-        if ($allowedOrigins !== []) {
-            $ceremonyFactory->setAllowedOrigins($allowedOrigins, false, [$this->rpId()]);
-        } else {
-            $ceremonyFactory->setSecuredRelyingPartyId([$this->rpId()]);
-        }
+        $ceremonyFactory->setAttestationStatementSupportManager($attestationManager);
+        $this->configureCeremonyOrigins($ceremonyFactory);
 
         $this->attestationValidator = AuthenticatorAttestationResponseValidator::create(
             $ceremonyFactory->creationCeremony()
@@ -384,6 +381,21 @@ class ConsumerWebAuthnService
         $this->assertionValidator = AuthenticatorAssertionResponseValidator::create(
             $ceremonyFactory->requestCeremony()
         );
+    }
+
+    private function configureCeremonyOrigins(CeremonyStepManagerFactory $ceremonyFactory): void
+    {
+        $origins = $this->allowedOrigins();
+        $rpOrigin = 'https://'.$this->rpId();
+        if (! in_array($rpOrigin, $origins, true)) {
+            $origins[] = $rpOrigin;
+        }
+
+        if ($origins !== []) {
+            $ceremonyFactory->setAllowedOrigins($origins, true);
+        } else {
+            $ceremonyFactory->setSecuredRelyingPartyId([$this->rpId()]);
+        }
     }
 
     private function serializer(): SerializerInterface
@@ -517,8 +529,19 @@ class ConsumerWebAuthnService
     private function allowedOrigins(): array
     {
         $origins = config('consumer_wallet.webauthn_allowed_origins', []);
+        $origins = is_array($origins) ? array_values(array_filter($origins)) : [];
 
-        return is_array($origins) ? array_values(array_filter($origins)) : [];
+        foreach ((array) config('consumer_wallet.webauthn_android_apk_key_hashes', []) as $hash) {
+            $hash = trim((string) $hash);
+            if ($hash === '') {
+                continue;
+            }
+            $origins[] = str_starts_with($hash, 'android:apk-key-hash:')
+                ? $hash
+                : 'android:apk-key-hash:'.$hash;
+        }
+
+        return array_values(array_unique($origins));
     }
 
     /**

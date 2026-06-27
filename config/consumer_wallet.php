@@ -13,7 +13,7 @@ return [
     /**
      * Allowed clientDataJSON origins for native passkeys (comma-separated).
      * iOS: https://check-outpay.com
-     * Android: android:apk-key-hash:BASE64URL_SHA256_OF_SIGNING_CERT
+     * Android: android:apk-key-hash:… (or set CONSUMER_WEBAUTHN_ANDROID_APK_KEY_HASHES)
      */
     'webauthn_allowed_origins' => array_values(array_filter(array_map(
         static fn (string $origin): string => trim($origin),
@@ -21,6 +21,22 @@ return [
             'CONSUMER_WEBAUTHN_ALLOWED_ORIGINS',
             'https://check-outpay.com'
         ))
+    ))),
+
+    /**
+     * Comma-separated Base64URL SHA-256 cert hashes for Android passkeys → android:apk-key-hash: origins.
+     *
+     * @var list<string>
+     */
+    'webauthn_android_apk_key_hashes' => array_values(array_filter(array_map(
+        static fn (string $hash): string => trim($hash),
+        explode(',', (string) env('CONSUMER_WEBAUTHN_ANDROID_APK_KEY_HASHES', ''))
+    ))),
+
+    /** SHA-256 fingerprints for public/.well-known/assetlinks.json (colon-separated hex). */
+    'android_assetlinks_sha256_fingerprints' => array_values(array_filter(array_map(
+        static fn (string $fp): string => trim($fp),
+        explode(',', (string) env('CONSUMER_ANDROID_ASSETLINKS_SHA256', ''))
     ))),
 
     /** Max single transfer amount (NGN) while transfer lock is active. */
