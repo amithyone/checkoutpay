@@ -273,6 +273,14 @@ class WhatsappWaWalletMenuHandler
             $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
         }
 
+        if ($this->tryHandleSaveTogetherCommand($session, $instance, $phone, $text, $cmd, $wallet)) {
+            return;
+        }
+
+        if ($this->tryHandleMoneyRequestCommand($session, $instance, $phone, $text, $cmd, $wallet)) {
+            return;
+        }
+
         if ($this->canInterpretAsGlobalP2pPhoneShortcut($step) && PhoneNormalizer::parseBareWalletMobileForP2pShortcut($text, $phone) !== null) {
             if (! $wallet->hasPin()) {
                 $this->client->sendText($instance, $phone, 'Send *1* in *WALLET* to register your PIN first.');
@@ -466,8 +474,8 @@ class WhatsappWaWalletMenuHandler
             : "*4* WhatsApp send (intl OK).\n";
 
         $casualLine = $ngRails
-            ? "Or: *send 20000 to 0210085995 gtbank* · *send 5000 on whatsapp to 081...* · *send mon 8148790554 1000*\n\n"
-            : '';
+            ? "Or: *send 20000 to 0210085995 gtbank* · *need 5000 from 080…* · *ST CONTRIBUTE {id} {amount}*\n\n"
+            : "Or: *need 5000 from 080…* · *ST CONTRIBUTE {id} {amount}*\n\n";
 
         $this->client->sendText(
             $instance,
@@ -575,19 +583,25 @@ class WhatsappWaWalletMenuHandler
     {
         $wallet->refresh();
         $on = (bool) $wallet->transfer_email_otp_enabled;
+        $hintOn = (bool) ($wallet->money_request_balance_hint_enabled ?? true);
         $hasEmail = $wallet->resolveOtpEmail() !== null;
         $statusLine = $on
-            ? 'ON — email *6-digit* code (PIN link still works).'
-            : 'OFF — PIN link only (default).';
+            ? 'Transfer email code: ON'
+            : 'Transfer email code: OFF (default)';
+        $hintLine = $hintOn
+            ? 'Money request balance hints: ON'
+            : 'Money request balance hints: OFF';
         $emailWarn = $hasEmail
             ? ''
-            : "\n_No email — Tier 2 + email before *2* ON._";
+            : "\n_No email — Tier 2 + email before transfer code ON._";
 
         $this->client->sendText(
             $instance,
             $phone,
-            "*Settings*\n{$statusLine}{$emailWarn}\n\n".
-            "*1* OFF · *2* ON · *0* back\n".
+            "*Settings*\n{$statusLine}\n{$hintLine}{$emailWarn}\n\n".
+            "*1* Email code OFF · *2* Email code ON\n".
+            "*3* Toggle balance hints on money requests\n".
+            "*0* back\n".
             'PIN only on secure page.'
         );
     }
@@ -654,10 +668,25 @@ class WhatsappWaWalletMenuHandler
             return;
         }
 
+        if (in_array($cmd, ['3', 'HINT', 'HINTS'], true)) {
+            $wallet->money_request_balance_hint_enabled = ! (bool) ($wallet->money_request_balance_hint_enabled ?? true);
+            $wallet->save();
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $state = $wallet->money_request_balance_hint_enabled ? 'ON' : 'OFF';
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'Saved: money request balance hints are *'.$state."*.\n\nWhen OFF, requesters won't be told if your balance is below their amount."
+            );
+            $this->sendSubmenu($instance, $phone, $wallet->fresh());
+
+            return;
+        }
+
         $this->client->sendText(
             $instance,
             $phone,
-            "*1* OFF · *2* ON · *0* back\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+            "*1* Email code OFF · *2* Email code ON · *3* balance hints\n*0* back\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
         );
     }
 
@@ -913,6 +942,16 @@ class WhatsappWaWalletMenuHandler
         }
 
         if ($wallet->hasPin() && ! $wallet->isPinLocked() && $wallet->normalizedSenderName() !== null) {
+            $requestNorm = WhatsappWalletCasualMoneyRequestParser::normalizeForCasualParse($text);
+            if (WhatsappWalletCasualMoneyRequestParser::looksLikeCasualMoneyRequest($requestNorm)) {
+                $parsed = WhatsappWalletCasualMoneyRequestParser::tryParse($requestNorm, $wallet);
+                if ($parsed !== null) {
+                    $this->handleCasualMoneyRequestFromSubmenu($session, $instance, $phone, $wallet, $parsed);
+
+                    return;
+                }
+            }
+
             $norm = WhatsappWalletCasualSendParser::normalizeForCasualParse($text);
             if (WhatsappWalletCasualSendParser::looksLikeCasualSend($norm)) {
                 $recent = $this->recentBankTransferTargets($wallet, 10);
@@ -2642,5 +2681,185 @@ class WhatsappWaWalletMenuHandler
         } else {
             $this->checkoutServicesMenu->sendRootMenu($instance, $phone);
         }
+    }
+
+    /**
+     * @param  array{amount: float, payer_phone_e164: string}  $parsed
+     */
+    private function handleCasualMoneyRequestFromSubmenu(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $parsed,
+    ): void {
+        $service = app(WhatsappWalletMoneyRequestService::class);
+        if (! $service->isEnabled()) {
+            $this->client->sendText($instance, $phone, 'Money requests are not available right now.');
+
+            return;
+        }
+
+        $result = $service->create(
+            $wallet->fresh(),
+            (string) $parsed['payer_phone_e164'],
+            (float) $parsed['amount'],
+            null,
+            \App\Models\WhatsappWalletMoneyRequest::CHANNEL_WHATSAPP,
+        );
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            ($result['message'] ?? 'Request failed.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+        );
+    }
+
+    private function tryHandleMoneyRequestCommand(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        string $cmd,
+        WhatsappWallet $wallet,
+    ): bool {
+        $service = app(WhatsappWalletMoneyRequestService::class);
+        if (! $service->isEnabled()) {
+            return false;
+        }
+
+        if (preg_match('/^ACCEPT\s+([0-9a-f-]{36})$/i', trim($text), $m)) {
+            if (! $wallet->hasPin() || $wallet->isPinLocked()) {
+                $this->client->sendText($instance, $phone, 'Set up or unlock your wallet PIN first (*WALLET* → *1*).');
+
+                return true;
+            }
+            $publicId = strtolower($m[1]);
+            $pending = $service->findByPublicId($publicId);
+            if ($pending === null || ! $pending->isPending() || (string) $pending->payer_phone_e164 !== (string) $wallet->phone_e164) {
+                $this->client->sendText($instance, $phone, 'That money request was not found or is no longer pending.');
+
+                return true;
+            }
+            $requester = $pending->requesterWallet;
+            $requesterName = $requester?->displayName() ?: (string) $pending->requester_phone_e164;
+            $this->secureTransferAuth->beginMoneyRequestAcceptConfirmation(
+                $session,
+                $instance,
+                $phone,
+                $wallet->fresh(),
+                [
+                    'money_request_public_id' => $publicId,
+                    'money_request_amount' => (float) $pending->amount,
+                    'money_request_requester_name' => $requesterName,
+                ],
+            );
+
+            return true;
+        }
+
+        if (preg_match('/^DECLINE\s+([0-9a-f-]{36})$/i', trim($text), $m)) {
+            $result = $service->decline($wallet->fresh(), strtolower($m[1]));
+            $this->client->sendText($instance, $phone, ($result['message'] ?? 'Done.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function tryHandleSaveTogetherCommand(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        string $text,
+        string $cmd,
+        WhatsappWallet $wallet,
+    ): bool {
+        $service = app(\App\Services\Consumer\SaveTogetherService::class);
+        if (! $service->isEnabled()) {
+            return false;
+        }
+
+        if (preg_match('/^ST\s+CONTRIBUTE\s+([0-9a-f-]{36})(?:\s+(\d+(?:\.\d+)?))?$/i', trim($text), $m)) {
+            if (! $wallet->hasPin() || $wallet->isPinLocked()) {
+                $this->client->sendText($instance, $phone, 'Set up or unlock your wallet PIN first (*WALLET* → *1*).');
+
+                return true;
+            }
+            $publicId = strtolower($m[1]);
+            $amount = isset($m[2]) && is_numeric($m[2]) ? (float) $m[2] : null;
+            if ($amount === null || $amount < 1) {
+                $this->client->sendText(
+                    $instance,
+                    $phone,
+                    "Send amount with the command, e.g. *ST CONTRIBUTE {$publicId} 500* for ₦500.\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter()
+                );
+
+                return true;
+            }
+            $pot = $service->findPotByPublicId($publicId);
+            $title = $pot?->title ?? 'Save Together';
+            $this->secureTransferAuth->beginSaveTogetherContributeConfirmation(
+                $session,
+                $instance,
+                $phone,
+                $wallet->fresh(),
+                [
+                    'save_together_public_id' => $publicId,
+                    'save_together_amount' => $amount,
+                    'save_together_title' => $title,
+                ],
+            );
+
+            return true;
+        }
+
+        if (preg_match('/^ST\s+WITHDRAW\s+([0-9a-f-]{36})$/i', trim($text), $m)) {
+            if (! $wallet->hasPin() || $wallet->isPinLocked()) {
+                $this->client->sendText($instance, $phone, 'Set up or unlock your wallet PIN first (*WALLET* → *1*).');
+
+                return true;
+            }
+            $publicId = strtolower($m[1]);
+            $pot = $service->findPotByPublicId($publicId);
+            $this->secureTransferAuth->beginSaveTogetherWithdrawConfirmation(
+                $session,
+                $instance,
+                $phone,
+                $wallet->fresh(),
+                [
+                    'save_together_public_id' => $publicId,
+                    'save_together_title' => $pot?->title ?? 'Save Together',
+                ],
+            );
+
+            return true;
+        }
+
+        if (preg_match('/^ST\s+DECLINE\s+([0-9a-f-]{36})$/i', trim($text), $m)) {
+            $result = $service->decline($wallet->fresh(), strtolower($m[1]));
+            $this->client->sendText($instance, $phone, ($result['message'] ?? 'Done.')."\n\n".WhatsappMenuInputNormalizer::navigationHelpFooter());
+
+            return true;
+        }
+
+        if (in_array($cmd, ['SAVE TOGETHER', 'ST'], true) || $cmd === '8') {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*Save Together*\n\n".
+                "Create a group save in CheckoutNow (Savings → Save Together).\n\n".
+                "When invited:\n".
+                "• *ST CONTRIBUTE {id} {amount}* — add money (repeat until your share is complete)\n".
+                "• *ST DECLINE {id}* — decline invite\n".
+                "• *ST WITHDRAW {id}* — after the pot unlocks\n\n".
+                WhatsappMenuInputNormalizer::navigationHelpFooter()
+            );
+
+            return true;
+        }
+
+        return false;
     }
 }

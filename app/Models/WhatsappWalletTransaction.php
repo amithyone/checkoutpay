@@ -55,6 +55,12 @@ class WhatsappWalletTransaction extends Model
     /** Flexible savings withdrawal back to spendable balance. */
     public const TYPE_SAVINGS_WITHDRAW = 'savings_withdraw';
 
+    /** Save Together group pot: member contribution (escrow lock). */
+    public const TYPE_SAVE_TOGETHER_CONTRIBUTE = 'save_together_contribute';
+
+    /** Save Together group pot: return member contribution after unlock. */
+    public const TYPE_SAVE_TOGETHER_WITHDRAW = 'save_together_withdraw';
+
     /** @deprecated Use TYPE_PARTNER_MERCHANT_PAY; kept for existing rows. */
     public const TYPE_TAGINE_MERCHANT_PAY = 'tagine_merchant_pay';
 

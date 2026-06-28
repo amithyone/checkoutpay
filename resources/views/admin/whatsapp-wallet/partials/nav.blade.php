@@ -26,6 +26,14 @@
        class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.p2p']) }}">
         <i class="fas fa-paper-plane mr-2 text-green-600"></i> P2P transfers
     </a>
+    <a href="{{ route('admin.whatsapp-wallet.money-requests.index') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.money-requests.*']) }}">
+        <i class="fas fa-hand-holding-usd mr-2 text-green-600"></i> Money requests
+    </a>
+    <a href="{{ route('admin.whatsapp-wallet.save-together.index') }}"
+       class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.save-together.*']) }}">
+        <i class="fas fa-users mr-2 text-green-600"></i> Save Together
+    </a>
     <a href="{{ route('admin.whatsapp-wallet.transactions.pending') }}"
        class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.pending']) }}">
         <i class="fas fa-clock mr-2 text-amber-600"></i> Pending payouts

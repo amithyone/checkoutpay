@@ -64,6 +64,18 @@ return [
     'device_stepup_push_title' => env('CONSUMER_DEVICE_STEPUP_PUSH_TITLE', 'New sign-in attempt'),
     'device_stepup_push_channel' => env('CONSUMER_DEVICE_STEPUP_PUSH_CHANNEL', 'wallet_alerts'),
 
+    /** P2P money requests (ask someone to pay you). */
+    'money_request_enabled' => filter_var(env('CONSUMER_MONEY_REQUEST_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'money_request_expiry_days' => (int) env('CONSUMER_MONEY_REQUEST_EXPIRY_DAYS', 7),
+    'money_request_max_pending_per_pair' => (int) env('CONSUMER_MONEY_REQUEST_MAX_PENDING_PER_PAIR', 3),
+
+    /** Save Together group savings pots. */
+    'save_together_enabled' => filter_var(env('CONSUMER_SAVE_TOGETHER_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'save_together_min_members' => (int) env('CONSUMER_SAVE_TOGETHER_MIN_MEMBERS', 2),
+    'save_together_max_members' => (int) env('CONSUMER_SAVE_TOGETHER_MAX_MEMBERS', 20),
+    'save_together_min_target' => (float) env('CONSUMER_SAVE_TOGETHER_MIN_TARGET', 100),
+    'save_together_min_contribution' => (float) env('CONSUMER_SAVE_TOGETHER_MIN_CONTRIBUTION', 1),
+
     /** CAC business name registration + business receive account (CheckoutNow Receive Funds). */
     'business_name_registration' => [
         'enabled' => filter_var(env('CONSUMER_BUSINESS_NAME_REGISTRATION_ENABLED', false), FILTER_VALIDATE_BOOL),

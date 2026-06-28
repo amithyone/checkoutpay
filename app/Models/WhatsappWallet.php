@@ -58,6 +58,7 @@ class WhatsappWallet extends Model
         'rubies_account_type',
         'kyc_cac',
         'transfer_email_otp_enabled',
+        'money_request_balance_hint_enabled',
         'notify_card_created_email',
         'notify_card_created_whatsapp',
         'notify_card_transaction_email',
@@ -82,6 +83,7 @@ class WhatsappWallet extends Model
         'kyc_dob' => 'date',
         'tier' => 'integer',
         'transfer_email_otp_enabled' => 'boolean',
+        'money_request_balance_hint_enabled' => 'boolean',
         'notify_card_created_email' => 'boolean',
         'notify_card_created_whatsapp' => 'boolean',
         'notify_card_transaction_email' => 'boolean',
@@ -334,6 +336,12 @@ class WhatsappWallet extends Model
     public function wantsCardTransactionWhatsapp(): bool
     {
         return (bool) ($this->notify_card_transaction_whatsapp ?? true);
+    }
+
+    /** When true, money requesters may be told if this wallet balance is below the requested amount. */
+    public function wantsMoneyRequestBalanceHint(): bool
+    {
+        return (bool) ($this->money_request_balance_hint_enabled ?? true);
     }
 
     public function isPinLocked(): bool

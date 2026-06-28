@@ -45,6 +45,10 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->timezone('Africa/Lagos')
             ->withoutOverlapping(15);
+        $schedule->command('save-together:process-deadlines')
+            ->hourly()
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping(15);
     }
 
     /**

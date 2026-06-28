@@ -23,6 +23,8 @@ use App\Http\Controllers\Admin\VirtualCardAdminController;
 use App\Http\Controllers\Admin\ConsumerAppSessionAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletTransactionAdminController;
+use App\Http\Controllers\Admin\WhatsappWalletMoneyRequestAdminController;
+use App\Http\Controllers\Admin\WhatsappSaveTogetherAdminController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
@@ -287,6 +289,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             Route::get('whatsapp-wallet/transactions', [WhatsappWalletTransactionAdminController::class, 'index'])->name('whatsapp-wallet.transactions.index');
             Route::get('whatsapp-wallet/transactions/p2p', [WhatsappWalletTransactionAdminController::class, 'p2p'])->name('whatsapp-wallet.transactions.p2p');
+            Route::get('whatsapp-wallet/money-requests', [WhatsappWalletMoneyRequestAdminController::class, 'index'])->name('whatsapp-wallet.money-requests.index');
+            Route::get('whatsapp-wallet/save-together', [WhatsappSaveTogetherAdminController::class, 'index'])->name('whatsapp-wallet.save-together.index');
             Route::get('whatsapp-wallet/transactions/failed', [WhatsappWalletTransactionAdminController::class, 'failed'])->name('whatsapp-wallet.transactions.failed');
             Route::get('whatsapp-wallet/transactions/pending', [WhatsappWalletTransactionAdminController::class, 'pending'])->name('whatsapp-wallet.transactions.pending');
             Route::get('whatsapp-wallet/transactions/{transaction}', [WhatsappWalletTransactionAdminController::class, 'show'])->name('whatsapp-wallet.transactions.show');

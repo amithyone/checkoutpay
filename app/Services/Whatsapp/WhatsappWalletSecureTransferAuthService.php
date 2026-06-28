@@ -153,6 +153,150 @@ class WhatsappWalletSecureTransferAuthService
     }
 
     /**
+     * @param  array<string, mixed>  $ctx  Must include money_request_public_id
+     */
+    public function beginMoneyRequestAcceptConfirmation(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $ctx,
+    ): void {
+        $token = bin2hex(random_bytes(32));
+        $publicId = (string) ($ctx['money_request_public_id'] ?? '');
+        $amount = isset($ctx['money_request_amount']) && is_numeric($ctx['money_request_amount'])
+            ? (float) $ctx['money_request_amount']
+            : 0.0;
+        $requesterName = isset($ctx['money_request_requester_name']) && is_string($ctx['money_request_requester_name'])
+            ? $ctx['money_request_requester_name']
+            : 'Someone';
+
+        Cache::put($this->cacheKey($token), [
+            'whatsapp_session_id' => $session->id,
+            'phone_e164' => $phone,
+            'evolution_instance' => $instance,
+            'wallet_id' => $wallet->id,
+            'kind' => 'money_request',
+            'ctx' => [
+                'money_request_public_id' => $publicId,
+            ],
+        ], now()->addSeconds($this->linkTtlSeconds()));
+
+        $linkUrl = $this->secureConfirmBaseUrl().'/wallet/whatsapp/confirm/'.$token;
+        $summaryLine = sprintf(
+            'Accept money request: %s from %s',
+            WhatsappWalletMoneyFormatter::format($amount, 'NGN'),
+            $requesterName,
+        );
+
+        $ctx['step'] = 'money_request_pin';
+        $ctx['wallet_transfer_confirm_token'] = $token;
+        $session->update(['chat_context' => $ctx]);
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Confirm money request*\n{$summaryLine}\n\n".
+            "Open the link in the *next message* and enter your *4-digit wallet PIN* on the secure page.\n\n".
+            "*Do not* send your wallet PIN in this chat.\n\n".
+            '*BACK* — cancel'
+        );
+        $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    public function beginSaveTogetherContributeConfirmation(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $ctx,
+    ): void {
+        $publicId = (string) ($ctx['save_together_public_id'] ?? '');
+        $amount = isset($ctx['save_together_amount']) && is_numeric($ctx['save_together_amount'])
+            ? (float) $ctx['save_together_amount']
+            : 0.0;
+        $title = (string) ($ctx['save_together_title'] ?? 'Save Together');
+
+        $token = bin2hex(random_bytes(32));
+        Cache::put($this->cacheKey($token), [
+            'whatsapp_session_id' => $session->id,
+            'phone_e164' => $phone,
+            'evolution_instance' => $instance,
+            'wallet_id' => $wallet->id,
+            'kind' => 'save_together_contribute',
+            'ctx' => [
+                'save_together_public_id' => $publicId,
+                'save_together_amount' => $amount,
+            ],
+        ], now()->addSeconds($this->linkTtlSeconds()));
+
+        $linkUrl = $this->secureConfirmBaseUrl().'/wallet/whatsapp/confirm/'.$token;
+        $summaryLine = sprintf(
+            'Save Together: %s — contribute %s',
+            $title,
+            WhatsappWalletMoneyFormatter::format($amount, 'NGN'),
+        );
+
+        $ctx['step'] = 'save_together_contribute_pin';
+        $ctx['wallet_transfer_confirm_token'] = $token;
+        $session->update(['chat_context' => $ctx]);
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Confirm Save Together*\n{$summaryLine}\n\n".
+            "Open the link in the *next message* and enter your *4-digit wallet PIN*.\n\n".
+            '*BACK* — cancel'
+        );
+        $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    public function beginSaveTogetherWithdrawConfirmation(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        array $ctx,
+    ): void {
+        $publicId = (string) ($ctx['save_together_public_id'] ?? '');
+        $title = (string) ($ctx['save_together_title'] ?? 'Save Together');
+
+        $token = bin2hex(random_bytes(32));
+        Cache::put($this->cacheKey($token), [
+            'whatsapp_session_id' => $session->id,
+            'phone_e164' => $phone,
+            'evolution_instance' => $instance,
+            'wallet_id' => $wallet->id,
+            'kind' => 'save_together_withdraw',
+            'ctx' => [
+                'save_together_public_id' => $publicId,
+            ],
+        ], now()->addSeconds($this->linkTtlSeconds()));
+
+        $linkUrl = $this->secureConfirmBaseUrl().'/wallet/whatsapp/confirm/'.$token;
+        $summaryLine = sprintf('Save Together withdraw: %s', $title);
+
+        $ctx['step'] = 'save_together_withdraw_pin';
+        $ctx['wallet_transfer_confirm_token'] = $token;
+        $session->update(['chat_context' => $ctx]);
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "*Confirm withdraw*\n{$summaryLine}\n\n".
+            "Open the link in the *next message* and enter your *4-digit wallet PIN*.\n\n".
+            '*BACK* — cancel'
+        );
+        $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
+    }
+
+    /**
      * @param  array<string, mixed>  $ctx
      */
     private function beginConfirmation(
@@ -420,7 +564,7 @@ class WhatsappWalletSecureTransferAuthService
         $walletId = (int) ($payload['wallet_id'] ?? 0);
         $kind = (string) ($payload['kind'] ?? '');
         $execCtx = $payload['ctx'] ?? [];
-        if ($sessionId < 1 || $phone === '' || $instance === '' || $walletId < 1 || ! in_array($kind, ['bank', 'p2p'], true) || ! is_array($execCtx)) {
+        if ($sessionId < 1 || $phone === '' || $instance === '' || $walletId < 1 || ! in_array($kind, ['bank', 'p2p', 'money_request', 'save_together_contribute', 'save_together_withdraw'], true) || ! is_array($execCtx)) {
             return ['ok' => false, 'error' => 'Invalid confirmation data.'];
         }
 
@@ -456,6 +600,57 @@ class WhatsappWalletSecureTransferAuthService
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $session = $session->fresh();
         $wallet = $wallet->fresh();
+
+        if ($kind === 'money_request') {
+            $publicId = (string) ($execCtx['money_request_public_id'] ?? '');
+            if ($publicId === '') {
+                return ['ok' => false, 'error' => 'Invalid money request.'];
+            }
+            $result = app(WhatsappWalletMoneyRequestService::class)->accept($wallet, $publicId);
+            if (! ($result['ok'] ?? false)) {
+                return ['ok' => false, 'error' => (string) ($result['message'] ?? 'Could not accept request.')];
+            }
+
+            return [
+                'ok' => true,
+                'message' => (string) ($result['message'] ?? 'Request accepted.'),
+            ];
+        }
+
+        if ($kind === 'save_together_contribute') {
+            $publicId = (string) ($execCtx['save_together_public_id'] ?? '');
+            $amount = isset($execCtx['save_together_amount']) && is_numeric($execCtx['save_together_amount'])
+                ? (float) $execCtx['save_together_amount']
+                : 0.0;
+            if ($publicId === '' || $amount < 1) {
+                return ['ok' => false, 'error' => 'Invalid Save Together contribution.'];
+            }
+            $result = app(\App\Services\Consumer\SaveTogetherService::class)->contribute($wallet, $publicId, $amount);
+            if (! ($result['ok'] ?? false)) {
+                return ['ok' => false, 'error' => (string) ($result['message'] ?? 'Could not contribute.')];
+            }
+
+            return [
+                'ok' => true,
+                'message' => (string) ($result['message'] ?? 'Contribution saved.'),
+            ];
+        }
+
+        if ($kind === 'save_together_withdraw') {
+            $publicId = (string) ($execCtx['save_together_public_id'] ?? '');
+            if ($publicId === '') {
+                return ['ok' => false, 'error' => 'Invalid Save Together pot.'];
+            }
+            $result = app(\App\Services\Consumer\SaveTogetherService::class)->withdraw($wallet, $publicId);
+            if (! ($result['ok'] ?? false)) {
+                return ['ok' => false, 'error' => (string) ($result['message'] ?? 'Could not withdraw.')];
+            }
+
+            return [
+                'ok' => true,
+                'message' => (string) ($result['message'] ?? 'Withdrawn.'),
+            ];
+        }
 
         $out = $kind === 'bank'
             ? $this->completion->completeBankTransfer($session, $instance, $phone, $wallet, $execCtx, false)
