@@ -111,22 +111,81 @@ class ConsumerMoneyRequestController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
-    public function updateSettings(Request $request): JsonResponse
+    public function settings(Request $request, WhatsappWalletMoneyRequestService $moneyRequests): JsonResponse
+    {
+        $wallet = $this->walletFor($request);
+
+        return response()->json([
+            'success' => true,
+            'data' => array_merge($moneyRequests->serializeSettings($wallet), [
+                'blocks' => $moneyRequests->listBlocks($wallet),
+            ]),
+        ]);
+    }
+
+    public function updateSettings(Request $request, WhatsappWalletMoneyRequestService $moneyRequests): JsonResponse
     {
         $request->validate([
-            'money_request_balance_hint_enabled' => 'required|boolean',
+            'money_request_balance_hint_enabled' => 'sometimes|boolean',
+            'money_request_paused' => 'sometimes|boolean',
+            'money_request_pause_hours' => 'nullable|integer|min:-1|max:8760',
         ]);
 
         $wallet = $this->walletFor($request);
-        $wallet->money_request_balance_hint_enabled = (bool) $request->boolean('money_request_balance_hint_enabled');
-        $wallet->save();
+        $result = $moneyRequests->updateSettings($wallet, $request->only([
+            'money_request_balance_hint_enabled',
+            'money_request_paused',
+            'money_request_pause_hours',
+        ]));
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => $result['data'] ?? null,
+        ]);
+    }
+
+    public function listBlocks(Request $request, WhatsappWalletMoneyRequestService $moneyRequests): JsonResponse
+    {
+        $wallet = $this->walletFor($request);
 
         return response()->json([
             'success' => true,
             'data' => [
-                'money_request_balance_hint_enabled' => (bool) $wallet->money_request_balance_hint_enabled,
+                'blocks' => $moneyRequests->listBlocks($wallet),
             ],
         ]);
+    }
+
+    public function storeBlock(Request $request, WhatsappWalletMoneyRequestService $moneyRequests): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+        ]);
+
+        $wallet = $this->walletFor($request);
+        $result = $moneyRequests->addBlock($wallet, (string) $request->input('phone'));
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => $result['data'] ?? null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function destroyBlock(Request $request, WhatsappWalletMoneyRequestService $moneyRequests): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+        ]);
+
+        $wallet = $this->walletFor($request);
+        $result = $moneyRequests->removeBlock($wallet, (string) $request->input('phone'));
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+        ], $result['ok'] ? 200 : 422);
     }
 
     private function walletFor(Request $request): \App\Models\WhatsappWallet

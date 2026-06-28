@@ -137,6 +137,10 @@ Route::prefix('v1')->group(function () {
         Route::patch('wallet/transfer-email-otp', [ConsumerWalletApiController::class, 'updateTransferEmailOtp']);
         Route::patch('wallet/card-notifications', [ConsumerWalletApiController::class, 'updateCardNotifications']);
         Route::patch('wallet/money-request-settings', [ConsumerMoneyRequestController::class, 'updateSettings']);
+        Route::get('wallet/money-request-settings', [ConsumerMoneyRequestController::class, 'settings']);
+        Route::get('wallet/money-request-blocks', [ConsumerMoneyRequestController::class, 'listBlocks']);
+        Route::post('wallet/money-request-blocks', [ConsumerMoneyRequestController::class, 'storeBlock']);
+        Route::delete('wallet/money-request-blocks', [ConsumerMoneyRequestController::class, 'destroyBlock']);
         Route::get('money-requests', [ConsumerMoneyRequestController::class, 'index']);
         Route::post('money-requests', [ConsumerMoneyRequestController::class, 'store']);
         Route::post('money-requests/{id}/accept', [ConsumerMoneyRequestController::class, 'accept']);

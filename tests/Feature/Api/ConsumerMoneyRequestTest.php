@@ -119,6 +119,63 @@ class ConsumerMoneyRequestTest extends TestCase
             ->assertJsonPath('data.status', WhatsappWalletMoneyRequest::STATUS_CANCELLED);
     }
 
+    public function test_create_rejected_when_payer_paused_requests(): void
+    {
+        [, $requesterAccount] = $this->seedWallet('2348011111111', 1000, '1111');
+        [, , $payerWallet] = $this->seedWallet('2348022222222', 5000, '2222');
+        $payerWallet->money_request_paused_until = now()->addDay();
+        $payerWallet->save();
+
+        Sanctum::actingAs($requesterAccount, ['consumer']);
+
+        $this->postJson('/api/v1/consumer/money-requests', [
+            'to_phone' => '+2348022222222',
+            'amount' => 500,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_create_rejected_when_payer_blocked_requester(): void
+    {
+        [, $requesterAccount] = $this->seedWallet('2348011111111', 1000, '1111');
+        [, $payerAccount] = $this->seedWallet('2348022222222', 5000, '2222');
+
+        Sanctum::actingAs($payerAccount, ['consumer']);
+        $this->postJson('/api/v1/consumer/wallet/money-request-blocks', [
+            'phone' => '+2348011111111',
+        ])->assertOk();
+
+        Sanctum::actingAs($requesterAccount, ['consumer']);
+        $this->postJson('/api/v1/consumer/money-requests', [
+            'to_phone' => '+2348022222222',
+            'amount' => 200,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_payer_can_pause_and_resume_requests(): void
+    {
+        [, $payerAccount, $payerWallet] = $this->seedWallet('2348022222222', 5000, '2222');
+
+        Sanctum::actingAs($payerAccount, ['consumer']);
+        $this->patchJson('/api/v1/consumer/wallet/money-request-settings', [
+            'money_request_pause_hours' => 24,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.money_request_paused', true);
+
+        $payerWallet->refresh();
+        $this->assertTrue($payerWallet->isMoneyRequestPaused());
+
+        $this->patchJson('/api/v1/consumer/wallet/money-request-settings', [
+            'money_request_pause_hours' => 0,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.money_request_paused', false);
+    }
+
     private function ensureSchema(): void
     {
         Config::set('database.default', 'sqlite');
@@ -142,7 +199,19 @@ class ConsumerMoneyRequestTest extends TestCase
                 $table->timestamp('pin_locked_until')->nullable();
                 $table->boolean('transfer_email_otp_enabled')->default(false);
                 $table->boolean('money_request_balance_hint_enabled')->default(true);
+                $table->timestamp('money_request_paused_until')->nullable();
                 $table->string('status', 32)->default('active');
+                $table->timestamps();
+            });
+        }
+
+        if (! $schema->hasTable('whatsapp_wallet_money_request_blocks')) {
+            $schema->create('whatsapp_wallet_money_request_blocks', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('whatsapp_wallet_id');
+                $table->string('blocked_phone_e164', 32);
+                $table->unsignedBigInteger('blocked_wallet_id')->nullable();
+                $table->string('blocked_display_name', 128)->nullable();
                 $table->timestamps();
             });
         }

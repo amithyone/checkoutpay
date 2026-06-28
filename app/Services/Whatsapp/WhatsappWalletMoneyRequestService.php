@@ -4,6 +4,7 @@ namespace App\Services\Whatsapp;
 
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletMoneyRequest;
+use App\Models\WhatsappWalletMoneyRequestBlock;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerWalletPushNotificationService;
 use App\Services\Consumer\ConsumerWalletTransferService;
@@ -50,6 +51,21 @@ class WhatsappWalletMoneyRequestService
             return ['ok' => false, 'message' => 'You cannot request money from yourself.'];
         }
 
+        $payerWallet = WhatsappWallet::query()
+            ->where('phone_e164', $payerPhone)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
+
+        if ($payerWallet instanceof WhatsappWallet) {
+            if ($payerWallet->isMoneyRequestPaused()) {
+                return ['ok' => false, 'message' => 'This person is not accepting money requests right now.'];
+            }
+
+            if ($payerWallet->blocksMoneyRequestFrom($requesterPhone)) {
+                return ['ok' => false, 'message' => 'You cannot send a money request to this person.'];
+            }
+        }
+
         if ($amount < 1) {
             return ['ok' => false, 'message' => 'Invalid amount.'];
         }
@@ -67,11 +83,6 @@ class WhatsappWalletMoneyRequestService
         if ($pendingCount >= $maxPending) {
             return ['ok' => false, 'message' => 'You already have pending requests to this number. Wait for a response or cancel one first.'];
         }
-
-        $payerWallet = WhatsappWallet::query()
-            ->where('phone_e164', $payerPhone)
-            ->where('status', WhatsappWallet::STATUS_ACTIVE)
-            ->first();
 
         $expiryDays = max(1, (int) config('consumer_wallet.money_request_expiry_days', 7));
 
@@ -220,6 +231,146 @@ class WhatsappWalletMoneyRequestService
     public function findByPublicId(string $publicId): ?WhatsappWalletMoneyRequest
     {
         return WhatsappWalletMoneyRequest::query()->where('public_id', $publicId)->first();
+    }
+
+    /**
+     * @return array{money_request_balance_hint_enabled: bool, money_request_paused: bool, money_request_paused_until: string|null}
+     */
+    public function serializeSettings(WhatsappWallet $wallet): array
+    {
+        return [
+            'money_request_balance_hint_enabled' => (bool) ($wallet->money_request_balance_hint_enabled ?? true),
+            'money_request_paused' => $wallet->isMoneyRequestPaused(),
+            'money_request_paused_until' => $wallet->money_request_paused_until?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    public function updateSettings(WhatsappWallet $wallet, array $input): array
+    {
+        if (array_key_exists('money_request_balance_hint_enabled', $input)) {
+            $wallet->money_request_balance_hint_enabled = (bool) $input['money_request_balance_hint_enabled'];
+        }
+
+        if (array_key_exists('money_request_pause_hours', $input)) {
+            $hours = $input['money_request_pause_hours'];
+            if ($hours === null || $hours === 0 || $hours === '0') {
+                $wallet->money_request_paused_until = null;
+            } elseif ((int) $hours < 0) {
+                $wallet->money_request_paused_until = now()->addYears(50);
+            } else {
+                $wallet->money_request_paused_until = now()->addHours(max(1, (int) $hours));
+            }
+        } elseif (array_key_exists('money_request_paused', $input) && ! (bool) $input['money_request_paused']) {
+            $wallet->money_request_paused_until = null;
+        } elseif (array_key_exists('money_request_paused', $input) && (bool) $input['money_request_paused']) {
+            $wallet->money_request_paused_until = now()->addYears(50);
+        }
+
+        $wallet->save();
+
+        return [
+            'ok' => true,
+            'message' => 'Settings updated.',
+            'data' => $this->serializeSettings($wallet->fresh()),
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listBlocks(WhatsappWallet $wallet): array
+    {
+        return $wallet->moneyRequestBlocks()
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (WhatsappWalletMoneyRequestBlock $block) => $this->serializeBlock($block))
+            ->all();
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    public function addBlock(WhatsappWallet $wallet, string $phoneInput): array
+    {
+        $blockedPhone = PhoneNormalizer::canonicalNgE164Digits($phoneInput)
+            ?? PhoneNormalizer::canonicalInternationalWalletRecipientDigits(
+                PhoneNormalizer::digitsOnly($phoneInput) ?? $phoneInput
+            );
+
+        if ($blockedPhone === null || $blockedPhone === '') {
+            return ['ok' => false, 'message' => 'Invalid phone number.'];
+        }
+
+        if ($blockedPhone === (string) $wallet->phone_e164) {
+            return ['ok' => false, 'message' => 'You cannot block yourself.'];
+        }
+
+        $blockedWallet = WhatsappWallet::query()
+            ->where('phone_e164', $blockedPhone)
+            ->where('status', WhatsappWallet::STATUS_ACTIVE)
+            ->first();
+
+        $displayName = $this->displayNameForPhone($blockedWallet, $blockedPhone);
+
+        $block = WhatsappWalletMoneyRequestBlock::query()->updateOrCreate(
+            [
+                'whatsapp_wallet_id' => $wallet->id,
+                'blocked_phone_e164' => $blockedPhone,
+            ],
+            [
+                'blocked_wallet_id' => $blockedWallet?->id,
+                'blocked_display_name' => $displayName !== $blockedPhone ? $displayName : null,
+            ],
+        );
+
+        return [
+            'ok' => true,
+            'message' => sprintf('%s can no longer request money from you.', $displayName),
+            'data' => $this->serializeBlock($block),
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    public function removeBlock(WhatsappWallet $wallet, string $phoneInput): array
+    {
+        $blockedPhone = PhoneNormalizer::canonicalNgE164Digits($phoneInput)
+            ?? PhoneNormalizer::canonicalInternationalWalletRecipientDigits(
+                PhoneNormalizer::digitsOnly($phoneInput) ?? $phoneInput
+            );
+
+        if ($blockedPhone === null || $blockedPhone === '') {
+            return ['ok' => false, 'message' => 'Invalid phone number.'];
+        }
+
+        $deleted = WhatsappWalletMoneyRequestBlock::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('blocked_phone_e164', $blockedPhone)
+            ->delete();
+
+        if ($deleted < 1) {
+            return ['ok' => false, 'message' => 'Block not found.'];
+        }
+
+        return ['ok' => true, 'message' => 'Person unblocked.'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeBlock(WhatsappWalletMoneyRequestBlock $block): array
+    {
+        return [
+            'phone_e164' => (string) $block->blocked_phone_e164,
+            'display_name' => $block->blocked_display_name,
+            'created_at' => $block->created_at?->toIso8601String(),
+        ];
     }
 
     private function findPendingForPayer(WhatsappWallet $payerWallet, string $publicId): ?WhatsappWalletMoneyRequest

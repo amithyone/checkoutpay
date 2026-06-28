@@ -59,6 +59,7 @@ class WhatsappWallet extends Model
         'kyc_cac',
         'transfer_email_otp_enabled',
         'money_request_balance_hint_enabled',
+        'money_request_paused_until',
         'notify_card_created_email',
         'notify_card_created_whatsapp',
         'notify_card_transaction_email',
@@ -84,6 +85,7 @@ class WhatsappWallet extends Model
         'tier' => 'integer',
         'transfer_email_otp_enabled' => 'boolean',
         'money_request_balance_hint_enabled' => 'boolean',
+        'money_request_paused_until' => 'datetime',
         'notify_card_created_email' => 'boolean',
         'notify_card_created_whatsapp' => 'boolean',
         'notify_card_transaction_email' => 'boolean',
@@ -342,6 +344,24 @@ class WhatsappWallet extends Model
     public function wantsMoneyRequestBalanceHint(): bool
     {
         return (bool) ($this->money_request_balance_hint_enabled ?? true);
+    }
+
+    public function moneyRequestBlocks(): HasMany
+    {
+        return $this->hasMany(WhatsappWalletMoneyRequestBlock::class, 'whatsapp_wallet_id');
+    }
+
+    public function isMoneyRequestPaused(): bool
+    {
+        return $this->money_request_paused_until !== null
+            && $this->money_request_paused_until->isFuture();
+    }
+
+    public function blocksMoneyRequestFrom(string $requesterPhoneE164): bool
+    {
+        return $this->moneyRequestBlocks()
+            ->where('blocked_phone_e164', $requesterPhoneE164)
+            ->exists();
     }
 
     public function isPinLocked(): bool

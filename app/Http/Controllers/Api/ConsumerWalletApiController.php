@@ -221,6 +221,8 @@ class ConsumerWalletApiController extends Controller
                 ],
                 'transfer_email_otp_enabled' => (bool) $wallet->transfer_email_otp_enabled,
                 'money_request_balance_hint_enabled' => (bool) ($wallet->money_request_balance_hint_enabled ?? true),
+                'money_request_paused' => $wallet->isMoneyRequestPaused(),
+                'money_request_paused_until' => $wallet->money_request_paused_until?->toIso8601String(),
                 'money_request_enabled' => (bool) config('consumer_wallet.money_request_enabled', true),
                 'transfer_email_otp_eligible' => $wallet->isTier2(),
                 'transfer_email_otp_has_email' => $wallet->resolveOtpEmail() !== null,
