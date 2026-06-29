@@ -3,6 +3,7 @@
 namespace Tests\Unit\Consumer;
 
 use App\Models\Setting;
+use App\Models\WalletSaveTogetherMember;
 use App\Models\WalletSaveTogetherPot;
 use App\Models\WhatsappWallet;
 use App\Services\Consumer\SaveTogetherService;
@@ -95,6 +96,63 @@ class SaveTogetherServiceTest extends TestCase
         $service->processDeadlines();
         $pot->refresh();
         $this->assertSame(WalletSaveTogetherPot::STATUS_UNLOCKED, $pot->status);
+    }
+
+    public function test_invite_records_activity_and_sends_whatsapp(): void
+    {
+        $sent = [];
+        $this->mock(EvolutionWhatsAppClient::class, function ($mock) use (&$sent) {
+            $mock->shouldReceive('sendText')->andReturnUsing(function ($instance, $phone, $text) use (&$sent) {
+                $sent[] = ['phone' => $phone, 'text' => $text];
+
+                return true;
+            });
+        });
+
+        $creator = $this->wallet('2348011111111', 5000, 'Creator');
+        $member = $this->wallet('2348022222222', 1000, 'Member');
+
+        $service = app(SaveTogetherService::class);
+        $result = $service->create($creator, 'Trip', 1000, ['+2348022222222'], WalletSaveTogetherPot::MODE_FULL_CONTRIBUTION);
+
+        $this->assertTrue($result['ok']);
+        $this->assertCount(1, $sent);
+        $this->assertSame('2348022222222', $sent[0]['phone']);
+        $this->assertStringContainsString('Creator', $sent[0]['text']);
+        $this->assertStringContainsString('Trip', $sent[0]['text']);
+
+        $this->assertSame(
+            1,
+            \App\Models\WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $member->id)
+                ->where('type', \App\Models\WhatsappWalletTransaction::TYPE_SAVE_TOGETHER_INVITE)
+                ->count(),
+        );
+    }
+
+    public function test_declined_pot_still_listed_for_member(): void
+    {
+        $creator = $this->wallet('2348011111111', 5000);
+        $member = $this->wallet('2348022222222', 5000);
+
+        $service = app(SaveTogetherService::class);
+        $create = $service->create($creator, 'Test', 1000, ['+2348022222222'], WalletSaveTogetherPot::MODE_FULL_CONTRIBUTION);
+        $potId = (string) $create['data']['id'];
+
+        $decline = $service->decline($member, $potId);
+        $this->assertTrue($decline['ok']);
+
+        $listed = $service->listForWallet($member);
+        $this->assertCount(1, $listed);
+        $this->assertSame(WalletSaveTogetherMember::STATUS_DECLINED, $listed[0]['my_status']);
+
+        $this->assertSame(
+            1,
+            \App\Models\WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $member->id)
+                ->where('type', \App\Models\WhatsappWalletTransaction::TYPE_SAVE_TOGETHER_DECLINE)
+                ->count(),
+        );
     }
 
     private function ensureSchema(): void

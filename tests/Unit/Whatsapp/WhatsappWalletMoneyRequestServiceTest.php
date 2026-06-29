@@ -9,6 +9,7 @@ use App\Services\Whatsapp\WhatsappWalletMoneyRequestService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -57,6 +58,36 @@ class WhatsappWalletMoneyRequestServiceTest extends TestCase
         $this->assertStringNotContainsString("doesn't have", $result['message']);
     }
 
+    public function test_whatsapp_notify_payer_uses_short_message_with_pin_link(): void
+    {
+        $sent = [];
+        $this->mock(EvolutionWhatsAppClient::class, function ($mock) use (&$sent) {
+            $mock->shouldReceive('sendText')->andReturnUsing(function ($instance, $phone, $text) use (&$sent) {
+                $sent[] = $text;
+
+                return true;
+            });
+        });
+
+        $requester = $this->wallet('2348011111111', 1000, senderName: 'Chidi Nwosu');
+        $payer = $this->wallet('2348022222222', 10000, senderName: 'Ada Okoro');
+        $payer->pin_hash = Hash::make('1234');
+        $payer->save();
+
+        $service = app(WhatsappWalletMoneyRequestService::class);
+        $result = $service->create($requester, '+2348022222222', 2500, channel: \App\Models\WhatsappWalletMoneyRequest::CHANNEL_WHATSAPP);
+
+        $this->assertTrue($result['ok']);
+        $this->assertGreaterThanOrEqual(2, count($sent));
+        $this->assertStringContainsString('Chidi Nwosu', $sent[0]);
+        $this->assertStringContainsString('23480', $sent[0]);
+        $this->assertStringNotContainsString('ACCEPT', implode("\n", $sent));
+        $this->assertTrue(
+            collect($sent)->contains(fn (string $m) => str_contains($m, '/wallet/whatsapp/confirm/')),
+            'Expected PIN confirm link in WhatsApp messages',
+        );
+    }
+
     private function ensureSchema(): void
     {
         Config::set('database.default', 'sqlite');
@@ -75,7 +106,20 @@ class WhatsappWalletMoneyRequestServiceTest extends TestCase
                 $table->unsignedTinyInteger('tier')->default(1);
                 $table->decimal('balance', 14, 2)->default(0);
                 $table->boolean('money_request_balance_hint_enabled')->default(true);
+                $table->timestamp('money_request_paused_until')->nullable();
+                $table->string('mevon_virtual_account_number', 32)->nullable();
                 $table->string('status', 32)->default('active');
+                $table->timestamps();
+            });
+        }
+
+        if (! $schema->hasTable('whatsapp_wallet_money_request_blocks')) {
+            $schema->create('whatsapp_wallet_money_request_blocks', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('whatsapp_wallet_id');
+                $table->string('blocked_phone_e164', 32);
+                $table->unsignedBigInteger('blocked_wallet_id')->nullable();
+                $table->string('blocked_display_name', 128)->nullable();
                 $table->timestamps();
             });
         }
@@ -97,6 +141,14 @@ class WhatsappWalletMoneyRequestServiceTest extends TestCase
                 $table->timestamp('responded_at')->nullable();
                 $table->unsignedBigInteger('p2p_debit_transaction_id')->nullable();
                 $table->json('meta')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (! $schema->hasTable('whatsapp_sessions')) {
+            $schema->create('whatsapp_sessions', function (Blueprint $table) {
+                $table->id();
+                $table->string('phone_e164', 32);
                 $table->timestamps();
             });
         }

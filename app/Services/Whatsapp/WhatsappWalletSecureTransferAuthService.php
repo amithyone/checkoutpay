@@ -5,6 +5,7 @@ namespace App\Services\Whatsapp;
 use App\Mail\WhatsappWalletTransferOtpMail;
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
+use App\Models\WhatsappWalletMoneyRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -202,6 +203,43 @@ class WhatsappWalletSecureTransferAuthService
             '*BACK* — cancel'
         );
         $this->sendStandaloneConfirmLink($instance, $phone, $linkUrl);
+    }
+
+    /**
+     * Proactive money-request notification: issue a PIN link without an active chat step.
+     */
+    public function issueMoneyRequestAcceptLink(
+        WhatsappWallet $payerWallet,
+        string $instance,
+        string $publicId,
+    ): ?string {
+        if (! $payerWallet->hasPin() || $payerWallet->isPinLocked()) {
+            return null;
+        }
+
+        $phone = (string) $payerWallet->phone_e164;
+        if ($phone === '' || $instance === '') {
+            return null;
+        }
+
+        $session = WhatsappSession::query()
+            ->where('phone_e164', $phone)
+            ->orderByDesc('id')
+            ->first();
+
+        $token = bin2hex(random_bytes(32));
+        Cache::put($this->cacheKey($token), [
+            'whatsapp_session_id' => $session?->id ?? 0,
+            'phone_e164' => $phone,
+            'evolution_instance' => $instance,
+            'wallet_id' => $payerWallet->id,
+            'kind' => 'money_request',
+            'ctx' => [
+                'money_request_public_id' => $publicId,
+            ],
+        ], now()->addSeconds($this->linkTtlSeconds()));
+
+        return $this->transferConfirmUrl($token);
     }
 
     /**
@@ -564,13 +602,26 @@ class WhatsappWalletSecureTransferAuthService
         $walletId = (int) ($payload['wallet_id'] ?? 0);
         $kind = (string) ($payload['kind'] ?? '');
         $execCtx = $payload['ctx'] ?? [];
-        if ($sessionId < 1 || $phone === '' || $instance === '' || $walletId < 1 || ! in_array($kind, ['bank', 'p2p', 'money_request', 'save_together_contribute', 'save_together_withdraw'], true) || ! is_array($execCtx)) {
+        if ($phone === '' || $instance === '' || $walletId < 1 || ! in_array($kind, ['bank', 'p2p', 'money_request', 'save_together_contribute', 'save_together_withdraw'], true) || ! is_array($execCtx)) {
             return ['ok' => false, 'error' => 'Invalid confirmation data.'];
         }
 
-        $session = WhatsappSession::query()->find($sessionId);
+        $sessionOptional = in_array($kind, ['money_request'], true);
+        if (! $sessionOptional && $sessionId < 1) {
+            return ['ok' => false, 'error' => 'Invalid confirmation data.'];
+        }
+
+        $session = $sessionId > 0 ? WhatsappSession::query()->find($sessionId) : null;
         $wallet = WhatsappWallet::query()->find($walletId);
-        if (! $session || ! $wallet || (string) $session->phone_e164 !== $phone || (string) $wallet->phone_e164 !== $phone) {
+        if (! $wallet || (string) $wallet->phone_e164 !== $phone) {
+            return ['ok' => false, 'error' => 'Session no longer valid.'];
+        }
+
+        if ($session !== null && (string) $session->phone_e164 !== $phone) {
+            return ['ok' => false, 'error' => 'Session no longer valid.'];
+        }
+
+        if (! $sessionOptional && $session === null) {
             return ['ok' => false, 'error' => 'Session no longer valid.'];
         }
 
@@ -597,8 +648,10 @@ class WhatsappWalletSecureTransferAuthService
         $wallet->save();
 
         Cache::forget($this->cacheKey($token));
-        $session->update(['chat_context' => ['step' => 'submenu']]);
-        $session = $session->fresh();
+        if ($session !== null) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $session = $session->fresh();
+        }
         $wallet = $wallet->fresh();
 
         if ($kind === 'money_request') {
@@ -680,13 +733,49 @@ class WhatsappWalletSecureTransferAuthService
 
         $kind = (string) ($payload['kind'] ?? '');
         $execCtx = $payload['ctx'] ?? [];
-        if (! is_array($execCtx) || ! in_array($kind, ['bank', 'p2p'], true)) {
+        if (! is_array($execCtx) || ! in_array($kind, ['bank', 'p2p', 'money_request'], true)) {
             return ['ok' => false, 'error' => 'Invalid link.'];
         }
 
-        $summary = $kind === 'bank' ? $this->summarizeBank($execCtx) : $this->summarizeP2p($execCtx);
+        $summary = match ($kind) {
+            'bank' => $this->summarizeBank($execCtx),
+            'p2p' => $this->summarizeP2p($execCtx),
+            'money_request' => $this->summarizeMoneyRequest($execCtx),
+            default => '',
+        };
 
         return ['ok' => true, 'kind' => $kind, 'summary' => $summary];
+    }
+
+    /**
+     * @param  array<string, mixed>  $execCtx
+     */
+    private function summarizeMoneyRequest(array $execCtx): string
+    {
+        $publicId = (string) ($execCtx['money_request_public_id'] ?? '');
+        if ($publicId === '') {
+            return 'Accept money request';
+        }
+
+        $request = WhatsappWalletMoneyRequest::query()
+            ->where('public_id', $publicId)
+            ->with('requesterWallet')
+            ->first();
+
+        if (! $request instanceof WhatsappWalletMoneyRequest) {
+            return 'Accept money request';
+        }
+
+        $requester = $request->requesterWallet;
+        $requesterName = $requester instanceof WhatsappWallet
+            ? ($requester->displayName() ?: (string) $request->requester_phone_e164)
+            : (string) $request->requester_phone_e164;
+
+        return sprintf(
+            'Pay %s to %s',
+            WhatsappWalletMoneyFormatter::format((float) $request->amount, (string) $request->currency),
+            $requesterName,
+        );
     }
 
     public function forgetConfirmTokenIfPresent(?string $token): void

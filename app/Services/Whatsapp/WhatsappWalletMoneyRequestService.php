@@ -428,6 +428,7 @@ class WhatsappWalletMoneyRequestService
 
         $requesterName = $this->displayNameForPhone($requester, (string) $request->requester_phone_e164);
         $amountLabel = WhatsappWalletMoneyFormatter::format((float) $request->amount, (string) $request->currency);
+        $requesterIdentity = $this->maskRequesterIdentity($requester, (string) $request->requester_phone_e164);
         $title = 'Money request';
         $body = sprintf('%s requested %s from you.', $requesterName, $amountLabel);
         if ($request->note) {
@@ -452,18 +453,64 @@ class WhatsappWalletMoneyRequestService
         }
 
         $lines = [
-            '💸 *Money request*',
-            '',
-            sprintf('%s requested *%s* from you.', $requesterName, $amountLabel),
+            sprintf('💸 *%s* wants *%s*', $requesterName, $amountLabel),
+            $requesterIdentity,
         ];
         if ($request->note) {
-            $lines[] = 'Note: '.$request->note;
+            $lines[] = Str::limit((string) $request->note, 80, '…');
         }
-        $lines[] = '';
-        $lines[] = 'Reply *ACCEPT '.$request->public_id.'* to pay (PIN required) or *DECLINE '.$request->public_id.'* to decline.';
-        $lines[] = 'Or open CheckoutNow app → Requests.';
 
         $this->whatsappClient->sendText($instance, (string) $request->payer_phone_e164, implode("\n", $lines));
+
+        if ($payerWallet instanceof WhatsappWallet) {
+            $linkUrl = app(WhatsappWalletSecureTransferAuthService::class)->issueMoneyRequestAcceptLink(
+                $payerWallet->fresh(),
+                $instance,
+                (string) $request->public_id,
+            );
+            if ($linkUrl !== null) {
+                $this->whatsappClient->sendText(
+                    $instance,
+                    (string) $request->payer_phone_e164,
+                    "Open the link below and enter your *4-digit wallet PIN* to pay.\n*Do not* send your PIN in this chat.",
+                );
+                $this->whatsappClient->sendText($instance, (string) $request->payer_phone_e164, $linkUrl);
+
+                return;
+            }
+        }
+
+        $this->whatsappClient->sendText(
+            $instance,
+            (string) $request->payer_phone_e164,
+            'Send *WALLET* to set up your wallet and respond.',
+        );
+    }
+
+    private function maskRequesterIdentity(WhatsappWallet $requester, string $phoneE164): string
+    {
+        $phoneMasked = $this->maskPhoneTail($phoneE164);
+        $acct = trim((string) $requester->mevon_virtual_account_number);
+        if ($acct === '') {
+            return $phoneMasked;
+        }
+
+        $digits = preg_replace('/\D/', '', $acct) ?? '';
+        if (strlen($digits) >= 4) {
+            return $phoneMasked.' · Acct ••••'.substr($digits, -4);
+        }
+
+        return $phoneMasked;
+    }
+
+    private function maskPhoneTail(string $e164Digits): string
+    {
+        $d = preg_replace('/\D/', '', $e164Digits) ?? '';
+        if (strlen($d) < 9) {
+            return '••••';
+        }
+
+        return substr($d, 0, 5).' •••• '.substr($d, -4);
     }
 
     private function notifyRequesterOfDeclineOrAccept(WhatsappWalletMoneyRequest $request, bool $accepted): void

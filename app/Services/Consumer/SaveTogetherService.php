@@ -184,6 +184,8 @@ final class SaveTogetherService
             return ['ok' => false, 'message' => 'Amount exceeds your remaining share (₦'.number_format($remaining, 2).' left).'];
         }
 
+        $acceptedInvite = $member->status === WalletSaveTogetherMember::STATUS_INVITED;
+
         try {
             DB::transaction(function () use ($wallet, $pot, $member, $amount) {
                 $lockedWallet = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
@@ -261,7 +263,10 @@ final class SaveTogetherService
             return ['ok' => false, 'message' => 'Contribution failed. Check balance and try again.'];
         }
 
-        $pot = $pot->fresh(['members']);
+        $pot = $pot->fresh(['members', 'creatorWallet']);
+        if ($acceptedInvite) {
+            $this->notifyCreatorMemberJoined($pot, $wallet);
+        }
         if ($this->allActiveMembersCompleted($pot)) {
             $this->unlockPot($pot);
             $pot = $pot->fresh(['members']);
@@ -403,7 +408,10 @@ final class SaveTogetherService
         $member->status = WalletSaveTogetherMember::STATUS_DECLINED;
         $member->save();
 
-        $pot = $pot->fresh(['members']);
+        $pot = $pot->fresh(['members', 'creatorWallet']);
+        $this->recordMemberActivity($wallet, $pot, WhatsappWalletTransaction::TYPE_SAVE_TOGETHER_DECLINE);
+        $this->notifyCreatorMemberDeclined($pot, $member, $wallet);
+
         if ($this->allActiveMembersCompleted($pot)) {
             $this->unlockPot($pot);
         }
@@ -423,7 +431,6 @@ final class SaveTogetherService
         $phone = (string) $wallet->phone_e164;
         $potIds = WalletSaveTogetherMember::query()
             ->where('phone_e164', $phone)
-            ->whereNotIn('status', [WalletSaveTogetherMember::STATUS_DECLINED])
             ->pluck('pot_id');
 
         return WalletSaveTogetherPot::query()
@@ -530,6 +537,13 @@ final class SaveTogetherService
                 : WhatsappWallet::query()->where('phone_e164', $member->phone_e164)->where('status', WhatsappWallet::STATUS_ACTIVE)->first();
 
             if ($wallet instanceof WhatsappWallet) {
+                if ($member->wallet_id === null) {
+                    $member->wallet_id = $wallet->id;
+                    $member->save();
+                }
+
+                $this->recordMemberActivity($wallet, $pot, WhatsappWalletTransaction::TYPE_SAVE_TOGETHER_INVITE, $creatorName);
+
                 $this->consumerPush->notifyGeneric($wallet, 'Save Together invite', sprintf(
                     '%s invited you to save together: %s. Your share: %s.',
                     $creatorName,
@@ -538,7 +552,7 @@ final class SaveTogetherService
                 ), [
                     'type' => 'save_together_invite',
                     'save_together_pot_id' => (string) $pot->public_id,
-                    'screen' => 'saving',
+                    'screen' => 'save_together',
                 ]);
             }
 
@@ -547,16 +561,105 @@ final class SaveTogetherService
             }
 
             $lines = [
-                '🤝 *Save Together*',
-                '',
-                sprintf('%s invited you to *%s*.', $creatorName, $pot->title),
-                sprintf('Your share: *%s* (contribute any amount until complete).', $shareLabel),
-                '',
-                'Reply *ST CONTRIBUTE '.$pot->public_id.'* to add money or *ST DECLINE '.$pot->public_id.'* to decline.',
-                'Or open CheckoutNow → Savings → Save Together.',
+                sprintf('🤝 *%s* invited you to *%s*', $creatorName, $pot->title),
+                sprintf('Your share: *%s*', $shareLabel),
+                'Open CheckoutNow → Save Together to accept or decline.',
             ];
             $this->whatsappClient->sendText($instance, (string) $member->phone_e164, implode("\n", $lines));
         }
+    }
+
+    private function notifyCreatorMemberJoined(WalletSaveTogetherPot $pot, WhatsappWallet $memberWallet): void
+    {
+        $creator = $pot->creatorWallet;
+        if (! $creator instanceof WhatsappWallet) {
+            return;
+        }
+
+        $memberName = $this->displayNameForPhone($memberWallet, (string) $memberWallet->phone_e164);
+        $body = sprintf('%s joined your Save Together: %s.', $memberName, $pot->title);
+
+        $this->consumerPush->notifyGeneric($creator, 'Save Together update', $body, [
+            'type' => 'save_together_member_joined',
+            'save_together_pot_id' => (string) $pot->public_id,
+            'screen' => 'save_together',
+        ]);
+
+        $instance = WhatsappEvolutionConfigResolver::walletInstance();
+        if ($instance === '') {
+            return;
+        }
+
+        $this->whatsappClient->sendText(
+            $instance,
+            (string) $creator->phone_e164,
+            sprintf('✅ *%s* joined *%s*.', $memberName, $pot->title),
+        );
+    }
+
+    private function notifyCreatorMemberDeclined(
+        WalletSaveTogetherPot $pot,
+        WalletSaveTogetherMember $member,
+        WhatsappWallet $memberWallet,
+    ): void {
+        $creator = $pot->creatorWallet;
+        if (! $creator instanceof WhatsappWallet) {
+            return;
+        }
+
+        $memberName = $this->displayNameForPhone($memberWallet, (string) $member->phone_e164);
+        $body = sprintf('%s declined your Save Together invite: %s.', $memberName, $pot->title);
+
+        $this->consumerPush->notifyGeneric($creator, 'Save Together update', $body, [
+            'type' => 'save_together_member_declined',
+            'save_together_pot_id' => (string) $pot->public_id,
+            'screen' => 'save_together',
+        ]);
+
+        $instance = WhatsappEvolutionConfigResolver::walletInstance();
+        if ($instance === '') {
+            return;
+        }
+
+        $this->whatsappClient->sendText(
+            $instance,
+            (string) $creator->phone_e164,
+            sprintf('❌ *%s* declined *%s*.', $memberName, $pot->title),
+        );
+    }
+
+    private function recordMemberActivity(
+        WhatsappWallet $wallet,
+        WalletSaveTogetherPot $pot,
+        string $type,
+        ?string $creatorName = null,
+    ): void {
+        if (! in_array($type, [
+            WhatsappWalletTransaction::TYPE_SAVE_TOGETHER_INVITE,
+            WhatsappWalletTransaction::TYPE_SAVE_TOGETHER_DECLINE,
+        ], true)) {
+            return;
+        }
+
+        $meta = [
+            'channel' => 'consumer_api',
+            'save_together_pot_id' => (string) $pot->public_id,
+            'save_together_title' => $pot->title,
+        ];
+        if ($creatorName !== null && trim($creatorName) !== '') {
+            $meta['creator_name'] = trim($creatorName);
+        }
+
+        WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'sender_name' => $wallet->normalizedSenderName(),
+            'type' => $type,
+            'ledger_scope' => ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+            'amount' => 0,
+            'balance_after' => (float) $wallet->fresh()->balance,
+            'counterparty_account_name' => $pot->title,
+            'meta' => $meta,
+        ]);
     }
 
     private function notifyPotUnlocked(WalletSaveTogetherPot $pot): void
@@ -577,7 +680,7 @@ final class SaveTogetherService
                 ), [
                     'type' => 'save_together_unlocked',
                     'save_together_pot_id' => (string) $pot->public_id,
-                    'screen' => 'saving',
+                    'screen' => 'save_together',
                 ]);
             }
 

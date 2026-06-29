@@ -61,6 +61,12 @@ class WhatsappWalletTransaction extends Model
     /** Save Together group pot: return member contribution after unlock. */
     public const TYPE_SAVE_TOGETHER_WITHDRAW = 'save_together_withdraw';
 
+    /** Save Together: member invited to a group pot (informational, amount 0). */
+    public const TYPE_SAVE_TOGETHER_INVITE = 'save_together_invite';
+
+    /** Save Together: member declined an invite (informational, amount 0). */
+    public const TYPE_SAVE_TOGETHER_DECLINE = 'save_together_decline';
+
     /** @deprecated Use TYPE_PARTNER_MERCHANT_PAY; kept for existing rows. */
     public const TYPE_TAGINE_MERCHANT_PAY = 'tagine_merchant_pay';
 
