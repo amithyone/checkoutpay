@@ -99,6 +99,7 @@ class ConsumerWalletKycService
             'mevon_bank_code' => $created['bank_code'],
             'mevon_reference' => $created['reference'] !== '' ? $created['reference'] : $wallet->mevon_reference,
             'tier2_provisioned_at' => now(),
+            ...($this->tier2SenderNamePatch($wallet, (string) ($created['account_name'] ?? ''), $fname, $lname)),
         ]);
 
         return ['ok' => true, 'message' => 'Tier 2 activated.', 'data' => $this->vaPayload($wallet->fresh())];
@@ -153,9 +154,24 @@ class ConsumerWalletKycService
             'mevon_bank_code' => $created['bank_code'],
             'mevon_reference' => $created['reference'] !== '' ? $created['reference'] : $wallet->mevon_reference,
             'tier2_provisioned_at' => now(),
+            ...($this->tier2SenderNamePatch($wallet, (string) ($created['account_name'] ?? ''))),
         ]);
 
         return ['ok' => true, 'message' => 'Business Tier 2 activated.', 'data' => $this->vaPayload($wallet->fresh())];
+    }
+
+    /**
+     * @return array{sender_name?: string}
+     */
+    private function tier2SenderNamePatch(
+        WhatsappWallet $wallet,
+        string $verifiedAccountName,
+        ?string $kycFname = null,
+        ?string $kycLname = null,
+    ): array {
+        $verifiedSenderName = $wallet->resolveSenderNameAfterTier2($verifiedAccountName, $kycFname, $kycLname);
+
+        return $verifiedSenderName !== null ? ['sender_name' => $verifiedSenderName] : [];
     }
 
     /**

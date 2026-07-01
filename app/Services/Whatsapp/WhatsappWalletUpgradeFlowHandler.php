@@ -539,7 +539,7 @@ class WhatsappWalletUpgradeFlowHandler
         $accountType = (string) ($ctx['rubies_account_type'] ?? 'personal');
         $isBusiness = $accountType === 'business';
 
-        $wallet->update([
+        $update = [
             'tier' => WhatsappWallet::TIER_RUBIES_VA,
             'rubies_account_type' => $isBusiness ? 'business' : 'personal',
             'kyc_cac' => $isBusiness ? (string) ($ctx['cac'] ?? '') : null,
@@ -556,7 +556,17 @@ class WhatsappWalletUpgradeFlowHandler
             'mevon_bank_code' => $va['bank_code'],
             'mevon_reference' => $va['reference'] !== '' ? $va['reference'] : $wallet->mevon_reference,
             'tier2_provisioned_at' => now(),
-        ]);
+        ];
+        $verifiedSenderName = $wallet->resolveSenderNameAfterTier2(
+            (string) ($va['account_name'] ?? ''),
+            $isBusiness ? null : (string) ($ctx['fname'] ?? ''),
+            $isBusiness ? null : (string) ($ctx['lname'] ?? ''),
+        );
+        if ($verifiedSenderName !== null) {
+            $update['sender_name'] = $verifiedSenderName;
+        }
+
+        $wallet->update($update);
 
         $priorCtx = is_array($session->chat_context) ? $session->chat_context : [];
         $resumePinReset = (bool) ($priorCtx['resume_pin_reset'] ?? false);

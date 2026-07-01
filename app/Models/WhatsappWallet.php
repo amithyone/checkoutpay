@@ -256,6 +256,42 @@ class WhatsappWallet extends Model
     }
 
     /**
+     * After Tier 2 BVN/NIN verification, align wallet display name with the bank-accepted identity.
+     *
+     * @return string|null New sender_name when it should change, null when unchanged.
+     */
+    public function resolveSenderNameAfterTier2(
+        ?string $verifiedAccountName,
+        ?string $kycFname = null,
+        ?string $kycLname = null,
+    ): ?string {
+        $verified = trim((string) $verifiedAccountName);
+        if ($verified === '') {
+            $verified = trim(trim((string) $kycFname).' '.trim((string) $kycLname));
+        }
+        if ($verified === '') {
+            return null;
+        }
+
+        $current = trim((string) $this->sender_name);
+        if ($current === $verified) {
+            return null;
+        }
+
+        if ($current !== '' && \App\Services\Whatsapp\WhatsappWalletNameMatcher::passes($current, $verified)) {
+            return null;
+        }
+
+        $currentNorm = \App\Services\Whatsapp\WhatsappWalletNameMatcher::normalizePersonName($current);
+        $verifiedNorm = \App\Services\Whatsapp\WhatsappWalletNameMatcher::normalizePersonName($verified);
+        if ($currentNorm !== '' && $currentNorm === $verifiedNorm) {
+            return null;
+        }
+
+        return $verified;
+    }
+
+    /**
      * True until PIN and display name are set — show a short wallet menu and onboarding-style alerts.
      */
     public function needsQuickWalletSetup(): bool
