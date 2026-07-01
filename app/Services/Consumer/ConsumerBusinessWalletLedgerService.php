@@ -146,7 +146,28 @@ final class ConsumerBusinessWalletLedgerService
             return;
         }
 
+        $this->syncWalletBusinessBalanceFromMerchant($wallet, $business);
+    }
+
+    /** After merchant balance changes (pay-in, withdrawal, app debit), mirror onto linked wallets. */
+    public function syncLinkedWalletsFromMerchantBalance(Business $business): void
+    {
         $merchantBal = round((float) $business->balance, 2);
+
+        WhatsappWallet::query()
+            ->where('linked_business_id', $business->id)
+            ->get()
+            ->each(function (WhatsappWallet $wallet) use ($merchantBal, $business): void {
+                $this->syncWalletBusinessBalanceFromMerchant($wallet, $business, $merchantBal);
+            });
+    }
+
+    private function syncWalletBusinessBalanceFromMerchant(
+        WhatsappWallet $wallet,
+        Business $business,
+        ?float $merchantBal = null,
+    ): void {
+        $merchantBal ??= round((float) $business->balance, 2);
         if ((float) $wallet->business_balance === $merchantBal) {
             return;
         }

@@ -216,6 +216,9 @@ class Business extends Authenticatable implements CanResetPasswordContract
                 return;
             }
 
+            app(\App\Services\Consumer\ConsumerBusinessWalletLedgerService::class)
+                ->syncLinkedWalletsFromMerchantBalance($business);
+
             $previousBalance = (float) $business->getOriginal('balance');
             $newBalance = (float) $business->balance;
 
