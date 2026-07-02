@@ -103,6 +103,8 @@ return [
     */
     'self_bank_transfer_fee_enabled' => filter_var(env('WHATSAPP_SELF_BANK_TRANSFER_FEE_ENABLED', true), FILTER_VALIDATE_BOOL),
     'self_bank_transfer_fee_percent' => (float) env('WHATSAPP_SELF_BANK_TRANSFER_FEE_PERCENT', 1.5),
+    'self_bank_transfer_fixed_fee' => max(0.0, (float) env('WHATSAPP_SELF_BANK_TRANSFER_FIXED_FEE', 0)),
+    'self_bank_transfer_max_fee' => max(0.0, (float) env('WHATSAPP_SELF_BANK_TRANSFER_MAX_FEE', 500)),
     'self_bank_transfer_name_min_score' => max(50, min(100, (int) env('WHATSAPP_SELF_BANK_TRANSFER_NAME_MIN_SCORE', 68))),
     'self_bank_transfer_fintech_bank_codes' => [
         '100004', // Opay

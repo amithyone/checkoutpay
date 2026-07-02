@@ -377,6 +377,8 @@ class WhatsappWalletAdminController extends Controller
             'whatsapp_cross_border_missing_rate_message' => 'nullable|string|max:2000',
             'whatsapp_self_bank_transfer_fee_enabled' => 'nullable|boolean',
             'whatsapp_self_bank_transfer_fee_percent' => 'nullable|numeric|min:0|max:25',
+            'whatsapp_self_bank_transfer_fixed_fee' => 'nullable|numeric|min:0|max:10000000',
+            'whatsapp_self_bank_transfer_max_fee' => 'nullable|numeric|min:0|max:10000000',
         ]);
 
         Setting::set('whatsapp_app_url', $validated['whatsapp_app_url'] ?: null, 'string', 'whatsapp', 'Public app URL (WHATSAPP_APP_URL override)');
@@ -416,6 +418,20 @@ class WhatsappWalletAdminController extends Controller
             'float',
             'whatsapp',
             'Self bank transfer fee percent (deducted from amount sent; recipient gets remainder)'
+        );
+        Setting::set(
+            'whatsapp_self_bank_transfer_fixed_fee',
+            $validated['whatsapp_self_bank_transfer_fixed_fee'] ?? config('whatsapp.self_bank_transfer_fixed_fee', 0),
+            'float',
+            'whatsapp',
+            'Flat naira fee added on top of the percent fee for self bank transfers'
+        );
+        Setting::set(
+            'whatsapp_self_bank_transfer_max_fee',
+            $validated['whatsapp_self_bank_transfer_max_fee'] ?? config('whatsapp.self_bank_transfer_max_fee', 500),
+            'float',
+            'whatsapp',
+            'Maximum naira fee charged on a self bank transfer (0 = no cap)'
         );
 
         $enabledPayCodeCountries = $request->input('whatsapp_checkout_pay_code_countries', []);

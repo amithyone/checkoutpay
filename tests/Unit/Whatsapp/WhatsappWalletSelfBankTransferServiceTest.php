@@ -130,4 +130,91 @@ class WhatsappWalletSelfBankTransferServiceTest extends TestCase
 
         $this->assertFalse($quoted['ok']);
     }
+
+    /** @test */
+    public function fixed_fee_reads_admin_setting(): void
+    {
+        Setting::set('whatsapp_self_bank_transfer_fixed_fee', 75, 'float', 'whatsapp', 'test');
+
+        $this->assertSame(75.0, $this->service->fixedFee());
+    }
+
+    /** @test */
+    public function quote_applies_fixed_fee_alone_when_percent_is_zero(): void
+    {
+        Setting::set('whatsapp_self_bank_transfer_fee_enabled', true, 'boolean', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fee_percent', 0, 'float', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fixed_fee', 50, 'float', 'whatsapp', 'test');
+
+        $quoted = $this->service->quote(10000, true);
+
+        $this->assertTrue($quoted['ok']);
+        $this->assertTrue($quoted['is_self_transfer']);
+        $this->assertSame(50.0, $quoted['fee']);
+        $this->assertSame(9950.0, $quoted['payout_amount']);
+    }
+
+    /** @test */
+    public function quote_adds_percent_and_fixed_before_max_cap(): void
+    {
+        Setting::set('whatsapp_self_bank_transfer_fee_enabled', true, 'boolean', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fee_percent', 2.0, 'float', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fixed_fee', 50, 'float', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_max_fee', 500, 'float', 'whatsapp', 'test');
+
+        $quoted = $this->service->quote(10000, true);
+
+        $this->assertTrue($quoted['ok']);
+        $this->assertSame(250.0, $quoted['fee']);
+        $this->assertSame(9750.0, $quoted['payout_amount']);
+    }
+
+    /** @test */
+    public function max_fee_reads_admin_setting(): void
+    {
+        Setting::set('whatsapp_self_bank_transfer_max_fee', 750, 'float', 'whatsapp', 'test');
+
+        $this->assertSame(750.0, $this->service->maxFee());
+    }
+
+    /** @test */
+    public function quote_caps_self_transfer_fee_at_max(): void
+    {
+        Setting::set('whatsapp_self_bank_transfer_max_fee', 500, 'float', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fee_enabled', true, 'boolean', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fee_percent', 2.0, 'float', 'whatsapp', 'test');
+
+        $quoted = $this->service->quote(50000, true);
+
+        $this->assertTrue($quoted['ok']);
+        $this->assertTrue($quoted['is_self_transfer']);
+        $this->assertSame(500.0, $quoted['fee']);
+        $this->assertSame(49500.0, $quoted['payout_amount']);
+    }
+
+    /** @test */
+    public function quote_uses_calculated_fee_when_below_max(): void
+    {
+        Setting::set('whatsapp_self_bank_transfer_max_fee', 500, 'float', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fee_enabled', true, 'boolean', 'whatsapp', 'test');
+        Setting::set('whatsapp_self_bank_transfer_fee_percent', 2.0, 'float', 'whatsapp', 'test');
+
+        $quoted = $this->service->quote(10000, true);
+
+        $this->assertTrue($quoted['ok']);
+        $this->assertSame(200.0, $quoted['fee']);
+        $this->assertSame(9800.0, $quoted['payout_amount']);
+    }
+
+    /** @test */
+    public function quote_does_not_cap_fee_for_non_self_transfer(): void
+    {
+        Setting::set('whatsapp_self_bank_transfer_max_fee', 500, 'float', 'whatsapp', 'test');
+
+        $quoted = $this->service->quote(50000, false);
+
+        $this->assertTrue($quoted['ok']);
+        $this->assertSame(0.0, $quoted['fee']);
+        $this->assertSame(50000.0, $quoted['payout_amount']);
+    }
 }

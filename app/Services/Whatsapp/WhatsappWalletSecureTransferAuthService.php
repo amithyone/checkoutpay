@@ -440,11 +440,7 @@ class WhatsappWalletSecureTransferAuthService
             $payout = isset($execCtx['payout_amount']) && is_numeric($execCtx['payout_amount'])
                 ? (float) $execCtx['payout_amount']
                 : round($amount - $fee, 2);
-            $pct = isset($execCtx['self_transfer_fee_percent']) && is_numeric($execCtx['self_transfer_fee_percent'])
-                ? (float) $execCtx['self_transfer_fee_percent']
-                : 0.0;
-            $pctLabel = rtrim(rtrim(number_format($pct, 2, '.', ''), '0'), '.').'%';
-            $line .= "\nOwn-account fee ({$pctLabel}): ₦".number_format($fee, 2).' · Recipient receives ₦'.number_format($payout, 2);
+            $line .= "\nOwn-account fee: ₦".number_format($fee, 2).' · Recipient receives ₦'.number_format($payout, 2);
         }
 
         return $line;

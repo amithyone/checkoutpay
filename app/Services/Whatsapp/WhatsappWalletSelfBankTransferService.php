@@ -30,6 +30,28 @@ final class WhatsappWalletSelfBankTransferService
         return max(0.0, min(25.0, (float) config('whatsapp.self_bank_transfer_fee_percent', 1.5)));
     }
 
+    /** Max naira fee charged on a self bank transfer (0 = no cap). */
+    public function maxFee(): float
+    {
+        $stored = Setting::get('whatsapp_self_bank_transfer_max_fee');
+        if ($stored !== null && is_numeric($stored)) {
+            return max(0.0, (float) $stored);
+        }
+
+        return max(0.0, (float) config('whatsapp.self_bank_transfer_max_fee', 500));
+    }
+
+    /** Flat naira fee added on top of the percent fee (0 = none). */
+    public function fixedFee(): float
+    {
+        $stored = Setting::get('whatsapp_self_bank_transfer_fixed_fee');
+        if ($stored !== null && is_numeric($stored)) {
+            return max(0.0, (float) $stored);
+        }
+
+        return max(0.0, (float) config('whatsapp.self_bank_transfer_fixed_fee', 0));
+    }
+
     /**
      * @return list<string>
      */
@@ -83,6 +105,7 @@ final class WhatsappWalletSelfBankTransferService
      *   fee: float,
      *   payout_amount: float,
      *   fee_percent: float,
+     *   fixed_fee: float,
      *   ok: bool,
      *   message?: string
      * }
@@ -98,6 +121,7 @@ final class WhatsappWalletSelfBankTransferService
                 'fee' => 0.0,
                 'payout_amount' => 0.0,
                 'fee_percent' => 0.0,
+                'fixed_fee' => 0.0,
                 'ok' => false,
                 'message' => 'Minimum transfer is ₦1.',
             ];
@@ -109,31 +133,41 @@ final class WhatsappWalletSelfBankTransferService
                 'fee' => 0.0,
                 'payout_amount' => $amount,
                 'fee_percent' => 0.0,
+                'fixed_fee' => 0.0,
                 'ok' => true,
             ];
         }
 
         $percent = $this->feePercent();
-        if ($percent <= 0) {
+        $fixed = $this->fixedFee();
+        $percentFee = $percent > 0 ? round($amount * ($percent / 100), 2) : 0.0;
+        $fee = round($percentFee + $fixed, 2);
+        $maxFee = $this->maxFee();
+        if ($maxFee > 0 && $fee > $maxFee + 0.0001) {
+            $fee = round($maxFee, 2);
+        }
+        $payout = round($amount - $fee, 2);
+
+        if ($fee <= 0) {
             return [
                 'is_self_transfer' => true,
                 'fee' => 0.0,
                 'payout_amount' => $amount,
-                'fee_percent' => 0.0,
+                'fee_percent' => $percent,
+                'fixed_fee' => 0.0,
                 'ok' => true,
             ];
         }
 
-        $fee = round($amount * ($percent / 100), 2);
-        $payout = round($amount - $fee, 2);
         if ($payout < 1) {
             return [
                 'is_self_transfer' => true,
                 'fee' => $fee,
                 'payout_amount' => $payout,
                 'fee_percent' => $percent,
+                'fixed_fee' => $fixed,
                 'ok' => false,
-                'message' => 'Amount too small after the '.$this->formatPercent($percent).' fee. Recipient must receive at least ₦1.',
+                'message' => 'Amount too small after the self-transfer fee (₦'.$this->formatNaira($fee).'). Recipient must receive at least ₦1.',
             ];
         }
 
@@ -142,6 +176,7 @@ final class WhatsappWalletSelfBankTransferService
             'fee' => $fee,
             'payout_amount' => $payout,
             'fee_percent' => $percent,
+            'fixed_fee' => $fixed,
             'ok' => true,
         ];
     }
@@ -172,8 +207,34 @@ final class WhatsappWalletSelfBankTransferService
         $ctx['self_transfer_fee'] = (float) ($quoted['fee'] ?? 0);
         $ctx['payout_amount'] = (float) ($quoted['payout_amount'] ?? $amount);
         $ctx['self_transfer_fee_percent'] = (float) ($quoted['fee_percent'] ?? 0);
+        $ctx['self_transfer_fixed_fee'] = (float) ($quoted['fixed_fee'] ?? 0);
 
         return ['ok' => true, 'ctx' => $ctx];
+    }
+
+    public function describeFeePolicy(): string
+    {
+        $parts = [];
+        $percent = $this->feePercent();
+        $fixed = $this->fixedFee();
+
+        if ($percent > 0) {
+            $parts[] = 'a '.$this->formatPercent($percent).' fee';
+        }
+        if ($fixed > 0) {
+            $parts[] = 'a ₦'.$this->formatNaira($fixed).' fixed fee';
+        }
+        if ($parts === []) {
+            return 'no fee';
+        }
+
+        $label = count($parts) === 1 ? $parts[0] : implode(' plus ', $parts);
+        $max = $this->maxFee();
+        if ($max > 0) {
+            $label .= ' (max ₦'.$this->formatNaira($max).')';
+        }
+
+        return $label;
     }
 
     public function formatPercent(float $percent): string
@@ -182,6 +243,16 @@ final class WhatsappWalletSelfBankTransferService
         $s = rtrim(rtrim($s, '0'), '.');
 
         return $s.'%';
+    }
+
+    private function formatNaira(float $amount): string
+    {
+        $formatted = number_format($amount, 2, '.', ',');
+        if (str_ends_with($formatted, '.00')) {
+            return substr($formatted, 0, -3);
+        }
+
+        return rtrim(rtrim($formatted, '0'), '.');
     }
 
     private function normalizeBankCode(string $code): string

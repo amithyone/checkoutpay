@@ -245,12 +245,28 @@
                         @checked(old('whatsapp_self_bank_transfer_fee_enabled', $wa['whatsapp_self_bank_transfer_fee_enabled'] ?? config('whatsapp.self_bank_transfer_fee_enabled', true)))>
                     <span class="text-sm text-gray-700">Enable self bank transfer fee</span>
                 </label>
-                <div class="max-w-xs">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Fee percent (%)</label>
-                    <input type="number" step="0.01" min="0" max="25" name="whatsapp_self_bank_transfer_fee_percent"
-                        value="{{ old('whatsapp_self_bank_transfer_fee_percent', $wa['whatsapp_self_bank_transfer_fee_percent'] ?? config('whatsapp.self_bank_transfer_fee_percent', 1.5)) }}"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <p class="text-xs text-gray-500 mt-1">Example: 1.5 on ₦10,000 → recipient gets ₦9,850.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-4xl">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fee percent (%)</label>
+                        <input type="number" step="0.01" min="0" max="25" name="whatsapp_self_bank_transfer_fee_percent"
+                            value="{{ old('whatsapp_self_bank_transfer_fee_percent', $wa['whatsapp_self_bank_transfer_fee_percent'] ?? config('whatsapp.self_bank_transfer_fee_percent', 1.5)) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Percent of amount sent. Use <strong>0</strong> for fixed-only pricing.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fixed fee (₦)</label>
+                        <input type="number" step="0.01" min="0" max="10000000" name="whatsapp_self_bank_transfer_fixed_fee"
+                            value="{{ old('whatsapp_self_bank_transfer_fixed_fee', $wa['whatsapp_self_bank_transfer_fixed_fee'] ?? config('whatsapp.self_bank_transfer_fixed_fee', 0)) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Flat charge added on top of the percent fee. Example: 1.5% + ₦50 fixed.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Max self transfer fee (₦)</label>
+                        <input type="number" step="0.01" min="0" max="10000000" name="whatsapp_self_bank_transfer_max_fee"
+                            value="{{ old('whatsapp_self_bank_transfer_max_fee', $wa['whatsapp_self_bank_transfer_max_fee'] ?? config('whatsapp.self_bank_transfer_max_fee', 500)) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <p class="text-xs text-gray-500 mt-1">Caps the total fee (percent + fixed). Use <strong>0</strong> for no cap.</p>
+                    </div>
                 </div>
             </div>
 

@@ -1905,8 +1905,8 @@ class WhatsappWaWalletMenuHandler
             $feeHint = '';
             if ($this->selfBankTransfer->isEnabled()
                 && $this->selfBankTransfer->isSelfTransfer($wallet, $acct, $resolved['code'], $accountName, true)) {
-                $feeHint = "\n\n_This looks like your account — a ".$this->selfBankTransfer->formatPercent($this->selfBankTransfer->feePercent())
-                    .' fee applies (recipient gets amount minus fee)._';
+                $feeHint = "\n\n_This looks like your account — ".$this->selfBankTransfer->describeFeePolicy()
+                    .' applies (recipient gets amount minus fee)._';
             }
             $this->client->sendText(
                 $instance,
