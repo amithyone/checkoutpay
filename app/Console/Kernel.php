@@ -49,6 +49,13 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->timezone('Africa/Lagos')
             ->withoutOverlapping(15);
+
+        if (config('virtual_card.fx_hourly_capture_enabled', false)) {
+            $schedule->command('virtual-cards:capture-fx-rates')
+                ->hourly()
+                ->timezone('Africa/Lagos')
+                ->withoutOverlapping(10);
+        }
     }
 
     /**

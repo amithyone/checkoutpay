@@ -369,7 +369,7 @@
 
     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 leading-relaxed">
         <p class="font-semibold text-gray-800 mb-1">How tracking works</p>
-        <p>Rates are captured when MevonPay or Cashwyre is queried live and when app FX is published. Use <strong>Sync live rates</strong> to force fresh reads from both providers. <strong>Buy USD</strong> / <strong>Sell USD</strong> call MevonPay exchange directly to fund or withdraw merchant float.</p>
+        <p>Rates are captured when MevonPay or Cashwyre is queried live, when app FX is published, and automatically after every <strong>{{ (int) config('virtual_card.fx_payment_capture_every', 50) }}</strong> payment account assignments (no cron required). Optional hourly backup: <code class="text-[11px] bg-gray-100 px-1 rounded">VIRTUAL_CARD_FX_HOURLY_CAPTURE_ENABLED=true</code>. Use <strong>Sync live rates</strong> for an immediate refresh. <strong>Buy USD</strong> / <strong>Sell USD</strong> call MevonPay exchange directly to fund or withdraw merchant float.</p>
     </div>
 </div>
 

@@ -246,6 +246,12 @@ class PaymentService
             $payment->save();
         }
 
+        try {
+            app(\App\Services\Admin\VirtualCardFxRateCaptureTriggerService::class)->recordPaymentAccountAssigned();
+        } catch (\Throwable) {
+            // FX tracking must not block payment creation.
+        }
+
         return $payment;
     }
 

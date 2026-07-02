@@ -12,6 +12,8 @@ final class MevonPayFxRateTrackerService
 {
     private const DEDUP_MINUTES = 1;
 
+    private const HOURLY_DEDUP_MINUTES = 55;
+
     private const DEDUP_EPSILON = 0.0001;
 
     /** @var list<string> */
@@ -216,6 +218,140 @@ final class MevonPayFxRateTrackerService
             isset($cashwyre['sell_rate']) ? (float) $cashwyre['sell_rate'] : null,
             isset($cashwyre['buy_rate']) ? (float) $cashwyre['buy_rate'] : null,
         );
+    }
+
+    /**
+     * Capture MevonPay + Cashwyre FX for the rate tracker (scheduler, CLI, or payment milestones).
+     *
+     * @return array{ok: bool, skipped?: bool, message: string, mevon_mid?: ?float, cashwyre_mid?: ?float, published_mid?: ?float, source?: string}
+     */
+    public function captureScheduledSnapshot(string $source = 'scheduled_hourly'): array
+    {
+        $dedupMinutes = match ($source) {
+            'payment_milestone' => 2,
+            'scheduled_hourly' => self::HOURLY_DEDUP_MINUTES,
+            default => 1,
+        };
+
+        if ($this->hasRecentSnapshotForSource($source, $dedupMinutes)) {
+            return [
+                'ok' => true,
+                'skipped' => true,
+                'message' => 'FX snapshot already captured recently for this source.',
+                'source' => $source,
+            ];
+        }
+
+        $mevonMid = $this->fetchMevonMidFresh();
+        $cashwyre = $this->cashwyreCurrent(fetchFresh: true);
+        $cashwyreMid = ($cashwyre['ok'] ?? false) ? ($cashwyre['mid'] ?? null) : null;
+        $cashwyreSell = ($cashwyre['ok'] ?? false) ? ($cashwyre['sell_rate'] ?? null) : null;
+        $cashwyreBuy = ($cashwyre['ok'] ?? false) ? ($cashwyre['buy_rate'] ?? null) : null;
+
+        if ($mevonMid === null && $cashwyreMid === null) {
+            return [
+                'ok' => false,
+                'message' => 'Could not fetch MevonPay or Cashwyre FX rates.',
+                'source' => $source,
+            ];
+        }
+
+        $publish = app(\App\Services\Consumer\VirtualCardFxPublishService::class);
+        $provider = app(\App\Services\VirtualCard\VirtualCardProviderResolver::class)->activeKey();
+        if ($provider === \App\Services\VirtualCard\VirtualCardProviderResolver::PROVIDER_CASHWYRE) {
+            $publish->syncFromCashwyre();
+        } else {
+            $publish->syncFromMevon();
+        }
+
+        $published = $publish->publishedSnapshot();
+        $publishedMid = (float) ($published['mid'] ?? $mevonMid ?? $cashwyreMid ?? 0);
+        if ($publishedMid <= 0) {
+            return [
+                'ok' => false,
+                'message' => 'Could not resolve published FX mid for snapshot.',
+                'source' => $source,
+            ];
+        }
+
+        $resolvedMevonMid = $mevonMid ?? (float) ($published['mid'] ?? $cashwyreMid ?? $publishedMid);
+
+        $this->insertSnapshot(
+            $resolvedMevonMid,
+            $publishedMid,
+            isset($published['sell_rate']) ? (float) $published['sell_rate'] : null,
+            isset($published['buy_rate']) ? (float) $published['buy_rate'] : null,
+            $source,
+            null,
+            $cashwyreMid !== null ? (float) $cashwyreMid : null,
+            $cashwyreSell !== null ? (float) $cashwyreSell : null,
+            $cashwyreBuy !== null ? (float) $cashwyreBuy : null,
+        );
+
+        return [
+            'ok' => true,
+            'message' => 'FX snapshot captured.',
+            'mevon_mid' => $resolvedMevonMid,
+            'cashwyre_mid' => $cashwyreMid !== null ? (float) $cashwyreMid : null,
+            'published_mid' => $publishedMid,
+            'source' => $source,
+        ];
+    }
+
+    public function captureHourlySnapshot(): array
+    {
+        return $this->captureScheduledSnapshot('scheduled_hourly');
+    }
+
+    private function hasRecentSnapshotForSource(string $source, int $minutes): bool
+    {
+        if ($minutes <= 0) {
+            return false;
+        }
+
+        return MevonPayFxRateSnapshot::query()
+            ->where('source', $source)
+            ->where('recorded_at', '>=', now()->subMinutes($minutes))
+            ->exists();
+    }
+
+    private function hasRecentHourlySnapshot(): bool
+    {
+        return $this->hasRecentSnapshotForSource('scheduled_hourly', self::HOURLY_DEDUP_MINUTES);
+    }
+
+    private function fetchMevonMidFresh(): ?float
+    {
+        $exchange = app(\App\Services\MevonPay\MevonPayExchangeClient::class);
+        if (! $exchange->isConfigured()) {
+            return null;
+        }
+
+        try {
+            $response = $exchange->convert(1, 'NGN', 'USD');
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! ($response['ok'] ?? false)) {
+            return null;
+        }
+
+        $data = $response['data'] ?? null;
+        if (! is_array($data)) {
+            $raw = $response['raw'] ?? null;
+            if (is_array($raw)) {
+                $data = $raw['data'] ?? $raw;
+            }
+        }
+
+        if (! is_array($data)) {
+            return null;
+        }
+
+        $rate = $data['rate'] ?? $data['exchange_rate'] ?? $data['usd_ngn_rate'] ?? null;
+
+        return is_numeric($rate) && (float) $rate > 0 ? round((float) $rate, 4) : null;
     }
 
     public function recordPublished(float $publishedMid, ?float $sellRate, ?float $buyRate, string $source, ?float $mevonMid = null): void

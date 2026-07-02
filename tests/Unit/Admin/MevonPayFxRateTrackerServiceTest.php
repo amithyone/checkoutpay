@@ -201,4 +201,51 @@ class MevonPayFxRateTrackerServiceTest extends TestCase
         $this->assertTrue($dashboard['comparison']['available']);
         $this->assertEquals(-27.5, $dashboard['comparison']['mid_diff']['abs']);
     }
+
+    public function test_capture_hourly_snapshot_inserts_scheduled_row(): void
+    {
+        config([
+            'cashwyre.base_url' => 'https://cashwyre.test/api/v1.0',
+            'cashwyre.app_id' => 'app-id',
+            'cashwyre.business_code' => 'biz-code',
+            'cashwyre.secret_key' => 'secret',
+            'cashwyre.paths.get_fx_rates' => '/businessRate/getFxRates',
+            'services.mevonpay.base_url' => 'https://mevon.test',
+            'services.mevonpay.secret_key' => 'test-secret',
+            'mevonpay_vtu.paths.exchange' => '/V1/exchange',
+        ]);
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://cashwyre.test/api/v1.0/businessRate/getFxRates' => \Illuminate\Support\Facades\Http::response([
+                'success' => true,
+                'message' => 'Request Successful',
+                'data' => [
+                    ['currency' => 'NGN', 'buyRate' => 1380, 'sellRate' => 1415],
+                ],
+            ], 200),
+            'https://mevon.test/V1/exchange' => \Illuminate\Support\Facades\Http::response([
+                'status' => true,
+                'data' => ['rate' => '1370.00'],
+            ], 200),
+        ]);
+
+        \App\Models\Setting::set('virtual_card_fx_sell_profit_ngn', 15, 'float', 'virtual_card', 'test');
+        \App\Models\Setting::set('virtual_card_fx_buy_profit_ngn', 30, 'float', 'virtual_card', 'test');
+
+        $tracker = app(MevonPayFxRateTrackerService::class);
+        $result = $tracker->captureHourlySnapshot();
+
+        $this->assertTrue($result['ok']);
+        $this->assertFalse($result['skipped'] ?? false);
+
+        $row = MevonPayFxRateSnapshot::query()->orderByDesc('id')->first();
+        $this->assertNotNull($row);
+        $this->assertSame('scheduled_hourly', $row->source);
+        $this->assertEquals(1370.0, $row->mevon_mid);
+        $this->assertEquals(1397.5, $row->cashwyre_mid);
+
+        $again = $tracker->captureHourlySnapshot();
+        $this->assertTrue($again['skipped'] ?? false);
+        $this->assertSame(1, MevonPayFxRateSnapshot::query()->where('source', 'scheduled_hourly')->count());
+    }
 }
