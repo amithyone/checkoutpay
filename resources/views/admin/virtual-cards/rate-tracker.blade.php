@@ -93,8 +93,6 @@
         </div>
     @endif
 
-    @endif
-
     {{-- Provider comparison --}}
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div class="rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-5 shadow-sm">
@@ -361,7 +359,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-4 py-10 text-center text-gray-500">No snapshots recorded yet.</td>
+                            <td colspan="10" class="px-4 py-10 text-center text-gray-500">No snapshots recorded yet.</td>
                         </tr>
                     @endforelse
                 </tbody>
