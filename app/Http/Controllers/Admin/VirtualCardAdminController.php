@@ -8,6 +8,7 @@ use App\Services\Admin\AdminVirtualCardProfitService;
 use App\Services\Admin\AdminVirtualCardService;
 use App\Services\Admin\MevonPayAdminFxConversionService;
 use App\Services\Admin\MevonPayFxRateTrackerService;
+use App\Services\Cashwyre\CashwyreFxRateService;
 use App\Services\Cashwyre\CashwyreHttpClient;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFxPublishService;
@@ -51,6 +52,7 @@ class VirtualCardAdminController extends Controller
             : null;
 
         $cashwyreWalletUsd = null;
+        $cashwyreFxRates = null;
         if ($activeProvider === VirtualCardProviderResolver::PROVIDER_CASHWYRE) {
             $http = app(CashwyreHttpClient::class);
             if ($http->isConfigured()) {
@@ -61,12 +63,15 @@ class VirtualCardAdminController extends Controller
                     $cashwyreWalletUsd = is_array($resp['data'] ?? null) ? $resp['data'] : null;
                 }
             }
+
+            $cashwyreFxRates = app(CashwyreFxRateService::class)->ngnUsdRates();
         }
 
         return view('admin.virtual-cards.index', [
             'activeProvider' => $activeProvider,
             'providerCounts' => $providerCounts,
             'cashwyreWalletUsd' => $cashwyreWalletUsd,
+            'cashwyreFxRates' => $cashwyreFxRates,
             'cards' => $this->cards->indexQuery($request->merge(['provider' => $activeProvider])),
             'stats' => $this->cards->stats($activeProvider),
             'profitSummary' => $profitStats['summary'],
@@ -82,10 +87,22 @@ class VirtualCardAdminController extends Controller
 
     public function refreshRates(Request $request): RedirectResponse
     {
+        $provider = $this->cards->normalizeProvider($request->string('provider')->toString());
+
+        if ($provider === VirtualCardProviderResolver::PROVIDER_CASHWYRE) {
+            $result = app(CashwyreFxRateService::class)->ngnUsdRatesFresh();
+
+            return redirect()
+                ->route('admin.virtual-cards.index', ['provider' => $provider])
+                ->with($result['ok'] ? 'success' : 'error', $result['ok']
+                    ? 'Cashwyre FX rates refreshed.'
+                    : ($result['message'] ?? 'Could not refresh Cashwyre FX rates.'));
+        }
+
         $result = app(VirtualCardFxPublishService::class)->syncFromMevon();
 
         return redirect()
-            ->route('admin.virtual-cards.index', ['provider' => $this->cards->normalizeProvider($request->string('provider')->toString())])
+            ->route('admin.virtual-cards.index', ['provider' => $provider])
             ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 

@@ -11,7 +11,10 @@ return [
     'connect_timeout_seconds' => (int) env('CASHWYRE_CONNECT_TIMEOUT_SECONDS', 5),
     'default_card_brand' => (string) env('CASHWYRE_DEFAULT_CARD_BRAND', 'Visa'),
     'default_phone_code' => (string) env('CASHWYRE_DEFAULT_PHONE_CODE', '+234'),
+    'fx_rate_cache_seconds' => (int) env('CASHWYRE_FX_RATE_CACHE_SECONDS', 600),
     'paths' => [
+        'get_fx_rates' => (string) env('CASHWYRE_PATH_GET_FX_RATES', '/businessRate/getFxRates'),
+        'rate_info' => (string) env('CASHWYRE_PATH_RATE_INFO', '/businessRate/rateInfo'),
         'create_customer' => (string) env('CASHWYRE_PATH_CREATE_CUSTOMER', '/Customer/createCustomer'),
         'create_card' => (string) env('CASHWYRE_PATH_CREATE_CARD', '/CustomerCard/createCard'),
         'topup_card' => (string) env('CASHWYRE_PATH_TOPUP_CARD', '/CustomerCard/topup'),
