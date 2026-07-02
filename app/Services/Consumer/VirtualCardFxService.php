@@ -4,7 +4,9 @@ namespace App\Services\Consumer;
 
 use App\Models\Setting;
 use App\Models\WhatsappCrossBorderFxRate;
+use App\Services\Cashwyre\CashwyreFxRateService;
 use App\Services\MevonPay\MevonPayExchangeRateService;
+use App\Services\VirtualCard\VirtualCardProviderResolver;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 
 final class VirtualCardFxService
@@ -24,6 +26,8 @@ final class VirtualCardFxService
     public function __construct(
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private MevonPayExchangeRateService $mevonRate,
+        private CashwyreFxRateService $cashwyreFx,
+        private VirtualCardProviderResolver $providerResolver,
     ) {}
 
     public function isMidAutoSyncEnabled(): bool
@@ -41,6 +45,52 @@ final class VirtualCardFxService
         $live = $this->mevonRate->ngnPerUsd();
 
         return ($live !== null && $live > 0) ? round($live, 4) : null;
+    }
+
+    public function cashwyreLiveMidRate(): ?float
+    {
+        $live = $this->cashwyreLiveRates();
+
+        return ($live !== null && ($live['mid'] ?? null) > 0)
+            ? round((float) $live['mid'], 4)
+            : null;
+    }
+
+    public function isCashwyreProvider(): bool
+    {
+        return $this->providerResolver->activeKey() === VirtualCardProviderResolver::PROVIDER_CASHWYRE;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function cashwyreLiveRates(): ?array
+    {
+        if (! $this->isCashwyreProvider() || ! $this->cashwyreFx->isConfigured()) {
+            return null;
+        }
+
+        $rates = $this->cashwyreFx->ngnUsdRates();
+
+        return ($rates['ok'] ?? false) ? $rates : null;
+    }
+
+    private function publishedSource(): ?string
+    {
+        $source = Setting::get('virtual_card_fx_published_source');
+
+        return is_string($source) && $source !== '' ? $source : null;
+    }
+
+    private function publishedRatesMatchActiveProvider(): bool
+    {
+        if ($this->isCashwyreProvider()) {
+            return $this->publishedSource() === 'cashwyre_live';
+        }
+
+        $source = $this->publishedSource();
+
+        return $source === null || $source !== 'cashwyre_live';
     }
 
     public function publishedMidUsdNgnRate(): ?float
@@ -104,8 +154,15 @@ final class VirtualCardFxService
         $this->midUsdNgnRateComputed = true;
 
         $published = $this->publishedMidUsdNgnRate();
-        if ($published !== null) {
+        if ($published !== null && $this->publishedRatesMatchActiveProvider()) {
             return $this->midUsdNgnRateCache = $published;
+        }
+
+        if ($this->isCashwyreProvider()) {
+            $liveMid = $this->cashwyreLiveMidRate();
+            if ($liveMid !== null) {
+                return $this->midUsdNgnRateCache = $liveMid;
+            }
         }
 
         $manual = $this->manualMidUsdNgnRate();
@@ -134,10 +191,14 @@ final class VirtualCardFxService
     public function midSource(): string
     {
         $publishedSource = Setting::get('virtual_card_fx_published_source');
-        if ($this->publishedMidUsdNgnRate() !== null) {
+        if ($this->publishedMidUsdNgnRate() !== null && $this->publishedRatesMatchActiveProvider()) {
             return is_string($publishedSource) && $publishedSource !== ''
                 ? 'published_'.$publishedSource
                 : 'admin_published';
+        }
+
+        if ($this->isCashwyreProvider() && $this->cashwyreLiveMidRate() !== null) {
+            return 'cashwyre_live';
         }
 
         if ($this->manualMidUsdNgnRate() !== null) {
@@ -214,8 +275,16 @@ final class VirtualCardFxService
         }
 
         $publishedSell = $this->publishedSellRate();
-        if ($publishedSell !== null) {
+        if ($publishedSell !== null && $this->publishedRatesMatchActiveProvider()) {
             return $this->sellRateCache = $publishedSell;
+        }
+
+        if ($this->isCashwyreProvider()) {
+            $live = $this->cashwyreLiveRates();
+            $liveSell = is_array($live) ? ($live['sell_rate'] ?? null) : null;
+            if ($liveSell !== null && (float) $liveSell > 0) {
+                return $this->sellRateCache = round((float) $liveSell + $this->sellProfitNgnPerUsd(), 4);
+            }
         }
 
         $mid = $this->midUsdNgnRate();
@@ -240,8 +309,18 @@ final class VirtualCardFxService
         }
 
         $publishedBuy = $this->publishedBuyRate();
-        if ($publishedBuy !== null) {
+        if ($publishedBuy !== null && $this->publishedRatesMatchActiveProvider()) {
             return $this->buyRateCache = $publishedBuy;
+        }
+
+        if ($this->isCashwyreProvider()) {
+            $live = $this->cashwyreLiveRates();
+            $liveBuy = is_array($live) ? ($live['buy_rate'] ?? null) : null;
+            if ($liveBuy !== null && (float) $liveBuy > 0) {
+                $rate = round((float) $liveBuy - $this->buyProfitNgnPerUsd(), 4);
+
+                return $this->buyRateCache = $rate > 0 ? $rate : null;
+            }
         }
 
         $mid = $this->midUsdNgnRate();
@@ -267,7 +346,7 @@ final class VirtualCardFxService
      */
     public function ratesPayload(): array
     {
-        return [
+        $payload = [
             'fx_available' => $this->isAvailable(),
             'fx_mid_usd_ngn' => $this->midUsdNgnRate(),
             'fx_mid_auto_sync' => $this->isMidAutoSyncEnabled(),
@@ -277,7 +356,20 @@ final class VirtualCardFxService
             'buy_rate' => $this->buyRate(),
             'sell_profit_ngn_per_usd' => $this->sellProfitNgnPerUsd(),
             'buy_profit_ngn_per_usd' => $this->buyProfitNgnPerUsd(),
+            'card_provider' => $this->providerResolver->activeKey(),
         ];
+
+        if ($this->isCashwyreProvider()) {
+            $live = $this->cashwyreLiveRates();
+            if ($live !== null) {
+                $payload['cashwyre_live_sell_rate'] = $live['sell_rate'] ?? null;
+                $payload['cashwyre_live_buy_rate'] = $live['buy_rate'] ?? null;
+                $payload['cashwyre_live_mid'] = $live['mid'] ?? null;
+                $payload['cashwyre_live_fetched_at'] = $live['fetched_at'] ?? null;
+            }
+        }
+
+        return $payload;
     }
 
     /**

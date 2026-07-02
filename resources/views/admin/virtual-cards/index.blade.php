@@ -24,7 +24,7 @@
                 <button type="submit" class="text-sm text-blue-700 hover:underline font-medium">
                     <i class="fas fa-sync-alt mr-1"></i>
                     @if($activeProvider === 'cashwyre')
-                        Refresh Cashwyre FX rates
+                        Refresh app FX rates from Cashwyre
                     @else
                         Refresh app FX rates
                     @endif
@@ -71,7 +71,7 @@
     @if($activeProvider === 'cashwyre')
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="bg-white rounded-lg border border-orange-200 p-4 shadow-sm bg-orange-50/40">
-            <p class="text-xs text-gray-500 uppercase">Cashwyre sell rate</p>
+            <p class="text-xs text-gray-500 uppercase">Cashwyre provider sell</p>
             <p class="text-2xl font-bold text-orange-800">
                 @if(is_array($cashwyreFxRates) && ($cashwyreFxRates['ok'] ?? false) && ($cashwyreFxRates['sell_rate'] ?? null) !== null)
                     ₦{{ number_format($cashwyreFxRates['sell_rate'], 2) }}
@@ -79,10 +79,10 @@
                     —
                 @endif
             </p>
-            <p class="text-xs text-gray-500 mt-1">Fund card / spend NGN for USD</p>
+            <p class="text-xs text-gray-500 mt-1">Cashwyre API — fund card / spend NGN for USD</p>
         </div>
         <div class="bg-white rounded-lg border border-amber-200 p-4 shadow-sm bg-amber-50/40">
-            <p class="text-xs text-gray-500 uppercase">Cashwyre buy rate</p>
+            <p class="text-xs text-gray-500 uppercase">Cashwyre provider buy</p>
             <p class="text-2xl font-bold text-amber-800">
                 @if(is_array($cashwyreFxRates) && ($cashwyreFxRates['ok'] ?? false) && ($cashwyreFxRates['buy_rate'] ?? null) !== null)
                     ₦{{ number_format($cashwyreFxRates['buy_rate'], 2) }}
@@ -90,7 +90,7 @@
                     —
                 @endif
             </p>
-            <p class="text-xs text-gray-500 mt-1">Withdraw USD to NGN</p>
+            <p class="text-xs text-gray-500 mt-1">Cashwyre API — withdraw USD to NGN</p>
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm md:col-span-2">
             <p class="text-xs text-gray-500 uppercase">Cashwyre live FX (NGN per USD)</p>
@@ -108,11 +108,57 @@
                     Last fetched {{ \Carbon\Carbon::parse($cashwyreFxRates['fetched_at'])->diffForHumans() }}
                     ({{ \Carbon\Carbon::parse($cashwyreFxRates['fetched_at'])->format('M j, Y g:i A') }})
                 @elseif(is_array($cashwyreFxRates) && !($cashwyreFxRates['ok'] ?? false))
-                    {{ $cashwyreFxRates['message'] ?? 'Could not load Cashwyre rates.' }} — use Refresh Cashwyre FX rates.
+                    {{ $cashwyreFxRates['message'] ?? 'Could not load Cashwyre rates.' }} — use refresh below.
                 @else
-                    Rates not loaded yet — use Refresh Cashwyre FX rates.
+                    Rates not loaded yet — use refresh below.
                 @endif
                 · From <code class="text-[11px] bg-gray-100 px-1 rounded">/businessRate/getFxRates</code>.
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg border border-blue-200 p-4 shadow-sm bg-blue-50/40">
+            <p class="text-xs text-gray-500 uppercase">App sell rate</p>
+            <p class="text-2xl font-bold text-blue-800">
+                @if(($publishedRates['sell_rate'] ?? null) !== null)
+                    ₦{{ number_format($publishedRates['sell_rate'], 2) }}
+                @else
+                    —
+                @endif
+            </p>
+            <p class="text-xs text-gray-500 mt-1">CheckoutNow fund &amp; card setup</p>
+        </div>
+        <div class="bg-white rounded-lg border border-violet-200 p-4 shadow-sm bg-violet-50/40">
+            <p class="text-xs text-gray-500 uppercase">App buy rate</p>
+            <p class="text-2xl font-bold text-violet-800">
+                @if(($publishedRates['buy_rate'] ?? null) !== null)
+                    ₦{{ number_format($publishedRates['buy_rate'], 2) }}
+                @else
+                    —
+                @endif
+            </p>
+            <p class="text-xs text-gray-500 mt-1">CheckoutNow withdraw</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm md:col-span-2">
+            <p class="text-xs text-gray-500 uppercase">Published FX for app</p>
+            <p class="text-sm text-gray-800 mt-1">
+                Mid:
+                @if(($publishedRates['mid'] ?? null) !== null)
+                    <strong>₦{{ number_format($publishedRates['mid'], 2) }}</strong>
+                @else
+                    <strong>—</strong>
+                @endif
+                · Source: <strong>{{ $publishedRates['source'] ?? 'not published' }}</strong>
+            </p>
+            <p class="text-xs text-gray-500 mt-2">
+                @if(!empty($publishedRates['published_at']))
+                    Last synced {{ \Carbon\Carbon::parse($publishedRates['published_at'])->diffForHumans() }}
+                    ({{ \Carbon\Carbon::parse($publishedRates['published_at'])->format('M j, Y g:i A') }})
+                @else
+                    Rates not published yet — use Refresh app FX rates from Cashwyre.
+                @endif
+                · App sell/buy = Cashwyre live + your ₦ profit settings.
             </p>
         </div>
     </div>

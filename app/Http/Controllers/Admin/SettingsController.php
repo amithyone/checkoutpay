@@ -339,7 +339,13 @@ class SettingsController extends Controller
                 }
             }
 
-            app(\App\Services\Consumer\VirtualCardFxPublishService::class)->syncFromMevon();
+            $publish = app(\App\Services\Consumer\VirtualCardFxPublishService::class);
+            $provider = (string) Setting::get('virtual_card_provider', VirtualCardProviderResolver::PROVIDER_MEVONPAY);
+            if ($provider === VirtualCardProviderResolver::PROVIDER_CASHWYRE) {
+                $publish->syncFromCashwyre();
+            } else {
+                $publish->syncFromMevon();
+            }
         }
 
         if ($request->input('settings_section') === 'savings') {

@@ -33,8 +33,16 @@ class VirtualCardAdminController extends Controller
 
         $publish = app(VirtualCardFxPublishService::class);
         $published = $publish->publishedSnapshot();
-        if ($published['sell_rate'] === null || $published['buy_rate'] === null) {
-            $publish->syncFromMevon();
+        $globalProvider = app(VirtualCardProviderResolver::class)->activeKey();
+        $usesCashwyreFx = $globalProvider === VirtualCardProviderResolver::PROVIDER_CASHWYRE
+            || $activeProvider === VirtualCardProviderResolver::PROVIDER_CASHWYRE;
+
+        if ($published['sell_rate'] === null || $published['buy_rate'] === null || ($usesCashwyreFx && ($published['source'] ?? null) !== 'cashwyre_live')) {
+            if ($usesCashwyreFx) {
+                $publish->syncFromCashwyre();
+            } else {
+                $publish->syncFromMevon();
+            }
             $published = $publish->publishedSnapshot();
         }
 
@@ -90,13 +98,11 @@ class VirtualCardAdminController extends Controller
         $provider = $this->cards->normalizeProvider($request->string('provider')->toString());
 
         if ($provider === VirtualCardProviderResolver::PROVIDER_CASHWYRE) {
-            $result = app(CashwyreFxRateService::class)->ngnUsdRatesFresh();
+            $result = app(VirtualCardFxPublishService::class)->syncFromCashwyre();
 
             return redirect()
                 ->route('admin.virtual-cards.index', ['provider' => $provider])
-                ->with($result['ok'] ? 'success' : 'error', $result['ok']
-                    ? 'Cashwyre FX rates refreshed.'
-                    : ($result['message'] ?? 'Could not refresh Cashwyre FX rates.'));
+                ->with($result['ok'] ? 'success' : 'error', $result['message']);
         }
 
         $result = app(VirtualCardFxPublishService::class)->syncFromMevon();

@@ -3,6 +3,7 @@
 namespace App\Services\Consumer;
 
 use App\Models\Setting;
+use App\Services\Cashwyre\CashwyreFxRateService;
 use App\Services\MevonPay\MevonPayExchangeRateService;
 
 /**
@@ -12,6 +13,7 @@ final class VirtualCardFxPublishService
 {
     public function __construct(
         private MevonPayExchangeRateService $mevonRate,
+        private CashwyreFxRateService $cashwyreRate,
     ) {}
 
     /**
@@ -85,6 +87,74 @@ final class VirtualCardFxPublishService
             'live_mevon' => $liveMevon,
             'published_at' => $publishedAt,
         ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, mid?: float, sell_rate?: float, buy_rate?: float, source?: string, live_cashwyre?: ?array, published_at?: string}
+     */
+    public function syncFromCashwyre(): array
+    {
+        $live = $this->cashwyreRate->ngnUsdRatesFresh();
+        if (! ($live['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => (string) ($live['message'] ?? 'Could not fetch Cashwyre FX rates.'),
+            ];
+        }
+
+        $mid = $this->toFloat($live['mid'] ?? null);
+        $providerSell = $this->toFloat($live['sell_rate'] ?? null);
+        $providerBuy = $this->toFloat($live['buy_rate'] ?? null);
+
+        if ($mid === null || $providerSell === null || $providerBuy === null) {
+            return [
+                'ok' => false,
+                'message' => 'Cashwyre returned invalid NGN FX rates.',
+            ];
+        }
+
+        $sell = round($providerSell + $this->sellProfitNgnPerUsd($mid), 4);
+        $buy = round($providerBuy - $this->buyProfitNgnPerUsd($mid), 4);
+
+        if ($sell <= 0 || $buy <= 0) {
+            return [
+                'ok' => false,
+                'message' => 'Could not compute sell/buy rates from Cashwyre and profit settings.',
+                'mid' => $mid,
+            ];
+        }
+
+        $publishedAt = now()->toIso8601String();
+        $source = 'cashwyre_live';
+
+        Setting::set('virtual_card_fx_published_mid', $mid, 'float', 'virtual_card', 'Published FX mid for CheckoutNow (NGN per 1 USD)');
+        Setting::set('virtual_card_fx_published_sell_rate', $sell, 'float', 'virtual_card', 'Published sell rate for CheckoutNow');
+        Setting::set('virtual_card_fx_published_buy_rate', $buy, 'float', 'virtual_card', 'Published buy rate for CheckoutNow');
+        Setting::set('virtual_card_fx_published_at', $publishedAt, 'string', 'virtual_card', 'When card FX rates were last published for the app');
+        Setting::set('virtual_card_fx_published_source', $source, 'string', 'virtual_card', 'Source used when card FX rates were published');
+        Setting::set('virtual_card_fx_mid_usd_ngn', $mid, 'float', 'virtual_card', 'Virtual card FX mid rate (NGN per 1 USD)');
+
+        return [
+            'ok' => true,
+            'message' => 'Card FX rates published from Cashwyre for the app.',
+            'mid' => $mid,
+            'sell_rate' => $sell,
+            'buy_rate' => $buy,
+            'source' => $source,
+            'live_cashwyre' => $live,
+            'published_at' => $publishedAt,
+        ];
+    }
+
+    private function toFloat(mixed $value): ?float
+    {
+        if ($value === null || ! is_numeric($value)) {
+            return null;
+        }
+
+        $float = (float) $value;
+
+        return $float > 0 ? $float : null;
     }
 
     /**

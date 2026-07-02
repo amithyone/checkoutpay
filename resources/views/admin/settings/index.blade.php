@@ -773,6 +773,8 @@
         $cardFx = app(\App\Services\Consumer\VirtualCardFxService::class);
         $cardMidAutoSync = $cardFx->isMidAutoSyncEnabled();
         $cardMevonLiveMid = $cardFx->mevonLiveMidRate();
+        $cardCashwyreLiveMid = $cardFx->cashwyreLiveMidRate();
+        $cardCashwyreLiveRates = $cardFx->cashwyreLiveRates();
         $cardMid = $cardFx->midUsdNgnRate();
         $cardMidSource = $cardFx->midSource();
         $cardSellProfit = $cardFx->sellProfitNgnPerUsd();
@@ -934,9 +936,30 @@
                     <input type="hidden" name="virtual_card_fx_mid_auto_sync" value="0">
                     <input type="checkbox" name="virtual_card_fx_mid_auto_sync" value="1" id="virtual_card_fx_mid_auto_sync" class="mr-2 rounded"
                         {{ \App\Models\Setting::get('virtual_card_fx_mid_auto_sync', config('virtual_card.fx_mid_auto_sync', true)) ? 'checked' : '' }}>
-                    <span><strong>Auto-sync mid from Mevon live rate</strong> — sell/buy rates follow Mevon automatically; your ₦15 / ₦30 profit stays fixed.</span>
+                    <span>
+                        @if(($virtualCardProvider ?? 'mevonpay') === 'cashwyre')
+                            <strong>Auto-sync mid from Cashwyre live rate</strong> — sell/buy rates follow Cashwyre automatically; your ₦ profit stays fixed.
+                        @else
+                            <strong>Auto-sync mid from Mevon live rate</strong> — sell/buy rates follow Mevon automatically; your ₦15 / ₦30 profit stays fixed.
+                        @endif
+                    </span>
                 </label>
-                @if($cardMevonLiveMid !== null)
+                @if(($virtualCardProvider ?? 'mevonpay') === 'cashwyre')
+                    @if($cardCashwyreLiveMid !== null)
+                        <p class="text-xs text-gray-600">
+                            Cashwyre live mid now: <strong>₦{{ number_format($cardCashwyreLiveMid, 2) }}</strong>
+                            @if(is_array($cardCashwyreLiveRates))
+                                · Provider sell <strong>₦{{ number_format((float) ($cardCashwyreLiveRates['sell_rate'] ?? 0), 2) }}</strong>
+                                · Provider buy <strong>₦{{ number_format((float) ($cardCashwyreLiveRates['buy_rate'] ?? 0), 2) }}</strong>
+                            @endif
+                            @if($cardMidAutoSync)
+                                · Active mid: <strong>₦{{ number_format($cardMid, 2) }}</strong>
+                            @endif
+                        </p>
+                    @else
+                        <p class="text-xs text-amber-700">Cashwyre live rate unavailable — check <code>CASHWYRE_*</code> env credentials.</p>
+                    @endif
+                @elseif($cardMevonLiveMid !== null)
                     <p class="text-xs text-gray-600">Mevon live mid now: <strong>₦{{ number_format($cardMevonLiveMid, 2) }}</strong>
                         @if($cardMidAutoSync)
                             · Active mid: <strong>₦{{ number_format($cardMid, 2) }}</strong>
