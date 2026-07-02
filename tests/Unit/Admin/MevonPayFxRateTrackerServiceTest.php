@@ -160,5 +160,45 @@ class MevonPayFxRateTrackerServiceTest extends TestCase
 
         $this->assertEquals(1415.0, $calculator['sell_rate']);
         $this->assertEquals(1370.0, $calculator['buy_rate']);
+        $this->assertSame(60, $calculator['poll_seconds']);
+    }
+
+    public function test_dashboard_includes_cashwyre_comparison_when_configured(): void
+    {
+        config([
+            'cashwyre.base_url' => 'https://cashwyre.test/api/v1.0',
+            'cashwyre.app_id' => 'app-id',
+            'cashwyre.business_code' => 'biz-code',
+            'cashwyre.secret_key' => 'secret',
+            'cashwyre.paths.get_fx_rates' => '/businessRate/getFxRates',
+        ]);
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://cashwyre.test/api/v1.0/businessRate/getFxRates' => \Illuminate\Support\Facades\Http::response([
+                'success' => true,
+                'message' => 'Request Successful',
+                'data' => [
+                    ['currency' => 'NGN', 'buyRate' => 1380, 'sellRate' => 1415],
+                ],
+            ], 200),
+        ]);
+
+        MevonPayFxRateSnapshot::query()->create([
+            'recorded_at' => now()->subMinute(),
+            'mevon_mid' => 1370,
+            'published_mid' => 1370,
+            'sell_rate' => 1385,
+            'buy_rate' => 1340,
+            'source' => 'mevon_live',
+        ]);
+
+        $dashboard = app(MevonPayFxRateTrackerService::class)->dashboard(
+            request()->merge(['range' => '1h'])
+        );
+
+        $this->assertTrue($dashboard['cashwyre']['ok']);
+        $this->assertSame(1397.5, $dashboard['cashwyre']['mid']);
+        $this->assertTrue($dashboard['comparison']['available']);
+        $this->assertEquals(-27.5, $dashboard['comparison']['mid_diff']['abs']);
     }
 }

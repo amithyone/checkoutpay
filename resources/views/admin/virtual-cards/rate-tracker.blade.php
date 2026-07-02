@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'MevonPay FX rate tracker')
-@section('page-title', 'MevonPay FX rate tracker')
+@section('title', 'USD/NGN rate tracker')
+@section('page-title', 'USD/NGN rate tracker')
 
 @section('content')
 @php
@@ -14,6 +14,8 @@
     $livePoll = $tracker['live_poll'] ?? false;
     $pollSeconds = $tracker['poll_seconds'] ?? 60;
     $wallet = $tracker['wallet'] ?? [];
+    $cashwyre = $tracker['cashwyre'] ?? [];
+    $comparison = $tracker['comparison'] ?? [];
     $maxFxUsd = $tracker['max_fx_usd_per_op'] ?? 500;
     $liveMid = $current['mevon_mid'] ?? $current['published_mid'];
     $fmt = fn (?float $v, int $dec = 2) => $v !== null ? '₦'.number_format($v, $dec) : '—';
@@ -24,8 +26,8 @@
 <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900">MevonPay USD/NGN rate tracker</h2>
-            <p class="text-sm text-gray-600 mt-1">Live Mevon mid, published sell/buy spreads, and historical movement</p>
+            <h2 class="text-2xl font-bold text-gray-900">USD/NGN rate tracker</h2>
+            <p class="text-sm text-gray-600 mt-1">Compare MevonPay and Cashwyre live mid, sell/buy spreads, and historical movement</p>
         </div>
         <div class="flex flex-wrap gap-3 items-center">
             @if($wallet['configured'] ?? false)
@@ -44,7 +46,7 @@
                 @csrf
                 <input type="hidden" name="range" value="{{ $range }}">
                 <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-white text-sm font-medium shadow-sm transition">
-                    <i class="fas fa-bolt"></i> Sync live rate
+                    <i class="fas fa-bolt"></i> Sync live rates
                 </button>
             </form>
             <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-gray-600 hover:text-gray-900 font-medium">
@@ -91,12 +93,106 @@
         </div>
     @endif
 
-    {{-- Hero ticker panel (light theme — matches other admin card pages) --}}
+    @endif
+
+    {{-- Provider comparison --}}
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-5 shadow-sm">
+            <p class="text-xs uppercase tracking-wider text-indigo-700 font-semibold mb-2">MevonPay live mid · NGN per 1 USD</p>
+            <p id="fx-live-mevon" class="text-4xl font-bold text-gray-900 tabular-nums tracking-tight font-mono">
+                {{ $current['mevon_mid'] !== null ? number_format($current['mevon_mid'], 2) : '—' }}
+            </p>
+            <div class="grid grid-cols-3 gap-3 mt-4 text-sm">
+                <div class="rounded-lg bg-white border border-emerald-200 px-3 py-2">
+                    <span class="text-gray-500 text-xs block">App sell</span>
+                    <p id="fx-sell-rate" class="font-mono font-semibold text-emerald-800">{{ $current['sell_rate'] !== null ? number_format($current['sell_rate'], 2) : '—' }}</p>
+                </div>
+                <div class="rounded-lg bg-white border border-violet-200 px-3 py-2">
+                    <span class="text-gray-500 text-xs block">App buy</span>
+                    <p id="fx-buy-rate" class="font-mono font-semibold text-violet-800">{{ $current['buy_rate'] !== null ? number_format($current['buy_rate'], 2) : '—' }}</p>
+                </div>
+                <div class="rounded-lg bg-white border border-gray-200 px-3 py-2">
+                    <span class="text-gray-500 text-xs block">Spread</span>
+                    <p id="fx-spread" class="font-mono font-semibold text-gray-900">{{ $current['spread'] !== null ? number_format($current['spread'], 2) : '—' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-lg border-2 border-orange-200 bg-gradient-to-br from-orange-50 via-white to-amber-50 p-5 shadow-sm">
+            <p class="text-xs uppercase tracking-wider text-orange-700 font-semibold mb-2">Cashwyre live mid · NGN per 1 USD</p>
+            <p id="fx-live-cashwyre-mid" class="text-4xl font-bold text-gray-900 tabular-nums tracking-tight font-mono">
+                @if($cashwyre['ok'] ?? false)
+                    {{ $cashwyre['mid'] !== null ? number_format($cashwyre['mid'], 2) : '—' }}
+                @else
+                    —
+                @endif
+            </p>
+            <div class="grid grid-cols-3 gap-3 mt-4 text-sm">
+                <div class="rounded-lg bg-white border border-orange-200 px-3 py-2">
+                    <span class="text-gray-500 text-xs block">Provider sell</span>
+                    <p id="fx-cashwyre-sell" class="font-mono font-semibold text-orange-800">
+                        @if($cashwyre['ok'] ?? false)
+                            {{ $cashwyre['sell_rate'] !== null ? number_format($cashwyre['sell_rate'], 2) : '—' }}
+                        @else
+                            —
+                        @endif
+                    </p>
+                </div>
+                <div class="rounded-lg bg-white border border-amber-200 px-3 py-2">
+                    <span class="text-gray-500 text-xs block">Provider buy</span>
+                    <p id="fx-cashwyre-buy" class="font-mono font-semibold text-amber-800">
+                        @if($cashwyre['ok'] ?? false)
+                            {{ $cashwyre['buy_rate'] !== null ? number_format($cashwyre['buy_rate'], 2) : '—' }}
+                        @else
+                            —
+                        @endif
+                    </p>
+                </div>
+                <div class="rounded-lg bg-white border border-gray-200 px-3 py-2">
+                    <span class="text-gray-500 text-xs block">Spread</span>
+                    <p id="fx-cashwyre-spread" class="font-mono font-semibold text-gray-900">
+                        @if($cashwyre['ok'] ?? false)
+                            {{ $cashwyre['spread'] !== null ? number_format($cashwyre['spread'], 2) : '—' }}
+                        @else
+                            —
+                        @endif
+                    </p>
+                </div>
+            </div>
+            @if(!($cashwyre['ok'] ?? false))
+                <p id="fx-cashwyre-error" class="text-xs text-amber-700 mt-3">{{ $cashwyre['message'] ?? 'Cashwyre rates unavailable.' }}</p>
+            @else
+                <p id="fx-cashwyre-error" class="text-xs text-gray-500 mt-3 hidden"></p>
+            @endif
+        </div>
+    </div>
+
+    <div id="fx-comparison-panel" class="rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm {{ ($comparison['available'] ?? false) ? '' : 'hidden' }}">
+        <p class="text-xs uppercase tracking-wider text-slate-600 font-semibold mb-3">MevonPay vs Cashwyre · difference (Mevon − Cashwyre)</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            @foreach (['mid_diff' => 'Mid', 'sell_diff' => 'Sell', 'buy_diff' => 'Buy'] as $key => $label)
+                @php $diff = $comparison[$key] ?? null; @endphp
+                <div class="rounded-lg bg-white border border-slate-200 px-3 py-2">
+                    <span class="text-gray-500 text-xs block">{{ $label }}</span>
+                    <p id="fx-diff-{{ str_replace('_', '-', $key) }}" class="font-mono font-semibold {{ $deltaClass($diff['abs'] ?? null) }}">
+                        @if($diff)
+                            {{ $deltaPrefix($diff['abs']).number_format($diff['abs'], 2) }}
+                            <span class="text-xs text-gray-500">({{ $deltaPrefix($diff['pct']).number_format($diff['pct'], 2) }}%)</span>
+                        @else
+                            —
+                        @endif
+                    </p>
+                </div>
+            @endforeach
+        </div>
+    </div>
+
+    {{-- Hero ticker panel --}}
     <div class="rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6 sm:p-8 shadow-sm">
         <div class="space-y-6">
             <div>
-                <p class="text-xs uppercase tracking-wider text-indigo-700 font-semibold mb-2">Mevon live mid · NGN per 1 USD</p>
-                <p id="fx-live-mevon" class="text-4xl sm:text-5xl font-bold text-gray-900 tabular-nums tracking-tight font-mono">
+                <p class="text-xs uppercase tracking-wider text-indigo-700 font-semibold mb-2">Mevon movement · NGN per 1 USD</p>
+                <p class="text-3xl sm:text-4xl font-bold text-gray-900 tabular-nums tracking-tight font-mono">
                     {{ $current['mevon_mid'] !== null ? number_format($current['mevon_mid'], 2) : '—' }}
                 </p>
                 <div class="flex flex-wrap gap-3 mt-4 text-sm">
@@ -124,18 +220,30 @@
                     <p class="text-xs text-gray-500 mt-2">App mid rate</p>
                 </div>
                 <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
-                    <p class="text-xs uppercase tracking-wider text-emerald-800 font-medium">Sell rate</p>
-                    <p id="fx-sell-rate" class="text-2xl font-bold text-emerald-800 font-mono mt-2 tabular-nums">{{ $current['sell_rate'] !== null ? number_format($current['sell_rate'], 2) : '—' }}</p>
-                    <p class="text-xs text-emerald-700 mt-2">+{{ $current['sell_markup'] !== null ? number_format($current['sell_markup'], 2) : '—' }} markup</p>
+                    <p class="text-xs uppercase tracking-wider text-emerald-800 font-medium">Mevon markup</p>
+                    <p class="text-2xl font-bold text-emerald-800 font-mono mt-2 tabular-nums">+{{ $current['sell_markup'] !== null ? number_format($current['sell_markup'], 2) : '—' }}</p>
+                    <p class="text-xs text-emerald-700 mt-2">Sell side · −{{ $current['buy_discount'] !== null ? number_format($current['buy_discount'], 2) : '—' }} buy</p>
                 </div>
-                <div class="rounded-lg border border-violet-200 bg-violet-50/60 p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
-                    <p class="text-xs uppercase tracking-wider text-violet-800 font-medium">Buy rate</p>
-                    <p id="fx-buy-rate" class="text-2xl font-bold text-violet-800 font-mono mt-2 tabular-nums">{{ $current['buy_rate'] !== null ? number_format($current['buy_rate'], 2) : '—' }}</p>
-                    <p class="text-xs text-violet-700 mt-2">−{{ $current['buy_discount'] !== null ? number_format($current['buy_discount'], 2) : '—' }} discount</p>
+                <div class="rounded-lg border border-orange-200 bg-orange-50/60 p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
+                    <p class="text-xs uppercase tracking-wider text-orange-800 font-medium">Cashwyre mid</p>
+                    <p id="fx-cashwyre-mid-card" class="text-2xl font-bold text-orange-800 font-mono mt-2 tabular-nums">
+                        @if($cashwyre['ok'] ?? false)
+                            {{ $cashwyre['mid'] !== null ? number_format($cashwyre['mid'], 2) : '—' }}
+                        @else
+                            —
+                        @endif
+                    </p>
+                    <p class="text-xs text-orange-700 mt-2">Provider reference rate</p>
                 </div>
                 <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-4 sm:p-5 shadow-sm min-h-[7.5rem] flex flex-col justify-between">
-                    <p class="text-xs uppercase tracking-wider text-amber-800 font-medium">Spread</p>
-                    <p id="fx-spread" class="text-2xl font-bold text-amber-900 font-mono mt-2 tabular-nums">{{ $current['spread'] !== null ? number_format($current['spread'], 2) : '—' }}</p>
+                    <p class="text-xs uppercase tracking-wider text-amber-800 font-medium">Mid gap</p>
+                    <p id="fx-mid-gap" class="text-2xl font-bold text-amber-900 font-mono mt-2 tabular-nums">
+                        @if(($comparison['mid_diff']['abs'] ?? null) !== null)
+                            {{ $deltaPrefix($comparison['mid_diff']['abs']).number_format($comparison['mid_diff']['abs'], 2) }}
+                        @else
+                            —
+                        @endif
+                    </p>
                     <p class="text-xs text-amber-800 mt-2 truncate" title="{{ $current['source'] ?? 'unknown' }}">{{ $current['source'] ?? 'unknown' }}</p>
                 </div>
             </div>
@@ -198,7 +306,7 @@
                     </button>
                 </div>
             </div>
-            <p id="fx-chart-series-hint" class="text-xs text-gray-500 mb-3">Mevon mid (blue) · Sell (green) · Buy (violet) · Published mid (gray)</p>
+            <p id="fx-chart-series-hint" class="text-xs text-gray-500 mb-3">Mevon mid (blue) · Cashwyre mid (orange) · App sell/buy · Published mid (gray)</p>
             <div class="h-80 sm:h-96">
                 <canvas id="fxRateChart"></canvas>
             </div>
@@ -220,9 +328,12 @@
                     <tr>
                         <th class="px-4 py-3">Recorded</th>
                         <th class="px-4 py-3">Mevon mid</th>
+                        <th class="px-4 py-3">Cashwyre mid</th>
                         <th class="px-4 py-3">Published</th>
                         <th class="px-4 py-3">Sell</th>
                         <th class="px-4 py-3">Buy</th>
+                        <th class="px-4 py-3">CW sell</th>
+                        <th class="px-4 py-3">CW buy</th>
                         <th class="px-4 py-3">Change</th>
                         <th class="px-4 py-3">Source</th>
                     </tr>
@@ -232,9 +343,12 @@
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ $row['recorded_at'] }}</td>
                             <td class="px-4 py-3 font-semibold text-indigo-700">{{ $row['mevon_mid'] !== null ? number_format($row['mevon_mid'], 2) : '—' }}</td>
+                            <td class="px-4 py-3 font-semibold text-orange-700">{{ $row['cashwyre_mid'] !== null ? number_format($row['cashwyre_mid'], 2) : '—' }}</td>
                             <td class="px-4 py-3 text-gray-900">{{ number_format($row['published_mid'], 2) }}</td>
                             <td class="px-4 py-3 text-emerald-700">{{ $row['sell_rate'] !== null ? number_format($row['sell_rate'], 2) : '—' }}</td>
                             <td class="px-4 py-3 text-violet-700">{{ $row['buy_rate'] !== null ? number_format($row['buy_rate'], 2) : '—' }}</td>
+                            <td class="px-4 py-3 text-orange-700">{{ $row['cashwyre_sell_rate'] !== null ? number_format($row['cashwyre_sell_rate'], 2) : '—' }}</td>
+                            <td class="px-4 py-3 text-amber-700">{{ $row['cashwyre_buy_rate'] !== null ? number_format($row['cashwyre_buy_rate'], 2) : '—' }}</td>
                             <td class="px-4 py-3 {{ $deltaClass($row['change_pct']) }}">
                                 @if($row['change_pct'] !== null)
                                     {{ ($row['change_pct'] > 0 ? '+' : '').number_format($row['change_pct'], 3) }}%
@@ -247,7 +361,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-10 text-center text-gray-500">No snapshots recorded yet.</td>
+                            <td colspan="9" class="px-4 py-10 text-center text-gray-500">No snapshots recorded yet.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -257,7 +371,7 @@
 
     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 leading-relaxed">
         <p class="font-semibold text-gray-800 mb-1">How tracking works</p>
-        <p>Rates are captured when MevonPay is queried live (cached fetch) and when app FX is published. Historical card transactions are backfilled once on first visit. Use <strong>Sync live rate</strong> to force a fresh Mevon read and publish to the app. <strong>Buy USD</strong> / <strong>Sell USD</strong> call MevonPay exchange directly to fund or withdraw merchant float.</p>
+        <p>Rates are captured when MevonPay or Cashwyre is queried live and when app FX is published. Use <strong>Sync live rates</strong> to force fresh reads from both providers. <strong>Buy USD</strong> / <strong>Sell USD</strong> call MevonPay exchange directly to fund or withdraw merchant float.</p>
     </div>
 </div>
 
@@ -389,8 +503,11 @@ function updateSellEstimate() {
     const tickColor = '#6b7280';
     const datasetDefs = [
         ['Mevon mid', 'mevon_mid', '#3C50E0', 'rgba(60, 80, 224, 0.08)'],
-        ['Sell rate', 'sell_rate', '#059669', 'transparent'],
-        ['Buy rate', 'buy_rate', '#7c3aed', 'transparent'],
+        ['Cashwyre mid', 'cashwyre_mid', '#ea580c', 'transparent'],
+        ['App sell rate', 'sell_rate', '#059669', 'transparent'],
+        ['App buy rate', 'buy_rate', '#7c3aed', 'transparent'],
+        ['Cashwyre sell', 'cashwyre_sell_rate', '#fb923c', 'transparent'],
+        ['Cashwyre buy', 'cashwyre_buy_rate', '#f59e0b', 'transparent'],
         ['Published mid', 'published_mid', '#6b7280', 'transparent'],
     ];
 
@@ -474,9 +591,9 @@ function updateSellEstimate() {
     const buildCandleData = (series) => series.map((p, i) => {
         const x = parseTime(p);
         if (x == null) return null;
-        const rates = [p.mevon_mid, p.sell_rate, p.buy_rate, p.published_mid].filter((v) => v != null);
-        const close = p.mevon_mid ?? p.published_mid;
-        const prev = i > 0 ? (series[i - 1].mevon_mid ?? series[i - 1].published_mid) : close;
+        const rates = [p.mevon_mid, p.cashwyre_mid, p.sell_rate, p.buy_rate, p.cashwyre_sell_rate, p.cashwyre_buy_rate, p.published_mid].filter((v) => v != null);
+        const close = p.mevon_mid ?? p.cashwyre_mid ?? p.published_mid;
+        const prev = i > 0 ? (series[i - 1].mevon_mid ?? series[i - 1].cashwyre_mid ?? series[i - 1].published_mid) : close;
         const open = prev ?? close;
         const hi = rates.length ? Math.max(...rates) : close;
         const lo = rates.length ? Math.min(...rates) : close;
@@ -556,8 +673,8 @@ function updateSellEstimate() {
         const legend = document.getElementById('fx-chart-legend-hint');
         if (hint) {
             hint.textContent = chartMode === 'line'
-                ? 'Mevon mid (blue) · Sell (green) · Buy (violet) · Published mid (gray)'
-                : 'Each candle = Mevon mid OHLC per snapshot (wick spans sell/buy when present)';
+                ? 'Mevon mid (blue) · Cashwyre mid (orange) · App sell/buy · Cashwyre sell/buy · Published mid (gray)'
+                : 'Each candle = Mevon/Cashwyre mid OHLC per snapshot (wick spans available provider rates)';
         }
         if (legend) {
             legend.textContent = chartMode === 'line'
@@ -626,13 +743,60 @@ function updateSellEstimate() {
     const fmtNgn = (v) => v == null ? '—' : Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtMoney = (v) => v == null ? '—' : '₦' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const updateHero = (current, wallet) => {
+    const updateHero = (current, wallet, cashwyre, comparison) => {
         const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
         set('fx-live-mevon', fmtNgn(current.mevon_mid));
         set('fx-published-mid', fmtNgn(current.published_mid));
         set('fx-sell-rate', fmtNgn(current.sell_rate));
         set('fx-buy-rate', fmtNgn(current.buy_rate));
         set('fx-spread', fmtNgn(current.spread));
+
+        if (cashwyre && cashwyre.ok) {
+            set('fx-live-cashwyre-mid', fmtNgn(cashwyre.mid));
+            set('fx-cashwyre-sell', fmtNgn(cashwyre.sell_rate));
+            set('fx-cashwyre-buy', fmtNgn(cashwyre.buy_rate));
+            set('fx-cashwyre-spread', fmtNgn(cashwyre.spread));
+            set('fx-cashwyre-mid-card', fmtNgn(cashwyre.mid));
+            const err = document.getElementById('fx-cashwyre-error');
+            if (err) err.classList.add('hidden');
+        } else if (cashwyre) {
+            set('fx-live-cashwyre-mid', '—');
+            set('fx-cashwyre-sell', '—');
+            set('fx-cashwyre-buy', '—');
+            set('fx-cashwyre-spread', '—');
+            set('fx-cashwyre-mid-card', '—');
+            const err = document.getElementById('fx-cashwyre-error');
+            if (err) {
+                err.textContent = cashwyre.message || 'Cashwyre rates unavailable.';
+                err.classList.remove('hidden');
+            }
+        }
+
+        const renderDiff = (key, diff) => {
+            const el = document.getElementById(`fx-diff-${key}`);
+            if (!el || !diff || diff.abs == null) {
+                if (el) el.textContent = '—';
+                return;
+            }
+            const sign = diff.abs > 0 ? '+' : '';
+            el.textContent = `${sign}${Number(diff.abs).toFixed(2)} (${sign}${Number(diff.pct).toFixed(2)}%)`;
+            el.className = `font-mono font-semibold ${diff.abs >= 0 ? 'text-emerald-700' : 'text-red-600'}`;
+        };
+
+        const panel = document.getElementById('fx-comparison-panel');
+        if (comparison && comparison.available) {
+            panel?.classList.remove('hidden');
+            renderDiff('mid-diff', comparison.mid_diff);
+            renderDiff('sell-diff', comparison.sell_diff);
+            renderDiff('buy-diff', comparison.buy_diff);
+            set('fx-mid-gap', comparison.mid_diff?.abs != null
+                ? `${comparison.mid_diff.abs > 0 ? '+' : ''}${Number(comparison.mid_diff.abs).toFixed(2)}`
+                : '—');
+        } else {
+            panel?.classList.add('hidden');
+            set('fx-mid-gap', '—');
+        }
+
         if (current.recorded_at) {
             const at = new Date(current.recorded_at);
             set('fx-last-snapshot', `Last snapshot just now · ${at.toLocaleString()}`);
@@ -692,7 +856,7 @@ function updateSellEstimate() {
             if (!res.ok) return;
             const payload = await res.json();
             if (!payload.ok) return;
-            updateHero(payload.current || {}, payload.wallet || null);
+            updateHero(payload.current || {}, payload.wallet || null, payload.cashwyre || null, payload.comparison || null);
             updateStats(payload.stats || {});
             updateChart(payload.series || []);
             secondsLeft = payload.poll_seconds || pollSeconds;

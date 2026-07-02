@@ -160,6 +160,7 @@ class VirtualCardAdminController extends Controller
     public function refreshRateTracker(Request $request): RedirectResponse
     {
         $result = app(VirtualCardFxPublishService::class)->syncFromMevon();
+        app(MevonPayFxRateTrackerService::class)->captureCashwyreSnapshot();
 
         return redirect()
             ->route('admin.virtual-cards.rate-tracker', ['range' => $request->query('range', $request->input('range', '1h'))])

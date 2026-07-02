@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\MevonPayFxRateSnapshot;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Cashwyre\CashwyreFxRateService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -33,6 +34,20 @@ final class MevonPayFxRateTrackerService
         $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
         $published = $this->publishedCurrent();
         $wallet = app(\App\Services\MevonPay\MevonPayBalanceSnapshotService::class)->forDashboard();
+        $cashwyre = $this->cashwyreCurrent(fetchFresh: false);
+        $current = $this->currentSnapshot($latest, $published);
+
+        if ($cashwyre['configured'] ?? false) {
+            try {
+                $this->captureCashwyreSnapshot();
+                $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
+                $series = $this->series($from, $to, $range);
+                $cashwyre = $this->cashwyreCurrent(fetchFresh: false);
+                $current = $this->currentSnapshot($latest, $published);
+            } catch (\Throwable) {
+                // Dashboard must still render if Cashwyre capture fails.
+            }
+        }
 
         return [
             'range' => $range,
@@ -40,7 +55,9 @@ final class MevonPayFxRateTrackerService
             'to' => $to->toIso8601String(),
             'wallet' => $wallet,
             'max_fx_usd_per_op' => app(MevonPayAdminFxConversionService::class)->maxUsdPerOp(),
-            'current' => $this->currentSnapshot($latest, $published),
+            'current' => $current,
+            'cashwyre' => $cashwyre,
+            'comparison' => $this->comparison($current, $cashwyre),
             'change' => $this->changeWindows($latest),
             'stats' => $this->periodStats($from, $to),
             'series' => $series,
@@ -109,6 +126,8 @@ final class MevonPayFxRateTrackerService
             } catch (\Throwable) {
                 // Poll must still return the latest stored series.
             }
+
+            $this->captureCashwyreSnapshot();
         }
 
         $range = $this->normalizeRange((string) $request->query('range', '1h'));
@@ -117,6 +136,8 @@ final class MevonPayFxRateTrackerService
         $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
         $published = $this->publishedCurrent();
         $wallet = app(\App\Services\MevonPay\MevonPayBalanceSnapshotService::class)->forDashboard();
+        $cashwyre = $this->cashwyreCurrent(fetchFresh: false);
+        $current = $this->currentSnapshot($latest, $published);
 
         return [
             'ok' => true,
@@ -125,7 +146,9 @@ final class MevonPayFxRateTrackerService
             'to' => $to->toIso8601String(),
             'updated_at' => $to->toIso8601String(),
             'wallet' => $wallet,
-            'current' => $this->currentSnapshot($latest, $published),
+            'current' => $current,
+            'cashwyre' => $cashwyre,
+            'comparison' => $this->comparison($current, $cashwyre),
             'stats' => $this->periodStats($from, $to),
             'series' => $this->series($from, $to, $range),
             'live_poll' => $this->isLiveRange($range),
@@ -145,6 +168,54 @@ final class MevonPayFxRateTrackerService
         }
 
         $this->insertSnapshot($mevonMid, $mid, $sellRate, $buyRate, $source);
+    }
+
+    public function captureCashwyreSnapshot(): void
+    {
+        $cashwyre = $this->cashwyreCurrent(fetchFresh: true);
+        if (! ($cashwyre['ok'] ?? false)) {
+            return;
+        }
+
+        $latest = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
+        if ($latest !== null) {
+            $lastAt = $this->recordedAtCarbon($latest);
+            $sameRates = abs((float) ($latest->cashwyre_mid ?? 0) - (float) ($cashwyre['mid'] ?? 0)) < self::DEDUP_EPSILON
+                && abs((float) ($latest->cashwyre_sell_rate ?? 0) - (float) ($cashwyre['sell_rate'] ?? 0)) < self::DEDUP_EPSILON
+                && abs((float) ($latest->cashwyre_buy_rate ?? 0) - (float) ($cashwyre['buy_rate'] ?? 0)) < self::DEDUP_EPSILON;
+
+            if ($sameRates && $lastAt !== null && $lastAt->diffInMinutes(now()) < self::DEDUP_MINUTES) {
+                return;
+            }
+
+            if ($lastAt !== null && $lastAt->diffInMinutes(now()) < self::DEDUP_MINUTES) {
+                $latest->update([
+                    'cashwyre_mid' => $cashwyre['mid'],
+                    'cashwyre_sell_rate' => $cashwyre['sell_rate'],
+                    'cashwyre_buy_rate' => $cashwyre['buy_rate'],
+                ]);
+
+                return;
+            }
+        }
+
+        $published = $this->publishedCurrent();
+        $mevonMid = $latest?->mevon_mid ?? $published['live_mevon'] ?? $published['mid'] ?? (float) ($cashwyre['mid'] ?? 0);
+        if ($mevonMid <= 0) {
+            $mevonMid = (float) ($cashwyre['mid'] ?? 0);
+        }
+
+        $this->insertSnapshot(
+            (float) $mevonMid,
+            (float) ($latest?->published_mid ?? $published['mid'] ?? $mevonMid),
+            $latest?->sell_rate ?? $published['sell_rate'],
+            $latest?->buy_rate ?? $published['buy_rate'],
+            'provider_compare',
+            null,
+            (float) ($cashwyre['mid'] ?? 0),
+            isset($cashwyre['sell_rate']) ? (float) $cashwyre['sell_rate'] : null,
+            isset($cashwyre['buy_rate']) ? (float) $cashwyre['buy_rate'] : null,
+        );
     }
 
     public function recordPublished(float $publishedMid, ?float $sellRate, ?float $buyRate, string $source, ?float $mevonMid = null): void
@@ -205,6 +276,9 @@ final class MevonPayFxRateTrackerService
         ?float $buyRate,
         string $source,
         ?Carbon $recordedAt = null,
+        ?float $cashwyreMid = null,
+        ?float $cashwyreSellRate = null,
+        ?float $cashwyreBuyRate = null,
     ): void {
         $previous = MevonPayFxRateSnapshot::query()->orderByDesc('recorded_at')->first();
         $changeAbs = null;
@@ -224,6 +298,9 @@ final class MevonPayFxRateTrackerService
             'published_mid' => round($publishedMid, 4),
             'sell_rate' => $sellRate !== null ? round($sellRate, 4) : null,
             'buy_rate' => $buyRate !== null ? round($buyRate, 4) : null,
+            'cashwyre_mid' => $cashwyreMid !== null ? round($cashwyreMid, 4) : null,
+            'cashwyre_sell_rate' => $cashwyreSellRate !== null ? round($cashwyreSellRate, 4) : null,
+            'cashwyre_buy_rate' => $cashwyreBuyRate !== null ? round($cashwyreBuyRate, 4) : null,
             'source' => $source,
             'change_abs' => $changeAbs,
             'change_pct' => $changePct,
@@ -438,6 +515,9 @@ final class MevonPayFxRateTrackerService
             'published_mid' => $row->published_mid,
             'sell_rate' => $row->sell_rate,
             'buy_rate' => $row->buy_rate,
+            'cashwyre_mid' => $row->cashwyre_mid,
+            'cashwyre_sell_rate' => $row->cashwyre_sell_rate,
+            'cashwyre_buy_rate' => $row->cashwyre_buy_rate,
             'change_pct' => $row->change_pct,
             'source' => $row->source,
         ];
@@ -459,11 +539,96 @@ final class MevonPayFxRateTrackerService
                 'published_mid' => $row->published_mid,
                 'sell_rate' => $row->sell_rate,
                 'buy_rate' => $row->buy_rate,
+                'cashwyre_mid' => $row->cashwyre_mid,
+                'cashwyre_sell_rate' => $row->cashwyre_sell_rate,
+                'cashwyre_buy_rate' => $row->cashwyre_buy_rate,
                 'change_abs' => $row->change_abs,
                 'change_pct' => $row->change_pct,
                 'source' => $row->source,
             ])
             ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function cashwyreCurrent(bool $fetchFresh = false): array
+    {
+        $service = app(CashwyreFxRateService::class);
+        if (! $service->isConfigured()) {
+            return [
+                'ok' => false,
+                'configured' => false,
+                'message' => 'Cashwyre is not configured.',
+            ];
+        }
+
+        $rates = $fetchFresh ? $service->ngnUsdRatesFresh() : $service->ngnUsdRates();
+        if (! ($rates['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'configured' => true,
+                'message' => (string) ($rates['message'] ?? 'Could not fetch Cashwyre FX rates.'),
+            ];
+        }
+
+        $sell = isset($rates['sell_rate']) ? (float) $rates['sell_rate'] : null;
+        $buy = isset($rates['buy_rate']) ? (float) $rates['buy_rate'] : null;
+        $mid = isset($rates['mid']) ? (float) $rates['mid'] : null;
+
+        return [
+            'ok' => true,
+            'configured' => true,
+            'message' => 'OK',
+            'mid' => $mid,
+            'sell_rate' => $sell,
+            'buy_rate' => $buy,
+            'spread' => ($sell !== null && $buy !== null) ? round($sell - $buy, 4) : null,
+            'fetched_at' => $rates['fetched_at'] ?? null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $current
+     * @param  array<string, mixed>  $cashwyre
+     * @return array<string, mixed>
+     */
+    private function comparison(array $current, array $cashwyre): array
+    {
+        if (! ($cashwyre['ok'] ?? false)) {
+            return [
+                'available' => false,
+                'message' => (string) ($cashwyre['message'] ?? 'Cashwyre rates unavailable.'),
+            ];
+        }
+
+        return [
+            'available' => true,
+            'mid_diff' => $this->rateDiff($current['mevon_mid'] ?? null, $cashwyre['mid'] ?? null),
+            'sell_diff' => $this->rateDiff($current['sell_rate'] ?? null, $cashwyre['sell_rate'] ?? null),
+            'buy_diff' => $this->rateDiff($current['buy_rate'] ?? null, $cashwyre['buy_rate'] ?? null),
+            'provider_sell_diff' => $this->rateDiff($current['mevon_mid'] ?? null, $cashwyre['sell_rate'] ?? null),
+            'provider_buy_diff' => $this->rateDiff($current['mevon_mid'] ?? null, $cashwyre['buy_rate'] ?? null),
+        ];
+    }
+
+    /**
+     * @return array{abs: ?float, pct: ?float, left: ?float, right: ?float}|null
+     */
+    private function rateDiff(?float $left, ?float $right): ?array
+    {
+        if ($left === null || $right === null || $left <= 0 || $right <= 0) {
+            return null;
+        }
+
+        $abs = round($left - $right, 4);
+
+        return [
+            'abs' => $abs,
+            'pct' => round(($abs / $right) * 100, 4),
+            'left' => round($left, 4),
+            'right' => round($right, 4),
+        ];
     }
 
     /**
