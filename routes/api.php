@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ConsumerWalletApiController;
 use App\Http\Controllers\Api\ConsumerWalletAuthController;
 use App\Http\Controllers\Api\ConsumerWalletConversationController;
 use App\Http\Controllers\Api\LiveSyncReceiverController;
+use App\Http\Controllers\Api\CashwyreWebhookController;
 use App\Http\Controllers\Api\MevonPayWebhookController;
 use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\PaymentController;
@@ -256,6 +257,10 @@ Route::prefix('v1')->group(function () {
     Route::post('/webhooks/sla', [MevonPayWebhookController::class, 'receive']); // plural alias
     Route::post('/webhook/mavonpay', [MevonPayWebhookController::class, 'receive']); // backward compatibility
     Route::post('/webhooks/mavonpay', [MevonPayWebhookController::class, 'receive']); // plural alias
+
+    // Cashwyre virtual card webhooks
+    Route::post('/webhook/cashwyre', [CashwyreWebhookController::class, 'receive']);
+    Route::post('/webhooks/cashwyre', [CashwyreWebhookController::class, 'receive']);
 
     // VTU provider webhook (reversals/refunds/status updates)
     Route::post('/webhook/vtu', [VtuWebhookController::class, 'receive'])->middleware('throttle:120,1');

@@ -5,26 +5,30 @@ namespace App\Services\Cashwyre;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 final class CashwyreHttpClient
 {
     public function isConfigured(): bool
     {
         return rtrim((string) config('cashwyre.base_url', ''), '/') !== ''
-            && trim((string) config('cashwyre.api_key', '')) !== '';
+            && trim((string) config('cashwyre.secret_key', '')) !== ''
+            && trim((string) config('cashwyre.app_id', '')) !== ''
+            && trim((string) config('cashwyre.business_code', '')) !== '';
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed, http_status?: int}
      */
-    public function postJson(string $path, array $payload = []): array
+    public function postJson(string $path, array $payload = [], ?string $requestId = null): array
     {
         if (! $this->isConfigured()) {
             return ['ok' => false, 'message' => 'Cashwyre is not configured.'];
         }
 
         $url = $this->url($path);
+        $body = $this->withBasePayload($payload, $requestId);
         $timeout = (int) config('cashwyre.timeout_seconds', 30);
         $connect = (int) config('cashwyre.connect_timeout_seconds', 5);
 
@@ -33,7 +37,7 @@ final class CashwyreHttpClient
                 ->connectTimeout($connect)
                 ->acceptJson()
                 ->withHeaders($this->authHeaders())
-                ->post($url, $payload);
+                ->post($url, $body);
         } catch (\Throwable $e) {
             Log::warning('cashwyre.http_failed', ['path' => $path, 'error' => $e->getMessage()]);
 
@@ -41,6 +45,27 @@ final class CashwyreHttpClient
         }
 
         return $this->parseResponse($response, $path);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function withBasePayload(array $payload, ?string $requestId = null): array
+    {
+        $appId = trim((string) config('cashwyre.app_id', ''));
+        $businessCode = trim((string) config('cashwyre.business_code', ''));
+        $resolvedRequestId = trim((string) ($requestId ?? $payload['requestId'] ?? $payload['request_id'] ?? ''));
+
+        if ($resolvedRequestId === '') {
+            $resolvedRequestId = (string) Str::uuid();
+        }
+
+        return array_merge([
+            'appId' => $appId,
+            'businessCode' => $businessCode !== '' ? $businessCode : $appId,
+            'requestId' => $resolvedRequestId,
+        ], $payload);
     }
 
     private function url(string $path): string
@@ -53,23 +78,13 @@ final class CashwyreHttpClient
      */
     private function authHeaders(): array
     {
-        $headers = [
+        $secret = trim((string) config('cashwyre.secret_key', ''));
+
+        return [
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer '.$secret,
         ];
-
-        $apiKey = trim((string) config('cashwyre.api_key', ''));
-        if ($apiKey !== '') {
-            $headers['Authorization'] = 'Bearer '.$apiKey;
-            $headers['X-API-Key'] = $apiKey;
-        }
-
-        $secret = trim((string) config('cashwyre.secret_key', ''));
-        if ($secret !== '') {
-            $headers['X-Secret-Key'] = $secret;
-        }
-
-        return $headers;
     }
 
     /**

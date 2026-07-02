@@ -26,7 +26,7 @@ final class VirtualCardProviderResponseService
                 continue;
             }
 
-            foreach (['reference', 'request_id', 'requestId', 'order_id', 'order_reference', 'id'] as $key) {
+            foreach (['reference', 'request_id', 'requestId', 'order_id', 'order_reference', 'id', 'Reference'] as $key) {
                 $value = trim((string) ($data[$key] ?? ''));
                 if ($value !== '' && $this->looksLikeProviderReference($value)) {
                     return $value;
@@ -42,9 +42,18 @@ final class VirtualCardProviderResponseService
         if (! is_array($data)) {
             return null;
         }
-        $id = (string) ($data['card_id'] ?? $data['cardId'] ?? $data['card_code'] ?? $data['cardCode'] ?? $data['id'] ?? '');
+        $id = (string) (
+            $data['card_id']
+            ?? $data['cardId']
+            ?? $data['card_code']
+            ?? $data['cardCode']
+            ?? $data['code']
+            ?? $data['Code']
+            ?? $data['id']
+            ?? ''
+        );
 
-        return trim($id) !== '' ? $id : null;
+        return trim($id) !== '' ? trim($id) : null;
     }
 
     /**

@@ -69,4 +69,27 @@ class VirtualCardProviderResponseServiceTest extends TestCase
 
         $this->assertSame('REQ1780744493644', $ref);
     }
+
+    public function test_extract_card_id_reads_cashwyre_code_field(): void
+    {
+        $service = app(VirtualCardProviderResponseService::class);
+
+        $this->assertSame('VCARD2024121622195100121', $service->extractCardId([
+            'code' => 'VCARD2024121622195100121',
+        ]));
+        $this->assertSame('CARDXYZ123', $service->extractCardId([
+            'cardCode' => 'CARDXYZ123',
+        ]));
+    }
+
+    public function test_is_create_accepted_when_cashwyre_returns_code(): void
+    {
+        $service = app(VirtualCardProviderResponseService::class);
+
+        $this->assertTrue($service->isCreateAccepted([
+            'ok' => true,
+            'message' => 'Request Successful',
+            'data' => ['code' => 'VCARD123'],
+        ]));
+    }
 }

@@ -17,7 +17,7 @@ final class VirtualCardStoredDetailsService
             return null;
         }
 
-        foreach (['balance', 'card_balance', 'available_balance', 'new_balance', 'balance_usd'] as $key) {
+        foreach (['balance', 'card_balance', 'available_balance', 'new_balance', 'balance_usd', 'cardBalance', 'CardBalance'] as $key) {
             $value = $row[$key] ?? null;
             if (is_numeric($value)) {
                 return round((float) $value, 2);
@@ -33,18 +33,27 @@ final class VirtualCardStoredDetailsService
      */
     public function extractFromWebhook(array $payload): ?array
     {
-        $data = $payload['data'] ?? $payload;
+        $data = $payload['eventData'] ?? $payload['data'] ?? $payload;
         if (! is_array($data)) {
             return null;
         }
 
-        $cardNumber = trim((string) ($data['card_number'] ?? $data['cardNumber'] ?? $data['pan'] ?? ''));
-        $cvv = trim((string) ($data['cvv'] ?? $data['cvv2'] ?? ''));
-        $expiry = trim((string) ($data['expiry'] ?? $data['expiry_date'] ?? $data['expiry_month_year'] ?? $data['expiryMonthYear'] ?? $data['expiration'] ?? $data['exp_date'] ?? ''));
+        $cardNumber = trim((string) ($data['card_number'] ?? $data['cardNumber'] ?? $data['CardNumber'] ?? $data['pan'] ?? ''));
+        $cvv = trim((string) ($data['cvv'] ?? $data['cvv2'] ?? $data['CVV2'] ?? $data['cvV2'] ?? ''));
+        $expiry = trim((string) ($data['expiry'] ?? $data['expiry_date'] ?? $data['expiry_month_year'] ?? $data['expiryMonthYear'] ?? $data['ValidMonthYear'] ?? $data['expiration'] ?? $data['exp_date'] ?? ''));
         $expiry = str_replace('\\/', '/', $expiry);
 
         $expiryMonth = trim((string) ($data['expiry_month'] ?? $data['exp_month'] ?? $data['expiration_month'] ?? $data['expiryMonth'] ?? ''));
         $expiryYear = trim((string) ($data['expiry_year'] ?? $data['exp_year'] ?? $data['expiration_year'] ?? $data['expiryYear'] ?? ''));
+
+        if ($expiry === '' && ! empty($data['ExpiryOn'])) {
+            try {
+                $expiryCarbon = \Illuminate\Support\Carbon::parse((string) $data['ExpiryOn']);
+                $expiry = $expiryCarbon->format('m/y');
+            } catch (\Throwable) {
+                // ignore parse errors
+            }
+        }
 
         if ($expiry === '' && $expiryMonth !== '' && $expiryYear !== '') {
             $year = strlen($expiryYear) === 4 ? substr($expiryYear, -2) : $expiryYear;
@@ -59,7 +68,30 @@ final class VirtualCardStoredDetailsService
         }
 
         $billing = $data['billing_address'] ?? $data['billing'] ?? null;
+        if ($billing === null && (
+            ! empty($data['BillingAddressStreet'])
+            || ! empty($data['billingAddressStreet'])
+        )) {
+            $billing = [
+                'street' => (string) ($data['BillingAddressStreet'] ?? $data['billingAddressStreet'] ?? ''),
+                'city' => (string) ($data['BillingAddressCity'] ?? $data['billingAddressCity'] ?? ''),
+                'country' => (string) ($data['BillingAddressCountry'] ?? $data['billingAddressCountry'] ?? ''),
+                'zip_code' => (string) ($data['BillingAddressZipCode'] ?? $data['billingAddressZipCode'] ?? ''),
+                'country_code' => (string) ($data['BillingAddressCountryCode'] ?? $data['billingAddressCountryCode'] ?? ''),
+            ];
+        }
+
         $balance = $this->extractBalanceFromProviderPayload($payload);
+
+        $cardExternalId = trim((string) (
+            $data['card_id']
+            ?? $data['cardId']
+            ?? $data['card_code']
+            ?? $data['cardCode']
+            ?? $data['code']
+            ?? $data['Code']
+            ?? ''
+        ));
 
         return [
             'card_number' => $cardNumber,
@@ -67,15 +99,15 @@ final class VirtualCardStoredDetailsService
             'expiry' => $expiry,
             'expiry_month' => $expiryMonth,
             'expiry_year' => $expiryYear,
-            'last_four' => trim((string) ($data['last4'] ?? $data['last_four'] ?? '')),
-            'card_name' => trim((string) ($data['card_name'] ?? $data['name_on_card'] ?? '')),
-            'brand' => strtolower(trim((string) ($data['card_brand'] ?? $data['brand'] ?? 'visa'))),
-            'card_type' => trim((string) ($data['card_type'] ?? 'virtual')),
-            'card_external_id' => trim((string) ($data['card_id'] ?? $data['cardId'] ?? $data['card_code'] ?? '')),
-            'card_code' => trim((string) ($data['card_code'] ?? $data['cardCode'] ?? '')),
+            'last_four' => trim((string) ($data['last4'] ?? $data['last_four'] ?? $data['Last4'] ?? '')),
+            'card_name' => trim((string) ($data['card_name'] ?? $data['name_on_card'] ?? $data['CardName'] ?? $data['cardName'] ?? '')),
+            'brand' => strtolower(trim((string) ($data['card_brand'] ?? $data['brand'] ?? $data['CardBrand'] ?? 'visa'))),
+            'card_type' => trim((string) ($data['card_type'] ?? $data['CardType'] ?? 'virtual')),
+            'card_external_id' => $cardExternalId,
+            'card_code' => trim((string) ($data['card_code'] ?? $data['cardCode'] ?? $data['code'] ?? $data['Code'] ?? $cardExternalId)),
             'billing_address' => (is_array($billing) || is_string($billing)) ? $billing : null,
             'balance_usd' => is_numeric($balance) ? round((float) $balance, 2) : null,
-            'provider_reference' => trim((string) ($data['reference'] ?? $data['request_id'] ?? '')),
+            'provider_reference' => trim((string) ($data['reference'] ?? $data['Reference'] ?? $data['request_id'] ?? $data['requestId'] ?? '')),
             'synced_at' => now()->toIso8601String(),
             'source' => 'webhook',
         ];
@@ -309,6 +341,9 @@ final class VirtualCardStoredDetailsService
         }
 
         $row = $payload;
+        if (isset($row['eventData']) && is_array($row['eventData'])) {
+            $row = array_merge($row, $row['eventData']);
+        }
         if (isset($row['data']) && is_array($row['data'])) {
             $row = array_merge($row, $row['data']);
         }

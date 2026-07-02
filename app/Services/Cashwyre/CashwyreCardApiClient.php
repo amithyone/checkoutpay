@@ -6,6 +6,7 @@ final class CashwyreCardApiClient
 {
     public function __construct(
         private CashwyreHttpClient $http,
+        private CashwyrePayloadMapper $mapper,
     ) {}
 
     public function isConfigured(): bool
@@ -17,90 +18,84 @@ final class CashwyreCardApiClient
      * @param  array<string, mixed>  $payload
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function createCustomer(array $payload): array
+    public function createCustomer(array $payload, ?string $requestId = null): array
     {
-        return $this->http->postJson($this->path('create_customer'), $payload);
+        return $this->http->postJson($this->path('create_customer'), $payload, $requestId);
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function createCard(array $payload): array
+    public function createCard(array $payload, ?string $requestId = null): array
     {
-        return $this->http->postJson($this->path('create_card'), $payload);
+        $mapped = $this->mapper->createCardPayload($payload);
+
+        return $this->http->postJson($this->path('create_card'), $mapped, $requestId ?? (string) ($payload['reference'] ?? null));
     }
 
     /**
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function topupCard(float $amountUsd, string $cardCode, ?string $customerId = null): array
+    public function topupCard(float $amountUsd, string $cardCode, ?string $requestId = null): array
     {
-        return $this->http->postJson($this->path('topup_card'), array_filter([
-            'amount' => round($amountUsd, 2),
-            'card_code' => trim($cardCode),
-            'card_id' => trim($cardCode),
-            'customer_id' => $customerId,
-        ], static fn ($v) => $v !== null && $v !== ''));
+        return $this->http->postJson($this->path('topup_card'), [
+            'cardCode' => trim($cardCode),
+            'amountInUSD' => round($amountUsd, 2),
+        ], $requestId);
     }
 
     /**
      * @param  'freeze'|'unfreeze'  $action
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function setCardStatus(string $action, string $cardCode): array
+    public function setCardStatus(string $action, string $cardCode, ?string $requestId = null): array
     {
-        return $this->http->postJson($this->path('card_status'), [
-            'action' => $action,
-            'card_code' => trim($cardCode),
-            'card_id' => trim($cardCode),
-        ]);
+        $pathKey = $action === 'unfreeze' ? 'unfreeze_card' : 'freeze_card';
+
+        return $this->http->postJson($this->path($pathKey), [
+            'cardCode' => trim($cardCode),
+        ], $requestId);
     }
 
     /**
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function withdrawFromCard(float $amountUsd, string $cardCode, string $reason = 'Withdrawal to Wallet'): array
+    public function withdrawFromCard(float $amountUsd, string $cardCode, string $reason = 'Withdrawal to Wallet', ?string $requestId = null): array
     {
         return $this->http->postJson($this->path('withdraw_card'), [
-            'amount' => round($amountUsd, 2),
-            'card_code' => trim($cardCode),
-            'card_id' => trim($cardCode),
+            'cardCode' => trim($cardCode),
+            'amountInUSD' => round($amountUsd, 2),
             'reason' => $reason,
-        ]);
+        ], $requestId);
     }
 
     /**
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function getCardBalance(string $requestId): array
+    public function getCardBalance(string $cardCode, ?string $requestId = null): array
     {
-        return $this->http->postJson($this->path('card_balance'), [
-            'request_id' => trim($requestId),
-            'reference' => trim($requestId),
-        ]);
+        return $this->getCardDetails($cardCode, $requestId);
     }
 
     /**
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function getCardDetails(string $cardId): array
+    public function getCardDetails(string $cardCode, ?string $requestId = null): array
     {
         return $this->http->postJson($this->path('card_details'), [
-            'card_id' => trim($cardId),
-            'card_code' => trim($cardId),
-        ]);
+            'cardCode' => trim($cardCode),
+        ], $requestId);
     }
 
     /**
      * @return array{ok: bool, message: string, data?: mixed, raw?: mixed}
      */
-    public function getCardTransactions(string $cardCode): array
+    public function getCardTransactions(string $cardCode, ?string $requestId = null): array
     {
         return $this->http->postJson($this->path('card_transactions'), [
-            'card_code' => trim($cardCode),
-            'card_id' => trim($cardCode),
-        ]);
+            'cardCode' => trim($cardCode),
+        ], $requestId);
     }
 
     private function path(string $key): string

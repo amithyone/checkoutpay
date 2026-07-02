@@ -886,6 +886,13 @@
                 </label>
             </div>
 
+            <div class="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900 max-w-3xl">
+                <p class="font-medium mb-1">Cashwyre server setup</p>
+                <p class="text-violet-800 mb-2">Set <code class="text-xs">CASHWYRE_APP_ID</code>, <code class="text-xs">CASHWYRE_BUSINESS_CODE</code>, and <code class="text-xs">CASHWYRE_SECRET_KEY</code> in <code class="text-xs">.env</code>. Prefund your Cashwyre merchant wallet before live card requests.</p>
+                <p class="text-violet-800">Register this webhook URL in the Cashwyre Business dashboard:</p>
+                <p class="mt-1 font-mono text-xs break-all">{{ rtrim((string) config('app.url'), '/') }}/api/v1/webhook/cashwyre</p>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
                 <div>
                     <label for="virtual_card_creation_fee_usd" class="block text-sm font-medium text-gray-700 mb-2">
