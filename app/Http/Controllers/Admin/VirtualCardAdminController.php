@@ -8,9 +8,11 @@ use App\Services\Admin\AdminVirtualCardProfitService;
 use App\Services\Admin\AdminVirtualCardService;
 use App\Services\Admin\MevonPayAdminFxConversionService;
 use App\Services\Admin\MevonPayFxRateTrackerService;
+use App\Services\Cashwyre\CashwyreHttpClient;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFxPublishService;
 use App\Services\Consumer\VirtualCardFxService;
+use App\Services\VirtualCard\VirtualCardProviderResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +27,9 @@ class VirtualCardAdminController extends Controller
 
     public function index(Request $request): View
     {
+        $activeProvider = $this->cards->normalizeProvider($request->string('provider')->toString());
+        $providerCounts = $this->cards->openRequestCountsByProvider();
+
         $publish = app(VirtualCardFxPublishService::class);
         $published = $publish->publishedSnapshot();
         if ($published['sell_rate'] === null || $published['buy_rate'] === null) {
@@ -45,9 +50,25 @@ class VirtualCardAdminController extends Controller
             ? round($feeBreakdown['total_usd'] * $fxMarkupPerUsd, 2)
             : null;
 
+        $cashwyreWalletUsd = null;
+        if ($activeProvider === VirtualCardProviderResolver::PROVIDER_CASHWYRE) {
+            $http = app(CashwyreHttpClient::class);
+            if ($http->isConfigured()) {
+                $resp = $http->postJson('/Wallet/getFundwalletAccountInfo', [
+                    'currency' => 'USD',
+                ], 'admin-cashwyre-wallet-'.time());
+                if ($resp['ok'] ?? false) {
+                    $cashwyreWalletUsd = is_array($resp['data'] ?? null) ? $resp['data'] : null;
+                }
+            }
+        }
+
         return view('admin.virtual-cards.index', [
-            'cards' => $this->cards->indexQuery($request),
-            'stats' => $this->cards->stats(),
+            'activeProvider' => $activeProvider,
+            'providerCounts' => $providerCounts,
+            'cashwyreWalletUsd' => $cashwyreWalletUsd,
+            'cards' => $this->cards->indexQuery($request->merge(['provider' => $activeProvider])),
+            'stats' => $this->cards->stats($activeProvider),
             'profitSummary' => $profitStats['summary'],
             'monthlyProfit' => $profitStats['monthly'],
             'feeBreakdown' => $feeBreakdown,
@@ -59,26 +80,34 @@ class VirtualCardAdminController extends Controller
         ]);
     }
 
-    public function refreshRates(): RedirectResponse
+    public function refreshRates(Request $request): RedirectResponse
     {
         $result = app(VirtualCardFxPublishService::class)->syncFromMevon();
 
         return redirect()
-            ->route('admin.virtual-cards.index')
+            ->route('admin.virtual-cards.index', ['provider' => $this->cards->normalizeProvider($request->string('provider')->toString())])
             ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
     public function logs(Request $request): View
     {
+        $activeProvider = $this->cards->normalizeProvider($request->string('provider')->toString());
+
         return view('admin.virtual-cards.logs', [
-            'logs' => $this->cards->logsQuery($request),
+            'activeProvider' => $activeProvider,
+            'providerCounts' => $this->cards->openRequestCountsByProvider(),
+            'logs' => $this->cards->logsQuery($request->merge(['provider' => $activeProvider])),
         ]);
     }
 
     public function users(Request $request): View
     {
+        $activeProvider = $this->cards->normalizeProvider($request->string('provider')->toString());
+
         return view('admin.virtual-cards.users', [
-            'cards' => $this->cards->usersQuery($request),
+            'activeProvider' => $activeProvider,
+            'providerCounts' => $this->cards->openRequestCountsByProvider(),
+            'cards' => $this->cards->usersQuery($request->merge(['provider' => $activeProvider])),
         ]);
     }
 

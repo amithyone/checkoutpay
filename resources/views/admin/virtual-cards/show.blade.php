@@ -6,10 +6,13 @@
 @section('content')
 <div class="space-y-6">
     <div class="flex items-center justify-between">
-        <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
+        <a href="{{ route('admin.virtual-cards.index', ['provider' => $card->provider ?? 'mevonpay']) }}" class="text-sm text-gray-600 hover:text-gray-900">
             <i class="fas fa-arrow-left mr-1"></i> Back to list
         </a>
-        @include('admin.virtual-cards._status-badge', ['status' => $card->status])
+        <div class="flex items-center gap-2">
+            @include('admin.virtual-cards._provider-badge', ['provider' => $card->provider])
+            @include('admin.virtual-cards._status-badge', ['status' => $card->status])
+        </div>
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -24,7 +27,7 @@
                 <dd class="font-mono text-xs text-gray-900">{{ $card->external_reference ?? '—' }}</dd>
             </div>
             <div>
-                <dt class="text-gray-500">Mevon reference</dt>
+                <dt class="text-gray-500">Provider reference</dt>
                 <dd class="font-mono text-xs text-gray-900">{{ $card->provider_reference ?? '—' }}</dd>
             </div>
             <div>
@@ -192,7 +195,9 @@
 
     @if($card->status === \App\Models\VirtualCardRequest::STATUS_ACTIVE)
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Card transaction history (MevonPay)</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            Card transaction history ({{ ($card->provider ?? 'mevonpay') === 'cashwyre' ? 'Cashwyre' : 'MevonPay' }})
+        </h3>
         @if(!empty($cardTransactions))
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -239,7 +244,7 @@
                 </table>
             </div>
         @else
-            <p class="text-sm text-gray-500">No card transactions found from MevonPay.</p>
+            <p class="text-sm text-gray-500">No card transactions found from the card provider.</p>
         @endif
     </div>
     @endif
@@ -294,7 +299,7 @@
 
             @if($canRetry)
             <form method="POST" action="{{ route('admin.virtual-cards.retry', $card) }}"
-                onsubmit="return confirm('Resend create request to MevonPay? Wallet will not be debited again.');">
+                onsubmit="return confirm('Resend create request to {{ ($card->provider ?? 'mevonpay') === 'cashwyre' ? 'Cashwyre' : 'MevonPay' }}? Wallet will not be debited again.');">
                 @csrf
                 <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
                     <i class="fas fa-redo mr-1"></i> Retry provider request

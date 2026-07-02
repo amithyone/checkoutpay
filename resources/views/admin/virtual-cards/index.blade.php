@@ -8,11 +8,19 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold text-gray-900">Card Management</h2>
-            <p class="text-sm text-gray-600 mt-1">Dollar Virtual Card requests from CheckoutNow — review, activate, retry, or refund fees</p>
+            <p class="text-sm text-gray-600 mt-1">
+                Dollar Virtual Card requests from CheckoutNow —
+                @if($activeProvider === 'cashwyre')
+                    Cashwyre provider cards
+                @else
+                    MevonPay provider cards
+                @endif
+            </p>
         </div>
         <div class="flex flex-wrap gap-3">
             <form method="POST" action="{{ route('admin.virtual-cards.refresh-rates') }}">
                 @csrf
+                <input type="hidden" name="provider" value="{{ $activeProvider }}">
                 <button type="submit" class="text-sm text-blue-700 hover:underline font-medium">
                     <i class="fas fa-sync-alt mr-1"></i> Refresh app FX rates
                 </button>
@@ -20,13 +28,13 @@
             <a href="{{ route('admin.virtual-cards.rate-tracker') }}" class="text-sm text-cyan-700 hover:underline font-medium">
                 <i class="fas fa-chart-area mr-1"></i> FX rate tracker
             </a>
-            <a href="{{ route('admin.virtual-cards.users') }}" class="text-sm text-violet-700 hover:underline font-medium">
+            <a href="{{ route('admin.virtual-cards.users', ['provider' => $activeProvider]) }}" class="text-sm text-violet-700 hover:underline font-medium">
                 <i class="fas fa-users mr-1"></i> Card users
             </a>
             <a href="{{ route('admin.virtual-cards.stats') }}" class="text-sm text-emerald-700 hover:underline font-medium">
                 <i class="fas fa-chart-line mr-1"></i> Profit statistics
             </a>
-            <a href="{{ route('admin.virtual-cards.logs') }}" class="text-sm text-indigo-700 hover:underline font-medium">
+            <a href="{{ route('admin.virtual-cards.logs', ['provider' => $activeProvider]) }}" class="text-sm text-indigo-700 hover:underline font-medium">
                 <i class="fas fa-list-alt mr-1"></i> Request &amp; webhook logs
             </a>
             <a href="{{ route('admin.settings.index') }}#vtu-virtual-card" class="text-sm text-primary hover:underline">
@@ -35,6 +43,27 @@
         </div>
     </div>
 
+    @include('admin.virtual-cards._provider-tabs', [
+        'routeName' => 'admin.virtual-cards.index',
+        'activeProvider' => $activeProvider,
+        'providerCounts' => $providerCounts,
+    ])
+
+    @if($activeProvider === 'cashwyre' && is_array($cashwyreWalletUsd))
+    <div class="bg-white rounded-lg border border-orange-200 p-4 shadow-sm bg-orange-50/40">
+        <p class="text-xs text-gray-500 uppercase">Cashwyre merchant USD wallet</p>
+        <p class="text-2xl font-bold text-orange-800">${{ number_format((float) ($cashwyreWalletUsd['availableBalance'] ?? 0), 2) }}</p>
+        @if(! empty($cashwyreWalletUsd['businessWalletAccount']['number']))
+            <p class="text-xs text-gray-600 mt-2">
+                Prefund via {{ $cashwyreWalletUsd['businessWalletAccount']['name'] ?? 'wallet' }}
+                ({{ $cashwyreWalletUsd['businessWalletAccount']['code'] ?? '' }}):
+                <span class="font-mono">{{ $cashwyreWalletUsd['businessWalletAccount']['number'] }}</span>
+            </p>
+        @endif
+    </div>
+    @endif
+
+    @if($activeProvider === 'mevonpay')
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="bg-white rounded-lg border border-blue-200 p-4 shadow-sm bg-blue-50/40">
             <p class="text-xs text-gray-500 uppercase">App sell rate</p>
@@ -80,6 +109,7 @@
             </p>
         </div>
     </div>
+    @endif
 
     <div class="bg-white rounded-lg border border-amber-200 p-5 shadow-sm bg-amber-50/30">
         <p class="text-xs text-gray-500 uppercase mb-2">Current card setup pricing (CheckoutNow)</p>
@@ -92,16 +122,19 @@
             </p>
         </div>
         <p class="text-sm text-gray-700 mt-2">
-            <strong>${{ number_format($feeBreakdown['creation_fee_usd'], 2) }}</strong> Mevon setup
-            + <strong>${{ number_format($feeBreakdown['initial_load_usd'], 2) }}</strong> starting card balance
-            (Mevon <code>amount</code>).
+            <strong>${{ number_format($feeBreakdown['creation_fee_usd'], 2) }}</strong> setup fee
+            + <strong>${{ number_format($feeBreakdown['initial_load_usd'], 2) }}</strong> starting card balance.
+            @if($activeProvider === 'cashwyre')
+                Card issuer: <strong>Cashwyre</strong> (prefunded merchant wallet).
+            @else
+                Card issuer: <strong>MevonPay</strong>.
+            @endif
         </p>
         @if($fxMarkupPerUsd !== null && $estimatedSetupProfitNgn !== null)
             <p class="text-xs text-gray-600 mt-2">
                 Your FX markup per setup: <strong>₦{{ number_format($fxMarkupPerUsd, 2) }}</strong>/$
                 → about <strong>₦{{ number_format($estimatedSetupProfitNgn, 2) }}</strong> profit per new card
                 ({{ number_format($feeBreakdown['total_usd'], 2) }} × ₦{{ number_format($fxMarkupPerUsd, 2) }}).
-                User pays full provider cost; you do not subsidise Mevon.
             </p>
         @endif
     </div>
@@ -130,6 +163,11 @@
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div class="md:col-span-6">
+            <p class="text-xs font-medium uppercase text-gray-500">
+                {{ $activeProvider === 'cashwyre' ? 'Cashwyre' : 'MevonPay' }} request counts
+            </p>
+        </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <p class="text-xs text-gray-500 uppercase">Pending</p>
             <p class="text-2xl font-bold text-yellow-700">{{ number_format($stats['pending']) }}</p>
@@ -160,6 +198,7 @@
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <form method="GET" class="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="provider" value="{{ $activeProvider }}">
             <div>
                 <label class="block text-xs text-gray-500 mb-1">Status</label>
                 <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
@@ -185,7 +224,7 @@
                 <input type="date" name="to" value="{{ request('to') }}" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
             </div>
             <button type="submit" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm">Filter</button>
-            <a href="{{ route('admin.virtual-cards.index') }}" class="text-gray-600 hover:text-gray-900 text-sm py-2">Clear</a>
+            <a href="{{ route('admin.virtual-cards.index', ['provider' => $activeProvider]) }}" class="text-gray-600 hover:text-gray-900 text-sm py-2">Clear</a>
         </form>
     </div>
 
@@ -198,6 +237,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Wallet</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Card name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider ID</th>
@@ -215,6 +255,7 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-900">{{ $card->card_name ?? '—' }}</td>
                         <td class="px-6 py-4">@include('admin.virtual-cards._status-badge', ['status' => $card->status])</td>
+                        <td class="px-6 py-4">@include('admin.virtual-cards._provider-badge', ['provider' => $card->provider])</td>
                         <td class="px-6 py-4 text-sm text-gray-900">
                             ${{ number_format($card->fee_usd, 2) }}
                             <span class="text-gray-500 text-xs block">₦{{ number_format($card->fee_ngn, 2) }}</span>
@@ -239,7 +280,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-8 text-center text-sm text-gray-500">No card requests found</td>
+                        <td colspan="10" class="px-6 py-8 text-center text-sm text-gray-500">No card requests found</td>
                     </tr>
                     @endforelse
                 </tbody>

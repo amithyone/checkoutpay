@@ -8,10 +8,12 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold text-gray-900">Card Users</h2>
-            <p class="text-sm text-gray-600 mt-1">Users with active Dollar Virtual Cards — view balances and transaction history</p>
+            <p class="text-sm text-gray-600 mt-1">
+                Active {{ $activeProvider === 'cashwyre' ? 'Cashwyre' : 'MevonPay' }} Dollar Virtual Cards
+            </p>
         </div>
         <div class="flex flex-wrap gap-3">
-            <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-gray-600 hover:text-gray-900 font-medium py-2">
+            <a href="{{ route('admin.virtual-cards.index', ['provider' => $activeProvider]) }}" class="text-sm text-gray-600 hover:text-gray-900 font-medium py-2">
                 <i class="fas fa-arrow-left mr-1"></i> Card requests
             </a>
             <a href="{{ route('admin.virtual-cards.rate-tracker') }}" class="text-sm text-cyan-700 hover:underline font-medium py-2">
@@ -20,21 +22,28 @@
             <a href="{{ route('admin.virtual-cards.stats') }}" class="text-sm text-emerald-700 hover:underline font-medium py-2">
                 <i class="fas fa-chart-line mr-1"></i> Profit statistics
             </a>
-            <a href="{{ route('admin.virtual-cards.logs') }}" class="text-sm text-indigo-700 hover:underline font-medium py-2">
+            <a href="{{ route('admin.virtual-cards.logs', ['provider' => $activeProvider]) }}" class="text-sm text-indigo-700 hover:underline font-medium py-2">
                 <i class="fas fa-list-alt mr-1"></i> Request &amp; webhook logs
             </a>
         </div>
     </div>
 
+    @include('admin.virtual-cards._provider-tabs', [
+        'routeName' => 'admin.virtual-cards.users',
+        'activeProvider' => $activeProvider,
+        'providerCounts' => $providerCounts,
+    ])
+
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <form method="GET" class="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="provider" value="{{ $activeProvider }}">
             <div class="flex-1 min-w-[200px]">
                 <label class="block text-xs text-gray-500 mb-1">Search card users</label>
                 <input type="text" name="q" value="{{ request('q') }}" placeholder="Phone, card name, provider ID"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
             </div>
             <button type="submit" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 text-sm">Filter</button>
-            <a href="{{ route('admin.virtual-cards.users') }}" class="text-gray-600 hover:text-gray-900 text-sm py-2">Clear</a>
+            <a href="{{ route('admin.virtual-cards.users', ['provider' => $activeProvider]) }}" class="text-gray-600 hover:text-gray-900 text-sm py-2">Clear</a>
         </form>
     </div>
 

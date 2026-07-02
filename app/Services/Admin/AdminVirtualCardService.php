@@ -9,8 +9,8 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use App\Services\Consumer\VirtualCardFeeRefundService;
 use App\Services\Consumer\VirtualCardProviderResponseService;
-use App\Services\MevonPay\MevonPayCardApiClient;
 use App\Services\MevonPay\MevonPayUsdAutoFundService;
+use App\Services\VirtualCard\VirtualCardProviderResolver;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -18,23 +18,61 @@ use Illuminate\Http\Request;
 final class AdminVirtualCardService
 {
     public function __construct(
-        private MevonPayCardApiClient $cardApi,
         private VirtualCardFeeRefundService $refunds,
         private VirtualCardProviderResponseService $providerResponse,
         private MevonPayUsdAutoFundService $usdAutoFund,
+        private VirtualCardProviderResolver $cardProviders,
     ) {}
+
+    public function normalizeProvider(?string $provider): string
+    {
+        return in_array($provider, [
+            VirtualCardProviderResolver::PROVIDER_MEVONPAY,
+            VirtualCardProviderResolver::PROVIDER_CASHWYRE,
+        ], true)
+            ? $provider
+            : VirtualCardProviderResolver::PROVIDER_MEVONPAY;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function openRequestCountsByProvider(): array
+    {
+        $counts = [];
+
+        foreach ([
+            VirtualCardProviderResolver::PROVIDER_MEVONPAY,
+            VirtualCardProviderResolver::PROVIDER_CASHWYRE,
+        ] as $provider) {
+            $query = VirtualCardRequest::query()->whereIn('status', [
+                VirtualCardRequest::STATUS_PENDING,
+                VirtualCardRequest::STATUS_PREPARING,
+                VirtualCardRequest::STATUS_SUBMITTED,
+            ]);
+            $this->applyProviderFilter($query, $provider);
+            $counts[$provider] = (int) $query->count();
+        }
+
+        return $counts;
+    }
 
     /**
      * @return array<string, int|float>
      */
-    public function stats(): array
+    public function stats(?string $provider = null): array
     {
-        $counts = VirtualCardRequest::query()
+        $query = VirtualCardRequest::query();
+        if ($provider !== null) {
+            $this->applyProviderFilter($query, $this->normalizeProvider($provider));
+        }
+
+        $counts = (clone $query)
             ->selectRaw('status, COUNT(*) as cnt')
             ->groupBy('status')
             ->pluck('cnt', 'status');
 
-        $feeTotal = (float) VirtualCardRequest::query()
+        $feeTotal = (float) (clone $query)
             ->whereIn('status', [
                 VirtualCardRequest::STATUS_PREPARING,
                 VirtualCardRequest::STATUS_SUBMITTED,
@@ -65,6 +103,8 @@ final class AdminVirtualCardService
     {
         $query = VirtualCardRequest::query()
             ->where('status', VirtualCardRequest::STATUS_ACTIVE);
+
+        $this->applyProviderFilter($query, $this->normalizeProvider($request->string('provider')->toString()));
 
         $q = trim($request->string('q')->toString());
         if ($q !== '') {
@@ -136,6 +176,13 @@ final class AdminVirtualCardService
 
         if ($request->filled('request_id')) {
             $query->where('virtual_card_request_id', (int) $request->input('request_id'));
+        }
+
+        if ($request->filled('provider')) {
+            $provider = $this->normalizeProvider($request->string('provider')->toString());
+            $query->whereHas('request', function (Builder $rq) use ($provider) {
+                $this->applyProviderFilter($rq, $provider);
+            });
         }
 
         if ($request->filled('q')) {
@@ -215,8 +262,11 @@ final class AdminVirtualCardService
         if (! $this->canRetry($card)) {
             return ['ok' => false, 'message' => 'Retry is only allowed for failed or pending requests without a provider card ID.'];
         }
-        if (! $this->cardApi->isConfigured()) {
-            return ['ok' => false, 'message' => 'MevonPay card API is not configured.'];
+
+        $providerKey = $this->normalizeProvider($card->provider);
+        $provider = $this->cardProviders->forKey($providerKey);
+        if (! $provider->isConfigured()) {
+            return ['ok' => false, 'message' => ucfirst($providerKey).' card API is not configured.'];
         }
 
         $payload = $card->request_payload;
@@ -225,26 +275,30 @@ final class AdminVirtualCardService
         }
 
         $feeUsd = (float) ($card->fee_usd ?? 0);
-        if ($feeUsd > 0) {
+        if ($provider->requiresUsdPrefunding() && $feeUsd > 0) {
             $fund = $this->usdAutoFund->ensureUsdBalance($feeUsd, 'admin_virtual_card_retry');
             if (! ($fund['ok'] ?? false)) {
                 return ['ok' => false, 'message' => (string) ($fund['message'] ?? 'Could not prepare MevonPay USD balance.')];
             }
         }
 
-        $api = $this->cardApi->createCard($payload);
-        if (! ($api['ok'] ?? false) && $feeUsd > 0 && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
+        $api = $provider->createCard($payload);
+        if ($provider->requiresUsdPrefunding()
+            && ! ($api['ok'] ?? false)
+            && $feeUsd > 0
+            && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
             $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($feeUsd, 'admin_virtual_card_retry_2');
             if ($retryFund['ok'] ?? false) {
-                $api = $this->cardApi->createCard($payload);
+                $api = $provider->createCard($payload);
             }
         }
 
         if ($this->providerResponse->isCreateAccepted($api)) {
             $this->providerResponse->applyAccepted($card, $api);
             $fresh = $card->fresh();
+            $providerLabel = $providerKey === VirtualCardProviderResolver::PROVIDER_CASHWYRE ? 'Cashwyre' : 'MevonPay';
             $message = $fresh->status === VirtualCardRequest::STATUS_PREPARING
-                ? 'Card request accepted by MevonPay — waiting for webhook.'
+                ? "Card request accepted by {$providerLabel} — waiting for webhook."
                 : (string) ($api['message'] ?? 'Provider request succeeded.');
 
             return ['ok' => true, 'message' => $message];
@@ -345,6 +399,8 @@ final class AdminVirtualCardService
     {
         $query = VirtualCardRequest::query();
 
+        $this->applyProviderFilter($query, $this->normalizeProvider($request->string('provider')->toString()));
+
         $status = $request->string('status')->toString();
         if ($status !== '' && in_array($status, [
             VirtualCardRequest::STATUS_PENDING,
@@ -378,5 +434,19 @@ final class AdminVirtualCardService
         }
 
         return $query;
+    }
+
+    private function applyProviderFilter(Builder $query, string $provider): void
+    {
+        if ($provider === VirtualCardProviderResolver::PROVIDER_CASHWYRE) {
+            $query->where('provider', VirtualCardProviderResolver::PROVIDER_CASHWYRE);
+
+            return;
+        }
+
+        $query->where(function (Builder $inner) {
+            $inner->where('provider', VirtualCardProviderResolver::PROVIDER_MEVONPAY)
+                ->orWhereNull('provider');
+        });
     }
 }

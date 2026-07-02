@@ -8,15 +8,24 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold text-gray-900">Card request &amp; webhook logs</h2>
-            <p class="text-sm text-gray-600 mt-1">Fee debits, MevonPay responses, webhooks, refunds, and activations</p>
+            <p class="text-sm text-gray-600 mt-1">
+                {{ $activeProvider === 'cashwyre' ? 'Cashwyre' : 'MevonPay' }} fee debits, provider responses, webhooks, and refunds
+            </p>
         </div>
-        <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
+        <a href="{{ route('admin.virtual-cards.index', ['provider' => $activeProvider]) }}" class="text-sm text-gray-600 hover:text-gray-900">
             <i class="fas fa-arrow-left mr-1"></i> Back to Card Management
         </a>
     </div>
 
+    @include('admin.virtual-cards._provider-tabs', [
+        'routeName' => 'admin.virtual-cards.logs',
+        'activeProvider' => $activeProvider,
+        'providerCounts' => $providerCounts,
+    ])
+
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <form method="GET" class="flex flex-wrap items-end gap-3">
+            <input type="hidden" name="provider" value="{{ $activeProvider }}">
             <div>
                 <label class="block text-xs text-gray-500 mb-1">Event</label>
                 <input type="text" name="event" value="{{ request('event') }}" placeholder="webhook_received"
