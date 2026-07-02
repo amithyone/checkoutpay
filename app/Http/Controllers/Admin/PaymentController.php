@@ -90,7 +90,7 @@ class PaymentController extends Controller
             $query->where('created_at', '<=', $request->to_date . ' 23:59:59');
         }
 
-        // Search by transaction ID or payer name
+        // Search by transaction ID, payer name, or account numbers
         if ($request->filled('search')) {
             $search = trim($request->search);
             
@@ -98,16 +98,25 @@ class PaymentController extends Controller
             $searchClean = str_ireplace('TXN-', '', $search);
             $searchLower = strtolower($search);
             $searchCleanLower = strtolower($searchClean);
+            $searchDigits = preg_replace('/\D/', '', $search) ?? '';
             
             // Use case-insensitive search with LIKE
             // MySQL LIKE is case-insensitive by default for most collations
-            $query->where(function ($q) use ($search, $searchClean, $searchLower, $searchCleanLower) {
+            $query->where(function ($q) use ($search, $searchClean, $searchLower, $searchCleanLower, $searchDigits) {
                 // Search by transaction ID (handles both with and without TXN-)
                 $q->whereRaw('LOWER(transaction_id) LIKE ?', ['%' . $searchLower . '%'])
                   ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%' . $searchCleanLower . '%'])
                   ->orWhereRaw('LOWER(transaction_id) LIKE ?', ['%txn-' . $searchCleanLower . '%'])
                   // Search by payer name
-                  ->orWhereRaw('LOWER(payer_name) LIKE ?', ['%' . $searchLower . '%']);
+                  ->orWhereRaw('LOWER(payer_name) LIKE ?', ['%' . $searchLower . '%'])
+                  // Merchant receive VA / payer account number
+                  ->orWhereRaw('LOWER(account_number) LIKE ?', ['%' . $searchLower . '%'])
+                  ->orWhereRaw('LOWER(payer_account_number) LIKE ?', ['%' . $searchLower . '%']);
+
+                if ($searchDigits !== '') {
+                    $q->orWhere('account_number', 'like', '%' . $searchDigits . '%')
+                        ->orWhere('payer_account_number', 'like', '%' . $searchDigits . '%');
+                }
             });
         }
 
