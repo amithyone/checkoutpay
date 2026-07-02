@@ -7,8 +7,9 @@ use App\Models\VirtualCardRequest;
 use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
-use App\Services\MevonPay\MevonPayCardApiClient;
 use App\Services\MevonPay\MevonPayUsdAutoFundService;
+use App\Services\VirtualCard\VirtualCardProviderResolver;
+use App\Contracts\VirtualCard\VirtualCardProviderContract;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletTopupNotifier;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ final class ConsumerVirtualCardService
     private array $transactionsCache = [];
 
     public function __construct(
-        private MevonPayCardApiClient $cardApi,
+        private VirtualCardProviderResolver $cardProviders,
         private VirtualCardFxService $fx,
         private ConsumerWalletPinVerifier $pinVerifier,
         private VirtualCardFeeRefundService $feeRefunds,
@@ -42,6 +43,20 @@ final class ConsumerVirtualCardService
         }
 
         return (bool) config('virtual_card.enabled', true);
+    }
+
+    private function cardProvider(?VirtualCardRequest $request = null): VirtualCardProviderContract
+    {
+        if ($request !== null && filled($request->provider)) {
+            return $this->cardProviders->forKey((string) $request->provider);
+        }
+
+        return $this->cardProviders->active();
+    }
+
+    public function activeCardProviderKey(): string
+    {
+        return $this->cardProviders->activeKey();
     }
 
     public function creationFeeUsd(): float
@@ -130,7 +145,7 @@ final class ConsumerVirtualCardService
     public function refreshProviderCardBalance(WhatsappWallet $wallet): void
     {
         $card = $this->resolveDisplayCard($wallet);
-        if ($card === null || ! $this->cardApi->isConfigured()) {
+        if ($card === null || ! $this->cardProvider($card)->isConfigured()) {
             return;
         }
 
@@ -250,7 +265,7 @@ final class ConsumerVirtualCardService
         if (! $wallet->isTier2()) {
             return ['ok' => false, 'message' => 'Complete Tier 2 KYC on your profile before requesting a Dollar Virtual Card.'];
         }
-        if (! $this->cardApi->isConfigured()) {
+        if (! $this->cardProvider()->isConfigured()) {
             return ['ok' => false, 'message' => 'Dollar Virtual Card service is not configured.'];
         }
         if (! $this->pinVerifier->verify($wallet, $pin)) {
@@ -369,6 +384,9 @@ final class ConsumerVirtualCardService
                 ->applySpendToSave($wallet->fresh(), $feeNgn, (int) $feeTxn->id, 'virtual_card_fee');
         }
 
+        $providerKey = $this->cardProviders->activeKey();
+        $provider = $this->cardProviders->active();
+
         $payload = [
             'amount' => $initialLoadUsd,
             'firstName' => $fname,
@@ -379,11 +397,13 @@ final class ConsumerVirtualCardService
             'homeNumber' => $homeNumber,
             'homeAddress' => $homeAddress,
             'cardName' => $cardName,
+            'reference' => $reference,
         ];
 
         $row = VirtualCardRequest::query()->create([
             'whatsapp_wallet_id' => $wallet->id,
             'status' => VirtualCardRequest::STATUS_PENDING,
+            'provider' => $providerKey,
             'fee_usd' => $feeUsd,
             'fee_ngn' => $feeNgn,
             'fx_rate_used' => $sellRate,
@@ -400,7 +420,9 @@ final class ConsumerVirtualCardService
             'reference' => $reference,
         ], $wallet->id);
 
-        $fund = $this->usdAutoFund->ensureUsdBalance($this->mevonTotalCostUsd(), 'virtual_card_request');
+        $fund = $provider->requiresUsdPrefunding()
+            ? $this->usdAutoFund->ensureUsdBalance($this->mevonTotalCostUsd(), 'virtual_card_request')
+            : ['ok' => true];
         if (! ($fund['ok'] ?? false)) {
             $internalReason = (string) ($fund['message'] ?? 'USD auto-fund failed');
             Log::warning('consumer.virtual_card.usd_auto_fund_failed', [
@@ -448,12 +470,15 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => VirtualCardUserFacingMessage::requestFailedRefunded()];
         }
 
-        $this->cardLogs->info('provider_request_sent', 'Outbound MevonPay card_request payload', $row, $this->cardLogs->withMevonApiRequest($payload, [
+        $this->cardLogs->info('provider_request_sent', 'Outbound card provider create payload', $row, $this->cardLogs->withMevonApiRequest($payload, [
             'reference' => $reference,
+            'provider' => $providerKey,
         ]), $wallet->id);
 
-        $api = $this->cardApi->createCard($payload);
-        if (! ($api['ok'] ?? false) && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
+        $api = $provider->createCard($payload);
+        if ($provider->requiresUsdPrefunding()
+            && ! ($api['ok'] ?? false)
+            && $this->usdAutoFund->isInsufficientUsdError((string) ($api['message'] ?? ''))) {
             Log::warning('consumer.virtual_card.provider_insufficient_usd', [
                 'wallet_id' => $wallet->id,
                 'reference' => $reference,
@@ -462,7 +487,7 @@ final class ConsumerVirtualCardService
             ]);
             $retryFund = $this->usdAutoFund->fundAfterProviderInsufficientUsd($this->mevonTotalCostUsd(), 'virtual_card_request_retry');
             if ($retryFund['ok'] ?? false) {
-                $api = $this->cardApi->createCard($payload);
+                $api = $provider->createCard($payload);
             }
         }
 
@@ -593,7 +618,7 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => $this->debitFailureMessage($e, 'Could not debit wallet for card top-up. Check balance and limits.')];
         }
 
-        $api = $this->invokeCardTopupWithUsdRetry($amountUsd, $cardCode, $wallet->id, $reference);
+        $api = $this->invokeCardTopupWithUsdRetry($amountUsd, $cardCode, $wallet->id, $reference, $card);
 
         if ($api['ok'] ?? false) {
             $card->update([
@@ -755,10 +780,10 @@ final class ConsumerVirtualCardService
             'reconciliation_pending' => (bool) $card->reconciliation_pending,
         ];
 
-        if (! $this->cardApi->isConfigured()) {
+        if (! $this->cardProvider($card)->isConfigured()) {
             return [
                 'ok' => false,
-                'message' => 'MevonPay card API is not configured.',
+                'message' => 'Card provider is not configured.',
                 'before' => $before,
             ];
         }
@@ -800,8 +825,8 @@ final class ConsumerVirtualCardService
      */
     public function previewCardBalanceReconciliation(VirtualCardRequest $card): array
     {
-        if (! $this->cardApi->isConfigured()) {
-            return ['ok' => false, 'message' => 'MevonPay card API is not configured.'];
+        if (! $this->cardProvider($card)->isConfigured()) {
+            return ['ok' => false, 'message' => 'Card provider is not configured.'];
         }
 
         $card = $this->prepareCardForProviderSync($card);
@@ -842,13 +867,13 @@ final class ConsumerVirtualCardService
 
     private function readProviderBalanceUsd(VirtualCardRequest $card): ?float
     {
-        if (! $this->cardApi->isConfigured()) {
+        if (! $this->cardProvider($card)->isConfigured()) {
             return null;
         }
 
         $requestId = $this->resolveMevonBalanceRequestId($card);
         if ($requestId !== null) {
-            $api = $this->cardApi->getCardBalance($requestId);
+            $api = $this->cardProvider($card)->getCardBalance($requestId);
             if ($api['ok'] ?? false) {
                 $balance = $this->storedDetails->extractBalanceFromProviderPayload($api['raw'] ?? $api);
                 if ($balance !== null) {
@@ -868,7 +893,7 @@ final class ConsumerVirtualCardService
             return null;
         }
 
-        $api = $this->cardApi->getCardDetails($cardId);
+        $api = $this->cardProvider($card)->getCardDetails($cardId);
         if (! ($api['ok'] ?? false)) {
             return null;
         }
@@ -901,7 +926,7 @@ final class ConsumerVirtualCardService
         $empty = ['items' => [], 'auto_frozen' => false];
 
         $card = $this->resolveOperableCard($wallet);
-        if ($card === null || ! $this->cardApi->isConfigured()) {
+        if ($card === null || ! $this->cardProvider($card)->isConfigured()) {
             return $empty;
         }
 
@@ -913,7 +938,7 @@ final class ConsumerVirtualCardService
         $this->syncProviderCardBalance($card);
         $card = $card->fresh();
 
-        $api = $this->getCardTransactionsCached($cardCode);
+        $api = $this->getCardTransactionsCached($cardCode, $card);
         if (! ($api['ok'] ?? false)) {
             Log::warning('consumer.virtual_card.transactions_mevon_failed', [
                 'virtual_card_request_id' => $card->id,
@@ -969,7 +994,7 @@ final class ConsumerVirtualCardService
 
     private function evaluateAutoFreezeForCard(VirtualCardRequest $card): bool
     {
-        if (! $this->cardApi->isConfigured()) {
+        if (! $this->cardProvider($card)->isConfigured()) {
             return false;
         }
 
@@ -978,7 +1003,7 @@ final class ConsumerVirtualCardService
             return false;
         }
 
-        $api = $this->getCardTransactionsCached($cardCode);
+        $api = $this->getCardTransactionsCached($cardCode, $card);
         if (! ($api['ok'] ?? false)) {
             return false;
         }
@@ -1238,7 +1263,7 @@ final class ConsumerVirtualCardService
             return false;
         }
 
-        $api = $this->cardApi->setCardStatus('freeze', $cardCode);
+        $api = $this->cardProvider($card)->setCardStatus('freeze', $cardCode);
         if (! ($api['ok'] ?? false)) {
             Log::warning('consumer.virtual_card.auto_freeze_failed', [
                 'virtual_card_request_id' => $card->id,
@@ -1931,11 +1956,11 @@ final class ConsumerVirtualCardService
     {
         $this->repairCardExternalIdIfNeeded($card);
         $cardId = $this->resolveMevonCardIdentifier($card->fresh());
-        if ($cardId === null || ! $this->cardApi->isConfigured()) {
+        if ($cardId === null || ! $this->cardProvider($card)->isConfigured()) {
             return null;
         }
 
-        $api = $this->cardApi->getCardDetails($cardId);
+        $api = $this->cardProvider($card)->getCardDetails($cardId);
         if (! ($api['ok'] ?? false)) {
             Log::info('consumer.virtual_card.details_provider_miss', [
                 'virtual_card_request_id' => $card->id,
@@ -1995,7 +2020,7 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => 'Could not resolve card for status update.'];
         }
 
-        $api = $this->cardApi->setCardStatus($action, $cardCode);
+        $api = $this->cardProvider($card)->setCardStatus($action, $cardCode);
 
         if (! ($api['ok'] ?? false)) {
             Log::warning('consumer.virtual_card.status_failed', [
@@ -2082,7 +2107,7 @@ final class ConsumerVirtualCardService
             ];
         }
 
-        $api = $this->cardApi->withdrawFromCard($amountUsd, $cardCode, $reasonText);
+        $api = $this->cardProvider($card)->withdrawFromCard($amountUsd, $cardCode, $reasonText);
         if (! ($api['ok'] ?? false)) {
             $providerMessage = (string) ($api['message'] ?? 'Card withdraw failed.');
 
@@ -2234,9 +2259,6 @@ final class ConsumerVirtualCardService
         if (! $wallet->isTier2()) {
             return ['ok' => false, 'message' => 'Complete Tier 2 KYC before managing your Dollar Virtual Card.'];
         }
-        if (! $this->cardApi->isConfigured()) {
-            return ['ok' => false, 'message' => 'Dollar Virtual Card service is not configured.'];
-        }
         if (! $this->pinVerifier->verify($wallet, $pin)) {
             return ['ok' => false, 'message' => 'Invalid PIN.'];
         }
@@ -2244,6 +2266,9 @@ final class ConsumerVirtualCardService
         $card = $this->resolveOperableCard($wallet);
         if (! $card) {
             return ['ok' => false, 'message' => 'No active virtual card found for this wallet.'];
+        }
+        if (! $this->cardProvider($card)->isConfigured()) {
+            return ['ok' => false, 'message' => 'Dollar Virtual Card service is not configured.'];
         }
 
         return ['ok' => true, 'message' => 'OK', 'card' => $card];
@@ -2264,9 +2289,19 @@ final class ConsumerVirtualCardService
      *
      * @return array{ok?: bool, message?: string, raw?: mixed}
      */
-    private function invokeCardTopupWithUsdRetry(float $amountUsd, string $cardCode, int $walletId, string $reference): array
-    {
-        $api = $this->cardApi->topupCard($amountUsd, $cardCode);
+    private function invokeCardTopupWithUsdRetry(
+        float $amountUsd,
+        string $cardCode,
+        int $walletId,
+        string $reference,
+        VirtualCardRequest $card,
+    ): array {
+        $provider = $this->cardProvider($card);
+        $api = $provider->topupCard($amountUsd, $cardCode);
+        if (! $provider->requiresUsdPrefunding()) {
+            return $api;
+        }
+
         $maxRetries = max(1, (int) config('virtual_card.topup_merchant_usd_retries', 2));
 
         for ($attempt = 0; $attempt < $maxRetries; $attempt++) {
@@ -2301,7 +2336,7 @@ final class ConsumerVirtualCardService
                 return $api;
             }
 
-            $api = $this->cardApi->topupCard($amountUsd, $cardCode);
+            $api = $provider->topupCard($amountUsd, $cardCode);
         }
 
         return $api;
@@ -2786,7 +2821,7 @@ final class ConsumerVirtualCardService
             return $webhookCode;
         }
 
-        $api = $this->cardApi->getCardDetails($externalId);
+        $api = $this->cardProvider($card)->getCardDetails($externalId);
         if (! ($api['ok'] ?? false)) {
             Log::warning('consumer.virtual_card.card_code_lookup_failed', [
                 'virtual_card_request_id' => $card->id,
@@ -3011,13 +3046,13 @@ final class ConsumerVirtualCardService
         return preg_match('/^VCARD/i', $value) === 1;
     }
 
-    private function getCardTransactionsCached(string $cardCode): array
+    private function getCardTransactionsCached(string $cardCode, VirtualCardRequest $card): array
     {
         if (isset($this->transactionsCache[$cardCode])) {
             return $this->transactionsCache[$cardCode];
         }
 
-        $api = $this->cardApi->getCardTransactions($cardCode);
+        $api = $this->cardProvider($card)->getCardTransactions($cardCode);
         $this->transactionsCache[$cardCode] = $api;
 
         return $api;
@@ -3120,7 +3155,7 @@ final class ConsumerVirtualCardService
         $totalSpends = 0.0;
         $totalReversals = 0.0;
 
-        $api = $this->getCardTransactionsCached($cardCode);
+        $api = $this->getCardTransactionsCached($cardCode, $card);
         if ($api['ok'] ?? false) {
             $rows = $this->dedupeMevonTransactionRows($this->normalizeMevonTransactionList($api['data'] ?? null));
             foreach ($rows as $row) {
@@ -3161,7 +3196,7 @@ final class ConsumerVirtualCardService
         if ($finalBalance <= 0.0 && ! $card->is_frozen && trim((string) $card->card_external_id) !== '') {
             $cardCode = $this->resolveProviderCardCode($card);
             if ($cardCode !== null) {
-                $api = $this->cardApi->setCardStatus('freeze', $cardCode);
+                $api = $this->cardProvider($card)->setCardStatus('freeze', $cardCode);
                 if ($api['ok'] ?? false) {
                     $card->update(['is_frozen' => true]);
                     $this->cardLogs->info('auto_freeze_zero_balance', 'Card auto-frozen because reconciled balance reached $0.', $card, [], $card->whatsapp_wallet_id);

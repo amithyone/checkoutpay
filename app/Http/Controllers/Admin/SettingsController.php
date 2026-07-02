@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Models\WhitelistedEmailAddress;
 use App\Services\MevonPay\MevonPayHttpClient;
 use App\Services\Vtu\VtuProviderResolver;
+use App\Services\VirtualCard\VirtualCardProviderResolver;
 use App\Support\MarketingDownloadLinks;
 use Illuminate\Http\Request;
 
@@ -42,8 +43,9 @@ class SettingsController extends Controller
         }
 
         $vtuProvider = (string) Setting::get('vtu_provider', VtuProviderResolver::PROVIDER_VTU_NG);
+        $virtualCardProvider = (string) Setting::get('virtual_card_provider', VirtualCardProviderResolver::PROVIDER_MEVONPAY);
 
-        return view('admin.settings.index', compact('settings', 'groups', 'whitelistedEmails', 'mevonBalance', 'vtuProvider'));
+        return view('admin.settings.index', compact('settings', 'groups', 'whitelistedEmails', 'mevonBalance', 'vtuProvider', 'virtualCardProvider'));
     }
 
     /**
@@ -242,6 +244,9 @@ class SettingsController extends Controller
         if ($request->input('settings_section') === 'virtual_card') {
             $validated = $request->validate([
                 'virtual_card_enabled' => 'nullable|boolean',
+                'virtual_card_provider' => 'required|in:mevonpay,cashwyre',
+                'mevonpay_card_enabled' => 'nullable|boolean',
+                'cashwyre_card_enabled' => 'nullable|boolean',
                 'virtual_card_creation_fee_usd' => 'nullable|numeric|min:0|max:500',
                 'virtual_card_initial_load_usd' => 'nullable|numeric|min:0.01|max:500',
                 'virtual_card_fx_mid_auto_sync' => 'nullable|boolean',
@@ -271,6 +276,27 @@ class SettingsController extends Controller
                 'boolean',
                 'virtual_card',
                 'Enable Dollar Virtual Card in CheckoutNow app'
+            );
+            Setting::set(
+                'virtual_card_provider',
+                $validated['virtual_card_provider'],
+                'string',
+                'virtual_card',
+                'Active Dollar Virtual Card provider'
+            );
+            Setting::set(
+                'mevonpay_card_enabled',
+                $request->boolean('mevonpay_card_enabled') ? 1 : 0,
+                'boolean',
+                'virtual_card',
+                'Allow MevonPay card provider when selected'
+            );
+            Setting::set(
+                'cashwyre_card_enabled',
+                $request->boolean('cashwyre_card_enabled') ? 1 : 0,
+                'boolean',
+                'virtual_card',
+                'Allow Cashwyre card provider when selected'
             );
             Setting::set(
                 'virtual_card_fx_mid_auto_sync',

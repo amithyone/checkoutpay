@@ -22,6 +22,7 @@ class VirtualCardRequest extends Model
     protected $fillable = [
         'whatsapp_wallet_id',
         'status',
+        'provider',
         'fee_usd',
         'fee_ngn',
         'fx_rate_used',

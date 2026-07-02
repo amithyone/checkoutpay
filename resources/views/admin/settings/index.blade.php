@@ -840,7 +840,7 @@
         <h3 class="text-lg font-semibold text-gray-900 mb-2">
             <i class="fas fa-credit-card mr-2 text-violet-600"></i>Dollar Virtual Card
         </h3>
-        <p class="text-sm text-gray-600 mb-4">CheckoutNow app card requests, fund, withdraw, and freeze. Uses MevonPay card APIs and your own NGN sell/buy rates.</p>
+        <p class="text-sm text-gray-600 mb-4">CheckoutNow app card requests, fund, withdraw, and freeze. Choose MevonPay or Cashwyre as the card issuer API.</p>
 
         <form action="{{ route('admin.settings.update') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
             @csrf
@@ -853,6 +853,38 @@
                     {{ \App\Models\Setting::get('virtual_card_enabled', config('virtual_card.enabled', true)) ? 'checked' : '' }}>
                 Dollar Virtual Card enabled (CheckoutNow)
             </label>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Active card provider</label>
+                <div class="flex flex-wrap gap-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="virtual_card_provider" value="mevonpay" class="mr-2"
+                            {{ ($virtualCardProvider ?? 'mevonpay') === 'mevonpay' ? 'checked' : '' }}>
+                        MevonPay
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="virtual_card_provider" value="cashwyre" class="mr-2"
+                            {{ ($virtualCardProvider ?? '') === 'cashwyre' ? 'checked' : '' }}>
+                        Cashwyre
+                    </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">New card requests use this provider. Existing cards keep the provider stored on the request row.</p>
+            </div>
+
+            <div class="flex flex-wrap gap-6">
+                <label class="inline-flex items-center text-sm">
+                    <input type="hidden" name="mevonpay_card_enabled" value="0">
+                    <input type="checkbox" name="mevonpay_card_enabled" value="1" class="mr-2 rounded"
+                        {{ \App\Models\Setting::get('mevonpay_card_enabled', true) ? 'checked' : '' }}>
+                    MevonPay cards enabled
+                </label>
+                <label class="inline-flex items-center text-sm">
+                    <input type="hidden" name="cashwyre_card_enabled" value="0">
+                    <input type="checkbox" name="cashwyre_card_enabled" value="1" class="mr-2 rounded"
+                        {{ \App\Models\Setting::get('cashwyre_card_enabled', false) ? 'checked' : '' }}>
+                    Cashwyre cards enabled
+                </label>
+            </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
                 <div>
