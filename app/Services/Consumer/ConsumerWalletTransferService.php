@@ -287,7 +287,22 @@ class ConsumerWalletTransferService
             return ['ok' => false, 'message' => 'Invalid transfer details.'];
         }
 
-        $recipientWallet = $this->internalVaTransfer->resolveRecipientWallet($wallet->fresh(), $acct);
+        $walletFresh = $wallet->fresh();
+
+        if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+            && $this->internalVaTransfer->isOwnTier2Va($walletFresh, $acct)) {
+            return $this->bankTransferBusinessToOwnPersonal(
+                $walletFresh,
+                $amount,
+                $acct,
+                $bankCode,
+                $bankName,
+                $beneficiaryName,
+                $remark,
+            );
+        }
+
+        $recipientWallet = $this->internalVaTransfer->resolveRecipientWallet($walletFresh, $acct);
         if ($recipientWallet !== null) {
             return $this->bankTransferToInternalVa(
                 $wallet,
@@ -541,6 +556,77 @@ class ConsumerWalletTransferService
                 'payout_session_id' => $payoutSessionId !== '' ? $payoutSessionId : null,
                 'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
                 'reference' => $receipt['reference'] !== '' ? $receipt['reference'] : null,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    private function bankTransferBusinessToOwnPersonal(
+        WhatsappWallet $wallet,
+        float $amount,
+        string $acct,
+        string $bankCode,
+        string $bankName,
+        string $beneficiaryName,
+        ?string $remark,
+    ): array {
+        $senderDisplayName = $this->businessLedger->resolveLedgerSenderName(
+            $wallet,
+            ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+        );
+        $reference = $this->bankPayout->makeWalletPayoutReference();
+
+        $result = $this->internalVaTransfer->executeBusinessToPersonal(
+            $wallet,
+            $amount,
+            $acct,
+            $bankCode,
+            $bankName,
+            $beneficiaryName,
+            'consumer_api',
+            $senderDisplayName,
+            $remark,
+            $reference,
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            return ['ok' => false, 'message' => (string) ($result['message'] ?? 'Transfer failed.')];
+        }
+
+        $walletFresh = $wallet->fresh();
+        $creditTransactionId = isset($result['credit_transaction_id']) ? (int) $result['credit_transaction_id'] : null;
+        if ($creditTransactionId
+            && isset($result['personal_balance_before'], $result['personal_balance_after'])) {
+            $this->savings->handleIncomingCredit(
+                $walletFresh,
+                $amount,
+                $creditTransactionId,
+                'business_to_personal',
+                ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+                (float) $result['personal_balance_before'],
+                (float) $result['personal_balance_after'],
+            );
+        }
+
+        return [
+            'ok' => true,
+            'message' => 'Transfer completed.',
+            'data' => [
+                'reference' => (string) ($result['reference'] ?? $reference),
+                'session_id' => null,
+                'response_message' => 'Moved from business to personal wallet.',
+                'balance_after' => (float) ($result['business_balance_after'] ?? $this->businessLedger->resolvedBalance($walletFresh)),
+                'personal_balance_after' => (float) ($result['personal_balance_after'] ?? $walletFresh->balance),
+                'ledger_scope' => ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+                'amount_debited' => $amount,
+                'payout_amount' => $amount,
+                'self_transfer' => false,
+                'self_transfer_fee' => 0.0,
+                'bucket' => MavonPayTransferService::BUCKET_SUCCESSFUL,
+                'internal_va' => true,
+                'business_to_personal' => true,
             ],
         ];
     }

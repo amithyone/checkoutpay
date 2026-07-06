@@ -22,4 +22,29 @@ class WhatsappWalletInternalVaTransferServiceTest extends TestCase
 
         $this->assertNull($service->resolveRecipientWallet($wallet, ''));
     }
+
+    public function test_is_own_tier2_va_matches_wallet_permanent_account(): void
+    {
+        $wallet = new WhatsappWallet([
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'mevon_virtual_account_number' => '8012345678',
+        ]);
+
+        $service = app(WhatsappWalletInternalVaTransferService::class);
+
+        $this->assertTrue($service->isOwnTier2Va($wallet, '8012345678'));
+        $this->assertFalse($service->isOwnTier2Va($wallet, '8098765432'));
+    }
+
+    public function test_is_own_tier2_va_false_for_tier1_wallet(): void
+    {
+        $wallet = new WhatsappWallet([
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+            'mevon_virtual_account_number' => '8012345678',
+        ]);
+
+        $service = app(WhatsappWalletInternalVaTransferService::class);
+
+        $this->assertFalse($service->isOwnTier2Va($wallet, '8012345678'));
+    }
 }

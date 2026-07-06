@@ -45,6 +45,186 @@ final class WhatsappWalletInternalVaTransferService
         return $recipient;
     }
 
+    public function isOwnTier2Va(WhatsappWallet $wallet, string $accountNumber): bool
+    {
+        if (! $wallet->isTier2()) {
+            return false;
+        }
+
+        $acct = self::normalizeAccountNumber($accountNumber);
+        $own = self::normalizeAccountNumber((string) $wallet->mevon_virtual_account_number);
+
+        return $acct !== '' && $own !== '' && $acct === $own;
+    }
+
+    /**
+     * Move funds from business ledger to personal balance on the same wallet (no MevonPay).
+     *
+     * @return array{
+     *   ok: bool,
+     *   message: string,
+     *   bucket?: string,
+     *   reference?: string,
+     *   response_message?: string,
+     *   debit_transaction_id?: int,
+     *   credit_transaction_id?: int,
+     *   business_balance_after?: float,
+     *   personal_balance_after?: float,
+     *   internal_va?: bool,
+     *   business_to_personal?: bool
+     * }
+     */
+    public function executeBusinessToPersonal(
+        WhatsappWallet $wallet,
+        float $amount,
+        string $accountNumber,
+        string $bankCode,
+        string $bankName,
+        string $beneficiaryName,
+        string $channel,
+        ?string $senderDisplayName = null,
+        ?string $remark = null,
+        ?string $reference = null,
+    ): array {
+        $amount = round($amount, 2);
+
+        if ($amount < 1) {
+            return ['ok' => false, 'message' => 'Invalid transfer amount.'];
+        }
+
+        if (! $this->isOwnTier2Va($wallet, $accountNumber)) {
+            return ['ok' => false, 'message' => 'Destination is not your personal Tier 2 account.'];
+        }
+
+        $reference ??= 'B2P'.now()->format('YmdHis').Str::upper(Str::random(6));
+        $senderDisplayName ??= $this->businessLedger->resolveLedgerSenderName(
+            $wallet,
+            ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+        );
+        $acct = self::normalizeAccountNumber($accountNumber);
+
+        $debitTransactionId = null;
+        $creditTransactionId = null;
+        $businessBalanceAfter = null;
+        $personalBalanceBefore = null;
+        $personalBalanceAfter = null;
+
+        try {
+            DB::transaction(function () use (
+                $wallet,
+                $amount,
+                $acct,
+                $bankCode,
+                $bankName,
+                $beneficiaryName,
+                $channel,
+                $senderDisplayName,
+                $remark,
+                $reference,
+                &$debitTransactionId,
+                &$creditTransactionId,
+                &$businessBalanceAfter,
+                &$personalBalanceBefore,
+                &$personalBalanceAfter,
+            ) {
+                $locked = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
+                if (! $locked) {
+                    throw new \RuntimeException('wallet_missing');
+                }
+
+                if (! $locked->hasPin()) {
+                    throw new \RuntimeException('PIN not set.');
+                }
+
+                $debit = $this->businessLedger->debitLockedWallet($locked, $amount);
+                if (! ($debit['ok'] ?? false)) {
+                    throw new \RuntimeException($debit['message'] ?? 'cannot_debit');
+                }
+                $businessBalanceAfter = (float) $debit['balance_after'];
+
+                $creditCheck = $locked->canCredit($amount);
+                if (! ($creditCheck['ok'] ?? false)) {
+                    throw new \RuntimeException($creditCheck['message'] ?? 'Personal credit limit exceeded.');
+                }
+
+                $personalBalanceBefore = round((float) $locked->balance, 2);
+                $personalBalanceAfter = round($personalBalanceBefore + $amount, 2);
+                $locked->balance = $personalBalanceAfter;
+                $locked->pin_failed_attempts = 0;
+                $locked->save();
+
+                $debitTxn = WhatsappWalletTransaction::query()->create([
+                    'whatsapp_wallet_id' => $locked->id,
+                    'sender_name' => $senderDisplayName,
+                    'type' => WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
+                    'ledger_scope' => ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+                    'amount' => $amount,
+                    'balance_after' => $businessBalanceAfter,
+                    'counterparty_account_number' => $acct,
+                    'counterparty_bank_code' => $bankCode,
+                    'counterparty_account_name' => $beneficiaryName,
+                    'external_reference' => $reference,
+                    'meta' => array_filter([
+                        'bank_name' => $bankName,
+                        'channel' => $channel,
+                        'narration' => $remark,
+                        'payout_mode' => 'business_to_personal',
+                        'payout_pending' => false,
+                        'payout_bucket' => MavonPayTransferService::BUCKET_SUCCESSFUL,
+                    ], static fn ($v) => $v !== null && $v !== ''),
+                ]);
+                $debitTransactionId = $debitTxn->id;
+
+                $creditTxn = WhatsappWalletTransaction::query()->create([
+                    'whatsapp_wallet_id' => $locked->id,
+                    'sender_name' => $senderDisplayName,
+                    'type' => WhatsappWalletTransaction::TYPE_P2P_CREDIT,
+                    'amount' => $amount,
+                    'balance_after' => $personalBalanceAfter,
+                    'counterparty_account_number' => $acct,
+                    'counterparty_account_name' => $senderDisplayName,
+                    'external_reference' => $reference,
+                    'meta' => [
+                        'channel' => $channel,
+                        'business_to_personal' => true,
+                        'bank_name' => $bankName,
+                    ],
+                ]);
+                $creditTransactionId = $creditTxn->id;
+            });
+        } catch (\Throwable $e) {
+            Log::warning('whatsapp_wallet.business_to_personal_failed', [
+                'error' => $e->getMessage(),
+                'wallet_id' => $wallet->id,
+            ]);
+
+            $msg = $e->getMessage();
+            if (in_array($msg, ['wallet_missing', 'PIN not set.'], true)
+                || str_starts_with($msg, 'Tier 1')
+                || $msg === 'Insufficient balance.'
+                || $msg === 'Insufficient business balance.') {
+                return ['ok' => false, 'message' => $msg === 'wallet_missing' ? 'Wallet not found.' : $msg];
+            }
+
+            return ['ok' => false, 'message' => 'Transfer could not be completed. Check business balance and limits.'];
+        }
+
+        return [
+            'ok' => true,
+            'message' => 'Transfer completed.',
+            'bucket' => MavonPayTransferService::BUCKET_SUCCESSFUL,
+            'reference' => $reference,
+            'response_message' => 'Moved from business to personal wallet.',
+            'debit_transaction_id' => $debitTransactionId,
+            'credit_transaction_id' => $creditTransactionId,
+            'business_balance_after' => $businessBalanceAfter,
+            'personal_balance_after' => $personalBalanceAfter,
+            'personal_balance_before' => $personalBalanceBefore,
+            'internal_va' => true,
+            'business_to_personal' => true,
+        ];
+    }
+
     /**
      * @return array{
      *   ok: bool,
