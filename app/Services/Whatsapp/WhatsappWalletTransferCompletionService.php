@@ -29,6 +29,7 @@ class WhatsappWalletTransferCompletionService
         private VtuProviderResolver $vtuResolver,
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
+        private WhatsappWalletInternalVaTransferService $internalVaTransfer,
         private MevonPayPayoutPreRefundStatusService $preRefundStatus,
     ) {}
 
@@ -290,6 +291,23 @@ class WhatsappWalletTransferCompletionService
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
 
             return WalletTransferCompletionResult::failed('Bank transfers are only for Nigeria wallet numbers.');
+        }
+
+        $recipientWallet = $this->internalVaTransfer->resolveRecipientWallet($wallet, $acct);
+        if ($recipientWallet !== null) {
+            return $this->completeInternalVaBankTransfer(
+                $session,
+                $instance,
+                $phone,
+                $wallet,
+                $amount,
+                $acct,
+                $bankName,
+                $bankCode,
+                $beneficiary,
+                $recipientWallet,
+                $userTypedPinInChat,
+            );
         }
 
         if ($this->bankPayout->isConfigured()) {
@@ -666,6 +684,87 @@ class WhatsappWalletTransferCompletionService
         $this->sendWalletSubmenu($instance, $phone, $wallet);
 
         return WalletTransferCompletionResult::failed('Bank transfer not completed.');
+    }
+
+    private function completeInternalVaBankTransfer(
+        WhatsappSession $session,
+        string $instance,
+        string $phone,
+        WhatsappWallet $wallet,
+        float $amount,
+        string $acct,
+        string $bankName,
+        string $bankCode,
+        string $beneficiary,
+        WhatsappWallet $recipientWallet,
+        bool $userTypedPinInChat,
+    ): WalletTransferCompletionResult {
+        $reference = $this->bankPayout->makeWalletPayoutReference();
+        $result = $this->internalVaTransfer->execute(
+            $wallet,
+            $recipientWallet,
+            $amount,
+            $acct,
+            $bankCode,
+            $bankName,
+            $beneficiary,
+            'whatsapp_menu',
+            reference: $reference,
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText(
+                $instance,
+                $phone,
+                '❌ Transfer could not be completed. Check balance and limits, then try again.'.
+                $this->pinDeleteReminderSuffix($userTypedPinInChat)
+            );
+            $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
+
+            return WalletTransferCompletionResult::failed((string) ($result['message'] ?? 'Transfer failed.'));
+        }
+
+        $session->update(['chat_context' => ['step' => 'submenu']]);
+        $wallet = $wallet->fresh();
+        $recipientFresh = $recipientWallet->fresh();
+        $when = $this->transferNoticeTimeLine();
+        $refShown = (string) ($result['reference'] ?? $reference);
+        $acctTail = $this->accountLast4($acct);
+        $pin = $this->pinDeleteReminderSuffix($userTypedPinInChat);
+
+        if ($recipientFresh) {
+            $this->walletNotifier->notifyP2pReceived(
+                $instance,
+                $recipientFresh,
+                $amount,
+                (string) $wallet->phone_e164,
+                $wallet->normalizedSenderName(),
+                now(),
+            );
+        }
+
+        $this->client->sendText(
+            $instance,
+            $phone,
+            "✅ *Transfer sent!*\n\n".
+            "*To:* {$beneficiary}\n".
+            "*Account:* ****{$acctTail}\n".
+            '*Amount:* ₦'.number_format($amount, 2)."\n".
+            "*Time:* {$when}\n".
+            'Ref: *'.$refShown."*\n\n".
+            '_Sent instantly to another Checkout wallet._'.
+            $pin
+        );
+        $this->sendWalletSubmenu($instance, $phone, $wallet);
+
+        $receipt = [
+            'session_id' => '',
+            'response_message' => 'Internal wallet transfer.',
+            'reference' => $refShown,
+        ];
+
+        return WalletTransferCompletionResult::success((float) $wallet->balance, 'Transfer completed.', $receipt);
     }
 
     /**

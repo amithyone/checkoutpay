@@ -13,6 +13,7 @@ use App\Services\Whatsapp\WhatsappBankTransferReceiptDetails;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
+use App\Services\Whatsapp\WhatsappWalletInternalVaTransferService;
 use App\Services\Whatsapp\WhatsappWalletPendingP2pService;
 use App\Services\Whatsapp\WhatsappWalletSelfBankTransferService;
 use App\Services\Whatsapp\WhatsappWalletTopupNotifier;
@@ -32,6 +33,7 @@ class ConsumerWalletTransferService
         private WhatsappCrossBorderP2pFxService $crossBorderFx,
         private WhatsappWalletCountryResolver $walletCountry,
         private WhatsappWalletSelfBankTransferService $selfBankTransfer,
+        private WhatsappWalletInternalVaTransferService $internalVaTransfer,
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private ConsumerWalletSavingsService $savings,
         private MevonPayPayoutPreRefundStatusService $preRefundStatus,
@@ -285,6 +287,21 @@ class ConsumerWalletTransferService
             return ['ok' => false, 'message' => 'Invalid transfer details.'];
         }
 
+        $recipientWallet = $this->internalVaTransfer->resolveRecipientWallet($wallet->fresh(), $acct);
+        if ($recipientWallet !== null) {
+            return $this->bankTransferToInternalVa(
+                $wallet,
+                $amount,
+                $acct,
+                $bankCode,
+                $bankName,
+                $beneficiaryName,
+                $recipientWallet,
+                $remark,
+                $ledgerScope,
+            );
+        }
+
         $beneficiaryForMatch = trim($beneficiaryName);
         $fromEnquiry = false;
         if ($this->bankPayout->isNameEnquiryAvailable()) {
@@ -524,6 +541,99 @@ class ConsumerWalletTransferService
                 'payout_session_id' => $payoutSessionId !== '' ? $payoutSessionId : null,
                 'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
                 'reference' => $receipt['reference'] !== '' ? $receipt['reference'] : null,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string, data?: array<string, mixed>}
+     */
+    private function bankTransferToInternalVa(
+        WhatsappWallet $wallet,
+        float $amount,
+        string $acct,
+        string $bankCode,
+        string $bankName,
+        string $beneficiaryName,
+        WhatsappWallet $recipientWallet,
+        ?string $remark,
+        string $ledgerScope,
+    ): array {
+        $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+        $senderDisplayName = $this->businessLedger->resolveLedgerSenderName($wallet, $ledgerScope);
+        $reference = $this->bankPayout->makeWalletPayoutReference();
+
+        $result = $this->internalVaTransfer->execute(
+            $wallet,
+            $recipientWallet,
+            $amount,
+            $acct,
+            $bankCode,
+            $bankName,
+            $beneficiaryName,
+            'consumer_api',
+            $ledgerScope,
+            $senderDisplayName,
+            $remark,
+            $reference,
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            return ['ok' => false, 'message' => (string) ($result['message'] ?? 'Transfer failed.')];
+        }
+
+        $walletFresh = $wallet->fresh();
+        $debitTransactionId = isset($result['debit_transaction_id']) ? (int) $result['debit_transaction_id'] : null;
+        if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_PERSONAL && $debitTransactionId) {
+            $this->savings->applySpendToSave($walletFresh, $amount, $debitTransactionId, 'bank_transfer_internal_va');
+        }
+
+        $recipientFresh = $recipientWallet->fresh();
+        $creditTransactionId = isset($result['credit_transaction_id']) ? (int) $result['credit_transaction_id'] : null;
+        if ($creditTransactionId && $recipientFresh
+            && isset($result['recv_balance_before'], $result['recv_balance_after'])) {
+            $this->savings->handleIncomingCredit(
+                $recipientFresh,
+                $amount,
+                $creditTransactionId,
+                'internal_va',
+                ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+                (float) $result['recv_balance_before'],
+                (float) $result['recv_balance_after'],
+            );
+        }
+
+        $instance = $this->evolutionInstance();
+        if ($instance !== '' && $recipientFresh) {
+            $this->walletNotifier->notifyP2pReceived(
+                $instance,
+                $recipientFresh,
+                $amount,
+                (string) $walletFresh->phone_e164,
+                $senderDisplayName,
+                now(),
+            );
+        }
+
+        $balanceAfter = $ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+            ? $this->businessLedger->resolvedBalance($walletFresh)
+            : (float) ($result['balance_after'] ?? $walletFresh->balance);
+
+        return [
+            'ok' => true,
+            'message' => 'Transfer completed.',
+            'data' => [
+                'reference' => (string) ($result['reference'] ?? $reference),
+                'session_id' => null,
+                'response_message' => 'Internal wallet transfer.',
+                'balance_after' => $balanceAfter,
+                'ledger_scope' => $ledgerScope,
+                'amount_debited' => $amount,
+                'payout_amount' => $amount,
+                'self_transfer' => false,
+                'self_transfer_fee' => 0.0,
+                'bucket' => MavonPayTransferService::BUCKET_SUCCESSFUL,
+                'internal_va' => true,
             ],
         ];
     }
