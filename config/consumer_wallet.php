@@ -64,6 +64,9 @@ return [
     'device_stepup_push_title' => env('CONSUMER_DEVICE_STEPUP_PUSH_TITLE', 'New sign-in attempt'),
     'device_stepup_push_channel' => env('CONSUMER_DEVICE_STEPUP_PUSH_CHANNEL', 'wallet_alerts'),
 
+    /** End wallet app session after this many minutes without API activity (forces re-login). */
+    'app_session_idle_minutes' => max(1, (int) env('CONSUMER_APP_SESSION_IDLE_MINUTES', 10)),
+
     /** P2P money requests (ask someone to pay you). */
     'money_request_enabled' => filter_var(env('CONSUMER_MONEY_REQUEST_ENABLED', true), FILTER_VALIDATE_BOOL),
     'money_request_expiry_days' => (int) env('CONSUMER_MONEY_REQUEST_EXPIRY_DAYS', 7),

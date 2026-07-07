@@ -21,6 +21,8 @@ class ConsumerAppSessionEvent extends Model
 
     public const TYPE_HEARTBEAT = 'heartbeat';
 
+    public const TYPE_SESSION_EXPIRED = 'session_expired';
+
     protected $fillable = [
         'consumer_app_session_id',
         'consumer_wallet_api_account_id',

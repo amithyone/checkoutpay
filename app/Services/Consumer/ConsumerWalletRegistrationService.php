@@ -98,8 +98,7 @@ class ConsumerWalletRegistrationService
             $account->save();
 
             $account->tokens()->delete();
-            $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');
-            $plain = $account->createToken($tokenName)->plainTextToken;
+            $plain = app(ConsumerAppSessionService::class)->createAccessToken($account)->plainTextToken;
 
             return [
                 'ok' => true,

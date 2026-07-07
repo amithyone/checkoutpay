@@ -52,4 +52,46 @@ class ConsumerAppSessionTest extends TestCase
         $session->refresh();
         $this->assertNotNull($session->ended_at);
     }
+
+    public function test_idle_app_session_returns_401_and_ends_session(): void
+    {
+        config(['consumer_wallet.app_session_idle_minutes' => 10]);
+
+        WhatsappWallet::query()->create([
+            'phone_e164' => '2348012345678',
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+            'balance' => 0,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'pin_hash' => Hash::make('1234'),
+            'pin_set_at' => now(),
+        ]);
+
+        $login = $this->postJson('/api/v1/consumer/auth/pin/verify', [
+            'phone' => '08012345678',
+            'pin' => '1234',
+        ]);
+
+        $login->assertOk();
+        $token = (string) $login->json('data.token');
+        $sessionUuid = (string) $login->json('data.app_session_id');
+
+        $session = ConsumerAppSession::query()->where('session_uuid', $sessionUuid)->first();
+        $this->assertNotNull($session);
+        $session->forceFill(['last_seen_at' => now()->subMinutes(11)])->save();
+
+        $account = $session->account;
+        $this->assertNotNull($account);
+        $tokenModel = $account->tokens()->latest('id')->first();
+        $this->assertNotNull($tokenModel);
+        $tokenModel->forceFill(['expires_at' => now()->addHour()])->save();
+
+        $this->getJson('/api/v1/consumer/wallet', [
+            'Authorization' => 'Bearer '.$token,
+            'X-App-Session-Id' => $sessionUuid,
+        ])->assertStatus(401)
+            ->assertJsonPath('code', 'session_expired');
+
+        $session->refresh();
+        $this->assertNotNull($session->ended_at);
+    }
 }

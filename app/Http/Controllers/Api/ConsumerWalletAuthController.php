@@ -124,8 +124,7 @@ class ConsumerWalletAuthController extends Controller
         }
 
         $account->tokens()->delete();
-        $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');
-        $accessToken = $account->createToken($tokenName);
+        $accessToken = $sessions->createAccessToken($account);
         $appSessionId = $sessions->afterTokenIssued($account, ConsumerAppSession::LOGIN_OTP, $request, $accessToken);
 
         return response()->json([
@@ -275,8 +274,7 @@ class ConsumerWalletAuthController extends Controller
         }
 
         $account->tokens()->delete();
-        $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');
-        $accessToken = $account->createToken($tokenName);
+        $accessToken = $sessions->createAccessToken($account);
         $appSessionId = $sessions->afterTokenIssued($account, ConsumerAppSession::LOGIN_PIN, $request, $accessToken);
 
         return response()->json([
@@ -392,6 +390,12 @@ class ConsumerWalletAuthController extends Controller
     }
 
     public function logout(Request $request, ConsumerAppSessionService $sessions): JsonResponse
+    {
+        return $this->endAppSession($request, $sessions);
+    }
+
+    /** Call when the app goes to background so the user must sign in again on return. */
+    public function endAppSession(Request $request, ConsumerAppSessionService $sessions): JsonResponse
     {
         $user = $request->user();
         if ($user instanceof ConsumerWalletApiAccount) {

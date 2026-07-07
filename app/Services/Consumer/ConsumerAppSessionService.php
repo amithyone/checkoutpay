@@ -12,6 +12,75 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class ConsumerAppSessionService
 {
+    public function idleTimeoutMinutes(): int
+    {
+        return max(1, (int) config('consumer_wallet.app_session_idle_minutes', 10));
+    }
+
+    public function createAccessToken(ConsumerWalletApiAccount $account): NewAccessToken
+    {
+        $tokenName = (string) config('consumer_wallet.token_name', 'consumer_mobile');
+
+        return $account->createToken(
+            $tokenName,
+            ['*'],
+            now()->addMinutes($this->idleTimeoutMinutes()),
+        );
+    }
+
+    public function isSessionIdleExpired(ConsumerAppSession $session): bool
+    {
+        if (! $session->isActive()) {
+            return true;
+        }
+
+        $lastSeen = $session->last_seen_at ?? $session->started_at;
+        if ($lastSeen === null) {
+            return false;
+        }
+
+        return $lastSeen->lt(now()->subMinutes($this->idleTimeoutMinutes()));
+    }
+
+    public function isAccessTokenIdleExpired(PersonalAccessToken $token): bool
+    {
+        if ($token->expires_at !== null && $token->expires_at->isPast()) {
+            return true;
+        }
+
+        $reference = $token->last_used_at ?? $token->created_at;
+        if ($reference === null) {
+            return false;
+        }
+
+        return $reference->lt(now()->subMinutes($this->idleTimeoutMinutes()));
+    }
+
+    public function expireDueToIdle(
+        Request $request,
+        ConsumerWalletApiAccount $account,
+        ?ConsumerAppSession $session = null,
+    ): void {
+        $session ??= $this->resolveSession($request, $account);
+
+        if ($session !== null && $session->isActive()) {
+            $session->ended_at = now();
+            $session->save();
+
+            $this->recordEvent(
+                $session,
+                ConsumerAppSessionEvent::TYPE_SESSION_EXPIRED,
+                'Session expired after '.$this->idleTimeoutMinutes().' minutes of inactivity',
+                $request,
+                ['reason' => 'idle_timeout'],
+            );
+        }
+
+        $token = $account->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        }
+    }
     /**
      * @return array{platform: ?string, app_version: ?string, device_label: ?string}
      */
