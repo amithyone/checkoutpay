@@ -316,6 +316,12 @@
                     if (data.notified) {
                         text += ' Customer notified on WhatsApp.';
                     }
+                    if (data.awaiting_failed_confirmations) {
+                        text += ' Waiting for another failed confirmation before reverse.';
+                    }
+                    if (data.provider_failed_confirmations != null && data.provider_failed_confirmations_required != null) {
+                        text += ' Failed checks: ' + data.provider_failed_confirmations + '/' + data.provider_failed_confirmations_required + '.';
+                    }
                     if (data.auto_refund && data.auto_refund.message) {
                         text += ' ' + data.auto_refund.message;
                     }

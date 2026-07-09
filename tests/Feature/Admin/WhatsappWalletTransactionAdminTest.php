@@ -128,12 +128,13 @@ class WhatsappWalletTransactionAdminTest extends TestCase
         $this->assertSame('00', $meta['mevonpay']['api_response']['responseCode'] ?? null);
     }
 
-    public function test_check_status_auto_refunds_pending_to_failed(): void
+    public function test_check_status_does_not_auto_refund_on_first_failed(): void
     {
         config([
             'services.mevonpay.base_url' => 'https://mevonpay.com.ng',
             'services.mevonpay.secret_key' => 'secret_test',
             'services.mevonpay.transfer_status_path' => '/V1/tsk',
+            'whatsapp.wallet.payout_failed_confirmations_required' => 2,
         ]);
 
         Http::fake([
@@ -153,6 +154,51 @@ class WhatsappWalletTransactionAdminTest extends TestCase
             'external_reference' => 'waw_failref',
             'payout_bucket' => MavonPayTransferService::BUCKET_PENDING,
             'payout_pending' => true,
+        ]);
+        $walletId = $txn->whatsapp_wallet_id;
+        WhatsappWallet::query()->whereKey($walletId)->update(['balance' => 4000]);
+
+        $this->actingAs($admin, 'admin')
+            ->postJson(route('admin.whatsapp-wallet.transactions.check-status', $txn))
+            ->assertOk()
+            ->assertJsonMissingPath('auto_refund.ok')
+            ->assertJsonPath('awaiting_failed_confirmations', true);
+
+        $txn->refresh();
+        $this->assertFalse($txn->isReversed());
+        $this->assertSame(4000.0, (float) WhatsappWallet::query()->find($walletId)->balance);
+        $meta = is_array($txn->meta) ? $txn->meta : [];
+        $this->assertSame(1, (int) ($meta['provider_failed_confirmations'] ?? 0));
+        $this->assertSame(MavonPayTransferService::BUCKET_PENDING, $meta['payout_bucket'] ?? null);
+    }
+
+    public function test_check_status_auto_refunds_after_second_failed_confirmation(): void
+    {
+        config([
+            'services.mevonpay.base_url' => 'https://mevonpay.com.ng',
+            'services.mevonpay.secret_key' => 'secret_test',
+            'services.mevonpay.transfer_status_path' => '/V1/tsk',
+            'whatsapp.wallet.payout_failed_confirmations_required' => 2,
+        ]);
+
+        Http::fake([
+            'mevonpay.com.ng/V1/tsk' => Http::response([
+                'status' => 'success',
+                'reference' => 'waw_failref',
+                'details' => [
+                    'transactionStatus' => 'Failed',
+                    'responseCode' => '91',
+                    'responseMessage' => 'Failed',
+                ],
+            ], 200),
+        ]);
+
+        $admin = $this->regularAdmin();
+        $txn = $this->walletWithTransaction([
+            'external_reference' => 'waw_failref',
+            'payout_bucket' => MavonPayTransferService::BUCKET_PENDING,
+            'payout_pending' => true,
+            'provider_failed_confirmations' => 1,
         ]);
         $walletId = $txn->whatsapp_wallet_id;
         WhatsappWallet::query()->whereKey($walletId)->update(['balance' => 4000]);

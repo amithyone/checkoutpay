@@ -151,12 +151,29 @@ class WhatsappWalletPendingPayoutReconciliationService
 
         $transaction->update(['meta' => $meta]);
 
+        $fresh = $transaction->fresh() ?? $transaction;
+        $failedConfirmations = (int) ((is_array($fresh->meta) ? $fresh->meta : [])['provider_failed_confirmations'] ?? 0);
+        $requiredConfirmations = $this->failedConfirmationsRequired();
+
         // Never auto-refund again after a prior reverse (even if TSQ still says failed).
         $autoRefund = $alreadyReversed
             ? null
-            : $this->settleIfTerminal($transaction->fresh(), $newBucket, $adminId);
+            : $this->settleIfTerminal($fresh, $newBucket, $adminId, $failedConfirmations, $requiredConfirmations);
         if ($autoRefund !== null) {
             $result['auto_refund'] = $autoRefund;
+        } elseif (
+            ! $alreadyReversed
+            && $newBucket === MavonPayTransferService::BUCKET_FAILED
+            && $failedConfirmations < $requiredConfirmations
+        ) {
+            $result['message'] = sprintf(
+                'Provider reported failed (%d/%d confirmations). Waiting for another status check before reversing funds.',
+                $failedConfirmations,
+                $requiredConfirmations,
+            );
+            $result['awaiting_failed_confirmations'] = true;
+            $result['provider_failed_confirmations'] = $failedConfirmations;
+            $result['provider_failed_confirmations_required'] = $requiredConfirmations;
         }
 
         if ($alreadyReversed && $newBucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
@@ -166,7 +183,9 @@ class WhatsappWalletPendingPayoutReconciliationService
 
         $result['checked'] = true;
         $result['skipped'] = false;
-        $result['payout_bucket'] = $transaction->fresh()->payoutBucketLabel();
+        $result['payout_bucket'] = $fresh->fresh()->payoutBucketLabel();
+        $result['provider_failed_confirmations'] = $failedConfirmations;
+        $result['provider_failed_confirmations_required'] = $requiredConfirmations;
 
         return $result;
     }
@@ -211,13 +230,44 @@ class WhatsappWalletPendingPayoutReconciliationService
         $meta['provider_status_response_message'] = $result['response_message'] ?? null;
         $meta['provider_status_http_status'] = $result['http_status'] ?? null;
 
+        $requiredConfirmations = $this->failedConfirmationsRequired();
+        $failedConfirmations = (int) ($meta['provider_failed_confirmations'] ?? 0);
+
+        if ($newBucket === MavonPayTransferService::BUCKET_FAILED && ! $alreadyReversed) {
+            $failedConfirmations++;
+            $meta['provider_failed_confirmations'] = $failedConfirmations;
+            $meta['provider_failed_confirmation_at'] = now()->toIso8601String();
+        } elseif ($newBucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+            $failedConfirmations = 0;
+            $meta['provider_failed_confirmations'] = 0;
+        } elseif ($newBucket === MavonPayTransferService::BUCKET_PENDING) {
+            // Ambiguous / not-found responses reset the failed streak.
+            $failedConfirmations = 0;
+            $meta['provider_failed_confirmations'] = 0;
+        }
+
+        $terminalFailed = $alreadyReversed
+            || ($newBucket === MavonPayTransferService::BUCKET_FAILED
+                && $failedConfirmations >= $requiredConfirmations);
+
         if ($newBucket !== '') {
-            $meta['payout_bucket'] = $newBucket;
-            $meta['payout_pending'] = $newBucket === MavonPayTransferService::BUCKET_PENDING;
-            // Keep payout_failed true only for confirmed failures (or prior reverse without success).
-            $meta['payout_failed'] = $alreadyReversed
-                ? $newBucket !== MavonPayTransferService::BUCKET_SUCCESSFUL
-                : $newBucket === MavonPayTransferService::BUCKET_FAILED;
+            if ($newBucket === MavonPayTransferService::BUCKET_FAILED && ! $terminalFailed && ! $alreadyReversed) {
+                // Keep funds locked as pending until failure is confirmed enough times.
+                $meta['payout_bucket'] = MavonPayTransferService::BUCKET_PENDING;
+                $meta['payout_pending'] = true;
+                $meta['payout_failed'] = false;
+                $meta['provider_reported_failed'] = true;
+            } else {
+                $meta['payout_bucket'] = $newBucket;
+                $meta['payout_pending'] = $newBucket === MavonPayTransferService::BUCKET_PENDING;
+                // Keep payout_failed true only for confirmed failures (or prior reverse without success).
+                $meta['payout_failed'] = $alreadyReversed
+                    ? $newBucket !== MavonPayTransferService::BUCKET_SUCCESSFUL
+                    : $newBucket === MavonPayTransferService::BUCKET_FAILED;
+                if ($newBucket !== MavonPayTransferService::BUCKET_FAILED) {
+                    unset($meta['provider_reported_failed']);
+                }
+            }
         }
 
         if ($alreadyReversed && $newBucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
@@ -232,9 +282,10 @@ class WhatsappWalletPendingPayoutReconciliationService
             $meta['payout_response_message'] = $result['response_message'];
         }
 
-        $bucketForPayload = $newBucket !== '' ? $newBucket : $transaction->payoutBucketLabel();
+        $storedBucket = (string) ($meta['payout_bucket'] ?? $newBucket);
+        $bucketForPayload = $storedBucket !== '' ? $storedBucket : $transaction->payoutBucketLabel();
         $refundedFlag = $alreadyReversed
-            || $bucketForPayload === MavonPayTransferService::BUCKET_FAILED;
+            || ($bucketForPayload === MavonPayTransferService::BUCKET_FAILED && $terminalFailed);
 
         $existingMevon = is_array($meta['mevonpay'] ?? null) ? $meta['mevonpay'] : null;
         $existingPayoutApi = is_string($meta['payout_api'] ?? null) && $meta['payout_api'] !== ''
@@ -273,6 +324,8 @@ class WhatsappWalletPendingPayoutReconciliationService
         WhatsappWalletTransaction $transaction,
         string $newBucket,
         ?int $adminId,
+        int $failedConfirmations,
+        int $requiredConfirmations,
     ): ?array {
         if ($newBucket === MavonPayTransferService::BUCKET_PENDING) {
             return null;
@@ -282,11 +335,26 @@ class WhatsappWalletPendingPayoutReconciliationService
             return null;
         }
 
+        if ($failedConfirmations < $requiredConfirmations) {
+            Log::info('whatsapp.wallet.payout_failed_awaiting_confirmations', [
+                'transaction_id' => $transaction->id,
+                'confirmations' => $failedConfirmations,
+                'required' => $requiredConfirmations,
+            ]);
+
+            return null;
+        }
+
         return $this->refundService->refundTransaction(
             $transaction,
             $adminId,
             'provider_status_failed',
         );
+    }
+
+    private function failedConfirmationsRequired(): int
+    {
+        return max(2, (int) config('whatsapp.wallet.payout_failed_confirmations_required', 2));
     }
 
     private function wasCheckedRecently(WhatsappWalletTransaction $transaction): bool

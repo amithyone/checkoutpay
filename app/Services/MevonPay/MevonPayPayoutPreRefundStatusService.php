@@ -6,7 +6,8 @@ use App\Services\MavonPayTransferService;
 use Illuminate\Support\Facades\Log;
 
 /**
- * When an initial payout response is "failed", confirm with MevonPay TSQ before refunding the wallet.
+ * When an initial payout response is "failed", confirm with MevonPay TSQ before deciding.
+ * A single failed TSQ is not enough to refund — keep pending for later multi-check reconcile.
  */
 class MevonPayPayoutPreRefundStatusService
 {
@@ -72,15 +73,38 @@ class MevonPayPayoutPreRefundStatusService
                 'initial_message' => $payoutResult['response_message'] ?? null,
                 'tsq_message' => $status['response_message'] ?? null,
             ]);
+
+            $merged = $this->mergeStatusIntoResult($payoutResult, $status, checked: true);
+            $merged['bucket'] = MavonPayTransferService::BUCKET_SUCCESSFUL;
+
+            return [
+                'bucket' => MavonPayTransferService::BUCKET_SUCCESSFUL,
+                'result' => $merged,
+                'refund_allowed' => false,
+                'status_checked' => true,
+            ];
         }
 
+        // Pending or a single failed TSQ: never refund at payout time.
+        // Lazy reconcile / admin check must confirm failure more than once.
         $merged = $this->mergeStatusIntoResult($payoutResult, $status, checked: true);
-        $merged['bucket'] = $confirmedBucket;
+        $merged['bucket'] = MavonPayTransferService::BUCKET_PENDING;
+        $merged['provider_failed_confirmations'] = $confirmedBucket === MavonPayTransferService::BUCKET_FAILED ? 1 : 0;
+        $merged['pre_refund_status_check']['held_as_pending'] = true;
+        $merged['pre_refund_status_check']['provider_bucket'] = $confirmedBucket;
+
+        if ($confirmedBucket === MavonPayTransferService::BUCKET_FAILED) {
+            Log::info('mevonpay.initial_failed_tsq_held_pending', [
+                'reference' => $reference,
+                'tsq_code' => $status['response_code'] ?? null,
+                'tsq_message' => $status['response_message'] ?? null,
+            ]);
+        }
 
         return [
-            'bucket' => $confirmedBucket,
+            'bucket' => MavonPayTransferService::BUCKET_PENDING,
             'result' => $merged,
-            'refund_allowed' => $confirmedBucket === MavonPayTransferService::BUCKET_FAILED,
+            'refund_allowed' => false,
             'status_checked' => true,
         ];
     }

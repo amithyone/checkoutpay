@@ -29,6 +29,7 @@ class WhatsappWalletPendingPayoutReconciliationServiceTest extends TestCase
             'whatsapp.wallet.payout_reconcile_hours' => 48,
             'whatsapp.wallet.payout_reconcile_min_interval_minutes' => 5,
             'whatsapp.wallet.payout_reconcile_max_per_trigger' => 3,
+            'whatsapp.wallet.payout_failed_confirmations_required' => 2,
         ]);
     }
 
@@ -47,7 +48,7 @@ class WhatsappWalletPendingPayoutReconciliationServiceTest extends TestCase
         ]);
     }
 
-    public function test_reconcile_wallet_refunds_when_provider_returns_failed(): void
+    public function test_reconcile_wallet_does_not_refund_on_first_failed_status(): void
     {
         Http::fake([
             'mevonpay.com.ng/V1/tsk' => Http::response([
@@ -65,7 +66,47 @@ class WhatsappWalletPendingPayoutReconciliationServiceTest extends TestCase
             'phone_e164' => '+2348012345678',
             'balance' => 4000,
         ]);
-        $this->pendingTxn($wallet);
+        $txn = $this->pendingTxn($wallet);
+
+        $service = app(WhatsappWalletPendingPayoutReconciliationService::class);
+        $out = $service->reconcileWallet($wallet);
+
+        $this->assertSame(1, $out['checked']);
+        $this->assertSame([], $out['refunds']);
+        $wallet->refresh();
+        $this->assertSame(4000.0, (float) $wallet->balance);
+        $txn->refresh();
+        $meta = is_array($txn->meta) ? $txn->meta : [];
+        $this->assertSame(1, (int) ($meta['provider_failed_confirmations'] ?? 0));
+        $this->assertSame(MavonPayTransferService::BUCKET_PENDING, $meta['payout_bucket'] ?? null);
+        $this->assertTrue($meta['payout_pending'] ?? false);
+        $this->assertFalse($txn->isReversed());
+    }
+
+    public function test_reconcile_wallet_refunds_after_second_failed_status(): void
+    {
+        Http::fake([
+            'mevonpay.com.ng/V1/tsk' => Http::response([
+                'status' => 'success',
+                'reference' => 'waw_pending1',
+                'details' => [
+                    'transactionStatus' => 'Failed',
+                    'responseCode' => '91',
+                    'responseMessage' => 'Failed',
+                ],
+            ], 200),
+        ]);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348012345678',
+            'balance' => 4000,
+        ]);
+        $txn = $this->pendingTxn($wallet);
+        $txn->update([
+            'meta' => array_merge(is_array($txn->meta) ? $txn->meta : [], [
+                'provider_failed_confirmations' => 1,
+            ]),
+        ]);
 
         $service = app(WhatsappWalletPendingPayoutReconciliationService::class);
         $out = $service->reconcileWallet($wallet);
@@ -74,6 +115,7 @@ class WhatsappWalletPendingPayoutReconciliationServiceTest extends TestCase
         $this->assertCount(1, $out['refunds']);
         $wallet->refresh();
         $this->assertSame(5000.0, (float) $wallet->balance);
+        $this->assertTrue($txn->fresh()->isReversed());
 
         Http::assertSentCount(1);
     }
@@ -128,7 +170,12 @@ class WhatsappWalletPendingPayoutReconciliationServiceTest extends TestCase
             'phone_e164' => '+2348012345680',
             'balance' => 4000,
         ]);
-        $this->pendingTxn($wallet);
+        $txn = $this->pendingTxn($wallet);
+        $txn->update([
+            'meta' => array_merge(is_array($txn->meta) ? $txn->meta : [], [
+                'provider_failed_confirmations' => 1,
+            ]),
+        ]);
 
         $service = app(WhatsappWalletPendingPayoutReconciliationService::class);
         $service->reconcileWallet($wallet);

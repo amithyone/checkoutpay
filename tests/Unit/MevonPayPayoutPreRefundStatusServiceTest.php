@@ -35,7 +35,7 @@ class MevonPayPayoutPreRefundStatusServiceTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_initial_failed_confirmed_by_tsq_allows_refund(): void
+    public function test_initial_failed_confirmed_by_tsq_held_pending_without_immediate_refund(): void
     {
         Http::fake([
             'mevonpay.test/V1/tsk' => Http::response([
@@ -55,9 +55,10 @@ class MevonPayPayoutPreRefundStatusServiceTest extends TestCase
             'reference' => 'waw_fail1',
         ], 'waw_fail1');
 
-        $this->assertSame(MavonPayTransferService::BUCKET_FAILED, $out['bucket']);
-        $this->assertTrue($out['refund_allowed']);
+        $this->assertSame(MavonPayTransferService::BUCKET_PENDING, $out['bucket']);
+        $this->assertFalse($out['refund_allowed']);
         $this->assertTrue($out['status_checked']);
+        $this->assertSame(1, $out['result']['provider_failed_confirmations'] ?? null);
         Http::assertSentCount(1);
     }
 

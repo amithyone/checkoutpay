@@ -38,6 +38,10 @@ final class MevonPayPayoutMetaNormalizer
             $meta['payout_response_code'] = $payoutResult['response_code'];
         }
 
+        if (array_key_exists('provider_failed_confirmations', $payoutResult)) {
+            $meta['provider_failed_confirmations'] = max(0, (int) $payoutResult['provider_failed_confirmations']);
+        }
+
         return $meta;
     }
 

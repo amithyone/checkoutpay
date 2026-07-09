@@ -89,6 +89,11 @@ return [
         'payout_reconcile_min_interval_minutes' => max(1, (int) env('WHATSAPP_WALLET_PAYOUT_RECONCILE_MIN_INTERVAL', 5)),
         /** Max pending payouts to check per wallet menu / balance refresh. */
         'payout_reconcile_max_per_trigger' => max(1, (int) env('WHATSAPP_WALLET_PAYOUT_RECONCILE_MAX', 3)),
+        /**
+         * Consecutive failed MevonPay TSQ results required before auto-refunding a bank payout.
+         * Immediate payout-time "failed" responses are held as pending until this many confirmations.
+         */
+        'payout_failed_confirmations_required' => max(2, (int) env('WHATSAPP_WALLET_PAYOUT_FAILED_CONFIRMATIONS', 2)),
         /** Legacy: only rows created before no-expiry P2P used this TTL. New pending P2P credits use no auto-expiry. */
         'p2p_pending_claim_minutes' => max(5, min(120, (int) env('WHATSAPP_WALLET_P2P_PENDING_CLAIM_MINUTES', 30))),
         /** After bank / instant P2P success, send a small PNG receipt (requires GD). Safe to forward — no balance. */
