@@ -58,6 +58,43 @@ class MevonPayTransferStatusServiceTest extends TestCase
         });
     }
 
+    public function test_check_status_treats_response_code_25_as_pending_not_failed(): void
+    {
+        config([
+            'services.mevonpay.base_url' => 'https://mevonpay.com.ng',
+            'services.mevonpay.secret_key' => 'secret_test_key',
+            'services.mevonpay.transfer_status_path' => '/V1/tsk',
+            'services.mevonpay.transfer_status_auth' => 'bearer',
+        ]);
+
+        Http::fake([
+            'mevonpay.com.ng/V1/tsk' => Http::response([
+                'status' => 'success',
+                'message' => 'Transaction status verification complete.',
+                'reference' => 'waw_iiye3ek90efkw3',
+                'details' => [
+                    'responseCode' => '25',
+                    'responseMessage' => 'Unable to locate record',
+                    'transactionStatus' => 'Unable to locate record',
+                    'sessionId' => 'waw_iiye3ek90efkw3',
+                ],
+            ], 200),
+        ]);
+
+        $service = new MevonPayTransferStatusService;
+        $result = $service->checkStatus('waw_iiye3ek90efkw3', 'createtransfer');
+
+        $this->assertTrue($result['available']);
+        $this->assertSame(MavonPayTransferService::BUCKET_PENDING, $result['bucket']);
+        $this->assertSame('25', $result['response_code']);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://mevonpay.com.ng/V1/tsk'
+                && $request['reference'] === 'waw_iiye3ek90efkw3'
+                && $request['payoutApi'] === 'createtransfer';
+        });
+    }
+
     public function test_meta_normalizer_maps_details_from_tsk_raw(): void
     {
         $raw = [

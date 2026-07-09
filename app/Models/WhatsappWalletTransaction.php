@@ -107,14 +107,20 @@ class WhatsappWalletTransaction extends Model
     public function payoutBucketLabel(): string
     {
         $meta = is_array($this->meta) ? $this->meta : [];
-        if (! empty($meta['payout_failed']) || ($meta['payout_bucket'] ?? '') === MavonPayTransferService::BUCKET_FAILED) {
-            return MavonPayTransferService::BUCKET_FAILED;
+        $bucket = (string) ($meta['payout_bucket'] ?? '');
+
+        // Explicit bucket wins when present (avoids stale payout_failed after a later success).
+        if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+            return MavonPayTransferService::BUCKET_SUCCESSFUL;
         }
-        if (! empty($meta['payout_pending']) || ($meta['payout_bucket'] ?? '') === MavonPayTransferService::BUCKET_PENDING) {
+        if ($bucket === MavonPayTransferService::BUCKET_PENDING) {
             return MavonPayTransferService::BUCKET_PENDING;
         }
-        if (($meta['payout_bucket'] ?? '') === MavonPayTransferService::BUCKET_SUCCESSFUL) {
-            return MavonPayTransferService::BUCKET_SUCCESSFUL;
+        if ($bucket === MavonPayTransferService::BUCKET_FAILED || ! empty($meta['payout_failed'])) {
+            return MavonPayTransferService::BUCKET_FAILED;
+        }
+        if (! empty($meta['payout_pending'])) {
+            return MavonPayTransferService::BUCKET_PENDING;
         }
 
         return 'unknown';
@@ -189,7 +195,17 @@ class WhatsappWalletTransaction extends Model
     {
         return $query->where(function (Builder $q): void {
             $q->where('meta->payout_bucket', MavonPayTransferService::BUCKET_FAILED)
-                ->orWhere('meta->payout_failed', true);
+                ->orWhere(function (Builder $q2): void {
+                    // Legacy rows may only have payout_failed; ignore when bucket is terminal success/pending.
+                    $q2->where('meta->payout_failed', true)
+                        ->where(function (Builder $q3): void {
+                            $q3->whereNull('meta->payout_bucket')
+                                ->orWhereNotIn('meta->payout_bucket', [
+                                    MavonPayTransferService::BUCKET_SUCCESSFUL,
+                                    MavonPayTransferService::BUCKET_PENDING,
+                                ]);
+                        });
+                });
         });
     }
 
@@ -201,7 +217,16 @@ class WhatsappWalletTransaction extends Model
     {
         return $query->where(function (Builder $q): void {
             $q->where('meta->payout_bucket', MavonPayTransferService::BUCKET_PENDING)
-                ->orWhere('meta->payout_pending', true);
+                ->orWhere(function (Builder $q2): void {
+                    $q2->where('meta->payout_pending', true)
+                        ->where(function (Builder $q3): void {
+                            $q3->whereNull('meta->payout_bucket')
+                                ->orWhereNotIn('meta->payout_bucket', [
+                                    MavonPayTransferService::BUCKET_SUCCESSFUL,
+                                    MavonPayTransferService::BUCKET_FAILED,
+                                ]);
+                        });
+                });
         });
     }
 
@@ -211,12 +236,7 @@ class WhatsappWalletTransaction extends Model
      */
     public function scopePayoutSuccessful(Builder $query): Builder
     {
-        return $query
-            ->where('meta->payout_bucket', MavonPayTransferService::BUCKET_SUCCESSFUL)
-            ->where(function (Builder $q): void {
-                $q->whereNull('meta->payout_failed')
-                    ->orWhere('meta->payout_failed', false);
-            });
+        return $query->where('meta->payout_bucket', MavonPayTransferService::BUCKET_SUCCESSFUL);
     }
 
     /**

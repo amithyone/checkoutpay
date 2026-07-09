@@ -163,7 +163,9 @@ class MevonPayTransferStatusService
             return MavonPayTransferService::BUCKET_SUCCESSFUL;
         }
 
-        if (in_array($code, ['09', '90', '99'], true)) {
+        // 09/90/99 = in-flight. 25 = "Unable to locate record" — not terminal;
+        // the transfer may still be settling / not indexed for TSQ yet.
+        if (in_array($code, ['09', '90', '99', '25'], true)) {
             return MavonPayTransferService::BUCKET_PENDING;
         }
 
@@ -172,6 +174,9 @@ class MevonPayTransferStatusService
             return MavonPayTransferService::BUCKET_SUCCESSFUL;
         }
         if (in_array($txLower, ['pending', 'processing', 'in progress', 'in_progress'], true)) {
+            return MavonPayTransferService::BUCKET_PENDING;
+        }
+        if ($this->looksLikeRecordNotFound($code, $transactionStatus, $message)) {
             return MavonPayTransferService::BUCKET_PENDING;
         }
         if (in_array($txLower, ['failed', 'failure', 'declined', 'reversed'], true)) {
@@ -187,12 +192,31 @@ class MevonPayTransferStatusService
         }
 
         if ($httpStatus < 200 || $httpStatus >= 300) {
-            return in_array($code, ['09', '90', '99'], true)
+            return in_array($code, ['09', '90', '99', '25'], true)
                 ? MavonPayTransferService::BUCKET_PENDING
                 : MavonPayTransferService::BUCKET_FAILED;
         }
 
         return MavonPayTransferService::BUCKET_FAILED;
+    }
+
+    /**
+     * MevonPay sometimes returns HTTP 200 with responseCode 25 / "Unable to locate record"
+     * when TSQ cannot find the transfer yet. That is not a confirmed failure.
+     */
+    private function looksLikeRecordNotFound(string $code, string $transactionStatus, string $message): bool
+    {
+        if ($code === '25') {
+            return true;
+        }
+
+        $haystack = strtolower(trim($transactionStatus.' '.$message));
+
+        return $haystack !== '' && (
+            str_contains($haystack, 'unable to locate')
+            || str_contains($haystack, 'record not found')
+            || str_contains($haystack, 'locate record')
+        );
     }
 
     private function responseLooksSuccessful(string $message, string $topStatus): bool

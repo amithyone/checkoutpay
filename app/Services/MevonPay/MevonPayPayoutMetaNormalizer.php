@@ -28,6 +28,12 @@ final class MevonPayPayoutMetaNormalizer
         }
         $meta['mevonpay'] = $payload;
 
+        if (! empty($payload['payout_api'])) {
+            $meta['payout_api'] = $payload['payout_api'];
+        } elseif (! empty($payoutResult['payout_api'])) {
+            $meta['payout_api'] = (string) $payoutResult['payout_api'];
+        }
+
         if (! empty($payoutResult['response_code'])) {
             $meta['payout_response_code'] = $payoutResult['response_code'];
         }

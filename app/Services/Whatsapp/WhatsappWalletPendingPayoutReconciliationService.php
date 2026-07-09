@@ -98,7 +98,11 @@ class WhatsappWalletPendingPayoutReconciliationService
             ];
         }
 
-        if ($transaction->isReversed()) {
+        $alreadyReversed = $transaction->isReversed();
+
+        // Lazy wallet reconcile still skips reversed rows. Admin "Check status" may
+        // re-query so UI/meta can catch up when MevonPay later reports success.
+        if ($alreadyReversed && $onlyIfPending) {
             return [
                 'available' => true,
                 'message' => 'Transaction already reversed.',
@@ -124,7 +128,7 @@ class WhatsappWalletPendingPayoutReconciliationService
 
         $meta = is_array($transaction->meta) ? $transaction->meta : [];
         $reference = (string) ($transaction->external_reference ?? $meta['payout_reference'] ?? '');
-        $payoutApi = isset($meta['payout_api']) ? (string) $meta['payout_api'] : null;
+        $payoutApi = $this->resolvePayoutApi($meta);
 
         if ($reference === '') {
             return [
@@ -143,13 +147,21 @@ class WhatsappWalletPendingPayoutReconciliationService
         $transaction = $transaction->fresh() ?? $transaction;
         $newBucket = (string) ($result['bucket'] ?? $transaction->payoutBucketLabel());
 
-        $meta = $this->applyStatusToMeta($transaction, $result, $newBucket, $adminId);
+        $meta = $this->applyStatusToMeta($transaction, $result, $newBucket, $adminId, $alreadyReversed);
 
         $transaction->update(['meta' => $meta]);
 
-        $autoRefund = $this->settleIfTerminal($transaction->fresh(), $newBucket, $adminId);
+        // Never auto-refund again after a prior reverse (even if TSQ still says failed).
+        $autoRefund = $alreadyReversed
+            ? null
+            : $this->settleIfTerminal($transaction->fresh(), $newBucket, $adminId);
         if ($autoRefund !== null) {
             $result['auto_refund'] = $autoRefund;
+        }
+
+        if ($alreadyReversed && $newBucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+            $result['message'] = 'Provider reports successful, but this payout was already reversed to the customer. Manual recovery may be required.';
+            $result['reversal_conflict'] = true;
         }
 
         $result['checked'] = true;
@@ -157,6 +169,27 @@ class WhatsappWalletPendingPayoutReconciliationService
         $result['payout_bucket'] = $transaction->fresh()->payoutBucketLabel();
 
         return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function resolvePayoutApi(array $meta): ?string
+    {
+        foreach ([
+            $meta['payout_api'] ?? null,
+            is_array($meta['mevonpay'] ?? null) ? ($meta['mevonpay']['payout_api'] ?? null) : null,
+            is_array($meta['mevonpay']['initial_payout'] ?? null)
+                ? ($meta['mevonpay']['initial_payout']['payout_api'] ?? null)
+                : null,
+        ] as $candidate) {
+            $api = trim((string) $candidate);
+            if ($api !== '') {
+                return $api;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -168,6 +201,7 @@ class WhatsappWalletPendingPayoutReconciliationService
         array $result,
         string $newBucket,
         ?int $adminId,
+        bool $alreadyReversed = false,
     ): array {
         $meta = is_array($transaction->meta) ? $transaction->meta : [];
 
@@ -180,21 +214,47 @@ class WhatsappWalletPendingPayoutReconciliationService
         if ($newBucket !== '') {
             $meta['payout_bucket'] = $newBucket;
             $meta['payout_pending'] = $newBucket === MavonPayTransferService::BUCKET_PENDING;
-            $meta['payout_failed'] = $newBucket === MavonPayTransferService::BUCKET_FAILED;
+            // Keep payout_failed true only for confirmed failures (or prior reverse without success).
+            $meta['payout_failed'] = $alreadyReversed
+                ? $newBucket !== MavonPayTransferService::BUCKET_SUCCESSFUL
+                : $newBucket === MavonPayTransferService::BUCKET_FAILED;
+        }
+
+        if ($alreadyReversed && $newBucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+            $meta['provider_success_after_reversal'] = true;
+            $meta['provider_success_after_reversal_at'] = now()->toIso8601String();
+        }
+
+        if (! empty($result['response_code'])) {
+            $meta['payout_response_code'] = $result['response_code'];
+        }
+        if (! empty($result['response_message'])) {
+            $meta['payout_response_message'] = $result['response_message'];
         }
 
         $bucketForPayload = $newBucket !== '' ? $newBucket : $transaction->payoutBucketLabel();
-        $refundedFlag = $transaction->isReversed()
+        $refundedFlag = $alreadyReversed
             || $bucketForPayload === MavonPayTransferService::BUCKET_FAILED;
 
         $existingMevon = is_array($meta['mevonpay'] ?? null) ? $meta['mevonpay'] : null;
+        $existingPayoutApi = is_string($meta['payout_api'] ?? null) && $meta['payout_api'] !== ''
+            ? (string) $meta['payout_api']
+            : (is_array($existingMevon) ? (string) ($existingMevon['payout_api'] ?? '') : '');
+
         $meta['mevonpay'] = MevonPayPayoutMetaNormalizer::buildPayload(
-            array_merge($result, ['bucket' => $bucketForPayload]),
+            array_merge($result, [
+                'bucket' => $bucketForPayload,
+                'payout_api' => $existingPayoutApi !== '' ? $existingPayoutApi : ($result['payout_api'] ?? null),
+            ]),
             $bucketForPayload,
             $refundedFlag,
         );
         if (is_array($existingMevon)) {
             $meta['mevonpay']['initial_payout'] = $existingMevon['initial_payout'] ?? $existingMevon;
+        }
+        if ($existingPayoutApi !== '') {
+            $meta['payout_api'] = $existingPayoutApi;
+            $meta['mevonpay']['payout_api'] = $existingPayoutApi;
         }
 
         $source = $adminId !== null ? 'provider_status_api' : 'lazy_reconcile';

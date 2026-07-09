@@ -75,6 +75,9 @@
                 @if($transaction->isReversed())
                     <p class="text-xs text-red-600 mt-1">Reversed {{ $meta['reversed_at'] ?? '' }}</p>
                 @endif
+                @if(!empty($meta['provider_success_after_reversal']))
+                    <p class="text-xs text-amber-700 mt-1">Provider later reported success after wallet reverse — review manually.</p>
+                @endif
             @endif
         </div>
         <div class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
@@ -97,6 +100,10 @@
             <div>
                 <dt class="text-gray-500">External reference</dt>
                 <dd class="font-mono text-gray-900 break-all">{{ $transaction->external_reference ?: '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-gray-500">Ledger scope</dt>
+                <dd class="text-gray-900">{{ ucfirst((string) ($transaction->ledger_scope ?: 'personal')) }}</dd>
             </div>
             @if($isElectricity)
             <div>
@@ -170,7 +177,7 @@
             @if(!$isElectricity)
             <div>
                 <dt class="text-gray-500">Payout API</dt>
-                <dd class="text-gray-900">{{ $meta['payout_api'] ?? '—' }}</dd>
+                <dd class="text-gray-900">{{ $meta['payout_api'] ?? ($mevonpayPayload['payout_api'] ?? '—') }}</dd>
             </div>
             @endif
         </dl>
@@ -303,8 +310,14 @@
                     if (data.auto_refund && data.auto_refund.message) {
                         text += ' ' + data.auto_refund.message;
                     }
+                    if (data.reversal_conflict) {
+                        text += ' Warning: already reversed locally while provider reports success.';
+                    }
+                    if (data.payout_bucket) {
+                        text += ' Stored bucket: ' + data.payout_bucket + '.';
+                    }
                     msg.textContent = text;
-                    if (reloadOnSuccess(data)) {
+                    if (reloadOnSuccess(data) || data.checked) {
                         setTimeout(function () { window.location.reload(); }, 1500);
                     }
                 })

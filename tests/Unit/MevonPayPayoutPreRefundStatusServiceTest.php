@@ -86,6 +86,37 @@ class MevonPayPayoutPreRefundStatusServiceTest extends TestCase
         $this->assertTrue($out['status_checked']);
     }
 
+    public function test_initial_failed_but_tsq_code_25_stays_pending_without_refund(): void
+    {
+        Http::fake([
+            'mevonpay.test/V1/tsk' => Http::response([
+                'status' => 'success',
+                'reference' => 'waw_not_found',
+                'details' => [
+                    'transactionStatus' => 'Unable to locate record',
+                    'responseCode' => '25',
+                    'responseMessage' => 'Unable to locate record',
+                ],
+            ], 200),
+        ]);
+
+        $svc = app(MevonPayPayoutPreRefundStatusService::class);
+        $out = $svc->resolveBeforeRefund([
+            'bucket' => MavonPayTransferService::BUCKET_FAILED,
+            'response_message' => 'time limit exceeded',
+            'reference' => 'waw_not_found',
+            'payout_api' => 'createtransfer',
+        ], 'waw_not_found');
+
+        $this->assertSame(MavonPayTransferService::BUCKET_PENDING, $out['bucket']);
+        $this->assertFalse($out['refund_allowed']);
+        $this->assertTrue($out['status_checked']);
+        Http::assertSent(function ($request) {
+            return $request['reference'] === 'waw_not_found'
+                && $request['payoutApi'] === 'createtransfer';
+        });
+    }
+
     public function test_initial_failed_with_tsq_timeout_stays_pending_without_refund(): void
     {
         Http::fake(function () {
