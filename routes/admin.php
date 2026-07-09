@@ -297,6 +297,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('whatsapp-wallet/transactions/{transaction}/check-status', [WhatsappWalletTransactionAdminController::class, 'checkStatus'])->name('whatsapp-wallet.transactions.check-status');
             Route::post('whatsapp-wallet/transactions/{transaction}/check-electricity-status', [WhatsappWalletTransactionAdminController::class, 'checkElectricityStatus'])->name('whatsapp-wallet.transactions.check-electricity-status');
             Route::post('whatsapp-wallet/transactions/{transaction}/manual-refund', [WhatsappWalletTransactionAdminController::class, 'manualRefund'])->name('whatsapp-wallet.transactions.manual-refund');
+            Route::post('whatsapp-wallet/transactions/{transaction}/clawback-false-refund', [WhatsappWalletTransactionAdminController::class, 'clawbackFalseRefund'])->name('whatsapp-wallet.transactions.clawback-false-refund');
 
             Route::get('virtual-cards', [VirtualCardAdminController::class, 'index'])->name('virtual-cards.index');
             Route::post('virtual-cards/refresh-rates', [VirtualCardAdminController::class, 'refreshRates'])->name('virtual-cards.refresh-rates');

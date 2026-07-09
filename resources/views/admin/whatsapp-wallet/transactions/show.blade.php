@@ -208,6 +208,15 @@
                     </button>
                 </form>
             @endif
+            @if(($canClawbackFalseRefund ?? false) && auth('admin')->user()?->isSuperAdmin())
+                <form method="POST" action="{{ route('admin.whatsapp-wallet.transactions.clawback-false-refund', $transaction) }}"
+                    onsubmit="return confirm('MevonPay confirmed this payout succeeded, but the wallet was wrongly refunded. Debit the same ledger (personal/business) to recover the money?');">
+                    @csrf
+                    <button type="submit" class="bg-amber-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-800">
+                        Claw back false refund
+                    </button>
+                </form>
+            @endif
         </div>
         <p id="status-check-message" class="mt-3 text-sm text-gray-600 hidden"></p>
         @if($isElectricity)

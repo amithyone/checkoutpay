@@ -146,6 +146,26 @@ class WhatsappWalletTransaction extends Model
     }
 
     /**
+     * False auto-refund that can be clawed back after MevonPay confirms success.
+     */
+    public function canClawbackFalseRefund(): bool
+    {
+        if ($this->type !== self::TYPE_BANK_TRANSFER_OUT || ! $this->isReversed()) {
+            return false;
+        }
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        if (! empty($meta['clawback_at'])) {
+            return false;
+        }
+
+        return ($meta['admin_refund_reason'] ?? '') === 'provider_status_failed'
+            || ! empty($meta['provider_success_after_reversal'])
+            || ($meta['provider_status_bucket'] ?? '') === MavonPayTransferService::BUCKET_SUCCESSFUL
+            || ($meta['payout_bucket'] ?? '') === MavonPayTransferService::BUCKET_SUCCESSFUL;
+    }
+
+    /**
      * Count failed bank payouts in the last N days (sidebar badge).
      */
     public static function countFailedBankPayoutsRecent(int $days = 30): int

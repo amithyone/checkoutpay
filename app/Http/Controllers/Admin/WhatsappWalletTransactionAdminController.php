@@ -7,6 +7,7 @@ use App\Models\MevonPayLedgerEntry;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\MevonPay\MevonPayTransferStatusService;
 use App\Services\MavonPayTransferService;
+use App\Services\Whatsapp\WhatsappWalletBankPayoutClawbackService;
 use App\Services\Whatsapp\WhatsappWalletBankPayoutRefundService;
 use App\Services\Whatsapp\WhatsappWalletPendingPayoutReconciliationService;
 use App\Services\Whatsapp\WhatsappWalletVtuElectricityReconciliationService;
@@ -23,6 +24,7 @@ class WhatsappWalletTransactionAdminController extends Controller
         private MevonPayTransferStatusService $transferStatus,
         private WhatsappWalletPendingPayoutReconciliationService $payoutReconciliation,
         private WhatsappWalletBankPayoutRefundService $refundService,
+        private WhatsappWalletBankPayoutClawbackService $clawbackService,
         private WhatsappWalletVtuElectricityReconciliationService $electricityReconciliation,
     ) {}
 
@@ -76,6 +78,7 @@ class WhatsappWalletTransactionAdminController extends Controller
             'isElectricity' => $isElectricity,
             'electricityMeta' => $electricityMeta,
             'canManualRefund' => $transaction->canManualRefund(),
+            'canClawbackFalseRefund' => $transaction->canClawbackFalseRefund(),
             'auditUrl' => $auditUrl,
         ]);
     }
@@ -117,6 +120,26 @@ class WhatsappWalletTransactionAdminController extends Controller
             $admin->id,
             'admin_manual_refund',
         );
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.transactions.show', $transaction)
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
+    public function clawbackFalseRefund(Request $request, WhatsappWalletTransaction $transaction): RedirectResponse
+    {
+        $admin = Auth::guard('admin')->user();
+        if (! $admin || ! $admin->isSuperAdmin()) {
+            abort(403);
+        }
+
+        if (! $transaction->canClawbackFalseRefund()) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.transactions.show', $transaction)
+                ->with('error', 'Clawback is only allowed for reversed payouts that MevonPay later confirmed successful.');
+        }
+
+        $result = $this->clawbackService->clawbackTransaction($transaction, $admin->id);
 
         return redirect()
             ->route('admin.whatsapp-wallet.transactions.show', $transaction)
