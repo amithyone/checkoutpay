@@ -123,30 +123,43 @@ class AdminSidebarMenu
 
         return [
             'dashboard' => $this->link('Dashboard', 'admin.dashboard', 'fas fa-chart-line', ['admin.dashboard']),
-            'payments' => $this->link('Payments', 'admin.payments.index', 'fas fa-money-bill-wave', ['admin.payments.*'], excludeRoutes: ['admin.payments.needs-review']),
+            'payments' => array_merge(
+                $this->link('Payments', 'admin.payments.index', 'fas fa-money-bill-wave', ['admin.payments.*'], excludeRoutes: ['admin.payments.needs-review']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
             'payments_needs_review' => array_merge(
                 $this->link('Needs Review', 'admin.payments.needs-review', 'fas fa-exclamation-triangle', ['admin.payments.needs-review']),
                 [
                     'variant' => 'danger',
                     'badge_count' => $needsReviewCount,
                     'badge_color' => 'red',
+                    'visible' => ! $admin->isWalletSupport(),
                 ]
             ),
-            'businesses' => $this->link('Businesses', 'admin.businesses.index', 'fas fa-building', ['admin.businesses.*']),
+            'businesses' => array_merge(
+                $this->link('Businesses', 'admin.businesses.index', 'fas fa-building', ['admin.businesses.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
             'support' => array_merge(
                 $this->link('Support Tickets', 'admin.support.index', 'fas fa-comments', ['admin.support.*']),
                 ['visible' => $admin->canManageSupportTickets(), 'badge_count' => $openTickets, 'badge_color' => 'red']
             ),
             'virtual_cards' => array_merge(
                 $this->link('Card Management', 'admin.virtual-cards.index', 'fas fa-credit-card text-indigo-600', ['admin.virtual-cards.*']),
-                ['visible' => $admin->canManageSettings(), 'badge_count' => $pendingCardRequests, 'badge_color' => 'indigo']
+                ['visible' => $admin->canViewVirtualCards(), 'badge_count' => $pendingCardRequests, 'badge_color' => 'indigo']
             ),
-            'businesses_kyc' => $this->link('Business KYC', 'admin.businesses-kyc.index', 'fas fa-id-card', ['admin.businesses-kyc.*']),
+            'businesses_kyc' => array_merge(
+                $this->link('Business KYC', 'admin.businesses-kyc.index', 'fas fa-id-card', ['admin.businesses-kyc.*']),
+                ['visible' => true]
+            ),
             'renters_kyc' => array_merge(
                 $this->link('Renters KYC', 'admin.renters-kyc.index', 'fas fa-id-badge', ['admin.renters-kyc.*']),
-                ['badge_count' => $pendingRenterKycCount, 'badge_color' => 'yellow']
+                ['badge_count' => $pendingRenterKycCount, 'badge_color' => 'yellow', 'visible' => ! $admin->isWalletSupport()]
             ),
-            'rentals' => $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', ['admin.rentals.*', 'admin.rental-categories.*', 'admin.rental-items.*']),
+            'rentals' => array_merge(
+                $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', ['admin.rentals.*', 'admin.rental-categories.*', 'admin.rental-items.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
             'whatsapp_wallet' => array_merge(
                 $this->link('WhatsApp wallet', 'admin.whatsapp-wallet.index', 'fab fa-whatsapp text-green-600', [
                     'admin.whatsapp-wallet.index',
@@ -154,16 +167,16 @@ class AdminSidebarMenu
                     'admin.whatsapp-wallet.update',
                     'admin.whatsapp-wallet.fx-rates.update',
                 ]),
-                ['visible' => $admin->canManageSettings()]
+                ['visible' => $admin->canAccessWalletOps()]
             ),
             'whatsapp_wallet_users' => array_merge(
                 $this->link('Wallet users', 'admin.whatsapp-wallet.wallets.index', 'fas fa-users text-green-600', ['admin.whatsapp-wallet.wallets.*']),
-                ['visible' => $admin->canManageSettings()]
+                ['visible' => $admin->canAccessWalletOps()]
             ),
             'app_sessions' => array_merge(
                 $this->link('App sessions', 'admin.app-sessions.index', 'fas fa-mobile-alt text-green-600', ['admin.app-sessions.*']),
                 [
-                    'visible' => $admin->canManageSettings(),
+                    'visible' => $admin->canAccessWalletOps(),
                     'badge_count' => ConsumerAppSession::query()->whereNull('ended_at')->count(),
                     'badge_color' => 'green',
                 ]
@@ -171,7 +184,7 @@ class AdminSidebarMenu
             'whatsapp_wallet_transactions' => array_merge(
                 $this->link('Wallet transactions', 'admin.whatsapp-wallet.transactions.index', 'fas fa-exchange-alt text-green-600', ['admin.whatsapp-wallet.transactions.*']),
                 [
-                    'visible' => $admin->canManageSettings(),
+                    'visible' => $admin->canAccessWalletOps(),
                     'badge_count' => WhatsappWalletTransaction::countFailedBankPayoutsRecent(),
                     'badge_color' => 'red',
                 ]
@@ -192,8 +205,14 @@ class AdminSidebarMenu
                     'badge_color' => 'yellow',
                 ]
             ),
-            'withdrawals' => $this->link('Withdrawals', 'admin.withdrawals.index', 'fas fa-hand-holding-usd', ['admin.withdrawals.*']),
-            'overdraft' => $this->link('Overdraft queue', 'admin.overdraft-applications.index', 'fas fa-file-invoice-dollar', ['admin.overdraft-applications.*']),
+            'withdrawals' => array_merge(
+                $this->link('Withdrawals', 'admin.withdrawals.index', 'fas fa-hand-holding-usd', ['admin.withdrawals.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'overdraft' => array_merge(
+                $this->link('Overdraft queue', 'admin.overdraft-applications.index', 'fas fa-file-invoice-dollar', ['admin.overdraft-applications.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
             'peer_lending_offers' => array_merge(
                 $this->link('Peer lending offers', 'admin.peer-lending.offers.index', 'fas fa-hand-holding-usd', ['admin.peer-lending.offers.*']),
                 ['visible' => $admin->isSuperAdmin()]
@@ -206,14 +225,26 @@ class AdminSidebarMenu
                 $this->link('External APIs', 'admin.external-apis.index', 'fas fa-plug', ['admin.external-apis.*']),
                 ['visible' => $admin->canManageAccountNumbers()]
             ),
-            'processed_emails' => $this->link('Inbox', 'admin.processed-emails.index', 'fas fa-inbox', ['admin.processed-emails.*']),
-            'transaction_logs' => $this->link('Transaction Logs', 'admin.transaction-logs.index', 'fas fa-history', ['admin.transaction-logs.*']),
+            'processed_emails' => array_merge(
+                $this->link('Inbox', 'admin.processed-emails.index', 'fas fa-inbox', ['admin.processed-emails.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'transaction_logs' => array_merge(
+                $this->link('Transaction Logs', 'admin.transaction-logs.index', 'fas fa-history', ['admin.transaction-logs.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
             'audits' => array_merge(
                 $this->link('Audits', 'admin.audits.index', 'fas fa-clipboard-check', ['admin.audits.*']),
                 ['visible' => $admin->canManageSettings()]
             ),
-            'match_attempts' => $this->link('Match Logs', 'admin.match-attempts.index', 'fas fa-search-dollar', ['admin.match-attempts.*']),
-            'invoices' => $this->link('Invoices', 'admin.invoices.index', 'fas fa-file-invoice', ['admin.invoices.*']),
+            'match_attempts' => array_merge(
+                $this->link('Match Logs', 'admin.match-attempts.index', 'fas fa-search-dollar', ['admin.match-attempts.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'invoices' => array_merge(
+                $this->link('Invoices', 'admin.invoices.index', 'fas fa-file-invoice', ['admin.invoices.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
             'email_accounts' => array_merge(
                 $this->link('Email Accounts', 'admin.email-accounts.index', 'fas fa-envelope', ['admin.email-accounts.*']),
                 ['visible' => $admin->canManageEmailAccounts()]
@@ -222,14 +253,38 @@ class AdminSidebarMenu
                 $this->link('Account Numbers', 'admin.account-numbers.index', 'fas fa-hashtag', ['admin.account-numbers.*']),
                 ['visible' => $admin->canManageAccountNumbers()]
             ),
-            'bank_email_templates' => $this->link('Bank Templates', 'admin.bank-email-templates.index', 'fas fa-university', ['admin.bank-email-templates.*']),
-            'test_transaction' => $this->link('Test Transaction', 'admin.test-transaction.index', 'fas fa-flask', ['admin.test-transaction.*']),
-            'renters' => $this->link('Rental users', 'admin.renters.index', 'fas fa-users', ['admin.renters.index']),
-            'tickets' => $this->link('Tickets', 'admin.tickets.events.index', 'fas fa-ticket-alt', ['admin.tickets.*'], excludeRoutes: ['admin.tickets.scanner', 'admin.tickets.scanner*']),
-            'tickets_scanner' => $this->link('QR Scanner', 'admin.tickets.scanner', 'fas fa-qrcode', ['admin.tickets.scanner', 'admin.tickets.scanner*']),
-            'charity' => $this->link('Go Fund', 'admin.charity.index', 'fas fa-hand-holding-heart', ['admin.charity.*']),
-            'memberships' => $this->link('Memberships', 'admin.memberships.index', 'fas fa-address-card', ['admin.memberships.*', 'admin.membership-categories.*']),
-            'developer_program' => $this->link('Developer program', 'admin.developer-program.index', 'fas fa-handshake', ['admin.developer-program.*']),
+            'bank_email_templates' => array_merge(
+                $this->link('Bank Templates', 'admin.bank-email-templates.index', 'fas fa-university', ['admin.bank-email-templates.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'test_transaction' => array_merge(
+                $this->link('Test Transaction', 'admin.test-transaction.index', 'fas fa-flask', ['admin.test-transaction.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'renters' => array_merge(
+                $this->link('Rental users', 'admin.renters.index', 'fas fa-users', ['admin.renters.index']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'tickets' => array_merge(
+                $this->link('Tickets', 'admin.tickets.events.index', 'fas fa-ticket-alt', ['admin.tickets.*'], excludeRoutes: ['admin.tickets.scanner', 'admin.tickets.scanner*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'tickets_scanner' => array_merge(
+                $this->link('QR Scanner', 'admin.tickets.scanner', 'fas fa-qrcode', ['admin.tickets.scanner', 'admin.tickets.scanner*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'charity' => array_merge(
+                $this->link('Go Fund', 'admin.charity.index', 'fas fa-hand-holding-heart', ['admin.charity.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'memberships' => array_merge(
+                $this->link('Memberships', 'admin.memberships.index', 'fas fa-address-card', ['admin.memberships.*', 'admin.membership-categories.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'developer_program' => array_merge(
+                $this->link('Developer program', 'admin.developer-program.index', 'fas fa-handshake', ['admin.developer-program.*']),
+                ['visible' => ! $admin->isWalletSupport()]
+            ),
             'desktop_telemetry' => array_merge(
                 $this->link('Desktop DRM', 'admin.desktop-telemetry.events.index', 'fas fa-laptop-code', ['admin.desktop-telemetry.*']),
                 ['visible' => $admin->isSuperAdmin()]

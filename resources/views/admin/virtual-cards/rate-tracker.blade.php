@@ -30,6 +30,7 @@
             <p class="text-sm text-gray-600 mt-1">Compare MevonPay and Cashwyre live mid, sell/buy spreads, and historical movement</p>
         </div>
         <div class="flex flex-wrap gap-3 items-center">
+            @if(auth('admin')->user()?->canManageVirtualCards())
             @if($wallet['configured'] ?? false)
                 <button type="button" onclick="openBuyUsdModal()"
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium shadow-sm transition"
@@ -49,6 +50,7 @@
                     <i class="fas fa-bolt"></i> Sync live rates
                 </button>
             </form>
+            @endif
             <a href="{{ route('admin.virtual-cards.index') }}" class="text-sm text-gray-600 hover:text-gray-900 font-medium">
                 <i class="fas fa-arrow-left mr-1"></i> Card management
             </a>
@@ -373,7 +375,7 @@
     </div>
 </div>
 
-@if($wallet['configured'] ?? false)
+@if(auth('admin')->user()?->canManageVirtualCards() && ($wallet['configured'] ?? false))
 {{-- Buy USD modal --}}
 <div id="buyUsdModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg p-5 sm:p-6 max-w-md w-full shadow-xl">

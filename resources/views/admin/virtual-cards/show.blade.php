@@ -260,6 +260,7 @@
         </div>
     </div>
 
+    @if(auth('admin')->user()?->canManageVirtualCards())
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Admin notes</h3>
         <form method="POST" action="{{ route('admin.virtual-cards.update-notes', $card) }}">
@@ -287,6 +288,7 @@
 
             @if($canMarkFailed)
             <form method="POST" action="{{ route('admin.virtual-cards.mark-failed', $card) }}" class="flex flex-wrap items-end gap-2">
+
                 @csrf
                 <input type="text" name="failure_reason" required maxlength="500" placeholder="Failure reason"
                     class="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[240px]">
@@ -322,5 +324,11 @@
             @endif
         </div>
     </div>
+    @elseif(!empty($card->admin_notes))
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Admin notes</h3>
+        <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ $card->admin_notes }}</p>
+    </div>
+    @endif
 </div>
 @endsection

@@ -65,6 +65,8 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'super_admin' => \App\Http\Middleware\RequireSuperAdmin::class,
         'admin_or_super' => \App\Http\Middleware\RequireAdminOrSuperAdmin::class,
+        'wallet_ops' => \App\Http\Middleware\RequireWalletOpsAccess::class,
+        'restrict_wallet_support' => \App\Http\Middleware\RestrictWalletSupportAdmin::class,
         'renter_active' => \App\Http\Middleware\EnsureRenterIsActive::class,
         'tax_admin_redirect' => \App\Http\Middleware\RedirectTaxAdminFromCheckoutPanel::class,
         'tax_admin_api' => \App\Http\Middleware\EnsureTaxAdminApi::class,

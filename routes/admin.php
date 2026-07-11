@@ -35,7 +35,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('/logout', [\App\Http\Controllers\Admin\Auth\LoginController::class, 'logout'])->name('logout');
 
     // Protected admin routes (tax-role admins use NigTax /admin only)
-    Route::middleware(['auth:admin', 'tax_admin_redirect'])->group(function () {
+    Route::middleware(['auth:admin', 'tax_admin_redirect', 'restrict_wallet_support'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::put('sidebar-menu-order', [AdminSidebarMenuController::class, 'update'])->name('sidebar-menu-order.update');
         Route::delete('sidebar-menu-order', [AdminSidebarMenuController::class, 'reset'])->name('sidebar-menu-order.reset');
@@ -261,31 +261,58 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('settings/whitelisted-emails', [\App\Http\Controllers\Admin\SettingsController::class, 'addWhitelistedEmail'])->name('settings.add-whitelisted-email');
             Route::delete('settings/whitelisted-emails/{whitelistedEmail}', [\App\Http\Controllers\Admin\SettingsController::class, 'removeWhitelistedEmail'])->name('settings.remove-whitelisted-email');
 
-            Route::get('whatsapp-wallet', [WhatsappWalletAdminController::class, 'index'])->name('whatsapp-wallet.index');
+            // Wallet settings / account mutations (not wallet_support)
             Route::get('whatsapp-wallet/settings', [WhatsappWalletAdminController::class, 'settings'])->name('whatsapp-wallet.settings');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
-            Route::get('whatsapp-wallet/wallets', [WhatsappWalletAdminController::class, 'wallets'])->name('whatsapp-wallet.wallets.index');
-            Route::get('whatsapp-wallet/wallets/{wallet}', [WhatsappWalletAdminController::class, 'showWallet'])->name('whatsapp-wallet.wallets.show');
             Route::put('whatsapp-wallet/wallets/{wallet}/status', [WhatsappWalletAdminController::class, 'updateWalletStatus'])->name('whatsapp-wallet.wallets.status');
             Route::put('whatsapp-wallet/wallets/{wallet}/link-business', [WhatsappWalletAdminController::class, 'linkBusiness'])->name('whatsapp-wallet.wallets.link-business');
             Route::put('whatsapp-wallet/wallets/{wallet}/bot-pause', [WhatsappWalletAdminController::class, 'updateWalletBotPause'])->name('whatsapp-wallet.wallets.bot-pause');
+            Route::post('whatsapp-wallet/wallets/{wallet}/transfer-lock/clear', [WhatsappWalletAdminController::class, 'clearTransferLock'])->name('whatsapp-wallet.wallets.transfer-lock.clear');
+
+            Route::put('business-name-registrations/{registration}/status', [BusinessNameRegistrationAdminController::class, 'updateStatus'])
+                ->name('business-name-registrations.status');
+            Route::put('business-account-applications/{application}/status', [BusinessAccountApplicationAdminController::class, 'updateStatus'])
+                ->name('business-account-applications.status');
+
+            Route::post('whatsapp-wallet/transactions/{transaction}/manual-refund', [WhatsappWalletTransactionAdminController::class, 'manualRefund'])->name('whatsapp-wallet.transactions.manual-refund');
+            Route::post('whatsapp-wallet/transactions/{transaction}/clawback-false-refund', [WhatsappWalletTransactionAdminController::class, 'clawbackFalseRefund'])->name('whatsapp-wallet.transactions.clawback-false-refund');
+
+            // Virtual card mutations
+            Route::post('virtual-cards/refresh-rates', [VirtualCardAdminController::class, 'refreshRates'])->name('virtual-cards.refresh-rates');
+            Route::post('virtual-cards/rate-tracker/buy-usd', [VirtualCardAdminController::class, 'buyUsdOnRateTracker'])->name('virtual-cards.rate-tracker.buy-usd');
+            Route::post('virtual-cards/rate-tracker/sell-usd', [VirtualCardAdminController::class, 'sellUsdOnRateTracker'])->name('virtual-cards.rate-tracker.sell-usd');
+            Route::post('virtual-cards/rate-tracker/refresh', [VirtualCardAdminController::class, 'refreshRateTracker'])->name('virtual-cards.rate-tracker.refresh');
+            Route::post('virtual-cards/{virtualCardRequest}/notes', [VirtualCardAdminController::class, 'updateNotes'])->name('virtual-cards.update-notes');
+            Route::post('virtual-cards/{virtualCardRequest}/mark-active', [VirtualCardAdminController::class, 'markActive'])->name('virtual-cards.mark-active');
+            Route::post('virtual-cards/{virtualCardRequest}/mark-failed', [VirtualCardAdminController::class, 'markFailed'])->name('virtual-cards.mark-failed');
+            Route::post('virtual-cards/{virtualCardRequest}/retry', [VirtualCardAdminController::class, 'retry'])->name('virtual-cards.retry');
+            Route::post('virtual-cards/{virtualCardRequest}/refund-fee', [VirtualCardAdminController::class, 'refundFee'])->name('virtual-cards.refund-fee');
+
+            // Email Templates
+            Route::get('email-templates', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'index'])->name('email-templates.index');
+            Route::get('email-templates/{template}/edit', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'edit'])->name('email-templates.edit');
+            Route::put('email-templates/{template}', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'update'])->name('email-templates.update');
+            Route::post('email-templates/{template}/reset', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'reset'])->name('email-templates.reset');
+        });
+
+        // Wallet ops: admin/super + wallet_support (view + check-status + push + passkey reset)
+        Route::middleware('wallet_ops')->group(function () {
+            Route::get('whatsapp-wallet', [WhatsappWalletAdminController::class, 'index'])->name('whatsapp-wallet.index');
+            Route::get('whatsapp-wallet/wallets', [WhatsappWalletAdminController::class, 'wallets'])->name('whatsapp-wallet.wallets.index');
+            Route::get('whatsapp-wallet/wallets/{wallet}', [WhatsappWalletAdminController::class, 'showWallet'])->name('whatsapp-wallet.wallets.show');
             Route::post('whatsapp-wallet/wallets/{wallet}/push', [WhatsappWalletAdminController::class, 'sendPushNotification'])->name('whatsapp-wallet.wallets.push');
             Route::post('whatsapp-wallet/wallets/{wallet}/devices/{device}/revoke', [WhatsappWalletAdminController::class, 'revokeTrustedDevice'])->name('whatsapp-wallet.wallets.devices.revoke');
             Route::post('whatsapp-wallet/wallets/{wallet}/devices/reset', [WhatsappWalletAdminController::class, 'resetDeviceRequirement'])->name('whatsapp-wallet.wallets.devices.reset');
-            Route::post('whatsapp-wallet/wallets/{wallet}/transfer-lock/clear', [WhatsappWalletAdminController::class, 'clearTransferLock'])->name('whatsapp-wallet.wallets.transfer-lock.clear');
             Route::post('whatsapp-wallet/wallets/{wallet}/step-up/clear', [WhatsappWalletAdminController::class, 'clearStepUpSessions'])->name('whatsapp-wallet.wallets.step-up.clear');
+
             Route::get('business-name-registrations', [BusinessNameRegistrationAdminController::class, 'index'])->name('business-name-registrations.index');
             Route::get('business-name-registrations/{registration}', [BusinessNameRegistrationAdminController::class, 'show'])->name('business-name-registrations.show');
             Route::get('business-name-registrations/{registration}/id-document', [BusinessNameRegistrationAdminController::class, 'idDocument'])->name('business-name-registrations.id-document');
-            Route::put('business-name-registrations/{registration}/status', [BusinessNameRegistrationAdminController::class, 'updateStatus'])
-                ->name('business-name-registrations.status');
 
             Route::get('business-account-applications', [BusinessAccountApplicationAdminController::class, 'index'])->name('business-account-applications.index');
             Route::get('business-account-applications/{application}', [BusinessAccountApplicationAdminController::class, 'show'])->name('business-account-applications.show');
             Route::get('business-account-applications/{application}/cac-document', [BusinessAccountApplicationAdminController::class, 'cacDocument'])->name('business-account-applications.cac-document');
-            Route::put('business-account-applications/{application}/status', [BusinessAccountApplicationAdminController::class, 'updateStatus'])
-                ->name('business-account-applications.status');
 
             Route::get('app-sessions', [ConsumerAppSessionAdminController::class, 'index'])->name('app-sessions.index');
             Route::get('app-sessions/events', [ConsumerAppSessionAdminController::class, 'events'])->name('app-sessions.events');
@@ -300,31 +327,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('whatsapp-wallet/transactions/{transaction}', [WhatsappWalletTransactionAdminController::class, 'show'])->name('whatsapp-wallet.transactions.show');
             Route::post('whatsapp-wallet/transactions/{transaction}/check-status', [WhatsappWalletTransactionAdminController::class, 'checkStatus'])->name('whatsapp-wallet.transactions.check-status');
             Route::post('whatsapp-wallet/transactions/{transaction}/check-electricity-status', [WhatsappWalletTransactionAdminController::class, 'checkElectricityStatus'])->name('whatsapp-wallet.transactions.check-electricity-status');
-            Route::post('whatsapp-wallet/transactions/{transaction}/manual-refund', [WhatsappWalletTransactionAdminController::class, 'manualRefund'])->name('whatsapp-wallet.transactions.manual-refund');
-            Route::post('whatsapp-wallet/transactions/{transaction}/clawback-false-refund', [WhatsappWalletTransactionAdminController::class, 'clawbackFalseRefund'])->name('whatsapp-wallet.transactions.clawback-false-refund');
 
             Route::get('virtual-cards', [VirtualCardAdminController::class, 'index'])->name('virtual-cards.index');
-            Route::post('virtual-cards/refresh-rates', [VirtualCardAdminController::class, 'refreshRates'])->name('virtual-cards.refresh-rates');
             Route::get('virtual-cards/stats', [VirtualCardAdminController::class, 'stats'])->name('virtual-cards.stats');
             Route::get('virtual-cards/rate-tracker', [VirtualCardAdminController::class, 'rateTracker'])->name('virtual-cards.rate-tracker');
             Route::get('virtual-cards/rate-tracker/data', [VirtualCardAdminController::class, 'rateTrackerData'])->name('virtual-cards.rate-tracker.data');
-            Route::post('virtual-cards/rate-tracker/buy-usd', [VirtualCardAdminController::class, 'buyUsdOnRateTracker'])->name('virtual-cards.rate-tracker.buy-usd');
-            Route::post('virtual-cards/rate-tracker/sell-usd', [VirtualCardAdminController::class, 'sellUsdOnRateTracker'])->name('virtual-cards.rate-tracker.sell-usd');
-            Route::post('virtual-cards/rate-tracker/refresh', [VirtualCardAdminController::class, 'refreshRateTracker'])->name('virtual-cards.rate-tracker.refresh');
             Route::get('virtual-cards/logs/events', [VirtualCardAdminController::class, 'logs'])->name('virtual-cards.logs');
             Route::get('virtual-cards/users', [VirtualCardAdminController::class, 'users'])->name('virtual-cards.users');
             Route::get('virtual-cards/{virtualCardRequest}', [VirtualCardAdminController::class, 'show'])->name('virtual-cards.show');
-            Route::post('virtual-cards/{virtualCardRequest}/notes', [VirtualCardAdminController::class, 'updateNotes'])->name('virtual-cards.update-notes');
-            Route::post('virtual-cards/{virtualCardRequest}/mark-active', [VirtualCardAdminController::class, 'markActive'])->name('virtual-cards.mark-active');
-            Route::post('virtual-cards/{virtualCardRequest}/mark-failed', [VirtualCardAdminController::class, 'markFailed'])->name('virtual-cards.mark-failed');
-            Route::post('virtual-cards/{virtualCardRequest}/retry', [VirtualCardAdminController::class, 'retry'])->name('virtual-cards.retry');
-            Route::post('virtual-cards/{virtualCardRequest}/refund-fee', [VirtualCardAdminController::class, 'refundFee'])->name('virtual-cards.refund-fee');
-
-            // Email Templates
-            Route::get('email-templates', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'index'])->name('email-templates.index');
-            Route::get('email-templates/{template}/edit', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'edit'])->name('email-templates.edit');
-            Route::put('email-templates/{template}', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'update'])->name('email-templates.update');
-            Route::post('email-templates/{template}/reset', [\App\Http\Controllers\Admin\EmailTemplateController::class, 'reset'])->name('email-templates.reset');
         });
 
         // Pages Management

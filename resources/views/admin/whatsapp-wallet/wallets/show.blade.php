@@ -46,6 +46,7 @@
                 </div>
             </div>
 
+            @if(auth('admin')->user()?->canMutateWalletAccounts())
             <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.link-business', $wallet) }}" class="border border-gray-100 rounded-lg p-4 bg-gray-50 space-y-3">
                 @csrf
                 @method('PUT')
@@ -64,6 +65,12 @@
                 @endif
                 <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Save link</button>
             </form>
+            @elseif($wallet->linkedBusiness)
+            <div class="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                <p class="text-sm font-semibold text-gray-800">Linked merchant business</p>
+                <p class="text-sm text-gray-600 mt-1"><strong>{{ $wallet->linkedBusiness->name }}</strong></p>
+            </div>
+            @endif
 
             <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div><dt class="text-gray-500">Wallet ID</dt><dd class="font-mono">#{{ $wallet->id }}</dd></div>
@@ -155,6 +162,7 @@
                 </ul>
             </div>
 
+            @if(auth('admin')->user()?->canMutateWalletAccounts())
             <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
                 <h3 class="font-semibold text-gray-900 mb-3">Account controls</h3>
                 <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.status', $wallet) }}" class="space-y-3">
@@ -174,6 +182,7 @@
                     @endif
                 </form>
             </div>
+            @endif
 
             <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
                 <h3 class="font-semibold text-gray-900 mb-2">App device verification</h3>
@@ -242,7 +251,7 @@
                                 </button>
                             </form>
                         @endif
-                        @if(!empty($transferLockMeta['high_value_transfer_blocked']))
+                        @if(!empty($transferLockMeta['high_value_transfer_blocked']) && auth('admin')->user()?->canMutateWalletAccounts())
                             <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.transfer-lock.clear', $wallet) }}">
                                 @csrf
                                 <button type="submit" class="w-full border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
@@ -365,6 +374,7 @@
                 </form>
             </div>
 
+            @if(auth('admin')->user()?->canMutateWalletAccounts())
             <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
                 <h3 class="font-semibold text-gray-900 mb-2">Manual chat mode</h3>
                 <p class="text-sm text-gray-600 mb-4">
@@ -394,6 +404,14 @@
                     @endif
                 </form>
             </div>
+            @elseif($wallet->isAdminBotPaused())
+            <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+                <h3 class="font-semibold text-gray-900 mb-2">Manual chat mode</h3>
+                <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Bot is paused for this user (manual chat). Ask an admin to resume if needed.
+                </p>
+            </div>
+            @endif
         </div>
     </div>
 

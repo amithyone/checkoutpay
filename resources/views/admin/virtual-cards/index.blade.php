@@ -18,6 +18,7 @@
             </p>
         </div>
         <div class="flex flex-wrap gap-3">
+            @if(auth('admin')->user()?->canManageVirtualCards())
             <form method="POST" action="{{ route('admin.virtual-cards.refresh-rates') }}">
                 @csrf
                 <input type="hidden" name="provider" value="{{ $activeProvider }}">
@@ -30,6 +31,7 @@
                     @endif
                 </button>
             </form>
+            @endif
             <a href="{{ route('admin.virtual-cards.rate-tracker') }}" class="text-sm text-cyan-700 hover:underline font-medium">
                 <i class="fas fa-chart-area mr-1"></i> FX rate tracker
             </a>

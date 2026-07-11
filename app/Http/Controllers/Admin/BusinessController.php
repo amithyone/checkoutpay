@@ -921,6 +921,10 @@ class BusinessController extends Controller
     // KYC Management Methods
     public function approveVerification(Request $request, Business $business, BusinessVerification $verification, MevonRubiesVirtualAccountService $mevonRubies): RedirectResponse
     {
+        if (! auth('admin')->user()?->canDecideBusinessKyc()) {
+            abort(403, 'You cannot approve business KYC.');
+        }
+
         $request->validate([
             'admin_notes' => 'nullable|string|max:1000',
         ]);
@@ -975,6 +979,10 @@ class BusinessController extends Controller
 
     public function rejectVerification(Request $request, Business $business, BusinessVerification $verification): RedirectResponse
     {
+        if (! auth('admin')->user()?->canDecideBusinessKyc()) {
+            abort(403, 'You cannot reject business KYC.');
+        }
+
         $request->validate([
             'rejection_reason' => 'required|string|max:1000',
         ]);

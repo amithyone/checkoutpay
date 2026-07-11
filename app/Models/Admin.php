@@ -43,6 +43,9 @@ class Admin extends Authenticatable
 
     const ROLE_TAX = 'tax';
 
+    /** Wallet ops: view wallet tools, check payout/VTU status, push, reset passkey — no account/settings edits. */
+    const ROLE_WALLET_SUPPORT = 'wallet_support';
+
     /**
      * Get withdrawal requests processed by this admin
      */
@@ -73,6 +76,58 @@ class Admin extends Authenticatable
     public function isTaxAdmin(): bool
     {
         return $this->role === self::ROLE_TAX;
+    }
+
+    /**
+     * Wallet support ops role (CheckoutNow / WhatsApp wallet desk).
+     */
+    public function isWalletSupport(): bool
+    {
+        return $this->role === self::ROLE_WALLET_SUPPORT;
+    }
+
+    /**
+     * Access wallet users, transactions, app sessions, card views, and related support actions.
+     */
+    public function canAccessWalletOps(): bool
+    {
+        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN, self::ROLE_WALLET_SUPPORT], true);
+    }
+
+    /**
+     * Suspend wallets, link business, bot pause, wallet settings / FX, transfer-lock overrides.
+     */
+    public function canMutateWalletAccounts(): bool
+    {
+        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN], true);
+    }
+
+    /**
+     * View virtual card requests (no mark-active / refund / rate trades).
+     */
+    public function canViewVirtualCards(): bool
+    {
+        return $this->canAccessWalletOps();
+    }
+
+    /**
+     * Mutate virtual cards (status, refunds, rate tracker trades).
+     */
+    public function canManageVirtualCards(): bool
+    {
+        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN], true);
+    }
+
+    /**
+     * Approve/reject business KYC (wallet_support is view-only).
+     */
+    public function canDecideBusinessKyc(): bool
+    {
+        if (! $this->is_active || $this->isTaxAdmin() || $this->isWalletSupport()) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -157,6 +212,10 @@ class Admin extends Authenticatable
             return false;
         }
 
-        return ! $this->isTaxAdmin();
+        if ($this->isTaxAdmin() || $this->isWalletSupport()) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -41,6 +41,7 @@
                     <option value="staff" {{ old('role', $staff->role) === 'staff' ? 'selected' : '' }}>Staff</option>
                     <option value="admin" {{ old('role', $staff->role) === 'admin' ? 'selected' : '' }}>Admin</option>
                     <option value="support" {{ old('role', $staff->role) === 'support' ? 'selected' : '' }}>Support</option>
+                    <option value="wallet_support" {{ old('role', $staff->role) === 'wallet_support' ? 'selected' : '' }}>Wallet support</option>
                     <option value="tax" {{ old('role', $staff->role) === 'tax' ? 'selected' : '' }}>Tax (NigTax only)</option>
                 </select>
             </div>

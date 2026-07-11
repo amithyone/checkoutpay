@@ -41,6 +41,7 @@
                     <option value="staff" {{ old('role') === 'staff' ? 'selected' : '' }}>Staff - Review transactions, manage tickets, test transactions</option>
                     <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin - Full access except balance updates</option>
                     <option value="support" {{ old('role') === 'support' ? 'selected' : '' }}>Support - Manage support tickets only</option>
+                    <option value="wallet_support" {{ old('role') === 'wallet_support' ? 'selected' : '' }}>Wallet support - View wallet/cards/KYC, check payout &amp; VTU status, push &amp; reset passkey (no edits)</option>
                     <option value="tax" {{ old('role') === 'tax' ? 'selected' : '' }}>Tax - NigTax admin only (submitted tax records; signs in at nigtax.com/admin)</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500">

@@ -23,6 +23,8 @@
                 <option value="staff" {{ request('role') === 'staff' ? 'selected' : '' }}>Staff</option>
                 <option value="admin" {{ request('role') === 'admin' ? 'selected' : '' }}>Admin</option>
                 <option value="support" {{ request('role') === 'support' ? 'selected' : '' }}>Support</option>
+                <option value="wallet_support" {{ request('role') === 'wallet_support' ? 'selected' : '' }}>Wallet support</option>
+                <option value="tax" {{ request('role') === 'tax' ? 'selected' : '' }}>Tax</option>
             </select>
         </div>
         <div>
@@ -78,7 +80,9 @@
                         <span class="px-2 py-1 text-xs font-medium rounded-full 
                             @if($member->role === 'super_admin') bg-purple-100 text-purple-800
                             @elseif($member->role === 'admin') bg-blue-100 text-blue-800
+                            @elseif($member->role === 'wallet_support') bg-teal-100 text-teal-800
                             @elseif($member->role === 'staff') bg-green-100 text-green-800
+                            @elseif($member->role === 'tax') bg-amber-100 text-amber-800
                             @else bg-gray-100 text-gray-800
                             @endif">
                             {{ str_replace('_', ' ', ucfirst($member->role)) }}

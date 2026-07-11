@@ -684,7 +684,7 @@
                                         Text Data
                                     </span>
                                 @endif
-                                @if(in_array($status, ['pending', 'under_review']))
+                                @if(in_array($status, ['pending', 'under_review']) && auth('admin')->user()?->canDecideBusinessKyc())
                                     <button onclick="showApproveKYCModal({{ $verification->id }})" 
                                             class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs">
                                         <i class="fas fa-check mr-1"></i> Approve

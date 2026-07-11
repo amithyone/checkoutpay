@@ -49,6 +49,7 @@
         @endif
     </a>
     @php $bnrPending = \App\Models\BusinessNameRegistration::countPending(); @endphp
+    @if(auth('admin')->user()?->canManageSettings())
     <a href="{{ route('admin.business-name-registrations.index') }}"
        class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.business-name-registrations.*']) }}">
         <i class="fas fa-briefcase mr-2 text-green-600"></i> Business names
@@ -60,4 +61,5 @@
        class="inline-flex items-center px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.settings', 'admin.whatsapp-wallet.update', 'admin.whatsapp-wallet.fx-rates.update']) }}">
         <i class="fas fa-cog mr-2 text-gray-600"></i> Settings &amp; FX
     </a>
+    @endif
 </nav>
