@@ -110,7 +110,8 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
+        {{-- Desktop table --}}
+        <div class="hidden lg:block overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
@@ -182,6 +183,75 @@
                 </tbody>
             </table>
         </div>
+
+        {{-- Mobile list (no table) --}}
+        <div class="lg:hidden divide-y divide-gray-100">
+            @forelse($transactions as $txn)
+                @php
+                    $bucket = $txn->payoutBucketLabel();
+                    $txnMeta = is_array($txn->meta) ? $txn->meta : [];
+                    $isElec = $txn->type === \App\Models\WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY;
+                    $elecPending = (bool) ($txnMeta['vtu_pending'] ?? false);
+                    $elecToken = trim((string) ($txnMeta['electricity_token'] ?? ''));
+                    $elecRefunded = (bool) ($txnMeta['vtu_refunded'] ?? false);
+                    $statusLabel = '—';
+                    $statusClass = 'bg-gray-100 text-gray-700';
+                    if ($isElec) {
+                        if ($elecRefunded) {
+                            $statusLabel = 'Refunded';
+                            $statusClass = 'bg-red-100 text-red-800';
+                        } elseif ($elecPending) {
+                            $statusLabel = 'Pending token';
+                            $statusClass = 'bg-amber-100 text-amber-800';
+                        } elseif ($elecToken !== '') {
+                            $statusLabel = 'Token ready';
+                            $statusClass = 'bg-green-100 text-green-800';
+                        } else {
+                            $statusLabel = (string) ($txnMeta['vtu_status'] ?? 'VTU');
+                        }
+                    } elseif ($txn->type === \App\Models\WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT) {
+                        $statusLabel = ucfirst($bucket);
+                        $statusClass = $bucketBadge($bucket);
+                    }
+                @endphp
+                <div class="px-4 py-3">
+                    <a href="{{ route('admin.whatsapp-wallet.transactions.show', $txn) }}" class="block active:opacity-80">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-gray-900 truncate">{{ $txn->wallet?->phone_e164 ?? '—' }}</p>
+                                <p class="text-xs text-gray-500 mt-0.5">
+                                    #{{ $txn->id }}
+                                    · {{ $txn->created_at?->format('M j, H:i') }}
+                                    · {{ str_replace('_', ' ', $txn->type) }}
+                                </p>
+                                @if($txn->external_reference)
+                                    <p class="text-[11px] font-mono text-gray-400 truncate mt-0.5">{{ $txn->external_reference }}</p>
+                                @endif
+                            </div>
+                            <div class="text-right shrink-0">
+                                <p class="text-sm font-bold text-gray-900">₦{{ number_format((float) $txn->amount, 2) }}</p>
+                                @if($statusLabel !== '—')
+                                    <span class="inline-flex mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium {{ $statusClass }}">{{ $statusLabel }}</span>
+                                @endif
+                            </div>
+                        </div>
+                    </a>
+                    @if($isElec)
+                        <div class="mt-2 flex gap-3">
+                            <button type="button"
+                                class="text-xs font-medium text-amber-700 js-check-vtu-electricity"
+                                data-url="{{ route('admin.whatsapp-wallet.transactions.check-electricity-status', $txn) }}">
+                                Check VTU status
+                            </button>
+                            <a href="{{ route('admin.whatsapp-wallet.transactions.show', $txn) }}" class="text-xs font-medium text-primary">Open</a>
+                        </div>
+                    @endif
+                </div>
+            @empty
+                <div class="px-4 py-10 text-center text-sm text-gray-500">No transactions match your filters.</div>
+            @endforelse
+        </div>
+
         @if($transactions->hasPages())
             <div class="px-4 py-3 border-t border-gray-200">{{ $transactions->links() }}</div>
         @endif

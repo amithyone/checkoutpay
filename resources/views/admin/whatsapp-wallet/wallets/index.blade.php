@@ -60,7 +60,8 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
+        {{-- Desktop table --}}
+        <div class="hidden lg:block overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
@@ -120,6 +121,42 @@
                 </tbody>
             </table>
         </div>
+
+        {{-- Mobile list (no table) --}}
+        <div class="lg:hidden divide-y divide-gray-100">
+            @forelse($wallets as $w)
+                <a href="{{ route('admin.whatsapp-wallet.wallets.show', $w) }}" class="flex items-center gap-3 px-4 py-3 active:bg-gray-50">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <p class="font-mono text-sm font-semibold text-gray-900 truncate">{{ $w->phone_e164 }}</p>
+                            @if($w->isActive())
+                                <span class="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded">Active</span>
+                            @else
+                                <span class="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded">Suspended</span>
+                            @endif
+                            @if($w->isTier2())
+                                <span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">T2</span>
+                            @endif
+                            @if($w->isAdminBotPaused())
+                                <span class="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded">Manual</span>
+                            @endif
+                        </div>
+                        <p class="text-xs text-gray-500 truncate mt-0.5">
+                            {{ $w->displayName() ?? 'No name' }}
+                            · #{{ $w->id }}
+                            · PIN {{ $w->hasPin() ? 'set' : 'missing' }}
+                        </p>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <p class="text-sm font-bold text-gray-900">₦{{ number_format((float) $w->balance, 2) }}</p>
+                        <i class="fas fa-chevron-right text-gray-300 text-xs"></i>
+                    </div>
+                </a>
+            @empty
+                <div class="px-4 py-10 text-center text-sm text-gray-500">No wallets match your filters.</div>
+            @endforelse
+        </div>
+
         @if($wallets->hasPages())
             <div class="px-4 py-3 border-t border-gray-200">{{ $wallets->links() }}</div>
         @endif
