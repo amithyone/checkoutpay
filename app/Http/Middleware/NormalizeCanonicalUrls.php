@@ -58,7 +58,8 @@ final class NormalizeCanonicalUrls
     private function shouldSkip(string $path): bool
     {
         if (str_starts_with($path, '/api')
-            || str_starts_with($path, '/admin')
+            || str_starts_with($path, '/'.\App\Support\AdminPath::prefix())
+            || str_starts_with($path, '/'.\App\Support\AdminPath::honeypotPrefix())
             || str_starts_with($path, '/business')
             || str_starts_with($path, '/pay')
             || str_starts_with($path, '/wallet/')

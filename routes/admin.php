@@ -28,10 +28,11 @@ use App\Http\Controllers\Admin\WhatsappSaveTogetherAdminController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('admin')->name('admin.')->group(function () {
+Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function () {
     // Admin authentication routes
     Route::get('/login', [\App\Http\Controllers\Admin\Auth\LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [\App\Http\Controllers\Admin\Auth\LoginController::class, 'login']);
+    Route::post('/login', [\App\Http\Controllers\Admin\Auth\LoginController::class, 'login'])
+        ->middleware('throttle:admin-login');
     Route::post('/logout', [\App\Http\Controllers\Admin\Auth\LoginController::class, 'logout'])->name('logout');
 
     // Protected admin routes (tax-role admins use NigTax /admin only)
@@ -238,7 +239,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('audits', [AuditsController::class, 'index'])->name('audits.index');
             Route::get('audits/mevonpay', [MevonPayAuditController::class, 'index'])->name('audits.mevonpay.index');
             Route::get('audits/mevonpay/export', [MevonPayAuditController::class, 'exportCsv'])->name('audits.mevonpay.export');
-            Route::redirect('mevonpay-audit', '/admin/audits/mevonpay')->name('mevonpay-audit.index');
+            Route::redirect('mevonpay-audit', '/'.\App\Support\AdminPath::prefix().'/audits/mevonpay')->name('mevonpay-audit.index');
             Route::get('mevonpay-audit/export', fn () => redirect()->route('admin.audits.mevonpay.export', request()->query()));
         });
 

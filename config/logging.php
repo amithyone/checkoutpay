@@ -37,6 +37,13 @@ return [
             'days' => 30,
             'replace_placeholders' => true,
         ],
+        'honeypot' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/honeypot.log'),
+            'level' => 'info',
+            'days' => 60,
+            'replace_placeholders' => true,
+        ],
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,

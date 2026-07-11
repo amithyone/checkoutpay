@@ -352,7 +352,7 @@ function checkMatch(emailId) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Checking...';
     
-    fetch(`/admin/processed-emails/${emailId}/check-match`, {
+    fetch(`${window.__ADMIN_BASE__}/processed-emails/${emailId}/check-match`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

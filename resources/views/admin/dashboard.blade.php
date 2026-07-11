@@ -1679,7 +1679,7 @@ function resendWebhook(paymentId) {
         return;
     }
     
-    fetch(`/admin/payments/${paymentId}/resend-webhook`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/resend-webhook`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

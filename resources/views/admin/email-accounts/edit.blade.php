@@ -178,7 +178,7 @@ function testConnection(id) {
     btn.disabled = true;
     btn.textContent = 'Testing...';
     
-    fetch(`/admin/email-accounts/${id}/test-connection`, {
+    fetch(`${window.__ADMIN_BASE__}/email-accounts/${id}/test-connection`, {
         method: 'POST',
         headers: {
             'X-CSRF-TOKEN': '{{ csrf_token() }}',

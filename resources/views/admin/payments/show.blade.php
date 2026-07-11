@@ -787,7 +787,7 @@ function checkMatchForPayment(paymentId) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Checking...';
     
-    fetch(`/admin/payments/${paymentId}/check-match`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/check-match`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -851,7 +851,7 @@ function markAsExpired(paymentId) {
         return;
     }
 
-    fetch(`/admin/payments/${paymentId}/mark-expired`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/mark-expired`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -876,7 +876,7 @@ function markAsExpired(paymentId) {
 
 function showDeleteModal(paymentId, transactionId) {
     const form = document.getElementById('deleteForm');
-    form.action = `/admin/payments/${paymentId}`;
+    form.action = `${window.__ADMIN_BASE__}/payments/${paymentId}`;
     document.getElementById('delete-transaction-id').textContent = transactionId;
     document.getElementById('deleteModal').classList.remove('hidden');
 }
@@ -887,7 +887,7 @@ function closeDeleteModal() {
 
 function showManualVerifyModal(paymentId, transactionId, expectedAmount) {
     const form = document.getElementById('manualVerifyForm');
-    form.action = `/admin/payments/${paymentId}/manual-verify`;
+    form.action = `${window.__ADMIN_BASE__}/payments/${paymentId}/manual-verify`;
     
     document.getElementById('verify-modal-transaction-id').textContent = transactionId;
     document.getElementById('verify-modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
@@ -902,7 +902,7 @@ function closeManualVerifyModal() {
 
 function showManualApproveModal(paymentId, transactionId, expectedAmount) {
     const form = document.getElementById('manualApproveForm');
-    form.action = `/admin/payments/${paymentId}/manual-approve`;
+    form.action = `${window.__ADMIN_BASE__}/payments/${paymentId}/manual-approve`;
     
     document.getElementById('modal-transaction-id').textContent = transactionId;
     document.getElementById('modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
@@ -932,7 +932,7 @@ function loadUnmatchedEmails(paymentId, amount) {
     
     emailSelect.innerHTML = '<option value="">-- Loading emails... --</option>';
     
-    fetch(`/admin/payments/${paymentId}/unmatched-emails?amount=${amount}`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/unmatched-emails?amount=${amount}`, {
         method: 'GET',
         headers: {
             'Accept': 'application/json',
@@ -1003,7 +1003,7 @@ function resendWebhook(paymentId) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
     
-    fetch(`/admin/payments/${paymentId}/resend-webhook`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/resend-webhook`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

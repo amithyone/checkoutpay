@@ -294,7 +294,7 @@ function retryMatch(attemptId) {
         return;
     }
 
-    fetch(`/admin/match-attempts/${attemptId}/retry`, {
+    fetch(`${window.__ADMIN_BASE__}/match-attempts/${attemptId}/retry`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -351,7 +351,7 @@ function confirmClearLogs() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Clearing...</span>';
     
     // Build URL with current filters
-    const clearUrl = new URL('/admin/match-attempts/clear', window.location.origin);
+    const clearUrl = new URL(window.__ADMIN_BASE__ + '/match-attempts/clear', window.location.origin);
     if (result !== 'all') clearUrl.searchParams.set('result', result);
     if (extractionMethod !== 'all') clearUrl.searchParams.set('extraction_method', extractionMethod);
     if (dateFrom !== 'all') clearUrl.searchParams.set('date_from', dateFrom);

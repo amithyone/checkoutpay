@@ -210,7 +210,7 @@ class SetupController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Setup completed successfully!',
-                'redirect' => '/admin',
+                'redirect' => \App\Support\AdminPath::urlPrefix(),
             ]);
         } catch (\Exception $e) {
             Log::error('Setup complete error: ' . $e->getMessage(), [

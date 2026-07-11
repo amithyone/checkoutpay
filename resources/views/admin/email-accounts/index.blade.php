@@ -114,7 +114,7 @@
 
 <script>
 function testConnection(id) {
-    fetch(`/admin/email-accounts/${id}/test-connection`, {
+    fetch(`${window.__ADMIN_BASE__}/email-accounts/${id}/test-connection`, {
         method: 'POST',
         headers: {
             'X-CSRF-TOKEN': '{{ csrf_token() }}',

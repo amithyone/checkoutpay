@@ -280,7 +280,7 @@ function updateSenderName(emailId) {
         return;
     }
 
-    fetch(`/admin/processed-emails/${emailId}/update-name`, {
+    fetch(`${window.__ADMIN_BASE__}/processed-emails/${emailId}/update-name`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -314,7 +314,7 @@ function updateAndRematch(emailId) {
         return;
     }
 
-    fetch(`/admin/processed-emails/${emailId}/update-and-rematch`, {
+    fetch(`${window.__ADMIN_BASE__}/processed-emails/${emailId}/update-and-rematch`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -358,7 +358,7 @@ function updateAmount(emailId) {
         return;
     }
 
-    fetch(`/admin/processed-emails/${emailId}/update-amount`, {
+    fetch(`${window.__ADMIN_BASE__}/processed-emails/${emailId}/update-amount`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -396,7 +396,7 @@ function updateAmountAndRematch(emailId) {
         return;
     }
 
-    fetch(`/admin/processed-emails/${emailId}/update-amount-and-rematch`, {
+    fetch(`${window.__ADMIN_BASE__}/processed-emails/${emailId}/update-amount-and-rematch`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -434,7 +434,7 @@ function retryEmailMatch(emailId) {
         return;
     }
 
-    fetch(`/admin/processed-emails/${emailId}/retry-match`, {
+    fetch(`${window.__ADMIN_BASE__}/processed-emails/${emailId}/retry-match`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -446,7 +446,7 @@ function retryEmailMatch(emailId) {
         if (data.success) {
             alert('✅ ' + data.message);
             if (data.payment) {
-                window.location.href = '/admin/payments/' + data.payment.id;
+                window.location.href = window.__ADMIN_BASE__ + '/payments/' + data.payment.id;
             } else {
                 window.location.reload();
             }
@@ -484,7 +484,7 @@ function retryEmailMatch(emailId) {
         if (!selectEl) return;
         selectEl.innerHTML = '<option value="">Loading...</option>';
         submitBtn && (submitBtn.disabled = true);
-        const url = '/admin/processed-emails/' + emailId + '/pending-payments' + (search ? '?search=' + encodeURIComponent(search) : '');
+        const url = window.__ADMIN_BASE__ + '/processed-emails/' + emailId + '/pending-payments' + (search ? '?search=' + encodeURIComponent(search) : '');
         fetch(url, {
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         })

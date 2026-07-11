@@ -16,7 +16,8 @@ class SeoController extends Controller
         $lines = [
             'User-agent: *',
             'Allow: /',
-            'Disallow: /admin',
+            'Disallow: /'.\App\Support\AdminPath::honeypotPrefix(),
+            'Disallow: /'.\App\Support\AdminPath::prefix(),
             'Disallow: /business',
             'Disallow: /wallet/',
             'Disallow: /api/',

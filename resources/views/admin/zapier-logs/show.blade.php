@@ -146,7 +146,7 @@ function retryZapierLog(logId) {
     button.disabled = true;
     button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
 
-    fetch(`/admin/zapier-logs/${logId}/retry`, {
+    fetch(`${window.__ADMIN_BASE__}/zapier-logs/${logId}/retry`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

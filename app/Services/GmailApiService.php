@@ -301,7 +301,8 @@ class GmailApiService
     {
         $baseUrl = rtrim(config('app.url'), '/');
         $emailAccountId = $this->emailAccount ? $this->emailAccount->id : 'default';
-        return $baseUrl . '/admin/email-accounts/' . $emailAccountId . '/gmail/callback';
+
+        return $baseUrl.\App\Support\AdminPath::urlPrefix().'/email-accounts/'.$emailAccountId.'/gmail/callback';
     }
 
     /**

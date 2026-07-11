@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="admin-base" content="{{ \App\Support\AdminPath::urlPrefix() }}">
+    <script>window.__ADMIN_BASE__ = @json(\App\Support\AdminPath::urlPrefix());</script>
     <title>@yield('title', 'Admin Panel') - {{ $siteName ?? \App\Support\SiteBranding::name() }}</title>
     @if(\App\Models\Setting::get('site_favicon'))
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">

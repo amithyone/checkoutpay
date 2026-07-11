@@ -66,7 +66,7 @@ class Authenticate extends Middleware
         }
 
         // Check if admin route
-        if ($request->is('admin/*')) {
+        if (\App\Support\AdminPath::requestIsAdminPanel($request)) {
             return route('admin.login');
         }
 

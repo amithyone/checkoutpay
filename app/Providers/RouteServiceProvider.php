@@ -74,6 +74,10 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by('support-options:'.$key);
         });
 
+        RateLimiter::for('admin-login', function (Request $request) {
+            return Limit::perMinute(10)->by('admin-login:'.($request->ip() ?? '0'));
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')
@@ -91,6 +95,10 @@ class RouteServiceProvider extends ServiceProvider
 
             Route::middleware('web')
                 ->group(base_path('routes/admin.php'));
+
+            // Decoy /admin (and configured honeypot path) — after real admin routes
+            Route::middleware('web')
+                ->group(base_path('routes/honeypot.php'));
 
             Route::middleware('web')
                 ->group(base_path('routes/business.php'));

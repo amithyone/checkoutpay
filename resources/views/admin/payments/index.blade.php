@@ -504,7 +504,7 @@ function checkMatchForPayment(paymentId) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Checking...';
     
-    fetch(`/admin/payments/${paymentId}/check-match`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/check-match`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -568,7 +568,7 @@ function markAsExpired(paymentId) {
         return;
     }
 
-    fetch(`/admin/payments/${paymentId}/mark-expired`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/mark-expired`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -598,7 +598,7 @@ function showDeleteModal(paymentId, transactionId) {
 
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = `/admin/payments/${paymentId}`;
+    form.action = `${window.__ADMIN_BASE__}/payments/${paymentId}`;
     
     const csrfToken = document.createElement('input');
     csrfToken.type = 'hidden';
@@ -621,7 +621,7 @@ function resendWebhook(paymentId) {
         return;
     }
 
-    fetch(`/admin/payments/${paymentId}/resend-webhook`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/resend-webhook`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -659,7 +659,7 @@ function resendFailedWebhooks() {
             const statusText = statusCell.textContent.trim();
             const webhookText = webhookCell.textContent.trim();
             if (statusText.includes('Approved') && (webhookText.includes('Failed') || webhookText.includes('Pending') || webhookText.includes('Partial'))) {
-                const paymentId = row.querySelector('a[href*="/admin/payments/"]')?.href.match(/\/admin\/payments\/(\d+)/)?.[1];
+                const paymentId = row.querySelector('a[href*="/payments/"]')?.href.match(/\/payments\/(\d+)/)?.[1];
                 if (paymentId) {
                     paymentIds.push(paymentId);
                 }
@@ -672,7 +672,7 @@ function resendFailedWebhooks() {
         return;
     }
 
-    fetch('/admin/payments/resend-webhooks-bulk', {
+    fetch(window.__ADMIN_BASE__ + '/payments/resend-webhooks-bulk', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

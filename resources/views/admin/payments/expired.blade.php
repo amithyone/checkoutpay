@@ -220,7 +220,7 @@
 <script>
 function showManualApproveModal(paymentId, transactionId, expectedAmount) {
     const form = document.getElementById('manualApproveForm');
-    form.action = `/admin/payments/${paymentId}/manual-approve`;
+    form.action = `${window.__ADMIN_BASE__}/payments/${paymentId}/manual-approve`;
     
     document.getElementById('modal-transaction-id').textContent = transactionId;
     document.getElementById('modal-expected-amount').textContent = '₦' + expectedAmount.toLocaleString('en-NG', {minimumFractionDigits: 2});
@@ -254,7 +254,7 @@ function loadUnmatchedEmails(paymentId, amount) {
     
     emailSelect.innerHTML = '<option value="">-- Loading emails... --</option>';
     
-    fetch(`/admin/payments/${paymentId}/unmatched-emails?amount=${amount}`, {
+    fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/unmatched-emails?amount=${amount}`, {
         method: 'GET',
         headers: {
             'Accept': 'application/json',

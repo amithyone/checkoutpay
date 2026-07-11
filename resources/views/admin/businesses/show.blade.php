@@ -1357,7 +1357,7 @@ function previewTransactions() {
     const toDate = document.getElementById('to_date').value;
     const status = document.getElementById('status').value;
     
-    let url = `/admin/businesses/{{ $business->id }}/websites/${currentWebsiteId}/transactions/preview?`;
+    let url = `${window.__ADMIN_BASE__}/businesses/{{ $business->id }}/websites/${currentWebsiteId}/transactions/preview?`;
     if (targetAmount) {
         url += `target_amount=${targetAmount}&`;
     } else {

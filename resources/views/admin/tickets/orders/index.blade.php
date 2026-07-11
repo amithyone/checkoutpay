@@ -167,7 +167,7 @@
 
 <script>
 function showRefundModal(orderId) {
-    document.getElementById('refundForm').action = '/admin/tickets/orders/' + orderId + '/refund';
+    document.getElementById('refundForm').action = window.__ADMIN_BASE__ + '/tickets/orders/' + orderId + '/refund';
     document.getElementById('refundModal').classList.remove('hidden');
 }
 

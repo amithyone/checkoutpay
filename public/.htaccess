@@ -5,6 +5,19 @@
 
     RewriteEngine On
 
+    # Block sensitive files / probes (defense in depth; .env lives outside public/)
+    RewriteRule (^|/)\.env - [F,L,NC]
+    RewriteRule (^|/)\.git - [F,L,NC]
+    RewriteRule (^|/)\.svn - [F,L,NC]
+    RewriteRule (^|/)\.hg - [F,L,NC]
+    RewriteRule (^|/)\.aws - [F,L,NC]
+    RewriteRule ^composer\.(json|lock)$ - [F,L,NC]
+    RewriteRule ^package(-lock)?\.json$ - [F,L,NC]
+    RewriteRule ^artisan$ - [F,L,NC]
+    RewriteRule ^phpunit\.xml - [F,L,NC]
+    RewriteRule ^vendor/ - [F,L,NC]
+    RewriteRule ^storage/logs/ - [F,L,NC]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -19,3 +32,8 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Extra deny for direct file matches if rewrite is skipped
+<FilesMatch "(?i)^\.(env|htaccess|htpasswd)">
+    Require all denied
+</FilesMatch>

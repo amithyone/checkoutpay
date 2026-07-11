@@ -37,7 +37,7 @@ class CacheResponse
         }
 
         // Don't cache admin/dashboard pages
-        if ($request->is('admin/*') || $request->is('business/*')) {
+        if (\App\Support\AdminPath::requestIsAdminPanel($request) || $request->is('business/*') || $request->is('dashboard') || $request->is('dashboard/*')) {
             return $response;
         }
 

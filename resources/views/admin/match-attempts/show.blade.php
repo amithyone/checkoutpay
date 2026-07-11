@@ -341,7 +341,7 @@ function retryMatch(attemptId) {
         return;
     }
 
-    fetch(`/admin/match-attempts/${attemptId}/retry`, {
+    fetch(`${window.__ADMIN_BASE__}/match-attempts/${attemptId}/retry`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -353,7 +353,7 @@ function retryMatch(attemptId) {
         if (data.success) {
             alert('✅ ' + data.message);
             if (data.payment) {
-                window.location.href = '/admin/payments/' + data.payment.id;
+                window.location.href = window.__ADMIN_BASE__ + '/payments/' + data.payment.id;
             } else {
                 window.location.reload();
             }
@@ -378,7 +378,7 @@ function reExtractAndMatch(processedEmailId) {
         return;
     }
 
-    fetch(`/admin/processed-emails/${processedEmailId}/re-extract-match`, {
+    fetch(`${window.__ADMIN_BASE__}/processed-emails/${processedEmailId}/re-extract-match`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -396,7 +396,7 @@ function reExtractAndMatch(processedEmailId) {
             }
             alert(message);
             if (data.payment) {
-                window.location.href = '/admin/payments/' + data.payment.id;
+                window.location.href = window.__ADMIN_BASE__ + '/payments/' + data.payment.id;
             } else {
                 window.location.reload();
             }
