@@ -176,6 +176,114 @@
             </div>
 
             <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+                <h3 class="font-semibold text-gray-900 mb-2">App device verification</h3>
+                <p class="text-sm text-gray-600 mb-3">
+                    When a customer is stuck on <span class="font-medium">“Verify this device to continue”</span>,
+                    clear trusted devices so they can sign in with PIN/OTP again.
+                </p>
+
+                @if($apiAccount === null)
+                    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        No app login account yet — user has not registered on CheckoutNow.
+                    </p>
+                @else
+                    <dl class="text-xs text-gray-600 space-y-1 mb-4">
+                        <div class="flex justify-between gap-2">
+                            <dt>Device trust feature</dt>
+                            <dd class="{{ ($deviceTrustEnabled ?? true) ? 'text-green-700 font-medium' : 'text-gray-500' }}">
+                                {{ ($deviceTrustEnabled ?? true) ? 'Enabled' : 'Disabled' }}
+                            </dd>
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <dt>Step-up required</dt>
+                            <dd class="{{ ($stepUpRequired ?? false) ? 'text-amber-700 font-medium' : 'text-green-700 font-medium' }}">
+                                {{ ($stepUpRequired ?? false) ? 'Yes — verify device on login' : 'No' }}
+                            </dd>
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <dt>Trusted devices</dt>
+                            <dd class="font-medium">{{ count($trustedDevices ?? []) }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <dt>Pending step-up sessions</dt>
+                            <dd>{{ $pendingStepUpSessions ?? 0 }}</dd>
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <dt>High-value transfer lock</dt>
+                            <dd class="{{ !empty($transferLockMeta['high_value_transfer_blocked']) ? 'text-amber-700 font-medium' : 'text-gray-500' }}">
+                                @if(!empty($transferLockMeta['high_value_transfer_blocked']) && !empty($transferLockMeta['transfer_lock_until']))
+                                    Until {{ \Illuminate\Support\Carbon::parse($transferLockMeta['transfer_lock_until'])->timezone(config('app.timezone'))->format('Y-m-d H:i') }}
+                                @else
+                                    None
+                                @endif
+                            </dd>
+                        </div>
+                    </dl>
+
+                    @if(($stepUpRequired ?? false) || count($trustedDevices ?? []) > 0)
+                        <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.devices.reset', $wallet) }}" class="mb-3">
+                            @csrf
+                            <input type="hidden" name="clear_transfer_lock" value="1">
+                            <button type="submit"
+                                class="w-full bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700"
+                                onclick="return confirm('Clear ALL trusted devices and step-up for {{ $wallet->phone_e164 }}? They will sign in with PIN/OTP without verify-device, and must set up a new passkey.')">
+                                <i class="fas fa-unlock mr-1"></i> Unblock login (revoke all devices)
+                            </button>
+                        </form>
+                    @endif
+
+                    <div class="flex flex-col gap-2 mb-4">
+                        @if(($pendingStepUpSessions ?? 0) > 0)
+                            <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.step-up.clear', $wallet) }}">
+                                @csrf
+                                <button type="submit" class="w-full border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+                                    onclick="return confirm('Clear pending verify-device sessions?')">
+                                    Clear stuck step-up sessions
+                                </button>
+                            </form>
+                        @endif
+                        @if(!empty($transferLockMeta['high_value_transfer_blocked']))
+                            <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.transfer-lock.clear', $wallet) }}">
+                                @csrf
+                                <button type="submit" class="w-full border border-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+                                    onclick="return confirm('Clear high-value transfer lock?')">
+                                    Clear transfer lock only
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+
+                    @if(count($trustedDevices ?? []) > 0)
+                        <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Trusted devices</h4>
+                        <ul class="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden text-sm">
+                            @foreach($trustedDevices as $device)
+                                <li class="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50">
+                                    <div class="min-w-0">
+                                        <p class="font-medium text-gray-900 truncate">{{ $device['label'] ?: ('Device #'.$device['id']) }}</p>
+                                        <p class="text-xs text-gray-500">
+                                            {{ $device['platform'] ?: 'unknown' }}
+                                            @if(!empty($device['last_active_at']))
+                                                · {{ \Illuminate\Support\Carbon::parse($device['last_active_at'])->diffForHumans() }}
+                                            @endif
+                                        </p>
+                                    </div>
+                                    <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.devices.revoke', [$wallet, $device['id']]) }}">
+                                        @csrf
+                                        <button type="submit" class="text-xs text-red-700 hover:underline whitespace-nowrap"
+                                            onclick="return confirm('Revoke this trusted device?')">
+                                            Revoke
+                                        </button>
+                                    </form>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-xs text-gray-500">No passkey-bound trusted devices on file.</p>
+                    @endif
+                @endif
+            </div>
+
+            <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
                 <h3 class="font-semibold text-gray-900 mb-2">App push notification</h3>
                 <p class="text-sm text-gray-600 mb-3">
                     Send a Firebase (FCM) alert to this user&apos;s CheckoutNow app.

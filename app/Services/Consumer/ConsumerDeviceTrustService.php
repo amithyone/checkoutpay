@@ -2,6 +2,7 @@
 
 namespace App\Services\Consumer;
 
+use App\Models\ConsumerDeviceLoginApproval;
 use App\Models\ConsumerDeviceStepupSession;
 use App\Models\ConsumerPasskeyCredential;
 use App\Models\ConsumerTrustedDevice;
@@ -273,6 +274,69 @@ class ConsumerDeviceTrustService
         ])->save();
 
         return $count;
+    }
+
+    /**
+     * Clear high-value transfer lock after a new-device bind (support unlock).
+     */
+    public function clearTransferLock(ConsumerWalletApiAccount $account): bool
+    {
+        if ($account->transfer_lock_until === null) {
+            return false;
+        }
+
+        $account->forceFill(['transfer_lock_until' => null])->save();
+
+        return true;
+    }
+
+    /**
+     * Delete pending step-up sessions and login approvals so the user can restart verification.
+     *
+     * @return array{sessions: int, approvals: int}
+     */
+    public function clearStepUpState(ConsumerWalletApiAccount $account): array
+    {
+        $sessionIds = ConsumerDeviceStepupSession::query()
+            ->where('consumer_wallet_api_account_id', $account->id)
+            ->pluck('id');
+
+        if ($sessionIds->isNotEmpty()) {
+            $approvals = ConsumerDeviceLoginApproval::query()
+                ->whereIn('consumer_device_stepup_session_id', $sessionIds)
+                ->delete();
+        } else {
+            $approvals = 0;
+        }
+
+        $sessions = ConsumerDeviceStepupSession::query()
+            ->where('consumer_wallet_api_account_id', $account->id)
+            ->delete();
+
+        return [
+            'sessions' => (int) $sessions,
+            'approvals' => (int) $approvals,
+        ];
+    }
+
+    /**
+     * Support reset: revoke all trusted devices/passkeys, clear step-up, optionally clear transfer lock.
+     * After this, PIN/OTP login no longer requires "Verify this device to continue".
+     *
+     * @return array{devices_revoked: int, sessions: int, approvals: int, transfer_lock_cleared: bool}
+     */
+    public function adminResetDeviceRequirement(ConsumerWalletApiAccount $account, bool $clearTransferLock = true): array
+    {
+        $devices = $this->revokeOtherDevices($account, null);
+        $stepup = $this->clearStepUpState($account);
+        $lockCleared = $clearTransferLock ? $this->clearTransferLock($account) : false;
+
+        return [
+            'devices_revoked' => $devices,
+            'sessions' => $stepup['sessions'],
+            'approvals' => $stepup['approvals'],
+            'transfer_lock_cleared' => $lockCleared,
+        ];
     }
 
     public function deviceForCredential(ConsumerWalletApiAccount $account, string $credentialIdEncoded): ?ConsumerTrustedDevice

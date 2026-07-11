@@ -6,16 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\BusinessNameRegistration;
 use App\Models\Business;
+use App\Models\ConsumerDeviceStepupSession;
 use App\Models\WhatsappCrossBorderFxRate;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
+use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWalletPushNotificationService;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappWalletRegionConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class WhatsappWalletAdminController extends Controller
@@ -23,6 +27,7 @@ class WhatsappWalletAdminController extends Controller
     public function __construct(
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private ConsumerWalletPushNotificationService $walletPush,
+        private ConsumerDeviceTrustService $deviceTrust,
     ) {}
 
     public function index(): View
@@ -107,6 +112,29 @@ class WhatsappWalletAdminController extends Controller
             ->pendingReview()
             ->count();
 
+        $apiAccount = $wallet->consumerApiAccount;
+        $deviceTrustEnabled = $this->deviceTrust->isEnabled();
+        $trustedDevices = [];
+        $transferLockMeta = [
+            'high_value_transfer_blocked' => false,
+            'transfer_lock_until' => null,
+            'high_value_single_transfer_cap' => null,
+        ];
+        $stepUpRequired = false;
+        $pendingStepUpSessions = 0;
+
+        if ($apiAccount !== null) {
+            $trustedDevices = $this->deviceTrust->listDevices($apiAccount);
+            $transferLockMeta = $this->deviceTrust->transferLockMeta($apiAccount);
+            $stepUpRequired = $this->deviceTrust->requiresStepUp($apiAccount);
+            $pendingStepUpSessions = ConsumerDeviceStepupSession::query()
+                ->where('consumer_wallet_api_account_id', $apiAccount->id)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->count();
+        }
+
         return view('admin.whatsapp-wallet.wallets.show', [
             'wallet' => $wallet,
             'recentTx' => $recentTx,
@@ -115,7 +143,116 @@ class WhatsappWalletAdminController extends Controller
             'businessNamePendingCount' => $businessNamePendingCount,
             'linkableBusinesses' => Business::query()->orderBy('name')->limit(200)->get(['id', 'name', 'email']),
             'pushStatus' => $this->walletPush->tokenStatus($wallet),
+            'deviceTrustEnabled' => $deviceTrustEnabled,
+            'apiAccount' => $apiAccount,
+            'trustedDevices' => $trustedDevices,
+            'transferLockMeta' => $transferLockMeta,
+            'stepUpRequired' => $stepUpRequired,
+            'pendingStepUpSessions' => $pendingStepUpSessions,
         ]);
+    }
+
+    public function revokeTrustedDevice(WhatsappWallet $wallet, int $device): RedirectResponse
+    {
+        $account = $wallet->consumerApiAccount;
+        if ($account === null) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'This wallet has no app login account yet.');
+        }
+
+        $ok = $this->deviceTrust->revokeDevice($account, $device);
+        if ($ok) {
+            Log::info('admin.wallet.device_revoked', [
+                'wallet_id' => $wallet->id,
+                'device_id' => $device,
+                'admin_id' => Auth::guard('admin')->id(),
+            ]);
+        }
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with($ok ? 'success' : 'error', $ok
+                ? 'Trusted device revoked. User can sign in with PIN/OTP without “Verify this device”, then set up a new passkey.'
+                : 'Trusted device not found.');
+    }
+
+    public function resetDeviceRequirement(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        $account = $wallet->consumerApiAccount;
+        if ($account === null) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'This wallet has no app login account yet.');
+        }
+
+        $clearLock = $request->boolean('clear_transfer_lock', true);
+        $result = $this->deviceTrust->adminResetDeviceRequirement($account, $clearLock);
+
+        Log::info('admin.wallet.device_requirement_reset', [
+            'wallet_id' => $wallet->id,
+            'admin_id' => Auth::guard('admin')->id(),
+            'result' => $result,
+        ]);
+
+        $msg = sprintf(
+            'Device requirement cleared: revoked %d device(s), cleared %d step-up session(s)%s. Customer can sign in with PIN/OTP now.',
+            $result['devices_revoked'],
+            $result['sessions'],
+            $result['transfer_lock_cleared'] ? ', and transfer lock removed' : ''
+        );
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', $msg);
+    }
+
+    public function clearTransferLock(WhatsappWallet $wallet): RedirectResponse
+    {
+        $account = $wallet->consumerApiAccount;
+        if ($account === null) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'This wallet has no app login account yet.');
+        }
+
+        $cleared = $this->deviceTrust->clearTransferLock($account);
+        Log::info('admin.wallet.transfer_lock_cleared', [
+            'wallet_id' => $wallet->id,
+            'admin_id' => Auth::guard('admin')->id(),
+            'cleared' => $cleared,
+        ]);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with($cleared ? 'success' : 'error', $cleared
+                ? 'High-value transfer lock cleared.'
+                : 'No active transfer lock on this account.');
+    }
+
+    public function clearStepUpSessions(WhatsappWallet $wallet): RedirectResponse
+    {
+        $account = $wallet->consumerApiAccount;
+        if ($account === null) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'This wallet has no app login account yet.');
+        }
+
+        $result = $this->deviceTrust->clearStepUpState($account);
+        Log::info('admin.wallet.stepup_cleared', [
+            'wallet_id' => $wallet->id,
+            'admin_id' => Auth::guard('admin')->id(),
+            'result' => $result,
+        ]);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', sprintf(
+                'Cleared %d step-up session(s) and %d push approval(s). Customer can retry verify-device flow.',
+                $result['sessions'],
+                $result['approvals']
+            ));
     }
 
     public function sendPushNotification(Request $request, WhatsappWallet $wallet): RedirectResponse
