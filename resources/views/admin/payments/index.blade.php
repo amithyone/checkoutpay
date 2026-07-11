@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <!-- Table -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <!-- Desktop Table View -->
-        <div class="hidden lg:block overflow-x-auto">
+        <div class="overflow-x-auto admin-table-scroll">
             <table class="w-full">
                 <thead class="bg-gray-50">
                     <tr>
@@ -367,126 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </tbody>
             </table>
         </div>
-        
-        <!-- Mobile Card View -->
-        <div class="lg:hidden divide-y divide-gray-200">
-            @forelse($payments as $payment)
-            <a href="{{ route('admin.payments.show', $payment) }}" class="block p-4 hover:bg-gray-50 transition-colors">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-semibold text-gray-900 truncate mb-1">{{ Str::limit($payment->transaction_id, 20) }}</p>
-                        <p class="text-xs text-gray-500">
-                            {{ $payment->business->name ?? 'N/A' }}
-                            @if($payment->website)
-                                • {{ parse_url($payment->website->website_url, PHP_URL_HOST) }}
-                            @endif
-                        </p>
-                        <p class="text-xs text-gray-400 mt-1">{{ $payment->created_at->format('M d, Y H:i') }}</p>
-                    </div>
-                    <div class="ml-3 text-right">
-                        @if($payment->status === 'approved')
-                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
-                        @elseif($payment->status === 'pending')
-                            <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                                Pending
-                                @if($payment->expires_at && $payment->expires_at->isPast())
-                                    <span class="text-red-600">(Expired)</span>
-                                @endif
-                            </span>
-                        @else
-                            <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Rejected</span>
-                        @endif
-                        @if($payment->status === 'approved' && $payment->webhook_status)
-                            <div class="mt-1">
-                                @if($payment->webhook_status === 'sent')
-                                    <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">
-                                        <i class="fas fa-check-circle text-xs"></i> Webhook Sent
-                                    </span>
-                                @elseif($payment->webhook_status === 'partial')
-                                    <span class="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                                        <i class="fas fa-exclamation-triangle text-xs"></i> Partial
-                                    </span>
-                                @elseif($payment->webhook_status === 'failed')
-                                    <span class="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded-full">
-                                        <i class="fas fa-times-circle text-xs"></i> Failed
-                                    </span>
-                                @else
-                                    <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-800 rounded-full">
-                                        <i class="fas fa-clock text-xs"></i> Pending
-                                    </span>
-                                @endif
-                            </div>
-                        @endif
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <p class="text-xs text-gray-600">Amount</p>
-                        @php
-                            $hasReceivedAmount = $payment->received_amount !== null && abs((float) $payment->received_amount - (float) $payment->amount) > 0.01;
-                            $apiAmountUpdate = is_array($payment->email_data ?? null) ? ($payment->email_data['api_amount_update'] ?? null) : null;
-                        @endphp
-                        @if($hasReceivedAmount)
-                            <p class="text-xs text-gray-500 line-through leading-tight">₦{{ number_format($payment->amount, 2) }}</p>
-                            <p class="text-base font-bold text-orange-600 leading-tight">₦{{ number_format($payment->received_amount, 2) }}</p>
-                            <span class="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">Updated</span>
-                        @elseif(is_array($apiAmountUpdate) && isset($apiAmountUpdate['old_amount'], $apiAmountUpdate['new_amount']) && abs((float) $apiAmountUpdate['old_amount'] - (float) $apiAmountUpdate['new_amount']) > 0.01)
-                            <p class="text-xs text-gray-500 line-through leading-tight">₦{{ number_format((float) $apiAmountUpdate['old_amount'], 2) }}</p>
-                            <p class="text-base font-bold text-gray-900 leading-tight">₦{{ number_format((float) $apiAmountUpdate['new_amount'], 2) }}</p>
-                            <span class="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">API Updated</span>
-                        @else
-                            <p class="text-base font-bold text-gray-900">₦{{ number_format($payment->amount, 2) }}</p>
-                        @endif
-                    </div>
-                    @if($payment->payer_name)
-                    <div>
-                        <p class="text-xs text-gray-600">Payer</p>
-                        <p class="text-sm font-medium text-gray-900 truncate">{{ $payment->payer_name }}</p>
-                    </div>
-                    @endif
-                    @if($payment->account_number)
-                    <div>
-                        <p class="text-xs text-gray-600">Account</p>
-                        <p class="text-sm font-medium text-gray-900">{{ $payment->account_number }}</p>
-                    </div>
-                    @endif
-                    @if($payment->matched_at && $payment->status === 'approved')
-                    <div>
-                        <p class="text-xs text-gray-600">Matched</p>
-                        <p class="text-sm font-medium text-gray-900">
-                            {{ $payment->created_at->diffInMinutes($payment->matched_at) }} min
-                        </p>
-                    </div>
-                    @endif
-                </div>
-                <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <div class="flex items-center gap-2">
-                        @if($payment->status === 'pending' && (!$payment->expires_at || $payment->expires_at->isFuture()))
-                            <button onclick="event.stopPropagation(); checkMatchForPayment({{ $payment->id }})" 
-                                class="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded"
-                                title="Check Match">
-                                <i class="fas fa-search-dollar"></i>
-                            </button>
-                        @endif
-                        @if($payment->status === 'approved' && $payment->webhook_status !== 'sent')
-                            <button onclick="event.stopPropagation(); resendWebhook({{ $payment->id }})" 
-                                class="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded"
-                                title="Resend Webhook">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        @endif
-                    </div>
-                    <i class="fas fa-chevron-right text-gray-400"></i>
-                </div>
-            </a>
-            @empty
-            <div class="p-8 text-center">
-                <i class="fas fa-money-bill-wave text-gray-300 text-4xl mb-4"></i>
-                <p class="text-sm text-gray-500">No payments found</p>
-            </div>
-            @endforelse
-        </div>
-        
+
         @if($payments->hasPages())
         <div class="px-4 lg:px-6 py-4 border-t border-gray-200">
             {{ $payments->links() }}

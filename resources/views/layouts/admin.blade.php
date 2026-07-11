@@ -20,6 +20,51 @@
             #sidebar.sidebar-open {
                 transform: translateX(0);
             }
+
+            /* Keep pages usable on phones without changing desktop layouts */
+            html, body {
+                overflow-x: hidden;
+                max-width: 100vw;
+            }
+            main.admin-main {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+                padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+            }
+            main.admin-main > .space-y-6 {
+                gap: 0.75rem;
+            }
+            /* Tables: swipe horizontally instead of stacking giant cards */
+            main.admin-main .overflow-x-auto,
+            main.admin-main .admin-table-scroll {
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior-x: contain;
+                max-width: 100%;
+            }
+            main.admin-main table {
+                min-width: 36rem;
+            }
+            main.admin-main th,
+            main.admin-main td {
+                white-space: nowrap;
+            }
+            main.admin-main input,
+            main.admin-main select,
+            main.admin-main textarea {
+                font-size: 16px; /* avoid iOS zoom on focus */
+            }
+            main.admin-main .text-3xl {
+                font-size: 1.5rem;
+                line-height: 2rem;
+            }
+            /* Filter bars / action toolbars */
+            main.admin-main form.grid {
+                gap: 0.5rem;
+            }
+            /* Sticky bottom nav safe area */
+            .admin-mobile-bottom-nav {
+                padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+            }
         }
         #admin-sidebar-menu.sidebar-editing .sidebar-drag-handle {
             display: inline-block !important;
@@ -77,42 +122,53 @@
                 @include('admin.partials.sidebar-menu')
             </div>
 
-            <!-- User Section -->
-            <div class="p-4 border-t border-gray-200">
-                <div class="flex items-center mb-3">
-                    <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
-                        {{ substr(auth('admin')->user()->name, 0, 1) }}
+            <!-- User Section (compact on mobile — no profile card) -->
+            <div class="border-t border-gray-200">
+                <div class="hidden lg:block p-4">
+                    <div class="flex items-center mb-3">
+                        <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
+                            {{ substr(auth('admin')->user()->name, 0, 1) }}
+                        </div>
+                        <div class="ml-3 flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ auth('admin')->user()->name }}</p>
+                            <p class="text-xs text-gray-500 truncate">{{ auth('admin')->user()->email }}</p>
+                            @if(auth('admin')->user()->isSuperAdmin())
+                            <a href="{{ route('admin.profile.index') }}" class="text-xs text-primary font-medium capitalize hover:underline">{{ str_replace('_', ' ', auth('admin')->user()->role) }}</a>
+                            @else
+                            <p class="text-xs text-primary font-medium capitalize">{{ str_replace('_', ' ', auth('admin')->user()->role) }}</p>
+                            @endif
+                        </div>
                     </div>
-                    <div class="ml-3 flex-1 min-w-0">
-                        <p class="text-sm font-medium text-gray-900 truncate">{{ auth('admin')->user()->name }}</p>
-                        <p class="text-xs text-gray-500 truncate">{{ auth('admin')->user()->email }}</p>
-                        @if(auth('admin')->user()->isSuperAdmin())
-                        <a href="{{ route('admin.profile.index') }}" class="text-xs text-primary font-medium capitalize hover:underline">{{ str_replace('_', ' ', auth('admin')->user()->role) }}</a>
-                        @else
-                        <p class="text-xs text-primary font-medium capitalize">{{ str_replace('_', ' ', auth('admin')->user()->role) }}</p>
-                        @endif
-                    </div>
+                    <form action="{{ route('admin.logout') }}" method="POST">
+                        @csrf
+                        <button type="submit" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
+                            <i class="fas fa-sign-out-alt mr-2"></i> Sign out
+                        </button>
+                    </form>
                 </div>
-                <form action="{{ route('admin.logout') }}" method="POST">
-                    @csrf
-                    <button type="submit" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg">
-                        <i class="fas fa-sign-out-alt mr-2"></i> Sign out
-                    </button>
-                </form>
+                <div class="lg:hidden p-3 space-y-2">
+                    <p class="px-1 text-xs text-gray-500 truncate">{{ auth('admin')->user()->name }} · {{ str_replace('_', ' ', auth('admin')->user()->role) }}</p>
+                    <form action="{{ route('admin.logout') }}" method="POST">
+                        @csrf
+                        <button type="submit" class="w-full px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg">
+                            <i class="fas fa-sign-out-alt mr-2"></i> Sign out
+                        </button>
+                    </form>
+                </div>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col overflow-hidden lg:ml-0">
+        <div class="flex-1 flex flex-col overflow-hidden lg:ml-0 min-w-0">
             <!-- Top Bar -->
-            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6">
-                <div class="flex items-center">
-                    <button onclick="openSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700 mr-3">
+            <header class="h-14 lg:h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 lg:px-6 shrink-0">
+                <div class="flex items-center min-w-0 flex-1">
+                    <button type="button" onclick="openSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700 mr-2 p-2 -ml-1 rounded-lg hover:bg-gray-100" aria-label="Open menu">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
-                    <h2 class="text-lg lg:text-xl font-semibold text-gray-900">@yield('page-title', 'Dashboard')</h2>
+                    <h2 class="text-base lg:text-xl font-semibold text-gray-900 truncate">@yield('page-title', 'Dashboard')</h2>
                 </div>
-                <div class="hidden sm:flex items-center space-x-4">
+                <div class="hidden sm:flex items-center space-x-4 shrink-0">
                     <div class="text-sm text-gray-600">
                         <i class="far fa-clock mr-2"></i>
                         <span id="current-time"></span>
@@ -126,7 +182,7 @@
             </header>
 
             <!-- Page Content -->
-            <main class="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
+            <main class="admin-main flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 pb-20 lg:pb-6">
                 @if(session('success'))
                     <div class="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center">
                         <i class="fas fa-check-circle mr-2"></i>
@@ -164,39 +220,62 @@
     </div>
 
     <!-- Mobile Bottom Navigation (only on mobile) -->
-    <nav class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-30">
-        <div class="flex justify-around items-center">
-            <a href="{{ route('admin.dashboard') }}" class="flex flex-col items-center px-3 py-2 {{ request()->routeIs('admin.dashboard') ? 'text-primary' : 'text-gray-500' }}">
-                <i class="fas fa-chart-line text-lg mb-1"></i>
-                <span class="text-xs">Dashboard</span>
-            </a>
-            <a href="{{ route('admin.payments.index') }}" class="flex flex-col items-center px-3 py-2 {{ request()->routeIs('admin.payments.*') && !request()->routeIs('admin.payments.needs-review') ? 'text-primary' : 'text-gray-500' }}">
-                <i class="fas fa-money-bill-wave text-lg mb-1"></i>
-                <span class="text-xs">Payments</span>
-            </a>
-            <a href="{{ route('admin.payments.needs-review') }}" class="flex flex-col items-center px-3 py-2 relative {{ request()->routeIs('admin.payments.needs-review') ? 'text-primary' : 'text-gray-500' }}">
-                <i class="fas fa-exclamation-triangle text-lg mb-1"></i>
-                <span class="text-xs">Review</span>
-                @php
-                    $needsReviewCount = \App\Models\Payment::query()
-                    ->where('status', \App\Models\Payment::STATUS_PENDING)
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                    })
-                    ->has('statusChecks', '>=', 3)
-                    ->count();
-                @endphp
-                @if($needsReviewCount > 0)
-                    <span class="absolute top-0 right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ $needsReviewCount }}</span>
-                @endif
-            </a>
-            <a href="{{ route('admin.businesses.index') }}" class="flex flex-col items-center px-3 py-2 {{ request()->routeIs('admin.businesses.*') ? 'text-primary' : 'text-gray-500' }}">
-                <i class="fas fa-building text-lg mb-1"></i>
-                <span class="text-xs">Businesses</span>
-            </a>
-            <button onclick="openSidebar()" class="flex flex-col items-center px-3 py-2 text-gray-500">
-                <i class="fas fa-bars text-lg mb-1"></i>
-                <span class="text-xs">More</span>
+    @php
+        $mobileAdmin = auth('admin')->user();
+        $isWalletDesk = $mobileAdmin && $mobileAdmin->isWalletSupport();
+    @endphp
+    <nav class="admin-mobile-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 px-1 pt-1 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]" style="padding-bottom: max(0.35rem, env(safe-area-inset-bottom));">
+        <div class="flex justify-around items-stretch max-w-lg mx-auto">
+            @if($isWalletDesk)
+                <a href="{{ route('admin.whatsapp-wallet.wallets.index') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg {{ request()->routeIs('admin.whatsapp-wallet.wallets.*') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fas fa-users text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Users</span>
+                </a>
+                <a href="{{ route('admin.whatsapp-wallet.transactions.index') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg {{ request()->routeIs('admin.whatsapp-wallet.transactions.*') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fas fa-exchange-alt text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Txns</span>
+                </a>
+                <a href="{{ route('admin.support.index') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg {{ request()->routeIs('admin.support.*') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fas fa-comments text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Support</span>
+                </a>
+                <a href="{{ route('admin.virtual-cards.index') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg {{ request()->routeIs('admin.virtual-cards.*') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fas fa-credit-card text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Cards</span>
+                </a>
+            @else
+                <a href="{{ route('admin.dashboard') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg {{ request()->routeIs('admin.dashboard') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fas fa-chart-line text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Home</span>
+                </a>
+                <a href="{{ route('admin.payments.index') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg {{ request()->routeIs('admin.payments.*') && !request()->routeIs('admin.payments.needs-review') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fas fa-money-bill-wave text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Pay</span>
+                </a>
+                <a href="{{ route('admin.payments.needs-review') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg relative {{ request()->routeIs('admin.payments.needs-review') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fas fa-exclamation-triangle text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Review</span>
+                    @php
+                        $needsReviewCount = \App\Models\Payment::query()
+                        ->where('status', \App\Models\Payment::STATUS_PENDING)
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                        })
+                        ->has('statusChecks', '>=', 3)
+                        ->count();
+                    @endphp
+                    @if($needsReviewCount > 0)
+                        <span class="absolute top-0.5 right-1/4 bg-red-500 text-white text-[9px] rounded-full min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center">{{ $needsReviewCount > 99 ? '99+' : $needsReviewCount }}</span>
+                    @endif
+                </a>
+                <a href="{{ route('admin.whatsapp-wallet.wallets.index') }}" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg {{ request()->routeIs('admin.whatsapp-wallet.*') || request()->routeIs('admin.app-sessions.*') ? 'text-primary bg-primary/5' : 'text-gray-500' }}">
+                    <i class="fab fa-whatsapp text-base mb-0.5"></i>
+                    <span class="text-[10px] leading-tight truncate w-full text-center">Wallet</span>
+                </a>
+            @endif
+            <button type="button" onclick="openSidebar()" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 py-1.5 rounded-lg text-gray-500">
+                <i class="fas fa-bars text-base mb-0.5"></i>
+                <span class="text-[10px] leading-tight truncate w-full text-center">Menu</span>
             </button>
         </div>
     </nav>

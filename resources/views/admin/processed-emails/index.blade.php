@@ -90,7 +90,7 @@
     <!-- Emails Table -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <!-- Desktop Table View -->
-        <div class="hidden lg:block overflow-x-auto">
+        <div class="overflow-x-auto admin-table-scroll">
             <table class="w-full">
                 <thead class="bg-gray-50">
                     <tr>
@@ -210,93 +210,7 @@
                 </tbody>
             </table>
         </div>
-        
-        <!-- Mobile Card View -->
-        <div class="lg:hidden divide-y divide-gray-200">
-            @forelse($emails as $email)
-            <a href="{{ route('admin.processed-emails.show', $email) }}" class="block p-4 hover:bg-gray-50 transition-colors {{ !$email->is_matched ? 'bg-yellow-50/30' : '' }}">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-semibold text-gray-900 truncate mb-1">{{ Str::limit($email->subject ?? 'No Subject', 40) }}</p>
-                        <p class="text-xs text-gray-500 break-all mb-1">{{ Str::limit($email->from_email, 35) }}</p>
-                        <div class="flex flex-wrap items-center gap-2 mt-1">
-                            @if($email->source === 'gmail_api')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                    <i class="fas fa-google text-xs"></i>
-                                </span>
-                            @elseif($email->source === 'imap')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                    <i class="fas fa-server text-xs"></i>
-                                </span>
-                            @elseif($email->source === 'direct_filesystem')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                    <i class="fas fa-file-alt text-xs"></i>
-                                </span>
-                            @endif
-                            <span class="text-xs text-gray-400">
-                                {{ $email->email_date ? $email->email_date->format('M d, H:i') : $email->created_at->format('M d, H:i') }}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="ml-3 text-right">
-                        @if($email->is_matched)
-                            <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                                <i class="fas fa-check-circle text-xs"></i> Matched
-                            </span>
-                        @else
-                            <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                                <i class="fas fa-clock text-xs"></i> Unmatched
-                            </span>
-                        @endif
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    @if($email->amount)
-                    <div>
-                        <p class="text-xs text-gray-600">Amount</p>
-                        <p class="text-base font-bold text-gray-900">₦{{ number_format($email->amount, 2) }}</p>
-                    </div>
-                    @endif
-                    @if($email->sender_name)
-                    <div>
-                        <p class="text-xs text-gray-600">Sender</p>
-                        <p class="text-sm font-medium text-gray-900 truncate">{{ $email->sender_name }}</p>
-                    </div>
-                    @endif
-                    @if($email->matchedPayment)
-                    <div class="col-span-2">
-                        <p class="text-xs text-gray-600">Transaction</p>
-                        <p class="text-sm font-medium text-primary truncate">{{ $email->matchedPayment->transaction_id }}</p>
-                    </div>
-                    @endif
-                </div>
-                <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-                    @if(!$email->is_matched)
-                        <button onclick="event.stopPropagation(); checkMatch({{ $email->id }})" 
-                            class="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded"
-                            title="Check Match">
-                            <i class="fas fa-search-dollar"></i> Check Match
-                        </button>
-                    @endif
-                    <i class="fas fa-chevron-right text-gray-400"></i>
-                </div>
-            </a>
-            @empty
-            <div class="p-8 text-center">
-                <i class="fas fa-inbox text-gray-300 text-4xl mb-4"></i>
-                <p class="text-sm text-gray-500">
-                    @if(request()->hasAny(['search', 'status', 'email_account_id']))
-                        No emails found matching your search criteria.
-                        <a href="{{ route('admin.processed-emails.index') }}" class="text-primary hover:underline block mt-2">Clear filters</a>
-                    @else
-                        No emails found
-                    @endif
-                </p>
-            </div>
-            @endforelse
-        </div>
 
-        <!-- Pagination -->
         @if($emails->hasPages())
             <div class="px-4 lg:px-6 py-4 border-t border-gray-200">
                 {{ $emails->links() }}
