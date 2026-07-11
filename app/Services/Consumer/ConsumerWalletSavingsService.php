@@ -105,6 +105,8 @@ final class ConsumerWalletSavingsService
         $lockedActive = $activeLocks->where('lock_type', WalletSavingsLock::LOCK_TYPE_LOCKED)->values();
         $flexibleActive = $activeLocks->where('lock_type', WalletSavingsLock::LOCK_TYPE_FLEXIBLE)->values();
 
+        $ledgerTotals = $this->sumActiveLocksByLedger($activeLocks);
+
         $interestEarned = (float) WalletSavingsLock::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->where('status', WalletSavingsLock::STATUS_MATURED)
@@ -122,11 +124,33 @@ final class ConsumerWalletSavingsService
             ->values()
             ->all();
 
+        // Wallet columns are pooled totals (personal + business). App "strict" = locked type.
+        $lockedTotal = round($ledgerTotals['personal_locked'] + $ledgerTotals['business_locked'], 2);
+        $flexibleTotal = round($ledgerTotals['personal_flexible'] + $ledgerTotals['business_flexible'], 2);
+        $columnLocked = round((float) ($wallet->savings_balance ?? 0), 2);
+        $columnFlexible = round((float) ($wallet->flexible_savings_balance ?? 0), 2);
+
         return [
             'product_enabled' => $this->isProductEnabled(),
-            'savings_balance' => (float) ($wallet->savings_balance ?? 0),
-            'flexible_savings_balance' => (float) ($wallet->flexible_savings_balance ?? 0),
-            'locked_savings_balance' => (float) ($wallet->savings_balance ?? 0),
+            // Legacy / DB column names (pooled across personal + business).
+            'savings_balance' => $columnLocked,
+            'flexible_savings_balance' => $columnFlexible,
+            'locked_savings_balance' => $columnLocked,
+            // App-friendly aliases (normalizeSavingsSummary already prefers these).
+            'strict_savings_balance' => $columnLocked,
+            'strict_balance' => $columnLocked,
+            'flexible_balance' => $columnFlexible,
+            'locked_balance' => $columnLocked,
+            'total_saved' => round($columnFlexible + $columnLocked, 2),
+            // Lock-derived split (what the app shows when locks exist).
+            'personal_flexible_balance' => $ledgerTotals['personal_flexible'],
+            'personal_strict_balance' => $ledgerTotals['personal_locked'],
+            'business_flexible_balance' => $ledgerTotals['business_flexible'],
+            'business_strict_balance' => $ledgerTotals['business_locked'],
+            'locks_flexible_total' => $flexibleTotal,
+            'locks_strict_total' => $lockedTotal,
+            'balances_match_locks' => abs($columnLocked - $lockedTotal) < 0.02
+                && abs($columnFlexible - $flexibleTotal) < 0.02,
             'interest_earned' => round($interestEarned, 2),
             'lock_days' => $this->lockDays(),
             'interest_rate_percent' => $this->interestRatePercent(),
@@ -143,6 +167,82 @@ final class ConsumerWalletSavingsService
             'active_locks' => $lockedActive->take(10)->map(fn (WalletSavingsLock $l) => $this->formatLock($l))->values()->all(),
             'flexible_locks' => $flexibleActive->take(10)->map(fn (WalletSavingsLock $l) => $this->formatLock($l))->values()->all(),
         ];
+    }
+
+    /**
+     * Recompute wallet savings_balance / flexible_savings_balance from active locks.
+     *
+     * @return array{ok: bool, message: string, before?: array<string, float>, after?: array<string, float>}
+     */
+    public function reconcileWalletBalancesFromLocks(WhatsappWallet $wallet): array
+    {
+        return DB::transaction(function () use ($wallet) {
+            $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
+            if (! $w) {
+                return ['ok' => false, 'message' => 'Wallet not found.'];
+            }
+
+            $locks = WalletSavingsLock::query()
+                ->where('whatsapp_wallet_id', $w->id)
+                ->where('status', WalletSavingsLock::STATUS_ACTIVE)
+                ->lockForUpdate()
+                ->get();
+
+            $totals = $this->sumActiveLocksByLedger($locks);
+            $locked = round($totals['personal_locked'] + $totals['business_locked'], 2);
+            $flexible = round($totals['personal_flexible'] + $totals['business_flexible'], 2);
+
+            $before = [
+                'savings_balance' => round((float) $w->savings_balance, 2),
+                'flexible_savings_balance' => round((float) $w->flexible_savings_balance, 2),
+            ];
+
+            $w->savings_balance = $locked;
+            $w->flexible_savings_balance = $flexible;
+            $w->save();
+
+            return [
+                'ok' => true,
+                'message' => 'Wallet savings columns reconciled from active locks.',
+                'before' => $before,
+                'after' => [
+                    'savings_balance' => $locked,
+                    'flexible_savings_balance' => $flexible,
+                    'personal_strict' => $totals['personal_locked'],
+                    'personal_flexible' => $totals['personal_flexible'],
+                    'business_strict' => $totals['business_locked'],
+                    'business_flexible' => $totals['business_flexible'],
+                ],
+            ];
+        });
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, WalletSavingsLock>  $locks
+     * @return array{personal_flexible: float, personal_locked: float, business_flexible: float, business_locked: float}
+     */
+    private function sumActiveLocksByLedger($locks): array
+    {
+        $out = [
+            'personal_flexible' => 0.0,
+            'personal_locked' => 0.0,
+            'business_flexible' => 0.0,
+            'business_locked' => 0.0,
+        ];
+
+        foreach ($locks as $lock) {
+            $amount = round((float) $lock->amount, 2);
+            if ($amount <= 0) {
+                continue;
+            }
+            $isBusiness = ConsumerWalletTransactionScope::normalize((string) ($lock->ledger_scope ?? ''))
+                === ConsumerWalletTransactionScope::SCOPE_BUSINESS;
+            $isFlexible = ($lock->lock_type ?? '') === WalletSavingsLock::LOCK_TYPE_FLEXIBLE;
+            $key = ($isBusiness ? 'business_' : 'personal_').($isFlexible ? 'flexible' : 'locked');
+            $out[$key] = round($out[$key] + $amount, 2);
+        }
+
+        return $out;
     }
 
     /**
