@@ -3,9 +3,9 @@
 return [
     'site_name' => 'CheckoutPay',
     'site_name_consumer' => 'CheckoutNow',
-    'default_title' => 'CheckoutPay — Affordable & Reliable Payment Gateway in Nigeria',
-    'default_description' => 'CheckoutPay is a low-cost, reliable payment gateway for Nigerian businesses — plus WhatsApp Wallet to send money to anyone on WhatsApp or to any bank. Bank transfer matching, virtual accounts, WooCommerce plugin, and transparent fees.',
-    'default_keywords' => 'payment gateway Nigeria, cheapest payment gateway Nigeria, reliable payment gateway, bank transfer payments Nigeria, WooCommerce payment Nigeria, virtual account checkout, WordPress payment plugin Nigeria, payment gateway API Nigeria, developer payment gateway program Nigeria, CheckoutPay, check-outpay',
+    'default_title' => 'CheckoutPay — Payment Gateway for Nigerian Businesses',
+    'default_description' => 'CheckoutPay accepts NGN bank transfers with virtual accounts, WhatsApp Pay Code, WooCommerce (COPN), and transparent pricing at 1% + ₦50. CheckoutNow is the consumer wallet on the same platform.',
+    'default_keywords' => 'payment gateway Nigeria, bank transfer payments Nigeria, virtual account checkout, WhatsApp Pay Code, WooCommerce payment Nigeria, WordPress payment plugin Nigeria, CheckoutNow wallet, payment gateway API Nigeria, CheckoutPay, check-outpay',
     'locale' => 'en_NG',
     'twitter_handle' => '@CheckoutPayNG',
     'google_site_verification' => 'gDWop-gnIIBUlNGs0xdQRs47Rwi5wIm3Tg-eQ9kissk',

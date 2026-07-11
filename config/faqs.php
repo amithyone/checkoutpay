@@ -67,7 +67,7 @@ return [
             'category' => 'payment-gateway',
             'q' => 'What are CheckoutPay fees for merchants in Nigeria?',
             'a' => 'Pricing is transparent: typically 1% plus ₦50 per successful transaction with no setup or monthly fees on standard pay-as-you-go. See {pricing_url} for current rates.',
-            'keywords' => ['fees', 'cheapest payment gateway Nigeria', 'pricing'],
+            'keywords' => ['fees', 'payment gateway pricing Nigeria', '1% + 50', 'pricing'],
         ],
         [
             'category' => 'payment-gateway',

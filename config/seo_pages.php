@@ -5,14 +5,14 @@
  */
 return [
     '/' => [
-        'title' => 'CheckoutPay — Affordable Payment Gateway Nigeria | Bank Transfer & WooCommerce',
-        'description' => 'Accept NGN payments in Nigeria with bank transfer matching, virtual accounts, webhooks, WooCommerce plugin, and WhatsApp Wallet. Transparent fees for merchants and developers.',
-        'keywords' => 'payment gateway Nigeria, accept payments online Nigeria, bank transfer gateway, Naira payments',
+        'title' => 'CheckoutPay — Payments for Nigerian Businesses | Bank Transfer & WhatsApp',
+        'description' => 'Accept NGN with virtual accounts, automated bank-transfer matching, WhatsApp Pay Code, WooCommerce (COPN), and transparent pricing: 1% + ₦50. CheckoutNow wallet for customers.',
+        'keywords' => 'payment gateway Nigeria, accept payments online Nigeria, bank transfer gateway, WhatsApp Pay Code, Naira payments',
     ],
     '/pricing' => [
-        'title' => 'Pricing — Cheapest Payment Gateway Nigeria | CheckoutPay Fees',
-        'description' => 'Transparent payment gateway pricing for Nigeria: low per-transaction fees, no hidden charges. Built for Naira bank transfers and growing businesses.',
-        'keywords' => 'cheapest payment gateway Nigeria, payment gateway fees Nigeria, low transaction fees NGN',
+        'title' => 'Pricing — 1% + ₦50 Payment Gateway Fees | CheckoutPay',
+        'description' => 'Transparent CheckoutPay pricing for Nigeria: 1% + ₦50 per successful transaction. No setup or monthly fee on standard pay-as-you-go. Built for Naira bank transfers.',
+        'keywords' => 'payment gateway fees Nigeria, 1% + 50 Naira, transparent transaction fees NGN, CheckoutPay pricing',
     ],
     '/products' => [
         'title' => 'Products — Invoices, Tickets, Memberships & Rentals | CheckoutPay',

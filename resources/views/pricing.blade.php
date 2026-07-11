@@ -1,13 +1,13 @@
 @extends('layouts.marketing')
 
 @section('title')
-    <title>{{ $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay' }}</title>
+    <title>{{ $page->meta_title ?? 'Pricing — 1% + ₦50 | CheckoutPay' }}</title>
 @endsection
 
 @section('seo')
     @include('partials.seo-head', ['seoOverrides' => [
-        'title' => $page->meta_title ?? 'Pricing — Affordable Payment Gateway Nigeria | CheckoutPay',
-        'description' => $page->meta_description ?? 'Transparent low fees for Nigerian merchants: competitive rates, no hidden charges. Compare CheckoutPay — a reliable, cost-effective payment gateway.',
+        'title' => $page->meta_title ?? 'Pricing — 1% + ₦50 Payment Gateway Fees | CheckoutPay',
+        'description' => $page->meta_description ?? 'Transparent CheckoutPay pricing: 1% + ₦50 per successful transaction. No setup or monthly fee on standard pay-as-you-go. Built for Nigerian bank transfers.',
         'path' => '/pricing',
     ], 'jsonLdExtra' => [\App\Support\FaqCatalog::faqPageJsonLd(\App\Support\FaqCatalog::forCategory('payment-gateway'))]])
 @endsection

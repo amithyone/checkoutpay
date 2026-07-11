@@ -1064,7 +1064,7 @@
 <div class="bg-white rounded-lg shadow-md p-6 mb-6">
     <h2 class="text-xl font-semibold text-gray-800 mb-4">Savings (CheckoutNow)</h2>
     <p class="text-sm text-gray-600 mb-4">
-        Locked savings: spend-to-save, goals, lock period, and maturity interest bonus.
+        Locked and flexible savings: spend-to-save (flexible), goals, lock period, and maturity interest bonus.
     </p>
     <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
         @csrf

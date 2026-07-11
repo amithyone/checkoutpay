@@ -20,18 +20,18 @@
             @else
                 <div class="badge-brand">
                     <span class="h-2 w-2 rounded-full bg-brand-primary animate-pulse"></span>
-                    Built for Nigerian businesses
+                    Payments, simply.
                 </div>
             @endif
 
             <h1 class="text-4xl md:text-5xl lg:text-[3.25rem] lg:leading-[1.1] font-extrabold text-midnight-deep tracking-tight">
                 @if(!empty($hero['title_highlight']))
-                    {{ $hero['title'] ?? 'Intelligent ' }}
+                    {{ $hero['title'] ?? 'Payments for ' }}
                     <span class="text-brand-primary">{{ $hero['title_highlight'] }}</span>{{ $hero['title_suffix'] ?? '' }}
                 @elseif(!empty($hero['title']))
                     {{ $hero['title'] }}
                 @else
-                    Intelligent <span class="text-brand-primary">Payment Gateway</span> for Nigerian Business
+                    Payments for <span class="text-brand-primary">Nigerian businesses</span>
                 @endif
             </h1>
 
@@ -39,7 +39,7 @@
                 @if(!empty($hero['description']))
                     {{ $hero['description'] }}
                 @else
-                    Accept bank transfers and WhatsApp Pay Code on one checkout — virtual accounts, automated matching, and real-time webhooks for Nigerian merchants.
+                    Accept NGN bank transfers and WhatsApp Pay Code on one checkout — virtual accounts, automated matching, and webhooks. Transparent pricing for merchants.
                 @endif
                 @if(!empty($pricingText))
                     <span class="pricing-badge ml-1">{{ $pricingText }}</span>

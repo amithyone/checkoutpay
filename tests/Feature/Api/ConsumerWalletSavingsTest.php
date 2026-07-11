@@ -292,7 +292,7 @@ class ConsumerWalletSavingsTest extends TestCase
             ->assertJsonStructure(['data' => ['remaining_strict_percent']]);
     }
 
-    public function test_spend_to_save_creates_locked_savings_without_flexible_balance(): void
+    public function test_spend_to_save_credits_flexible_savings_balance(): void
     {
         $wallet = $this->actingWallet(10000);
         $savings = app(ConsumerWalletSavingsService::class);
@@ -314,7 +314,15 @@ class ConsumerWalletSavingsTest extends TestCase
 
         $wallet->refresh();
         $this->assertSame(7800.0, (float) $wallet->balance);
-        $this->assertSame(200.0, (float) $wallet->savings_balance);
+        $this->assertSame(0.0, (float) $wallet->savings_balance);
+        $this->assertSame(200.0, (float) $wallet->flexible_savings_balance);
+        $this->assertDatabaseHas('wallet_savings_locks', [
+            'whatsapp_wallet_id' => $wallet->id,
+            'source' => WalletSavingsLock::SOURCE_SPEND_TO_SAVE,
+            'lock_type' => WalletSavingsLock::LOCK_TYPE_FLEXIBLE,
+            'amount' => 200,
+            'status' => WalletSavingsLock::STATUS_ACTIVE,
+        ]);
     }
 
     public function test_maturity_credits_wallet_with_interest(): void

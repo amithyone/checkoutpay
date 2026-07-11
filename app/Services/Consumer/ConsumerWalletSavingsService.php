@@ -799,7 +799,7 @@ final class ConsumerWalletSavingsService
             WalletSavingsLock::SOURCE_SPEND_TO_SAVE,
             null,
             $sourceTransactionId,
-            WalletSavingsLock::LOCK_TYPE_LOCKED,
+            WalletSavingsLock::LOCK_TYPE_FLEXIBLE,
             ConsumerWalletTransactionScope::SCOPE_PERSONAL,
         );
 
