@@ -253,6 +253,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
         // Test Transaction (Live Testing)
         Route::get('test-transaction', [\App\Http\Controllers\Admin\TestTransactionController::class, 'index'])->name('test-transaction.index');
         Route::post('test-transaction/create', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createPayment'])->name('test-transaction.create');
+        Route::post('test-transaction/create-card', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createCardPayment'])
+            ->name('test-transaction.create-card');
         Route::get('test-transaction/status/{transactionId}', [\App\Http\Controllers\Admin\TestTransactionController::class, 'getStatus'])->name('test-transaction.status');
         Route::post('test-transaction/check-email', [\App\Http\Controllers\Admin\TestTransactionController::class, 'checkEmail'])->name('test-transaction.check-email');
         Route::post('test-transaction/mevonpay-temp-va', [\App\Http\Controllers\Admin\TestTransactionController::class, 'createMevonpayTempVa'])

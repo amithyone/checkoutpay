@@ -28,9 +28,11 @@ class TestTransactionController extends Controller
      */
     public function index()
     {
-        $businesses = Business::where('is_active', true)->get();
+        $businesses = Business::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'card_payments_enabled', 'webhook_url']);
         $emailAccounts = EmailAccount::where('is_active', true)->get();
-        
+
         return view('admin.test-transaction', compact('businesses', 'emailAccounts'));
     }
 
@@ -80,6 +82,77 @@ class TestTransactionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create payment: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Create a Mevon/Paga card checkout test payment for a business.
+     */
+    public function createCardPayment(Request $request)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:1',
+            'business_id' => 'required|exists:businesses,id',
+            'email' => 'required|email|max:255',
+            'phone' => 'nullable|string|max:30',
+            'payer_name' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $business = Business::findOrFail($validated['business_id']);
+
+            if (! $business->card_payments_enabled) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Card payments are not enabled for this business. Enable them on the business page first.',
+                ], 422);
+            }
+
+            $payment = $this->paymentService->createPayment([
+                'amount' => $validated['amount'],
+                'payment_method' => Payment::METHOD_CARD,
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+                'payer_name' => $validated['payer_name'] ?? null,
+                'webhook_url' => $business->webhook_url ?? 'https://webhook.site/test',
+            ], $business);
+
+            $cardCheckout = $payment->cardCheckoutPayload() ?? [];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Card checkout created. Open the checkout URL to pay, then wait for checkout.success.',
+                'payment' => [
+                    'id' => $payment->id,
+                    'transaction_id' => $payment->transaction_id,
+                    'amount' => (float) $payment->amount,
+                    'status' => $payment->status,
+                    'payer_name' => $payment->payer_name,
+                    'payment_method' => Payment::METHOD_CARD,
+                    'external_reference' => $payment->external_reference,
+                    'card_checkout' => $cardCheckout,
+                    'checkout_url' => $cardCheckout['checkout_url'] ?? null,
+                    'payment_reference' => $cardCheckout['payment_reference'] ?? $payment->external_reference,
+                    'created_at' => $payment->created_at->toDateTimeString(),
+                ],
+            ]);
+        } catch (\DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 403);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('Error creating test card payment', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create card checkout: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -174,6 +247,7 @@ class TestTransactionController extends Controller
                 ->get();
 
             // Get payment status
+            $cardCheckout = $payment->cardCheckoutPayload();
             $status = [
                 'transaction_id' => $payment->transaction_id,
                 'status' => $payment->status,
@@ -182,9 +256,18 @@ class TestTransactionController extends Controller
                 'account_number' => $payment->account_number,
                 'account_name' => $payment->accountNumberDetails->account_name ?? null,
                 'bank_name' => $payment->accountNumberDetails->bank_name ?? null,
+                'payment_method' => $payment->isMevonCardCheckout()
+                    ? Payment::METHOD_CARD
+                    : ($payment->payment_method_used ?: Payment::METHOD_BANK_TRANSFER),
+                'payment_method_used' => $payment->payment_method_used,
+                'external_reference' => $payment->external_reference,
+                'received_amount' => $payment->received_amount,
+                'card_checkout' => $cardCheckout,
+                'checkout_url' => $cardCheckout['checkout_url'] ?? null,
+                'payment_reference' => $cardCheckout['payment_reference'] ?? $payment->external_reference,
                 'created_at' => $payment->created_at->toDateTimeString(),
                 'matched_at' => $payment->matched_at?->toDateTimeString(),
-                'approved_at' => $payment->approved_at?->toDateTimeString(),
+                'approved_at' => $payment->matched_at?->toDateTimeString(),
                 'expires_at' => $payment->expires_at?->toDateTimeString(),
             ];
 
@@ -319,34 +402,38 @@ class TestTransactionController extends Controller
         if ($payment->status === Payment::STATUS_APPROVED) {
             return 'completed';
         }
-        
+
         if ($payment->status === Payment::STATUS_REJECTED) {
             return 'rejected';
         }
 
+        if ($payment->isMevonCardCheckout()) {
+            return 'awaiting_card_payment';
+        }
+
         // Check logs to determine step
         $logTypes = $logs->pluck('event_type')->toArray();
-        
+
         if (in_array('webhook_sent', $logTypes)) {
             return 'webhook_sent';
         }
-        
+
         if (in_array('payment_approved', $logTypes)) {
             return 'payment_approved';
         }
-        
+
         if (in_array('payment_matched', $logTypes)) {
             return 'payment_matched';
         }
-        
+
         if (in_array('email_received', $logTypes)) {
             return 'email_received';
         }
-        
+
         if (in_array('account_assigned', $logTypes)) {
             return 'account_assigned';
         }
-        
+
         if (in_array('payment_requested', $logTypes)) {
             return 'payment_requested';
         }
