@@ -92,6 +92,17 @@
                     <p class="text-xs text-gray-500">Webhook URL on pay/start must match an approved website or business webhook. Customer must confirm payment with wallet PIN on Checkout (no API-only debit).</p>
                 </div>
 
+                <div id="card-payments" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
+                    <h4 class="text-sm font-semibold text-gray-900">
+                        <i class="fas fa-credit-card text-indigo-600 mr-1"></i> Card payments (Mevon / Paga)
+                    </h4>
+                    <p class="text-xs text-gray-600">Allows <code class="bg-white px-1 rounded">payment_method: card</code> on payment-request (hosted checkout URL). Bank transfer remains the default. You can also toggle this on the business detail page.</p>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="card_payments_enabled" value="1" {{ old('card_payments_enabled', $business->card_payments_enabled) ? 'checked' : '' }} class="mt-1">
+                        <span class="text-sm text-gray-800"><strong>Enable</strong> card checkout for this merchant</span>
+                    </label>
+                </div>
+
                 <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
                     <a href="{{ route('admin.businesses.show', $business) }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                         Cancel

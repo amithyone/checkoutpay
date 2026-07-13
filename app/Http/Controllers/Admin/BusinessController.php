@@ -98,9 +98,11 @@ class BusinessController extends Controller
             'website_approved' => 'boolean',
             'uses_external_account_numbers' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
+            'card_payments_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
+        $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
 
         Business::create($validated);
 
@@ -162,9 +164,11 @@ class BusinessController extends Controller
             'balance' => 'nullable|numeric|min:0',
             'uses_external_account_numbers' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
+            'card_payments_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
+        $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
 
         $business->update($validated);
 
@@ -345,6 +349,19 @@ class BusinessController extends Controller
         $msg = $business->whatsapp_wallet_api_enabled
             ? 'WhatsApp wallet merchant API is now enabled for this business (X-API-Key: lookup, ensure, pay/start).'
             : 'WhatsApp wallet merchant API is now disabled for this business.';
+
+        return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
+    }
+
+    public function toggleCardPayments(Business $business): RedirectResponse
+    {
+        $business->update([
+            'card_payments_enabled' => ! $business->card_payments_enabled,
+        ]);
+
+        $msg = $business->card_payments_enabled
+            ? 'Card payments (Mevon/Paga checkout) are now enabled for this business. Merchants may send payment_method=card on payment-request.'
+            : 'Card payments are now disabled for this business.';
 
         return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
     }

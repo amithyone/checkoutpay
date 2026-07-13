@@ -37,6 +37,19 @@ class PaymentService
             throw new \InvalidArgumentException('Amount must be at least 0.01');
         }
 
+        $paymentMethod = strtolower(trim((string) ($data['payment_method'] ?? Payment::METHOD_BANK_TRANSFER)));
+        if ($paymentMethod === '' || $paymentMethod === 'bank') {
+            $paymentMethod = Payment::METHOD_BANK_TRANSFER;
+        }
+
+        if ($paymentMethod === Payment::METHOD_CARD) {
+            return $this->createCardPayment($data, $business);
+        }
+
+        if ($paymentMethod !== Payment::METHOD_BANK_TRANSFER) {
+            throw new \InvalidArgumentException('payment_method must be card or bank_transfer.');
+        }
+
         $transactionId = $data['transaction_id'] ?? null;
         if (!$transactionId) {
             do {
@@ -253,6 +266,112 @@ class PaymentService
         }
 
         return $payment;
+    }
+
+    /**
+     * Create a Mevon/Paga card checkout payment (no virtual account).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function createCardPayment(array $data, Business $business): Payment
+    {
+        if (! $business->card_payments_enabled) {
+            throw new \DomainException('Card payments are not enabled for this business. Contact support to enable them.');
+        }
+
+        $amount = (float) ($data['amount'] ?? 0);
+        $email = trim((string) ($data['email'] ?? ''));
+        if ($email === '') {
+            throw new \InvalidArgumentException('email is required when payment_method is card.');
+        }
+
+        $phone = isset($data['phone']) ? trim((string) $data['phone']) : null;
+        $currency = strtoupper(trim((string) ($data['currency'] ?? 'NGN'))) ?: 'NGN';
+
+        $transactionId = $data['transaction_id'] ?? null;
+        if (! $transactionId) {
+            do {
+                $transactionId = 'TXN-'.strtoupper(Str::random(10));
+            } while (Payment::where('transaction_id', $transactionId)->exists());
+        }
+
+        $payerName = isset($data['payer_name']) ? trim((string) $data['payer_name']) : null;
+        if ($payerName === null || $payerName === '') {
+            $payerName = strstr($email, '@', true) ?: 'card customer';
+        }
+
+        $businessWebsiteId = isset($data['business_website_id']) ? (int) $data['business_website_id'] : null;
+        $website = null;
+        if ($businessWebsiteId) {
+            $website = $business->websites()->find($businessWebsiteId);
+        }
+
+        $this->assertIncomingWebhookMatchesConfiguredWebsite($data, $business, $website);
+
+        if (! $website) {
+            $website = $this->resolveWebsiteFromIncomingData($business, $data);
+            if ($website) {
+                $businessWebsiteId = (int) $website->id;
+            }
+        }
+
+        $checkout = app(\App\Services\MevonPay\MevonPayCardCheckoutService::class)
+            ->createCheckout($amount, $email, $phone, $currency);
+
+        $webhookUrlForPayment = '';
+        $explicitWebhook = isset($data['webhook_url']) ? trim((string) $data['webhook_url']) : '';
+        if ($explicitWebhook !== '') {
+            $webhookUrlForPayment = $explicitWebhook;
+        } elseif ($website && filled($website->webhook_url)) {
+            $webhookUrlForPayment = $website->webhook_url;
+        } elseif (! empty($business->webhook_url)) {
+            $webhookUrlForPayment = (string) $business->webhook_url;
+        }
+
+        $charges = $this->chargeService->calculateCharges($amount, $website, $business);
+
+        $partnerBusinessId = isset($data['developer_program_partner_business_id'])
+            && $data['developer_program_partner_business_id'] !== ''
+            && $data['developer_program_partner_business_id'] !== null
+            ? (int) $data['developer_program_partner_business_id']
+            : null;
+
+        return Payment::create([
+            'payment_source' => Payment::SOURCE_EXTERNAL_MEVONPAY_CARD,
+            'payment_method_used' => null,
+            'transaction_id' => $transactionId,
+            'amount' => $amount,
+            'payer_name' => $payerName,
+            'bank' => $data['bank'] ?? null,
+            'webhook_url' => $webhookUrlForPayment,
+            'account_number' => null,
+            'external_reference' => $checkout['payment_reference'],
+            'business_id' => $business->id,
+            'business_website_id' => $businessWebsiteId,
+            'developer_program_partner_business_id' => $partnerBusinessId,
+            'status' => Payment::STATUS_PENDING,
+            'email_data' => array_filter([
+                'service' => $data['service'] ?? null,
+                'return_url' => $data['return_url'] ?? null,
+                'website_url' => $data['website_url'] ?? null,
+                'skip_auto_match' => true,
+                'payment_method' => Payment::METHOD_CARD,
+                'customer_email' => $email,
+                'customer_phone' => $phone,
+                'currency' => $currency,
+                'card_checkout' => [
+                    'checkout_url' => $checkout['checkout_url'],
+                    'payment_reference' => $checkout['payment_reference'],
+                ],
+                'developer_program_partner_business_id' => $partnerBusinessId,
+            ], static fn ($v) => $v !== null),
+            'charge_percentage' => $charges['charge_percentage'] ?? 0,
+            'charge_fixed' => $charges['charge_fixed'] ?? 0,
+            'total_charges' => $charges['total_charges'] ?? 0,
+            'business_receives' => $charges['business_receives'] ?? $amount,
+            'charges_paid_by_customer' => $charges['paid_by_customer'] ?? false,
+            'expires_at' => now()->addHours(24),
+        ]);
     }
 
     /**

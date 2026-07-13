@@ -304,6 +304,44 @@
         </div>
     </div>
 
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6" id="card-payments">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-credit-card mr-2 text-indigo-600"></i> Card payments (Mevon / Paga)
+                </h3>
+                <p class="text-sm text-gray-600 mt-1 max-w-2xl">
+                    When enabled, this business may send <code class="text-xs bg-gray-100 px-1 rounded">payment_method: card</code> on
+                    <code class="text-xs bg-gray-100 px-1 rounded">POST /api/v1/payment-request</code> to receive a hosted card checkout URL.
+                    Bank transfer (virtual account) remains the default when the field is omitted.
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 shrink-0">
+                @if($business->card_payments_enabled)
+                    <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">Enabled</span>
+                    <form action="{{ route('admin.businesses.toggle-card-payments', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 text-sm"
+                            onclick="return confirm('Disable card payments for this business? Card payment-request calls will be rejected.')">
+                            Disable card
+                        </button>
+                    </form>
+                @else
+                    <span class="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-700 rounded-full">Disabled</span>
+                    <form action="{{ route('admin.businesses.toggle-card-payments', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
+                            Enable card
+                        </button>
+                    </form>
+                @endif
+                <a href="{{ route('admin.businesses.edit', $business) }}#card-payments" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">
+                    <i class="fas fa-edit mr-1"></i> Edit on form
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- Charge Settings Section -->
     @if(auth('admin')->user()->canUpdateBusinessBalance())
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

@@ -28,6 +28,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'webhook_url',
         'uses_external_account_numbers',
         'whatsapp_wallet_api_enabled',
+        'card_payments_enabled',
         'email_account_id',
         'is_active',
         'rental_auto_approve',
@@ -159,6 +160,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_exempt' => 'boolean',
         'uses_external_account_numbers' => 'boolean',
         'whatsapp_wallet_api_enabled' => 'boolean',
+        'card_payments_enabled' => 'boolean',
         'rubies_signatory_dob' => 'date',
         'rubies_business_account_created_at' => 'datetime',
     ];

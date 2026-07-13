@@ -176,6 +176,29 @@
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">Account Number</label>
                 <p class="text-xs sm:text-sm font-medium text-gray-900 font-mono break-all">{{ $payment->account_number ?? 'N/A' }}</p>
             </div>
+            @if($payment->payment_method_used || $payment->isMevonCardCheckout())
+            <div>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">Payment Method</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900">
+                    @php
+                        $methodLabel = $payment->payment_method_used
+                            ?? ($payment->isMevonCardCheckout() ? 'card' : null);
+                    @endphp
+                    <span class="px-2 py-1 rounded {{ $methodLabel === 'card' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800' }}">
+                        {{ $methodLabel ?? 'N/A' }}
+                    </span>
+                </p>
+            </div>
+            @endif
+            @if($payment->external_reference)
+            <div>
+                <label class="block text-xs sm:text-sm text-gray-600 mb-1">External Reference</label>
+                <p class="text-xs sm:text-sm font-medium text-gray-900 font-mono break-all">{{ $payment->external_reference }}</p>
+                @if($payment->isMevonCardCheckout())
+                    <p class="text-xs text-gray-500 mt-1">Mevon card checkout payment_reference</p>
+                @endif
+            </div>
+            @endif
             @if($payment->accountNumberDetails)
             <div>
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">Account Details</label>

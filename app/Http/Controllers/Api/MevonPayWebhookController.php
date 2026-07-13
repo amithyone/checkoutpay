@@ -51,6 +51,12 @@ class MevonPayWebhookController extends Controller
         $payload = $this->normalizeWebhookPayload($request);
         $cardWebhook = app(VirtualCardMevonWebhookService::class);
         $event = $cardWebhook->extractWebhookEvent($payload);
+
+        // Merchant card checkout (Paga) — must run before virtual-card matching (PAY_* refs).
+        if ($event === 'checkout.success') {
+            return $this->handleCardCheckoutSuccess($request, $payload);
+        }
+
         $cardResult = $cardWebhook->handleWebhook($payload, [
             'raw_body' => (string) $request->getContent(),
         ]);
@@ -218,6 +224,142 @@ class MevonPayWebhookController extends Controller
         $this->recordWebhookSource($request, 'processed');
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Settle merchant card checkout when Mevon sends checkout.success.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function handleCardCheckoutSuccess(Request $request, array $payload): JsonResponse
+    {
+        $data = is_array(data_get($payload, 'data')) ? data_get($payload, 'data') : [];
+        $paymentReference = trim((string) (
+            data_get($data, 'payment_reference')
+            ?? data_get($payload, 'payment_reference')
+            ?? ''
+        ));
+        $netAmount = (float) (data_get($data, 'amount') ?? 0);
+        $grossAmount = data_get($data, 'gross_amount');
+        $chargeApplied = data_get($data, 'charge_applied');
+        $customerEmail = trim((string) (data_get($data, 'customer_email') ?? ''));
+        $customerPhone = trim((string) (data_get($data, 'customer_phone') ?? ''));
+        $timestamp = (string) (data_get($data, 'timestamp') ?? now()->toISOString());
+
+        Log::info('mevonpay.webhook.checkout_success', [
+            'payment_reference' => $paymentReference,
+            'amount' => $netAmount,
+            'gross_amount' => $grossAmount,
+            'charge_applied' => $chargeApplied,
+        ]);
+
+        if ($paymentReference === '' || $netAmount <= 0) {
+            $this->recordWebhookSource($request, 'card_checkout_invalid_payload');
+
+            return response()->json(['success' => false, 'message' => 'Invalid card checkout payload'], 422);
+        }
+
+        $payment = Payment::query()
+            ->where('external_reference', $paymentReference)
+            ->where('payment_source', Payment::SOURCE_EXTERNAL_MEVONPAY_CARD)
+            ->first();
+
+        if (! $payment) {
+            $payment = Payment::query()
+                ->where('external_reference', $paymentReference)
+                ->where('status', Payment::STATUS_PENDING)
+                ->where(function ($q) {
+                    $q->where('payment_source', Payment::SOURCE_EXTERNAL_MEVONPAY_CARD)
+                        ->orWhere('email_data->payment_method', Payment::METHOD_CARD);
+                })
+                ->first();
+        }
+
+        if (! $payment) {
+            $this->recordWebhookSource($request, 'card_checkout_no_payment');
+            Log::warning('MEVONPAY checkout.success could not find payment', [
+                'payment_reference' => $paymentReference,
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'No pending card payment']);
+        }
+
+        if ($payment->status === Payment::STATUS_APPROVED) {
+            $this->recordWebhookSource($request, 'card_checkout_already_approved');
+
+            return response()->json(['success' => true, 'message' => 'Card payment already approved']);
+        }
+
+        if ($payment->status !== Payment::STATUS_PENDING) {
+            $this->recordWebhookSource($request, 'card_checkout_not_pending');
+
+            return response()->json(['success' => true, 'message' => 'Card payment not pending']);
+        }
+
+        $existingEmailData = is_array($payment->email_data) ? $payment->email_data : [];
+
+        $payment->update([
+            'payment_method_used' => Payment::METHOD_CARD,
+            'email_data' => array_merge($existingEmailData, array_filter([
+                'mevon_card_checkout' => [
+                    'payment_reference' => $paymentReference,
+                    'amount' => $netAmount,
+                    'gross_amount' => $grossAmount !== null ? (float) $grossAmount : null,
+                    'charge_applied' => $chargeApplied !== null ? (float) $chargeApplied : null,
+                    'customer_email' => $customerEmail !== '' ? $customerEmail : null,
+                    'customer_phone' => $customerPhone !== '' ? $customerPhone : null,
+                    'timestamp' => $timestamp,
+                ],
+                'gross_amount' => $grossAmount !== null ? (float) $grossAmount : null,
+                'charge_applied' => $chargeApplied !== null ? (float) $chargeApplied : null,
+            ], static fn ($v) => $v !== null)),
+        ]);
+
+        $payment->approve([
+            'source' => 'mevonpay_card_checkout_webhook',
+            'reference' => $paymentReference,
+            'amount' => $netAmount,
+            'payer_name' => $customerEmail !== '' ? $customerEmail : ($payment->payer_name ?? ''),
+            'timestamp' => $timestamp,
+            'gross_amount' => $grossAmount !== null ? (float) $grossAmount : null,
+            'charge_applied' => $chargeApplied !== null ? (float) $chargeApplied : null,
+        ], false, $netAmount, null);
+
+        // approve() only sets bank_transfer when payment_method_used is empty; re-assert card.
+        $payment->update([
+            'payment_method_used' => Payment::METHOD_CARD,
+            'payment_source' => Payment::SOURCE_EXTERNAL_MEVONPAY_CARD,
+            'external_reference' => $paymentReference,
+        ]);
+
+        if ($payment->business_id) {
+            $payment->business->incrementBalanceWithCharges($payment->amount, $payment, $netAmount);
+            $payment->business->refresh();
+            $payment->business->notify(new \App\Notifications\NewDepositNotification($payment));
+            $payment->business->triggerAutoWithdrawal();
+        }
+
+        $payment->refresh();
+        MevonPayInboundWebhookRecorder::attach($payment, $payload, 'processed', $request);
+        app(MevonPayLedgerRecorder::class)->recordInbound(
+            MevonPayLedgerEntry::FLOW_MERCHANT_CHECKOUT,
+            $netAmount,
+            $paymentReference,
+            null,
+            $payment,
+            [
+                'payment_id' => $payment->id,
+                'business_id' => $payment->business_id,
+                'channel' => 'card_checkout',
+                'gross_amount' => $grossAmount,
+                'charge_applied' => $chargeApplied,
+            ],
+        );
+        $payment->load(['business.websites', 'website']);
+        event(new PaymentApproved($payment));
+        $this->recordWebhookSource($request, 'card_checkout_processed');
+
+        return response()->json(['success' => true, 'message' => 'Card checkout payment approved']);
     }
 
     /**

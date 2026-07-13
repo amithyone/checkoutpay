@@ -96,6 +96,9 @@ class Payment extends Model
 
     const SOURCE_EXTERNAL_MEVONPAY = 'external_mevonpay';
 
+    /** Merchant card checkout via Mevon/Paga hosted page (no VA). */
+    const SOURCE_EXTERNAL_MEVONPAY_CARD = 'external_mevonpay_card';
+
     const SOURCE_EXTERNAL_SLA = 'external_sla';
 
     const SOURCE_EXTERNAL_MAVONPAY = 'external_mavonpay'; // legacy
@@ -114,7 +117,48 @@ class Payment extends Model
 
     const METHOD_BANK_TRANSFER = 'bank_transfer';
 
+    const METHOD_CARD = 'card';
+
     const METHOD_WHATSAPP_WALLET = 'whatsapp_wallet';
+
+    public function isMevonCardCheckout(): bool
+    {
+        if ($this->payment_source === self::SOURCE_EXTERNAL_MEVONPAY_CARD) {
+            return true;
+        }
+
+        $emailData = is_array($this->email_data) ? $this->email_data : [];
+
+        return ($emailData['payment_method'] ?? null) === self::METHOD_CARD;
+    }
+
+    /**
+     * @return array{checkout_url?: string, payment_reference?: string}|null
+     */
+    public function cardCheckoutPayload(): ?array
+    {
+        if (! $this->isMevonCardCheckout()) {
+            return null;
+        }
+
+        $emailData = is_array($this->email_data) ? $this->email_data : [];
+        $block = $emailData['card_checkout'] ?? null;
+        if (! is_array($block)) {
+            $block = [];
+        }
+
+        $checkoutUrl = trim((string) ($block['checkout_url'] ?? ''));
+        $paymentReference = trim((string) ($block['payment_reference'] ?? $this->external_reference ?? ''));
+
+        if ($checkoutUrl === '' && $paymentReference === '') {
+            return null;
+        }
+
+        return array_filter([
+            'checkout_url' => $checkoutUrl !== '' ? $checkoutUrl : null,
+            'payment_reference' => $paymentReference !== '' ? $paymentReference : null,
+        ], static fn ($v) => $v !== null);
+    }
 
     public static function tracksPaymentMethodUsed(): bool
     {
@@ -271,6 +315,15 @@ class Payment extends Model
             'reported_amount',
             'mevonpay_inbound_webhook',
             'mevonpay_inbound_webhooks',
+            'payment_method',
+            'card_checkout',
+            'customer_email',
+            'customer_phone',
+            'currency',
+            'mevon_card_checkout',
+            'gross_amount',
+            'charge_applied',
+            'developer_program_partner_business_id',
         ];
     }
 

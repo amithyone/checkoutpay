@@ -53,6 +53,10 @@ return [
         'transfer_status_path' => env('MEVONPAY_TRANSFER_STATUS_PATH', '/V1/tsk'),
         /** bearer (default for /V1/tsk), token (same as payout), or raw */
         'transfer_status_auth' => env('MEVONPAY_TRANSFER_STATUS_AUTH', 'bearer'),
+        /** Merchant card checkout (Paga) — POST /V1/card_checkout */
+        'card_checkout_path' => env('MEVONPAY_CARD_CHECKOUT_PATH', '/V1/card_checkout'),
+        /** raw (Authorization: secret) or bearer (Authorization: Bearer secret) */
+        'card_checkout_auth' => env('MEVONPAY_CARD_CHECKOUT_AUTH', 'raw'),
     ],
 
     'mevonrubies' => [

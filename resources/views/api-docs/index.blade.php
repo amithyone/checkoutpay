@@ -236,6 +236,24 @@
                                                     <td class="px-4 py-3 text-gray-700">Registration number (if applicable)</td>
                                                 </tr>
                                                 <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">payment_method</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700"><code>bank_transfer</code> (default) or <code>card</code>. Omit for virtual-account bank transfer.</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">email</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">Yes if card</td>
+                                                    <td class="px-4 py-3 text-gray-700">Customer email — required when <code>payment_method</code> is <code>card</code></td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">phone</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Customer phone (optional for card checkout)</td>
+                                                </tr>
+                                                <tr>
                                                     <td class="px-4 py-3 font-mono text-gray-900">webhook_url</td>
                                                     <td class="px-4 py-3 text-gray-700">string</td>
                                                     <td class="px-4 py-3 text-gray-700">Yes</td>
@@ -487,6 +505,56 @@ X-API-Key: pk_your_api_key_here</code></pre>
                         </div>
                     </div>
 
+                    <!-- Card payments (optional Mevon/Paga) -->
+                    <div id="card-payments" class="bg-white rounded-lg shadow-sm border border-indigo-200 p-6 sm:p-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">
+                            <i class="fas fa-credit-card text-indigo-600 mr-2"></i>Card payments (optional)
+                        </h2>
+                        <p class="text-gray-700 mb-4">
+                            Opt-in rail on the same <code class="bg-gray-100 px-2 py-1 rounded text-sm">POST /payment-request</code> endpoint.
+                            Send <code class="bg-gray-100 px-1 rounded">payment_method: card</code> with a customer <code class="bg-gray-100 px-1 rounded">email</code> to receive a hosted checkout URL.
+                            <strong>Bank transfer (virtual account) remains the default</strong> when you omit <code class="bg-gray-100 px-1 rounded">payment_method</code> or send <code class="bg-gray-100 px-1 rounded">bank_transfer</code>.
+                        </p>
+
+                        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 text-sm text-indigo-900 space-y-2">
+                            <p><strong>Enablement:</strong> Card payments must be enabled on your business by CheckoutPay admin. Until then, card requests return <strong>403</strong>.</p>
+                            <p><strong>Flow:</strong> Create → redirect customer to <code class="bg-white px-1 rounded">card_checkout.checkout_url</code> → Mevon settles → you receive the same <code class="bg-white px-1 rounded">payment.approved</code> webhook with <code class="bg-white px-1 rounded">payment_method: card</code>.</p>
+                        </div>
+
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Example request</h3>
+                        <div class="code-block mb-6">
+                            <pre><code>{
+  "amount": 200.00,
+  "payment_method": "card",
+  "email": "customer@example.com",
+  "phone": "08012345678",
+  "payer_name": "Jane Doe",
+  "webhook_url": "https://yourwebsite.com/webhook/payment-status"
+}</code></pre>
+                        </div>
+
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Example response</h3>
+                        <div class="code-block mb-6">
+                            <pre><code>{
+  "success": true,
+  "message": "Payment request created successfully",
+  "data": {
+    "transaction_id": "TXN-ABC123",
+    "amount": 200,
+    "payment_method": "card",
+    "status": "pending",
+    "card_checkout": {
+      "checkout_url": "https://checkout.paga.com/...",
+      "payment_reference": "PAY_..."
+    },
+    "charges": { }
+  }
+}</code></pre>
+                        </div>
+
+                        <p class="text-gray-700 text-sm">There is no <code class="bg-gray-100 px-1 rounded">account_number</code> on card payments. Poll <code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> or wait for <code class="bg-gray-100 px-1 rounded">payment.approved</code>. Settled amount uses Mevon’s net <code class="bg-gray-100 px-1 rounded">amount</code> (after processor fee).</p>
+                    </div>
+
                     <!-- WhatsApp Pay Code (checkout dual rail) -->
                     <div id="whatsapp-pay-code" class="bg-white rounded-lg shadow-sm border border-green-200 p-6 sm:p-8">
                         <h2 class="text-3xl font-bold text-gray-900 mb-4">
@@ -503,7 +571,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
                         </div>
 
                         <h3 class="text-xl font-semibold text-gray-900 mb-3">Poll payment status</h3>
-                        <p class="text-gray-700 mb-3"><code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> includes <code class="bg-gray-100 px-1 rounded">payment_method_used</code> (<code class="bg-gray-100 px-1 rounded">bank_transfer</code> | <code class="bg-gray-100 px-1 rounded">whatsapp_wallet</code> | null while pending) and <code class="bg-gray-100 px-1 rounded">whatsapp_pay.status</code> (<code class="bg-gray-100 px-1 rounded">available</code>, <code class="bg-gray-100 px-1 rounded">claimed</code>, <code class="bg-gray-100 px-1 rounded">completed</code>, <code class="bg-gray-100 px-1 rounded">expired</code>).</p>
+                        <p class="text-gray-700 mb-3"><code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> includes <code class="bg-gray-100 px-1 rounded">payment_method_used</code> (<code class="bg-gray-100 px-1 rounded">bank_transfer</code> | <code class="bg-gray-100 px-1 rounded">whatsapp_wallet</code> | <code class="bg-gray-100 px-1 rounded">card</code> | null while pending) and <code class="bg-gray-100 px-1 rounded">whatsapp_pay.status</code> (<code class="bg-gray-100 px-1 rounded">available</code>, <code class="bg-gray-100 px-1 rounded">claimed</code>, <code class="bg-gray-100 px-1 rounded">completed</code>, <code class="bg-gray-100 px-1 rounded">expired</code>).</p>
 
                         <h3 class="text-xl font-semibold text-gray-900 mb-3 mt-6">Security</h3>
                         <p class="text-gray-700">Wallet PIN is <strong>never</strong> accepted in WhatsApp chat. The bot sends a time-limited HTTPS link; the customer enters their 4-digit PIN only on that page.</p>
@@ -670,7 +738,7 @@ X-API-Key: pk_your_api_key_here
   "developer_program_fee_share_base_description": "CheckoutPay's transaction fee revenue on qualifying attributed volume"
 }</code></pre>
                                 </div>
-                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>payment_method</code> (<code>bank_transfer</code> or <code>whatsapp_wallet</code>, nullable), <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
+                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code> or Mevon card <code>payment_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account; null for card), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>payment_method</code> (<code>bank_transfer</code>, <code>whatsapp_wallet</code>, or <code>card</code>, nullable), <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
                             </div>
 
                             <div>

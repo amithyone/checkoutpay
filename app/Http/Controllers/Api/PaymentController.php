@@ -54,6 +54,10 @@ class PaymentController extends Controller
                 'business_website_id' => $request->business_website_id,
                 'website_url' => $request->website_url,
                 'developer_program_partner_business_id' => $request->developer_program_partner_business_id,
+                'payment_method' => $request->input('payment_method', Payment::METHOD_BANK_TRANSFER),
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'currency' => $request->currency,
             ];
 
             $payment = $this->paymentService->createPayment($paymentData, $business, $request);
@@ -71,8 +75,10 @@ class PaymentController extends Controller
             // Load account number details
             $payment->load('accountNumberDetails', 'website');
 
-            // Ensure account number exists
-            if (!$payment->account_number) {
+            $isCard = $payment->isMevonCardCheckout();
+
+            // Ensure account number exists for bank-transfer payments
+            if (! $isCard && ! $payment->account_number) {
                 Log::error('Payment created without account number via API', [
                     'payment_id' => $payment->id,
                     'transaction_id' => $payment->transaction_id,
@@ -92,9 +98,11 @@ class PaymentController extends Controller
                     'transaction_id' => $payment->transaction_id,
                     'amount' => (float) $payment->amount,
                     'payer_name' => $payment->payer_name,
+                    'payment_method' => $isCard ? Payment::METHOD_CARD : Payment::METHOD_BANK_TRANSFER,
                     'account_number' => $payment->account_number,
                     'account_name' => $payment->accountNumberDetails->account_name ?? null,
                     'bank_name' => $payment->accountNumberDetails->bank_name ?? null,
+                    'card_checkout' => $payment->cardCheckoutPayload(),
                     'status' => $payment->status,
                     'expires_at' => $payment->expires_at?->toISOString(),
                     'created_at' => $payment->created_at->toISOString(),
@@ -113,6 +121,11 @@ class PaymentController extends Controller
                     'whatsapp_pay' => $whatsappPay,
                 ], static fn ($value) => $value !== null),
             ], 201);
+        } catch (\DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 403);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
@@ -191,6 +204,7 @@ class PaymentController extends Controller
                 'account_number' => $payment->account_number,
                 'account_name' => $payment->accountNumberDetails->account_name ?? null,
                 'bank_name' => $payment->accountNumberDetails->bank_name ?? null,
+                'card_checkout' => $payment->cardCheckoutPayload(),
                 'status' => $payment->status,
                 'webhook_url' => $payment->webhook_url,
                 'expires_at' => $payment->expires_at?->toISOString(),

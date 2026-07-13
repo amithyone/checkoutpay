@@ -230,6 +230,40 @@ Content-Type: application/json
         </div>
     </div>
 
+    <!-- Card payments -->
+    <div class="bg-white rounded-xl shadow-sm border border-indigo-200 p-4 lg:p-6" id="card-payments">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-credit-card mr-2 text-indigo-600"></i> Card payments (optional)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">
+            When card payments are enabled on your business (ask CheckoutPay support / admin), send
+            <code class="bg-gray-100 px-1 rounded text-xs">payment_method: card</code> and a customer
+            <code class="bg-gray-100 px-1 rounded text-xs">email</code> on the same
+            <code class="bg-gray-100 px-1 rounded text-xs">POST /api/v1/payment-request</code> endpoint.
+            You receive <code class="bg-gray-100 px-1 rounded text-xs">card_checkout.checkout_url</code> — redirect the customer there.
+            Bank transfer (account number) remains the default when you omit <code class="bg-gray-100 px-1 rounded text-xs">payment_method</code>.
+        </p>
+        <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto mb-3">
+            <pre class="text-xs text-gray-100"><code>POST {{ url('/api/v1/payment-request') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{
+  "amount": 200.00,
+  "payment_method": "card",
+  "email": "customer@example.com",
+  "payer_name": "Jane Doe",
+  "webhook_url": "https://yourwebsite.com/webhook/checkout"
+}</code></pre>
+        </div>
+        <p class="text-sm text-gray-600 mb-2">
+            On success you get the same <code class="bg-gray-100 px-1 rounded text-xs">payment.approved</code> webhook with
+            <code class="bg-gray-100 px-1 rounded text-xs">payment_method: card</code> and
+            <code class="bg-gray-100 px-1 rounded text-xs">external_reference</code> set to Mevon’s payment reference.
+        </p>
+        <p class="text-sm text-gray-600">Full reference: <a href="{{ route('api-docs') }}#card-payments" class="text-primary underline font-medium">public API docs — Card payments</a>.</p>
+    </div>
+
     <!-- WhatsApp Pay Code -->
     <div class="bg-white rounded-xl shadow-sm border border-green-200 p-4 lg:p-6" id="whatsapp-pay-code">
         <h3 class="text-lg font-semibold text-gray-900 mb-2">

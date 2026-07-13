@@ -39,6 +39,10 @@ class PaymentRequest extends FormRequest
             'website_url' => ['nullable', 'url', 'max:500'], // Allow website URL for identification
             'developer_program_partner_business_id' => ['nullable', 'integer', 'exists:businesses,id'],
             'devprogram' => ['nullable', 'integer'],
+            'payment_method' => ['nullable', 'string', 'in:card,bank_transfer,bank'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'currency' => ['nullable', 'string', 'size:3'],
         ];
     }
 
@@ -48,12 +52,25 @@ class PaymentRequest extends FormRequest
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            // Require either 'name' or 'payer_name' to be provided and not empty
-            $hasName = $this->has('name') && !empty(trim($this->input('name', '')));
-            $hasPayerName = $this->has('payer_name') && !empty(trim($this->input('payer_name', '')));
-            
-            if (!$hasName && !$hasPayerName) {
-                $validator->errors()->add('payer_name', 'The payer name is required to get an account number. Please provide either "name" or "payer_name".');
+            $method = strtolower(trim((string) $this->input('payment_method', 'bank_transfer')));
+            if ($method === '' || $method === 'bank') {
+                $method = 'bank_transfer';
+            }
+            $isCard = $method === 'card';
+
+            if ($isCard) {
+                $email = trim((string) $this->input('email', ''));
+                if ($email === '') {
+                    $validator->errors()->add('email', 'A customer email is required when payment_method is card.');
+                }
+            } else {
+                // Require either 'name' or 'payer_name' for bank transfer (account number assignment).
+                $hasName = $this->has('name') && ! empty(trim($this->input('name', '')));
+                $hasPayerName = $this->has('payer_name') && ! empty(trim($this->input('payer_name', '')));
+
+                if (! $hasName && ! $hasPayerName) {
+                    $validator->errors()->add('payer_name', 'The payer name is required to get an account number. Please provide either "name" or "payer_name".');
+                }
             }
 
             $webhookTrim = trim((string) ($this->input('webhook_url') ?? ''));
