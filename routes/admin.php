@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\WhatsappWalletAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletTransactionAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletMoneyRequestAdminController;
 use App\Http\Controllers\Admin\WhatsappSaveTogetherAdminController;
+use App\Http\Controllers\Admin\HoneypotAdminController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
@@ -243,6 +244,10 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::get('audits/mevonpay/export', [MevonPayAuditController::class, 'exportCsv'])->name('audits.mevonpay.export');
             Route::redirect('mevonpay-audit', '/'.\App\Support\AdminPath::prefix().'/audits/mevonpay')->name('mevonpay-audit.index');
             Route::get('mevonpay-audit/export', fn () => redirect()->route('admin.audits.mevonpay.export', request()->query()));
+
+            Route::get('honeypot', [HoneypotAdminController::class, 'index'])->name('honeypot.index');
+            Route::post('honeypot/ban', [HoneypotAdminController::class, 'ban'])->name('honeypot.ban');
+            Route::post('honeypot/unban', [HoneypotAdminController::class, 'unban'])->name('honeypot.unban');
         });
 
         // Test Transaction (Live Testing)

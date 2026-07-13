@@ -28,6 +28,7 @@ return [
         'processed_emails',
         'transaction_logs',
         'audits',
+        'honeypot',
         'match_attempts',
         'invoices',
         'email_accounts',

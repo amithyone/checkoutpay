@@ -237,6 +237,14 @@ class AdminSidebarMenu
                 $this->link('Audits', 'admin.audits.index', 'fas fa-clipboard-check', ['admin.audits.*']),
                 ['visible' => $admin->canManageSettings()]
             ),
+            'honeypot' => array_merge(
+                $this->link('Honeypot', 'admin.honeypot.index', 'fas fa-spider text-amber-700', ['admin.honeypot.*']),
+                [
+                    'visible' => $admin->canManageSettings(),
+                    'badge_count' => app(\App\Services\Security\AdminHoneypotService::class)->banCount(),
+                    'badge_color' => 'yellow',
+                ]
+            ),
             'match_attempts' => array_merge(
                 $this->link('Match Logs', 'admin.match-attempts.index', 'fas fa-search-dollar', ['admin.match-attempts.*']),
                 ['visible' => ! $admin->isWalletSupport()]
