@@ -18,7 +18,7 @@ use Tests\TestCase;
 
 /**
  * Live smoke (after deploy / with real MEVONPAY_SECRET_KEY):
- * 1. Enable card_payments_enabled on a test business in admin.
+ * 1. Enable card_payments_enabled on a test business (Settings or admin).
  * 2. POST /api/v1/payment-request with payment_method=card, email, amount.
  * 3. Open data.card_checkout.checkout_url and complete a test card payment.
  * 4. Confirm checkout.success webhook → payment approved, balance credited, merchant payment.approved.

@@ -505,6 +505,47 @@
         @endif
     </div>
 
+    <!-- Card payments -->
+    <div id="card-payments" class="bg-white rounded-lg shadow-sm border border-indigo-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-credit-card text-indigo-600 mr-2"></i> Card payments
+        </h3>
+        <p class="text-sm text-gray-600 mb-6">
+            Allow <code class="text-xs bg-gray-100 px-1 rounded">payment_method: card</code> on
+            <code class="text-xs bg-gray-100 px-1 rounded">POST /api/v1/payment-request</code>.
+            Customers pay on a hosted Mevon/Paga checkout page. Bank transfer stays the default when you omit the field.
+        </p>
+
+        <form method="POST" action="{{ route('business.settings.update') }}">
+            @csrf
+            @method('PUT')
+            <input type="hidden" name="card_payments_form" value="1">
+
+            <div class="flex items-start gap-3">
+                <div class="flex items-center h-5 mt-0.5">
+                    <input type="hidden" name="card_payments_enabled" value="0">
+                    <input type="checkbox" name="card_payments_enabled" id="card_payments_enabled" value="1"
+                        {{ old('card_payments_enabled', $business->card_payments_enabled) ? 'checked' : '' }}
+                        class="rounded border-gray-300 text-primary focus:ring-primary">
+                </div>
+                <div>
+                    <label for="card_payments_enabled" class="text-sm font-medium text-gray-900">Enable card checkout</label>
+                    <p class="text-xs text-gray-500 mt-0.5">
+                        When enabled, your integration can request a <code class="bg-gray-100 px-1 rounded">card_checkout.checkout_url</code>
+                        and redirect the customer. See
+                        <a href="{{ route('business.api-documentation.index') }}#card-payments" class="text-primary underline">API documentation</a>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    <i class="fas fa-save mr-2"></i> Save card payments
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Webhook Settings -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-6">Webhook Settings</h3>

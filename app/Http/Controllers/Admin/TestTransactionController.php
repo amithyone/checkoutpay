@@ -105,7 +105,7 @@ class TestTransactionController extends Controller
             if (! $business->card_payments_enabled) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Card payments are not enabled for this business. Enable them on the business page first.',
+                    'message' => 'Card payments are not enabled for this business. Enable them in Settings → Card payments (or via admin).',
                 ], 422);
             }
 

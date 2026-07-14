@@ -276,7 +276,7 @@ class PaymentService
     protected function createCardPayment(array $data, Business $business): Payment
     {
         if (! $business->card_payments_enabled) {
-            throw new \DomainException('Card payments are not enabled for this business. Contact support to enable them.');
+            throw new \DomainException('Card payments are not enabled for this business. Enable them in Settings → Card payments.');
         }
 
         $amount = (float) ($data['amount'] ?? 0);

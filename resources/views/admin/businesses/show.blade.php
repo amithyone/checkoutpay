@@ -314,6 +314,7 @@
                     When enabled, this business may send <code class="text-xs bg-gray-100 px-1 rounded">payment_method: card</code> on
                     <code class="text-xs bg-gray-100 px-1 rounded">POST /api/v1/payment-request</code> to receive a hosted card checkout URL.
                     Bank transfer (virtual account) remains the default when the field is omitted.
+                    Merchants can also toggle this in their own Settings.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-3 shrink-0">

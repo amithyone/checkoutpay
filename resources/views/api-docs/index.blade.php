@@ -517,7 +517,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
                         </p>
 
                         <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 text-sm text-indigo-900 space-y-2">
-                            <p><strong>Enablement:</strong> Card payments must be enabled on your business by CheckoutPay admin. Until then, card requests return <strong>403</strong>.</p>
+                            <p><strong>Enablement:</strong> Turn on <strong>Card payments</strong> in your CheckoutPay business dashboard under <strong>Settings → Card payments</strong>. Until then, card requests return <strong>403</strong>.</p>
                             <p><strong>Flow:</strong> Create → redirect customer to <code class="bg-white px-1 rounded">card_checkout.checkout_url</code> → Mevon settles → you receive the same <code class="bg-white px-1 rounded">payment.approved</code> webhook with <code class="bg-white px-1 rounded">payment_method: card</code>.</p>
                         </div>
 

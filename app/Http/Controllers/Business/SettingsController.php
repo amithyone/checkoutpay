@@ -87,6 +87,11 @@ class SettingsController extends Controller
             }
         }
 
+        // Card payments: only update when this settings section is submitted (avoid wiping from other forms).
+        if ($request->has('card_payments_form')) {
+            $validated['card_payments_enabled'] = $request->boolean('card_payments_enabled');
+        }
+
         // Require saved withdrawal account to enable auto-withdrawal (threshold > 0)
         $threshold = isset($validated['auto_withdraw_threshold']) ? (float) $validated['auto_withdraw_threshold'] : null;
         if ($threshold > 0 && !$business->hasSavedWithdrawalAccount()) {

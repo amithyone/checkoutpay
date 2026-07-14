@@ -236,8 +236,9 @@ Content-Type: application/json
             <i class="fas fa-credit-card mr-2 text-indigo-600"></i> Card payments (optional)
         </h3>
         <p class="text-sm text-gray-600 mb-4">
-            When card payments are enabled on your business (ask CheckoutPay support / admin), send
-            <code class="bg-gray-100 px-1 rounded text-xs">payment_method: card</code> and a customer
+            Enable <strong>Card payments</strong> in
+            <a href="{{ route('business.settings.index') }}#card-payments" class="text-primary underline font-medium">Settings</a>,
+            then send <code class="bg-gray-100 px-1 rounded text-xs">payment_method: card</code> and a customer
             <code class="bg-gray-100 px-1 rounded text-xs">email</code> on the same
             <code class="bg-gray-100 px-1 rounded text-xs">POST /api/v1/payment-request</code> endpoint.
             You receive <code class="bg-gray-100 px-1 rounded text-xs">card_checkout.checkout_url</code> — redirect the customer there.
