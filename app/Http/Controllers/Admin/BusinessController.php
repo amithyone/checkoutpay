@@ -360,7 +360,7 @@ class BusinessController extends Controller
         ]);
 
         $msg = $business->card_payments_enabled
-            ? 'Card payments (Mevon/Paga checkout) are now enabled for this business. Merchants may send payment_method=card on payment-request.'
+            ? 'Card payments are now enabled for this business. Merchants may send payment_method=card on payment-request.'
             : 'Card payments are now disabled for this business.';
 
         return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
