@@ -308,7 +308,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">
-                    <i class="fas fa-credit-card mr-2 text-indigo-600"></i> Card payments (Mevon / Paga)
+                    <i class="fas fa-credit-card mr-2 text-indigo-600"></i> Card payments
                 </h3>
                 <p class="text-sm text-gray-600 mt-1 max-w-2xl">
                     When enabled, this business may send <code class="text-xs bg-gray-100 px-1 rounded">payment_method: card</code> on

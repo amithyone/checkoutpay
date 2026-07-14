@@ -513,7 +513,7 @@
         <p class="text-sm text-gray-600 mb-6">
             Allow <code class="text-xs bg-gray-100 px-1 rounded">payment_method: card</code> on
             <code class="text-xs bg-gray-100 px-1 rounded">POST /api/v1/payment-request</code>.
-            Customers pay on a hosted Mevon/Paga checkout page. Bank transfer stays the default when you omit the field.
+            Customers pay on a hosted card checkout page. Bank transfer stays the default when you omit the field.
         </p>
 
         <form method="POST" action="{{ route('business.settings.update') }}">

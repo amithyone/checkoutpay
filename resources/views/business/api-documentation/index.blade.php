@@ -260,7 +260,7 @@ X-API-Key: {{ $business->api_key }}
         <p class="text-sm text-gray-600 mb-2">
             On success you get the same <code class="bg-gray-100 px-1 rounded text-xs">payment.approved</code> webhook with
             <code class="bg-gray-100 px-1 rounded text-xs">payment_method: card</code> and
-            <code class="bg-gray-100 px-1 rounded text-xs">external_reference</code> set to Mevon’s payment reference.
+            <code class="bg-gray-100 px-1 rounded text-xs">external_reference</code> set to the card checkout payment reference.
         </p>
         <p class="text-sm text-gray-600">Full reference: <a href="{{ route('api-docs') }}#card-payments" class="text-primary underline font-medium">public API docs — Card payments</a>.</p>
     </div>

@@ -505,7 +505,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
                         </div>
                     </div>
 
-                    <!-- Card payments (optional Mevon/Paga) -->
+                    <!-- Card payments (optional) -->
                     <div id="card-payments" class="bg-white rounded-lg shadow-sm border border-indigo-200 p-6 sm:p-8">
                         <h2 class="text-3xl font-bold text-gray-900 mb-4">
                             <i class="fas fa-credit-card text-indigo-600 mr-2"></i>Card payments (optional)
@@ -518,7 +518,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
 
                         <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6 text-sm text-indigo-900 space-y-2">
                             <p><strong>Enablement:</strong> Turn on <strong>Card payments</strong> in your CheckoutPay business dashboard under <strong>Settings → Card payments</strong>. Until then, card requests return <strong>403</strong>.</p>
-                            <p><strong>Flow:</strong> Create → redirect customer to <code class="bg-white px-1 rounded">card_checkout.checkout_url</code> → Mevon settles → you receive the same <code class="bg-white px-1 rounded">payment.approved</code> webhook with <code class="bg-white px-1 rounded">payment_method: card</code>.</p>
+                            <p><strong>Flow:</strong> Create → redirect customer to <code class="bg-white px-1 rounded">card_checkout.checkout_url</code> → customer pays → you receive the same <code class="bg-white px-1 rounded">payment.approved</code> webhook with <code class="bg-white px-1 rounded">payment_method: card</code>.</p>
                         </div>
 
                         <h3 class="text-xl font-semibold text-gray-900 mb-3">Example request</h3>
@@ -544,7 +544,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
     "payment_method": "card",
     "status": "pending",
     "card_checkout": {
-      "checkout_url": "https://checkout.paga.com/...",
+      "checkout_url": "https://checkout.example.com/pay/...",
       "payment_reference": "PAY_..."
     },
     "charges": { }
@@ -552,7 +552,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
 }</code></pre>
                         </div>
 
-                        <p class="text-gray-700 text-sm">There is no <code class="bg-gray-100 px-1 rounded">account_number</code> on card payments. Poll <code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> or wait for <code class="bg-gray-100 px-1 rounded">payment.approved</code>. Settled amount uses Mevon’s net <code class="bg-gray-100 px-1 rounded">amount</code> (after processor fee).</p>
+                        <p class="text-gray-700 text-sm">There is no <code class="bg-gray-100 px-1 rounded">account_number</code> on card payments. Poll <code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> or wait for <code class="bg-gray-100 px-1 rounded">payment.approved</code>. Use <code class="bg-gray-100 px-1 rounded">received_amount</code> for reconciliation (net after processor fees).</p>
                     </div>
 
                     <!-- WhatsApp Pay Code (checkout dual rail) -->
@@ -738,7 +738,7 @@ X-API-Key: pk_your_api_key_here
   "developer_program_fee_share_base_description": "CheckoutPay's transaction fee revenue on qualifying attributed volume"
 }</code></pre>
                                 </div>
-                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code> or Mevon card <code>payment_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account; null for card), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>payment_method</code> (<code>bank_transfer</code>, <code>whatsapp_wallet</code>, or <code>card</code>, nullable), <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
+                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code> or card checkout <code>payment_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account; null for card), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>payment_method</code> (<code>bank_transfer</code>, <code>whatsapp_wallet</code>, or <code>card</code>, nullable), <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
                             </div>
 
                             <div>

@@ -94,7 +94,7 @@
 
                 <div id="card-payments" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
                     <h4 class="text-sm font-semibold text-gray-900">
-                        <i class="fas fa-credit-card text-indigo-600 mr-1"></i> Card payments (Mevon / Paga)
+                        <i class="fas fa-credit-card text-indigo-600 mr-1"></i> Card payments
                     </h4>
                     <p class="text-xs text-gray-600">Allows <code class="bg-white px-1 rounded">payment_method: card</code> on payment-request (hosted checkout URL). Bank transfer remains the default. You can also toggle this on the business detail page.</p>
                     <label class="flex items-start gap-2 cursor-pointer">

@@ -195,7 +195,7 @@
                 <label class="block text-xs sm:text-sm text-gray-600 mb-1">External Reference</label>
                 <p class="text-xs sm:text-sm font-medium text-gray-900 font-mono break-all">{{ $payment->external_reference }}</p>
                 @if($payment->isMevonCardCheckout())
-                    <p class="text-xs text-gray-500 mt-1">Mevon card checkout payment_reference</p>
+                    <p class="text-xs text-gray-500 mt-1">Card checkout payment reference</p>
                 @endif
             </div>
             @endif

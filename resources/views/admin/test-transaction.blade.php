@@ -71,11 +71,11 @@
     <!-- Card checkout test -->
     <div class="bg-white rounded-lg shadow-sm border border-indigo-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-1">
-            <i class="fas fa-credit-card text-indigo-600 mr-2"></i>Test Card Checkout (Mevon / Paga)
+            <i class="fas fa-credit-card text-indigo-600 mr-2"></i>Test Card Checkout
         </h3>
         <p class="text-sm text-gray-600 mb-4">
             Creates a real <code class="text-xs bg-gray-100 px-1 rounded">payment_method=card</code> request, returns a hosted checkout URL,
-            then polls until Mevon sends <code class="text-xs bg-gray-100 px-1 rounded">checkout.success</code>.
+            then polls until the payment is approved after the customer completes checkout.
             Business must have <strong>card payments enabled</strong> (business Settings or admin).
         </p>
 
@@ -154,11 +154,11 @@
         <h3 class="text-lg font-semibold text-blue-900 mb-4">📋 How to Test</h3>
         <ol class="list-decimal list-inside space-y-2 text-sm text-blue-800">
             <li><strong>Bank transfer:</strong> Create a test payment, note the account number, transfer the amount, watch live updates / check email.</li>
-            <li><strong>Card:</strong> Enable card payments in business Settings (or admin), create card checkout, open the checkout URL, pay on Paga, wait for <code class="bg-blue-100 px-1 rounded">checkout.success</code> (status polls automatically).</li>
+            <li><strong>Card:</strong> Enable card payments in business Settings (or admin), create card checkout, open the checkout URL, complete payment, wait for approval (status polls automatically).</li>
         </ol>
         <div class="mt-4 p-3 bg-blue-100 rounded-lg">
             <p class="text-sm text-blue-900">
-                <strong>💡 Tip:</strong> Bank email checks run every 2 seconds while polling. Card settlement comes from the Mevon webhook — no email step.
+                <strong>💡 Tip:</strong> Bank email checks run every 2 seconds while polling. Card settlement is webhook-driven — no email step.
             </p>
         </div>
     </div>
