@@ -5,6 +5,7 @@ namespace App\Services\Rentals;
 use App\Models\Rental;
 use App\Models\RentalFeaturedBanner;
 use App\Models\RentalItem;
+use App\Models\RentalItemReview;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Str;
@@ -24,6 +25,10 @@ class RentalCatalogFormatter
 
         $business = $item->business;
         $category = $item->category;
+        $averageRating = self::averageRatingFromReviews(
+            (float) ($item->reviews_avg_rating ?? $item->average_rating ?? 0),
+            (int) ($item->reviews_count ?? 0)
+        );
 
         return [
             'id' => $item->id,
@@ -38,7 +43,10 @@ class RentalCatalogFormatter
             'weekly_rate' => $item->weekly_rate !== null ? (string) $item->weekly_rate : null,
             'monthly_rate' => $item->monthly_rate !== null ? (string) $item->monthly_rate : null,
             'currency' => $item->currency ?? 'NGN',
-            'rating' => self::itemRating($item),
+            'rating' => $averageRating,
+            'average_rating' => $averageRating,
+            'reviews_count' => (int) ($item->reviews_count ?? 0),
+            'how_to_videos' => self::howToVideos($item),
             'images' => $normalizedImages,
             'thumbnail' => $normalizedImages[0] ?? null,
             'is_featured' => (bool) $item->is_featured,
@@ -181,15 +189,64 @@ class RentalCatalogFormatter
 
     public static function itemRating(RentalItem $item): ?float
     {
-        $count = (int) ($item->rentals_count ?? $item->rentals()
-            ->where('status', Rental::STATUS_COMPLETED)
-            ->count());
+        return self::averageRatingFromReviews(
+            (float) ($item->reviews_avg_rating ?? 0),
+            (int) ($item->reviews_count ?? 0)
+        );
+    }
 
-        if ($count <= 0) {
+    public static function averageRatingFromReviews(float $avg, int $count): ?float
+    {
+        if ($count <= 0 || $avg <= 0) {
             return null;
         }
 
-        return min(5.0, round(3.5 + ($count * 0.15), 1));
+        return round(min(5.0, max(1.0, $avg)), 1);
+    }
+
+    /**
+     * @return array<int, array{title: string, url: string}>
+     */
+    public static function howToVideos(RentalItem $item): array
+    {
+        return RentalItem::normalizeHowToVideos($item->how_to_videos ?? []);
+    }
+
+    public static function reviewEntry(RentalItemReview $review): array
+    {
+        $review->loadMissing('renter:id,name');
+
+        $condition = $review->condition;
+        $conditionLabel = $condition !== null ? ucfirst($condition) : null;
+
+        return [
+            'id' => $review->id,
+            'item_id' => $review->rental_item_id,
+            'rental_id' => $review->rental_id,
+            'rating' => $review->rating,
+            'condition' => $conditionLabel,
+            'missing_items' => $review->missing_items,
+            'remarks' => $review->remarks,
+            'created_at' => $review->created_at?->toIso8601String(),
+            'renter' => [
+                'display_name' => self::reviewerDisplayName($review->renter?->name),
+            ],
+        ];
+    }
+
+    protected static function reviewerDisplayName(?string $name): string
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return 'Verified renter';
+        }
+
+        $parts = preg_split('/\s+/', $name) ?: [];
+        if (count($parts) === 1) {
+            return mb_substr($parts[0], 0, 1).'.';
+        }
+
+        return mb_substr($parts[0], 0, 1).'. '.mb_substr($parts[count($parts) - 1], 0, 1).'.';
     }
 
     public static function locationLabel(RentalItem $item): ?string

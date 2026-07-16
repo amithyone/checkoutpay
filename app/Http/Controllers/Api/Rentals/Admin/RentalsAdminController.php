@@ -309,9 +309,17 @@ class RentalsAdminController extends Controller
             'featured_sort' => 'sometimes|nullable|integer|min:1|max:9999',
             'is_active' => 'sometimes|boolean',
             'is_available' => 'sometimes|boolean',
+            'how_to_videos' => 'sometimes|nullable|array',
+            'how_to_videos.*.title' => 'nullable|string|max:200',
+            'how_to_videos.*.url' => 'nullable|string|max:500',
+            'howToVideos' => 'sometimes|nullable|array',
         ]);
 
         $payload = array_merge($validated, RentalItem::featuredFieldsFromRequest($request));
+
+        if ($request->hasAny(['how_to_videos', 'howToVideos'])) {
+            $payload = array_merge($payload, RentalItem::howToVideosFromRequest($request));
+        }
 
         if (array_key_exists('is_featured', $payload) && ! $payload['is_featured']) {
             $payload['featured_tag'] = null;
@@ -320,6 +328,8 @@ class RentalsAdminController extends Controller
 
         $item->update($payload);
         $item->load(['business', 'category']);
+        $item->loadCount(['publishedReviews as reviews_count']);
+        $item->loadAvg(['publishedReviews as reviews_avg_rating'], 'rating');
 
         return response()->json([
             'success' => true,

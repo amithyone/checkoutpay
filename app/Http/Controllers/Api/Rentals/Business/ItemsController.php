@@ -70,6 +70,10 @@ class ItemsController extends Controller
             'is_featured' => 'nullable|boolean',
             'featured_tag' => 'nullable|string|max:120',
             'featured_sort' => 'nullable|integer|min:1|max:9999',
+            'how_to_videos' => 'nullable|array',
+            'how_to_videos.*.title' => 'nullable|string|max:200',
+            'how_to_videos.*.url' => 'nullable|string|max:500',
+            'howToVideos' => 'nullable|array',
         ]);
 
         $categoryId = $validated['category_id'] ?? null;
@@ -99,10 +103,15 @@ class ItemsController extends Controller
             'is_available' => (bool) ($validated['is_available'] ?? true),
             'is_active' => (bool) ($validated['is_active'] ?? true),
             'images' => $images ?: null,
-        ], RentalItem::discountPatchFromRequest($request)));
+        ], RentalItem::discountPatchFromRequest($request), RentalItem::howToVideosFromRequest($request)));
+
+        $item->load(['business', 'category']);
+        $item->loadCount(['publishedReviews as reviews_count']);
+        $item->loadAvg(['publishedReviews as reviews_avg_rating'], 'rating');
 
         return response()->json([
-            'data' => $item,
+            'success' => true,
+            'data' => RentalCatalogFormatter::catalogItem($item),
         ], 201);
     }
 
@@ -143,6 +152,10 @@ class ItemsController extends Controller
             'is_featured' => 'sometimes|boolean',
             'featured_tag' => 'sometimes|nullable|string|max:120',
             'featured_sort' => 'sometimes|nullable|integer|min:1|max:9999',
+            'how_to_videos' => 'sometimes|nullable|array',
+            'how_to_videos.*.title' => 'nullable|string|max:200',
+            'how_to_videos.*.url' => 'nullable|string|max:500',
+            'howToVideos' => 'sometimes|nullable|array',
         ]);
 
         // Handle images: allow removal + appending uploads
@@ -204,6 +217,10 @@ class ItemsController extends Controller
             $validated = array_merge($validated, RentalItem::featuredFieldsFromRequest($request));
         }
 
+        if ($request->hasAny(['how_to_videos', 'howToVideos'])) {
+            $validated = array_merge($validated, RentalItem::howToVideosFromRequest($request));
+        }
+
         if (array_key_exists('is_featured', $validated) && ! $validated['is_featured']) {
             $validated['featured_tag'] = null;
             $validated['featured_sort'] = null;
@@ -213,6 +230,8 @@ class ItemsController extends Controller
 
         $item->load(['business', 'category']);
         $item->loadCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)]);
+        $item->loadCount(['publishedReviews as reviews_count']);
+        $item->loadAvg(['publishedReviews as reviews_avg_rating'], 'rating');
 
         return response()->json([
             'success' => true,

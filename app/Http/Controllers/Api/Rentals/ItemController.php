@@ -104,6 +104,8 @@ class ItemController extends Controller
             ->where('is_active', true)
             ->with(['business', 'category'])
             ->withCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)])
+            ->withCount(['publishedReviews as reviews_count'])
+            ->withAvg(['publishedReviews as reviews_avg_rating'], 'rating')
             ->firstOrFail();
 
         $relatedItems = RentalItem::query()
@@ -113,6 +115,8 @@ class ItemController extends Controller
             ->where('is_available', true)
             ->with(['business', 'category'])
             ->withCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)])
+            ->withCount(['publishedReviews as reviews_count'])
+            ->withAvg(['publishedReviews as reviews_avg_rating'], 'rating')
             ->limit(4)
             ->get();
 
@@ -152,6 +156,8 @@ class ItemController extends Controller
         return RentalItem::query()
             ->with(['business', 'category'])
             ->withCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)])
+            ->withCount(['publishedReviews as reviews_count'])
+            ->withAvg(['publishedReviews as reviews_avg_rating'], 'rating')
             ->where('is_active', true)
             ->where('is_available', true)
             ->where('quantity_available', '>', 0);

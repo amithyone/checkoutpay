@@ -324,9 +324,11 @@ Route::prefix('v1')->group(function () {
         Route::get('categories', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'categories']);
         Route::get('featured', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'featured']);
         Route::get('items', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'index']);
-        Route::get('items/{slug}', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'show']);
+        Route::get('items/{id}/reviews', [\App\Http\Controllers\Api\Rentals\ItemReviewsController::class, 'index'])
+            ->whereNumber('id');
         Route::get('items/{id}/unavailable-dates', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'unavailableDates'])
             ->whereNumber('id');
+        Route::get('items/{slug}', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'show']);
 
         // KYC verification (public AJAX-style endpoint)
         Route::post('kyc/verify', [\App\Http\Controllers\Api\Rentals\KycController::class, 'verify']);
@@ -395,6 +397,8 @@ Route::prefix('v1/rentals')
         Route::post('requests/{rental}/fulfillment', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'setFulfillment'])
             ->whereNumber('rental');
         Route::post('requests/{rental}/return-method', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'setReturnMethod'])
+            ->whereNumber('rental');
+        Route::post('requests/{rental}/reviews', [\App\Http\Controllers\Api\Rentals\ItemReviewsController::class, 'store'])
             ->whereNumber('rental');
         Route::post('requests/{rental}/cancel', [\App\Http\Controllers\Api\Rentals\RentalRequestActionsController::class, 'cancel'])
             ->whereNumber('rental');

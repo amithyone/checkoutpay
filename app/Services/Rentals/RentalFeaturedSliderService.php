@@ -22,6 +22,8 @@ class RentalFeaturedSliderService
         $itemQuery = RentalItem::query()
             ->with(['business', 'category'])
             ->withCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)])
+            ->withCount(['publishedReviews as reviews_count'])
+            ->withAvg(['publishedReviews as reviews_avg_rating'], 'rating')
             ->where('is_featured', true)
             ->orderByRaw('featured_sort IS NULL, featured_sort ASC')
             ->orderBy('id');

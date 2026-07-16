@@ -33,6 +33,7 @@ class RentalItem extends Model
         'is_available',
         'images',
         'specifications',
+        'how_to_videos',
         'terms_and_conditions',
         'is_active',
         'is_featured',
@@ -61,6 +62,7 @@ class RentalItem extends Model
         'discount_ends_at' => 'datetime',
         'images' => 'array',
         'specifications' => 'array',
+        'how_to_videos' => 'array',
     ];
 
     /**
@@ -164,6 +166,70 @@ class RentalItem extends Model
     }
 
     /**
+     * Normalize how-to video links from admin/business forms or API.
+     *
+     * @return array<int, array{title: string, url: string}>
+     */
+    public static function normalizeHowToVideos(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $videos = [];
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $title = trim((string) ($entry['title'] ?? $entry['name'] ?? $entry['label'] ?? ''));
+            $url = trim((string) ($entry['url'] ?? $entry['link'] ?? $entry['youtube_url'] ?? $entry['video_url'] ?? ''));
+
+            if ($url === '' || ! self::isAllowedHowToVideoUrl($url)) {
+                continue;
+            }
+
+            if ($title === '') {
+                $title = 'How-to video';
+            }
+
+            $videos[] = [
+                'title' => mb_substr($title, 0, 200),
+                'url' => $url,
+            ];
+        }
+
+        return array_values($videos);
+    }
+
+    /**
+     * @return array{how_to_videos?: array<int, array{title: string, url: string}>}
+     */
+    public static function howToVideosFromRequest(Request $request): array
+    {
+        if (! $request->hasAny(['how_to_videos', 'howToVideos'])) {
+            return [];
+        }
+
+        $raw = $request->input('how_to_videos', $request->input('howToVideos'));
+
+        return ['how_to_videos' => self::normalizeHowToVideos($raw) ?: null];
+    }
+
+    public static function isAllowedHowToVideoUrl(string $url): bool
+    {
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        return str_contains($host, 'youtube.com')
+            || str_contains($host, 'youtu.be')
+            || str_contains($host, 'youtube-nocookie.com');
+    }
+
+    /**
      * Get the business that owns this item
      */
     public function business()
@@ -187,6 +253,21 @@ class RentalItem extends Model
         return $this->belongsToMany(Rental::class, 'rental_rental_item')
             ->withPivot('quantity', 'unit_rate', 'total_amount')
             ->withTimestamps();
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(RentalItemReview::class, 'rental_item_id');
+    }
+
+    public function publishedReviews()
+    {
+        return $this->reviews()->where(function ($q) {
+            $q->whereNotNull('rating')
+                ->orWhereNotNull('condition')
+                ->orWhereNotNull('missing_items')
+                ->orWhereNotNull('remarks');
+        });
     }
 
     /**
