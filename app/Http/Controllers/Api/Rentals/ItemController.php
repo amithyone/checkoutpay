@@ -13,13 +13,28 @@ class ItemController extends Controller
      * GET /api/v1/rentals/categories
      * Public categories list.
      */
-    public function categories()
+    public function categories(Request $request)
     {
-        $cats = RentalCategory::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get(['id', 'name', 'slug', 'icon']);
+        $query = RentalCategory::query()
+            ->where('is_active', true);
+
+        if ($request->boolean('popular') || $request->input('sort') === 'popular') {
+            $query->leftJoin('rental_items', 'rental_categories.id', '=', 'rental_items.category_id')
+                ->leftJoin('rental_rental_item', 'rental_items.id', '=', 'rental_rental_item.rental_item_id')
+                ->selectRaw('rental_categories.id, rental_categories.name, rental_categories.slug, rental_categories.icon, COUNT(rental_rental_item.rental_id) as rentals_count')
+                ->groupBy('rental_categories.id', 'rental_categories.name', 'rental_categories.slug', 'rental_categories.icon')
+                ->orderByDesc('rentals_count');
+        } else {
+            $query->orderBy('sort_order')
+                ->orderBy('name')
+                ->select(['id', 'name', 'slug', 'icon']);
+        }
+
+        if ($request->filled('limit')) {
+            $query->limit((int) $request->input('limit'));
+        }
+
+        $cats = $query->get();
 
         return response()->json([
             'data' => $cats,
