@@ -322,6 +322,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('rentals')->group(function () {
         // Catalog
         Route::get('categories', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'categories']);
+        Route::get('featured', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'featured']);
         Route::get('items', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'index']);
         Route::get('items/{slug}', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'show']);
         Route::get('items/{id}/unavailable-dates', [\App\Http\Controllers\Api\Rentals\ItemController::class, 'unavailableDates'])

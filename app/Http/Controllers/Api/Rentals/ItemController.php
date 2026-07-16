@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Api\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\RentalCategory;
 use App\Models\RentalItem;
+use App\Services\Rentals\RentalCatalogFormatter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ItemController extends Controller
 {
+    protected const FEATURED_SLIDE_LIMIT = 10;
+
     /**
      * GET /api/v1/rentals/categories
-     * Public categories list.
      */
     public function categories(Request $request)
     {
@@ -34,46 +38,190 @@ class ItemController extends Controller
             $query->limit((int) $request->input('limit'));
         }
 
-        $cats = $query->get();
+        return response()->json([
+            'success' => true,
+            'data' => $query->get(),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/rentals/featured
+     */
+    public function featured(Request $request)
+    {
+        $limit = min(self::FEATURED_SLIDE_LIMIT, max(1, (int) $request->input('limit', self::FEATURED_SLIDE_LIMIT)));
+
+        $items = $this->rentableCatalogQuery()
+            ->where('is_featured', true)
+            ->orderByRaw('featured_sort IS NULL, featured_sort ASC')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
 
         return response()->json([
-            'data' => $cats,
+            'success' => true,
+            'data' => $items
+                ->map(fn (RentalItem $item) => RentalCatalogFormatter::featuredSlide($item))
+                ->values()
+                ->all(),
         ]);
     }
 
     /**
      * GET /api/v1/rentals/items
-     * Public catalog list with filters + pagination.
      */
     public function index(Request $request)
     {
-        $query = RentalItem::with(['business', 'category'])
-            ->withCount('rentals')
-            ->where('is_active', true)
-            ->where('is_available', true);
+        $query = $this->rentableCatalogQuery();
+        $filter = $this->applyCatalogFilters($query, $request);
 
-        if ($request->filled('category')) {
-            $query->whereHas('category', function ($q) use ($request) {
-                $q->where('slug', $request->category);
-            });
+        if ($request->boolean('featured') || $request->input('featured') === '1') {
+            $query->where('is_featured', true);
+            $query->orderByRaw('featured_sort IS NULL, featured_sort ASC')->orderBy('id');
+        } else {
+            $this->applyCatalogSort($query, $request->get('sort', 'featured'));
         }
 
-        if ($request->filled('city')) {
-            $query->where('city', 'like', '%' . $request->city . '%');
+        $perPage = min(48, max(1, (int) $request->get('per_page', 24)));
+        $items = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => collect($items->items())
+                ->map(fn (RentalItem $item) => RentalCatalogFormatter::catalogItem($item))
+                ->values()
+                ->all(),
+            'meta' => array_filter([
+                'current_page' => $items->currentPage(),
+                'per_page' => $items->perPage(),
+                'total' => $items->total(),
+                'last_page' => $items->lastPage(),
+                'filter' => $filter !== [] ? $filter : null,
+            ]),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/rentals/items/{slug}
+     */
+    public function show(string $slug)
+    {
+        $item = RentalItem::query()
+            ->where('slug', $slug)
+            ->where('is_active', true)
+            ->with(['business', 'category'])
+            ->withCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)])
+            ->firstOrFail();
+
+        $relatedItems = RentalItem::query()
+            ->where('category_id', $item->category_id)
+            ->where('id', '!=', $item->id)
+            ->where('is_active', true)
+            ->where('is_available', true)
+            ->with(['business', 'category'])
+            ->withCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)])
+            ->limit(4)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => RentalCatalogFormatter::catalogItem($item),
+            'related' => $relatedItems
+                ->map(fn (RentalItem $related) => RentalCatalogFormatter::catalogItem($related))
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/rentals/items/{id}/unavailable-dates?month=YYYY-MM
+     */
+    public function unavailableDates(Request $request, int $id)
+    {
+        $item = RentalItem::findOrFail($id);
+
+        $month = $request->get('month', now()->format('Y-m'));
+        $start = \Carbon\Carbon::parse($month.'-01')->startOfDay();
+        $end = $start->copy()->endOfMonth();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'item_id' => $item->id,
+                'month' => $month,
+                'unavailable_dates' => $item->getUnavailableDatesInRange($start, $end),
+            ],
+        ]);
+    }
+
+    protected function rentableCatalogQuery(): Builder
+    {
+        return RentalItem::query()
+            ->with(['business', 'category'])
+            ->withCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)])
+            ->where('is_active', true)
+            ->where('is_available', true)
+            ->where('quantity_available', '>', 0);
+    }
+
+    protected function applyCatalogFilters(Builder $query, Request $request): array
+    {
+        $filter = [];
+
+        if ($request->filled('category')) {
+            $slug = (string) $request->category;
+            $query->whereHas('category', fn ($q) => $q->where('slug', $slug));
+            $filter['category'] = $slug;
+        }
+
+        $location = $request->input('city', $request->input('location'));
+        if (is_string($location) && trim($location) !== '') {
+            $location = trim($location);
+            $query->where(function ($q) use ($location) {
+                $q->where('city', 'like', '%'.$location.'%')
+                    ->orWhere('state', 'like', '%'.$location.'%');
+            });
+            $filter['city'] = $location;
+        }
+
+        if ($request->filled('business_id')) {
+            $businessId = (int) $request->business_id;
+            $query->where('business_id', $businessId);
+            $filter['business_id'] = $businessId;
+        }
+
+        if ($request->filled('vendor_id')) {
+            $vendorId = (int) $request->vendor_id;
+            $query->where('business_id', $vendorId);
+            $filter['business_id'] = $vendorId;
+        }
+
+        if ($request->filled('business_slug')) {
+            $businessSlug = Str::slug((string) $request->business_slug);
+            $needle = str_replace('-', ' ', strtolower($businessSlug));
+            $query->whereHas('business', fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%'.$needle.'%']));
+            $filter['business_slug'] = (string) $request->business_slug;
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = (string) $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhereHas('business', function ($bq) use ($search) {
-                        $bq->where('name', 'like', "%{$search}%");
-                    });
+                    ->orWhereHas('business', fn ($bq) => $bq->where('name', 'like', "%{$search}%"));
             });
+            $filter['search'] = $search;
         }
 
-        $sort = $request->get('sort', 'featured');
+        if ($request->boolean('featured') || $request->input('featured') === '1') {
+            $filter['featured'] = true;
+        }
+
+        return $filter;
+    }
+
+    protected function applyCatalogSort(Builder $query, string $sort): void
+    {
         switch ($sort) {
             case 'price_low':
                 $query->orderBy('daily_rate', 'asc');
@@ -88,67 +236,9 @@ class ItemController extends Controller
                 $query->orderBy('rentals_count', 'desc')->latest();
                 break;
             default:
-                $query->orderBy('is_featured', 'desc')->latest();
+                $query->orderByRaw('featured_sort IS NULL, featured_sort ASC')
+                    ->orderByDesc('is_featured')
+                    ->latest();
         }
-
-        $perPage = (int) $request->get('per_page', 24);
-        $items = $query->paginate($perPage);
-
-        return response()->json([
-            'data' => $items->items(),
-            'meta' => [
-                'current_page' => $items->currentPage(),
-                'per_page' => $items->perPage(),
-                'total' => $items->total(),
-                'last_page' => $items->lastPage(),
-            ],
-        ]);
-    }
-
-    /**
-     * GET /api/v1/rentals/items/{slug}
-     * Public item detail.
-     */
-    public function show(string $slug)
-    {
-        $item = RentalItem::where('slug', $slug)
-            ->where('is_active', true)
-            ->with(['business', 'category'])
-            ->firstOrFail();
-
-        $relatedItems = RentalItem::where('category_id', $item->category_id)
-            ->where('id', '!=', $item->id)
-            ->where('is_active', true)
-            ->where('is_available', true)
-            ->limit(4)
-            ->get();
-
-        return response()->json([
-            'data' => $item,
-            'related' => $relatedItems,
-        ]);
-    }
-
-    /**
-     * GET /api/v1/rentals/items/{id}/unavailable-dates?month=YYYY-MM
-     */
-    public function unavailableDates(Request $request, int $id)
-    {
-        $item = RentalItem::findOrFail($id);
-
-        $month = $request->get('month', now()->format('Y-m'));
-        $start = \Carbon\Carbon::parse($month . '-01')->startOfDay();
-        $end = $start->copy()->endOfMonth();
-
-        $unavailable = $item->getUnavailableDatesInRange($start, $end);
-
-        return response()->json([
-            'data' => [
-                'item_id' => $item->id,
-                'month' => $month,
-                'unavailable_dates' => $unavailable,
-            ],
-        ]);
     }
 }
-

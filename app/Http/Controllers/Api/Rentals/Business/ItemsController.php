@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Rentals\Business\Concerns\ResolvesBusiness;
 use App\Http\Controllers\Controller;
 use App\Models\RentalCategory;
 use App\Models\RentalItem;
+use App\Services\Rentals\RentalCatalogFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -66,6 +67,9 @@ class ItemsController extends Controller
             'discount_percent' => 'nullable|numeric|min:0|max:95',
             'discount_starts_at' => 'nullable|date',
             'discount_ends_at' => 'nullable|date',
+            'is_featured' => 'nullable|boolean',
+            'featured_tag' => 'nullable|string|max:120',
+            'featured_sort' => 'nullable|integer|min:1|max:9999',
         ]);
 
         $categoryId = $validated['category_id'] ?? null;
@@ -136,6 +140,9 @@ class ItemsController extends Controller
             'discount_percent' => 'sometimes|nullable|numeric|min:0|max:95',
             'discount_starts_at' => 'sometimes|nullable|date',
             'discount_ends_at' => 'sometimes|nullable|date',
+            'is_featured' => 'sometimes|boolean',
+            'featured_tag' => 'sometimes|nullable|string|max:120',
+            'featured_sort' => 'sometimes|nullable|integer|min:1|max:9999',
         ]);
 
         // Handle images: allow removal + appending uploads
@@ -193,10 +200,19 @@ class ItemsController extends Controller
 
         $validated = array_merge($validated, RentalItem::discountPatchFromRequest($request));
 
+        if (array_key_exists('is_featured', $validated) && ! $validated['is_featured']) {
+            $validated['featured_tag'] = null;
+            $validated['featured_sort'] = null;
+        }
+
         $item->update($validated);
 
+        $item->load(['business', 'category']);
+        $item->loadCount(['rentals as rentals_count' => fn ($q) => $q->where('status', \App\Models\Rental::STATUS_COMPLETED)]);
+
         return response()->json([
-            'data' => $item->fresh(),
+            'success' => true,
+            'data' => RentalCatalogFormatter::catalogItem($item),
         ]);
     }
 }
