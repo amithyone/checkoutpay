@@ -3,6 +3,7 @@
 @section('title', 'Create Rental Item')
 
 @section('content')
+@include('admin.rental-items.partials.form-ui-styles')
 <div class="p-6">
     <a href="{{ route('admin.rental-items.index') }}" class="text-primary hover:underline mb-4 inline-block">
         <i class="fas fa-arrow-left"></i> Back to Items
@@ -11,13 +12,13 @@
     <div class="bg-white rounded-lg shadow p-6 max-w-4xl">
         <h1 class="text-2xl font-bold mb-6">Create Rental Item</h1>
 
-        <form action="{{ route('admin.rental-items.store') }}" method="POST" enctype="multipart/form-data">
+        <form action="{{ route('admin.rental-items.store') }}" method="POST" enctype="multipart/form-data" class="rental-admin-form space-y-4">
             @csrf
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Business *</label>
-                    <select name="business_id" required class="w-full border-gray-300 rounded-md">
+                    <select name="business_id" required>
                         <option value="">Select Business</option>
                         @foreach($businesses as $business)
                             <option value="{{ $business->id }}" {{ old('business_id') == $business->id ? 'selected' : '' }}>
@@ -31,7 +32,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Category *</label>
-                    <select name="category_id" required class="w-full border-gray-300 rounded-md">
+                    <select name="category_id" required>
                         <option value="">Select Category</option>
                         @foreach($categories as $category)
                             <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
@@ -158,9 +159,12 @@
                 'howToVideos' => old('how_to_videos', []),
             ])
 
-            <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">
-                Create Item
-            </button>
+            <div class="rental-admin-save-bar">
+                <button type="submit" class="rental-admin-save-btn">
+                    <i class="fas fa-save" aria-hidden="true"></i>
+                    Create item
+                </button>
+            </div>
         </form>
     </div>
 </div>

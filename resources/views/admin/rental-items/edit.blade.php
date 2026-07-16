@@ -3,6 +3,7 @@
 @section('title', 'Edit Rental Item')
 
 @section('content')
+@include('admin.rental-items.partials.form-ui-styles')
 <div class="p-4">
     <a href="{{ route('admin.rental-items.index') }}" class="text-xs text-primary hover:underline mb-2 inline-block">
         <i class="fas fa-arrow-left"></i> Back to items
@@ -20,7 +21,7 @@
             </form>
         </div>
 
-        <form action="{{ route('admin.rental-items.update', $rentalItem) }}" method="POST" enctype="multipart/form-data" class="space-y-3">
+        <form id="rental-item-edit-form" action="{{ route('admin.rental-items.update', $rentalItem) }}" method="POST" enctype="multipart/form-data" class="rental-admin-form space-y-3">
             @csrf
             @method('PUT')
 
@@ -176,9 +177,12 @@
                 'howToVideos' => old('how_to_videos', $rentalItem->how_to_videos ?? []),
             ])
 
-            <button type="submit" class="w-full text-sm bg-primary text-white py-2 rounded-md hover:bg-primary/90 font-medium">
-                Save changes
-            </button>
+            <div class="rental-admin-save-bar">
+                <button type="submit" class="rental-admin-save-btn">
+                    <i class="fas fa-save" aria-hidden="true"></i>
+                    Save changes
+                </button>
+            </div>
         </form>
     </div>
 </div>

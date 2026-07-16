@@ -3,7 +3,8 @@
 @section('title', 'Rental Items')
 
 @section('content')
-<div class="p-4" id="rental-items-admin">
+@include('admin.rental-items.partials.form-ui-styles')
+<div class="p-4 rental-admin-form" id="rental-items-admin">
     <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
         <h1 class="text-lg font-bold text-gray-900">Rental items</h1>
         <div class="flex flex-wrap gap-1.5">
@@ -72,7 +73,9 @@
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Name, business…" class="w-full text-sm border-gray-300 rounded-md py-1.5">
             </div>
             <div>
-                <button type="submit" class="w-full text-sm bg-primary text-white px-2 py-1.5 rounded-md">Filter</button>
+                <button type="submit" class="rental-admin-save-btn md:w-auto md:max-w-xs">
+                    Filter items
+                </button>
             </div>
         </form>
         <p class="text-xs text-gray-500 mt-2">{{ number_format($filteredTotal) }} item(s) match these filters.</p>
@@ -103,15 +106,16 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-0.5">Action</label>
-                    <select name="mode" id="bulk-mode" class="w-full text-sm border-gray-300 rounded-md py-1.5">
+                    <select name="mode" id="bulk-mode">
                         <option value="replace">Replace videos on selected items</option>
                         <option value="append">Append videos (keep existing)</option>
                         <option value="clear">Clear all videos on selected items</option>
                     </select>
                 </div>
                 <div class="md:col-span-3 flex items-end">
-                    <button type="submit" class="text-sm bg-sky-600 text-white px-4 py-1.5 rounded-md hover:bg-sky-700 font-medium" onclick="return confirmBulkHowTo();">
-                        Apply to selected items
+                    <button type="submit" class="rental-admin-save-btn md:w-auto" onclick="return confirmBulkHowTo();">
+                        <i class="fas fa-save" aria-hidden="true"></i>
+                        Save how-to videos to selected
                     </button>
                 </div>
             </div>
