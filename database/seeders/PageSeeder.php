@@ -50,7 +50,30 @@ class PageSeeder extends Seeder
             ]
         );
 
+        Page::updateOrCreate(
+            ['slug' => 'about-us'],
+            [
+                'title' => 'About Us',
+                'content' => $this->getAboutContent(),
+                'meta_title' => 'About CheckoutPay — Payment Infrastructure for Nigeria',
+                'meta_description' => 'CheckoutPay builds reliable payment infrastructure for Nigerian businesses: gateway, WhatsApp Wallet, rentals, invoices, payouts, and developer tools with transparent pricing.',
+                'is_published' => true,
+                'order' => 4,
+            ]
+        );
+
         LegalPagesDefinitions::syncToDatabase();
+    }
+
+    private function getAboutContent(): string
+    {
+        $path = database_path('legal/about-us.html');
+
+        if (! is_readable($path)) {
+            throw new \RuntimeException("About page content file missing: {$path}");
+        }
+
+        return (string) file_get_contents($path);
     }
 
     private function getHomeContent(): string
