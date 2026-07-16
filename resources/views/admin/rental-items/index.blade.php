@@ -3,7 +3,7 @@
 @section('title', 'Rental Items')
 
 @section('content')
-<div class="p-4">
+<div class="p-4" id="rental-items-admin">
     <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
         <h1 class="text-lg font-bold text-gray-900">Rental items</h1>
         <div class="flex flex-wrap gap-1.5">
@@ -22,27 +22,30 @@
         </div>
     </div>
 
+    @if(session('success'))
+        <div class="mb-3 text-sm bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded-md">{{ session('success') }}</div>
+    @endif
+    @if(session('error'))
+        <div class="mb-3 text-sm bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded-md">{{ session('error') }}</div>
+    @endif
+
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-3 mb-3">
-        <form method="GET" class="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
-            <div class="col-span-2 md:col-span-1">
+        <form method="GET" class="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+            <div>
                 <label class="block text-xs font-medium text-gray-600 mb-0.5">Category</label>
                 <select name="category_id" class="w-full text-sm border-gray-300 rounded-md py-1.5">
                     <option value="">All</option>
                     @foreach($categories as $category)
-                        <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
-                            {{ $category->name }}
-                        </option>
+                        <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>{{ $category->name }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="col-span-2 md:col-span-1">
+            <div>
                 <label class="block text-xs font-medium text-gray-600 mb-0.5">Business</label>
                 <select name="business_id" class="w-full text-sm border-gray-300 rounded-md py-1.5">
                     <option value="">All</option>
                     @foreach($businesses as $business)
-                        <option value="{{ $business->id }}" {{ request('business_id') == $business->id ? 'selected' : '' }}>
-                            {{ $business->name }}
-                        </option>
+                        <option value="{{ $business->id }}" {{ request('business_id') == $business->id ? 'selected' : '' }}>{{ $business->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -56,131 +59,220 @@
                     <option value="featured" {{ request('status') == 'featured' ? 'selected' : '' }}>Featured slider</option>
                 </select>
             </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-0.5">How-to videos</label>
+                <select name="how_to_filter" class="w-full text-sm border-gray-300 rounded-md py-1.5">
+                    <option value="">Any</option>
+                    <option value="with" {{ request('how_to_filter') == 'with' ? 'selected' : '' }}>Has videos</option>
+                    <option value="without" {{ request('how_to_filter') == 'without' ? 'selected' : '' }}>Missing videos</option>
+                </select>
+            </div>
             <div class="col-span-2 md:col-span-1">
+                <label class="block text-xs font-medium text-gray-600 mb-0.5">Search</label>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Name, business…" class="w-full text-sm border-gray-300 rounded-md py-1.5">
+            </div>
+            <div>
                 <button type="submit" class="w-full text-sm bg-primary text-white px-2 py-1.5 rounded-md">Filter</button>
             </div>
         </form>
+        <p class="text-xs text-gray-500 mt-2">{{ number_format($filteredTotal) }} item(s) match these filters.</p>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-3 mb-3">
-        <h2 class="text-sm font-semibold text-gray-800 mb-2">Clone catalog between businesses</h2>
-        <form method="POST" action="{{ route('admin.rental-items.clone-catalog') }}" class="grid grid-cols-1 md:grid-cols-3 gap-2">
-            @csrf
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-0.5">Source</label>
-                <select name="source_business_id" required class="w-full text-sm border-gray-300 rounded-md py-1.5">
-                    <option value="">Select…</option>
-                    @foreach($businesses as $business)
-                        <option value="{{ $business->id }}">{{ $business->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 mb-0.5">Target</label>
-                <select name="target_business_id" required class="w-full text-sm border-gray-300 rounded-md py-1.5">
-                    <option value="">Select…</option>
-                    @foreach($businesses as $business)
-                        <option value="{{ $business->id }}">{{ $business->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="flex items-end">
-                <button type="submit" class="w-full text-sm bg-indigo-600 text-white px-2 py-1.5 rounded-md hover:bg-indigo-700">
-                    <i class="fas fa-copy mr-1"></i>Clone catalog
-                </button>
-            </div>
-        </form>
-        <p class="text-xs text-gray-500 mt-1.5">Copies all items and images from source to target.</p>
-    </div>
+    <form method="POST" action="{{ route('admin.rental-items.bulk-how-to-videos') }}" id="bulk-how-to-form">
+        @csrf
+        <input type="hidden" name="select_all_filtered" id="select_all_filtered" value="0">
+        @foreach(['category_id', 'business_id', 'status', 'how_to_filter', 'search'] as $filterKey)
+            @if(request()->filled($filterKey))
+                <input type="hidden" name="{{ $filterKey }}" value="{{ request($filterKey) }}">
+            @endif
+        @endforeach
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-2 py-2 w-12"></th>
-                    <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Business</th>
-                    <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Cat</th>
-                    <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">City</th>
-                    <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Daily</th>
-                    <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
-                    <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Featured</th>
-                    <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase w-40">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                @forelse($items as $item)
-                    @php
-                        $imgs = $item->images;
-                        $thumb = is_array($imgs) && count($imgs) ? $imgs[0] : null;
-                    @endphp
-                    <tr class="hover:bg-gray-50/80">
-                        <td class="px-2 py-1.5 align-middle">
-                            @if($thumb)
-                                <img src="{{ asset('storage/' . $thumb) }}" alt="" class="w-9 h-9 object-cover rounded border border-gray-200">
-                            @else
-                                <div class="w-9 h-9 bg-gray-100 rounded border border-gray-200"></div>
-                            @endif
-                        </td>
-                        <td class="px-2 py-1.5 align-middle max-w-[140px] md:max-w-[200px]">
-                            <span class="font-medium text-gray-900 truncate block" title="{{ $item->name }}">{{ $item->name }}</span>
-                        </td>
-                        <td class="px-2 py-1.5 align-middle hidden lg:table-cell text-xs">
-                            <a href="{{ route('admin.businesses.show', $item->business_id) }}" class="text-primary hover:underline truncate block max-w-[160px]" title="{{ $item->business->name }}">
-                                {{ $item->business->name }}
-                            </a>
-                        </td>
-                        <td class="px-2 py-1.5 align-middle hidden md:table-cell text-xs text-gray-600">
-                            {{ $item->category->name }}
-                        </td>
-                        <td class="px-2 py-1.5 align-middle text-xs text-gray-600 whitespace-nowrap">
-                            {{ $item->city ?? '—' }}
-                        </td>
-                        <td class="px-2 py-1.5 align-middle text-right text-xs font-semibold whitespace-nowrap">
-                            ₦{{ number_format($item->daily_rate, 0) }}
-                        </td>
-                        <td class="px-2 py-1.5 align-middle text-center text-xs">{{ $item->quantity_available }}</td>
-                        <td class="px-2 py-1.5 align-middle hidden xl:table-cell text-xs text-gray-600">
-                            @if($item->is_featured)
-                                <span class="block font-medium text-amber-700">#{{ $item->featured_sort ?? '—' }}</span>
-                                <span class="block truncate max-w-[120px]" title="{{ $item->featured_tag }}">{{ $item->featured_tag ?: 'Featured' }}</span>
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="px-2 py-1.5 align-middle whitespace-nowrap">
-                            @if($item->is_active && $item->is_available)
-                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">Active</span>
-                            @elseif(!$item->is_active)
-                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">Off</span>
-                            @else
-                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800">NA</span>
-                            @endif
-                        </td>
-                        <td class="px-2 py-1.5 align-middle text-right whitespace-nowrap">
-                            <a href="{{ route('admin.rental-items.edit', $item) }}" class="text-xs text-primary hover:underline mr-2">Edit</a>
-                            <a href="{{ route('admin.rental-items.show', $item) }}" class="text-xs text-gray-600 hover:underline mr-2">View</a>
-                            <form action="{{ route('admin.rental-items.destroy', $item) }}" method="POST" class="inline" onsubmit="return confirm('Delete this rental item? This cannot be undone.');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="text-xs text-red-600 hover:text-red-800 hover:underline font-medium">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                @empty
+        <div class="bg-white rounded-lg shadow-sm border border-sky-100 p-3 mb-3">
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                <div class="text-sm font-semibold text-sky-900">
+                    <i class="fab fa-youtube mr-1"></i>Bulk how-to videos
+                </div>
+                <div class="text-xs text-gray-600">
+                    <span id="selected-count">0</span> selected
+                    @if($filteredTotal > 0)
+                        · <button type="button" id="select-all-filtered" class="text-primary hover:underline font-medium">Select all {{ number_format($filteredTotal) }} matching filters</button>
+                    @endif
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-0.5">Action</label>
+                    <select name="mode" id="bulk-mode" class="w-full text-sm border-gray-300 rounded-md py-1.5">
+                        <option value="replace">Replace videos on selected items</option>
+                        <option value="append">Append videos (keep existing)</option>
+                        <option value="clear">Clear all videos on selected items</option>
+                    </select>
+                </div>
+                <div class="md:col-span-3 flex items-end">
+                    <button type="submit" class="text-sm bg-sky-600 text-white px-4 py-1.5 rounded-md hover:bg-sky-700 font-medium" onclick="return confirmBulkHowTo();">
+                        Apply to selected items
+                    </button>
+                </div>
+            </div>
+
+            <div id="bulk-video-fields">
+                @include('admin.rental-items.partials.how-to-videos-fields', ['howToVideos' => [['title' => '', 'url' => '']], 'fieldPrefix' => 'how_to_videos'])
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
                     <tr>
-                        <td colspan="10" class="px-3 py-6 text-center text-sm text-gray-500">
-                            No rental items. <a href="{{ route('admin.rental-items.create') }}" class="text-primary hover:underline">Create one</a>
-                        </td>
+                        <th class="px-2 py-2 w-8">
+                            <input type="checkbox" id="select-page" class="rounded border-gray-300" title="Select all on this page">
+                        </th>
+                        <th class="px-2 py-2 w-12"></th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Business</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Cat</th>
+                        <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Videos</th>
+                        <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Daily</th>
+                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase w-32">Actions</th>
                     </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($items as $item)
+                        @php
+                            $imgs = $item->images;
+                            $thumb = is_array($imgs) && count($imgs) ? $imgs[0] : null;
+                            $videoCount = count(\App\Models\RentalItem::normalizeHowToVideos($item->how_to_videos ?? []));
+                        @endphp
+                        <tr class="hover:bg-gray-50/80 item-row">
+                            <td class="px-2 py-1.5 align-middle">
+                                <input type="checkbox" name="item_ids[]" value="{{ $item->id }}" class="item-checkbox rounded border-gray-300">
+                            </td>
+                            <td class="px-2 py-1.5 align-middle">
+                                @if($thumb)
+                                    <img src="{{ asset('storage/' . $thumb) }}" alt="" class="w-9 h-9 object-cover rounded border border-gray-200">
+                                @else
+                                    <div class="w-9 h-9 bg-gray-100 rounded border border-gray-200"></div>
+                                @endif
+                            </td>
+                            <td class="px-2 py-1.5 align-middle max-w-[160px]">
+                                <span class="font-medium text-gray-900 truncate block" title="{{ $item->name }}">{{ $item->name }}</span>
+                            </td>
+                            <td class="px-2 py-1.5 align-middle hidden lg:table-cell text-xs">
+                                <span class="truncate block max-w-[140px]" title="{{ $item->business->name }}">{{ $item->business->name }}</span>
+                            </td>
+                            <td class="px-2 py-1.5 align-middle hidden md:table-cell text-xs text-gray-600">{{ $item->category->name }}</td>
+                            <td class="px-2 py-1.5 align-middle text-center">
+                                @if($videoCount > 0)
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-100 text-sky-800">{{ $videoCount }}</span>
+                                @else
+                                    <span class="text-[10px] text-gray-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-2 py-1.5 align-middle text-right text-xs font-semibold whitespace-nowrap">₦{{ number_format($item->daily_rate, 0) }}</td>
+                            <td class="px-2 py-1.5 align-middle whitespace-nowrap">
+                                @if($item->is_active && $item->is_available)
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">Active</span>
+                                @elseif(!$item->is_active)
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">Off</span>
+                                @else
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800">NA</span>
+                                @endif
+                            </td>
+                            <td class="px-2 py-1.5 align-middle text-right whitespace-nowrap">
+                                <a href="{{ route('admin.rental-items.edit', $item) }}" class="text-xs text-primary hover:underline">Edit</a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="9" class="px-3 py-6 text-center text-sm text-gray-500">
+                                No rental items. <a href="{{ route('admin.rental-items.create') }}" class="text-primary hover:underline">Create one</a>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </form>
 
-    <div class="mt-3 text-sm">
-        {{ $items->links() }}
-    </div>
+    <div class="mt-3 text-sm">{{ $items->links() }}</div>
 </div>
+
+@push('scripts')
+<script>
+(function () {
+    const form = document.getElementById('bulk-how-to-form');
+    const selectPage = document.getElementById('select-page');
+    const selectAllFiltered = document.getElementById('select-all-filtered');
+    const selectAllFilteredInput = document.getElementById('select_all_filtered');
+    const selectedCountEl = document.getElementById('selected-count');
+    const bulkMode = document.getElementById('bulk-mode');
+    const bulkVideoFields = document.getElementById('bulk-video-fields');
+    const filteredTotal = {{ (int) $filteredTotal }};
+
+    function itemCheckboxes() {
+        return Array.from(document.querySelectorAll('.item-checkbox'));
+    }
+
+    function updateSelectedCount() {
+        if (selectAllFilteredInput.value === '1') {
+            selectedCountEl.textContent = filteredTotal.toLocaleString();
+            return;
+        }
+        selectedCountEl.textContent = itemCheckboxes().filter(function (cb) { return cb.checked; }).length;
+    }
+
+    if (selectPage) {
+        selectPage.addEventListener('change', function () {
+            selectAllFilteredInput.value = '0';
+            itemCheckboxes().forEach(function (cb) { cb.checked = selectPage.checked; });
+            updateSelectedCount();
+        });
+    }
+
+    itemCheckboxes().forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            selectAllFilteredInput.value = '0';
+            if (selectPage) {
+                selectPage.checked = itemCheckboxes().every(function (x) { return x.checked; });
+            }
+            updateSelectedCount();
+        });
+    });
+
+    if (selectAllFiltered) {
+        selectAllFiltered.addEventListener('click', function () {
+            selectAllFilteredInput.value = '1';
+            itemCheckboxes().forEach(function (cb) { cb.checked = true; });
+            if (selectPage) selectPage.checked = true;
+            updateSelectedCount();
+        });
+    }
+
+    if (bulkMode && bulkVideoFields) {
+        bulkMode.addEventListener('change', function () {
+            bulkVideoFields.style.display = bulkMode.value === 'clear' ? 'none' : '';
+        });
+    }
+
+    window.confirmBulkHowTo = function () {
+        const mode = bulkMode ? bulkMode.value : 'replace';
+        const count = selectAllFilteredInput.value === '1'
+            ? filteredTotal
+            : itemCheckboxes().filter(function (cb) { return cb.checked; }).length;
+
+        if (count < 1) {
+            alert('Select at least one item, or use “Select all matching filters”.');
+            return false;
+        }
+
+        const verb = mode === 'clear' ? 'clear how-to videos on' : (mode === 'append' ? 'append how-to videos to' : 'set how-to videos on');
+        return confirm('This will ' + verb + ' ' + count + ' item(s). Continue?');
+    };
+
+    updateSelectedCount();
+})();
+</script>
+@endpush
 @endsection

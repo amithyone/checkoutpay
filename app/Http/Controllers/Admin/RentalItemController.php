@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\RentalItem;
 use App\Models\RentalCategory;
 use App\Models\Business;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -61,6 +62,7 @@ class RentalItemController extends Controller
                 'discount_percent',
                 'discount_starts_at',
                 'discount_ends_at',
+                'how_to_videos',
             ]);
             $data['business_id'] = $targetBusiness->id;
 
@@ -91,53 +93,139 @@ class RentalItemController extends Controller
             ->with('success', "Cloned {$clonedCount} rental item(s) from {$sourceBusiness->name} to {$targetBusiness->name}.");
     }
 
-    /**
-     * Display a listing of rental items
-     */
     public function index(Request $request): View
     {
-        $query = RentalItem::with(['business', 'category'])->latest();
+        $query = $this->filteredItemsQuery($request);
 
-        // Filter by category
+        $filteredTotal = (clone $query)->count();
+        $items = $query->latest()->paginate(30)->withQueryString();
+        $categories = RentalCategory::where('is_active', true)->get();
+        $businesses = Business::orderBy('name')->get();
+
+        return view('admin.rental-items.index', compact('items', 'categories', 'businesses', 'filteredTotal'));
+    }
+
+    public function bulkHowToVideos(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'item_ids' => 'nullable|array',
+            'item_ids.*' => 'integer|exists:rental_items,id',
+            'select_all_filtered' => 'nullable|boolean',
+            'mode' => 'required|in:replace,append,clear',
+            'how_to_videos' => 'nullable|array',
+            'how_to_videos.*.title' => 'nullable|string|max:200',
+            'how_to_videos.*.url' => 'nullable|string|max:500',
+            'category_id' => 'nullable|integer|exists:rental_categories,id',
+            'business_id' => 'nullable|integer|exists:businesses,id',
+            'status' => 'nullable|string|in:active,inactive,unavailable,featured',
+            'how_to_filter' => 'nullable|string|in:with,without',
+            'search' => 'nullable|string|max:255',
+        ]);
+
+        if ($request->boolean('select_all_filtered')) {
+            $ids = $this->filteredItemsQuery($request)->pluck('id');
+        } else {
+            $ids = collect($validated['item_ids'] ?? [])->map(fn ($id) => (int) $id)->filter();
+        }
+
+        if ($ids->isEmpty()) {
+            return redirect()->route('admin.rental-items.index', $request->only([
+                'category_id', 'business_id', 'status', 'how_to_filter', 'search',
+            ]))->with('error', 'Select at least one item, or use “select all matching filters”.');
+        }
+
+        $mode = $validated['mode'];
+        $newVideos = RentalItem::normalizeHowToVideos($request->input('how_to_videos', []));
+
+        if ($mode !== 'clear' && $newVideos === []) {
+            return redirect()->route('admin.rental-items.index', $request->only([
+                'category_id', 'business_id', 'status', 'how_to_filter', 'search',
+            ]))->with('error', 'Add at least one valid YouTube URL, or choose “Clear videos”.');
+        }
+
+        $updated = 0;
+        RentalItem::query()->whereIn('id', $ids->all())->chunkById(100, function ($chunk) use ($mode, $newVideos, &$updated) {
+            foreach ($chunk as $item) {
+                if ($mode === 'clear') {
+                    $item->update(['how_to_videos' => null]);
+                    $updated++;
+
+                    continue;
+                }
+
+                if ($mode === 'replace') {
+                    $item->update(['how_to_videos' => $newVideos ?: null]);
+                    $updated++;
+
+                    continue;
+                }
+
+                $merged = RentalItem::mergeHowToVideos(
+                    RentalItem::normalizeHowToVideos($item->how_to_videos ?? []),
+                    $newVideos
+                );
+                $item->update(['how_to_videos' => $merged ?: null]);
+                $updated++;
+            }
+        });
+
+        $message = match ($mode) {
+            'clear' => "Cleared how-to videos on {$updated} item(s).",
+            'replace' => "Set how-to videos on {$updated} item(s).",
+            default => "Appended how-to videos on {$updated} item(s).",
+        };
+
+        return redirect()->route('admin.rental-items.index', $request->only([
+            'category_id', 'business_id', 'status', 'how_to_filter', 'search',
+        ]))->with('success', $message);
+    }
+
+    protected function filteredItemsQuery(Request $request): Builder
+    {
+        $query = RentalItem::query()->with(['business', 'category']);
+
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->category_id);
         }
 
-        // Filter by business
         if ($request->filled('business_id')) {
             $query->where('business_id', $request->business_id);
         }
 
-        // Filter by status
         if ($request->filled('status')) {
-            if ($request->status === 'active') {
-                $query->where('is_active', true)->where('is_available', true);
-            } elseif ($request->status === 'inactive') {
-                $query->where('is_active', false);
-            } elseif ($request->status === 'unavailable') {
-                $query->where('is_available', false);
-            } elseif ($request->status === 'featured') {
-                $query->where('is_featured', true);
+            match ($request->status) {
+                'active' => $query->where('is_active', true)->where('is_available', true),
+                'inactive' => $query->where('is_active', false),
+                'unavailable' => $query->where('is_available', false),
+                'featured' => $query->where('is_featured', true),
+                default => null,
+            };
+        }
+
+        if ($request->filled('how_to_filter')) {
+            if ($request->how_to_filter === 'with') {
+                $query->whereNotNull('how_to_videos')
+                    ->whereRaw("JSON_LENGTH(how_to_videos) > 0");
+            } elseif ($request->how_to_filter === 'without') {
+                $query->where(function ($q) {
+                    $q->whereNull('how_to_videos')
+                        ->orWhereRaw("JSON_LENGTH(how_to_videos) = 0");
+                });
             }
         }
 
-        // Search
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = (string) $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('business', function ($bq) use ($search) {
-                      $bq->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('business', function ($bq) use ($search) {
+                        $bq->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
-        $items = $query->paginate(30);
-        $categories = RentalCategory::where('is_active', true)->get();
-        $businesses = Business::orderBy('name')->get();
-
-        return view('admin.rental-items.index', compact('items', 'categories', 'businesses'));
+        return $query;
     }
 
     /**
@@ -179,6 +267,9 @@ class RentalItemController extends Controller
             'discount_percent' => 'nullable|numeric|min:0|max:95',
             'discount_starts_at' => 'nullable|date',
             'discount_ends_at' => 'nullable|date',
+            'how_to_videos' => 'nullable|array',
+            'how_to_videos.*.title' => 'nullable|string|max:200',
+            'how_to_videos.*.url' => 'nullable|string|max:500',
         ]);
 
         $validated['is_active'] = $validated['is_active'] ?? true;
@@ -187,7 +278,8 @@ class RentalItemController extends Controller
         $validated = array_merge(
             $validated,
             RentalItem::discountFieldsFromRequest($request),
-            RentalItem::featuredFieldsFromRequest($request)
+            RentalItem::featuredFieldsFromRequest($request),
+            ['how_to_videos' => RentalItem::normalizeHowToVideos($request->input('how_to_videos', [])) ?: null]
         );
 
         // Handle image uploads
@@ -255,12 +347,16 @@ class RentalItemController extends Controller
             'discount_percent' => 'nullable|numeric|min:0|max:95',
             'discount_starts_at' => 'nullable|date',
             'discount_ends_at' => 'nullable|date',
+            'how_to_videos' => 'nullable|array',
+            'how_to_videos.*.title' => 'nullable|string|max:200',
+            'how_to_videos.*.url' => 'nullable|string|max:500',
         ]);
 
         $validated = array_merge(
             $validated,
             RentalItem::discountFieldsFromRequest($request),
-            RentalItem::featuredFieldsFromRequest($request)
+            RentalItem::featuredFieldsFromRequest($request),
+            ['how_to_videos' => RentalItem::normalizeHowToVideos($request->input('how_to_videos', [])) ?: null]
         );
 
         $validated['is_featured'] = $request->boolean('is_featured');

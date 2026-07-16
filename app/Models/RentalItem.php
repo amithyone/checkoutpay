@@ -216,6 +216,25 @@ class RentalItem extends Model
         return ['how_to_videos' => self::normalizeHowToVideos($raw) ?: null];
     }
 
+    /**
+     * @param  array<int, array{title: string, url: string}>  $existing
+     * @param  array<int, array{title: string, url: string}>  $incoming
+     * @return array<int, array{title: string, url: string}>
+     */
+    public static function mergeHowToVideos(array $existing, array $incoming): array
+    {
+        $byUrl = [];
+        foreach (array_merge($existing, $incoming) as $video) {
+            $url = $video['url'] ?? '';
+            if ($url === '') {
+                continue;
+            }
+            $byUrl[$url] = $video;
+        }
+
+        return array_values($byUrl);
+    }
+
     public static function isAllowedHowToVideoUrl(string $url): bool
     {
         if (! filter_var($url, FILTER_VALIDATE_URL)) {

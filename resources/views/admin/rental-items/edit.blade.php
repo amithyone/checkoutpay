@@ -172,6 +172,10 @@
                 </div>
             </div>
 
+            @include('admin.rental-items.partials.how-to-videos-fields', [
+                'howToVideos' => old('how_to_videos', $rentalItem->how_to_videos ?? []),
+            ])
+
             <button type="submit" class="w-full text-sm bg-primary text-white py-2 rounded-md hover:bg-primary/90 font-medium">
                 Save changes
             </button>
