@@ -7,6 +7,9 @@
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Rental Requests</h1>
         <div class="flex gap-2">
+            <a href="{{ route('admin.rental-featured-banners.index') }}" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                <i class="fas fa-images mr-2"></i> Featured banners
+            </a>
             <a href="{{ route('admin.rental-items.index') }}" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
                 <i class="fas fa-box mr-2"></i> Rental Items
             </a>

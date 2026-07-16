@@ -434,5 +434,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
         Route::post('rental-items/clone-catalog', [\App\Http\Controllers\Admin\RentalItemController::class, 'cloneCatalog'])
             ->name('rental-items.clone-catalog');
         Route::resource('rental-items', \App\Http\Controllers\Admin\RentalItemController::class);
+
+        Route::resource('rental-featured-banners', \App\Http\Controllers\Admin\RentalFeaturedBannerController::class)
+            ->except(['show']);
     });
 });

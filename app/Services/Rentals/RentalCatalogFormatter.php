@@ -3,6 +3,7 @@
 namespace App\Services\Rentals;
 
 use App\Models\Rental;
+use App\Models\RentalFeaturedBanner;
 use App\Models\RentalItem;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -74,9 +75,37 @@ class RentalCatalogFormatter
             'id' => $item->id,
             'sort_order' => (int) ($item->featured_sort ?? $item->id),
             'tag' => $tag,
+            'type' => 'item',
             'item' => array_merge(self::catalogItem($item), [
                 'featured_tag' => $tag,
             ]),
+            'banner' => null,
+        ];
+    }
+
+    public static function bannerSlide(RentalFeaturedBanner $banner): array
+    {
+        $banner->loadMissing(['rentalItem' => fn ($q) => $q->with(['business', 'category'])]);
+
+        $imageUrl = self::publicUrl($banner->image);
+        $linkedItem = $banner->rentalItem;
+
+        return [
+            'id' => 'banner-'.$banner->id,
+            'sort_order' => (int) $banner->sort_order,
+            'tag' => $banner->tag ?: 'Sponsored',
+            'type' => 'banner',
+            'item' => null,
+            'banner' => [
+                'id' => $banner->id,
+                'title' => $banner->title,
+                'subtitle' => $banner->subtitle,
+                'image' => $imageUrl,
+                'link_url' => $banner->link_url,
+                'item_id' => $banner->rental_item_id,
+                'item_slug' => $linkedItem?->slug,
+                'item' => $linkedItem ? self::catalogItem($linkedItem) : null,
+            ],
         ];
     }
 

@@ -13,6 +13,9 @@
             <a href="{{ route('admin.rental-categories.index') }}" class="text-xs bg-white border border-gray-300 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-50">
                 <i class="fas fa-tags mr-1"></i>Categories
             </a>
+            <a href="{{ route('admin.rental-featured-banners.index') }}" class="text-xs bg-white border border-gray-300 text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-50">
+                <i class="fas fa-images mr-1"></i>Featured banners
+            </a>
             <a href="{{ route('admin.rental-items.create') }}" class="text-xs bg-primary text-white px-2.5 py-1.5 rounded-md hover:bg-primary/90">
                 <i class="fas fa-plus mr-1"></i>Add item
             </a>

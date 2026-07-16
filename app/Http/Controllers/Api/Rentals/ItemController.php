@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\RentalCategory;
 use App\Models\RentalItem;
 use App\Services\Rentals\RentalCatalogFormatter;
+use App\Services\Rentals\RentalFeaturedSliderService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -51,19 +52,11 @@ class ItemController extends Controller
     {
         $limit = min(self::FEATURED_SLIDE_LIMIT, max(1, (int) $request->input('limit', self::FEATURED_SLIDE_LIMIT)));
 
-        $items = $this->rentableCatalogQuery()
-            ->where('is_featured', true)
-            ->orderByRaw('featured_sort IS NULL, featured_sort ASC')
-            ->orderBy('id')
-            ->limit($limit)
-            ->get();
+        $slides = app(RentalFeaturedSliderService::class)->buildSlides($limit);
 
         return response()->json([
             'success' => true,
-            'data' => $items
-                ->map(fn (RentalItem $item) => RentalCatalogFormatter::featuredSlide($item))
-                ->values()
-                ->all(),
+            'data' => $slides,
         ]);
     }
 

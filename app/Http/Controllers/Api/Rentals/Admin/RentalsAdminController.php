@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\Business;
 use App\Models\Rental;
+use App\Models\RentalFeaturedBanner;
 use App\Models\RentalItem;
 use App\Models\RentalVendorApplication;
 use App\Models\Renter;
 use App\Models\WithdrawalRequest;
 use App\Services\Rentals\RentalCatalogFormatter;
 use App\Services\Rentals\RentalEscrowService;
+use App\Services\Rentals\RentalFeaturedSliderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -192,19 +194,107 @@ class RentalsAdminController extends Controller
      */
     public function featuredItems(Request $request)
     {
-        $items = RentalItem::query()
-            ->with(['business', 'category'])
-            ->withTrashed()
-            ->where('is_featured', true)
-            ->orderByRaw('featured_sort IS NULL, featured_sort ASC')
-            ->orderBy('id')
-            ->limit(50)
-            ->get();
+        $slides = app(RentalFeaturedSliderService::class)->buildSlides(50, true);
 
         return response()->json([
             'success' => true,
-            'data' => $items->map(fn (RentalItem $item) => RentalCatalogFormatter::featuredSlide($item))->values()->all(),
+            'data' => $slides,
         ]);
+    }
+
+    /**
+     * GET /api/v1/rentals/admin/featured-banners
+     */
+    public function featuredBannersIndex()
+    {
+        $banners = RentalFeaturedBanner::query()
+            ->with(['rentalItem', 'creator'])
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (RentalFeaturedBanner $banner) => RentalCatalogFormatter::bannerSlide($banner));
+
+        return response()->json(['success' => true, 'data' => $banners]);
+    }
+
+    /**
+     * POST /api/v1/rentals/admin/featured-banners
+     */
+    public function featuredBannersStore(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'tag' => 'nullable|string|max:120',
+            'subtitle' => 'nullable|string|max:500',
+            'image_url' => 'nullable|url|max:2048',
+            'link_url' => 'nullable|url|max:2048',
+            'rental_item_id' => 'nullable|integer|exists:rental_items,id',
+            'sort_order' => 'nullable|integer|min:0|max:9999',
+            'is_active' => 'sometimes|boolean',
+            'starts_at' => 'nullable|date',
+            'ends_at' => 'nullable|date|after_or_equal:starts_at',
+        ]);
+
+        if (empty($validated['image_url'])) {
+            return response()->json(['success' => false, 'message' => 'image_url is required for API banner create.'], 422);
+        }
+
+        $banner = RentalFeaturedBanner::query()->create([
+            'title' => $validated['title'],
+            'tag' => $validated['tag'] ?? 'Sponsored',
+            'subtitle' => $validated['subtitle'] ?? null,
+            'image' => $validated['image_url'],
+            'link_url' => $validated['link_url'] ?? null,
+            'rental_item_id' => $validated['rental_item_id'] ?? null,
+            'sort_order' => (int) ($validated['sort_order'] ?? 1),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
+            'starts_at' => $validated['starts_at'] ?? null,
+            'ends_at' => $validated['ends_at'] ?? null,
+            'created_by' => Auth::id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => RentalCatalogFormatter::bannerSlide($banner->fresh(['rentalItem'])),
+        ], 201);
+    }
+
+    /**
+     * PATCH /api/v1/rentals/admin/featured-banners/{banner}
+     */
+    public function featuredBannersUpdate(Request $request, RentalFeaturedBanner $banner)
+    {
+        $validated = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'tag' => 'sometimes|nullable|string|max:120',
+            'subtitle' => 'sometimes|nullable|string|max:500',
+            'image_url' => 'sometimes|nullable|url|max:2048',
+            'link_url' => 'sometimes|nullable|url|max:2048',
+            'rental_item_id' => 'sometimes|nullable|integer|exists:rental_items,id',
+            'sort_order' => 'sometimes|integer|min:0|max:9999',
+            'is_active' => 'sometimes|boolean',
+            'starts_at' => 'sometimes|nullable|date',
+            'ends_at' => 'sometimes|nullable|date',
+        ]);
+
+        if (array_key_exists('image_url', $validated) && filled($validated['image_url'])) {
+            $validated['image'] = $validated['image_url'];
+        }
+        unset($validated['image_url']);
+
+        $banner->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'data' => RentalCatalogFormatter::bannerSlide($banner->fresh(['rentalItem'])),
+        ]);
+    }
+
+    public function featuredBannersDestroy(RentalFeaturedBanner $banner)
+    {
+        $banner->delete();
+
+        return response()->json(['success' => true]);
     }
 
     /**

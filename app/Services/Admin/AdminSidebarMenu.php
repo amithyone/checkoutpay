@@ -157,7 +157,7 @@ class AdminSidebarMenu
                 ['badge_count' => $pendingRenterKycCount, 'badge_color' => 'yellow', 'visible' => ! $admin->isWalletSupport()]
             ),
             'rentals' => array_merge(
-                $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', ['admin.rentals.*', 'admin.rental-categories.*', 'admin.rental-items.*']),
+                $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', ['admin.rentals.*', 'admin.rental-categories.*', 'admin.rental-items.*', 'admin.rental-featured-banners.*']),
                 ['visible' => ! $admin->isWalletSupport()]
             ),
             'whatsapp_wallet' => array_merge(

@@ -477,6 +477,12 @@ Route::prefix('v1/rentals/admin')->group(function () {
         Route::post('payouts/{id}/hold', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'holdPayout'])
             ->whereNumber('id');
         Route::get('featured', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'featuredItems']);
+        Route::get('featured-banners', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'featuredBannersIndex']);
+        Route::post('featured-banners', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'featuredBannersStore']);
+        Route::patch('featured-banners/{banner}', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'featuredBannersUpdate'])
+            ->whereNumber('banner');
+        Route::delete('featured-banners/{banner}', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'featuredBannersDestroy'])
+            ->whereNumber('banner');
         Route::patch('items/{item}', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'updateItem'])
             ->whereNumber('item');
     });
