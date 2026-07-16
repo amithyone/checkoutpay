@@ -200,6 +200,10 @@ class ItemsController extends Controller
 
         $validated = array_merge($validated, RentalItem::discountPatchFromRequest($request));
 
+        if ($request->hasAny(['is_featured', 'featured_tag', 'featured_sort'])) {
+            $validated = array_merge($validated, RentalItem::featuredFieldsFromRequest($request));
+        }
+
         if (array_key_exists('is_featured', $validated) && ! $validated['is_featured']) {
             $validated['featured_tag'] = null;
             $validated['featured_sort'] = null;

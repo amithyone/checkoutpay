@@ -476,6 +476,9 @@ Route::prefix('v1/rentals/admin')->group(function () {
         Route::get('payouts', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'payouts']);
         Route::post('payouts/{id}/hold', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'holdPayout'])
             ->whereNumber('id');
+        Route::get('featured', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'featuredItems']);
+        Route::patch('items/{item}', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'updateItem'])
+            ->whereNumber('item');
     });
 });
 

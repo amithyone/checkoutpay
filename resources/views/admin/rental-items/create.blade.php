@@ -124,17 +124,34 @@
 
             <div class="grid grid-cols-3 gap-4 mb-4">
                 <label class="flex items-center">
+                    <input type="hidden" name="is_featured" value="0">
                     <input type="checkbox" name="is_featured" value="1" {{ old('is_featured') ? 'checked' : '' }} class="mr-2">
-                    <span>Featured</span>
+                    <span>Featured slider</span>
                 </label>
                 <label class="flex items-center">
+                    <input type="hidden" name="is_active" value="0">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }} class="mr-2">
                     <span>Active</span>
                 </label>
                 <label class="flex items-center">
+                    <input type="hidden" name="is_available" value="0">
                     <input type="checkbox" name="is_available" value="1" {{ old('is_available', true) ? 'checked' : '' }} class="mr-2">
                     <span>Available</span>
                 </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 rounded-lg border border-amber-100 bg-amber-50/60 p-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Featured pill text</label>
+                    <input type="text" name="featured_tag" maxlength="120" placeholder="Editor's pick"
+                           value="{{ old('featured_tag') }}" class="w-full border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Featured sort order</label>
+                    <input type="number" name="featured_sort" min="1" max="9999" placeholder="1"
+                           value="{{ old('featured_sort') }}" class="w-full border-gray-300 rounded-md">
+                    <p class="text-xs text-gray-500 mt-1">Lower numbers appear first in the home slider.</p>
+                </div>
             </div>
 
             <button type="submit" class="w-full bg-primary text-white py-3 rounded-lg hover:bg-primary/90 font-medium">

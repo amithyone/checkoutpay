@@ -133,6 +133,37 @@ class RentalItem extends Model
     }
 
     /**
+     * Featured slider fields from admin/business forms or API.
+     *
+     * @return array<string, mixed>
+     */
+    public static function featuredFieldsFromRequest(Request $request): array
+    {
+        $out = [];
+
+        if ($request->has('is_featured')) {
+            $out['is_featured'] = $request->boolean('is_featured');
+        }
+
+        if ($request->has('featured_tag')) {
+            $tag = trim((string) $request->input('featured_tag'));
+            $out['featured_tag'] = $tag !== '' ? $tag : null;
+        }
+
+        if ($request->has('featured_sort')) {
+            $sort = $request->input('featured_sort');
+            $out['featured_sort'] = ($sort === '' || $sort === null) ? null : (int) $sort;
+        }
+
+        if (array_key_exists('is_featured', $out) && ! $out['is_featured']) {
+            $out['featured_tag'] = null;
+            $out['featured_sort'] = null;
+        }
+
+        return $out;
+    }
+
+    /**
      * Get the business that owns this item
      */
     public function business()

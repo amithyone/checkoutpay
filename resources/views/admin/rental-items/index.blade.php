@@ -50,6 +50,7 @@
                     <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
                     <option value="inactive" {{ request('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
                     <option value="unavailable" {{ request('status') == 'unavailable' ? 'selected' : '' }}>Unavailable</option>
+                    <option value="featured" {{ request('status') == 'featured' ? 'selected' : '' }}>Featured slider</option>
                 </select>
             </div>
             <div class="col-span-2 md:col-span-1">
@@ -100,6 +101,7 @@
                     <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">City</th>
                     <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Daily</th>
                     <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
+                    <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Featured</th>
                     <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase w-40">Actions</th>
                 </tr>
@@ -136,6 +138,14 @@
                             ₦{{ number_format($item->daily_rate, 0) }}
                         </td>
                         <td class="px-2 py-1.5 align-middle text-center text-xs">{{ $item->quantity_available }}</td>
+                        <td class="px-2 py-1.5 align-middle hidden xl:table-cell text-xs text-gray-600">
+                            @if($item->is_featured)
+                                <span class="block font-medium text-amber-700">#{{ $item->featured_sort ?? '—' }}</span>
+                                <span class="block truncate max-w-[120px]" title="{{ $item->featured_tag }}">{{ $item->featured_tag ?: 'Featured' }}</span>
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="px-2 py-1.5 align-middle whitespace-nowrap">
                             @if($item->is_active && $item->is_available)
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">Active</span>
@@ -157,7 +167,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="px-3 py-6 text-center text-sm text-gray-500">
+                        <td colspan="10" class="px-3 py-6 text-center text-sm text-gray-500">
                             No rental items. <a href="{{ route('admin.rental-items.create') }}" class="text-primary hover:underline">Create one</a>
                         </td>
                     </tr>

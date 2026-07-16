@@ -139,17 +139,37 @@
 
             <div class="flex flex-wrap gap-4 text-sm">
                 <label class="inline-flex items-center gap-1.5">
+                    <input type="hidden" name="is_featured" value="0">
                     <input type="checkbox" name="is_featured" value="1" {{ old('is_featured', $rentalItem->is_featured) ? 'checked' : '' }} class="rounded">
-                    <span class="text-xs">Featured</span>
+                    <span class="text-xs">Featured slider</span>
                 </label>
                 <label class="inline-flex items-center gap-1.5">
+                    <input type="hidden" name="is_active" value="0">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', $rentalItem->is_active) ? 'checked' : '' }} class="rounded">
                     <span class="text-xs">Active</span>
                 </label>
                 <label class="inline-flex items-center gap-1.5">
+                    <input type="hidden" name="is_available" value="0">
                     <input type="checkbox" name="is_available" value="1" {{ old('is_available', $rentalItem->is_available) ? 'checked' : '' }} class="rounded">
                     <span class="text-xs">Available</span>
                 </label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-md border border-amber-100 bg-amber-50/60 p-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-0.5">Featured pill text</label>
+                    <input type="text" name="featured_tag" maxlength="120" placeholder="Editor's pick"
+                           value="{{ old('featured_tag', $rentalItem->featured_tag) }}"
+                           class="w-full text-sm border-gray-300 rounded-md py-1.5">
+                    <p class="text-[10px] text-gray-500 mt-0.5">Shown on the home carousel tag.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-0.5">Featured sort order</label>
+                    <input type="number" name="featured_sort" min="1" max="9999" placeholder="1"
+                           value="{{ old('featured_sort', $rentalItem->featured_sort) }}"
+                           class="w-full text-sm border-gray-300 rounded-md py-1.5">
+                    <p class="text-[10px] text-gray-500 mt-0.5">Lower numbers appear first (1 = first slide).</p>
+                </div>
             </div>
 
             <button type="submit" class="w-full text-sm bg-primary text-white py-2 rounded-md hover:bg-primary/90 font-medium">

@@ -80,6 +80,10 @@
                 <div class="bg-gray-50 p-4 rounded-lg">
                     <p><strong>Active:</strong> {{ $rentalItem->is_active ? 'Yes' : 'No' }}</p>
                     <p><strong>Featured:</strong> {{ $rentalItem->is_featured ? 'Yes' : 'No' }}</p>
+                    @if($rentalItem->is_featured)
+                        <p><strong>Featured tag:</strong> {{ $rentalItem->featured_tag ?: 'Featured' }}</p>
+                        <p><strong>Featured sort:</strong> {{ $rentalItem->featured_sort ?? '—' }}</p>
+                    @endif
                 </div>
             </div>
         </div>

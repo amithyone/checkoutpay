@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\Business;
 use App\Models\Rental;
+use App\Models\RentalItem;
 use App\Models\RentalVendorApplication;
 use App\Models\Renter;
 use App\Models\WithdrawalRequest;
+use App\Services\Rentals\RentalCatalogFormatter;
 use App\Services\Rentals\RentalEscrowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -182,5 +184,56 @@ class RentalsAdminController extends Controller
         $id->update(['status' => WithdrawalRequest::STATUS_REJECTED]);
 
         return response()->json(['success' => true, 'message' => 'Payout held/rejected.']);
+    }
+
+    /**
+     * GET /api/v1/rentals/admin/featured
+     * Admin view of featured slider items (includes inactive/unavailable for editing).
+     */
+    public function featuredItems(Request $request)
+    {
+        $items = RentalItem::query()
+            ->with(['business', 'category'])
+            ->withTrashed()
+            ->where('is_featured', true)
+            ->orderByRaw('featured_sort IS NULL, featured_sort ASC')
+            ->orderBy('id')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $items->map(fn (RentalItem $item) => RentalCatalogFormatter::featuredSlide($item))->values()->all(),
+        ]);
+    }
+
+    /**
+     * PATCH /api/v1/rentals/admin/items/{item}
+     * Update featured slider fields (and basic availability flags).
+     */
+    public function updateItem(Request $request, RentalItem $item)
+    {
+        $validated = $request->validate([
+            'is_featured' => 'sometimes|boolean',
+            'featured_tag' => 'sometimes|nullable|string|max:120',
+            'featured_sort' => 'sometimes|nullable|integer|min:1|max:9999',
+            'is_active' => 'sometimes|boolean',
+            'is_available' => 'sometimes|boolean',
+        ]);
+
+        $payload = array_merge($validated, RentalItem::featuredFieldsFromRequest($request));
+
+        if (array_key_exists('is_featured', $payload) && ! $payload['is_featured']) {
+            $payload['featured_tag'] = null;
+            $payload['featured_sort'] = null;
+        }
+
+        $item->update($payload);
+        $item->load(['business', 'category']);
+
+        return response()->json([
+            'success' => true,
+            'data' => RentalCatalogFormatter::catalogItem($item),
+        ]);
     }
 }

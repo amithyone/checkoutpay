@@ -55,6 +55,8 @@ class RentalItemController extends Controller
                 'terms_and_conditions',
                 'is_active',
                 'is_featured',
+                'featured_tag',
+                'featured_sort',
                 'discount_active',
                 'discount_percent',
                 'discount_starts_at',
@@ -114,6 +116,8 @@ class RentalItemController extends Controller
                 $query->where('is_active', false);
             } elseif ($request->status === 'unavailable') {
                 $query->where('is_available', false);
+            } elseif ($request->status === 'featured') {
+                $query->where('is_featured', true);
             }
         }
 
@@ -167,6 +171,8 @@ class RentalItemController extends Controller
             'images.*' => 'image|max:2048',
             'specifications' => 'nullable|array',
             'is_featured' => 'boolean',
+            'featured_tag' => 'nullable|string|max:120',
+            'featured_sort' => 'nullable|integer|min:1|max:9999',
             'is_active' => 'boolean',
             'is_available' => 'boolean',
             'discount_active' => 'sometimes|boolean',
@@ -177,7 +183,12 @@ class RentalItemController extends Controller
 
         $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['is_available'] = $validated['is_available'] ?? true;
-        $validated = array_merge($validated, RentalItem::discountFieldsFromRequest($request));
+        $validated['is_featured'] = $request->boolean('is_featured');
+        $validated = array_merge(
+            $validated,
+            RentalItem::discountFieldsFromRequest($request),
+            RentalItem::featuredFieldsFromRequest($request)
+        );
 
         // Handle image uploads
         if ($request->hasFile('images')) {
@@ -235,6 +246,8 @@ class RentalItemController extends Controller
             'images.*' => 'image|max:2048',
             'specifications' => 'nullable|array',
             'is_featured' => 'boolean',
+            'featured_tag' => 'nullable|string|max:120',
+            'featured_sort' => 'nullable|integer|min:1|max:9999',
             'is_active' => 'boolean',
             'is_available' => 'boolean',
             'remove_images' => 'nullable|array',
@@ -244,7 +257,20 @@ class RentalItemController extends Controller
             'discount_ends_at' => 'nullable|date',
         ]);
 
-        $validated = array_merge($validated, RentalItem::discountFieldsFromRequest($request));
+        $validated = array_merge(
+            $validated,
+            RentalItem::discountFieldsFromRequest($request),
+            RentalItem::featuredFieldsFromRequest($request)
+        );
+
+        $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['is_active'] = $request->boolean('is_active');
+        $validated['is_available'] = $request->boolean('is_available');
+
+        if (! $validated['is_featured']) {
+            $validated['featured_tag'] = null;
+            $validated['featured_sort'] = null;
+        }
 
         $currentImages = is_array($rentalItem->images) ? array_values($rentalItem->images) : [];
 
