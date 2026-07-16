@@ -367,6 +367,13 @@ Route::prefix('v1/rentals')
         Route::post('password/change', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'changePassword']);
         Route::get('wallet', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'wallet']);
         Route::post('devices/register', [\App\Http\Controllers\Api\Rentals\DeviceController::class, 'register']);
+
+        Route::get('favorites', [\App\Http\Controllers\Api\Rentals\FavoritesController::class, 'index']);
+        Route::post('favorites', [\App\Http\Controllers\Api\Rentals\FavoritesController::class, 'store']);
+        Route::delete('favorites/{itemId}', [\App\Http\Controllers\Api\Rentals\FavoritesController::class, 'destroy'])
+            ->whereNumber('itemId');
+        Route::delete('favorites', [\App\Http\Controllers\Api\Rentals\FavoritesController::class, 'destroy']);
+
         Route::get('support/messages', [\App\Http\Controllers\Api\Rentals\SupportController::class, 'messages']);
         Route::post('wallet/fund', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'fundWallet']);
         Route::post('wallet/fund/check', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'checkWalletFunding']);
@@ -375,6 +382,10 @@ Route::prefix('v1/rentals')
         // Renter rentals
         Route::get('requests', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'listRentals']);
         Route::get('requests/{rental}', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'showRental'])
+            ->whereNumber('rental');
+        Route::get('requests/{rental}/rebundle-preview', [\App\Http\Controllers\Api\Rentals\RebundleController::class, 'preview'])
+            ->whereNumber('rental');
+        Route::post('requests/{rental}/rebundle', [\App\Http\Controllers\Api\Rentals\RebundleController::class, 'rebundle'])
             ->whereNumber('rental');
         Route::post('requests/{rental}/check-payment', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'checkPayment'])
             ->whereNumber('rental');

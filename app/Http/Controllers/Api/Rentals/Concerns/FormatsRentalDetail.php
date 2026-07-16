@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\Api\Rentals\Concerns;
 
 use App\Models\Rental;
+use App\Services\Rentals\RentalCatalogFormatter;
 use App\Services\Rentals\RentalEscrowService;
 
 trait FormatsRentalDetail
 {
     protected function rentalDetailPayload(Rental $rental): array
     {
-        $rental->loadMissing(['business', 'items', 'escrow', 'disputes']);
+        $rental->loadMissing(['business', 'items.category', 'escrow', 'disputes']);
 
         $data = $rental->toArray();
         /** @var RentalEscrowService $escrowService */
@@ -27,6 +28,11 @@ trait FormatsRentalDetail
 
         $data['cancellable'] = $escrowService->isCancellable($rental);
         $data['cancel_deadline'] = $escrowService->cancelDeadline($rental)?->toIso8601String();
+
+        $data['items'] = $rental->items
+            ->map(fn ($item) => RentalCatalogFormatter::rentalLineItem($rental, $item))
+            ->values()
+            ->all();
 
         return $data;
     }

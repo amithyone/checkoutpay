@@ -437,13 +437,16 @@ class CheckoutController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        $rentals = Rental::with(['business', 'items'])
+        $rentals = Rental::with(['business', 'items.category', 'escrow'])
             ->where('renter_id', $renter->id)
             ->latest()
             ->paginate(20);
 
         return response()->json([
-            'data' => $rentals->items(),
+            'data' => collect($rentals->items())
+                ->map(fn (Rental $rental) => $this->rentalDetailPayload($rental))
+                ->values()
+                ->all(),
             'meta' => [
                 'current_page' => $rentals->currentPage(),
                 'per_page' => $rentals->perPage(),
@@ -467,7 +470,7 @@ class CheckoutController extends Controller
             ], 404);
         }
 
-        $rental->load(['business', 'items']);
+        $rental->load(['business', 'items.category']);
 
         return response()->json([
             'data' => $this->rentalDetailPayload($rental),
