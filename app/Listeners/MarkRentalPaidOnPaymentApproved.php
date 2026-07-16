@@ -31,6 +31,8 @@ class MarkRentalPaidOnPaymentApproved
                     'approved_at' => $rental->approved_at ?? now(),
                 ]);
             }
+
+            app(\App\Services\Rentals\RentalEscrowService::class)->holdForRental($rental->fresh());
             Log::info('Rental marked approved after payment approved', [
                 'rental_id' => $rental->id,
                 'rental_number' => $rental->rental_number,

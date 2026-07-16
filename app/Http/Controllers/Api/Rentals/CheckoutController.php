@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Rentals;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\Rentals\Concerns\FormatsRentalDetail;
 use App\Mail\RentalApprovedPayNow;
 use App\Mail\RentalReceipt;
 use App\Mail\RentalRequestReceived;
@@ -10,6 +11,8 @@ use App\Models\Rental;
 use App\Models\RentalItem;
 use App\Models\Renter;
 use App\Services\RentalPaymentService;
+use App\Services\Rentals\RentalEscrowService;
+use App\Services\Rentals\RentalInventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +21,8 @@ use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
+    use FormatsRentalDetail;
+
     protected function maybeFinalizeReturn(Rental $rental): void
     {
         $rental->refresh();
@@ -38,7 +43,7 @@ class CheckoutController extends Controller
      * POST /api/v1/rentals/checkout/quote
      * Compute totals for a cart + dates without creating rentals.
      */
-    public function quote(Request $request)
+    public function quote(Request $request, RentalInventoryService $inventoryService)
     {
         $validated = $request->validate([
             'items' => 'required|array|min:1',
@@ -47,6 +52,11 @@ class CheckoutController extends Controller
             'items.*.selected_dates' => 'required|array|min:1',
             'items.*.selected_dates.*' => 'required|date|after_or_equal:today',
         ]);
+
+        $check = $inventoryService->checkCartAvailability($validated['items']);
+        if (! $check['ok']) {
+            return $inventoryService->inventoryOversellResponse($check['unavailable']);
+        }
 
         $itemIds = collect($validated['items'])->pluck('id')->all();
         $items = RentalItem::whereIn('id', $itemIds)
@@ -104,6 +114,7 @@ class CheckoutController extends Controller
         }
 
         return response()->json([
+            'success' => true,
             'total_amount' => $totalAmount,
             'deposit_amount' => $depositAmount,
             'grand_total' => $totalAmount + $depositAmount,
@@ -124,7 +135,7 @@ class CheckoutController extends Controller
      * POST /api/v1/rentals/checkout/submit
      * Create rentals for authenticated renter.
      */
-    public function submit(Request $request, RentalPaymentService $paymentService)
+    public function submit(Request $request, RentalPaymentService $paymentService, RentalInventoryService $inventoryService, RentalEscrowService $escrowService)
     {
         /** @var Renter $renter */
         $renter = $request->user();
@@ -211,6 +222,11 @@ class CheckoutController extends Controller
             ], 422);
         }
 
+        $inventoryCheck = $inventoryService->checkCartAvailability($validated['items']);
+        if (! $inventoryCheck['ok']) {
+            return $inventoryService->inventoryOversellResponse($inventoryCheck['unavailable']);
+        }
+
         $paymentMethod = $request->input('payment_method');
         $grandTotal = collect($businesses)->sum('total') + collect($businesses)->sum('deposit_total');
 
@@ -225,8 +241,13 @@ class CheckoutController extends Controller
         $createdRentals = [];
 
         try {
-            $createdRentals = DB::transaction(function () use ($businesses, $paymentMethod, $renter, $validated, $paymentService, $payerName) {
+            $createdRentals = DB::transaction(function () use ($businesses, $paymentMethod, $renter, $validated, $paymentService, $payerName, $inventoryService, $escrowService) {
                 $created = [];
+
+                $recheck = $inventoryService->checkCartAvailability($validated['items']);
+                if (! $recheck['ok']) {
+                    throw new \RuntimeException('INVENTORY_OVERSELL:'.json_encode($recheck['unavailable']));
+                }
 
                 foreach ($businesses as $businessData) {
                     $business = $businessData['business'];
@@ -310,6 +331,8 @@ class CheckoutController extends Controller
                         'status' => Rental::STATUS_APPROVED
                     ]);
 
+                    $escrowService->holdForRental($rental->fresh());
+
                     Mail::to($business->email)->send(new RentalRequestReceived($rental->fresh()));
                     Mail::to($renter->email)->send(new RentalReceipt($rental->fresh()));
                 } else {
@@ -380,6 +403,13 @@ class CheckoutController extends Controller
 
                 return $created;
             });
+        } catch (\RuntimeException $e) {
+            if (str_starts_with($e->getMessage(), 'INVENTORY_OVERSELL:')) {
+                $unavailable = json_decode(substr($e->getMessage(), strlen('INVENTORY_OVERSELL:')), true) ?: [];
+
+                return $inventoryService->inventoryOversellResponse($unavailable);
+            }
+            throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to submit rental request via API', [
                 'renter_id' => $renter->id,
@@ -440,7 +470,7 @@ class CheckoutController extends Controller
         $rental->load(['business', 'items']);
 
         return response()->json([
-            'data' => $rental,
+            'data' => $this->rentalDetailPayload($rental),
         ]);
     }
 

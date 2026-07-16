@@ -55,6 +55,9 @@ class Rental extends Model
         'business_return_confirmed_at',
         'penalty_amount',
         'cancelled_at',
+        'is_walk_in',
+        'walk_in_payment_note',
+        'cancel_reason',
     ];
 
     protected $casts = [
@@ -72,6 +75,7 @@ class Rental extends Model
         'renter_return_requested_at' => 'datetime',
         'business_return_confirmed_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'is_walk_in' => 'boolean',
     ];
 
     protected static function boot()
@@ -188,6 +192,21 @@ class Rental extends Model
         return $this->belongsToMany(RentalItem::class, 'rental_rental_item')
             ->withPivot('quantity', 'unit_rate', 'total_amount')
             ->withTimestamps();
+    }
+
+    public function escrow()
+    {
+        return $this->hasOne(RentalEscrow::class);
+    }
+
+    public function conditionReports()
+    {
+        return $this->hasMany(RentalConditionReport::class);
+    }
+
+    public function disputes()
+    {
+        return $this->hasMany(RentalDispute::class);
     }
 
     /**

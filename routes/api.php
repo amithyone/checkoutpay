@@ -384,13 +384,39 @@ Route::prefix('v1/rentals')
             ->whereNumber('rental');
         Route::post('requests/{rental}/return-method', [\App\Http\Controllers\Api\Rentals\CheckoutController::class, 'setReturnMethod'])
             ->whereNumber('rental');
+        Route::post('requests/{rental}/cancel', [\App\Http\Controllers\Api\Rentals\RentalRequestActionsController::class, 'cancel'])
+            ->whereNumber('rental');
+        Route::post('requests/{rental}/condition-report', [\App\Http\Controllers\Api\Rentals\RentalRequestActionsController::class, 'conditionReport'])
+            ->whereNumber('rental');
+        Route::post('requests/{rental}/disputes', [\App\Http\Controllers\Api\Rentals\RentalRequestActionsController::class, 'openDispute'])
+            ->whereNumber('rental');
+        Route::get('requests/{rental}/disputes', [\App\Http\Controllers\Api\Rentals\RentalRequestActionsController::class, 'listDisputes'])
+            ->whereNumber('rental');
+        Route::post('disputes/{dispute}/resolve', [\App\Http\Controllers\Api\Rentals\RentalRequestActionsController::class, 'resolveDispute'])
+            ->whereNumber('dispute');
+
+        Route::get('support/tickets', [\App\Http\Controllers\Api\Rentals\SupportTicketsController::class, 'index']);
+        Route::post('support/tickets', [\App\Http\Controllers\Api\Rentals\SupportTicketsController::class, 'store']);
+        Route::get('support/tickets/{ticket}/messages', [\App\Http\Controllers\Api\Rentals\SupportTicketsController::class, 'messages'])
+            ->whereNumber('ticket');
+        Route::post('support/tickets/{ticket}/messages', [\App\Http\Controllers\Api\Rentals\SupportTicketsController::class, 'postMessage'])
+            ->whereNumber('ticket');
 
         /**
          * Business management (authenticated via rentals token + email→Business)
          */
+        Route::post('business/apply', [\App\Http\Controllers\Api\Rentals\Business\VendorApplicationController::class, 'apply']);
+        Route::get('business/application', [\App\Http\Controllers\Api\Rentals\Business\VendorApplicationController::class, 'show']);
         Route::get('business/summary', \App\Http\Controllers\Api\Rentals\Business\SummaryController::class);
         Route::get('business/rentals', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'index']);
+        Route::post('business/rentals', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'store']);
         Route::get('business/rentals/{rental}', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'show'])
+            ->whereNumber('rental');
+        Route::post('business/rentals/{rental}/approve', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'approve'])
+            ->whereNumber('rental');
+        Route::post('business/rentals/{rental}/reject', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'reject'])
+            ->whereNumber('rental');
+        Route::post('business/rentals/{rental}/condition-report', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'conditionReport'])
             ->whereNumber('rental');
         Route::post('business/rentals/{rental}/mark-picked-up', [\App\Http\Controllers\Api\Rentals\Business\RentalsController::class, 'markPickedUp'])
             ->whereNumber('rental');
@@ -410,6 +436,36 @@ Route::prefix('v1/rentals')
         Route::post('business/settings/withdrawal-pin', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'setWithdrawalPin']);
         Route::post('business/settings/withdrawal-pin/verify', [\App\Http\Controllers\Api\Rentals\Business\SettingsController::class, 'verifyWithdrawalPin']);
     });
+
+/**
+ * Rentals platform admin API (CheckoutPay admin Sanctum token)
+ */
+Route::prefix('v1/rentals/admin')->group(function () {
+    Route::post('login', [\App\Http\Controllers\Api\Rentals\RentalsAdminAuthController::class, 'login'])
+        ->middleware('throttle:10,1');
+
+    Route::middleware(['auth:sanctum', 'rentals_admin_api'])->group(function () {
+        Route::get('kyc-queue', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'kycQueue']);
+        Route::post('kyc/{userId}/approve', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'approveKyc'])
+            ->whereNumber('userId');
+        Route::post('kyc/{userId}/reject', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'rejectKyc'])
+            ->whereNumber('userId');
+        Route::get('vendor-applications', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'vendorApplications']);
+        Route::post('vendor-applications/{id}/approve', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'approveVendorApplication'])
+            ->whereNumber('id');
+        Route::post('vendor-applications/{id}/reject', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'rejectVendorApplication'])
+            ->whereNumber('id');
+        Route::post('rentals/{id}/force-complete', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'forceComplete'])
+            ->whereNumber('id');
+        Route::post('rentals/{id}/force-cancel', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'forceCancel'])
+            ->whereNumber('id');
+        Route::post('rentals/{id}/refund', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'refund'])
+            ->whereNumber('id');
+        Route::get('payouts', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'payouts']);
+        Route::post('payouts/{id}/hold', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'holdPayout'])
+            ->whereNumber('id');
+    });
+});
 
 /**
  * NigTax admin API (Sanctum token; same Admin accounts as checkout, roles: tax, super_admin)
