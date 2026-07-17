@@ -13,6 +13,7 @@ return [
         'businesses_kyc',
         'renters_kyc',
         'rentals',
+        'rentals_app_sessions',
         'whatsapp_wallet',
         'whatsapp_wallet_users',
         'app_sessions',

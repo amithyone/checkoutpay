@@ -74,5 +74,6 @@ class Kernel extends HttpKernel
         'tax_admin_api' => \App\Http\Middleware\EnsureTaxAdminApi::class,
         'rentals_admin_api' => \App\Http\Middleware\EnsureRentalsAdminApi::class,
         'touch.consumer.app.session' => \App\Http\Middleware\TouchConsumerAppSession::class,
+        'touch.rentals.admin.app.session' => \App\Http\Middleware\TouchRentalsAdminAppSession::class,
     ];
 }

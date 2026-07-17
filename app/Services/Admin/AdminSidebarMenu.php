@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\Admin;
 use App\Models\ConsumerAppSession;
+use App\Models\RentalsAdminAppSession;
 use App\Models\BusinessAccountApplication;
 use App\Models\BusinessNameRegistration;
 use App\Models\Payment;
@@ -157,8 +158,22 @@ class AdminSidebarMenu
                 ['badge_count' => $pendingRenterKycCount, 'badge_color' => 'yellow', 'visible' => ! $admin->isWalletSupport()]
             ),
             'rentals' => array_merge(
-                $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', ['admin.rentals.*', 'admin.rental-categories.*', 'admin.rental-items.*', 'admin.rental-featured-banners.*']),
+                $this->link('Rentals', 'admin.rentals.index', 'fas fa-camera', [
+                    'admin.rentals.*',
+                    'admin.rental-categories.*',
+                    'admin.rental-items.*',
+                    'admin.rental-featured-banners.*',
+                    'admin.rentals-app-sessions.*',
+                ]),
                 ['visible' => ! $admin->isWalletSupport()]
+            ),
+            'rentals_app_sessions' => array_merge(
+                $this->link('Rentals app sessions', 'admin.rentals-app-sessions.index', 'fas fa-mobile-alt text-blue-600', ['admin.rentals-app-sessions.*']),
+                [
+                    'visible' => ! $admin->isWalletSupport(),
+                    'badge_count' => RentalsAdminAppSession::query()->whereNull('ended_at')->count(),
+                    'badge_color' => 'blue',
+                ]
             ),
             'whatsapp_wallet' => array_merge(
                 $this->link('WhatsApp wallet', 'admin.whatsapp-wallet.index', 'fab fa-whatsapp text-green-600', [

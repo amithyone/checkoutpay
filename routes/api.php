@@ -461,7 +461,10 @@ Route::prefix('v1/rentals/admin')->group(function () {
     Route::post('login', [\App\Http\Controllers\Api\Rentals\RentalsAdminAuthController::class, 'login'])
         ->middleware('throttle:10,1');
 
-    Route::middleware(['auth:sanctum', 'rentals_admin_api'])->group(function () {
+    Route::middleware(['auth:sanctum', 'rentals_admin_api', 'touch.rentals.admin.app.session'])->group(function () {
+        Route::post('logout', [\App\Http\Controllers\Api\Rentals\RentalsAdminAuthController::class, 'logout']);
+        Route::post('auth/session/end', [\App\Http\Controllers\Api\Rentals\RentalsAdminAuthController::class, 'endAppSession']);
+        Route::get('me', [\App\Http\Controllers\Api\Rentals\RentalsAdminAuthController::class, 'me']);
         Route::get('kyc-queue', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'kycQueue']);
         Route::post('kyc/{userId}/approve', [\App\Http\Controllers\Api\Rentals\Admin\RentalsAdminController::class, 'approveKyc'])
             ->whereNumber('userId');

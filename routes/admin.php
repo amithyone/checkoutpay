@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\RenterKycController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\VirtualCardAdminController;
 use App\Http\Controllers\Admin\ConsumerAppSessionAdminController;
+use App\Http\Controllers\Admin\RentalsAdminAppSessionAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletTransactionAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletMoneyRequestAdminController;
@@ -418,6 +419,13 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::delete('{membership}', [\App\Http\Controllers\Admin\MembershipController::class, 'destroy'])->name('destroy');
         });
         Route::resource('membership-categories', \App\Http\Controllers\Admin\MembershipCategoryController::class);
+
+        // Rentals admin app sessions (mobile / ops app)
+        Route::prefix('rentals-app-sessions')->name('rentals-app-sessions.')->group(function () {
+            Route::get('/', [RentalsAdminAppSessionAdminController::class, 'index'])->name('index');
+            Route::get('/events', [RentalsAdminAppSessionAdminController::class, 'events'])->name('events');
+            Route::get('/{appSession}', [RentalsAdminAppSessionAdminController::class, 'show'])->name('show');
+        });
 
         // Rentals Management
         Route::prefix('rentals')->name('rentals.')->group(function () {
