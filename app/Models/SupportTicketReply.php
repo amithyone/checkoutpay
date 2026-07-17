@@ -24,15 +24,9 @@ class SupportTicketReply extends Model
             }
 
             try {
-                app(\App\Services\PushNotificationService::class)->notifyBusiness(
+                app(\App\Services\Rentals\RentalsPushNotifier::class)->supportMessageToBusiness(
                     (int) $ticket->business_id,
-                    'New support message',
-                    'Support has replied to your ticket.',
-                    [
-                        'type' => 'support_message',
-                        'ticket_id' => (string) $ticket->id,
-                        'reply_id' => (string) $reply->id,
-                    ]
+                    (int) $ticket->id
                 );
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Push notify failed for support reply', [

@@ -49,5 +49,36 @@ class DeviceController extends Controller
             ],
         ]);
     }
-}
 
+    /**
+     * DELETE /api/v1/rentals/devices/register
+     * Unregister a push token on logout.
+     */
+    public function unregister(Request $request)
+    {
+        /** @var Renter $renter */
+        $renter = $request->user();
+
+        $validated = $request->validate([
+            'token' => 'required|string|max:2048',
+        ]);
+
+        $deleted = RentalDeviceToken::query()
+            ->where('token', $validated['token'])
+            ->where(function ($q) use ($renter) {
+                $q->where('renter_id', $renter->id);
+                $businessId = Business::query()
+                    ->whereRaw('LOWER(email) = LOWER(?)', [$renter->email])
+                    ->value('id');
+                if ($businessId) {
+                    $q->orWhere('business_id', $businessId);
+                }
+            })
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'deleted' => (int) $deleted,
+        ]);
+    }
+}

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RentalDeviceToken;
 use App\Services\Push\ApnsPushNotificationService;
+use App\Services\Push\ExpoPushNotificationService;
 use App\Services\Push\PushTokenDeliveryClassifier;
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use GuzzleHttp\Client;
@@ -17,6 +18,7 @@ class PushNotificationService
 
     public function __construct(
         private ApnsPushNotificationService $apns,
+        private ExpoPushNotificationService $expo,
     ) {}
 
     public function notifyRenter(
@@ -25,13 +27,18 @@ class PushNotificationService
         string $body,
         array $data = []
     ): void {
-        $tokens = RentalDeviceToken::query()
+        $rows = RentalDeviceToken::query()
             ->where('renter_id', $renterId)
             ->where('platform', '!=', 'web')
-            ->pluck('token')
-            ->all();
+            ->get(['token', 'platform']);
 
-        $this->sendToTokens($tokens, $title, $body, $data);
+        $failed = $this->sendToTokens(
+            $rows->map(fn ($r) => ['token' => (string) $r->token, 'platform' => $r->platform])->all(),
+            $title,
+            $body,
+            $data
+        );
+        $this->pruneFailedTokens($failed);
     }
 
     public function notifyBusiness(
@@ -40,13 +47,20 @@ class PushNotificationService
         string $body,
         array $data = []
     ): void {
-        $tokens = RentalDeviceToken::query()
+        $rows = RentalDeviceToken::query()
             ->where('business_id', $businessId)
             ->where('platform', '!=', 'web')
-            ->pluck('token')
-            ->all();
+            ->get(['token', 'platform']);
 
-        $this->sendToTokens($tokens, $title, $body, $data, 'rentals_alerts', self::PROFILE_RENTALS);
+        $failed = $this->sendToTokens(
+            $rows->map(fn ($r) => ['token' => (string) $r->token, 'platform' => $r->platform])->all(),
+            $title,
+            $body,
+            $data,
+            'rentals',
+            self::PROFILE_RENTALS
+        );
+        $this->pruneFailedTokens($failed);
     }
 
     /**
@@ -68,6 +82,16 @@ class PushNotificationService
         $failedTokens = [];
         foreach ($this->normalizeTokenTargets($tokens) as $target) {
             $token = $target['token'];
+
+            if (ExpoPushNotificationService::isExpoPushToken($token)) {
+                $expoChannel = $androidChannelId === 'rentals_alerts' ? 'rentals' : $androidChannelId;
+                $failedTokens = array_merge(
+                    $failedTokens,
+                    $this->expo->sendToDevice($token, $title, $body, $data, $expoChannel),
+                );
+                continue;
+            }
+
             if ($this->shouldDeliverViaApns($target['platform'], $token, $profile)) {
                 $failedTokens = array_merge(
                     $failedTokens,
@@ -76,13 +100,30 @@ class PushNotificationService
                 continue;
             }
 
+            $fcmChannel = $androidChannelId === 'rentals' ? 'rentals_alerts' : $androidChannelId;
             $failedTokens = array_merge(
                 $failedTokens,
-                $this->sendSingleFcmToken($token, $title, $body, $data, $androidChannelId, $profile),
+                $this->sendSingleFcmToken($token, $title, $body, $data, $fcmChannel, $profile),
             );
         }
 
         return array_values(array_unique(array_filter($failedTokens)));
+    }
+
+    /**
+     * @param  list<string>  $failedTokens
+     */
+    private function pruneFailedTokens(array $failedTokens): void
+    {
+        if ($failedTokens === []) {
+            return;
+        }
+
+        try {
+            RentalDeviceToken::query()->whereIn('token', $failedTokens)->delete();
+        } catch (\Throwable $e) {
+            Log::warning('push.prune_failed_tokens', ['error' => $e->getMessage()]);
+        }
     }
 
     /**

@@ -178,6 +178,11 @@ class RentalRequestActionsController extends Controller
 
         $this->escrowService->freezeForDispute($rental);
 
+        app(\App\Services\Rentals\RentalsPushNotifier::class)->disputeUpdate(
+            $rental,
+            'A dispute was opened on this rental.'
+        );
+
         return response()->json([
             'success' => true,
             'data' => $dispute,
@@ -231,6 +236,14 @@ class RentalRequestActionsController extends Controller
             (float) ($validated['capture_amount'] ?? 0),
             $validated['notes'] ?? null
         );
+
+        $rental = $dispute->rental;
+        if ($rental) {
+            app(\App\Services\Rentals\RentalsPushNotifier::class)->disputeUpdate(
+                $rental,
+                'A dispute was resolved on this rental.'
+            );
+        }
 
         return response()->json([
             'success' => true,

@@ -298,14 +298,9 @@ class CheckoutController extends Controller
                     $renter->wallet_balance = (float) ($renter->wallet_balance ?? 0.0) - $payable;
                     $renter->save();
                     try {
-                        app(\App\Services\PushNotificationService::class)->notifyRenter(
+                        app(\App\Services\Rentals\RentalsPushNotifier::class)->walletDebit(
                             (int) $renter->id,
-                            'Wallet debited',
-                            'Your wallet was debited for a rental payment.',
-                            [
-                                'type' => 'wallet_debit',
-                                'amount' => (string) $payable,
-                            ]
+                            (float) $payable
                         );
                     } catch (\Throwable $e) {
                         \Illuminate\Support\Facades\Log::warning('Push notify failed for wallet debit', [

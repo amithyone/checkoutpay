@@ -370,6 +370,7 @@ Route::prefix('v1/rentals')
         Route::post('password/change', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'changePassword']);
         Route::get('wallet', [\App\Http\Controllers\Api\Rentals\AccountController::class, 'wallet']);
         Route::post('devices/register', [\App\Http\Controllers\Api\Rentals\DeviceController::class, 'register']);
+        Route::delete('devices/register', [\App\Http\Controllers\Api\Rentals\DeviceController::class, 'unregister']);
 
         Route::get('favorites', [\App\Http\Controllers\Api\Rentals\FavoritesController::class, 'index']);
         Route::post('favorites', [\App\Http\Controllers\Api\Rentals\FavoritesController::class, 'store']);

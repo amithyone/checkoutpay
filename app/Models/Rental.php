@@ -89,53 +89,24 @@ class Rental extends Model
         });
 
         static::created(function (Rental $rental) {
-            try {
-                app(\App\Services\PushNotificationService::class)->notifyBusiness(
-                    (int) $rental->business_id,
-                    'New rental request',
-                    'You have a new rental request to review.',
-                    [
-                        'type' => 'rental_new',
-                        'rental_id' => (string) $rental->id,
-                        'rental_number' => (string) $rental->rental_number,
-                    ]
-                );
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Push notify failed for rental create', [
-                    'rental_id' => $rental->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            app(\App\Services\Rentals\RentalsPushNotifier::class)->rentalCreated($rental);
         });
 
         static::updated(function (Rental $rental) {
-            if (! $rental->wasChanged('status')) {
-                return;
+            if ($rental->wasChanged('status')) {
+                $previous = (string) ($rental->getOriginal('status') ?? '');
+                app(\App\Services\Rentals\RentalsPushNotifier::class)->statusChanged($rental, $previous);
             }
 
-            $status = strtolower((string) $rental->status);
-            try {
-                if ($status === self::STATUS_APPROVED) {
-                    app(\App\Services\PushNotificationService::class)->notifyRenter(
-                        (int) $rental->renter_id,
-                        'Rental approved',
-                        'Your rental request has been approved.',
-                        ['type' => 'rental_approved', 'rental_id' => (string) $rental->id]
-                    );
-                } elseif ($status === self::STATUS_REJECTED || $status === self::STATUS_CANCELLED) {
-                    app(\App\Services\PushNotificationService::class)->notifyRenter(
-                        (int) $rental->renter_id,
-                        'Rental denied',
-                        'Your rental request was denied.',
-                        ['type' => 'rental_denied', 'rental_id' => (string) $rental->id]
-                    );
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Push notify failed for rental status update', [
-                    'rental_id' => $rental->id,
-                    'status' => $rental->status,
-                    'error' => $e->getMessage(),
-                ]);
+            if ($rental->wasChanged('renter_return_requested_at')
+                && $rental->renter_return_requested_at
+                && ! $rental->getOriginal('renter_return_requested_at')) {
+                app(\App\Services\Rentals\RentalsPushNotifier::class)->pickupOrReturnRequested($rental);
+            }
+
+            if ($rental->wasChanged('fulfillment_method')
+                && strtolower((string) $rental->fulfillment_method) === 'delivery') {
+                app(\App\Services\Rentals\RentalsPushNotifier::class)->delivered($rental);
             }
         });
     }

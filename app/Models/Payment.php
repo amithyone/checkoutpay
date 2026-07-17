@@ -425,15 +425,10 @@ class Payment extends Model
 
         $renter->increment('wallet_balance', $amount);
         try {
-            app(\App\Services\PushNotificationService::class)->notifyRenter(
+            app(\App\Services\Rentals\RentalsPushNotifier::class)->walletCredit(
                 (int) $renter->id,
-                'Wallet credited',
-                'Your wallet has been credited.',
-                [
-                    'type' => 'wallet_credit',
-                    'amount' => (string) $amount,
-                    'payment_id' => (string) $this->id,
-                ]
+                (float) $amount,
+                (int) $this->id
             );
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Push notify failed for wallet credit', [

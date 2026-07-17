@@ -50,6 +50,11 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Lagos')
             ->withoutOverlapping(15);
 
+        $schedule->command('rentals:send-return-reminders')
+            ->everyFifteenMinutes()
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping(10);
+
         if (config('virtual_card.fx_hourly_capture_enabled', false)) {
             $schedule->command('virtual-cards:capture-fx-rates')
                 ->hourly()
