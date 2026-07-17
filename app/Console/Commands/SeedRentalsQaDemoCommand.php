@@ -191,7 +191,8 @@ class SeedRentalsQaDemoCommand extends Command
             'rental_auto_approve' => false,
             'rental_global_caution_fee_enabled' => true,
             'rental_global_caution_fee_percent' => 10,
-            'business_id' => $business?->business_id ?: 'RENT-QA'.strtoupper(Str::random(6)),
+            // businesses.business_id is a 5-char public code (see Business::generateBusinessId).
+            'business_id' => $business?->business_id ?: Business::generateBusinessId(),
             'withdrawal_pin_hash' => Hash::make('2468'),
             'withdrawal_pin_set_at' => now(),
         ];

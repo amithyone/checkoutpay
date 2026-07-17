@@ -111,7 +111,7 @@ class RentalsAdminController extends Controller
                 'phone' => $application->phone,
                 'address' => $application->address,
                 'is_active' => true,
-                'business_id' => 'RENT-'.strtoupper(Str::random(8)),
+                // Leave business_id empty so Business::boot generates a 5-char code.
             ]);
         }
 
