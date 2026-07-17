@@ -164,8 +164,10 @@ final class ConsumerWalletSavingsService
             'next_maturity_at' => $nextMaturity?->matures_at?->toIso8601String(),
             'settings' => $this->formatSettings($settings),
             'goals' => $goals,
-            'active_locks' => $lockedActive->take(10)->map(fn (WalletSavingsLock $l) => $this->formatLock($l))->values()->all(),
-            'flexible_locks' => $flexibleActive->take(10)->map(fn (WalletSavingsLock $l) => $this->formatLock($l))->values()->all(),
+            'active_locks' => $lockedActive->take(50)->map(fn (WalletSavingsLock $l) => $this->formatLock($l))->values()->all(),
+            'flexible_locks' => $flexibleActive->take(50)->map(fn (WalletSavingsLock $l) => $this->formatLock($l))->values()->all(),
+            'active_locks_total_count' => $lockedActive->count(),
+            'flexible_locks_total_count' => $flexibleActive->count(),
         ];
     }
 
