@@ -339,7 +339,9 @@ class SeedRentalsItemReviewsCommand extends Command
         $rate = (float) ($item->daily_rate ?? 1000);
 
         return Rental::withoutEvents(function () use ($renter, $item, $noteKey, $start, $end, $rate) {
+            // withoutEvents skips the creating hook that normally sets rental_number.
             $rental = Rental::query()->create([
+                'rental_number' => Rental::generateRentalNumber(),
                 'renter_id' => $renter->id,
                 'business_id' => $item->business_id,
                 'start_date' => $start->toDateString(),
