@@ -464,7 +464,7 @@ class CheckoutController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json([
                 'message' => 'Not found.',
             ], 404);
@@ -486,7 +486,7 @@ class CheckoutController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json([
                 'message' => 'Not found.',
             ], 404);
@@ -550,7 +550,7 @@ class CheckoutController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json([
                 'message' => 'Not found.',
             ], 404);
@@ -587,7 +587,7 @@ class CheckoutController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -626,7 +626,7 @@ class CheckoutController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 

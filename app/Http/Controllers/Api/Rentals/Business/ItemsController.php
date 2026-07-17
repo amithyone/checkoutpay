@@ -121,7 +121,7 @@ class ItemsController extends Controller
     public function update(Request $request, RentalItem $item)
     {
         $business = $this->resolveBusinessOr403($request);
-        if ($item->business_id !== $business->id) {
+        if ((int) $item->business_id !== (int) $business->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 

@@ -28,7 +28,7 @@ class RentalRequestActionsController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json(['success' => false, 'message' => 'Not found.'], 404);
         }
 
@@ -104,7 +104,7 @@ class RentalRequestActionsController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json(['success' => false, 'message' => 'Not found.'], 404);
         }
 
@@ -157,7 +157,7 @@ class RentalRequestActionsController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json(['success' => false, 'message' => 'Not found.'], 404);
         }
 
@@ -192,7 +192,7 @@ class RentalRequestActionsController extends Controller
         /** @var Renter $renter */
         $renter = $request->user();
 
-        if ($rental->renter_id !== $renter->id) {
+        if ((int) $rental->renter_id !== (int) $renter->id) {
             return response()->json(['success' => false, 'message' => 'Not found.'], 404);
         }
 

@@ -74,7 +74,7 @@ class RentalsController extends Controller
     public function show(Request $request, Rental $rental)
     {
         $business = $this->resolveBusinessOr403($request);
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -91,7 +91,7 @@ class RentalsController extends Controller
     public function approve(Request $request, Rental $rental, RentalPaymentService $paymentService)
     {
         $business = $this->resolveBusinessOr403($request);
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -130,7 +130,7 @@ class RentalsController extends Controller
     public function reject(Request $request, Rental $rental, RentalEscrowService $escrowService)
     {
         $business = $this->resolveBusinessOr403($request);
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -274,7 +274,7 @@ class RentalsController extends Controller
     public function conditionReport(Request $request, Rental $rental)
     {
         $business = $this->resolveBusinessOr403($request);
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -312,7 +312,7 @@ class RentalsController extends Controller
     public function markPickedUp(Request $request, Rental $rental)
     {
         $business = $this->resolveBusinessOr403($request);
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
@@ -343,7 +343,7 @@ class RentalsController extends Controller
     public function confirmReturn(Request $request, Rental $rental)
     {
         $business = $this->resolveBusinessOr403($request);
-        if ($rental->business_id !== $business->id) {
+        if ((int) $rental->business_id !== (int) $business->id) {
             return response()->json(['message' => 'Not found.'], 404);
         }
 
