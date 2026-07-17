@@ -28,6 +28,7 @@ use App\Contracts\Vtu\VtuProviderContract;
 use App\Services\Vtu\VtuProviderResolver;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
+use App\Services\Region\RegionCapabilitiesService;
 use App\Services\Whatsapp\WhatsappWalletPartnerApiService;
 use App\Services\Whatsapp\WhatsappWalletPendingP2pService;
 use App\Services\Whatsapp\WhatsappWalletPendingPayoutReconciliationService;
@@ -47,6 +48,7 @@ class ConsumerWalletApiController extends Controller
         private WhatsappWalletPartnerApiService $partnerApi,
         private WhatsappWalletTier1TopupVaService $tier1TopupVa,
         private WhatsappWalletCountryResolver $walletCountry,
+        private RegionCapabilitiesService $regionCapabilities,
         private ConsumerWalletPinVerifier $pinVerifier,
         private ConsumerWalletTransferService $transfers,
         private ConsumerWalletKycService $kyc,
@@ -181,9 +183,15 @@ class ConsumerWalletApiController extends Controller
         }
 
         $e164 = (string) $wallet->phone_e164;
-        $vtuEligible = $this->walletCountry->isNigeriaPayInWallet($e164);
+        $isNg = $this->walletCountry->isNigeriaPayInWallet($e164);
+        if (! $isNg) {
+            // Kenya and other regions do not use MevonPay temporary/permanent VAs.
+            $payIn = null;
+        }
+        $vtuEligible = $isNg;
         $vtuConfigured = $this->vtu()->isConfigured();
         $savingsSummary = $this->savings->getSummary($wallet);
+        $region = $this->regionCapabilities->forPhone($e164);
 
         $transferLock = $user instanceof ConsumerWalletApiAccount
             ? $this->deviceTrust->transferLockMeta($user)
@@ -197,15 +205,16 @@ class ConsumerWalletApiController extends Controller
             'success' => true,
             'data' => array_merge($base, [
                 'currency' => $cur,
+                'region' => $region,
                 'sender_name' => $wallet->normalizedSenderName(),
                 'needs_quick_setup' => $wallet->needsQuickWalletSetup(),
                 'is_pin_locked' => $wallet->isPinLocked(),
-                'mevon_virtual_account_number' => $wallet->mevon_virtual_account_number,
-                'mevon_bank_name' => $wallet->mevon_bank_name,
-                'mevon_bank_code' => $wallet->mevon_bank_code,
+                'mevon_virtual_account_number' => $isNg ? $wallet->mevon_virtual_account_number : null,
+                'mevon_bank_name' => $isNg ? $wallet->mevon_bank_name : null,
+                'mevon_bank_code' => $isNg ? $wallet->mevon_bank_code : null,
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'pay_in' => $payIn,
-                'business_pay_in' => $this->businessLedger->resolveBusinessPayInPayload($wallet),
+                'business_pay_in' => $isNg ? $this->businessLedger->resolveBusinessPayInPayload($wallet) : null,
                 'business_balance' => $this->businessLedger->resolvedBalance($wallet),
                 'business_wallet_enabled' => $this->businessLedger->walletHasBusinessActivity($wallet),
                 'linked_business_id' => $wallet->linked_business_id,

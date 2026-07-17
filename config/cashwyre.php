@@ -23,5 +23,9 @@ return [
         'unfreeze_card' => (string) env('CASHWYRE_PATH_UNFREEZE_CARD', '/customerCard/unfreezeCard'),
         'card_details' => (string) env('CASHWYRE_PATH_CARD_DETAILS', '/CustomerCard/getCard'),
         'card_transactions' => (string) env('CASHWYRE_PATH_CARD_TRANSACTIONS', '/CustomerCard/getCardTransactions'),
+        'get_country_banks' => (string) env('CASHWYRE_PATH_GET_COUNTRY_BANKS', '/CountryBank/getCountryBanks'),
+        'initiate_payout' => (string) env('CASHWYRE_PATH_INITIATE_PAYOUT', '/Payout/initiate'),
+        'payout_status' => (string) env('CASHWYRE_PATH_PAYOUT_STATUS', '/Payout/getPayoutStatus'),
+        'airtime_info' => (string) env('CASHWYRE_PATH_AIRTIME_INFO', ''),
     ],
 ];

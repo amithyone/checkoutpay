@@ -3,7 +3,7 @@
 namespace App\Services\Whatsapp;
 
 /**
- * E.164 digits only (no leading +). Nigeria, Namibia, Ghana, ZM/ZW/BW/BJ/TZ/ZA, UK, NANP (+1) for WhatsApp wallet P2P.
+ * E.164 digits only (no leading +). Nigeria, Kenya, Namibia, Ghana, ZM/ZW/BW/BJ/TZ/ZA, UK, NANP (+1) for WhatsApp wallet P2P.
  */
 final class PhoneNormalizer
 {
@@ -221,6 +221,31 @@ final class PhoneNormalizer
     }
 
     /**
+     * Kenya: 254 + 9-digit national (mobile typically 7… / 1…).
+     * Accepts 254XXXXXXXXX, 07XXXXXXXX / 01XXXXXXXX, or 9-digit without trunk 0.
+     */
+    public static function canonicalKeE164Digits(string $input): ?string
+    {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+        if (str_starts_with($d, '254')) {
+            $rest = substr($d, 3);
+
+            return strlen($rest) === 9 ? $d : null;
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '0') && ($d[1] === '7' || $d[1] === '1')) {
+            return '254'.substr($d, 1);
+        }
+        if (strlen($d) === 9 && ($d[0] === '7' || $d[0] === '1')) {
+            return '254'.$d;
+        }
+
+        return null;
+    }
+
+    /**
      * Benin: 229 + 8-digit national.
      */
     public static function canonicalBjE164Digits(string $input): ?string
@@ -295,6 +320,9 @@ final class PhoneNormalizer
         if (str_starts_with($d, '255')) {
             return self::canonicalTzE164Digits($input);
         }
+        if (str_starts_with($d, '254')) {
+            return self::canonicalKeE164Digits($input);
+        }
         if (str_starts_with($d, '234')) {
             return self::canonicalNgE164Digits($input);
         }
@@ -315,14 +343,12 @@ final class PhoneNormalizer
         }
 
         if (strlen($d) === 11 && str_starts_with($d, '0')) {
-            $gb = self::canonicalGbE164Digits($input);
-            if ($gb !== null) {
-                return $gb;
-            }
-
+            // Ambiguous trunk-0: African locals (NG/KE/…) before UK — CheckoutNow default market.
             return self::canonicalNgE164Digits($input)
+                ?? self::canonicalKeE164Digits($input)
                 ?? self::canonicalNaE164Digits($input)
-                ?? self::canonicalGhE164Digits($input);
+                ?? self::canonicalGhE164Digits($input)
+                ?? self::canonicalGbE164Digits($input);
         }
 
         if (strlen($d) === 10 && $d[0] !== '0') {
@@ -345,6 +371,7 @@ final class PhoneNormalizer
             ?? self::canonicalZwE164Digits($input)
             ?? self::canonicalBwE164Digits($input)
             ?? self::canonicalTzE164Digits($input)
+            ?? self::canonicalKeE164Digits($input)
             ?? self::canonicalBjE164Digits($input)
             ?? self::canonicalZaE164Digits($input)
             ?? self::canonicalNaE164Digits($input)
@@ -363,6 +390,7 @@ final class PhoneNormalizer
             'ZW' => self::canonicalZwE164Digits($input),
             'BW' => self::canonicalBwE164Digits($input),
             'TZ' => self::canonicalTzE164Digits($input),
+            'KE' => self::canonicalKeE164Digits($input),
             'BJ' => self::canonicalBjE164Digits($input),
             'ZA' => self::canonicalZaE164Digits($input),
             'GB', 'UK' => self::canonicalGbE164Digits($input),
@@ -467,6 +495,25 @@ final class PhoneNormalizer
     }
 
     /**
+     * Auth / registration: accept any dial in whatsapp_wallet_regions (incl. KE), not Nigeria-only.
+     * Prefer NG/KE local trunk-0 forms before ambiguous international parsers (e.g. UK 0…).
+     */
+    public static function canonicalAuthE164Digits(string $input): ?string
+    {
+        return self::canonicalNgE164Digits($input)
+            ?? self::canonicalKeE164Digits($input)
+            ?? self::canonicalInternationalWalletRecipientDigits($input);
+    }
+
+    /**
+     * Public ISO country from E.164 digits (null if unknown).
+     */
+    public static function countryIsoFromE164(string $e164Digits): ?string
+    {
+        return self::countryFromE164($e164Digits);
+    }
+
+    /**
      * Phone-only shortcut parser across supported wallet countries.
      */
     public static function parseBareWalletMobileForP2pShortcut(string $text, ?string $senderPhoneE164): ?string
@@ -493,6 +540,7 @@ final class PhoneNormalizer
             || str_starts_with($digits, '264')
             || str_starts_with($digits, '267')
             || str_starts_with($digits, '255')
+            || str_starts_with($digits, '254')
             || str_starts_with($digits, '234')
             || str_starts_with($digits, '233')
             || str_starts_with($digits, '229')
@@ -522,6 +570,9 @@ final class PhoneNormalizer
         }
         if (str_starts_with($d, '255')) {
             return 'TZ';
+        }
+        if (str_starts_with($d, '254')) {
+            return 'KE';
         }
         if (str_starts_with($d, '234')) {
             return 'NG';

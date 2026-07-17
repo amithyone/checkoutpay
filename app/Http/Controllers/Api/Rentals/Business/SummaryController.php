@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\Rental;
 use App\Models\RentalItem;
 use App\Models\WithdrawalRequest;
+use App\Services\Region\RegionCapabilitiesService;
 use Illuminate\Http\Request;
 
 class SummaryController extends Controller
@@ -17,7 +18,7 @@ class SummaryController extends Controller
     /**
      * GET /api/v1/rentals/business/summary
      */
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, RegionCapabilitiesService $regions)
     {
         $business = $this->resolveBusinessOr403($request);
 
@@ -68,12 +69,34 @@ class SummaryController extends Controller
             ->selectRaw('COALESCE(SUM(COALESCE(business_receives, amount)), 0) as total')
             ->value('total') ?? 0);
 
+        $region = $this->regionForBusiness($business, $regions);
+        $features = is_array($region['features'] ?? null) ? $region['features'] : [];
+        $bankPayinVa = (bool) ($features['bank_payin_va'] ?? false);
+
         return response()->json([
             'business' => [
                 'id' => $business->id,
                 'business_id' => $business->business_id ?? null,
                 'name' => $business->name ?? null,
                 'address' => $business->address ?? null,
+                'phone' => $business->phone ?? null,
+                'currency' => $region['currency'] ?? ($business->currency ?? 'NGN'),
+                'country' => $region['country'] ?? null,
+            ],
+            'region' => $region,
+            'capabilities' => [
+                'bank_payin_va' => $bankPayinVa,
+                'nip_transfer' => $bankPayinVa,
+                'bank_payout' => (bool) ($features['bank_payout'] ?? false),
+                'mpesa_payout' => (bool) ($features['mpesa_payout'] ?? false),
+                'mpesa_collection' => (bool) ($features['mpesa_collection'] ?? false),
+                'bills' => (bool) ($features['bills'] ?? false),
+                'airtime' => (bool) ($features['airtime'] ?? false),
+                'cross_border_p2p' => (bool) ($features['cross_border_p2p'] ?? false),
+                'rails' => $region['rails'] ?? null,
+                'messaging' => $bankPayinVa
+                    ? null
+                    : 'Kenya businesses use Cashwyre rails for payouts/mobile money. Nigeria-style virtual account / NIP collection is not available.',
             ],
             'counts' => [
                 'pending_orders' => $pendingOrders,
@@ -88,5 +111,23 @@ class SummaryController extends Controller
             'earnings_today' => $earningsToday,
         ]);
     }
-}
 
+    /**
+     * @param  \App\Models\Business  $business
+     * @return array<string, mixed>
+     */
+    protected function regionForBusiness($business, RegionCapabilitiesService $regions): array
+    {
+        $phone = trim((string) ($business->phone ?? ''));
+        if ($phone !== '') {
+            return $regions->forPhone($phone);
+        }
+
+        $currency = strtoupper(trim((string) ($business->currency ?? '')));
+        if ($currency === 'KES') {
+            return $regions->forCountryIso('KE');
+        }
+
+        return $regions->forCountryIso('NG');
+    }
+}

@@ -8,6 +8,7 @@ use App\Models\BusinessNameRegistration;
 use App\Models\BusinessWebsite;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Services\Region\RegionCapabilitiesService;
 use App\Services\Whatsapp\WhatsappWalletMoneyFormatter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,7 @@ final class ConsumerBusinessAccountOnboardingService
             'can_apply' => $this->canApply($wallet),
             'linked_business' => $this->linkedBusinessSummary($wallet),
             'prefill' => $this->prefillFromBnr($wallet),
+            'region' => app(RegionCapabilitiesService::class)->forPhone((string) $wallet->phone_e164),
         ];
     }
 
@@ -403,7 +405,14 @@ final class ConsumerBusinessAccountOnboardingService
             'id' => (int) $business->id,
             'name' => (string) $business->name,
             'email' => (string) $business->email,
+            'phone' => (string) ($business->phone ?? ''),
+            'currency' => (string) ($business->currency ?? ''),
             'dashboard_login_url' => $this->dashboardLoginUrl(),
+            'region' => app(RegionCapabilitiesService::class)->forPhone(
+                trim((string) ($business->phone ?? '')) !== ''
+                    ? (string) $business->phone
+                    : (string) $wallet->phone_e164
+            ),
         ];
     }
 

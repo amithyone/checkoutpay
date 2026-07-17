@@ -28,9 +28,9 @@ class ConsumerDeviceStepupService
             return ['ok' => false, 'message' => 'Device trust is disabled.'];
         }
 
-        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits($phoneInput);
         if ($e164 === null) {
-            return ['ok' => false, 'message' => 'Invalid Nigerian mobile number.'];
+            return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }
 
         $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();

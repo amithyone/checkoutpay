@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Rentals;
 
 use App\Http\Controllers\Controller;
 use App\Models\Renter;
+use App\Services\Region\RegionCapabilitiesService;
 use App\Services\Rentals\RenterPortalAccountBridge;
+use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,11 +38,17 @@ class AuthController extends Controller
 
         $validated = $validator->validated();
 
+        $phone = (string) $validated['phone'];
+        $normalized = PhoneNormalizer::canonicalAuthE164Digits($phone);
+        if ($normalized !== null) {
+            $phone = '+'.$normalized;
+        }
+
         $renter = Renter::create([
             'name' => $validated['name'] ?? $validated['email'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'phone' => $validated['phone'],
+            'phone' => $phone,
             'address' => $validated['address'] ?? null,
             'is_active' => true,
         ]);
@@ -227,12 +235,21 @@ class AuthController extends Controller
         $rentScore = min(100, $rentCount * 5);
         $salesScore = min(100, $salesCount * 5);
 
+        $phoneRaw = (string) ($renter->phone ?? '');
+        $phoneE164 = $phoneRaw !== ''
+            ? (PhoneNormalizer::canonicalAuthE164Digits($phoneRaw) ?? PhoneNormalizer::digitsOnly($phoneRaw))
+            : null;
+        $region = app(RegionCapabilitiesService::class)->forPhone($phoneRaw !== '' ? $phoneRaw : null);
+
         return [
             'id' => $renter->id,
             'name' => $renter->name,
             'email' => $renter->email,
             'is_active' => (bool) $renter->is_active,
             'phone' => $renter->phone,
+            'phone_e164' => $phoneE164,
+            'country' => $region['country'] ?? null,
+            'region' => $region,
             'address' => $renter->address,
             'email_verified' => (bool) $renter->email_verified_at,
             'kyc_verified' => $renter->isKycVerified(),

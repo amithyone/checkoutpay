@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Models\Renter;
 use App\Models\User;
+use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -33,9 +34,14 @@ class AccountController extends Controller
         }
 
         $data = $validator->validated();
+        $phone = (string) $data['phone'];
+        $normalized = PhoneNormalizer::canonicalAuthE164Digits($phone);
+        if ($normalized !== null) {
+            $phone = '+'.$normalized;
+        }
 
         $renter->update([
-            'phone' => $data['phone'],
+            'phone' => $phone,
         ]);
 
         return response()->json([
@@ -45,6 +51,10 @@ class AccountController extends Controller
                 'name' => $renter->name,
                 'email' => $renter->email,
                 'phone' => $renter->phone,
+                'phone_e164' => $normalized,
+                'country' => $normalized
+                    ? PhoneNormalizer::countryIsoFromE164($normalized)
+                    : null,
             ],
         ]);
     }

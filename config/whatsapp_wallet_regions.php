@@ -53,6 +53,19 @@ return [
             'label' => 'Tanzania',
             'features' => ['p2p' => true, 'bank' => false, 'vtu' => false, 'rentals' => false],
         ],
+        env('WHATSAPP_EVOLUTION_INSTANCE_KENYA', 'Kenya') => [
+            'country' => 'KE',
+            'currency' => 'KES',
+            'label' => 'Kenya',
+            // Bank VA/NIP are Nigeria-only; KE payouts/bills gated via Cashwyre discovery flags.
+            'features' => [
+                'p2p' => true,
+                'bank' => false,
+                'vtu' => false,
+                'rentals' => false,
+                'cross_border_p2p' => true,
+            ],
+        ],
     ],
 
     'unknown_instance_country' => strtoupper((string) env('WHATSAPP_WALLET_UNKNOWN_INSTANCE_COUNTRY', 'NG')),
@@ -64,6 +77,7 @@ return [
         ['dial' => '264', 'country' => 'NA', 'currency' => 'NAD', 'label' => 'Namibia'],
         ['dial' => '267', 'country' => 'BW', 'currency' => 'BWP', 'label' => 'Botswana'],
         ['dial' => '255', 'country' => 'TZ', 'currency' => 'TZS', 'label' => 'Tanzania'],
+        ['dial' => '254', 'country' => 'KE', 'currency' => 'KES', 'label' => 'Kenya'],
         ['dial' => '234', 'country' => 'NG', 'currency' => 'NGN', 'label' => 'Nigeria'],
         ['dial' => '233', 'country' => 'GH', 'currency' => 'GHS', 'label' => 'Ghana'],
         ['dial' => '229', 'country' => 'BJ', 'currency' => 'XOF', 'label' => 'Benin'],

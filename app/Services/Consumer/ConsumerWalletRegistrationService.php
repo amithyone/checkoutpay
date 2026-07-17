@@ -19,9 +19,9 @@ class ConsumerWalletRegistrationService
      */
     public function register(string $phoneInput, string $code, array $profile): array
     {
-        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits($phoneInput);
         if ($e164 === null) {
-            return ['ok' => false, 'message' => 'Invalid Nigerian mobile number.'];
+            return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }
 
         $fname = trim((string) ($profile['fname'] ?? ''));

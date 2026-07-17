@@ -64,9 +64,9 @@ class ConsumerWalletOtpService
      */
     public function otpOptions(string $phoneInput): array
     {
-        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits($phoneInput);
         if ($e164 === null) {
-            return ['ok' => false, 'message' => 'Invalid Nigerian mobile number.'];
+            return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }
 
         $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
@@ -94,9 +94,9 @@ class ConsumerWalletOtpService
      */
     public function requestOtp(string $phoneInput, string $channel = 'whatsapp', ?string $registrationEmail = null): array
     {
-        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits($phoneInput);
         if ($e164 === null) {
-            return ['ok' => false, 'message' => 'Invalid Nigerian mobile number.'];
+            return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }
 
         $channel = strtolower(trim($channel));
@@ -212,9 +212,9 @@ class ConsumerWalletOtpService
      */
     public function checkOtp(string $phoneInput, string $code): array
     {
-        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits($phoneInput);
         if ($e164 === null) {
-            return ['ok' => false, 'message' => 'Invalid Nigerian mobile number.'];
+            return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }
 
         $attemptsKey = $this->attemptsKey($e164);

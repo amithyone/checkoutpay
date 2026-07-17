@@ -21,7 +21,7 @@ class ConsumerDeviceTrustService
 
     public function accountForPhone(string $phoneInput): ?ConsumerWalletApiAccount
     {
-        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits($phoneInput);
         if ($e164 === null) {
             return null;
         }

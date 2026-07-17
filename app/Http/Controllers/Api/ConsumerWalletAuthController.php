@@ -14,12 +14,13 @@ use App\Services\Consumer\ConsumerWalletRegistrationService;
 use App\Services\Consumer\ConsumerDeviceStepupService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Whatsapp\PhoneNormalizer;
+use App\Services\Region\RegionCapabilitiesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ConsumerWalletAuthController extends Controller
 {
-    public function otpOptions(Request $request, ConsumerWalletOtpService $otp): JsonResponse
+    public function otpOptions(Request $request, ConsumerWalletOtpService $otp, RegionCapabilitiesService $regions): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -33,6 +34,8 @@ class ConsumerWalletAuthController extends Controller
             ], 422);
         }
 
+        $region = $regions->forPhone((string) $request->input('phone'));
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -43,6 +46,7 @@ class ConsumerWalletAuthController extends Controller
                 'has_pin' => (bool) ($result['has_pin'] ?? false),
                 'wallet_exists' => (bool) ($result['wallet_exists'] ?? false),
                 'needs_registration' => (bool) ($result['needs_registration'] ?? false),
+                'region' => $region,
             ],
         ]);
     }
@@ -71,7 +75,7 @@ class ConsumerWalletAuthController extends Controller
         ], $result['ok'] ? 200 : ($result['otp_blocked'] ?? false ? 429 : 422));
     }
 
-    public function verifyOtp(Request $request, ConsumerWalletOtpService $otp, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions): JsonResponse
+    public function verifyOtp(Request $request, ConsumerWalletOtpService $otp, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions, RegionCapabilitiesService $regions): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -87,6 +91,7 @@ class ConsumerWalletAuthController extends Controller
         }
 
         $e164 = (string) $checked['phone_e164'];
+        $region = $regions->forPhone($e164);
 
         $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
         if (! $wallet || $wallet->needsRegistrationProfile()) {
@@ -96,6 +101,7 @@ class ConsumerWalletAuthController extends Controller
                 'data' => [
                     'needs_registration' => true,
                     'phone_e164' => $e164,
+                    'region' => $region,
                 ],
             ], 422);
         }
@@ -119,7 +125,9 @@ class ConsumerWalletAuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Verify this device to continue',
-                'data' => $trust->stepUpPayload($session, $wallet),
+                'data' => array_merge($trust->stepUpPayload($session, $wallet), [
+                    'region' => $region,
+                ]),
             ], 403);
         }
 
@@ -136,11 +144,12 @@ class ConsumerWalletAuthController extends Controller
                 'phone_e164' => $e164,
                 'wallet_id' => $wallet->id,
                 'app_session_id' => $appSessionId,
+                'region' => $region,
             ],
         ]);
     }
 
-    public function register(Request $request, ConsumerWalletRegistrationService $registration): JsonResponse
+    public function register(Request $request, ConsumerWalletRegistrationService $registration, RegionCapabilitiesService $regions): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
@@ -194,22 +203,23 @@ class ConsumerWalletAuthController extends Controller
                 'phone_e164' => $result['phone_e164'],
                 'wallet_id' => $result['wallet_id'],
                 'app_session_id' => $appSessionId,
+                'region' => $regions->forPhone((string) ($result['phone_e164'] ?? $request->input('phone'))),
             ], fn ($v) => $v !== null),
         ]);
     }
 
-    public function verifyPin(Request $request, ConsumerWalletPinVerifier $pinVerifier, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions): JsonResponse
+    public function verifyPin(Request $request, ConsumerWalletPinVerifier $pinVerifier, ConsumerDeviceTrustService $trust, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions, RegionCapabilitiesService $regions): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'pin' => ['required', 'regex:/^\d{4}$/'],
         ]);
 
-        $e164 = PhoneNormalizer::canonicalNgE164Digits((string) $request->input('phone'));
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits((string) $request->input('phone'));
         if ($e164 === null) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid Nigerian mobile number.',
+                'message' => 'Invalid mobile number for a supported country.',
             ], 422);
         }
 
@@ -286,6 +296,7 @@ class ConsumerWalletAuthController extends Controller
                 'phone_e164' => $e164,
                 'wallet_id' => $wallet->id,
                 'app_session_id' => $appSessionId,
+                'region' => $regions->forPhone($e164),
             ],
         ]);
     }
