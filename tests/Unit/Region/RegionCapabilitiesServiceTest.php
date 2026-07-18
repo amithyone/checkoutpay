@@ -48,4 +48,16 @@ class RegionCapabilitiesServiceTest extends TestCase
         $this->assertTrue($region['features']['vtu_ng']);
         $this->assertFalse($region['features']['mpesa_payout']);
     }
+
+    public function test_namibia_phone_normalizes_for_login(): void
+    {
+        $this->assertSame('264818612179', PhoneNormalizer::canonicalAuthE164Digits('264818612179'));
+        $this->assertSame('264818612179', PhoneNormalizer::canonicalAuthE164Digits('+264818612179'));
+        $this->assertSame('264818612179', PhoneNormalizer::canonicalAuthE164Digits('0818612179'));
+        $this->assertSame('NA', PhoneNormalizer::countryIsoFromE164('264818612179'));
+
+        $region = app(RegionCapabilitiesService::class)->forPhone('+264818612179');
+        $this->assertSame('NA', $region['country']);
+        $this->assertSame('NAD', $region['currency']);
+    }
 }

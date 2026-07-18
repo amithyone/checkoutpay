@@ -166,9 +166,9 @@ class ConsumerWalletOtpService
             ];
         }
 
-        $instance = WhatsappEvolutionConfigResolver::walletInstance();
+        $instance = WhatsappEvolutionConfigResolver::walletInstanceForPhone($e164);
         if ($instance === '') {
-            Log::warning('consumer_wallet.otp: no evolution instance');
+            Log::warning('consumer_wallet.otp: no evolution instance', ['phone_e164' => $e164]);
             Cache::forget($this->otpKey($e164));
 
             return ['ok' => false, 'message' => 'OTP delivery is not configured.'];

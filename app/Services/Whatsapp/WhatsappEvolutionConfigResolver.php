@@ -64,6 +64,61 @@ final class WhatsappEvolutionConfigResolver
         return self::defaultInstance();
     }
 
+    /**
+     * Evolution instance for consumer OTP / outbound texts based on phone country.
+     * Namibia uses admin setting `whatsapp_evolution_instance_namibia` (default "Namibia").
+     */
+    public static function walletInstanceForPhone(?string $phoneE164): string
+    {
+        $digits = PhoneNormalizer::digitsOnly($phoneE164 ?? '');
+        if ($digits === null || $digits === '') {
+            return self::walletInstance();
+        }
+
+        $country = app(WhatsappWalletCountryResolver::class)->countryIsoForPhoneE164($digits);
+
+        if ($country === 'NA') {
+            $db = Setting::get('whatsapp_evolution_instance_namibia');
+            if (is_string($db) && trim($db) !== '') {
+                return trim($db);
+            }
+
+            $fromMap = self::instanceNameForCountry('NA');
+            if ($fromMap !== null) {
+                return $fromMap;
+            }
+
+            $env = trim((string) env('WHATSAPP_EVOLUTION_INSTANCE_NAMIBIA', 'Namibia'));
+
+            return $env !== '' ? $env : self::walletInstance();
+        }
+
+        $mapped = self::instanceNameForCountry($country);
+        if ($mapped !== null && $country !== 'NG') {
+            return $mapped;
+        }
+
+        return self::walletInstance();
+    }
+
+    /** @return string|null Evolution instance name configured for ISO country */
+    private static function instanceNameForCountry(string $countryIso): ?string
+    {
+        $iso = strtoupper(trim($countryIso));
+        foreach (WhatsappWalletRegionConfig::instances() as $name => $meta) {
+            if (! is_array($meta)) {
+                continue;
+            }
+            if (strtoupper((string) ($meta['country'] ?? '')) === $iso) {
+                $name = trim((string) $name);
+
+                return $name !== '' ? $name : null;
+            }
+        }
+
+        return null;
+    }
+
     public static function isRentalsOnlyInstance(string $instance): bool
     {
         $instance = trim($instance);

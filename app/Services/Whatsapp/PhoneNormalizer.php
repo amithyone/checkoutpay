@@ -495,13 +495,14 @@ final class PhoneNormalizer
     }
 
     /**
-     * Auth / registration: accept any dial in whatsapp_wallet_regions (incl. KE), not Nigeria-only.
-     * Prefer NG/KE local trunk-0 forms before ambiguous international parsers (e.g. UK 0…).
+     * Auth / registration: accept any dial in whatsapp_wallet_regions (incl. KE/NA), not Nigeria-only.
+     * Prefer NG/KE/NA local + explicit country-code forms before ambiguous international parsers (e.g. UK 0…).
      */
     public static function canonicalAuthE164Digits(string $input): ?string
     {
         return self::canonicalNgE164Digits($input)
             ?? self::canonicalKeE164Digits($input)
+            ?? self::canonicalNaE164Digits($input)
             ?? self::canonicalInternationalWalletRecipientDigits($input);
     }
 
