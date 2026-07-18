@@ -1617,17 +1617,30 @@ class ConsumerWalletApiController extends Controller
 
     public function kycTier2Personal(Request $request): JsonResponse
     {
-        $request->validate([
-            'fname' => 'required|string|max:128',
-            'lname' => 'required|string|max:128',
-            'dob' => 'required|date_format:Y-m-d',
-            'gender' => 'required|string|in:male,female,M,F',
-            'email' => 'required|email|max:255',
-            'bvn' => 'required_without:nin|nullable|string|size:11',
-            'nin' => 'required_without:bvn|nullable|string|size:11',
-        ]);
-
         $wallet = $this->walletFor($request)->fresh();
+        $iso = $this->walletCountry->countryIsoForPhoneE164((string) $wallet->phone_e164);
+
+        if ($iso === 'KE') {
+            $request->validate([
+                'fname' => 'required|string|max:128',
+                'lname' => 'required|string|max:128',
+                'dob' => 'required|date_format:Y-m-d',
+                'gender' => 'required|string|in:male,female,M,F',
+                'email' => 'required|email|max:255',
+                'national_id' => 'required|string|min:5|max:12',
+            ]);
+        } else {
+            $request->validate([
+                'fname' => 'required|string|max:128',
+                'lname' => 'required|string|max:128',
+                'dob' => 'required|date_format:Y-m-d',
+                'gender' => 'required|string|in:male,female,M,F',
+                'email' => 'required|email|max:255',
+                'bvn' => 'required_without:nin|nullable|string|size:11',
+                'nin' => 'required_without:bvn|nullable|string|size:11',
+            ]);
+        }
+
         $g = strtolower((string) $request->input('gender', ''));
         if ($g === 'm') {
             $g = 'male';
@@ -1636,9 +1649,11 @@ class ConsumerWalletApiController extends Controller
             $g = 'female';
         }
 
-        $out = $this->kyc->submitPersonalTier2($wallet, array_merge($request->only([
-            'fname', 'lname', 'dob', 'email', 'bvn', 'nin',
-        ]), ['gender' => $g]));
+        $fields = $iso === 'KE'
+            ? ['fname', 'lname', 'dob', 'email', 'national_id']
+            : ['fname', 'lname', 'dob', 'email', 'bvn', 'nin'];
+
+        $out = $this->kyc->submitPersonalTier2($wallet, array_merge($request->only($fields), ['gender' => $g]));
 
         return response()->json([
             'success' => $out['ok'],

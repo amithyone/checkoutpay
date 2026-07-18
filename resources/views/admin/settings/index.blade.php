@@ -856,6 +856,13 @@
                 Dollar Virtual Card enabled (CheckoutNow)
             </label>
 
+            <label class="inline-flex items-center text-sm">
+                <input type="hidden" name="kenya_tier2_enabled" value="0">
+                <input type="checkbox" name="kenya_tier2_enabled" value="1" class="mr-2 rounded"
+                    {{ \App\Models\Setting::get('kenya_tier2_enabled', config('consumer_wallet.kenya_tier2_enabled', false)) ? 'checked' : '' }}>
+                Kenya Tier 2 KYC enabled (Smile ID National ID — also needs SMILE_ID_* env)
+            </label>
+
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Active card provider</label>
                 <div class="flex flex-wrap gap-4">
@@ -1021,6 +1028,41 @@
                         <label for="virtual_card_fx_buy_rate" class="block text-sm font-medium text-gray-700 mb-1">Buy rate override (optional)</label>
                         <input type="number" step="0.01" min="0" id="virtual_card_fx_buy_rate" name="virtual_card_fx_buy_rate"
                             value="{{ \App\Models\Setting::get('virtual_card_fx_buy_rate', config('virtual_card.fx_buy_rate')) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto: mid − buy profit">
+                    </div>
+                </div>
+
+                <p class="text-sm font-semibold text-gray-800 mt-6 mb-2">Kenya wallet FX (KES per $1)</p>
+                <p class="text-xs text-gray-500 mb-3">Used when a Kenya (+254) Tier 2 wallet funds or withdraws a Dollar Virtual Card. Debits/credits stay in KES; <code>fee_ngn</code> columns store the wallet-currency amount.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="virtual_card_fx_mid_usd_kes" class="block text-sm font-medium text-gray-700 mb-1">Mid (KES per $1)</label>
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_mid_usd_kes" name="virtual_card_fx_mid_usd_kes"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_mid_usd_kes', config('virtual_card.fx_mid_usd_kes')) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. 130">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_sell_profit_kes" class="block text-sm font-medium text-gray-700 mb-1">Sell profit (KES per $1)</label>
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_sell_profit_kes" name="virtual_card_fx_sell_profit_kes"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_sell_profit_kes', config('virtual_card.fx_sell_profit_kes', 5)) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_buy_profit_kes" class="block text-sm font-medium text-gray-700 mb-1">Buy profit (KES per $1)</label>
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_buy_profit_kes" name="virtual_card_fx_buy_profit_kes"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_buy_profit_kes', config('virtual_card.fx_buy_profit_kes', 3)) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_sell_rate_kes" class="block text-sm font-medium text-gray-700 mb-1">Sell rate override (KES)</label>
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_sell_rate_kes" name="virtual_card_fx_sell_rate_kes"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_sell_rate_kes', config('virtual_card.fx_sell_rate_kes')) }}"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto: mid + sell profit">
+                    </div>
+                    <div>
+                        <label for="virtual_card_fx_buy_rate_kes" class="block text-sm font-medium text-gray-700 mb-1">Buy rate override (KES)</label>
+                        <input type="number" step="0.01" min="0" id="virtual_card_fx_buy_rate_kes" name="virtual_card_fx_buy_rate_kes"
+                            value="{{ \App\Models\Setting::get('virtual_card_fx_buy_rate_kes', config('virtual_card.fx_buy_rate_kes')) }}"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto: mid − buy profit">
                     </div>
                 </div>

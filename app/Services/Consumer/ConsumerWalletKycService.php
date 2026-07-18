@@ -9,13 +9,14 @@ use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Tier-2 Rubies KYC for mobile (same Mevon calls as WhatsApp upgrade flow).
+ * Tier-2 KYC for mobile: Nigeria Rubies VA, Kenya Smile ID National ID.
  */
 class ConsumerWalletKycService
 {
     public function __construct(
         private MevonRubiesVirtualAccountService $rubies,
         private WhatsappWalletCountryResolver $walletCountry,
+        private KenyaKycVerificationService $kenyaKyc,
     ) {}
 
     /**
@@ -23,6 +24,13 @@ class ConsumerWalletKycService
      */
     public function tier2Status(WhatsappWallet $wallet): array
     {
+        $iso = $this->walletCountry->countryIsoForPhoneE164((string) $wallet->phone_e164);
+        $mode = match ($iso) {
+            'KE' => 'kenya_smile',
+            'NG' => 'nigeria_rubies',
+            default => 'unsupported',
+        };
+
         return [
             'ok' => true,
             'message' => 'OK',
@@ -36,6 +44,14 @@ class ConsumerWalletKycService
                 'kyc_email' => $wallet->kyc_email,
                 'kyc_dob' => $wallet->kyc_dob?->format('Y-m-d'),
                 'kyc_cac' => $wallet->kyc_cac,
+                'country_iso' => $iso,
+                'kyc_mode' => $mode,
+                'kenya_tier2_enabled' => $iso === 'KE' ? $this->kenyaKyc->isReady() : false,
+                'tier2_available' => match ($iso) {
+                    'NG' => true,
+                    'KE' => $this->kenyaKyc->isReady(),
+                    default => false,
+                },
             ],
         ];
     }
@@ -45,8 +61,14 @@ class ConsumerWalletKycService
      */
     public function submitPersonalTier2(WhatsappWallet $wallet, array $input): array
     {
+        $iso = $this->walletCountry->countryIsoForPhoneE164((string) $wallet->phone_e164);
+
+        if ($iso === 'KE') {
+            return $this->kenyaKyc->submitPersonalTier2($wallet, $input);
+        }
+
         if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
-            return ['ok' => false, 'message' => 'Tier 2 is only available for Nigeria numbers.'];
+            return ['ok' => false, 'message' => 'Tier 2 is only available for Nigeria and Kenya wallet numbers.'];
         }
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
             return ['ok' => true, 'message' => 'Already on Tier 2.', 'data' => $this->vaPayload($wallet)];
@@ -111,7 +133,7 @@ class ConsumerWalletKycService
     public function submitBusinessTier2(WhatsappWallet $wallet, array $input): array
     {
         if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
-            return ['ok' => false, 'message' => 'Tier 2 is only available for Nigeria numbers.'];
+            return ['ok' => false, 'message' => 'Business Tier 2 is only available for Nigeria numbers.'];
         }
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
             return ['ok' => true, 'message' => 'Already on Tier 2.', 'data' => $this->vaPayload($wallet)];
@@ -184,6 +206,7 @@ class ConsumerWalletKycService
             'bank_name' => $wallet->mevon_bank_name,
             'bank_code' => $wallet->mevon_bank_code,
             'reference' => $wallet->mevon_reference,
+            'kyc_mode' => 'nigeria_rubies',
         ];
     }
 }

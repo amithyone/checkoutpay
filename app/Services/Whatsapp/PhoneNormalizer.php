@@ -474,6 +474,39 @@ final class PhoneNormalizer
     }
 
     /**
+     * E.164 digits → local trunk form (leading 0) for supported wallet countries.
+     * NG: 234… → 0… · KE: 254… → 0… · NA: 264… → 0…
+     */
+    public static function e164DigitsToLocalTrunk(string $e164Digits): ?string
+    {
+        $d = self::digitsOnly($e164Digits);
+        if ($d === null) {
+            return null;
+        }
+
+        $ng = self::e164DigitsToNgLocal11($d);
+        if ($ng !== null) {
+            return $ng;
+        }
+
+        if (str_starts_with($d, '254') && strlen($d) === 12) {
+            return '0'.substr($d, 3);
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '0') && ($d[1] === '7' || $d[1] === '1')) {
+            return $d;
+        }
+
+        if (str_starts_with($d, '264') && strlen($d) >= 11 && strlen($d) <= 13) {
+            return '0'.substr($d, 3);
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '0') && $d[1] === '8') {
+            return $d;
+        }
+
+        return null;
+    }
+
+    /**
      * Message is only a phone number (no letters): “paste NG mobile” P2P shortcut from root / services.
      * Nigerian numbers only — use *4* in the wallet menu for other countries (see {@see canonicalInternationalWalletRecipientDigits}).
      */

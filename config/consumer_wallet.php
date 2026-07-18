@@ -83,6 +83,12 @@ return [
      */
     'token_absolute_lifetime_minutes' => max(60, (int) env('CONSUMER_TOKEN_ABSOLUTE_LIFETIME_MINUTES', 60 * 24 * 30)),
 
+    /**
+     * Kenya Tier 2 via Smile ID (National ID). Also overridable by Setting kenya_tier2_enabled.
+     * Requires SMILE_ID_PARTNER_ID + SMILE_ID_API_KEY.
+     */
+    'kenya_tier2_enabled' => filter_var(env('CONSUMER_KENYA_TIER2_ENABLED', false), FILTER_VALIDATE_BOOL),
+
     /** P2P money requests (ask someone to pay you). */
     'money_request_enabled' => filter_var(env('CONSUMER_MONEY_REQUEST_ENABLED', true), FILTER_VALIDATE_BOOL),
     'money_request_expiry_days' => (int) env('CONSUMER_MONEY_REQUEST_EXPIRY_DAYS', 7),

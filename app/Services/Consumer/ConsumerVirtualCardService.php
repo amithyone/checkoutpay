@@ -11,6 +11,7 @@ use App\Services\MevonPay\MevonPayUsdAutoFundService;
 use App\Services\VirtualCard\VirtualCardProviderResolver;
 use App\Contracts\VirtualCard\VirtualCardProviderContract;
 use App\Services\Whatsapp\PhoneNormalizer;
+use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use App\Services\Whatsapp\WhatsappWalletTopupNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -33,6 +34,7 @@ final class ConsumerVirtualCardService
         private VirtualCardStoredDetailsService $storedDetails,
         private VirtualCardNotificationService $cardNotifier,
         private WhatsappWalletTopupNotifier $walletNotifier,
+        private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
     public function isEnabled(): bool
@@ -100,20 +102,27 @@ final class ConsumerVirtualCardService
     }
 
     /**
-     * @return array{creation_fee_usd: float, initial_load_usd: float, total_usd: float, total_ngn: ?float}
+     * @return array{creation_fee_usd: float, initial_load_usd: float, total_usd: float, total_ngn: ?float, wallet_currency: string}
      */
-    public function requestFeeBreakdown(): array
+    public function requestFeeBreakdown(string $walletCurrency = 'NGN'): array
     {
         $creation = $this->creationFeeUsd();
         $load = $this->initialLoadUsd();
         $total = $this->requestFeeUsd();
+        $cur = strtoupper($walletCurrency);
 
         return [
             'creation_fee_usd' => $creation,
             'initial_load_usd' => $load,
             'total_usd' => $total,
-            'total_ngn' => $this->fx->quoteRequestFeeNgn($total),
+            'total_ngn' => $this->fx->quoteRequestFeeForCurrency($total, $cur),
+            'wallet_currency' => $cur,
         ];
+    }
+
+    private function walletCurrency(WhatsappWallet $wallet): string
+    {
+        return $this->walletCountry->currencyForPhoneE164((string) $wallet->phone_e164);
     }
 
     /**
@@ -235,7 +244,8 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => 'Dollar Virtual Card is not available right now.'];
         }
 
-        $quote = $this->fx->quoteForAction($amountUsd, $action);
+        $walletCur = $this->walletCurrency($wallet);
+        $quote = $this->fx->quoteForAction($amountUsd, $action, $walletCur);
         if ($quote === null) {
             return ['ok' => false, 'message' => 'Exchange rate is not configured.'];
         }
@@ -246,6 +256,7 @@ final class ConsumerVirtualCardService
             'data' => array_merge($quote, [
                 'action' => $action === 'withdraw' || $action === 'buy' ? 'withdraw' : 'topup',
                 'rate_used' => $quote['sell_rate'] ?? $quote['buy_rate'] ?? null,
+                'wallet_currency' => $walletCur,
             ]),
         ];
     }
@@ -299,7 +310,8 @@ final class ConsumerVirtualCardService
             ];
         }
 
-        $feeBreakdown = $this->requestFeeBreakdown();
+        $walletCur = $this->walletCurrency($wallet);
+        $feeBreakdown = $this->requestFeeBreakdown($walletCur);
         $feeUsd = $feeBreakdown['total_usd'];
         $feeNgn = $feeBreakdown['total_ngn'];
         $creationFeeUsd = $feeBreakdown['creation_fee_usd'];
@@ -307,7 +319,7 @@ final class ConsumerVirtualCardService
         if ($feeNgn === null || $feeNgn < 0.01) {
             return [
                 'ok' => false,
-                'message' => 'USD/NGN sell rate is not configured. Ask admin to set virtual card FX rates.',
+                'message' => "USD/{$walletCur} sell rate is not configured. Ask admin to set virtual card FX rates.",
             ];
         }
 
@@ -315,7 +327,7 @@ final class ConsumerVirtualCardService
         $lname = trim((string) ($input['last_name'] ?? $wallet->kyc_lname ?? ''));
         $email = trim((string) ($input['email'] ?? $wallet->kyc_email ?? ''));
         $dob = trim((string) ($input['dob'] ?? ($wallet->kyc_dob?->format('Y-m-d') ?? '')));
-        $phone11 = PhoneNormalizer::e164DigitsToNgLocal11((string) ($input['phone_number'] ?? $wallet->phone_e164));
+        $phone11 = PhoneNormalizer::e164DigitsToLocalTrunk((string) ($input['phone_number'] ?? $wallet->phone_e164));
         $homeNumber = trim((string) ($input['home_number'] ?? $wallet->card_home_number ?? ''));
         $homeAddress = trim((string) ($input['home_address'] ?? $wallet->card_home_address ?? ''));
         $cardName = trim((string) ($input['card_name'] ?? trim($fname.' '.$lname)));
@@ -327,11 +339,11 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => 'Home address, home number, and card name are required.'];
         }
 
-        $sellRate = $this->fx->sellRate();
+        $sellRate = $walletCur === 'KES' ? $this->fx->sellRateKes() : $this->fx->sellRate();
         $reference = 'VCARD-'.strtoupper(Str::random(14));
 
         try {
-            DB::transaction(function () use ($wallet, $feeNgn, $reference, $feeUsd, $sellRate, $creationFeeUsd, $initialLoadUsd) {
+            DB::transaction(function () use ($wallet, $feeNgn, $reference, $feeUsd, $sellRate, $creationFeeUsd, $initialLoadUsd, $walletCur) {
                 $w = WhatsappWallet::query()->lockForUpdate()->find($wallet->id);
                 if (! $w) {
                     throw new \RuntimeException('wallet_missing');
@@ -363,7 +375,8 @@ final class ConsumerVirtualCardService
                         'creation_fee_usd' => $creationFeeUsd,
                         'initial_load_usd' => $initialLoadUsd,
                         'mevon_amount_usd' => $initialLoadUsd,
-                        'fx_mid_usd_ngn' => $this->fx->midUsdNgnRate(),
+                        'fx_mid_usd_ngn' => $walletCur === 'KES' ? $this->fx->midUsdKesRate() : $this->fx->midUsdNgnRate(),
+                        'wallet_currency' => $walletCur,
                         'sell_rate' => $sellRate,
                         'fx_side' => 'sell',
                     ],
@@ -566,7 +579,8 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => "Top-up amount must be between \${$min} and \${$max}."];
         }
 
-        $quote = $this->fx->quoteTopupNgn($amountUsd);
+        $walletCur = $this->walletCurrency($wallet);
+        $quote = $this->fx->quoteTopupForCurrency($amountUsd, $walletCur);
         if ($quote === null) {
             return ['ok' => false, 'message' => 'Sell rate is not configured.'];
         }
@@ -2073,7 +2087,8 @@ final class ConsumerVirtualCardService
             return ['ok' => false, 'message' => "Withdraw amount must be between \${$min} and \${$max}."];
         }
 
-        $quote = $this->fx->quoteWithdrawNgn($amountUsd);
+        $walletCur = $this->walletCurrency($wallet);
+        $quote = $this->fx->quoteWithdrawForCurrency($amountUsd, $walletCur);
         if ($quote === null) {
             return ['ok' => false, 'message' => 'Buy rate is not configured.'];
         }
@@ -2406,7 +2421,8 @@ final class ConsumerVirtualCardService
      */
     private function statusPayload(WhatsappWallet $wallet): array
     {
-        $feeBreakdown = $this->requestFeeBreakdown();
+        $walletCur = $this->walletCurrency($wallet);
+        $feeBreakdown = $this->requestFeeBreakdown($walletCur);
 
         $display = $this->resolveDisplayCard($wallet);
         $rawLatest = VirtualCardRequest::query()
@@ -2416,11 +2432,23 @@ final class ConsumerVirtualCardService
         $latest = $display ?? $rawLatest;
         $cardScreen = $this->cardScreenFor($display, $rawLatest);
 
-        return array_merge($this->fx->ratesPayload(), $this->profileFieldsForWallet($wallet), [
+        $rates = $this->fx->ratesPayload();
+        if ($walletCur === 'KES') {
+            $rates['fx_mid_usd_kes'] = $this->fx->midUsdKesRate();
+            $rates['sell_rate_kes'] = $this->fx->sellRateKes();
+            $rates['buy_rate_kes'] = $this->fx->buyRateKes();
+            $rates['sell_rate'] = $this->fx->sellRateKes();
+            $rates['buy_rate'] = $this->fx->buyRateKes();
+            $rates['fx_available'] = $this->fx->sellRateKes() !== null && $this->fx->buyRateKes() !== null;
+        }
+
+        return array_merge($rates, $this->profileFieldsForWallet($wallet), [
             'enabled' => $this->isEnabled(),
             'is_tier2' => $wallet->isTier2(),
+            'wallet_currency' => $walletCur,
             'fee_usd' => $feeBreakdown['total_usd'],
             'fee_ngn' => $feeBreakdown['total_ngn'],
+            'fee_wallet' => $feeBreakdown['total_ngn'],
             'creation_fee_usd' => $feeBreakdown['creation_fee_usd'],
             'initial_load_usd' => $feeBreakdown['initial_load_usd'],
             'topup_min_usd' => (float) config('virtual_card.topup_min_usd', 1),
@@ -2442,14 +2470,14 @@ final class ConsumerVirtualCardService
      */
     private function profileFieldsForWallet(WhatsappWallet $wallet): array
     {
-        $phone11 = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164);
+        $phoneLocal = PhoneNormalizer::e164DigitsToLocalTrunk((string) $wallet->phone_e164);
         $dob = $wallet->kyc_dob?->format('Y-m-d');
 
         return [
             'first_name' => $wallet->kyc_fname,
             'last_name' => $wallet->kyc_lname,
             'email' => $wallet->kyc_email,
-            'phone_number' => $phone11,
+            'phone_number' => $phoneLocal,
             'dob' => $dob,
             'home_number' => $wallet->card_home_number,
             'home_address' => $wallet->card_home_address,

@@ -417,14 +417,162 @@ final class VirtualCardFxService
         return $quote['amount_ngn'] ?? null;
     }
 
+    public function midUsdKesRate(): ?float
+    {
+        $stored = Setting::get('virtual_card_fx_mid_usd_kes');
+        if ($stored !== null && is_numeric($stored) && (float) $stored > 0) {
+            return round((float) $stored, 4);
+        }
+        $cfg = config('virtual_card.fx_mid_usd_kes');
+        if ($cfg !== null && is_numeric($cfg) && (float) $cfg > 0) {
+            return round((float) $cfg, 4);
+        }
+
+        return null;
+    }
+
+    public function sellProfitKesPerUsd(): float
+    {
+        $stored = Setting::get('virtual_card_fx_sell_profit_kes');
+        if ($stored !== null && is_numeric($stored)) {
+            return max(0.0, round((float) $stored, 2));
+        }
+
+        return max(0.0, round((float) config('virtual_card.fx_sell_profit_kes', 5), 2));
+    }
+
+    public function buyProfitKesPerUsd(): float
+    {
+        $stored = Setting::get('virtual_card_fx_buy_profit_kes');
+        if ($stored !== null && is_numeric($stored)) {
+            return max(0.0, round((float) $stored, 2));
+        }
+
+        return max(0.0, round((float) config('virtual_card.fx_buy_profit_kes', 3), 2));
+    }
+
+    public function sellRateKes(): ?float
+    {
+        $explicit = Setting::get('virtual_card_fx_sell_rate_kes');
+        if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
+            return round((float) $explicit, 4);
+        }
+        $cfg = config('virtual_card.fx_sell_rate_kes');
+        if ($cfg !== null && is_numeric($cfg) && (float) $cfg > 0) {
+            return round((float) $cfg, 4);
+        }
+        $mid = $this->midUsdKesRate();
+        if ($mid === null) {
+            return null;
+        }
+
+        return round($mid + $this->sellProfitKesPerUsd(), 4);
+    }
+
+    public function buyRateKes(): ?float
+    {
+        $explicit = Setting::get('virtual_card_fx_buy_rate_kes');
+        if ($explicit !== null && is_numeric($explicit) && (float) $explicit > 0) {
+            return round((float) $explicit, 4);
+        }
+        $cfg = config('virtual_card.fx_buy_rate_kes');
+        if ($cfg !== null && is_numeric($cfg) && (float) $cfg > 0) {
+            return round((float) $cfg, 4);
+        }
+        $mid = $this->midUsdKesRate();
+        if ($mid === null) {
+            return null;
+        }
+        $rate = round($mid - $this->buyProfitKesPerUsd(), 4);
+
+        return $rate > 0 ? $rate : null;
+    }
+
+    /**
+     * Quote card top-up debit in wallet currency. amount_ngn = wallet debit (legacy key).
+     *
+     * @return array{amount_usd: float, amount_ngn: float, wallet_currency: string, sell_rate: float, fx_side: string, fx_mid?: float|null}|null
+     */
+    public function quoteTopupForCurrency(float $amountUsd, string $walletCurrency): ?array
+    {
+        $cur = strtoupper($walletCurrency);
+        if ($cur === 'NGN') {
+            $q = $this->quoteTopupNgn($amountUsd);
+            if ($q === null) {
+                return null;
+            }
+            $q['wallet_currency'] = 'NGN';
+
+            return $q;
+        }
+        if ($cur === 'KES') {
+            $sell = $this->sellRateKes();
+            if ($sell === null || $amountUsd < 0.01) {
+                return null;
+            }
+
+            return [
+                'amount_usd' => round($amountUsd, 2),
+                'amount_ngn' => round($amountUsd * $sell, 2),
+                'wallet_currency' => 'KES',
+                'sell_rate' => $sell,
+                'fx_side' => 'sell',
+                'fx_mid' => $this->midUsdKesRate(),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{amount_usd: float, amount_ngn: float, wallet_currency: string, buy_rate: float, fx_side: string, fx_mid?: float|null}|null
+     */
+    public function quoteWithdrawForCurrency(float $amountUsd, string $walletCurrency): ?array
+    {
+        $cur = strtoupper($walletCurrency);
+        if ($cur === 'NGN') {
+            $q = $this->quoteWithdrawNgn($amountUsd);
+            if ($q === null) {
+                return null;
+            }
+            $q['wallet_currency'] = 'NGN';
+
+            return $q;
+        }
+        if ($cur === 'KES') {
+            $buy = $this->buyRateKes();
+            if ($buy === null || $amountUsd < 0.01) {
+                return null;
+            }
+
+            return [
+                'amount_usd' => round($amountUsd, 2),
+                'amount_ngn' => round($amountUsd * $buy, 2),
+                'wallet_currency' => 'KES',
+                'buy_rate' => $buy,
+                'fx_side' => 'buy',
+                'fx_mid' => $this->midUsdKesRate(),
+            ];
+        }
+
+        return null;
+    }
+
+    public function quoteRequestFeeForCurrency(float $feeUsd, string $walletCurrency): ?float
+    {
+        $quote = $this->quoteTopupForCurrency($feeUsd, $walletCurrency);
+
+        return $quote['amount_ngn'] ?? null;
+    }
+
     /**
      * @return array<string, mixed>|null
      */
-    public function quoteForAction(float $amountUsd, string $action): ?array
+    public function quoteForAction(float $amountUsd, string $action, string $walletCurrency = 'NGN'): ?array
     {
         return match ($action) {
-            'topup', 'sell' => $this->quoteTopupNgn($amountUsd),
-            'withdraw', 'buy' => $this->quoteWithdrawNgn($amountUsd),
+            'topup', 'sell' => $this->quoteTopupForCurrency($amountUsd, $walletCurrency),
+            'withdraw', 'buy' => $this->quoteWithdrawForCurrency($amountUsd, $walletCurrency),
             default => null,
         };
     }

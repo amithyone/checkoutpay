@@ -16,6 +16,12 @@ return [
     'fx_buy_profit_ngn' => max(0.0, (float) env('VIRTUAL_CARD_FX_BUY_PROFIT_NGN', 30)),
     'fx_sell_rate' => env('VIRTUAL_CARD_FX_SELL_RATE') !== null ? (float) env('VIRTUAL_CARD_FX_SELL_RATE') : null,
     'fx_buy_rate' => env('VIRTUAL_CARD_FX_BUY_RATE') !== null ? (float) env('VIRTUAL_CARD_FX_BUY_RATE') : null,
+    /** Kenya wallet debit currency (KES per 1 USD). */
+    'fx_mid_usd_kes' => env('VIRTUAL_CARD_FX_MID_USD_KES') !== null ? (float) env('VIRTUAL_CARD_FX_MID_USD_KES') : null,
+    'fx_sell_profit_kes' => max(0.0, (float) env('VIRTUAL_CARD_FX_SELL_PROFIT_KES', 5)),
+    'fx_buy_profit_kes' => max(0.0, (float) env('VIRTUAL_CARD_FX_BUY_PROFIT_KES', 3)),
+    'fx_sell_rate_kes' => env('VIRTUAL_CARD_FX_SELL_RATE_KES') !== null ? (float) env('VIRTUAL_CARD_FX_SELL_RATE_KES') : null,
+    'fx_buy_rate_kes' => env('VIRTUAL_CARD_FX_BUY_RATE_KES') !== null ? (float) env('VIRTUAL_CARD_FX_BUY_RATE_KES') : null,
     'topup_min_usd' => max(0.01, (float) env('VIRTUAL_CARD_TOPUP_MIN_USD', 1)),
     'topup_max_usd' => max(1.0, (float) env('VIRTUAL_CARD_TOPUP_MAX_USD', 500)),
     /** Retries after Mevon card_topup reports low merchant USD (auto NGN→USD buy between attempts). */

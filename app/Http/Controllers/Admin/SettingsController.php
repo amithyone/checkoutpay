@@ -244,6 +244,7 @@ class SettingsController extends Controller
         if ($request->input('settings_section') === 'virtual_card') {
             $validated = $request->validate([
                 'virtual_card_enabled' => 'nullable|boolean',
+                'kenya_tier2_enabled' => 'nullable|boolean',
                 'virtual_card_provider' => 'required|in:mevonpay,cashwyre',
                 'mevonpay_card_enabled' => 'nullable|boolean',
                 'cashwyre_card_enabled' => 'nullable|boolean',
@@ -255,6 +256,11 @@ class SettingsController extends Controller
                 'virtual_card_fx_buy_profit_ngn' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_fx_sell_rate' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_fx_buy_rate' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_mid_usd_kes' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_sell_profit_kes' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_buy_profit_kes' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_sell_rate_kes' => 'nullable|numeric|min:0|max:100000',
+                'virtual_card_fx_buy_rate_kes' => 'nullable|numeric|min:0|max:100000',
                 'virtual_card_design_image' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:4096',
             ]);
 
@@ -276,6 +282,13 @@ class SettingsController extends Controller
                 'boolean',
                 'virtual_card',
                 'Enable Dollar Virtual Card in CheckoutNow app'
+            );
+            Setting::set(
+                'kenya_tier2_enabled',
+                $request->boolean('kenya_tier2_enabled') ? 1 : 0,
+                'boolean',
+                'virtual_card',
+                'Enable Kenya Tier 2 KYC via Smile ID (National ID)'
             );
             Setting::set(
                 'virtual_card_provider',
@@ -326,6 +339,11 @@ class SettingsController extends Controller
                 'virtual_card_fx_buy_profit_ngn' => 'Virtual card buy profit (NGN per $1 withdrawn)',
                 'virtual_card_fx_sell_rate' => 'Virtual card explicit sell rate override (NGN per 1 USD)',
                 'virtual_card_fx_buy_rate' => 'Virtual card explicit buy rate override (NGN per 1 USD)',
+                'virtual_card_fx_mid_usd_kes' => 'Virtual card FX mid rate (KES per 1 USD)',
+                'virtual_card_fx_sell_profit_kes' => 'Virtual card sell profit (KES per $1 funded)',
+                'virtual_card_fx_buy_profit_kes' => 'Virtual card buy profit (KES per $1 withdrawn)',
+                'virtual_card_fx_sell_rate_kes' => 'Virtual card explicit sell rate override (KES per 1 USD)',
+                'virtual_card_fx_buy_rate_kes' => 'Virtual card explicit buy rate override (KES per 1 USD)',
             ] as $key => $description) {
                 if (array_key_exists($key, $validated)) {
                     $value = $validated[$key];
