@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1StatusController;
 use App\Http\Controllers\Api\VtuWebhookController;
 use App\Http\Controllers\Api\WhatsappWalletApiController;
 use App\Http\Controllers\Api\WhatsappWebhookController;
+use App\Http\Controllers\Api\BroadcastVerifyController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -65,6 +66,22 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
 Route::prefix('v1')->group(function () {
     // GET /api/v1 — JSON status; webhook_base_url from WHATSAPP_APP_URL or APP_URL (see config/whatsapp.php)
     Route::get('/', V1StatusController::class)->name('api.v1.status');
+
+    /**
+     * Checkout Broadcast verify API (CheckoutNow + merchant POS).
+     * Mobile: EXPO_PUBLIC_CHECKOUT_BROADCAST_API=https://check-outpay.com/api/v1/broadcast
+     */
+    Route::prefix('broadcast')->group(function () {
+        Route::get('health', [BroadcastVerifyController::class, 'health']);
+        Route::post('verify-broadcast', [BroadcastVerifyController::class, 'verifyBroadcast'])
+            ->middleware('throttle:120,1');
+        Route::post('terminals/register', [BroadcastVerifyController::class, 'registerTerminal'])
+            ->middleware('throttle:30,1');
+        Route::get('terminals', [BroadcastVerifyController::class, 'listTerminals'])
+            ->middleware('throttle:60,1');
+        Route::get('terminals/{id}', [BroadcastVerifyController::class, 'showTerminal'])
+            ->middleware('throttle:60,1');
+    });
 
     /**
      * Consumer mobile wallet API (Android/iOS): WhatsApp OTP login + Sanctum Bearer token.
