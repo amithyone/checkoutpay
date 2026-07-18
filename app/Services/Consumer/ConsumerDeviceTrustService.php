@@ -37,6 +37,12 @@ class ConsumerDeviceTrustService
             return false;
         }
 
+        // PIN/OTP login should not block users who still have an old passkey on file
+        // unless explicitly re-enabled (see CONSUMER_DEVICE_STEPUP_REQUIRED_ON_LOGIN).
+        if (! (bool) config('consumer_wallet.device_stepup_required_on_login', false)) {
+            return false;
+        }
+
         return $this->activePasskeyDevice($account) !== null;
     }
 

@@ -14,7 +14,16 @@ class ConsumerAppSessionService
 {
     public function idleTimeoutMinutes(): int
     {
-        return max(1, (int) config('consumer_wallet.app_session_idle_minutes', 10));
+        return max(1, (int) config('consumer_wallet.app_session_idle_minutes', 60));
+    }
+
+    /** Hard token lifetime; refreshed on every authenticated API call while the user is active. */
+    public function tokenAbsoluteLifetimeMinutes(): int
+    {
+        return max(
+            $this->idleTimeoutMinutes(),
+            (int) config('consumer_wallet.token_absolute_lifetime_minutes', 60 * 24 * 30)
+        );
     }
 
     public function createAccessToken(ConsumerWalletApiAccount $account): NewAccessToken
@@ -24,7 +33,7 @@ class ConsumerAppSessionService
         return $account->createToken(
             $tokenName,
             ['*'],
-            now()->addMinutes($this->idleTimeoutMinutes()),
+            now()->addMinutes($this->tokenAbsoluteLifetimeMinutes()),
         );
     }
 
@@ -44,10 +53,7 @@ class ConsumerAppSessionService
 
     public function isAccessTokenIdleExpired(PersonalAccessToken $token): bool
     {
-        if ($token->expires_at !== null && $token->expires_at->isPast()) {
-            return true;
-        }
-
+        // Sliding idle: only inactivity matters. Absolute expires_at is extended on touch.
         $reference = $token->last_used_at ?? $token->created_at;
         if ($reference === null) {
             return false;
@@ -201,17 +207,27 @@ class ConsumerAppSessionService
 
     public function touchSession(Request $request, ?ConsumerWalletApiAccount $account = null): void
     {
+        $now = now();
         $session = $this->resolveSession($request, $account);
-        if ($session === null || ! $session->isActive()) {
+
+        if ($session !== null && $session->isActive()) {
+            $session->last_seen_at = $now;
+            $session->save();
+        }
+
+        if ($account === null) {
             return;
         }
 
-        $now = now();
-        $session->last_seen_at = $now;
-        $session->save();
+        $account->forceFill(['last_app_active_at' => $now])->save();
 
-        if ($account !== null) {
-            $account->forceFill(['last_app_active_at' => $now])->save();
+        // Keep Sanctum token valid while the user is active (prevents fixed-clock logout).
+        $token = $account->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->forceFill([
+                'last_used_at' => $now,
+                'expires_at' => now()->addMinutes($this->tokenAbsoluteLifetimeMinutes()),
+            ])->save();
         }
     }
 

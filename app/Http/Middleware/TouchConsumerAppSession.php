@@ -35,6 +35,7 @@ class TouchConsumerAppSession
                 ], 401);
             }
 
+            // Always slide token + last_seen while the user is making requests.
             $this->sessions->touchSession($request, $user);
         }
 

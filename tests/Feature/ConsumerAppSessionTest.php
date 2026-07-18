@@ -55,7 +55,10 @@ class ConsumerAppSessionTest extends TestCase
 
     public function test_idle_app_session_returns_401_and_ends_session(): void
     {
-        config(['consumer_wallet.app_session_idle_minutes' => 10]);
+        config([
+            'consumer_wallet.app_session_idle_minutes' => 10,
+            'consumer_wallet.token_absolute_lifetime_minutes' => 60,
+        ]);
 
         WhatsappWallet::query()->create([
             'phone_e164' => '2348012345678',

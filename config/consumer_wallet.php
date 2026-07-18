@@ -4,6 +4,13 @@ return [
     /** Enable passkey device trust, step-up, and transfer lock enforcement. */
     'device_trust_enabled' => filter_var(env('CONSUMER_DEVICE_TRUST_ENABLED', true), FILTER_VALIDATE_BOOL),
 
+    /**
+     * When true, PIN/OTP login returns 403 “Verify this device” if the account already has a passkey.
+     * Default false so PIN/OTP sign-in works on the same phone without a stuck step-up wall.
+     * Passkey login remains available as a separate auth path.
+     */
+    'device_stepup_required_on_login' => filter_var(env('CONSUMER_DEVICE_STEPUP_REQUIRED_ON_LOGIN', false), FILTER_VALIDATE_BOOL),
+
     /** WebAuthn relying party ID (must match associated domains / asset links). */
     'webauthn_rp_id' => env('CONSUMER_WEBAUTHN_RP_ID', 'check-outpay.com'),
 
@@ -64,8 +71,17 @@ return [
     'device_stepup_push_title' => env('CONSUMER_DEVICE_STEPUP_PUSH_TITLE', 'New sign-in attempt'),
     'device_stepup_push_channel' => env('CONSUMER_DEVICE_STEPUP_PUSH_CHANNEL', 'wallet_alerts'),
 
-    /** End wallet app session after this many minutes without API activity (forces re-login). */
-    'app_session_idle_minutes' => max(1, (int) env('CONSUMER_APP_SESSION_IDLE_MINUTES', 10)),
+    /**
+     * End wallet app session after this many minutes without API activity (forces re-login).
+     * While the app keeps calling the API, the session stays alive (sliding idle).
+     */
+    'app_session_idle_minutes' => max(1, (int) env('CONSUMER_APP_SESSION_IDLE_MINUTES', 60)),
+
+    /**
+     * Hard Sanctum token lifetime (minutes). Extended on every authenticated request.
+     * Must be >> idle minutes so active users are not kicked by a fixed clock.
+     */
+    'token_absolute_lifetime_minutes' => max(60, (int) env('CONSUMER_TOKEN_ABSOLUTE_LIFETIME_MINUTES', 60 * 24 * 30)),
 
     /** P2P money requests (ask someone to pay you). */
     'money_request_enabled' => filter_var(env('CONSUMER_MONEY_REQUEST_ENABLED', true), FILTER_VALIDATE_BOOL),

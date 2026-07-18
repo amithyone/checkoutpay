@@ -27,6 +27,7 @@ class ConsumerDeviceTrustTest extends TestCase
 
         config([
             'consumer_wallet.device_trust_enabled' => true,
+            'consumer_wallet.device_stepup_required_on_login' => true,
             'consumer_wallet.high_value_single_transfer_cap' => 10000,
             'consumer_wallet.transfer_lock_hours' => 24,
         ]);
@@ -49,6 +50,20 @@ class ConsumerDeviceTrustTest extends TestCase
 
         $this->assertNotEmpty($response->json('data.stepup_session'));
         $this->assertContains('whatsapp', $response->json('data.channels'));
+    }
+
+    public function test_pin_verify_skips_stepup_when_not_required_on_login(): void
+    {
+        config(['consumer_wallet.device_stepup_required_on_login' => false]);
+
+        $this->seedWalletWithPasskeyDevice();
+
+        $this->postJson('/api/v1/consumer/auth/pin/verify', [
+            'phone' => self::PHONE,
+            'pin' => '1234',
+        ])->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['data' => ['token', 'app_session_id']]);
     }
 
     public function test_p2p_transfer_blocked_above_cap_during_lock(): void
