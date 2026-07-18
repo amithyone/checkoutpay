@@ -16,6 +16,7 @@ class WhatsappWalletMoneyRequestService
         private ConsumerWalletTransferService $transfers,
         private ConsumerWalletPushNotificationService $consumerPush,
         private EvolutionWhatsAppClient $whatsappClient,
+        private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
     public function isEnabled(): bool
@@ -38,10 +39,7 @@ class WhatsappWalletMoneyRequestService
         }
 
         $requesterPhone = (string) $requesterWallet->phone_e164;
-        $payerPhone = PhoneNormalizer::canonicalNgE164Digits($payerPhoneInput)
-            ?? PhoneNormalizer::canonicalInternationalWalletRecipientDigits(
-                PhoneNormalizer::digitsOnly($payerPhoneInput) ?? $payerPhoneInput
-            );
+        $payerPhone = PhoneNormalizer::canonicalWalletRecipientForSender($payerPhoneInput, $requesterPhone);
 
         if ($payerPhone === null || $payerPhone === '') {
             return ['ok' => false, 'message' => 'Invalid phone number.'];
@@ -86,6 +84,8 @@ class WhatsappWalletMoneyRequestService
 
         $expiryDays = max(1, (int) config('consumer_wallet.money_request_expiry_days', 7));
 
+        $requestCurrency = $this->walletCountry->currencyForPhoneE164($requesterPhone);
+
         $request = WhatsappWalletMoneyRequest::query()->create([
             'public_id' => (string) Str::uuid(),
             'requester_wallet_id' => $requesterWallet->id,
@@ -93,7 +93,7 @@ class WhatsappWalletMoneyRequestService
             'payer_phone_e164' => $payerPhone,
             'payer_wallet_id' => $payerWallet?->id,
             'amount' => round($amount, 2),
-            'currency' => 'NGN',
+            'currency' => $requestCurrency,
             'note' => $note !== null && trim($note) !== '' ? Str::limit(trim($note), 140, '') : null,
             'status' => WhatsappWalletMoneyRequest::STATUS_PENDING,
             'channel' => $channel,
@@ -128,9 +128,15 @@ class WhatsappWalletMoneyRequestService
         }
 
         $requesterPhone = (string) $request->requester_phone_e164;
-        $amount = (float) $request->amount;
+        $creditAmount = (float) $request->amount;
 
-        $transfer = $this->transfers->p2p($payerWallet->fresh(), $requesterPhone, $amount);
+        // Ask amount = exact credit in requester currency; FX computes payer debit.
+        $transfer = $this->transfers->p2p(
+            $payerWallet->fresh(),
+            $requesterPhone,
+            $creditAmount,
+            $creditAmount,
+        );
         if (! ($transfer['ok'] ?? false)) {
             return [
                 'ok' => false,
@@ -139,13 +145,14 @@ class WhatsappWalletMoneyRequestService
             ];
         }
 
-        $debitTxnId = WhatsappWalletTransaction::query()
-            ->where('whatsapp_wallet_id', $payerWallet->id)
-            ->where('type', WhatsappWalletTransaction::TYPE_P2P_DEBIT)
-            ->where('counterparty_phone_e164', $requesterPhone)
-            ->where('amount', $amount)
-            ->orderByDesc('id')
-            ->value('id');
+        $debitTxnId = $transfer['data']['debit_transaction_id']
+            ?? WhatsappWalletTransaction::query()
+                ->where('whatsapp_wallet_id', $payerWallet->id)
+                ->where('type', WhatsappWalletTransaction::TYPE_P2P_DEBIT)
+                ->where('counterparty_phone_e164', $requesterPhone)
+                ->where('amount', (float) ($transfer['data']['amount_debited'] ?? $creditAmount))
+                ->orderByDesc('id')
+                ->value('id');
 
         $request->status = WhatsappWalletMoneyRequest::STATUS_ACCEPTED;
         $request->responded_at = now();
@@ -297,10 +304,10 @@ class WhatsappWalletMoneyRequestService
      */
     public function addBlock(WhatsappWallet $wallet, string $phoneInput): array
     {
-        $blockedPhone = PhoneNormalizer::canonicalNgE164Digits($phoneInput)
-            ?? PhoneNormalizer::canonicalInternationalWalletRecipientDigits(
-                PhoneNormalizer::digitsOnly($phoneInput) ?? $phoneInput
-            );
+        $blockedPhone = PhoneNormalizer::canonicalWalletRecipientForSender(
+            $phoneInput,
+            (string) $wallet->phone_e164
+        );
 
         if ($blockedPhone === null || $blockedPhone === '') {
             return ['ok' => false, 'message' => 'Invalid phone number.'];
@@ -340,10 +347,10 @@ class WhatsappWalletMoneyRequestService
      */
     public function removeBlock(WhatsappWallet $wallet, string $phoneInput): array
     {
-        $blockedPhone = PhoneNormalizer::canonicalNgE164Digits($phoneInput)
-            ?? PhoneNormalizer::canonicalInternationalWalletRecipientDigits(
-                PhoneNormalizer::digitsOnly($phoneInput) ?? $phoneInput
-            );
+        $blockedPhone = PhoneNormalizer::canonicalWalletRecipientForSender(
+            $phoneInput,
+            (string) $wallet->phone_e164
+        );
 
         if ($blockedPhone === null || $blockedPhone === '') {
             return ['ok' => false, 'message' => 'Invalid phone number.'];
@@ -393,9 +400,15 @@ class WhatsappWalletMoneyRequestService
         string $payerDisplay,
         float $amount,
     ): string {
-        $amountLabel = WhatsappWalletMoneyFormatter::format($amount, 'NGN');
+        $currency = $this->walletCountry->currencyForPhoneE164((string) $requesterWallet->phone_e164);
+        $amountLabel = WhatsappWalletMoneyFormatter::format($amount, $currency);
+
+        // Balance hint only when same currency (cross-border ask amount ≠ payer ledger units).
+        $sameCurrency = $payerWallet !== null
+            && $this->walletCountry->currencyForPhoneE164((string) $payerWallet->phone_e164) === $currency;
 
         if ($payerWallet !== null
+            && $sameCurrency
             && $payerWallet->wantsMoneyRequestBalanceHint()
             && (float) $payerWallet->balance + 0.0001 < $amount) {
             return sprintf(

@@ -131,6 +131,94 @@ final class WhatsappCrossBorderP2pFxService
     }
 
     /**
+     * Money-request accept: target credit in the requester (recipient) currency,
+     * compute the payer debit (reverse of {@see evaluateP2p}).
+     *
+     * @return array{
+     *   status: 'domestic'|'ok'|'blocked'|'missing_rate',
+     *   sender_currency: string,
+     *   recipient_currency: string,
+     *   debit: float,
+     *   credit: float,
+     *   message?: string
+     * }
+     */
+    public function evaluateP2pForCredit(
+        string $evolutionInstance,
+        string $recipientPhoneE164,
+        float $creditAmount,
+        ?string $senderWalletPhoneE164 = null,
+    ): array {
+        $senderCur = $this->senderCurrencyForWalletPhone($evolutionInstance, $senderWalletPhoneE164);
+        $recvCur = $this->countries->currencyForPhoneE164($recipientPhoneE164);
+        $credit = round($creditAmount, 2);
+
+        if ($senderCur === $recvCur) {
+            return [
+                'status' => 'domestic',
+                'sender_currency' => $senderCur,
+                'recipient_currency' => $recvCur,
+                'debit' => $credit,
+                'credit' => $credit,
+            ];
+        }
+
+        if (! (bool) Setting::get('whatsapp_cross_border_p2p_enabled', false)) {
+            return [
+                'status' => 'blocked',
+                'sender_currency' => $senderCur,
+                'recipient_currency' => $recvCur,
+                'debit' => $credit,
+                'credit' => $credit,
+                'message' => $this->defaultOrSettingText(
+                    'whatsapp_cross_border_disabled_message',
+                    'Cross-border wallet sends are turned off. Ask an admin to enable them or send to someone in the same region.'
+                ),
+            ];
+        }
+
+        $mult = $this->fxMultiplier($senderCur, $recvCur);
+        $margin = $this->recipientSideMarginFactor();
+        if ($mult === null || $mult <= 0 || $margin <= 0) {
+            return [
+                'status' => 'missing_rate',
+                'sender_currency' => $senderCur,
+                'recipient_currency' => $recvCur,
+                'debit' => $credit,
+                'credit' => $credit,
+                'message' => $this->defaultOrSettingText(
+                    'whatsapp_cross_border_missing_rate_message',
+                    'We do not have an exchange rate for this pair yet. Ask an admin to add it in WhatsApp wallet settings.'
+                ),
+            ];
+        }
+
+        // credit = debit * mult * margin  →  debit = credit / (mult * margin)
+        $debit = round($credit / ($mult * $margin), 2);
+        if ($debit < 0.01) {
+            return [
+                'status' => 'missing_rate',
+                'sender_currency' => $senderCur,
+                'recipient_currency' => $recvCur,
+                'debit' => $credit,
+                'credit' => $credit,
+                'message' => $this->defaultOrSettingText(
+                    'whatsapp_cross_border_missing_rate_message',
+                    'We do not have an exchange rate for this pair yet. Ask an admin to add it in WhatsApp wallet settings.'
+                ),
+            ];
+        }
+
+        return [
+            'status' => 'ok',
+            'sender_currency' => $senderCur,
+            'recipient_currency' => $recvCur,
+            'debit' => $debit,
+            'credit' => $credit,
+        ];
+    }
+
+    /**
      * Convert amount using admin FX table (units of TO per 1 FROM).
      */
     public function convertCurrency(string $from, string $to, float $amount): ?float

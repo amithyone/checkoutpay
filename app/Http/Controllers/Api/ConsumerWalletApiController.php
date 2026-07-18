@@ -489,7 +489,10 @@ class ConsumerWalletApiController extends Controller
             'phone' => 'required|string|min:10|max:20',
         ]);
 
-        $recipient = PhoneNormalizer::canonicalNgE164Digits((string) $request->input('phone'));
+        $recipient = PhoneNormalizer::canonicalWalletRecipientForSender(
+            (string) $request->input('phone'),
+            (string) $wallet->phone_e164
+        );
         if ($recipient === null) {
             return response()->json([
                 'success' => false,

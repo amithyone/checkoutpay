@@ -47,17 +47,28 @@ class ConsumerWalletTransferService
     /**
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function p2p(WhatsappWallet $wallet, string $recipientPhoneInput, float $amount): array
-    {
+    /**
+     * @param  float  $amount  Debit in sender currency, unless {@see $creditInRecipientCurrency} is set
+     *                         (money-request accept: ask amount = exact credit to recipient).
+     */
+    public function p2p(
+        WhatsappWallet $wallet,
+        string $recipientPhoneInput,
+        float $amount,
+        ?float $creditInRecipientCurrency = null,
+    ): array {
         $phone = (string) $wallet->phone_e164;
-        $recipient = \App\Services\Whatsapp\PhoneNormalizer::canonicalNgE164Digits($recipientPhoneInput);
+        $recipient = \App\Services\Whatsapp\PhoneNormalizer::canonicalWalletRecipientForSender(
+            $recipientPhoneInput,
+            $phone
+        );
         if ($recipient === null) {
             return ['ok' => false, 'message' => 'Invalid recipient number.'];
         }
         if ($recipient === $phone) {
             return ['ok' => false, 'message' => 'Cannot send to your own number.'];
         }
-        if ($amount < 1) {
+        if ($amount < 1 && ($creditInRecipientCurrency === null || $creditInRecipientCurrency < 1)) {
             return ['ok' => false, 'message' => 'Invalid amount.'];
         }
 
@@ -66,7 +77,9 @@ class ConsumerWalletTransferService
             return ['ok' => false, 'message' => 'Transfer notifications are not configured (Evolution instance).'];
         }
 
-        $eval = $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount, $phone);
+        $eval = $creditInRecipientCurrency !== null
+            ? $this->crossBorderFx->evaluateP2pForCredit($instance, $recipient, $creditInRecipientCurrency, $phone)
+            : $this->crossBorderFx->evaluateP2p($instance, $recipient, $amount, $phone);
         if ($eval['status'] === 'blocked' || $eval['status'] === 'missing_rate') {
             return ['ok' => false, 'message' => (string) ($eval['message'] ?? 'This send is not available.')];
         }
@@ -102,6 +115,9 @@ class ConsumerWalletTransferService
                 'data' => [
                     'pending_recipient' => true,
                     'balance_after' => (float) $wallet->fresh()->balance,
+                    'amount_debited' => $debitAmount,
+                    'amount_credited' => $creditAmount,
+                    'debit_transaction_id' => $hold['debit_transaction_id'] ?? null,
                 ],
             ];
         }
@@ -257,6 +273,9 @@ class ConsumerWalletTransferService
             'data' => [
                 'balance_after' => (float) $wallet->fresh()->balance,
                 'receipt_id' => 'P2P-'.$sentAt->timezone(config('app.timezone'))->format('Ymd-His'),
+                'amount_debited' => $debitAmount,
+                'amount_credited' => $creditAmount,
+                'debit_transaction_id' => $debitTransactionId,
             ],
         ];
     }
