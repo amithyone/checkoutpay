@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\WhatsappWalletTransaction;
+use App\Observers\WhatsappWalletTransactionReferralObserver;
 use App\Services\Admin\AdminSidebarMenu;
 use App\Support\SiteBranding;
 use Illuminate\Database\Events\QueryExecuted;
@@ -31,6 +33,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configurePublicUrlFromRequest();
         $this->configureSiteBranding();
+
+        WhatsappWalletTransaction::observe(WhatsappWalletTransactionReferralObserver::class);
 
         // Register Telegram notification channel
         $this->app->make(ChannelManager::class)->extend('telegram', function ($app) {

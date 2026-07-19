@@ -11,10 +11,11 @@ class ConsumerWalletRegistrationService
 {
     public function __construct(
         private ConsumerWalletOtpService $otp,
+        private WalletReferralAttributionService $referrals,
     ) {}
 
     /**
-     * @param  array{fname: string, lname: string, email: string, bvn?: string|null, nin?: string|null, dob?: string|null, gender?: string|null}  $profile
+     * @param  array{fname: string, lname: string, email: string, bvn?: string|null, nin?: string|null, dob?: string|null, gender?: string|null, referral_code?: string|null}  $profile
      * @return array{ok: bool, message: string, phone_e164?: string, token?: string, token_type?: string, wallet_id?: int}
      */
     public function register(string $phoneInput, string $code, array $profile): array
@@ -65,7 +66,9 @@ class ConsumerWalletRegistrationService
             return ['ok' => false, 'message' => $verified['message']];
         }
 
-        return DB::transaction(function () use ($e164, $fname, $lname, $email, $bvn, $nin, $dob, $gender) {
+        $referralCode = trim((string) ($profile['referral_code'] ?? ''));
+
+        return DB::transaction(function () use ($e164, $fname, $lname, $email, $bvn, $nin, $dob, $gender, $referralCode) {
             $wallet = WhatsappWallet::query()->firstOrCreate(
                 ['phone_e164' => $e164],
                 [
@@ -81,6 +84,9 @@ class ConsumerWalletRegistrationService
             if ($bvn !== null && $bvn !== '') {
                 $wallet->kyc_bvn = $bvn;
             }
+            if ($nin !== null && $nin !== '') {
+                $wallet->kyc_nin = $nin;
+            }
             if ($dob !== '') {
                 $wallet->kyc_dob = $dob;
             }
@@ -91,6 +97,10 @@ class ConsumerWalletRegistrationService
                 $wallet->sender_name = trim($fname.' '.$lname);
             }
             $wallet->save();
+
+            if ($referralCode !== '') {
+                $this->referrals->attributeFromRegistration($wallet->fresh(), $referralCode);
+            }
 
             $account = ConsumerWalletApiAccount::query()->firstOrNew(['phone_e164' => $e164]);
             $account->whatsapp_wallet_id = $wallet->id;

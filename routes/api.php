@@ -111,6 +111,7 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::prefix('consumer')->middleware('throttle:consumer_wallet_otp')->group(function () {
+        Route::get('referrals/rules', [\App\Http\Controllers\Api\ConsumerReferralController::class, 'rules']);
         Route::post('auth/otp/options', [ConsumerWalletAuthController::class, 'otpOptions']);
         Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
         Route::post('auth/otp/verify', [ConsumerWalletAuthController::class, 'verifyOtp']);
@@ -165,6 +166,11 @@ Route::prefix('v1')->group(function () {
         Route::post('money-requests/{id}/accept', [ConsumerMoneyRequestController::class, 'accept']);
         Route::post('money-requests/{id}/decline', [ConsumerMoneyRequestController::class, 'decline']);
         Route::delete('money-requests/{id}', [ConsumerMoneyRequestController::class, 'destroy']);
+        Route::get('referrals/me', [\App\Http\Controllers\Api\ConsumerReferralController::class, 'me']);
+        Route::get('referrals/invite', [\App\Http\Controllers\Api\ConsumerReferralController::class, 'invite']);
+        Route::get('referrals/list', [\App\Http\Controllers\Api\ConsumerReferralController::class, 'list']);
+        Route::get('referrals/bonuses', [\App\Http\Controllers\Api\ConsumerReferralController::class, 'bonuses']);
+        Route::get('referrals/leaderboard', [\App\Http\Controllers\Api\ConsumerReferralController::class, 'leaderboard']);
         Route::get('save-together', [ConsumerSaveTogetherController::class, 'index']);
         Route::post('save-together', [ConsumerSaveTogetherController::class, 'store']);
         Route::get('save-together/{id}', [ConsumerSaveTogetherController::class, 'show']);

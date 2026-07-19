@@ -17,6 +17,9 @@ class WalletSavingsLock extends Model
 
     public const SOURCE_GOAL = 'goal';
 
+    /** Referral programme bonus credited directly into flexible savings. */
+    public const SOURCE_REFERRAL_BONUS = 'referral_bonus';
+
     public const LOCK_TYPE_LOCKED = 'locked';
 
     public const LOCK_TYPE_FLEXIBLE = 'flexible';

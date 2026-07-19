@@ -88,7 +88,7 @@ class WhatsappWalletAdminController extends Controller
             'transactions as p2p_count' => fn ($q) => $q->p2p(),
             'transactions as topups_count' => fn ($q) => $q->where('type', WhatsappWalletTransaction::TYPE_TOPUP),
         ]);
-        $wallet->load('linkedBusiness');
+        $wallet->load(['linkedBusiness', 'referralAsReferred.referrerWallet', 'referralsAsReferrer']);
 
         $recentTx = $wallet->transactions()
             ->orderByDesc('id')
@@ -149,6 +149,8 @@ class WhatsappWalletAdminController extends Controller
             'transferLockMeta' => $transferLockMeta,
             'stepUpRequired' => $stepUpRequired,
             'pendingStepUpSessions' => $pendingStepUpSessions,
+            'referralAsReferred' => $wallet->referralAsReferred,
+            'referralsMadeCount' => $wallet->referralsAsReferrer->count(),
         ]);
     }
 

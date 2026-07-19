@@ -25,6 +25,10 @@ class Kernel extends ConsoleKernel
             ->dailyAt('18:00')
             ->timezone('Africa/Lagos')
             ->withoutOverlapping(30);
+        $schedule->command('wallet:referral-leaderboard')
+            ->monthlyOn(1, '00:30')
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping(60);
         $schedule->command('overdraft:charge-interest')->weekly();
         $schedule->command('overdraft:process-installments')->daily();
         // Peer loans: one scheduler pass per repayment rhythm (offer frequency). Lump-sum loans run with the daily pass.

@@ -161,6 +161,7 @@ class ConsumerWalletAuthController extends Controller
             'nin' => 'nullable|string|regex:/^(\d{11})?$/',
             'dob' => 'nullable|date_format:Y-m-d',
             'gender' => 'nullable|string|in:male,female,M,F,m,f',
+            'referral_code' => 'nullable|string|max:64',
         ]);
 
         $result = $registration->register(
@@ -174,6 +175,7 @@ class ConsumerWalletAuthController extends Controller
                 'nin' => $request->input('nin'),
                 'dob' => $request->input('dob'),
                 'gender' => $request->input('gender'),
+                'referral_code' => $request->input('referral_code'),
             ],
         );
 

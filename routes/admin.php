@@ -274,6 +274,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
             // Wallet settings / account mutations (not wallet_support)
             Route::get('whatsapp-wallet/settings', [WhatsappWalletAdminController::class, 'settings'])->name('whatsapp-wallet.settings');
+            Route::put('whatsapp-wallet/referrals/settings', [\App\Http\Controllers\Admin\WhatsappWalletReferralAdminController::class, 'updateSettings'])
+                ->name('whatsapp-wallet.referrals.settings');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
             Route::put('whatsapp-wallet/wallets/{wallet}/status', [WhatsappWalletAdminController::class, 'updateWalletStatus'])->name('whatsapp-wallet.wallets.status');
@@ -333,6 +335,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::get('whatsapp-wallet/transactions/p2p', [WhatsappWalletTransactionAdminController::class, 'p2p'])->name('whatsapp-wallet.transactions.p2p');
             Route::get('whatsapp-wallet/money-requests', [WhatsappWalletMoneyRequestAdminController::class, 'index'])->name('whatsapp-wallet.money-requests.index');
             Route::get('whatsapp-wallet/save-together', [WhatsappSaveTogetherAdminController::class, 'index'])->name('whatsapp-wallet.save-together.index');
+            Route::get('whatsapp-wallet/referrals', [\App\Http\Controllers\Admin\WhatsappWalletReferralAdminController::class, 'index'])
+                ->name('whatsapp-wallet.referrals.index');
             Route::get('whatsapp-wallet/transactions/failed', [WhatsappWalletTransactionAdminController::class, 'failed'])->name('whatsapp-wallet.transactions.failed');
             Route::get('whatsapp-wallet/transactions/pending', [WhatsappWalletTransactionAdminController::class, 'pending'])->name('whatsapp-wallet.transactions.pending');
             Route::get('whatsapp-wallet/transactions/{transaction}', [WhatsappWalletTransactionAdminController::class, 'show'])->name('whatsapp-wallet.transactions.show');

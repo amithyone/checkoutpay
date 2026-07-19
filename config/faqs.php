@@ -250,12 +250,48 @@ return [
             'keywords' => ['agency', 'multiple clients'],
         ],
 
-        // WhatsApp wallet (8)
+        // WhatsApp wallet
         [
             'category' => 'whatsapp-wallet',
             'q' => 'What is CheckoutPay WhatsApp Wallet?',
             'a' => 'WhatsApp Wallet lets consumers send money on WhatsApp or to any Nigerian bank account, with PIN-protected confirmations on secure CheckoutPay pages. It is powered by the same backend as merchant tools on check-outpay.com.',
             'keywords' => ['WhatsApp wallet', 'send money Nigeria'],
+        ],
+        [
+            'category' => 'whatsapp-wallet',
+            'q' => 'What is the wallet referral programme?',
+            'a' => 'When enabled, you can invite friends to CheckoutNow using your pay code or phone number (they enter it at signup), or by being the first person to send them money on wallet. You may earn referral rewards when they use the wallet, subject to the current rules shown in the app.',
+            'keywords' => ['referral', 'invite', 'pay code'],
+        ],
+        [
+            'category' => 'whatsapp-wallet',
+            'q' => 'Why do you pay referral bonuses?',
+            'a' => 'Referrals are how we grow through word of mouth—referral marketing and customer acquisition. Rewards are our cost of bringing engaged users onto the wallet. On average we aim for a fair trade: what we pay referrers tracks our customer acquisition cost versus the value of an active customer.',
+            'keywords' => ['referral bonus', 'why referral', 'CAC', 'acquisition'],
+        ],
+        [
+            'category' => 'whatsapp-wallet',
+            'q' => 'How do you make money if you pay referrers?',
+            'a' => 'We earn when people use the product—transfers, bills, cards, and related services. Referral spend is budgeted as marketing (customer acquisition), with rates, caps, and an on/off switch so it stays sustainable. See current rates in the CheckoutNow app; we can adjust or pause the programme.',
+            'keywords' => ['referral cost', 'marketing', 'how CheckoutPay makes money'],
+        ],
+        [
+            'category' => 'whatsapp-wallet',
+            'q' => 'How do I become someone’s referrer?',
+            'a' => 'They enter your pay code or phone when they register (that always wins), or—if they signed up with no code—you are the first person to successfully send them money to their wallet.',
+            'keywords' => ['become referrer', 'first P2P', 'referral code'],
+        ],
+        [
+            'category' => 'whatsapp-wallet',
+            'q' => 'How long do referral bonuses last on an account I introduced?',
+            'a' => 'Each referred account has a limited bonus window from the date they were attributed to you. The length and other rules are shown in the app and can be changed by CheckoutPay for future rewards. Past bonuses already paid stay paid.',
+            'keywords' => ['referral window', 'how long', 'expires'],
+        ],
+        [
+            'category' => 'whatsapp-wallet',
+            'q' => 'Can referral rates change?',
+            'a' => 'Yes. Percentages, milestone amounts, and leaderboard pots are set by CheckoutPay and shown in the app. Changes apply to future rewards; we may also turn the whole programme off or on.',
+            'keywords' => ['referral rates', 'change', 'settings'],
         ],
         [
             'category' => 'whatsapp-wallet',

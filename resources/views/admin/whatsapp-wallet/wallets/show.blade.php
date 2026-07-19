@@ -37,6 +37,19 @@
                     @if($wallet->pay_code)
                         <p class="text-sm text-gray-500 mt-1">Pay code: <span class="font-mono font-medium">{{ $wallet->pay_code }}</span></p>
                     @endif
+                    @if(!empty($referralAsReferred))
+                        <p class="text-sm text-gray-500 mt-1">
+                            Referred by
+                            <a href="{{ route('admin.whatsapp-wallet.wallets.show', $referralAsReferred->referrer_wallet_id) }}" class="text-green-700 hover:underline font-mono">
+                                {{ $referralAsReferred->referrerWallet?->phone_e164 ?? ('#'.$referralAsReferred->referrer_wallet_id) }}
+                            </a>
+                            <span class="text-gray-400">({{ $referralAsReferred->attribution_source }})</span>
+                        </p>
+                    @endif
+                    <p class="text-sm text-gray-500 mt-1">
+                        Referrals made:
+                        <a href="{{ route('admin.whatsapp-wallet.referrals.index') }}" class="text-green-700 hover:underline">{{ (int) ($referralsMadeCount ?? 0) }}</a>
+                    </p>
                 </div>
                 <div class="text-right">
                     <p class="text-sm text-gray-500">Personal balance</p>

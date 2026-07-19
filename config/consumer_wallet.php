@@ -123,6 +123,28 @@ return [
     ],
 
     /**
+     * Wallet referral programme (admin Setting keys override these defaults).
+     * Commercial numbers must never be hardcoded in services — use WalletReferralSettingsService.
+     */
+    'referral' => [
+        'enabled' => filter_var(env('CONSUMER_REFERRAL_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'bonus_months' => max(1, (int) env('CONSUMER_REFERRAL_BONUS_MONTHS', 6)),
+        'first_deposit_percent' => (float) env('CONSUMER_REFERRAL_FIRST_DEPOSIT_PERCENT', 5),
+        'first_deposit_max_ngn' => env('CONSUMER_REFERRAL_FIRST_DEPOSIT_MAX_NGN') !== null
+            && env('CONSUMER_REFERRAL_FIRST_DEPOSIT_MAX_NGN') !== ''
+            ? (float) env('CONSUMER_REFERRAL_FIRST_DEPOSIT_MAX_NGN')
+            : null,
+        'first_deposit_min_ngn' => (float) env('CONSUMER_REFERRAL_FIRST_DEPOSIT_MIN_NGN', 0),
+        'milestone_every' => max(1, (int) env('CONSUMER_REFERRAL_MILESTONE_EVERY', 100)),
+        'milestone_amount_ngn' => (float) env('CONSUMER_REFERRAL_MILESTONE_AMOUNT_NGN', 200),
+        'leaderboard_enabled' => filter_var(env('CONSUMER_REFERRAL_LEADERBOARD_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'leaderboard_month_pot_ngn' => (float) env('CONSUMER_REFERRAL_LEADERBOARD_POT_NGN', 0),
+        'leaderboard_top_n' => max(1, (int) env('CONSUMER_REFERRAL_LEADERBOARD_TOP_N', 10)),
+        'leaderboard_split' => env('CONSUMER_REFERRAL_LEADERBOARD_SPLIT', 'equal'),
+        'timezone' => env('CONSUMER_REFERRAL_TIMEZONE', 'Africa/Lagos'),
+    ],
+
+    /**
      * Daily “complete a transaction” nudges (Laravel schedule 09:00 / 18:00 Africa/Lagos).
      * App push only — never WhatsApp.
      */

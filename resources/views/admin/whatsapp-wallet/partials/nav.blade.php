@@ -34,6 +34,10 @@
        class="inline-flex items-center shrink-0 px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.save-together.*']) }}">
         <i class="fas fa-users mr-2 text-green-600"></i> Save Together
     </a>
+    <a href="{{ route('admin.whatsapp-wallet.referrals.index') }}"
+       class="inline-flex items-center shrink-0 px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.referrals.*']) }}">
+        <i class="fas fa-user-friends mr-2 text-green-600"></i> Referrals
+    </a>
     <a href="{{ route('admin.whatsapp-wallet.transactions.pending') }}"
        class="inline-flex items-center shrink-0 px-3 py-2 rounded-lg border text-sm {{ $navClass(['admin.whatsapp-wallet.transactions.pending']) }}">
         <i class="fas fa-clock mr-2 text-amber-600"></i> Pending payouts

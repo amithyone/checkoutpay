@@ -20,6 +20,7 @@ class WhatsappWallet extends Model
     protected $fillable = [
         'phone_e164',
         'pay_code',
+        'referred_by_wallet_id',
         'renter_id',
         'tier',
         'balance',
@@ -104,6 +105,21 @@ class WhatsappWallet extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(WhatsappWalletTransaction::class, 'whatsapp_wallet_id');
+    }
+
+    public function referredByWallet(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'referred_by_wallet_id');
+    }
+
+    public function referralAsReferred(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(WhatsappWalletReferral::class, 'referred_wallet_id');
+    }
+
+    public function referralsAsReferrer(): HasMany
+    {
+        return $this->hasMany(WhatsappWalletReferral::class, 'referrer_wallet_id');
     }
 
     public function businessNameRegistrations(): HasMany

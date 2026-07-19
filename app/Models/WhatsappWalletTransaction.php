@@ -70,6 +70,25 @@ class WhatsappWalletTransaction extends Model
     /** @deprecated Use TYPE_PARTNER_MERCHANT_PAY; kept for existing rows. */
     public const TYPE_TAGINE_MERCHANT_PAY = 'tagine_merchant_pay';
 
+    public const TYPE_REFERRAL_BONUS_FIRST_DEPOSIT = 'referral_bonus_first_deposit';
+
+    public const TYPE_REFERRAL_BONUS_MILESTONE = 'referral_bonus_milestone';
+
+    public const TYPE_REFERRAL_BONUS_LEADERBOARD = 'referral_bonus_leaderboard';
+
+    /** Outbound activity that counts toward referrer milestones. */
+    public const REFERRAL_COUNTED_TYPES = [
+        self::TYPE_VTU_AIRTIME,
+        self::TYPE_VTU_DATA,
+        self::TYPE_VTU_ELECTRICITY,
+        self::TYPE_VTU_CABLE,
+        self::TYPE_VTU_BETTING,
+        self::TYPE_P2P_DEBIT,
+        self::TYPE_BANK_TRANSFER_OUT,
+        self::TYPE_PARTNER_MERCHANT_PAY,
+        self::TYPE_TAGINE_MERCHANT_PAY,
+    ];
+
     protected $fillable = [
         'whatsapp_wallet_id',
         'sender_name',
