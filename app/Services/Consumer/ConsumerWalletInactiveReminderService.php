@@ -164,6 +164,10 @@ class ConsumerWalletInactiveReminderService
 
     private function sendWhatsapp(WhatsappWallet $wallet, string $displayName, string $balanceLabel): bool
     {
+        if (! \App\Services\Whatsapp\WhatsappProactiveOutbound::enabled()) {
+            return false;
+        }
+
         $instance = WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance === '') {
             return false;

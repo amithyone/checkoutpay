@@ -460,6 +460,10 @@ class WhatsappWalletMoneyRequestService
             ]);
         }
 
+        if (! WhatsappProactiveOutbound::enabled()) {
+            return;
+        }
+
         $instance = WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance === '') {
             return;
@@ -549,6 +553,10 @@ class WhatsappWalletMoneyRequestService
             'type' => $accepted ? 'money_request_accepted' : 'money_request_declined',
             'money_request_id' => (string) $request->public_id,
         ]);
+
+        if (! WhatsappProactiveOutbound::enabled()) {
+            return;
+        }
 
         $instance = WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance === '') {

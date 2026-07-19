@@ -126,7 +126,22 @@ final class WhatsappEvolutionConfigResolver
             return false;
         }
 
-        return strcasecmp($instance, self::rentalsInstance()) === 0;
+        if (! (bool) config('whatsapp.evolution.rentals_dedicated_only', true)) {
+            return false;
+        }
+
+        $rentals = self::rentalsInstance();
+        if ($rentals === '' || strcasecmp($instance, $rentals) !== 0) {
+            return false;
+        }
+
+        // Shared number: wallet OTP/bot and rentals on the same Evolution instance.
+        if (strcasecmp(self::walletInstance(), $rentals) === 0
+            || strcasecmp(self::defaultInstance(), $rentals) === 0) {
+            return false;
+        }
+
+        return true;
     }
 
     /** Public Checkout base for webhook URL (admin whatsapp_app_url overrides WHATSAPP_APP_URL / APP_URL). */

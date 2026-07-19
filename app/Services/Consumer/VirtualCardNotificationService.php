@@ -122,12 +122,16 @@ final class VirtualCardNotificationService
 
     private function sendWhatsapp(WhatsappWallet $wallet, string $text): void
     {
+        if (! \App\Services\Whatsapp\WhatsappProactiveOutbound::enabled()) {
+            return;
+        }
+
         $instance = WhatsappSession::query()
             ->where('phone_e164', $wallet->phone_e164)
             ->value('evolution_instance');
 
         if ($instance === null || $instance === '') {
-            $instance = (string) config('whatsapp.evolution.instance', '');
+            $instance = \App\Services\Whatsapp\WhatsappEvolutionConfigResolver::walletInstance();
         }
 
         if ($instance === '') {

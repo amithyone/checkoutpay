@@ -118,6 +118,16 @@ return [
         '090267', // Kuda
     ],
 
+    /*
+    | Proactive outbound WhatsApp (top-up/P2P/card/money-request alerts, inactive reminders).
+    | Keep false when the primary line is blocked — OTP + interactive bot replies still send.
+    | Admin Setting whatsapp_proactive_notifications_enabled overrides when set.
+    */
+    'proactive_notifications_enabled' => filter_var(
+        env('WHATSAPP_PROACTIVE_NOTIFICATIONS_ENABLED', false),
+        FILTER_VALIDATE_BOOL
+    ),
+
     'evolution' => [
         'base_url' => rtrim((string) env('WHATSAPP_EVOLUTION_BASE_URL', ''), '/'),
         'api_key' => (string) env('WHATSAPP_EVOLUTION_API_KEY', ''),
@@ -127,6 +137,14 @@ return [
         'wallet_instance' => (string) env('WHATSAPP_EVOLUTION_INSTANCE_WALLET', ''),
         /** Dedicated rentals-only inbound instance (optional). */
         'rentals_instance' => (string) env('WHATSAPP_EVOLUTION_INSTANCE_RENTALS', ''),
+        /**
+         * When true, rentals_instance rejects WALLET commands (rentals-only line).
+         * Set false when Checkout + Rentals share one WhatsApp number.
+         */
+        'rentals_dedicated_only' => filter_var(
+            env('WHATSAPP_RENTALS_DEDICATED_ONLY', true),
+            FILTER_VALIDATE_BOOL
+        ),
     ],
 
     'otp' => [

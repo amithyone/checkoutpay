@@ -51,6 +51,10 @@ class WhatsappWalletTopupNotifier
             $crossBorderFx,
         );
 
+        if (! WhatsappProactiveOutbound::enabled()) {
+            return;
+        }
+
         $instance = $senderChatInstance !== ''
             ? $senderChatInstance
             : (string) (WhatsappSession::query()
@@ -58,7 +62,7 @@ class WhatsappWalletTopupNotifier
                 ->value('evolution_instance') ?? '');
 
         if ($instance === '') {
-            $instance = (string) config('whatsapp.evolution.instance', '');
+            $instance = WhatsappEvolutionConfigResolver::walletInstance();
         }
 
         if ($instance === '') {
@@ -202,12 +206,16 @@ class WhatsappWalletTopupNotifier
             $this->consumerPush->notifyWalletCredited($wallet, $credited, $balanceAfter);
         }
 
+        if (! WhatsappProactiveOutbound::enabled()) {
+            return;
+        }
+
         $instance = WhatsappSession::query()
             ->where('phone_e164', $wallet->phone_e164)
             ->value('evolution_instance');
 
         if ($instance === null || $instance === '') {
-            $instance = (string) config('whatsapp.evolution.instance', '');
+            $instance = WhatsappEvolutionConfigResolver::walletInstance();
         }
 
         if ($instance === '') {
