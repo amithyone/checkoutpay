@@ -5,16 +5,17 @@ namespace App\Http\Controllers\Api\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\Bank;
 use App\Models\Renter;
+use App\Services\BankLogoService;
 use App\Services\MevonPayBankService;
 use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class KycController extends Controller
 {
     public function __construct(
         protected NubanValidationService $nubanService,
         protected MevonPayBankService $mevonBankService,
+        protected BankLogoService $bankLogos,
     ) {}
 
     /**
@@ -47,7 +48,7 @@ class KycController extends Controller
         }
 
         return response()->json([
-            'banks' => $banks,
+            'banks' => is_array($banks) ? $this->bankLogos->enrichRowsWithLogoUrl($banks) : $banks,
         ]);
     }
 
@@ -57,15 +58,8 @@ class KycController extends Controller
      */
     public function banksFromDatabase()
     {
-        $banks = Cache::remember('rentals:banks:list:v1', now()->addHours(6), function () {
-            return Bank::query()
-                ->orderBy('name')
-                ->get(['code', 'name'])
-                ->toArray();
-        });
-
         return response()->json([
-            'banks' => $banks,
+            'banks' => $this->bankLogos->listForApi(),
         ]);
     }
 

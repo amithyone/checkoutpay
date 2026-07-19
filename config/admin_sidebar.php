@@ -35,6 +35,7 @@ return [
         'email_accounts',
         'account_numbers',
         'bank_email_templates',
+        'bank_logos',
         'test_transaction',
         'renters',
         'tickets',

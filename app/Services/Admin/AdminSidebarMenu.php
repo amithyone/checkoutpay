@@ -280,6 +280,10 @@ class AdminSidebarMenu
                 $this->link('Bank Templates', 'admin.bank-email-templates.index', 'fas fa-university', ['admin.bank-email-templates.*']),
                 ['visible' => ! $admin->isWalletSupport()]
             ),
+            'bank_logos' => array_merge(
+                $this->link('Bank Logos', 'admin.bank-logos.index', 'fas fa-image', ['admin.bank-logos.*']),
+                ['visible' => $admin->canMutateWalletAccounts()]
+            ),
             'test_transaction' => array_merge(
                 $this->link('Test Transaction', 'admin.test-transaction.index', 'fas fa-flask', ['admin.test-transaction.*']),
                 ['visible' => ! $admin->isWalletSupport()]

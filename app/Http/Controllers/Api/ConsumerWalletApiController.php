@@ -36,6 +36,7 @@ use App\Services\Whatsapp\WhatsappWalletSecureTransferAuthService;
 use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
 use App\Services\Whatsapp\WhatsappWalletVtuPurchaseService;
 use App\Services\WhatsappWalletBankPayoutService;
+use App\Services\BankLogoService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +46,7 @@ use Illuminate\Validation\ValidationException;
 class ConsumerWalletApiController extends Controller
 {
     public function __construct(
+        private BankLogoService $bankLogos,
         private WhatsappWalletPartnerApiService $partnerApi,
         private WhatsappWalletTier1TopupVaService $tier1TopupVa,
         private WhatsappWalletCountryResolver $walletCountry,
@@ -1171,6 +1173,20 @@ class ConsumerWalletApiController extends Controller
                 'balance_after' => isset($result['balance_after']) ? (float) $result['balance_after'] : (float) $wallet->fresh()->balance,
             ] : null,
         ], $ok ? 200 : 422);
+    }
+
+    /**
+     * GET /api/v1/consumer/banks
+     * Full bank directory with logo_url (SVG/PNG absolute URL) for native + web pickers.
+     */
+    public function banks(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'banks' => $this->bankLogos->listForApi(),
+            ],
+        ]);
     }
 
     public function bankNameEnquiry(Request $request): JsonResponse

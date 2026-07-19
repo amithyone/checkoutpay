@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AuditsController;
 use App\Http\Controllers\Admin\MevonPayAuditController;
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
+use App\Http\Controllers\Admin\BankLogoController;
 use App\Http\Controllers\Admin\BusinessNameRegistrationAdminController;
 use App\Http\Controllers\Admin\BusinessAccountApplicationAdminController;
 use App\Http\Controllers\Admin\BusinessController;
@@ -366,6 +367,15 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
         // Bank Email Templates
         Route::resource('bank-email-templates', BankEmailTemplateController::class);
+
+        // Bank logos (map / upload; does not alter bank codes)
+        Route::middleware('admin_or_super')->group(function () {
+            Route::get('bank-logos', [BankLogoController::class, 'index'])->name('bank-logos.index');
+            Route::post('bank-logos/auto-map', [BankLogoController::class, 'autoMap'])->name('bank-logos.auto-map');
+            Route::post('bank-logos/{bank}/upload', [BankLogoController::class, 'upload'])->name('bank-logos.upload');
+            Route::post('bank-logos/{bank}/assign', [BankLogoController::class, 'assign'])->name('bank-logos.assign');
+            Route::delete('bank-logos/{bank}', [BankLogoController::class, 'clear'])->name('bank-logos.clear');
+        });
 
         // Email Monitoring
         Route::post('email-monitor/fetch', [\App\Http\Controllers\Admin\EmailMonitorController::class, 'fetchEmails'])->name('email-monitor.fetch');
