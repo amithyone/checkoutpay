@@ -51,7 +51,7 @@ class ConsumerWalletPinRecoveryService
         }
 
         if ($wallet->isTier2()) {
-            if ($this->pinReset->shouldPromptBvn($wallet) && preg_replace('/\D/', '', (string) $wallet->kyc_bvn) !== '') {
+            if ($this->pinReset->shouldPromptBvn($wallet) && $this->pinReset->storedIdentityDigits($wallet) !== '') {
                 $methods[] = 'tier2_bvn';
             }
             if ($this->pinReset->bankNameForMatch($wallet) !== '') {
@@ -137,7 +137,7 @@ class ConsumerWalletPinRecoveryService
         }
 
         if (! $wallet->isTier2()) {
-            return ['ok' => false, 'message' => 'BVN recovery requires a Tier 2 wallet.'];
+            return ['ok' => false, 'message' => 'BVN/NIN recovery requires a Tier 2 wallet.'];
         }
 
         if ($this->isRateLimited($wallet)) {
@@ -147,7 +147,7 @@ class ConsumerWalletPinRecoveryService
         if (! $this->pinReset->verifyBvn($wallet, $bvnInput)) {
             $this->recordFailure($wallet, 'bvn_failed');
 
-            return ['ok' => false, 'message' => 'BVN does not match our records.'];
+            return ['ok' => false, 'message' => 'BVN/NIN does not match our records.'];
         }
 
         return $this->issueRecoveryToken($wallet, 'tier2_bvn');
@@ -264,12 +264,12 @@ class ConsumerWalletPinRecoveryService
 
     private function bvnSuffix(WhatsappWallet $wallet): ?string
     {
-        $bvn = preg_replace('/\D/', '', (string) $wallet->kyc_bvn) ?? '';
-        if (strlen($bvn) !== 11) {
+        $id = $this->pinReset->storedIdentityDigits($wallet);
+        if ($id === '') {
             return null;
         }
 
-        return substr($bvn, -4);
+        return substr($id, -4);
     }
 
     /**

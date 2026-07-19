@@ -18,6 +18,7 @@ class EvolutionWhatsAppClient
         $base = WhatsappEvolutionConfigResolver::baseUrl();
         $key = WhatsappEvolutionConfigResolver::apiKey();
         $instanceName = $instanceName !== '' ? $instanceName : WhatsappEvolutionConfigResolver::defaultInstance();
+        $instanceName = WhatsappEvolutionConfigResolver::canonicalInstanceName($instanceName);
 
         if ($base === '' || $key === '' || $instanceName === '') {
             Log::warning('whatsapp.evolution: missing base_url, api_key, or instance', [
@@ -83,6 +84,7 @@ class EvolutionWhatsAppClient
         $base = WhatsappEvolutionConfigResolver::baseUrl();
         $key = WhatsappEvolutionConfigResolver::apiKey();
         $instanceName = $instanceName !== '' ? $instanceName : WhatsappEvolutionConfigResolver::defaultInstance();
+        $instanceName = WhatsappEvolutionConfigResolver::canonicalInstanceName($instanceName);
 
         if ($base === '' || $key === '' || $instanceName === '') {
             Log::warning('whatsapp.evolution: missing base_url, api_key, or instance', [

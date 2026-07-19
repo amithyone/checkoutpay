@@ -52,6 +52,7 @@ class WhatsappWallet extends Model
         'kyc_gender',
         'kyc_dob',
         'kyc_bvn',
+        'kyc_nin',
         'kyc_national_id',
         'kyc_email',
         'card_home_number',

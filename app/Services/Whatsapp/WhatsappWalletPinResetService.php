@@ -69,13 +69,19 @@ class WhatsappWalletPinResetService
 
     public function verifyBvn(WhatsappWallet $wallet, string $input): bool
     {
-        $stored = preg_replace('/\D/', '', (string) $wallet->kyc_bvn) ?? '';
         $given = preg_replace('/\D/', '', $input) ?? '';
-        if (strlen($stored) !== 11 || strlen($given) !== 11) {
+        if (strlen($given) !== 11) {
             return false;
         }
 
-        return hash_equals($stored, $given);
+        foreach ([(string) $wallet->kyc_bvn, (string) $wallet->kyc_nin] as $candidate) {
+            $stored = preg_replace('/\D/', '', $candidate) ?? '';
+            if (strlen($stored) === 11 && hash_equals($stored, $given)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function verifyCac(WhatsappWallet $wallet, string $input): bool
@@ -97,10 +103,23 @@ class WhatsappWalletPinResetService
     public function shouldPromptBvn(WhatsappWallet $wallet): bool
     {
         if ($this->isBusinessAccount($wallet)) {
-            return preg_replace('/\D/', '', (string) $wallet->kyc_bvn) !== '';
+            return $this->storedIdentityDigits($wallet) !== '';
         }
 
         return true;
+    }
+
+    /** 11-digit BVN or NIN stored on the wallet (Nigeria Tier 2 personal). */
+    public function storedIdentityDigits(WhatsappWallet $wallet): string
+    {
+        foreach ([(string) $wallet->kyc_bvn, (string) $wallet->kyc_nin] as $candidate) {
+            $digits = preg_replace('/\D/', '', $candidate) ?? '';
+            if (strlen($digits) === 11) {
+                return $digits;
+            }
+        }
+
+        return '';
     }
 
     public function shouldPromptCac(WhatsappWallet $wallet): bool

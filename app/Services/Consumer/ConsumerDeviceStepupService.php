@@ -88,7 +88,7 @@ class ConsumerDeviceStepupService
 
         $wallet = $session->wallet;
         if (! $wallet || ! $this->pinReset->verifyBvn($wallet, $bvn)) {
-            return ['ok' => false, 'message' => 'BVN does not match our records.'];
+            return ['ok' => false, 'message' => 'BVN/NIN does not match our records.'];
         }
 
         $session->bvn_verified_at = now();
@@ -108,7 +108,7 @@ class ConsumerDeviceStepupService
         }
 
         if ($session->bvn_verified_at === null) {
-            return ['ok' => false, 'message' => 'Verify BVN first.'];
+            return ['ok' => false, 'message' => 'Verify BVN/NIN first.'];
         }
 
         $result = $this->otp->requestOtp((string) $session->phone_e164, $channel);
@@ -130,7 +130,7 @@ class ConsumerDeviceStepupService
         }
 
         if ($session->bvn_verified_at === null) {
-            return ['ok' => false, 'message' => 'Verify BVN first.'];
+            return ['ok' => false, 'message' => 'Verify BVN/NIN first.'];
         }
 
         $verified = $this->otp->verifyOtp((string) $session->phone_e164, $code);

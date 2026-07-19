@@ -3,12 +3,76 @@
 namespace App\Services\Whatsapp;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Evolution API URL/key/instance: admin Settings override .env (matches WhatsApp wallet admin form).
  */
 final class WhatsappEvolutionConfigResolver
 {
+    /**
+     * Evolution API instance paths are case-sensitive. Resolve configured names
+     * (e.g. "rentals") to the canonical name from Evolution (e.g. "Rentals").
+     */
+    public static function canonicalInstanceName(string $instanceName): string
+    {
+        $requested = trim($instanceName);
+        if ($requested === '') {
+            return '';
+        }
+
+        $cacheKey = 'whatsapp.evolution.canonical_instance:'.strtolower($requested);
+        $cached = cache()->get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        $canonical = self::lookupCanonicalInstanceName($requested) ?? $requested;
+        cache()->put($cacheKey, $canonical, now()->addMinutes(10));
+
+        return $canonical;
+    }
+
+    private static function lookupCanonicalInstanceName(string $requested): ?string
+    {
+        $base = self::baseUrl();
+        $key = self::apiKey();
+        if ($base === '' || $key === '') {
+            return null;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'apikey' => $key,
+            ])
+                ->timeout(10)
+                ->get($base.'/instance/fetchInstances');
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $rows = $response->json();
+            if (! is_array($rows)) {
+                return null;
+            }
+
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $name = trim((string) ($row['name'] ?? $row['instance']['instanceName'] ?? ''));
+                if ($name !== '' && strcasecmp($name, $requested) === 0) {
+                    return $name;
+                }
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
+    }
+
     public static function baseUrl(): string
     {
         $db = Setting::get('whatsapp_evolution_base_url');

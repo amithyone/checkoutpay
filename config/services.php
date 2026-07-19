@@ -51,6 +51,8 @@ return [
         'account_logs_enabled' => (bool) env('MEVONPAY_ACCOUNT_LOGS_ENABLED', false),
         /** TSQ (transaction status) path — POST with { "reference": "..." }. */
         'transfer_status_path' => env('MEVONPAY_TRANSFER_STATUS_PATH', '/V1/tsk'),
+        /** Standalone NIN verify (₦50 / success). Used when Tier 2 personal KYC submits nin. */
+        'nin_verify_path' => env('MEVONPAY_NIN_VERIFY_PATH', '/V1/nin-verify'),
         /** bearer (default for /V1/tsk), token (same as payout), or raw */
         'transfer_status_auth' => env('MEVONPAY_TRANSFER_STATUS_AUTH', 'bearer'),
         /** Merchant card checkout (Paga) — POST /V1/card_checkout */

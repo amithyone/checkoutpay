@@ -3,6 +3,7 @@
 namespace App\Services\Consumer;
 
 use App\Models\WhatsappWallet;
+use App\Services\MevonPay\MevonNinVerifyService;
 use App\Services\MevonRubiesVirtualAccountService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
@@ -15,6 +16,7 @@ class ConsumerWalletKycService
 {
     public function __construct(
         private MevonRubiesVirtualAccountService $rubies,
+        private MevonNinVerifyService $ninVerify,
         private WhatsappWalletCountryResolver $walletCountry,
         private KenyaKycVerificationService $kenyaKyc,
     ) {}
@@ -44,6 +46,7 @@ class ConsumerWalletKycService
                 'kyc_email' => $wallet->kyc_email,
                 'kyc_dob' => $wallet->kyc_dob?->format('Y-m-d'),
                 'kyc_cac' => $wallet->kyc_cac,
+                'kyc_id_type' => $this->nigeriaKycIdType($wallet),
                 'country_iso' => $iso,
                 'kyc_mode' => $mode,
                 'kenya_tier2_enabled' => $iso === 'KE' ? $this->kenyaKyc->isReady() : false,
@@ -94,12 +97,29 @@ class ConsumerWalletKycService
             return ['ok' => false, 'message' => 'Gender is required (male or female).'];
         }
 
+        $useBvn = strlen($bvn) === 11;
+        $useNin = ! $useBvn && strlen($nin) === 11;
+        if (! $useBvn && ! $useNin) {
+            return ['ok' => false, 'message' => 'BVN or NIN (11 digits) is required.'];
+        }
+
         try {
-            $created = strlen($bvn) === 11
+            if ($useNin) {
+                if (! $this->ninVerify->isConfigured()) {
+                    return ['ok' => false, 'message' => 'NIN verification is not configured.'];
+                }
+                $this->ninVerify->verify($nin, $dob, $fname, $lname);
+            }
+
+            $created = $useBvn
                 ? $this->rubies->createRubiesPersonalAccount($fname, $lname, $apiPhone, $dob, $email, $bvn, null)
-                : $this->rubies->createRubiesPersonalAccount($fname, $lname, $apiPhone, $dob, $email, null, strlen($nin) === 11 ? $nin : null);
+                : $this->rubies->createRubiesPersonalAccount($fname, $lname, $apiPhone, $dob, $email, null, $nin);
         } catch (\Throwable $e) {
-            Log::warning('consumer_wallet.kyc.personal_failed', ['wallet_id' => $wallet->id, 'error' => $e->getMessage()]);
+            Log::warning('consumer_wallet.kyc.personal_failed', [
+                'wallet_id' => $wallet->id,
+                'id_type' => $useBvn ? 'bvn' : 'nin',
+                'error' => $e->getMessage(),
+            ]);
 
             return ['ok' => false, 'message' => $e->getMessage()];
         }
@@ -112,7 +132,8 @@ class ConsumerWalletKycService
             'kyc_lname' => $lname,
             'kyc_gender' => $gender,
             'kyc_dob' => $dob,
-            'kyc_bvn' => strlen($bvn) === 11 ? $bvn : null,
+            'kyc_bvn' => $useBvn ? $bvn : null,
+            'kyc_nin' => $useNin ? $nin : null,
             'kyc_email' => $email,
             'kyc_verified_at' => now(),
             'mevon_virtual_account_number' => $created['account_number'],
@@ -168,6 +189,7 @@ class ConsumerWalletKycService
             'kyc_gender' => null,
             'kyc_dob' => $dob,
             'kyc_bvn' => null,
+            'kyc_nin' => null,
             'kyc_email' => $email,
             'kyc_verified_at' => now(),
             'mevon_virtual_account_number' => $created['account_number'],
@@ -180,6 +202,20 @@ class ConsumerWalletKycService
         ]);
 
         return ['ok' => true, 'message' => 'Business Tier 2 activated.', 'data' => $this->vaPayload($wallet->fresh())];
+    }
+
+    private function nigeriaKycIdType(WhatsappWallet $wallet): ?string
+    {
+        $bvn = preg_replace('/\D+/', '', (string) $wallet->kyc_bvn) ?? '';
+        if (strlen($bvn) === 11) {
+            return 'bvn';
+        }
+        $nin = preg_replace('/\D+/', '', (string) $wallet->kyc_nin) ?? '';
+        if (strlen($nin) === 11) {
+            return 'nin';
+        }
+
+        return null;
     }
 
     /**

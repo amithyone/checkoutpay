@@ -112,6 +112,7 @@ final class KenyaKycVerificationService
             'kyc_gender' => $gender,
             'kyc_dob' => $dob,
             'kyc_bvn' => null,
+            'kyc_nin' => null,
             'kyc_national_id' => $nationalId,
             'kyc_email' => $email,
             'kyc_verified_at' => now(),
