@@ -6,17 +6,17 @@ use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletInactiveReminder;
 use App\Services\PushNotificationService;
-use App\Services\Whatsapp\EvolutionWhatsAppClient;
-use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
-use App\Services\Whatsapp\WhatsappWalletAppLinkCopy;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Daily “do a transaction” nudges for wallets that still have balance but no activity today.
+ * Delivered via CheckoutNow app push (FCM/APNs) only — never WhatsApp (treated as spam).
+ */
 class ConsumerWalletInactiveReminderService
 {
     public function __construct(
-        private EvolutionWhatsAppClient $whatsapp,
         private PushNotificationService $push,
     ) {}
 
@@ -64,18 +64,13 @@ class ConsumerWalletInactiveReminderService
                 $stats['push']++;
             }
 
-            if ($this->sendWhatsapp($wallet, $displayName, $balanceLabel)) {
-                $reminder->whatsapp_sent = true;
-                $stats['whatsapp']++;
-            }
-
             $reminder->save();
 
             Log::info('consumer_wallet.inactive_reminder.sent', [
                 'wallet_id' => $wallet->id,
                 'slot' => $slot,
                 'push' => $reminder->push_sent,
-                'whatsapp' => $reminder->whatsapp_sent,
+                'whatsapp' => false,
             ]);
         }
 
@@ -98,6 +93,8 @@ class ConsumerWalletInactiveReminderService
     }
 
     /**
+     * App-installed wallets only (native push token), with balance and no activity today.
+     *
      * @return Collection<int, WhatsappWallet>
      */
     private function candidateWallets(Carbon $startOfDay, float $minBalance): Collection
@@ -111,6 +108,11 @@ class ConsumerWalletInactiveReminderService
             })
             ->whereDoesntHave('consumerApiAccount', function ($query) use ($startOfDay) {
                 $query->where('last_app_active_at', '>=', $startOfDay);
+            })
+            ->whereHas('consumerApiAccount', function ($query) {
+                $query->whereNotNull('fcm_token')
+                    ->where('fcm_token', '!=', '')
+                    ->where('fcm_platform', '!=', 'web');
             })
             ->orderBy('id')
             ->get();
@@ -159,36 +161,7 @@ class ConsumerWalletInactiveReminderService
         );
         ConsumerWalletApiAccount::clearFcmTokenIfInvalid($target['token'], $failed);
 
-        return true;
-    }
-
-    private function sendWhatsapp(WhatsappWallet $wallet, string $displayName, string $balanceLabel): bool
-    {
-        if (! \App\Services\Whatsapp\WhatsappProactiveOutbound::enabled()) {
-            return false;
-        }
-
-        $instance = WhatsappEvolutionConfigResolver::walletInstance();
-        if ($instance === '') {
-            return false;
-        }
-
-        $brand = trim((string) config('whatsapp.bot_brand_name', 'CheckoutNow'));
-        $text = $this->whatsappText($brand, $displayName, $balanceLabel);
-
-        return $this->whatsapp->sendText($instance, (string) $wallet->phone_e164, $text);
-    }
-
-    private function whatsappText(string $brand, string $displayName, string $balanceLabel): string
-    {
-        $greeting = $displayName !== ''
-            ? "Hey *{$displayName}*, hope you're doing well today!"
-            : "Hey, hope you're doing well today!";
-
-        return "{$greeting}\n\n".
-            "Your *{$brand}* wallet balance is *{$balanceLabel}*.\n\n".
-            "Would you like to complete at least one transaction today? You can send money, pay bills, or top up — we're here when you need us.".
-            WhatsappWalletAppLinkCopy::downloadBlock();
+        return ! in_array($target['token'], $failed, true);
     }
 
     private function pushBody(string $displayName, string $balanceLabel): string

@@ -122,6 +122,16 @@ return [
         ],
     ],
 
+    /**
+     * Daily “complete a transaction” nudges (Laravel schedule 09:00 / 18:00 Africa/Lagos).
+     * App push only — never WhatsApp.
+     */
+    'inactive_reminders_enabled' => filter_var(env('CONSUMER_INACTIVE_REMINDERS_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'inactive_reminder_min_balance' => (float) env('CONSUMER_INACTIVE_REMINDER_MIN_BALANCE', 1),
+    'inactive_reminder_timezone' => env('CONSUMER_INACTIVE_REMINDER_TIMEZONE', 'Africa/Lagos'),
+    'inactive_reminder_push_title' => env('CONSUMER_INACTIVE_REMINDER_PUSH_TITLE', 'Hope your day is going well'),
+    'inactive_reminder_push_channel' => env('CONSUMER_INACTIVE_REMINDER_PUSH_CHANNEL', 'wallet_alerts'),
+
     /** CheckoutPay merchant business account onboarding from CheckoutNow app. */
     'business_account_onboarding' => [
         'enabled' => filter_var(env('CONSUMER_BUSINESS_ACCOUNT_ONBOARDING_ENABLED', false), FILTER_VALIDATE_BOOL),
