@@ -90,7 +90,7 @@ class ConsumerWalletOtpService
     }
 
     /**
-     * @return array{ok: bool, message: string, channel?: string, otp_blocked?: bool}
+     * @return array{ok: bool, message: string, channel?: string, otp_blocked?: bool, email_masked?: string|null, fallback_from_whatsapp?: bool}
      */
     public function requestOtp(string $phoneInput, string $channel = 'whatsapp', ?string $registrationEmail = null): array
     {
@@ -123,71 +123,121 @@ class ConsumerWalletOtpService
         ], $ttl);
 
         if ($channel === 'email') {
-            $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
-            $email = $wallet?->resolveOtpEmail();
-            $needsRegistration = $wallet === null || $wallet->needsRegistrationProfile();
-
-            if ($needsRegistration) {
-                $registrationEmail = strtolower(trim((string) $registrationEmail));
-                if ($registrationEmail === '' || ! filter_var($registrationEmail, FILTER_VALIDATE_EMAIL)) {
-                    Cache::forget($this->otpKey($e164));
-
-                    return ['ok' => false, 'message' => 'Enter a valid email address to receive your code.'];
-                }
-                $email = $registrationEmail;
-            } elseif (! $wallet?->isTier2() || $email === null) {
-                Cache::forget($this->otpKey($e164));
-
-                return ['ok' => false, 'message' => 'Email OTP is only available for verified Tier 2 wallets with a KYC email.'];
-            }
-
-            try {
-                $brand = (string) config('whatsapp.bot_brand_name', 'Checkout');
-                Mail::send('emails.login-otp-code', [
-                    'code' => $code,
-                    'ttlMinutes' => max(1, (int) round($ttl / 60)),
-                ], function ($message) use ($email, $brand) {
-                    $message->to($email)->subject("Your {$brand} app login code");
-                });
-            } catch (\Throwable $e) {
-                Cache::forget($this->otpKey($e164));
-                Log::warning('consumer_wallet.otp: email send failed', ['error' => $e->getMessage()]);
-
-                return ['ok' => false, 'message' => 'Could not send OTP email. Try WhatsApp instead.'];
-            }
-
-            Cache::forget($this->attemptsKey($e164));
-            $this->recordUnusedOtpSend($e164);
-
-            return [
-                'ok' => true,
-                'message' => $needsRegistration ? 'OTP sent to your email.' : 'OTP sent to your KYC email.',
-                'channel' => 'email',
-            ];
+            return $this->deliverEmailOtp($e164, $code, $ttl, $registrationEmail, false);
         }
 
         $instance = WhatsappEvolutionConfigResolver::walletInstanceForPhone($e164);
-        if ($instance === '') {
-            Log::warning('consumer_wallet.otp: no evolution instance', ['phone_e164' => $e164]);
-            Cache::forget($this->otpKey($e164));
-
-            return ['ok' => false, 'message' => 'OTP delivery is not configured.'];
-        }
-
         $brand = (string) config('whatsapp.bot_brand_name', 'Checkout');
         $text = "*{$brand}* app login\n\nYour code: *{$code}*\n\nIt expires in ".round($ttl / 60).' minutes. Do not share this code.';
 
-        $sent = $this->whatsapp->sendText($instance, $e164, $text);
-        if (! $sent) {
+        $sent = false;
+        if ($instance !== '') {
+            $sent = $this->whatsapp->sendText($instance, $e164, $text);
+        } else {
+            Log::warning('consumer_wallet.otp: no evolution instance', ['phone_e164' => $e164]);
+        }
+
+        if ($sent) {
+            Cache::forget($this->attemptsKey($e164));
+            $this->recordUnusedOtpSend($e164);
+
+            return ['ok' => true, 'message' => 'OTP sent to your WhatsApp.', 'channel' => 'whatsapp'];
+        }
+
+        Log::warning('consumer_wallet.otp: whatsapp send failed, trying email fallback', [
+            'phone_e164' => $e164,
+            'has_instance' => $instance !== '',
+        ]);
+
+        return $this->deliverEmailOtp($e164, $code, $ttl, $registrationEmail, true);
+    }
+
+    /**
+     * @return array{ok: bool, message: string, channel?: string, email_masked?: string|null, fallback_from_whatsapp?: bool}
+     */
+    private function deliverEmailOtp(
+        string $e164,
+        string $code,
+        int $ttl,
+        ?string $registrationEmail,
+        bool $fromWhatsappFallback,
+    ): array {
+        $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
+        $email = $wallet?->resolveOtpEmail();
+        $needsRegistration = $wallet === null || $wallet->needsRegistrationProfile();
+
+        if ($fromWhatsappFallback) {
+            // Fallback: any stored KYC/renter email, or registration email if provided.
+            $registrationEmail = strtolower(trim((string) $registrationEmail));
+            if (($email === null || $email === '') && $registrationEmail !== '' && filter_var($registrationEmail, FILTER_VALIDATE_EMAIL)) {
+                $email = $registrationEmail;
+            }
+            if ($email === null || $email === '') {
+                Cache::forget($this->otpKey($e164));
+
+                return [
+                    'ok' => false,
+                    'message' => 'WhatsApp could not deliver your code. Request OTP by email (enter your email if signing up), or try again later.',
+                    'fallback_from_whatsapp' => true,
+                ];
+            }
+        } elseif ($needsRegistration) {
+            $registrationEmail = strtolower(trim((string) $registrationEmail));
+            if ($registrationEmail === '' || ! filter_var($registrationEmail, FILTER_VALIDATE_EMAIL)) {
+                Cache::forget($this->otpKey($e164));
+
+                return ['ok' => false, 'message' => 'Enter a valid email address to receive your code.'];
+            }
+            $email = $registrationEmail;
+        } elseif (! $wallet?->isTier2() || $email === null) {
             Cache::forget($this->otpKey($e164));
 
-            return ['ok' => false, 'message' => 'Could not send OTP. Try again later.'];
+            return ['ok' => false, 'message' => 'Email OTP is only available for verified Tier 2 wallets with a KYC email.'];
+        }
+
+        try {
+            $brand = (string) config('whatsapp.bot_brand_name', 'Checkout');
+            Mail::send('emails.login-otp-code', [
+                'code' => $code,
+                'ttlMinutes' => max(1, (int) round($ttl / 60)),
+            ], function ($message) use ($email, $brand) {
+                $message->to($email)->subject("Your {$brand} app login code");
+            });
+        } catch (\Throwable $e) {
+            Cache::forget($this->otpKey($e164));
+            Log::warning('consumer_wallet.otp: email send failed', [
+                'error' => $e->getMessage(),
+                'fallback_from_whatsapp' => $fromWhatsappFallback,
+            ]);
+
+            return [
+                'ok' => false,
+                'message' => $fromWhatsappFallback
+                    ? 'WhatsApp and email both failed to send your code. Try again later.'
+                    : 'Could not send OTP email. Try WhatsApp instead.',
+                'fallback_from_whatsapp' => $fromWhatsappFallback ?: null,
+            ];
         }
 
         Cache::forget($this->attemptsKey($e164));
         $this->recordUnusedOtpSend($e164);
 
-        return ['ok' => true, 'message' => 'OTP sent to your WhatsApp.', 'channel' => 'whatsapp'];
+        if ($fromWhatsappFallback) {
+            return [
+                'ok' => true,
+                'message' => 'WhatsApp was unavailable, so we emailed your code to '.$this->maskEmail($email).'.',
+                'channel' => 'email',
+                'email_masked' => $this->maskEmail($email),
+                'fallback_from_whatsapp' => true,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'message' => $needsRegistration ? 'OTP sent to your email.' : 'OTP sent to your KYC email.',
+            'channel' => 'email',
+            'email_masked' => $this->maskEmail($email),
+        ];
     }
 
     private function maskEmail(string $email): string

@@ -71,6 +71,8 @@ class ConsumerWalletAuthController extends Controller
             'data' => array_filter([
                 'channel' => $result['channel'] ?? null,
                 'otp_blocked' => ($result['otp_blocked'] ?? false) ? true : null,
+                'email_masked' => $result['email_masked'] ?? null,
+                'fallback_from_whatsapp' => ($result['fallback_from_whatsapp'] ?? false) ? true : null,
             ], fn ($v) => $v !== null),
         ], $result['ok'] ? 200 : ($result['otp_blocked'] ?? false ? 429 : 422));
     }
