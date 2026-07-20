@@ -48,6 +48,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Counterparty</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
@@ -80,6 +81,16 @@
                         <td class="px-6 py-4 text-sm text-gray-600">
                             {{ $row['counterparty_label'] ?? ($row['description'] ? Str::limit($row['description'], 40) : '—') }}
                         </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            @if($row['website'])
+                                <a href="{{ $row['website']->website_url }}" target="_blank" class="text-primary hover:underline truncate block max-w-[180px]" title="{{ $row['website']->website_url }}">
+                                    {{ parse_url($row['website']->website_url, PHP_URL_HOST) ?? Str::limit($row['website']->website_url, 32) }}
+                                    <i class="fas fa-external-link-alt text-xs ml-0.5"></i>
+                                </a>
+                            @else
+                                <span class="text-gray-400">—</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4">
                             @if(in_array($row['status'], ['approved', 'completed'], true))
                                 <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Completed</span>
@@ -100,7 +111,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">No transactions found</td>
+                        <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">No transactions found</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -121,6 +132,9 @@
                         <p class="text-xs text-gray-500">
                             {{ $row['kind'] === 'loan_repayment' ? 'Loan repayment' : 'Payment' }}
                             · {{ $row['occurred_at']->format('M d, Y H:i') }}
+                            @if($row['website'])
+                                · {{ parse_url($row['website']->website_url, PHP_URL_HOST) ?? Str::limit($row['website']->website_url, 24) }}
+                            @endif
                         </p>
                     </div>
                     <div class="ml-3 text-right">
