@@ -14,7 +14,7 @@
             <h3 class="text-lg font-semibold text-gray-900">Email + app push mailer</h3>
             <p class="text-sm text-gray-600 mt-1">Message wallet, rental, and business accounts. Never sends WhatsApp.</p>
         </div>
-        <a href="{{ route('admin.announcements.create') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm inline-flex items-center">
+        <a href="{{ route('admin.announcements.create') }}" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm inline-flex items-center border border-transparent">
             <i class="fas fa-paper-plane mr-2"></i> Compose
         </a>
     </div>

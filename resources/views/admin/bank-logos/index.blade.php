@@ -50,8 +50,8 @@
 
     <form method="GET" class="bg-white rounded-lg border border-gray-200 p-4 flex flex-col sm:flex-row gap-3">
         <input type="text" name="q" value="{{ $q }}" placeholder="Search name or code"
-               class="flex-1 rounded-lg border-gray-300 text-sm">
-        <select name="status" class="rounded-lg border-gray-300 text-sm">
+               class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+        <select name="status" class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
             <option value="all" @selected($status === 'all')>All</option>
             <option value="mapped" @selected($status === 'mapped')>Mapped</option>
             <option value="unmapped" @selected($status === 'unmapped')>Unmapped</option>
@@ -93,7 +93,7 @@
                             <td class="px-4 py-3 space-y-2 min-w-[16rem]">
                                 <form action="{{ route('admin.bank-logos.assign', $bank) }}" method="POST" class="flex gap-2">
                                     @csrf
-                                    <select name="library_file" class="flex-1 rounded-lg border-gray-300 text-xs">
+                                    <select name="library_file" class="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
                                         <option value="">Library SVG…</option>
                                         @foreach($library as $file)
                                             <option value="{{ $file }}" @selected(($suggestions[$bank->id] ?? null) === $file)>{{ $file }}</option>
@@ -103,7 +103,7 @@
                                 </form>
                                 <form action="{{ route('admin.bank-logos.upload', $bank) }}" method="POST" enctype="multipart/form-data" class="flex gap-2 items-center">
                                     @csrf
-                                    <input type="file" name="logo" accept=".svg,.png,.jpg,.jpeg,.webp,image/svg+xml,image/*" class="text-xs flex-1">
+                                    <input type="file" name="logo" accept=".svg,.png,.jpg,.jpeg,.webp,image/svg+xml,image/*" class="text-xs flex-1 border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
                                     <button type="submit" class="text-xs px-2 py-1 rounded border border-gray-300 text-gray-700">Upload</button>
                                 </form>
                             </td>

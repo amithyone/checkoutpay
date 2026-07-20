@@ -26,32 +26,34 @@
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
             <input type="text" name="title" value="{{ old('title') }}" required maxlength="160"
-                   class="w-full rounded-lg border-gray-300 text-sm" placeholder="e.g. New savings feature">
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                   placeholder="e.g. New savings feature">
         </div>
 
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
             <textarea name="body" rows="6" required maxlength="5000"
-                      class="w-full rounded-lg border-gray-300 text-sm" placeholder="Plain text body for email and push">{{ old('body') }}</textarea>
+                      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      placeholder="Plain text body for email and push">{{ old('body') }}</textarea>
         </div>
 
         <div>
             <div class="text-sm font-medium text-gray-700 mb-2">Audiences</div>
             <div class="space-y-2">
                 <label class="flex items-start gap-2 text-sm">
-                    <input type="checkbox" name="audiences[]" value="wallet" class="mt-1 rounded border-gray-300" @checked(in_array('wallet', old('audiences', ['wallet', 'rentals', 'business'])))>
+                    <input type="checkbox" name="audiences[]" value="wallet" class="mt-1 rounded border border-gray-300 text-primary focus:ring-primary" @checked(in_array('wallet', old('audiences', ['wallet', 'rentals', 'business'])))>
                     <span>Wallet / CheckoutNow users
                         <span class="block text-xs text-gray-500">~{{ number_format($reach['wallet']['emails']) }} emails · ~{{ number_format($reach['wallet']['pushes']) }} pushes</span>
                     </span>
                 </label>
                 <label class="flex items-start gap-2 text-sm">
-                    <input type="checkbox" name="audiences[]" value="rentals" class="mt-1 rounded border-gray-300" @checked(in_array('rentals', old('audiences', ['wallet', 'rentals', 'business'])))>
+                    <input type="checkbox" name="audiences[]" value="rentals" class="mt-1 rounded border border-gray-300 text-primary focus:ring-primary" @checked(in_array('rentals', old('audiences', ['wallet', 'rentals', 'business'])))>
                     <span>Rentals users
                         <span class="block text-xs text-gray-500">~{{ number_format($reach['rentals']['emails']) }} emails · ~{{ number_format($reach['rentals']['pushes']) }} pushes</span>
                     </span>
                 </label>
                 <label class="flex items-start gap-2 text-sm">
-                    <input type="checkbox" name="audiences[]" value="business" class="mt-1 rounded border-gray-300" @checked(in_array('business', old('audiences', ['wallet', 'rentals', 'business'])))>
+                    <input type="checkbox" name="audiences[]" value="business" class="mt-1 rounded border border-gray-300 text-primary focus:ring-primary" @checked(in_array('business', old('audiences', ['wallet', 'rentals', 'business'])))>
                     <span>Businesses
                         <span class="block text-xs text-gray-500">~{{ number_format($reach['business']['emails']) }} emails · ~{{ number_format($reach['business']['pushes']) }} pushes</span>
                     </span>
@@ -63,11 +65,11 @@
             <div class="text-sm font-medium text-gray-700 mb-2">Channels</div>
             <div class="flex flex-wrap gap-4">
                 <label class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="channel_email" value="1" class="rounded border-gray-300" @checked(old('channel_email', true))>
+                    <input type="checkbox" name="channel_email" value="1" class="rounded border border-gray-300 text-primary focus:ring-primary" @checked(old('channel_email', true))>
                     Email
                 </label>
                 <label class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="channel_push" value="1" class="rounded border-gray-300" @checked(old('channel_push', true))>
+                    <input type="checkbox" name="channel_push" value="1" class="rounded border border-gray-300 text-primary focus:ring-primary" @checked(old('channel_push', true))>
                     App push
                 </label>
             </div>
@@ -75,7 +77,7 @@
 
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Push deep-link screen (optional)</label>
-            <select name="push_screen" class="rounded-lg border-gray-300 text-sm">
+            <select name="push_screen" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
                 <option value="">Default</option>
                 @foreach(['home','history','saving','card','profile','support'] as $screen)
                     <option value="{{ $screen }}" @selected(old('push_screen') === $screen)>{{ $screen }}</option>
