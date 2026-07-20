@@ -287,6 +287,7 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
             Route::put('whatsapp-wallet/wallets/{wallet}/status', [WhatsappWalletAdminController::class, 'updateWalletStatus'])->name('whatsapp-wallet.wallets.status');
+            Route::put('whatsapp-wallet/wallets/{wallet}/balance-audit-exempt', [WhatsappWalletAdminController::class, 'updateBalanceAuditExempt'])->name('whatsapp-wallet.wallets.balance-audit-exempt');
             Route::put('whatsapp-wallet/wallets/{wallet}/link-business', [WhatsappWalletAdminController::class, 'linkBusiness'])->name('whatsapp-wallet.wallets.link-business');
             Route::put('whatsapp-wallet/wallets/{wallet}/bot-pause', [WhatsappWalletAdminController::class, 'updateWalletBotPause'])->name('whatsapp-wallet.wallets.bot-pause');
             Route::post('whatsapp-wallet/wallets/{wallet}/transfer-lock/clear', [WhatsappWalletAdminController::class, 'clearTransferLock'])->name('whatsapp-wallet.wallets.transfer-lock.clear');

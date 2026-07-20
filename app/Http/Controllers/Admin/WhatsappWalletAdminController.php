@@ -312,6 +312,19 @@ class WhatsappWalletAdminController extends Controller
                 : 'Wallet suspended.');
     }
 
+    public function updateBalanceAuditExempt(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        $wallet->update([
+            'balance_audit_exempt' => $request->boolean('balance_audit_exempt'),
+        ]);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', $wallet->balance_audit_exempt
+                ? 'Wallet excluded from bank float audit.'
+                : 'Wallet included in bank float audit again.');
+    }
+
     public function updateWalletBotPause(Request $request, WhatsappWallet $wallet): RedirectResponse
     {
         $validated = $request->validate([

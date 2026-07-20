@@ -1061,6 +1061,7 @@ class BusinessController extends Controller
             'charge_percentage' => 'nullable|numeric|min:0|max:100',
             'charge_fixed' => 'nullable|numeric|min:0',
             'charge_exempt' => 'nullable|boolean',
+            'balance_audit_exempt' => 'nullable|boolean',
             'charges_paid_by_customer' => 'nullable|boolean',
         ]);
 
@@ -1068,6 +1069,7 @@ class BusinessController extends Controller
             'charge_percentage' => $request->filled('charge_percentage') ? $request->charge_percentage : null,
             'charge_fixed' => $request->filled('charge_fixed') ? $request->charge_fixed : null,
             'charge_exempt' => $request->has('charge_exempt') ? (bool) $request->charge_exempt : false,
+            'balance_audit_exempt' => $request->has('balance_audit_exempt') ? (bool) $request->balance_audit_exempt : false,
             'charges_paid_by_customer' => $request->has('charges_paid_by_customer') ? (bool) $request->charges_paid_by_customer : false,
         ]);
 

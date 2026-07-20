@@ -85,6 +85,9 @@
                     @endif
                     @endif
                 </div>
+                @if($business->balance_audit_exempt)
+                    <p class="text-xs text-amber-700 mt-1">Excluded from bank float audit (test)</p>
+                @endif
             </div>
             <div class="md:col-span-2">
                 <label class="text-xs text-gray-600">Overdraft</label>
@@ -395,10 +398,25 @@
                         name="charge_exempt" 
                         value="1"
                         {{ $business->charge_exempt ? 'checked' : '' }}
-                        class="w-5 h-5 text-primary border-gray-300 rounded"
+                        class="w-5 h-5 text-primary border border-gray-300 rounded"
                     >
                     <label for="charge_exempt" class="text-sm font-medium text-gray-700 cursor-pointer">
                         Exempt from charges
+                    </label>
+                </div>
+
+                <div class="flex items-center space-x-3 md:col-span-2">
+                    <input 
+                        type="checkbox" 
+                        id="balance_audit_exempt" 
+                        name="balance_audit_exempt" 
+                        value="1"
+                        {{ $business->balance_audit_exempt ? 'checked' : '' }}
+                        class="w-5 h-5 text-primary border border-gray-300 rounded"
+                    >
+                    <label for="balance_audit_exempt" class="text-sm font-medium text-gray-700 cursor-pointer">
+                        Exclude from bank float audit
+                        <span class="block text-xs font-normal text-gray-500">Test businesses — balance won’t count toward Audits → site total</span>
                     </label>
                 </div>
                 

@@ -194,6 +194,23 @@
                         </button>
                     @endif
                 </form>
+
+                <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.balance-audit-exempt', $wallet) }}" class="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                    @csrf
+                    @method('PUT')
+                    <label class="flex items-start gap-2 text-sm text-gray-800">
+                        <input type="checkbox" name="balance_audit_exempt" value="1" class="mt-1 rounded border border-gray-300"
+                               @checked($wallet->balance_audit_exempt)
+                               onchange="this.form.submit()">
+                        <span>
+                            Exclude from bank float audit
+                            <span class="block text-xs text-gray-500">Test wallets — won’t count on Audits totals</span>
+                        </span>
+                    </label>
+                    @if($wallet->balance_audit_exempt)
+                        <p class="text-xs text-amber-700">Currently excluded from site bank float.</p>
+                    @endif
+                </form>
             </div>
             @endif
 

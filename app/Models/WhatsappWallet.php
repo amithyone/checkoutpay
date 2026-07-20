@@ -68,6 +68,7 @@ class WhatsappWallet extends Model
         'notify_card_transaction_email',
         'notify_card_transaction_whatsapp',
         'status',
+        'balance_audit_exempt',
         'admin_bot_paused',
         'support_whatsapp_welcome_sent_at',
     ];
@@ -93,6 +94,7 @@ class WhatsappWallet extends Model
         'notify_card_created_whatsapp' => 'boolean',
         'notify_card_transaction_email' => 'boolean',
         'notify_card_transaction_whatsapp' => 'boolean',
+        'balance_audit_exempt' => 'boolean',
         'admin_bot_paused' => 'boolean',
         'support_whatsapp_welcome_sent_at' => 'datetime',
     ];
