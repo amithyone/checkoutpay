@@ -225,6 +225,9 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
         // Rental users (renters)
         Route::get('renters', [RenterController::class, 'index'])->name('renters.index');
+        Route::get('renters/{renter}', [RenterController::class, 'show'])->name('renters.show');
+        Route::put('renters/{renter}', [RenterController::class, 'update'])->name('renters.update');
+        Route::put('renters/{renter}/balance', [RenterController::class, 'updateBalance'])->name('renters.update-balance');
 
         // Renters KYC (ID review)
         Route::get('renters-kyc', [RenterKycController::class, 'index'])->name('renters-kyc.index');

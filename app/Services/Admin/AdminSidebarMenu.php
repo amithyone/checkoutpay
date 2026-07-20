@@ -289,7 +289,7 @@ class AdminSidebarMenu
                 ['visible' => ! $admin->isWalletSupport()]
             ),
             'renters' => array_merge(
-                $this->link('Rental users', 'admin.renters.index', 'fas fa-users', ['admin.renters.index']),
+                $this->link('Rental users', 'admin.renters.index', 'fas fa-users', ['admin.renters.*']),
                 ['visible' => ! $admin->isWalletSupport()]
             ),
             'tickets' => array_merge(
