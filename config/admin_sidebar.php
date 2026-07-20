@@ -46,6 +46,7 @@ return [
         'desktop_telemetry',
         'whitelisted_emails',
         'pages',
+        'announcements',
         'settings',
         'email_templates',
         'staff',

@@ -324,6 +324,10 @@ class AdminSidebarMenu
                 $this->link('Pages', 'admin.pages.index', 'fas fa-file-alt', ['admin.pages.*']),
                 ['visible' => $admin->canManageSettings()]
             ),
+            'announcements' => array_merge(
+                $this->link('Announcements', 'admin.announcements.index', 'fas fa-bullhorn', ['admin.announcements.*']),
+                ['visible' => $admin->canMutateWalletAccounts()]
+            ),
             'settings' => array_merge(
                 $this->link('Settings', 'admin.settings.index', 'fas fa-cog', ['admin.settings.*']),
                 ['visible' => $admin->canManageSettings()]

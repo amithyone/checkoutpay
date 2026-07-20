@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminAnnouncementController;
 use App\Http\Controllers\Admin\AdminSidebarMenuController;
 use App\Http\Controllers\Admin\AuditsController;
 use App\Http\Controllers\Admin\MevonPayAuditController;
@@ -266,6 +267,12 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
         // Settings (Admin/Super Admin only)
         Route::middleware('admin_or_super')->group(function () {
+            Route::get('announcements', [AdminAnnouncementController::class, 'index'])->name('announcements.index');
+            Route::get('announcements/create', [AdminAnnouncementController::class, 'create'])->name('announcements.create');
+            Route::post('announcements', [AdminAnnouncementController::class, 'store'])->name('announcements.store');
+            Route::get('announcements/{announcement}', [AdminAnnouncementController::class, 'show'])->name('announcements.show');
+            Route::post('announcements/{announcement}/process', [AdminAnnouncementController::class, 'processNow'])->name('announcements.process');
+
             Route::get('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
             Route::put('settings', [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
             Route::post('settings/general', [\App\Http\Controllers\Admin\SettingsController::class, 'updateGeneral'])->name('settings.update-general');
