@@ -47,6 +47,12 @@ class SyncAndroidAssetLinksCommand extends Command
         );
 
         $this->info('Updated '.$path.' with '.count($fingerprints).' fingerprint(s).');
+        foreach ($fingerprints as $fp) {
+            $hash = \App\Services\Consumer\ConsumerWebAuthnService::sha256FingerprintToApkKeyHash($fp);
+            if ($hash !== null) {
+                $this->line('  android:apk-key-hash:'.$hash.'  ← '.$fp);
+            }
+        }
 
         return self::SUCCESS;
     }

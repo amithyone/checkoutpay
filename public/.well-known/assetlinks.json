@@ -8,7 +8,8 @@
       "namespace": "android_app",
       "package_name": "com.checkoutnow.app",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_YOUR_RELEASE_OR_DEBUG_SHA256_FINGERPRINT"
+        "1C:E8:36:89:E0:FF:AF:DC:37:7A:CB:55:F5:02:BF:22:F7:00:25:15:90:E8:7F:55:DD:FA:21:41:B0:9B:FC:AD",
+        "85:1C:C1:3A:27:EA:49:91:6D:58:C8:A7:26:24:55:68:12:E0:C4:76:DC:91:8B:94:DC:B5:B9:AF:AF:69:1A:64"
       ]
     }
   }

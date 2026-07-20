@@ -55,8 +55,9 @@ Mobile native passkeys send a **platform-specific origin** in the signed payload
 | **Android** | `android:apk-key-hash:…` (SHA-256 of app signing cert, Base64URL) |
 
 1. Try passkey again, then check `storage/logs/laravel.log` for `consumer_webauthn.verification_failed` — it logs `client_origin` and `allowed_origins`.
-2. Add the logged `client_origin` to `CONSUMER_WEBAUTHN_ALLOWED_ORIGINS` (comma-separated).
+2. Android `android:apk-key-hash:…` origins are **auto-derived** from `CONSUMER_ANDROID_ASSETLINKS_SHA256`. You can also set `CONSUMER_WEBAUTHN_ALLOWED_ORIGINS` / `CONSUMER_WEBAUTHN_ANDROID_APK_KEY_HASHES` explicitly.
 3. `php artisan config:clear`
+4. Refresh Digital Asset Links file: `php artisan consumer:sync-android-assetlinks`
 
 Host association files (required for mobile passkeys):
 

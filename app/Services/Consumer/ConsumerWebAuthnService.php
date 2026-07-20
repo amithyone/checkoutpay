@@ -541,7 +541,34 @@ class ConsumerWebAuthnService
                 : 'android:apk-key-hash:'.$hash;
         }
 
+        // Derive Android WebAuthn origins from Digital Asset Links cert fingerprints
+        // so native verify works without duplicating CONSUMER_WEBAUTHN_ANDROID_APK_KEY_HASHES.
+        foreach ((array) config('consumer_wallet.android_assetlinks_sha256_fingerprints', []) as $fp) {
+            $apkHash = self::sha256FingerprintToApkKeyHash((string) $fp);
+            if ($apkHash !== null) {
+                $origins[] = 'android:apk-key-hash:'.$apkHash;
+            }
+        }
+
         return array_values(array_unique($origins));
+    }
+
+    /**
+     * Convert colon-separated SHA-256 cert fingerprint → Base64URL for android:apk-key-hash.
+     */
+    public static function sha256FingerprintToApkKeyHash(string $fingerprint): ?string
+    {
+        $hex = strtolower(preg_replace('/[^0-9a-f]/i', '', $fingerprint) ?? '');
+        if ($hex === '' || strlen($hex) !== 64 || ! ctype_xdigit($hex)) {
+            return null;
+        }
+
+        $binary = hex2bin($hex);
+        if ($binary === false) {
+            return null;
+        }
+
+        return rtrim(strtr(base64_encode($binary), '+/', '-_'), '=');
     }
 
     /**
