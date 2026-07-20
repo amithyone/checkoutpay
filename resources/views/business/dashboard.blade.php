@@ -465,18 +465,27 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-                                <a href="{{ $websiteStat['website']->website_url }}" target="_blank" class="text-primary hover:underline font-medium text-xs sm:text-sm truncate">
-                                    {{ parse_url($websiteStat['website']->website_url, PHP_URL_HOST) }}
-                                    <i class="fas fa-external-link-alt text-xs ml-1"></i>
-                                </a>
-                                @if($websiteStat['website']->is_approved)
-                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full self-start">
-                                        <i class="fas fa-check-circle mr-1"></i> Approved
+                                @if(!empty($websiteStat['is_unattributed']))
+                                    <span class="text-gray-900 font-medium text-xs sm:text-sm truncate">
+                                        {{ $websiteStat['label'] }}
+                                    </span>
+                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full self-start">
+                                        <i class="fas fa-question-circle mr-1"></i> Unattributed
                                     </span>
                                 @else
-                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full self-start">
-                                        <i class="fas fa-clock mr-1"></i> Pending
-                                    </span>
+                                    <a href="{{ $websiteStat['website']->website_url }}" target="_blank" class="text-primary hover:underline font-medium text-xs sm:text-sm truncate">
+                                        {{ parse_url($websiteStat['website']->website_url, PHP_URL_HOST) }}
+                                        <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                                    </a>
+                                    @if($websiteStat['website']->is_approved)
+                                        <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full self-start">
+                                            <i class="fas fa-check-circle mr-1"></i> Approved
+                                        </span>
+                                    @else
+                                        <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full self-start">
+                                            <i class="fas fa-clock mr-1"></i> Pending
+                                        </span>
+                                    @endif
                                 @endif
                             </div>
                         </div>
@@ -508,8 +517,7 @@
                         </div>
                     </div>
                     @endif
-                    </div>
-                    
+
                     <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-gray-600 mt-3">
                         <span><strong>{{ number_format($websiteStat['approved_payments']) }}</strong> approved</span>
                         @if($websiteStat['pending_payments'] > 0)

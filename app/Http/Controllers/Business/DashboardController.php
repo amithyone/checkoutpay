@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\Business\BusinessActivityFeedService;
+use App\Services\Business\BusinessWebsiteStatsService;
 use App\Services\Business\BusinessWhatsappWalletLinkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,7 @@ class DashboardController extends Controller
 {
     public function __construct(
         private BusinessActivityFeedService $activityFeed,
+        private BusinessWebsiteStatsService $websiteStats,
         private BusinessWhatsappWalletLinkService $whatsappWalletLinks,
     ) {}
 
@@ -78,61 +80,7 @@ class DashboardController extends Controller
             'peer_lending_lend_eligible' => (bool) $business->peer_lending_lend_eligible,
         ];
 
-        // Get website statistics with daily and monthly breakdowns
-        $websiteStats = [];
-        foreach ($business->websites as $website) {
-            // Enforce both business_id and business_website_id ownership filters.
-            $websitePaymentsQuery = Payment::query()
-                ->where('business_id', $business->id)
-                ->where('business_website_id', $website->id);
-            
-            // Calculate revenue from actual transactions
-            $todayRevenue = (clone $websitePaymentsQuery)
-                ->where('status', 'approved')
-                ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
-                ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
-            
-            // Calculate monthly/yearly revenue from actual transactions
-            $monthlyRevenue = (clone $websitePaymentsQuery)
-                ->where('status', 'approved')
-                ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
-                ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
-            $yearlyRevenue = (clone $websitePaymentsQuery)
-                ->where('status', 'approved')
-                ->whereBetween($approvedAtExpr, [$yearStartUtc, $yearEndUtc])
-                ->sum(\DB::raw('COALESCE(business_receives, amount)')) ?? 0;
-            
-            // Calculate daily payments count
-            $todayPayments = (clone $websitePaymentsQuery)
-                ->where('status', 'approved')
-                ->whereBetween($approvedAtExpr, [$todayStartUtc, $todayEndUtc])
-                ->count();
-            
-            // Calculate monthly payments count
-            $monthlyPayments = (clone $websitePaymentsQuery)
-                ->where('status', 'approved')
-                ->whereBetween($approvedAtExpr, [$monthStartUtc, $monthEndUtc])
-                ->count();
-            
-            $websiteStats[] = [
-                'website' => $website,
-                'total_revenue' => (clone $websitePaymentsQuery)
-                    ->where('status', 'approved')
-                    ->sum(DB::raw('COALESCE(business_receives, amount)')) ?? 0,
-                'total_payments' => (clone $websitePaymentsQuery)->count(),
-                'approved_payments' => (clone $websitePaymentsQuery)->where('status', 'approved')->count(),
-                'pending_payments' => (clone $websitePaymentsQuery)->where('status', 'pending')->count(),
-                'today_revenue' => $todayRevenue, // Calculated from actual transactions
-                'today_payments' => $todayPayments,
-                'monthly_revenue' => $monthlyRevenue, // Calculated from actual transactions
-                'yearly_revenue' => $yearlyRevenue, // Calculated from actual transactions
-                'monthly_payments' => $monthlyPayments,
-            ];
-        }
-        // Sort by revenue descending
-        usort($websiteStats, function($a, $b) {
-            return $b['total_revenue'] <=> $a['total_revenue'];
-        });
+        $websiteStats = $this->websiteStats->buildDashboardBreakdown($business);
 
         // Recent payments, loan repayments, and other balance activity
         $recentActivity = $this->activityFeed->recent($business, 10);
