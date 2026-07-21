@@ -193,13 +193,25 @@ final class SupportIntakeService
             }
 
             $messages[] = $this->userLine($account);
-            $messages[] = $this->botLine((string) config('support.intake_messages.ask_session_id', ''));
-            $session->fill([
-                'reported_destination_account' => $account,
-                'account_in_platform' => true,
-                'current_step' => self::STEP_SESSION_ID,
-                'bot_messages' => $messages,
-            ])->save();
+
+            if ($this->bankRequiresSessionId($this->payeeBankKey($session))) {
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_session_id', ''));
+                $session->fill([
+                    'reported_destination_account' => $account,
+                    'account_in_platform' => true,
+                    'current_step' => self::STEP_SESSION_ID,
+                    'bot_messages' => $messages,
+                ])->save();
+            } else {
+                $messages[] = $this->botLine((string) config('support.intake_messages.kuda_no_session_id', ''));
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_name', ''));
+                $session->fill([
+                    'reported_destination_account' => $account,
+                    'account_in_platform' => true,
+                    'current_step' => self::STEP_NAME,
+                    'bot_messages' => $messages,
+                ])->save();
+            }
 
             return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
         }
@@ -695,7 +707,28 @@ final class SupportIntakeService
 
     private function isMoniepointPayeeBank(SupportIntakeSession $session): bool
     {
-        return strtolower(trim((string) $session->reported_payee_name)) === 'moniepoint_mfb';
+        return $this->payeeBankKey($session) === 'moniepoint_mfb';
+    }
+
+    private function payeeBankKey(SupportIntakeSession $session): ?string
+    {
+        $key = strtolower(trim((string) $session->reported_payee_name));
+
+        return $key !== '' ? $key : null;
+    }
+
+    private function bankRequiresSessionId(?string $bankKey): bool
+    {
+        if ($bankKey === null) {
+            return true;
+        }
+
+        $banks = config('support.payee_banks', []);
+        if (! isset($banks[$bankKey]) || ! is_array($banks[$bankKey])) {
+            return true;
+        }
+
+        return (bool) ($banks[$bankKey]['requires_session_id'] ?? true);
     }
 
     private function canRestartIntake(SupportIntakeSession $session): bool
@@ -766,6 +799,8 @@ final class SupportIntakeService
             'can_retry_account' => $session->canRetryDestinationAccount(),
             'can_restart' => $this->canRestartIntake($session),
             'payee_banks' => $this->payeeBankOptions(),
+            'payee_bank_key' => $this->payeeBankKey($session),
+            'requires_session_id' => $this->bankRequiresSessionId($this->payeeBankKey($session)),
             'messages' => $session->bot_messages ?? [],
             'public_token' => $session->public_token,
             'ticket_id' => $session->support_ticket_id,

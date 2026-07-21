@@ -37,11 +37,16 @@ final class SupportPaymentMatchService
         $payment = $this->resolvePayment($session);
 
         if (! $payment) {
+            $bankKey = strtolower(trim((string) $session->reported_payee_name));
+            $messageKey = $bankKey === 'kuda'
+                ? 'support.intake_messages.match_not_found_kuda'
+                : 'support.intake_messages.match_not_found';
+
             return [
                 'ok' => true,
                 'matched' => false,
                 'payment' => null,
-                'message' => (string) config('support.intake_messages.match_not_found', ''),
+                'message' => (string) config($messageKey, ''),
             ];
         }
 
@@ -75,29 +80,36 @@ final class SupportPaymentMatchService
 
         $this->applyIntakeHintsToPayment($session, $payment);
 
-        $matched = $this->runMatchAgainstStoredEmails($payment);
+        try {
+            $matched = $this->runMatchAgainstStoredEmails($payment);
 
-        if ($matched) {
+            if ($matched) {
+                $payment->refresh();
+
+                return [
+                    'ok' => true,
+                    'matched' => true,
+                    'payment' => $payment,
+                    'message' => (string) config('support.intake_messages.match_success', ''),
+                ];
+            }
+
+            CheckPaymentEmails::dispatchSync($payment);
             $payment->refresh();
 
-            return [
-                'ok' => true,
-                'matched' => true,
-                'payment' => $payment,
-                'message' => (string) config('support.intake_messages.match_success', ''),
-            ];
-        }
-
-        CheckPaymentEmails::dispatchSync($payment);
-        $payment->refresh();
-
-        if ($payment->status === Payment::STATUS_APPROVED) {
-            return [
-                'ok' => true,
-                'matched' => true,
-                'payment' => $payment,
-                'message' => (string) config('support.intake_messages.match_success', ''),
-            ];
+            if ($payment->status === Payment::STATUS_APPROVED) {
+                return [
+                    'ok' => true,
+                    'matched' => true,
+                    'payment' => $payment,
+                    'message' => (string) config('support.intake_messages.match_success', ''),
+                ];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('support.intake: auto-match email check failed', [
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return [
@@ -117,15 +129,17 @@ final class SupportPaymentMatchService
             }
         }
 
+        $bankKey = strtolower(trim((string) $session->reported_payee_name));
         $sessionId = trim((string) $session->payment_session_id);
+        $account = SupportPayeeAccountService::normalizeAccountNumber((string) $session->reported_destination_account);
+
         if ($sessionId !== '') {
             $bySession = Payment::query()->where('transaction_id', $sessionId)->first();
-            if ($bySession) {
+            if ($bySession && $this->sessionLookupAcceptsPayment($bankKey, $bySession, $account)) {
                 return $bySession;
             }
         }
 
-        $account = SupportPayeeAccountService::normalizeAccountNumber((string) $session->reported_destination_account);
         $name = trim((string) $session->visitor_name);
         $amount = $session->payment_amount_reported !== null ? (float) $session->payment_amount_reported : null;
 
@@ -150,14 +164,19 @@ final class SupportPaymentMatchService
             $nameScore = $this->nameSimilarity($name, (string) ($candidate->payer_name ?? ''));
             $amountDiff = abs((float) $candidate->amount - $amount);
             $amountOk = $amountDiff <= max(1.0, $amount * 0.03);
+            $exactAmount = $amountDiff <= 0.01;
 
             if (! $amountOk) {
                 continue;
             }
 
             $score = $nameScore;
-            if ($sessionId !== '' && strcasecmp($candidate->transaction_id, $sessionId) === 0) {
+            if ($sessionId !== '' && strcasecmp((string) $candidate->transaction_id, $sessionId) === 0) {
                 $score += 50;
+            }
+
+            if ($bankKey === 'kuda' && $nameScore === 0 && $exactAmount && blank($candidate->payer_name)) {
+                $score = max($score, 55);
             }
 
             if ($score > $bestScore) {
@@ -166,11 +185,26 @@ final class SupportPaymentMatchService
             }
         }
 
-        if ($best && $bestScore >= 50) {
+        $minScore = $bankKey === 'kuda' ? 55 : 50;
+
+        if ($best && $bestScore >= $minScore) {
             return $best;
         }
 
         return null;
+    }
+
+    private function sessionLookupAcceptsPayment(string $bankKey, Payment $payment, string $reportedAccount): bool
+    {
+        if ($bankKey === 'rubies_mfb' || $bankKey === '') {
+            return true;
+        }
+
+        if ($reportedAccount === '') {
+            return false;
+        }
+
+        return SupportPayeeAccountService::normalizeAccountNumber((string) $payment->account_number) === $reportedAccount;
     }
 
     private function applyIntakeHintsToPayment(SupportIntakeSession $session, Payment $payment): void

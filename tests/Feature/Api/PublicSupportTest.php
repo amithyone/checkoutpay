@@ -133,6 +133,7 @@ class PublicSupportTest extends TestCase
                 $table->string('intake_status', 32)->nullable();
                 $table->string('reported_destination_account', 32)->nullable();
                 $table->string('reported_destination_bank', 120)->nullable();
+                $table->string('reported_payee_name', 120)->nullable();
                 $table->timestamp('whatsapp_eligible_at')->nullable();
                 $table->string('payment_receipt_path')->nullable();
                 $table->boolean('account_on_session')->default(false);
@@ -194,6 +195,7 @@ class PublicSupportTest extends TestCase
                 $table->boolean('is_payment_issue')->nullable();
                 $table->string('reported_destination_account', 32)->nullable();
                 $table->string('reported_destination_bank', 120)->nullable();
+                $table->string('reported_payee_name', 120)->nullable();
                 $table->string('payment_session_id', 64)->nullable();
                 $table->decimal('payment_amount_reported', 14, 2)->nullable();
                 $table->string('visitor_name', 120)->nullable();
@@ -214,6 +216,31 @@ class PublicSupportTest extends TestCase
                 $table->uuid('public_token')->nullable();
                 $table->json('bot_messages')->nullable();
                 $table->timestamps();
+            });
+        }
+
+        if (! $schema->hasTable('processed_emails')) {
+            $schema->create('processed_emails', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('email_account_id')->nullable();
+                $table->string('message_id')->unique();
+                $table->string('subject')->nullable();
+                $table->string('from_email')->nullable();
+                $table->text('from_name')->nullable();
+                $table->text('text_body')->nullable();
+                $table->text('html_body')->nullable();
+                $table->datetime('email_date')->nullable();
+                $table->decimal('amount', 15, 2)->nullable();
+                $table->string('sender_name')->nullable();
+                $table->string('account_number')->nullable();
+                $table->text('extracted_data')->nullable();
+                $table->unsignedBigInteger('matched_payment_id')->nullable();
+                $table->datetime('matched_at')->nullable();
+                $table->boolean('is_matched')->default(false);
+                $table->text('processing_notes')->nullable();
+                $table->timestamps();
+                $table->index('is_matched');
+                $table->index(['amount', 'sender_name', 'is_matched']);
             });
         }
 
@@ -541,6 +568,11 @@ class PublicSupportTest extends TestCase
         ])->assertOk();
 
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payee_bank',
+            'value' => 'rubies_mfb',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
             'value' => $account,
         ])->assertOk();
@@ -607,6 +639,10 @@ class PublicSupportTest extends TestCase
             'value' => true,
         ]);
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payee_bank',
+            'value' => 'rubies_mfb',
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
             'value' => $other,
         ]);
@@ -629,7 +665,11 @@ class PublicSupportTest extends TestCase
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'payment_issue',
             'value' => true,
-        ])->assertOk();
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payee_bank',
+            'value' => 'rubies_mfb',
+        ]);
 
         $max = (int) config('support.intake_wrong_account_max_attempts', 5);
 
@@ -664,6 +704,10 @@ class PublicSupportTest extends TestCase
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'payment_issue',
             'value' => true,
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payee_bank',
+            'value' => 'rubies_mfb',
         ]);
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
@@ -721,6 +765,10 @@ class PublicSupportTest extends TestCase
             'value' => true,
         ]);
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payee_bank',
+            'value' => 'rubies_mfb',
+        ]);
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
             'value' => $account,
         ]);
@@ -754,6 +802,59 @@ class PublicSupportTest extends TestCase
         ])->assertOk();
 
         return ['public_token' => (string) $done->json('data.public_token')];
+    }
+
+    /** @test */
+    public function kuda_intake_skips_session_id_and_matches_on_account_name_amount(): void
+    {
+        $account = '0555666777';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        $payment = Payment::create([
+            'transaction_id' => 'KUDA-INTERNAL-1',
+            'amount' => 4200,
+            'status' => Payment::STATUS_PENDING,
+            'account_number' => $account,
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payee_bank',
+            'value' => 'kuda',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'name')
+            ->assertJsonPath('data.requires_session_id', false);
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'name',
+            'value' => 'Ada Lovelace',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'amount',
+            'value' => 4200,
+        ])->assertOk();
+
+        $session = SupportIntakeSession::query()->where('intake_token', $intakeToken)->first();
+        $this->assertNotNull($session);
+        $this->assertSame($payment->id, $session->payment_id);
     }
 
     /** @test */

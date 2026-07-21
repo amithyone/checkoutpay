@@ -35,12 +35,18 @@ return [
     'payee_banks' => [
         'rubies_mfb' => [
             'label' => 'Rubies MFB',
+            'requires_session_id' => true,
+            'source' => 'external_api',
         ],
         'moniepoint_mfb' => [
             'label' => 'Moniepoint MFB',
+            'requires_session_id' => true,
+            'source' => 'internal',
         ],
         'kuda' => [
             'label' => 'Kuda Bank',
+            'requires_session_id' => false,
+            'source' => 'internal',
         ],
     ],
 
@@ -51,6 +57,8 @@ return [
         'ask_payee_bank' => 'Which CheckoutPay collection bank did you send money to?',
         'ask_destination_account' => 'What is the account number you sent money TO? (From your bank receipt.)',
         'ask_session_id' => 'What is the bank session ID on your transfer receipt or SMS? (Not the website URL.)',
+        'kuda_no_session_id' => 'Kuda receipts usually do not include a bank session ID. We will match your transfer using the account number, your name, and the amount.',
+        'match_not_found_kuda' => "We couldn't find a pending payment with that account, name, and amount. Please double-check your details, or continue below to speak with customer care.",
         'ask_moniepoint_charges' => 'For Moniepoint transfers: did you send the full checkout amount including all fees/charges shown on the payment page?',
         'moniepoint_fix_amount' => 'Please go back to the merchant checkout page and update the amount you intend to pay so it includes Moniepoint charges, then pay again. Our checkout API lets merchants correct the intended amount before you transfer. Tap *Start over* when you are ready to try again.',
         'match_searching' => 'Thanks — searching for your pending payment and trying to match it now…',

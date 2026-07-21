@@ -263,8 +263,9 @@
             } else {
                 const hint = document.createElement('p');
                 hint.className = 'text-xs text-gray-500 mt-2';
-                hint.textContent =
-                    'WhatsApp is available after we confirm your bank session ID matches the account you paid to.';
+                hint.textContent = intakeState.requires_session_id === false
+                    ? 'WhatsApp linking is available after we verify your account, name, and amount.'
+                    : 'WhatsApp is available after we confirm your bank session ID matches the account you paid to.';
                 actions.appendChild(hint);
             }
             return;
