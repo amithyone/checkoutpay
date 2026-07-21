@@ -5,8 +5,11 @@
     const POLL_MS = window.CP_SUPPORT_POLL_MS || 4000;
 
     const STEP_PAYMENT_ISSUE = 'payment_issue';
+    const STEP_PAYEE_BANK = 'payee_bank';
     const STEP_DESTINATION_ACCOUNT = 'destination_account';
     const STEP_SESSION_ID = 'session_id';
+    const STEP_MONIEPOINT_CHARGES = 'moniepoint_charges';
+    const STEP_MONIEPOINT_AMOUNT_FIX = 'moniepoint_amount_fix';
     const STEP_NAME = 'name';
     const STEP_AMOUNT = 'amount';
     const STEP_BANK_FROM = 'bank_from';
@@ -189,25 +192,52 @@
             return;
         }
 
+        if (step === STEP_PAYEE_BANK) {
+            const banks = intakeState.payee_banks || [];
+            banks.forEach(function (bank) {
+                actions.appendChild(
+                    actionButton(bank.label, function () {
+                        advanceIntake(STEP_PAYEE_BANK, bank.key);
+                    })
+                );
+            });
+            appendRestartButton(actions);
+            return;
+        }
+
+        if (step === STEP_MONIEPOINT_CHARGES) {
+            actions.appendChild(
+                actionButton('Yes — I sent the full amount with charges', function () {
+                    advanceIntake(STEP_MONIEPOINT_CHARGES, true);
+                })
+            );
+            actions.appendChild(
+                actionButton('No — I did not include charges', function () {
+                    advanceIntake(STEP_MONIEPOINT_CHARGES, false);
+                })
+            );
+            appendRestartButton(actions);
+            return;
+        }
+
+        if (step === STEP_MONIEPOINT_AMOUNT_FIX) {
+            appendRestartButton(actions);
+            return;
+        }
+
         if (
             step === STEP_DESTINATION_ACCOUNT ||
             step === STEP_SESSION_ID ||
-            step === STEP_NAME ||
-            step === STEP_BANK_FROM
+            step === STEP_NAME
         ) {
             actions.appendChild(textInputAction(step, getPlaceholder(step)));
-            if (intakeState.can_restart) {
-                actions.appendChild(
-                    actionButton('Start over', function () {
-                        advanceIntake(STEP_RESTART, true);
-                    })
-                );
-            }
+            appendRestartButton(actions);
             return;
         }
 
         if (step === STEP_AMOUNT) {
             actions.appendChild(numberInputAction());
+            appendRestartButton(actions);
             return;
         }
 
@@ -250,10 +280,20 @@
         const map = {
             destination_account: 'Account number you paid TO',
             session_id: 'Bank session ID from receipt',
-            name: 'Your name',
-            bank_from: 'Bank you sent from',
+            name: 'Your name (as on bank transfer)',
         };
         return map[step] || '';
+    }
+
+    function appendRestartButton(actions) {
+        if (!intakeState || !intakeState.can_restart) {
+            return;
+        }
+        actions.appendChild(
+            actionButton('Start over', function () {
+                advanceIntake(STEP_RESTART, true);
+            })
+        );
     }
 
     function actionButton(label, onClick) {

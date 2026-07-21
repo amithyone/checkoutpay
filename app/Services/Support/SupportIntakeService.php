@@ -18,9 +18,15 @@ final class SupportIntakeService
 
     public const STEP_PAYMENT_ISSUE = 'payment_issue';
 
+    public const STEP_PAYEE_BANK = 'payee_bank';
+
     public const STEP_DESTINATION_ACCOUNT = 'destination_account';
 
     public const STEP_SESSION_ID = 'session_id';
+
+    public const STEP_MONIEPOINT_CHARGES = 'moniepoint_charges';
+
+    public const STEP_MONIEPOINT_AMOUNT_FIX = 'moniepoint_amount_fix';
 
     public const STEP_NAME = 'name';
 
@@ -46,6 +52,7 @@ final class SupportIntakeService
         private SupportIssueOptionsService $issues,
         private SupportPaymentLookupService $payments,
         private SupportIntakeLockoutService $lockout,
+        private SupportPaymentMatchService $paymentMatch,
     ) {}
 
     public function start(string $channel, ?int $consumerWalletApiAccountId = null, ?Request $request = null): array
@@ -146,8 +153,27 @@ final class SupportIntakeService
             }
 
             $session->issue_type = 'payment_pending_transfer';
+            $messages[] = $this->botLine((string) config('support.intake_messages.ask_payee_bank', ''));
+            $session->fill([
+                'current_step' => self::STEP_PAYEE_BANK,
+                'bot_messages' => $messages,
+            ])->save();
+
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+        }
+
+        if ($step === self::STEP_PAYEE_BANK) {
+            $bankKey = strtolower(trim((string) $value));
+            $banks = config('support.payee_banks', []);
+            if (! isset($banks[$bankKey])) {
+                return ['ok' => false, 'message' => 'Please select Rubies MFB, Moniepoint MFB, or Kuda Bank.'];
+            }
+
+            $messages[] = $this->userLine((string) $banks[$bankKey]['label']);
             $messages[] = $this->botLine((string) config('support.intake_messages.ask_destination_account', ''));
             $session->fill([
+                'reported_payee_name' => $bankKey,
+                'reported_destination_bank' => (string) $banks[$bankKey]['label'],
                 'current_step' => self::STEP_DESTINATION_ACCOUNT,
                 'bot_messages' => $messages,
             ])->save();
@@ -218,6 +244,37 @@ final class SupportIntakeService
                     : SupportIntakeSession::STATUS_IN_PROGRESS,
             ]);
 
+            if ($this->isMoniepointPayeeBank($session)) {
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_moniepoint_charges', ''));
+                $session->fill([
+                    'current_step' => self::STEP_MONIEPOINT_CHARGES,
+                    'bot_messages' => $messages,
+                ])->save();
+            } else {
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_name', ''));
+                $session->fill([
+                    'current_step' => self::STEP_NAME,
+                    'bot_messages' => $messages,
+                ])->save();
+            }
+
+            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+        }
+
+        if ($step === self::STEP_MONIEPOINT_CHARGES) {
+            $confirmed = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            $messages[] = $this->userLine($confirmed ? 'Yes — I sent the full amount with charges' : 'No — I did not include charges');
+
+            if (! $confirmed) {
+                $messages[] = $this->botLine((string) config('support.intake_messages.moniepoint_fix_amount', ''));
+                $session->fill([
+                    'current_step' => self::STEP_MONIEPOINT_AMOUNT_FIX,
+                    'bot_messages' => $messages,
+                ])->save();
+
+                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+            }
+
             $messages[] = $this->botLine((string) config('support.intake_messages.ask_name', ''));
             $session->fill([
                 'current_step' => self::STEP_NAME,
@@ -249,14 +306,33 @@ final class SupportIntakeService
                 return ['ok' => false, 'message' => 'Please enter a valid amount.'];
             }
             $messages[] = $this->userLine('₦'.number_format($amount, 2));
-            $messages[] = $this->botLine((string) config('support.intake_messages.ask_bank_from', ''));
-            $session->fill([
-                'payment_amount_reported' => $amount,
-                'current_step' => self::STEP_BANK_FROM,
-                'bot_messages' => $messages,
-            ])->save();
+            $session->payment_amount_reported = $amount;
+            $session->bot_messages = $messages;
+            $session->save();
 
-            return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+            $messages[] = $this->botLine((string) config('support.intake_messages.match_searching', ''));
+            $session->bot_messages = $messages;
+            $session->save();
+
+            $matchResult = $this->paymentMatch->attemptForIntake($session->fresh());
+            $messages[] = $this->botLine($matchResult['message']);
+
+            if (! empty($matchResult['payment'])) {
+                $session->payment_id = $matchResult['payment']->id;
+            }
+
+            if ($matchResult['matched'] ?? false) {
+                $session->fill([
+                    'intake_status' => SupportIntakeSession::STATUS_QUALIFIED,
+                    'bot_messages' => $messages,
+                ])->save();
+
+                return $this->complete($session->fresh(), $request, $messages);
+            }
+
+            $session->fill(['bot_messages' => $messages])->save();
+
+            return $this->advanceToContactMode($session->fresh(), $messages, $request);
         }
 
         if ($step === self::STEP_BANK_FROM) {
@@ -481,8 +557,11 @@ final class SupportIntakeService
         if ($session->payment_amount_reported) {
             $lines[] = 'Amount: '.$this->payments->formatMoney((float) $session->payment_amount_reported);
         }
+        if ($session->reported_payee_name) {
+            $lines[] = 'Paid to bank: '.$session->reported_payee_name;
+        }
         if ($session->reported_destination_bank) {
-            $lines[] = 'Bank sent from: '.$session->reported_destination_bank;
+            $lines[] = 'Collection bank: '.$session->reported_destination_bank;
         }
         $lines[] = 'Session matched account: '.($session->account_on_session ? 'yes' : 'no');
         $lines[] = 'WhatsApp eligible: '.($session->isWhatsappEligible() ? 'yes' : 'no');
@@ -582,6 +661,7 @@ final class SupportIntakeService
             'issue_type' => null,
             'reported_destination_account' => null,
             'reported_destination_bank' => null,
+            'reported_payee_name' => null,
             'payment_session_id' => null,
             'payment_amount_reported' => null,
             'visitor_name' => null,
@@ -613,6 +693,52 @@ final class SupportIntakeService
         return str_replace(':minutes', $minutes, $template);
     }
 
+    private function isMoniepointPayeeBank(SupportIntakeSession $session): bool
+    {
+        return strtolower(trim((string) $session->reported_payee_name)) === 'moniepoint_mfb';
+    }
+
+    private function canRestartIntake(SupportIntakeSession $session): bool
+    {
+        if ($session->isLockedOut() || $session->intake_status === SupportIntakeSession::STATUS_COMPLETED) {
+            return false;
+        }
+
+        return in_array($session->current_step, [
+            self::STEP_PAYEE_BANK,
+            self::STEP_DESTINATION_ACCOUNT,
+            self::STEP_SESSION_ID,
+            self::STEP_MONIEPOINT_CHARGES,
+            self::STEP_MONIEPOINT_AMOUNT_FIX,
+            self::STEP_NAME,
+            self::STEP_AMOUNT,
+            self::STEP_BANK_FROM,
+            self::STEP_RECEIPT,
+            self::STEP_CONTACT_MODE,
+            self::STEP_PHONE,
+        ], true);
+    }
+
+    /**
+     * @return list<array{key: string, label: string}>
+     */
+    private function payeeBankOptions(): array
+    {
+        $banks = config('support.payee_banks', []);
+        $out = [];
+        foreach ($banks as $key => $meta) {
+            if (! is_array($meta)) {
+                continue;
+            }
+            $out[] = [
+                'key' => (string) $key,
+                'label' => (string) ($meta['label'] ?? $key),
+            ];
+        }
+
+        return $out;
+    }
+
     public function sessionPayload(SupportIntakeSession $session, ?Request $request = null): array
     {
         $max = $this->lockout->maxWrongAccountAttempts();
@@ -638,8 +764,8 @@ final class SupportIntakeService
                 max($attempts, (int) ($clientLock['attempts'] ?? 0))
             ),
             'can_retry_account' => $session->canRetryDestinationAccount(),
-            'can_restart' => $session->intake_status === SupportIntakeSession::STATUS_IN_PROGRESS
-                && $session->current_step === self::STEP_DESTINATION_ACCOUNT,
+            'can_restart' => $this->canRestartIntake($session),
+            'payee_banks' => $this->payeeBankOptions(),
             'messages' => $session->bot_messages ?? [],
             'public_token' => $session->public_token,
             'ticket_id' => $session->support_ticket_id,

@@ -32,12 +32,32 @@ return [
         'checkoutpay',
     ],
 
+    'payee_banks' => [
+        'rubies_mfb' => [
+            'label' => 'Rubies MFB',
+        ],
+        'moniepoint_mfb' => [
+            'label' => 'Moniepoint MFB',
+        ],
+        'kuda' => [
+            'label' => 'Kuda Bank',
+        ],
+    ],
+
     'intake_messages' => [
         'disclaimer' => "Hi — we're CheckoutPay (Checkout Now Ltd), a payment gateway. We process bank transfers only. We are not the shop or website you paid — we don't deliver products or handle merchant service issues.",
         'ask_payment_issue' => 'Is this about a bank transfer you made to pay for something online (instant payment)?',
         'rejected_non_payment' => 'We only help with instant bank transfer problems (money sent to our checkout account). For product, delivery, or service issues, please contact the website or seller where you started checkout.',
+        'ask_payee_bank' => 'Which CheckoutPay collection bank did you send money to?',
         'ask_destination_account' => 'What is the account number you sent money TO? (From your bank receipt.)',
         'ask_session_id' => 'What is the bank session ID on your transfer receipt or SMS? (Not the website URL.)',
+        'ask_moniepoint_charges' => 'For Moniepoint transfers: did you send the full checkout amount including all fees/charges shown on the payment page?',
+        'moniepoint_fix_amount' => 'Please go back to the merchant checkout page and update the amount you intend to pay so it includes Moniepoint charges, then pay again. Our checkout API lets merchants correct the intended amount before you transfer. Tap *Start over* when you are ready to try again.',
+        'match_searching' => 'Thanks — searching for your pending payment and trying to match it now…',
+        'match_success' => 'Good news: your payment has been matched and approved. You can return to the merchant site — it should update shortly. Our team is also notified if you need anything else.',
+        'match_not_received' => "We haven't received your transfer yet, or we couldn't match it with the details provided. Please try again in a few minutes, or continue below to speak with customer care.",
+        'match_not_found' => "We couldn't find a pending payment with those details. Please double-check your account number and bank session ID, or continue below to speak with customer care.",
+        'match_not_pending' => 'This payment is no longer pending in our system. Continue below if you still need help.',
         'account_mismatch' => "That account number doesn't match the account on this payment session. Check your receipt and try again.",
         'not_our_account' => 'This account number is not one we operate. If you paid a different website, contact them directly — we only handle transfers to CheckoutPay / Checkout Now accounts.',
         'not_our_account_retry' => 'If you have another receipt, enter the account number you sent money TO on that transfer. You can also tap Restart to begin again.',
