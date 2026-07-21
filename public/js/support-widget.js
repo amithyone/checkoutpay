@@ -236,13 +236,13 @@
         const actions = document.getElementById('cp-intake-actions');
         if (actions) {
             actions.classList.toggle('cp-intake-actions-busy', busy);
-            if (!busy) {
-                actions.querySelectorAll('button').forEach(function (el) {
-                    el.disabled = false;
+            actions.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+                el.disabled = busy;
+                if (!busy) {
                     el.classList.remove('cp-btn-loading');
                     el.removeAttribute('aria-busy');
-                });
-            }
+                }
+            });
         }
 
         if (busy) {
@@ -263,6 +263,7 @@
         if (!actions || !intakeState) {
             return;
         }
+        actions.classList.remove('cp-intake-actions-busy');
         actions.innerHTML = '';
 
         if (intakeState.is_terminal || intakeState.is_locked) {
@@ -585,6 +586,7 @@
 
     function handleIntakeHttpError(e, data, res) {
         if (res && res.status === 429) {
+            setIntakeBusy(false);
             intakeToken = '';
             intakeState = { is_terminal: true, is_locked: true, locked_until: data.locked_until, messages: [] };
             try {
@@ -605,9 +607,7 @@
     }
 
     function applyIntakePayload(data) {
-        hideIntakeTyping();
-        intakeBusy = false;
-        intakeBusyButton = null;
+        setIntakeBusy(false, intakeBusyButton);
         intakeState = data;
         intakeToken = data.intake_token || intakeToken;
         try {

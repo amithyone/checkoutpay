@@ -349,8 +349,7 @@
 }
 
 #cp-intake-actions.cp-intake-actions-busy {
-    opacity: 0.65;
-    pointer-events: none;
+    opacity: 0.85;
 }
 
 .cp-onboard-error {
