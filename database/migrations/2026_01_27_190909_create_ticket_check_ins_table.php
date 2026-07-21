@@ -17,7 +17,11 @@ return new class extends Migration
 
         Schema::create('ticket_check_ins', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('ticket_id')->constrained('tickets')->onDelete('cascade');
+            if (Schema::hasTable('tickets')) {
+                $table->foreignId('ticket_id')->constrained('tickets')->onDelete('cascade');
+            } else {
+                $table->unsignedBigInteger('ticket_id');
+            }
             $table->foreignId('checked_in_by')->constrained('admins')->onDelete('cascade');
             $table->enum('check_in_method', ['qr_scan', 'manual'])->default('qr_scan');
             $table->string('location')->nullable(); // GPS or venue location
