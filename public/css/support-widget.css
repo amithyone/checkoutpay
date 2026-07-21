@@ -272,6 +272,87 @@
     cursor: not-allowed;
 }
 
+.cp-btn-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.cp-btn-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1rem;
+    height: 1rem;
+    margin: -0.5rem 0 0 -0.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: cp-spin 0.65s linear infinite;
+}
+
+#cp-support-send.cp-btn-loading::after {
+    border-color: rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+}
+
+.cp-btn-secondary.cp-btn-loading::after {
+    border-color: rgba(60, 80, 224, 0.25);
+    border-top-color: #3C50E0;
+}
+
+@keyframes cp-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.cp-msg-typing {
+    padding: 0.625rem 0.875rem;
+    min-width: 3.5rem;
+}
+
+.cp-typing-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 0.75rem;
+}
+
+.cp-typing-dots span {
+    display: block;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: #64748b;
+    animation: cp-typing-bounce 1.2s ease-in-out infinite;
+}
+
+.cp-typing-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.cp-typing-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes cp-typing-bounce {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.45;
+    }
+    30% {
+        transform: translateY(-3px);
+        opacity: 1;
+    }
+}
+
+#cp-intake-actions.cp-intake-actions-busy {
+    opacity: 0.65;
+    pointer-events: none;
+}
+
 .cp-onboard-error {
     color: #dc2626;
     font-size: 0.75rem;

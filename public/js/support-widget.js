@@ -8,10 +8,13 @@
     const STEP_PAYEE_BANK = 'payee_bank';
     const STEP_DESTINATION_ACCOUNT = 'destination_account';
     const STEP_SESSION_ID = 'session_id';
+    const STEP_SESSION_ID_FOR_CHAT = 'session_id_for_chat';
     const STEP_MONIEPOINT_CHARGES = 'moniepoint_charges';
     const STEP_MONIEPOINT_AMOUNT_FIX = 'moniepoint_amount_fix';
     const STEP_NAME = 'name';
     const STEP_AMOUNT = 'amount';
+    const STEP_MATCH_AMOUNT_VERIFY = 'match_amount_verify';
+    const STEP_MATCH_AMOUNT_FIX = 'match_amount_fix';
     const STEP_BANK_FROM = 'bank_from';
     const STEP_RECEIPT = 'receipt';
     const STEP_CONTACT_MODE = 'contact_mode';
@@ -25,6 +28,8 @@
     let lastMessageId = 0;
     let pollTimer = null;
     let supportOptions = null;
+    let intakeBusy = false;
+    let intakeBusyButton = null;
 
     let launcher = null;
     let panel = null;
@@ -129,21 +134,128 @@
         if (!body) {
             return;
         }
-        let html = '<div class="cp-intake-chat">';
+
+        let chat = body.querySelector('.cp-intake-chat');
+        let actions = document.getElementById('cp-intake-actions');
+        let errorEl = document.getElementById('cp-intake-error');
+
+        if (!chat || !actions) {
+            body.innerHTML =
+                '<div class="cp-intake-chat"></div>' +
+                '<div id="cp-intake-actions"></div>' +
+                '<p id="cp-intake-error" class="cp-onboard-error" style="display:none"></p>';
+            chat = body.querySelector('.cp-intake-chat');
+            actions = document.getElementById('cp-intake-actions');
+            errorEl = document.getElementById('cp-intake-error');
+        }
+
+        chat.innerHTML = '';
         (messages || []).forEach(function (m, idx) {
             const role = m.role === 'user' ? 'cp-msg-visitor' : 'cp-msg-bot';
-            html +=
-                '<div class="cp-msg ' +
-                role +
-                '" data-intake-idx="' +
-                idx +
-                '">' +
-                escapeHtml(m.body || '') +
-                '</div>';
+            const div = document.createElement('div');
+            div.className = 'cp-msg ' + role;
+            div.setAttribute('data-intake-idx', String(idx));
+            div.textContent = m.body || '';
+            chat.appendChild(div);
         });
-        html += '</div><div id="cp-intake-actions"></div><p id="cp-intake-error" class="cp-onboard-error" style="display:none"></p>';
-        body.innerHTML = html;
+
+        if (errorEl) {
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+        }
+
         body.scrollTop = body.scrollHeight;
+    }
+
+    function needsSessionIdForChat() {
+        if (!intakeState) {
+            return false;
+        }
+        if (typeof intakeState.needs_session_id_for_chat === 'boolean') {
+            return intakeState.needs_session_id_for_chat;
+        }
+
+        return intakeState.current_step === STEP_SESSION_ID_FOR_CHAT;
+    }
+
+    function appendSessionIdInput(actions, step) {
+        actions.appendChild(textInputAction(step || STEP_SESSION_ID_FOR_CHAT, getPlaceholder(step || STEP_SESSION_ID_FOR_CHAT)));
+    }
+
+    function showIntakeTyping() {
+        if (!body) {
+            return;
+        }
+        hideIntakeTyping();
+        const chat = body.querySelector('.cp-intake-chat');
+        if (!chat) {
+            return;
+        }
+        const el = document.createElement('div');
+        el.className = 'cp-msg cp-msg-bot cp-msg-typing';
+        el.id = 'cp-intake-typing';
+        el.setAttribute('aria-label', 'CheckoutPay is typing');
+        el.innerHTML =
+            '<span class="cp-typing-dots"><span></span><span></span><span></span></span>';
+        chat.appendChild(el);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function hideIntakeTyping() {
+        const el = document.getElementById('cp-intake-typing');
+        if (el) {
+            el.remove();
+        }
+    }
+
+    function setButtonLoading(btn, loading) {
+        if (!btn) {
+            return;
+        }
+        if (loading) {
+            if (!btn.dataset.cpOriginalText) {
+                btn.dataset.cpOriginalText = btn.textContent;
+            }
+            btn.disabled = true;
+            btn.classList.add('cp-btn-loading');
+            btn.setAttribute('aria-busy', 'true');
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('cp-btn-loading');
+            btn.removeAttribute('aria-busy');
+            if (btn.dataset.cpOriginalText) {
+                btn.textContent = btn.dataset.cpOriginalText;
+            }
+        }
+    }
+
+    function setIntakeBusy(busy, triggerBtn) {
+        intakeBusy = busy;
+        intakeBusyButton = busy ? triggerBtn || null : null;
+
+        const actions = document.getElementById('cp-intake-actions');
+        if (actions) {
+            actions.classList.toggle('cp-intake-actions-busy', busy);
+            if (!busy) {
+                actions.querySelectorAll('button').forEach(function (el) {
+                    el.disabled = false;
+                    el.classList.remove('cp-btn-loading');
+                    el.removeAttribute('aria-busy');
+                });
+            }
+        }
+
+        if (busy) {
+            if (triggerBtn) {
+                setButtonLoading(triggerBtn, true);
+            }
+            showIntakeTyping();
+        } else {
+            hideIntakeTyping();
+            if (triggerBtn) {
+                setButtonLoading(triggerBtn, false);
+            }
+        }
     }
 
     function renderIntakeActions() {
@@ -160,105 +272,124 @@
                 lockMsg.textContent = formatLockoutMessage(intakeState.locked_until);
                 actions.appendChild(lockMsg);
             }
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'cp-btn-primary';
-            btn.textContent = 'Close';
-            btn.addEventListener('click', function () {
-                if (intakeState.is_locked) {
-                    intakeToken = '';
-                    intakeState = null;
-                    try {
-                        localStorage.removeItem(INTAKE_STORAGE_KEY);
-                    } catch (e) {
-                        /* ignore */
+            if (intakeState.can_restart) {
+                appendRestartButton(actions);
+            } else {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'cp-btn-primary';
+                btn.textContent = 'Close';
+                btn.addEventListener('click', function () {
+                    if (intakeState.is_locked) {
+                        intakeToken = '';
+                        intakeState = null;
+                        try {
+                            localStorage.removeItem(INTAKE_STORAGE_KEY);
+                        } catch (e) {
+                            /* ignore */
+                        }
                     }
-                }
-                closePanel();
-            });
-            actions.appendChild(btn);
+                    closePanel();
+                });
+                actions.appendChild(btn);
+            }
             return;
         }
 
         const step = intakeState.current_step;
 
         if (step === STEP_PAYMENT_ISSUE) {
-            actions.appendChild(actionButton('Yes — bank transfer issue', function () {
-                advanceIntake(STEP_PAYMENT_ISSUE, true);
+            actions.appendChild(actionButton('Yes — bank transfer issue', function (btn) {
+                advanceIntake(STEP_PAYMENT_ISSUE, true, btn);
             }));
-            actions.appendChild(actionButton('No — something else', function () {
-                advanceIntake(STEP_PAYMENT_ISSUE, false);
+            actions.appendChild(actionButton('No — something else', function (btn) {
+                advanceIntake(STEP_PAYMENT_ISSUE, false, btn);
             }));
-            return;
-        }
-
-        if (step === STEP_PAYEE_BANK) {
+        } else if (step === STEP_PAYEE_BANK) {
             const banks = intakeState.payee_banks || [];
             banks.forEach(function (bank) {
                 actions.appendChild(
-                    actionButton(bank.label, function () {
-                        advanceIntake(STEP_PAYEE_BANK, bank.key);
+                    actionButton(bank.label, function (btn) {
+                        advanceIntake(STEP_PAYEE_BANK, bank.key, btn);
                     })
                 );
             });
-            appendRestartButton(actions);
-            return;
-        }
-
-        if (step === STEP_MONIEPOINT_CHARGES) {
+        } else if (step === STEP_MONIEPOINT_CHARGES) {
             actions.appendChild(
-                actionButton('Yes — I sent the full amount with charges', function () {
-                    advanceIntake(STEP_MONIEPOINT_CHARGES, true);
+                actionButton('Yes — I sent the full amount with charges', function (btn) {
+                    advanceIntake(STEP_MONIEPOINT_CHARGES, true, btn);
                 })
             );
             actions.appendChild(
-                actionButton('No — I did not include charges', function () {
-                    advanceIntake(STEP_MONIEPOINT_CHARGES, false);
+                actionButton('No — I did not include charges', function (btn) {
+                    advanceIntake(STEP_MONIEPOINT_CHARGES, false, btn);
                 })
             );
-            appendRestartButton(actions);
-            return;
-        }
-
-        if (step === STEP_MONIEPOINT_AMOUNT_FIX) {
-            appendRestartButton(actions);
-            return;
-        }
-
-        if (
+        } else if (step === STEP_MONIEPOINT_AMOUNT_FIX || step === STEP_MATCH_AMOUNT_FIX) {
+            actions.appendChild(
+                actionButton('I updated the amount on the checkout page', function (btn) {
+                    advanceIntake(STEP_RESTART, true, btn);
+                })
+            );
+        } else if (step === STEP_MATCH_AMOUNT_VERIFY) {
+            actions.appendChild(
+                actionButton('Yes — exact amount with charges', function (btn) {
+                    advanceIntake(STEP_MATCH_AMOUNT_VERIFY, true, btn);
+                })
+            );
+            actions.appendChild(
+                actionButton('No — wrong amount or missing charges', function (btn) {
+                    advanceIntake(STEP_MATCH_AMOUNT_VERIFY, false, btn);
+                })
+            );
+        } else if (step === STEP_SESSION_ID_FOR_CHAT) {
+            appendSessionIdInput(actions, step);
+        } else if (
             step === STEP_DESTINATION_ACCOUNT ||
             step === STEP_SESSION_ID ||
             step === STEP_NAME
         ) {
             actions.appendChild(textInputAction(step, getPlaceholder(step)));
-            appendRestartButton(actions);
-            return;
-        }
-
-        if (step === STEP_AMOUNT) {
+        } else if (step === STEP_AMOUNT) {
             actions.appendChild(numberInputAction());
-            appendRestartButton(actions);
-            return;
-        }
-
-        if (step === STEP_RECEIPT) {
+        } else if (step === STEP_RECEIPT) {
             actions.appendChild(receiptUploadAction());
-            actions.appendChild(actionButton('Skip receipt', function () {
-                advanceIntake(STEP_RECEIPT, 'skip');
+            actions.appendChild(actionButton('Skip receipt', function (btn) {
+                advanceIntake(STEP_RECEIPT, 'skip', btn);
             }));
-            return;
-        }
-
-        if (step === STEP_CONTACT_MODE) {
+        } else if (step === STEP_CONTACT_MODE) {
             const modes = intakeState.allowed_contact_modes || ['browser'];
-            if (modes.indexOf('browser') !== -1) {
-                actions.appendChild(actionButton('Continue in this chat', function () {
-                    advanceIntake(STEP_CONTACT_MODE, 'browser');
+            const canChat = intakeState.can_continue_chat !== false;
+            const showSessionInput = needsSessionIdForChat();
+            let sessionInput = null;
+
+            if (showSessionInput) {
+                const sessionWrap = textInputAction(STEP_SESSION_ID_FOR_CHAT, getPlaceholder(STEP_SESSION_ID_FOR_CHAT));
+                sessionInput = sessionWrap.querySelector('input');
+                const sessionSend = sessionWrap.querySelector('button');
+                if (sessionSend) {
+                    sessionSend.remove();
+                }
+                actions.appendChild(sessionWrap);
+            }
+
+            if (modes.indexOf('browser') !== -1 && canChat) {
+                actions.appendChild(actionButton('Continue in this chat', function (btn) {
+                    if (sessionInput) {
+                        const sid = sessionInput.value.trim();
+                        if (!sid) {
+                            showIntakeError('Please enter your bank session ID.');
+                            return;
+                        }
+                        advanceIntake(STEP_CONTACT_MODE, { mode: 'browser', session_id: sid }, btn);
+                        return;
+                    }
+                    advanceIntake(STEP_CONTACT_MODE, 'browser', btn);
                 }));
             }
             if (modes.indexOf('whatsapp') !== -1) {
-                actions.appendChild(actionButton('Link WhatsApp (verified)', function () {
-                    advanceIntake(STEP_CONTACT_MODE, 'whatsapp');
+                actions.appendChild(actionButton('Link WhatsApp (verified)', function (btn) {
+                    advanceIntake(STEP_CONTACT_MODE, 'whatsapp', btn);
                 }));
             } else {
                 const hint = document.createElement('p');
@@ -268,19 +399,18 @@
                     : 'WhatsApp is available after we confirm your bank session ID matches the account you paid to.';
                 actions.appendChild(hint);
             }
-            return;
+        } else if (step === STEP_PHONE) {
+            actions.appendChild(phoneAction());
         }
 
-        if (step === STEP_PHONE) {
-            actions.appendChild(phoneAction());
-            return;
-        }
+        appendRestartButton(actions);
     }
 
     function getPlaceholder(step) {
         const map = {
             destination_account: 'Account number you paid TO',
             session_id: 'Bank session ID from receipt',
+            session_id_for_chat: 'Bank session ID from receipt',
             name: 'Your name (as on bank transfer)',
         };
         return map[step] || '';
@@ -291,18 +421,23 @@
             return;
         }
         actions.appendChild(
-            actionButton('Start over', function () {
-                advanceIntake(STEP_RESTART, true);
-            })
+            actionButton('Start over', function (btn) {
+                advanceIntake(STEP_RESTART, true, btn);
+            }, 'cp-btn-secondary cp-btn-block')
         );
     }
 
-    function actionButton(label, onClick) {
+    function actionButton(label, onClick, className) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'cp-btn-primary cp-btn-block';
+        btn.className = className || 'cp-btn-primary cp-btn-block';
         btn.textContent = label;
-        btn.addEventListener('click', onClick);
+        btn.addEventListener('click', function () {
+            if (intakeBusy) {
+                return;
+            }
+            onClick(btn);
+        });
         return btn;
     }
 
@@ -319,10 +454,10 @@
         btn.textContent = 'Send';
         btn.addEventListener('click', function () {
             const v = input.value.trim();
-            if (!v) {
+            if (!v || intakeBusy) {
                 return;
             }
-            advanceIntake(step, v);
+            advanceIntake(step, v, btn);
         });
         input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
@@ -348,7 +483,10 @@
         btn.className = 'cp-btn-primary';
         btn.textContent = 'Send';
         btn.addEventListener('click', function () {
-            advanceIntake(STEP_AMOUNT, input.value);
+            if (intakeBusy) {
+                return;
+            }
+            advanceIntake(STEP_AMOUNT, input.value, btn);
         });
         wrap.appendChild(input);
         wrap.appendChild(btn);
@@ -370,7 +508,10 @@
                 showIntakeError('Choose a file first.');
                 return;
             }
-            uploadReceipt(input.files[0]);
+            if (intakeBusy) {
+                return;
+            }
+            uploadReceipt(input.files[0], btn);
         });
         wrap.appendChild(input);
         wrap.appendChild(btn);
@@ -400,6 +541,9 @@
         btn.className = 'cp-btn-primary cp-btn-block';
         btn.textContent = 'Start chat';
         btn.addEventListener('click', function () {
+            if (intakeBusy) {
+                return;
+            }
             const phone = document.getElementById('cp-intake-phone');
             const country = document.getElementById('cp-intake-country');
             const consent = document.getElementById('cp-intake-wallet-consent');
@@ -410,7 +554,7 @@
             advanceIntake(STEP_PHONE, {
                 phone: phone ? phone.value.trim() : '',
                 country_iso: country ? country.value : '',
-            });
+            }, btn);
         });
         wrap.appendChild(btn);
         return wrap;
@@ -461,6 +605,9 @@
     }
 
     function applyIntakePayload(data) {
+        hideIntakeTyping();
+        intakeBusy = false;
+        intakeBusyButton = null;
         intakeState = data;
         intakeToken = data.intake_token || intakeToken;
         try {
@@ -520,11 +667,15 @@
         }
     }
 
-    async function advanceIntake(step, value) {
+    async function advanceIntake(step, value, triggerBtn) {
+        if (intakeBusy) {
+            return;
+        }
         const errEl = document.getElementById('cp-intake-error');
         if (errEl) {
             errEl.style.display = 'none';
         }
+        setIntakeBusy(true, triggerBtn || null);
         try {
             const res = await fetch(
                 API_BASE + '/public/support/intake/' + encodeURIComponent(intakeToken) + '/advance',
@@ -539,17 +690,23 @@
             });
             if (!res.ok) {
                 if (handleIntakeHttpError(new Error(data.message || 'Request failed'), data, res)) {
+                    setIntakeBusy(false, triggerBtn || null);
                     return;
                 }
                 throw new Error(data.message || 'Request failed');
             }
             applyIntakePayload(data.data);
         } catch (e) {
+            setIntakeBusy(false, triggerBtn || null);
             showIntakeError(e.message || 'Could not continue');
         }
     }
 
-    async function uploadReceipt(file) {
+    async function uploadReceipt(file, triggerBtn) {
+        if (intakeBusy) {
+            return;
+        }
+        setIntakeBusy(true, triggerBtn || null);
         const form = new FormData();
         form.append('receipt', file);
         try {
@@ -569,6 +726,7 @@
             }
             applyIntakePayload(data.data);
         } catch (e) {
+            setIntakeBusy(false, triggerBtn || null);
             showIntakeError(e.message || 'Upload failed');
         }
     }
@@ -686,10 +844,11 @@
             return;
         }
         const text = composer.value.trim();
-        if (!text || !publicToken) {
+        if (!text || !publicToken || sendBtn.classList.contains('cp-btn-loading')) {
             return;
         }
-        sendBtn.disabled = true;
+        setButtonLoading(sendBtn, true);
+        composer.disabled = true;
         try {
             const data = await api(
                 '/public/support/conversations/' + encodeURIComponent(publicToken) + '/messages',
@@ -703,7 +862,9 @@
         } catch (e) {
             alert(e.message || 'Send failed');
         } finally {
-            sendBtn.disabled = false;
+            setButtonLoading(sendBtn, false);
+            composer.disabled = false;
+            composer.focus();
         }
     }
 

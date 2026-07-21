@@ -12,7 +12,7 @@ use App\Notifications\NewDepositNotification;
 use App\Services\ChargeService;
 use App\Services\MatchAttemptLogger;
 use App\Services\PaymentMatchingService;
-use App\Services\TransactionLogService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 final class SupportPaymentMatchService
@@ -21,6 +21,7 @@ final class SupportPaymentMatchService
         private PaymentMatchingService $matchingService,
         private MatchAttemptLogger $matchLogger,
         private ChargeService $chargeService,
+        private SupportAccountInboxScanService $inboxScan,
     ) {}
 
     /**
@@ -34,12 +35,26 @@ final class SupportPaymentMatchService
      */
     public function attemptForIntake(SupportIntakeSession $session): array
     {
+        $bankKey = strtolower(trim((string) $session->reported_payee_name));
+
+        if ($this->isInternalCollectionBank($bankKey)) {
+            $credited = $this->findExistingCredit($session, $bankKey);
+            if ($credited !== null) {
+                return [
+                    'ok' => true,
+                    'matched' => true,
+                    'already_approved' => true,
+                    'payment' => $credited,
+                    'message' => (string) config('support.intake_messages.payment_approved', ''),
+                ];
+            }
+        }
+
         $payment = $this->resolvePayment($session);
 
         if (! $payment) {
-            $bankKey = strtolower(trim((string) $session->reported_payee_name));
-            $messageKey = $bankKey === 'kuda'
-                ? 'support.intake_messages.match_not_found_kuda'
+            $messageKey = $this->isInternalCollectionBank($bankKey)
+                ? 'support.intake_messages.match_not_found_internal'
                 : 'support.intake_messages.match_not_found';
 
             return [
@@ -81,7 +96,10 @@ final class SupportPaymentMatchService
         $this->applyIntakeHintsToPayment($session, $payment);
 
         try {
-            $matched = $this->runMatchAgainstStoredEmails($payment);
+            $matched = $this->runMatchAgainstStoredEmails(
+                $payment,
+                $bankKey
+            );
 
             if ($matched) {
                 $payment->refresh();
@@ -147,30 +165,121 @@ final class SupportPaymentMatchService
             return null;
         }
 
-        $candidates = Payment::query()
-            ->where('status', Payment::STATUS_PENDING)
-            ->where('account_number', $account)
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+        return $this->bestPaymentCandidate(
+            Payment::query()
+                ->where('account_number', $account)
+                ->where('status', Payment::STATUS_PENDING)
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get(),
+            $name,
+            $amount,
+            $bankKey,
+            $sessionId
+        );
+    }
 
+    private function findExistingCredit(SupportIntakeSession $session, string $bankKey): ?Payment
+    {
+        $account = SupportPayeeAccountService::normalizeAccountNumber((string) $session->reported_destination_account);
+        $name = trim((string) $session->visitor_name);
+        $amount = $session->payment_amount_reported !== null ? (float) $session->payment_amount_reported : null;
+
+        if ($account === '' || $name === '' || $amount === null || $amount <= 0) {
+            return null;
+        }
+
+        $since = $this->creditedLookupSince();
+
+        $fromPayments = $this->bestPaymentCandidate(
+            Payment::query()
+                ->where('account_number', $account)
+                ->where('status', Payment::STATUS_APPROVED)
+                ->where('created_at', '>=', $since)
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get(),
+            $name,
+            $amount,
+            $bankKey
+        );
+
+        if ($fromPayments !== null) {
+            return $fromPayments;
+        }
+
+        return $this->findApprovedPaymentViaMatchedInbox($account, $name, $amount, $bankKey, $since);
+    }
+
+    private function findApprovedPaymentViaMatchedInbox(
+        string $account,
+        string $name,
+        float $amount,
+        string $bankKey,
+        Carbon $since
+    ): ?Payment {
+        $emails = $this->inboxScan->scanMatchedForIntake($account, $bankKey, $since);
+
+        $bestPayment = null;
+        $bestScore = 0;
+
+        foreach ($emails as $email) {
+            if (! $this->amountMatches($amount, (float) $email->amount)) {
+                continue;
+            }
+
+            $nameScore = $this->nameSimilarity($name, (string) ($email->sender_name ?? ''));
+            if ($nameScore < $this->minimumNameScore($bankKey)) {
+                continue;
+            }
+
+            $payment = $email->matchedPayment;
+            if ($payment === null) {
+                $payment = Payment::query()->find($email->matched_payment_id);
+            }
+
+            if ($payment === null || $payment->status !== Payment::STATUS_APPROVED) {
+                continue;
+            }
+
+            if (SupportPayeeAccountService::normalizeAccountNumber((string) $payment->account_number) !== $account) {
+                continue;
+            }
+
+            if ($nameScore > $bestScore) {
+                $bestScore = $nameScore;
+                $bestPayment = $payment;
+            }
+        }
+
+        return $bestPayment;
+    }
+
+    /**
+     * @param  iterable<int, Payment>  $candidates
+     */
+    private function bestPaymentCandidate(
+        iterable $candidates,
+        string $name,
+        float $amount,
+        string $bankKey,
+        string $sessionId = ''
+    ): ?Payment {
         $best = null;
         $bestScore = 0;
 
         foreach ($candidates as $candidate) {
-            $nameScore = $this->nameSimilarity($name, (string) ($candidate->payer_name ?? ''));
-            $amountDiff = abs((float) $candidate->amount - $amount);
-            $amountOk = $amountDiff <= max(1.0, $amount * 0.03);
-            $exactAmount = $amountDiff <= 0.01;
-
-            if (! $amountOk) {
+            if (! $this->amountMatches($amount, (float) $candidate->amount)) {
                 continue;
             }
 
+            $nameScore = $this->nameSimilarity($name, (string) ($candidate->payer_name ?? ''));
+            $exactAmount = abs((float) $candidate->amount - $amount) <= 0.01;
             $score = $nameScore;
+
             if ($sessionId !== '' && strcasecmp((string) $candidate->transaction_id, $sessionId) === 0) {
                 $score += 50;
             }
@@ -185,13 +294,44 @@ final class SupportPaymentMatchService
             }
         }
 
-        $minScore = $bankKey === 'kuda' ? 55 : 50;
+        $minScore = $this->minimumNameScore($bankKey);
 
         if ($best && $bestScore >= $minScore) {
             return $best;
         }
 
         return null;
+    }
+
+    private function lookupSince(): Carbon
+    {
+        $days = max(1, (int) config('support.intake_lookup_days', 30));
+
+        return now()->subDays($days);
+    }
+
+    private function creditedLookupSince(): Carbon
+    {
+        $days = max(1, (int) config('support.intake_credited_lookup_days', 180));
+
+        return now()->subDays($days);
+    }
+
+    private function isInternalCollectionBank(string $bankKey): bool
+    {
+        return in_array($bankKey, ['kuda', 'moniepoint_mfb'], true);
+    }
+
+    private function minimumNameScore(string $bankKey): int
+    {
+        return $bankKey === 'kuda' ? 55 : 50;
+    }
+
+    private function amountMatches(float $reported, float $candidate): bool
+    {
+        $amountDiff = abs($candidate - $reported);
+
+        return $amountDiff <= max(1.0, $reported * 0.03);
     }
 
     private function sessionLookupAcceptsPayment(string $bankKey, Payment $payment, string $reportedAccount): bool
@@ -242,11 +382,33 @@ final class SupportPaymentMatchService
         $payment->save();
     }
 
-    private function runMatchAgainstStoredEmails(Payment $payment): bool
+    private function runMatchAgainstStoredEmails(Payment $payment, string $bankKey = ''): bool
     {
-        $storedEmails = ProcessedEmail::unmatched()
-            ->withAmount((float) $payment->amount)
-            ->get();
+        $query = ProcessedEmail::unmatched()
+            ->withAmount((float) $payment->amount);
+
+        if ($bankKey === 'moniepoint_mfb' && $payment->account_number) {
+            $query->where(
+                'account_number',
+                SupportPayeeAccountService::normalizeAccountNumber((string) $payment->account_number)
+            );
+        }
+
+        if ($bankKey === 'moniepoint_mfb') {
+            $query->whereRaw('LOWER(COALESCE(from_email, "")) LIKE ?', ['%moniepoint.com%']);
+        } elseif ($bankKey === 'kuda') {
+            $query->where(function ($inner) {
+                $inner->whereRaw('LOWER(COALESCE(from_email, "")) LIKE ?', ['%kuda%'])
+                    ->orWhereRaw('LOWER(COALESCE(from_email, "")) LIKE ?', ['%kudabank%']);
+            });
+        } elseif ($payment->account_number) {
+            $query->where(
+                'account_number',
+                SupportPayeeAccountService::normalizeAccountNumber((string) $payment->account_number)
+            );
+        }
+
+        $storedEmails = $query->get();
 
         foreach ($storedEmails as $storedEmail) {
             $emailData = [
@@ -269,7 +431,16 @@ final class SupportPaymentMatchService
                 continue;
             }
 
-            $emailDate = $storedEmail->email_date ? \Carbon\Carbon::parse($storedEmail->email_date) : null;
+            if ($bankKey === 'kuda') {
+                $sessionName = trim((string) ($payment->payer_name ?? ''));
+                $senderName = trim((string) ($extractedInfo['sender_name'] ?? $storedEmail->sender_name ?? ''));
+                if ($sessionName !== '' && $senderName !== ''
+                    && $this->nameSimilarity($sessionName, $senderName) < $this->minimumNameScore('kuda')) {
+                    continue;
+                }
+            }
+
+            $emailDate = $storedEmail->email_date ? Carbon::parse($storedEmail->email_date) : null;
             $match = $this->matchingService->matchPayment($payment, $extractedInfo, $emailDate);
 
             try {

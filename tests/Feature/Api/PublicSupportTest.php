@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\AccountNumber;
 use App\Models\Admin;
 use App\Models\Payment;
+use App\Models\ProcessedEmail;
 use App\Models\SupportIntakeSession;
 use App\Models\SupportTicket;
 use App\Models\WhatsappWallet;
@@ -541,9 +542,10 @@ class PublicSupportTest extends TestCase
         AccountNumber::create([
             'account_number' => $account,
             'account_name' => 'CHECKOUT NOW LTD',
-            'bank_name' => 'Test Bank',
+            'bank_name' => 'Rubies MFB',
             'is_pool' => true,
             'is_active' => true,
+            'is_external' => true,
         ]);
 
         $payment = Payment::create([
@@ -568,14 +570,11 @@ class PublicSupportTest extends TestCase
         ])->assertOk();
 
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
-            'step' => 'payee_bank',
-            'value' => 'rubies_mfb',
-        ])->assertOk();
-
-        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
             'value' => $account,
-        ])->assertOk();
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'session_id')
+            ->assertJsonPath('data.payee_bank_key', 'rubies_mfb');
 
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'session_id',
@@ -614,14 +613,18 @@ class PublicSupportTest extends TestCase
         AccountNumber::create([
             'account_number' => $account,
             'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Rubies MFB',
             'is_pool' => true,
             'is_active' => true,
+            'is_external' => true,
         ]);
         AccountNumber::create([
             'account_number' => $other,
             'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Rubies MFB',
             'is_pool' => true,
             'is_active' => true,
+            'is_external' => true,
         ]);
 
         Payment::create([
@@ -637,10 +640,6 @@ class PublicSupportTest extends TestCase
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'payment_issue',
             'value' => true,
-        ]);
-        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
-            'step' => 'payee_bank',
-            'value' => 'rubies_mfb',
         ]);
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
@@ -665,10 +664,6 @@ class PublicSupportTest extends TestCase
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'payment_issue',
             'value' => true,
-        ]);
-        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
-            'step' => 'payee_bank',
-            'value' => 'rubies_mfb',
         ]);
 
         $max = (int) config('support.intake_wrong_account_max_attempts', 5);
@@ -706,10 +701,6 @@ class PublicSupportTest extends TestCase
             'value' => true,
         ]);
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
-            'step' => 'payee_bank',
-            'value' => 'rubies_mfb',
-        ]);
-        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
             'value' => '0000000001',
         ])->assertOk()
@@ -729,8 +720,10 @@ class PublicSupportTest extends TestCase
         AccountNumber::create([
             'account_number' => $account,
             'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Rubies MFB',
             'is_pool' => true,
             'is_active' => true,
+            'is_external' => true,
         ]);
 
         Payment::create([
@@ -763,10 +756,6 @@ class PublicSupportTest extends TestCase
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'payment_issue',
             'value' => true,
-        ]);
-        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
-            'step' => 'payee_bank',
-            'value' => 'rubies_mfb',
         ]);
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
@@ -811,6 +800,7 @@ class PublicSupportTest extends TestCase
         AccountNumber::create([
             'account_number' => $account,
             'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Kuda Bank',
             'is_pool' => true,
             'is_active' => true,
         ]);
@@ -831,16 +821,13 @@ class PublicSupportTest extends TestCase
         ])->assertOk();
 
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
-            'step' => 'payee_bank',
-            'value' => 'kuda',
-        ])->assertOk();
-
-        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'destination_account',
             'value' => $account,
         ])->assertOk()
             ->assertJsonPath('data.current_step', 'name')
-            ->assertJsonPath('data.requires_session_id', false);
+            ->assertJsonPath('data.requires_session_id', false)
+            ->assertJsonPath('data.payee_bank_key', 'kuda')
+            ->assertJsonPath('data.can_continue_chat', true);
 
         $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
             'step' => 'name',
@@ -855,6 +842,307 @@ class PublicSupportTest extends TestCase
         $session = SupportIntakeSession::query()->where('intake_token', $intakeToken)->first();
         $this->assertNotNull($session);
         $this->assertSame($payment->id, $session->payment_id);
+    }
+
+    /** @test */
+    public function moniepoint_intake_detects_already_credited_payment(): void
+    {
+        $account = '5212979253';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Moniepoint MFB',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        $pending = Payment::create([
+            'transaction_id' => 'PENDING-MP-1',
+            'amount' => 5100,
+            'status' => Payment::STATUS_PENDING,
+            'account_number' => $account,
+            'payer_name' => 'Ugwu CHIBUEZE Paul',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $approved = Payment::create([
+            'transaction_id' => 'APPROVED-MP-1',
+            'amount' => 5100,
+            'status' => Payment::STATUS_APPROVED,
+            'account_number' => $account,
+            'payer_name' => 'chibueze paul ugwu',
+            'matched_at' => now(),
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'name',
+            'value' => 'chibueze paul ugwu',
+        ])->assertOk();
+
+        $response = $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'amount',
+            'value' => 5100,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'contact_mode');
+
+        $messages = collect($response->json('data.messages'))->pluck('body')->implode("\n");
+        $this->assertStringContainsString('approved', strtolower($messages));
+
+        $session = SupportIntakeSession::query()->where('intake_token', $intakeToken)->first();
+        $this->assertNotNull($session);
+        $this->assertSame($approved->id, $session->payment_id);
+        $this->assertNotSame($pending->id, $session->payment_id);
+    }
+
+    /** @test */
+    public function kuda_intake_detects_already_credited_via_matched_inbox(): void
+    {
+        $account = '0888999000';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Kuda Bank',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        $approved = Payment::create([
+            'transaction_id' => 'KUDA-APPROVED-1',
+            'amount' => 4200,
+            'status' => Payment::STATUS_APPROVED,
+            'account_number' => $account,
+            'payer_name' => 'ada lovelace',
+            'matched_at' => now(),
+        ]);
+
+        ProcessedEmail::create([
+            'message_id' => 'kuda-email-1',
+            'from_email' => 'no-reply@kuda.com',
+            'email_date' => now(),
+            'amount' => 4200,
+            'sender_name' => 'Ada Lovelace',
+            'account_number' => null,
+            'is_matched' => true,
+            'matched_payment_id' => $approved->id,
+            'matched_at' => now(),
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'name',
+            'value' => 'Ada Lovelace',
+        ])->assertOk();
+
+        $response = $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'amount',
+            'value' => 4200,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'contact_mode');
+
+        $messages = collect($response->json('data.messages'))->pluck('body')->implode("\n");
+        $this->assertStringContainsString('approved', strtolower($messages));
+
+        $session = SupportIntakeSession::query()->where('intake_token', $intakeToken)->first();
+        $this->assertNotNull($session);
+        $this->assertSame($approved->id, $session->payment_id);
+    }
+
+    /** @test */
+    public function failed_match_prompts_amount_verify_before_customer_care(): void
+    {
+        $account = '0666777888';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Kuda Bank',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'name',
+            'value' => 'Jane Doe',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'amount',
+            'value' => 1000,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'match_amount_verify');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'match_amount_verify',
+            'value' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'contact_mode');
+    }
+
+    /** @test */
+    public function failed_match_amount_verify_no_shows_fix_instructions(): void
+    {
+        $account = '0777888999';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Kuda Bank',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'name',
+            'value' => 'Jane Doe',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'amount',
+            'value' => 3000,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'match_amount_verify');
+
+        $response = $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'match_amount_verify',
+            'value' => false,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'match_amount_fix');
+
+        $messages = collect($response->json('data.messages'))->pluck('body')->implode("\n");
+        $this->assertStringContainsString('update the amount you intend to pay', $messages);
+    }
+
+    /** @test */
+    public function rubies_intake_requires_session_id_before_browser_chat(): void
+    {
+        $account = '0444555666';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Rubies MFB',
+            'is_pool' => true,
+            'is_active' => true,
+            'is_external' => true,
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'session_id')
+            ->assertJsonPath('data.can_continue_chat', true);
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'contact_mode',
+            'value' => 'browser',
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'session_id_for_chat')
+            ->assertJsonPath('data.needs_session_id_for_chat', true);
+    }
+
+    /** @test */
+    public function kuda_intake_asks_session_id_before_browser_chat(): void
+    {
+        $account = '0999888777';
+        AccountNumber::create([
+            'account_number' => $account,
+            'account_name' => 'CHECKOUT NOW LTD',
+            'bank_name' => 'Kuda Bank',
+            'is_pool' => true,
+            'is_active' => true,
+        ]);
+
+        $intakeToken = (string) $this->postJson('/api/v1/public/support/intake/start')->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'payment_issue',
+            'value' => true,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'destination_account',
+            'value' => $account,
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'name',
+            'value' => 'Jane Doe',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'amount',
+            'value' => 1000,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'match_amount_verify');
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'match_amount_verify',
+            'value' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'contact_mode')
+            ->assertJsonPath('data.needs_session_id_for_chat', true);
+
+        $this->postJson('/api/v1/public/support/intake/'.$intakeToken.'/advance', [
+            'step' => 'contact_mode',
+            'value' => [
+                'mode' => 'browser',
+                'session_id' => 'KUDA-SESSION-1234',
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'done')
+            ->assertJsonStructure(['data' => ['public_token']]);
     }
 
     /** @test */

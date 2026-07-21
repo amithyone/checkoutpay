@@ -3,6 +3,7 @@
 namespace App\Services\Support;
 
 use App\Models\ConsumerWalletApiAccount;
+use App\Models\Payment;
 use App\Models\SupportIntakeSession;
 use App\Models\SupportTicket;
 use App\Models\WhatsappWallet;
@@ -24,6 +25,8 @@ final class SupportIntakeService
 
     public const STEP_SESSION_ID = 'session_id';
 
+    public const STEP_SESSION_ID_FOR_CHAT = 'session_id_for_chat';
+
     public const STEP_MONIEPOINT_CHARGES = 'moniepoint_charges';
 
     public const STEP_MONIEPOINT_AMOUNT_FIX = 'moniepoint_amount_fix';
@@ -31,6 +34,10 @@ final class SupportIntakeService
     public const STEP_NAME = 'name';
 
     public const STEP_AMOUNT = 'amount';
+
+    public const STEP_MATCH_AMOUNT_VERIFY = 'match_amount_verify';
+
+    public const STEP_MATCH_AMOUNT_FIX = 'match_amount_fix';
 
     public const STEP_BANK_FROM = 'bank_from';
 
@@ -46,6 +53,7 @@ final class SupportIntakeService
 
     public function __construct(
         private SupportPayeeAccountService $payeeAccounts,
+        private SupportAccountInboxScanService $inboxScan,
         private SupportConversationService $conversations,
         private SupportWalletOnboardingService $onboarding,
         private SupportCountryOptionsService $countries,
@@ -124,14 +132,21 @@ final class SupportIntakeService
             ];
         }
 
-        if ($session->isTerminal()) {
-            return ['ok' => false, 'message' => 'This intake session is already finished.'];
-        }
-
         $step = trim($step);
         $messages = is_array($session->bot_messages) ? $session->bot_messages : [];
 
+        if ($session->isTerminal() && $step !== self::STEP_RESTART) {
+            return ['ok' => false, 'message' => 'This intake session is already finished.'];
+        }
+
         if ($step === self::STEP_RESTART) {
+            if ($session->isLockedOut()) {
+                return ['ok' => false, 'message' => $this->lockoutMessage($session->locked_until?->toIso8601String())];
+            }
+            if ($session->support_ticket_id || $session->intake_status === SupportIntakeSession::STATUS_COMPLETED) {
+                return ['ok' => false, 'message' => 'Your support chat has already started.'];
+            }
+
             return $this->restartIntake($session, $request, $messages);
         }
 
@@ -153,9 +168,9 @@ final class SupportIntakeService
             }
 
             $session->issue_type = 'payment_pending_transfer';
-            $messages[] = $this->botLine((string) config('support.intake_messages.ask_payee_bank', ''));
+            $messages[] = $this->botLine((string) config('support.intake_messages.ask_destination_account', ''));
             $session->fill([
-                'current_step' => self::STEP_PAYEE_BANK,
+                'current_step' => self::STEP_DESTINATION_ACCOUNT,
                 'bot_messages' => $messages,
             ])->save();
 
@@ -194,21 +209,53 @@ final class SupportIntakeService
 
             $messages[] = $this->userLine($account);
 
-            if ($this->bankRequiresSessionId($this->payeeBankKey($session))) {
-                $messages[] = $this->botLine((string) config('support.intake_messages.ask_session_id', ''));
+            $evaluation = $this->payeeAccounts->evaluateDestinationAccount($account);
+            $bankKey = $evaluation['collection_bank_key'];
+            $bankLabel = $this->bankLabelForKey($bankKey);
+
+            $messages[] = $this->botLine((string) config('support.intake_messages.account_confirmed_ours', ''));
+
+            $pendingCount = (int) $evaluation['pending_count'];
+            if ($pendingCount > 0) {
+                $messages[] = $this->botLine(str_replace(
+                    ':count',
+                    (string) $pendingCount,
+                    (string) config('support.intake_messages.pending_payment_found', '')
+                ));
+                $pending = $evaluation['pending_payments'];
+                if ($pending->count() === 1) {
+                    $session->payment_id = $pending->first()->id;
+                }
+            } else {
+                $messages[] = $this->botLine((string) config('support.intake_messages.pending_payment_none', ''));
+            }
+
+            $session->fill([
+                'reported_destination_account' => $account,
+                'account_in_platform' => true,
+                'reported_payee_name' => $bankKey,
+                'reported_destination_bank' => $bankLabel,
+            ]);
+
+            if ($this->isEmailCollectionBank($bankKey)) {
+                $inbox = $this->inboxScan->scanUnmatchedForAccount($account, (string) $bankKey);
+                if ($inbox['count'] > 0) {
+                    $messages[] = $this->botLine(str_replace(
+                        ':count',
+                        (string) $inbox['count'],
+                        (string) config('support.intake_messages.inbox_unmatched_found', '')
+                    ));
+                }
+
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_name', ''));
                 $session->fill([
-                    'reported_destination_account' => $account,
-                    'account_in_platform' => true,
-                    'current_step' => self::STEP_SESSION_ID,
+                    'current_step' => self::STEP_NAME,
                     'bot_messages' => $messages,
                 ])->save();
             } else {
-                $messages[] = $this->botLine((string) config('support.intake_messages.kuda_no_session_id', ''));
-                $messages[] = $this->botLine((string) config('support.intake_messages.ask_name', ''));
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_session_id', ''));
                 $session->fill([
-                    'reported_destination_account' => $account,
-                    'account_in_platform' => true,
-                    'current_step' => self::STEP_NAME,
+                    'current_step' => self::STEP_SESSION_ID,
                     'bot_messages' => $messages,
                 ])->save();
             }
@@ -339,10 +386,47 @@ final class SupportIntakeService
                     'bot_messages' => $messages,
                 ])->save();
 
+                if (! empty($matchResult['already_approved'])) {
+                    return $this->advanceToContactMode($session->fresh(), $messages, $request);
+                }
+
                 return $this->complete($session->fresh(), $request, $messages);
             }
 
+            if ($this->isEmailCollectionBank($this->payeeBankKey($session)) && $session->payment_id) {
+                $linked = Payment::query()->find($session->payment_id);
+                $account = SupportPayeeAccountService::normalizeAccountNumber((string) $session->reported_destination_account);
+                if ($linked && SupportPayeeAccountService::normalizeAccountNumber((string) $linked->account_number) === $account) {
+                    $session->fill([
+                        'account_on_session' => true,
+                        'whatsapp_eligible_at' => $session->whatsapp_eligible_at ?? now(),
+                        'intake_status' => SupportIntakeSession::STATUS_QUALIFIED,
+                    ])->save();
+                }
+            }
+
             $session->fill(['bot_messages' => $messages])->save();
+
+            return $this->advanceToMatchAmountVerify($session->fresh(), $messages, $request);
+        }
+
+        if ($step === self::STEP_MATCH_AMOUNT_VERIFY) {
+            $confirmed = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            $messages[] = $this->userLine(
+                $confirmed
+                    ? 'Yes — I sent the exact amount shown on checkout, including charges'
+                    : 'No — wrong amount or I did not include bank charges'
+            );
+
+            if (! $confirmed) {
+                $messages[] = $this->botLine((string) config('support.intake_messages.checkout_fix_amount', ''));
+                $session->fill([
+                    'current_step' => self::STEP_MATCH_AMOUNT_FIX,
+                    'bot_messages' => $messages,
+                ])->save();
+
+                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+            }
 
             return $this->advanceToContactMode($session->fresh(), $messages, $request);
         }
@@ -373,13 +457,23 @@ final class SupportIntakeService
         }
 
         if ($step === self::STEP_CONTACT_MODE) {
-            $mode = strtolower(trim((string) $value));
+            $mode = '';
+            $sessionIdFromRequest = '';
+
+            if (is_array($value)) {
+                $mode = strtolower(trim((string) ($value['mode'] ?? '')));
+                $sessionIdFromRequest = trim((string) ($value['session_id'] ?? ''));
+            } else {
+                $mode = strtolower(trim((string) $value));
+            }
+
             $linkWallet = $mode === 'whatsapp' || $mode === 'wallet';
+
             if ($linkWallet && ! $session->isWhatsappEligible()) {
                 return ['ok' => false, 'message' => (string) config('support.intake_messages.whatsapp_requires_verification', '')];
             }
 
-            $messages[] = $this->userLine($linkWallet ? 'Link WhatsApp' : 'Browser chat only');
+            $messages[] = $this->userLine($linkWallet ? 'Link WhatsApp' : 'Continue in this chat');
             $session->link_whatsapp_wallet = $linkWallet;
 
             if ($linkWallet) {
@@ -392,10 +486,33 @@ final class SupportIntakeService
                     'bot_messages' => $messages,
                 ])->save();
 
-                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session->fresh(), $request)];
+            }
+
+            if (trim((string) $session->payment_session_id) === '') {
+                if ($sessionIdFromRequest !== '') {
+                    return $this->applySessionIdForChat($session, $sessionIdFromRequest, $messages, $request);
+                }
+
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_session_id_before_chat', ''));
+                $session->fill([
+                    'current_step' => self::STEP_SESSION_ID_FOR_CHAT,
+                    'bot_messages' => $messages,
+                ])->save();
+
+                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session->fresh(), $request)];
             }
 
             return $this->complete($session, $request, $messages);
+        }
+
+        if ($step === self::STEP_SESSION_ID_FOR_CHAT) {
+            $sessionId = trim((string) $value);
+            if (strlen($sessionId) < 4) {
+                return ['ok' => false, 'message' => 'Bank session ID must be at least 4 characters.'];
+            }
+
+            return $this->applySessionIdForChat($session, $sessionId, $messages, $request);
         }
 
         if ($step === self::STEP_PHONE) {
@@ -451,6 +568,25 @@ final class SupportIntakeService
         $session->payment_receipt_path = $path;
 
         return $this->advanceToContactMode($session, $messages, $request);
+    }
+
+    /**
+     * @param  array<int, array{role: string, body: string}>  $messages
+     * @return array{ok: bool, message?: string, session?: SupportIntakeSession, payload?: array<string, mixed>}
+     */
+    /**
+     * @param  array<int, array{role: string, body: string}>  $messages
+     * @return array{ok: bool, message?: string, session?: SupportIntakeSession, payload?: array<string, mixed>}
+     */
+    private function advanceToMatchAmountVerify(SupportIntakeSession $session, array $messages, Request $request): array
+    {
+        $messages[] = $this->botLine((string) config('support.intake_messages.ask_match_amount_verify', ''));
+        $session->fill([
+            'current_step' => self::STEP_MATCH_AMOUNT_VERIFY,
+            'bot_messages' => $messages,
+        ])->save();
+
+        return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
     }
 
     /**
@@ -710,6 +846,59 @@ final class SupportIntakeService
         return $this->payeeBankKey($session) === 'moniepoint_mfb';
     }
 
+    private function isEmailCollectionBank(?string $bankKey): bool
+    {
+        return in_array($bankKey, ['kuda', 'moniepoint_mfb'], true);
+    }
+
+    private function canContinueBrowserChat(SupportIntakeSession $session): bool
+    {
+        return (bool) $session->account_in_platform;
+    }
+
+    /**
+     * @param  array<int, array{role: string, body: string}>  $messages
+     * @return array{ok: bool, message?: string, session?: SupportIntakeSession, payload?: array<string, mixed>}
+     */
+    private function applySessionIdForChat(
+        SupportIntakeSession $session,
+        string $sessionId,
+        array $messages,
+        Request $request
+    ): array {
+        $account = (string) $session->reported_destination_account;
+        $evaluation = $this->payeeAccounts->evaluate($sessionId, $account);
+        $messages[] = $this->userLine($sessionId);
+
+        if ($evaluation['payment_found'] ?? false) {
+            $payment = $evaluation['payment'];
+            $session->payment_id = $payment?->id;
+            $session->account_on_session = (bool) ($evaluation['account_on_session'] ?? false);
+            if ($evaluation['whatsapp_eligible'] ?? false) {
+                $session->whatsapp_eligible_at = $session->whatsapp_eligible_at ?? now();
+                $session->intake_status = SupportIntakeSession::STATUS_QUALIFIED;
+            }
+        }
+
+        $session->payment_session_id = $sessionId;
+        $session->link_whatsapp_wallet = false;
+
+        return $this->complete($session, $request, $messages);
+    }
+
+    private function bankLabelForKey(?string $bankKey): ?string
+    {
+        if ($bankKey === null) {
+            return null;
+        }
+
+        $banks = config('support.payee_banks', []);
+
+        return is_array($banks[$bankKey] ?? null)
+            ? (string) ($banks[$bankKey]['label'] ?? $bankKey)
+            : $bankKey;
+    }
+
     private function payeeBankKey(SupportIntakeSession $session): ?string
     {
         $key = strtolower(trim((string) $session->reported_payee_name));
@@ -717,39 +906,27 @@ final class SupportIntakeService
         return $key !== '' ? $key : null;
     }
 
+    /** @deprecated Bank is detected from account number; kept for legacy intake sessions. */
     private function bankRequiresSessionId(?string $bankKey): bool
     {
         if ($bankKey === null) {
             return true;
         }
 
-        $banks = config('support.payee_banks', []);
-        if (! isset($banks[$bankKey]) || ! is_array($banks[$bankKey])) {
-            return true;
-        }
-
-        return (bool) ($banks[$bankKey]['requires_session_id'] ?? true);
+        return ! $this->isEmailCollectionBank($bankKey);
     }
 
     private function canRestartIntake(SupportIntakeSession $session): bool
     {
-        if ($session->isLockedOut() || $session->intake_status === SupportIntakeSession::STATUS_COMPLETED) {
+        if ($session->isLockedOut()) {
             return false;
         }
 
-        return in_array($session->current_step, [
-            self::STEP_PAYEE_BANK,
-            self::STEP_DESTINATION_ACCOUNT,
-            self::STEP_SESSION_ID,
-            self::STEP_MONIEPOINT_CHARGES,
-            self::STEP_MONIEPOINT_AMOUNT_FIX,
-            self::STEP_NAME,
-            self::STEP_AMOUNT,
-            self::STEP_BANK_FROM,
-            self::STEP_RECEIPT,
-            self::STEP_CONTACT_MODE,
-            self::STEP_PHONE,
-        ], true);
+        if ($session->support_ticket_id !== null || $session->intake_status === SupportIntakeSession::STATUS_COMPLETED) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -800,7 +977,9 @@ final class SupportIntakeService
             'can_restart' => $this->canRestartIntake($session),
             'payee_banks' => $this->payeeBankOptions(),
             'payee_bank_key' => $this->payeeBankKey($session),
-            'requires_session_id' => $this->bankRequiresSessionId($this->payeeBankKey($session)),
+            'requires_session_id' => $this->payeeBankKey($session) === 'rubies_mfb',
+            'needs_session_id_for_chat' => trim((string) $session->payment_session_id) === '',
+            'can_continue_chat' => $this->canContinueBrowserChat($session),
             'messages' => $session->bot_messages ?? [],
             'public_token' => $session->public_token,
             'ticket_id' => $session->support_ticket_id,

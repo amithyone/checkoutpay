@@ -6,6 +6,7 @@ use App\Models\AccountNumber;
 use App\Models\Payment;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletPendingTopup;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 final class SupportPayeeAccountService
@@ -97,6 +98,9 @@ final class SupportPayeeAccountService
             return [
                 'account_number' => $normalizedAccount,
                 'account_name' => $accountRow->account_name,
+                'bank_name' => $accountRow->bank_name,
+                'is_external' => (bool) $accountRow->is_external,
+                'is_pool' => (bool) $accountRow->is_pool,
                 'source' => $accountRow->is_external ? 'external_api' : 'account_number',
             ];
         }
@@ -202,6 +206,79 @@ final class SupportPayeeAccountService
         }
 
         return 'Payment status: '.$statusLabel.'. Our team can review the details you provided.';
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $platformMeta
+     */
+    public function detectCollectionBankKey(?array $platformMeta): ?string
+    {
+        if ($platformMeta === null) {
+            return null;
+        }
+
+        if (($platformMeta['source'] ?? '') === 'external_api' || ($platformMeta['is_external'] ?? false)) {
+            return 'rubies_mfb';
+        }
+
+        $bankName = strtolower(trim((string) ($platformMeta['bank_name'] ?? '')));
+        if ($bankName !== '') {
+            if (str_contains($bankName, 'moniepoint')) {
+                return 'moniepoint_mfb';
+            }
+            if (str_contains($bankName, 'kuda')) {
+                return 'kuda';
+            }
+            if (str_contains($bankName, 'rubies')) {
+                return 'rubies_mfb';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return Collection<int, Payment>
+     */
+    public function findPendingPaymentsForAccount(string $accountNumber, int $limit = 10): Collection
+    {
+        $account = self::normalizeAccountNumber($accountNumber);
+        if ($account === '') {
+            return collect();
+        }
+
+        return Payment::query()
+            ->where('account_number', $account)
+            ->where('status', Payment::STATUS_PENDING)
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * @return array{
+     *   account_meta: array<string, mixed>,
+     *   collection_bank_key: string|null,
+     *   pending_payments: Collection<int, Payment>,
+     *   pending_count: int
+     * }
+     */
+    public function evaluateDestinationAccount(string $accountNumber): array
+    {
+        $normalized = self::normalizeAccountNumber($accountNumber);
+        $meta = $this->resolvePlatformAccount($normalized) ?? [];
+        $bankKey = $this->detectCollectionBankKey($meta);
+        $pending = $this->findPendingPaymentsForAccount($normalized);
+
+        return [
+            'account_meta' => $meta,
+            'collection_bank_key' => $bankKey,
+            'pending_payments' => $pending,
+            'pending_count' => $pending->count(),
+        ];
     }
 
     /**
