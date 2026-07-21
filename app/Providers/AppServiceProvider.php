@@ -23,7 +23,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(EvolutionWhatsAppClient::class, function () {
+            if (\App\Services\Whatsapp\WhatsappCloudConfigResolver::isEnabled()) {
+                return new \App\Services\Whatsapp\MetaCloudWhatsAppClient();
+            }
+
+            return new \App\Services\Whatsapp\EvolutionWhatsAppClient();
+        });
     }
 
     /**

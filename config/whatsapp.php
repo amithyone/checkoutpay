@@ -4,17 +4,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Checkout ↔ WhatsApp (Evolution API)
+    | Checkout ↔ WhatsApp
     |--------------------------------------------------------------------------
     |
-    | Webhook URL (Evolution Manager → Webhook, or):
-    |   php artisan whatsapp:configure-webhook
-    | Target: POST {WHATSAPP_APP_URL or APP_URL}/api/v1/whatsapp/webhook
+    | Provider: evolution (Evolution API) or cloud (Meta WhatsApp Cloud API).
     |
-    | Recommended header: X-Checkout-WhatsApp-Secret: {WHATSAPP_WEBHOOK_SECRET}
-    | Or query: ?secret={WHATSAPP_WEBHOOK_SECRET}
+    | Evolution webhook:
+    |   POST {WHATSAPP_APP_URL or APP_URL}/api/v1/whatsapp/webhook
+    |   Header: X-Checkout-WhatsApp-Secret or ?secret=
+    |
+    | Meta Cloud webhook (same URL):
+    |   GET  …/api/v1/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…
+    |   POST …/api/v1/whatsapp/webhook  (X-Hub-Signature-256)
+    |
+    | See reference/WHATSAPP_META_CLOUD_API.md for Facebook Developer setup.
     |
     */
+
+    'provider' => strtolower((string) env('WHATSAPP_PROVIDER', 'evolution')),
 
     'webhook_secret' => env('WHATSAPP_WEBHOOK_SECRET', ''),
 
@@ -145,6 +152,22 @@ return [
             env('WHATSAPP_RENTALS_DEDICATED_ONLY', true),
             FILTER_VALIDATE_BOOL
         ),
+    ],
+
+    /*
+    | Meta WhatsApp Cloud API (official). Set WHATSAPP_PROVIDER=cloud.
+    */
+    'cloud' => [
+        'graph_version' => (string) env('WHATSAPP_CLOUD_GRAPH_VERSION', 'v21.0'),
+        'access_token' => (string) env('WHATSAPP_CLOUD_ACCESS_TOKEN', ''),
+        'app_secret' => (string) env('WHATSAPP_CLOUD_APP_SECRET', ''),
+        /** Must match the Verify Token entered in Meta Developer → WhatsApp → Configuration */
+        'verify_token' => (string) env('WHATSAPP_CLOUD_VERIFY_TOKEN', ''),
+        /** Primary phone_number_id from Meta (WhatsApp → API Setup) */
+        'phone_number_id' => (string) env('WHATSAPP_CLOUD_PHONE_NUMBER_ID', ''),
+        'phone_number_id_wallet' => (string) env('WHATSAPP_CLOUD_PHONE_NUMBER_ID_WALLET', ''),
+        'phone_number_id_rentals' => (string) env('WHATSAPP_CLOUD_PHONE_NUMBER_ID_RENTALS', ''),
+        'waba_id' => (string) env('WHATSAPP_CLOUD_WABA_ID', ''),
     ],
 
     'otp' => [

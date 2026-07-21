@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 class WhatsappInboundHandler
 {
     public function __construct(
-        private EvolutionWebhookPayloadParser $parser,
+        private WhatsappWebhookPayloadRouter $parser,
         private EvolutionWhatsAppClient $client,
         private WhatsappLinkedMenuHandler $linkedMenu,
         private WhatsappGuestRentalBrowseHandler $guestRentalBrowse,
