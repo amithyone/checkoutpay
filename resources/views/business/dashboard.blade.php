@@ -304,7 +304,7 @@
                                     <span class="text-xs">Loan repayment</span>
                                 @elseif($row['website'])
                                     <span class="text-xs truncate block max-w-[150px]" title="{{ $row['website']->website_url }}">
-                                        {{ parse_url($row['website']->website_url, PHP_URL_HOST) }}
+                                        {{ $row['website']->displayHost() ?? Str::limit($row['website']->website_url, 24) }}
                                     </span>
                                 @else
                                     <span class="text-gray-400 text-xs">N/A</span>
@@ -348,7 +348,7 @@
                                 @if($row['kind'] === 'loan_repayment')
                                     Loan repayment •
                                 @elseif($row['website'])
-                                    {{ parse_url($row['website']->website_url, PHP_URL_HOST) }} •
+                                    {{ $row['website']->displayHost() ?? Str::limit($row['website']->website_url, 24) }} •
                                 @endif
                                 {{ $row['occurred_at']->format('M d, Y') }}
                             </p>
@@ -473,8 +473,8 @@
                                         <i class="fas fa-question-circle mr-1"></i> Unattributed
                                     </span>
                                 @else
-                                    <a href="{{ $websiteStat['website']->website_url }}" target="_blank" class="text-primary hover:underline font-medium text-xs sm:text-sm truncate">
-                                        {{ parse_url($websiteStat['website']->website_url, PHP_URL_HOST) }}
+                                    <a href="{{ $websiteStat['website']->hrefUrl() ?? $websiteStat['website']->website_url }}" target="_blank" class="text-primary hover:underline font-medium text-xs sm:text-sm truncate">
+                                        {{ $websiteStat['website']->displayHost() ?? Str::limit($websiteStat['website']->website_url, 32) }}
                                         <i class="fas fa-external-link-alt text-xs ml-1"></i>
                                     </a>
                                     @if($websiteStat['website']->is_approved)

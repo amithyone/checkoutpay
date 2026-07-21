@@ -83,8 +83,8 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">
                             @if($row['website'])
-                                <a href="{{ $row['website']->website_url }}" target="_blank" class="text-primary hover:underline truncate block max-w-[180px]" title="{{ $row['website']->website_url }}">
-                                    {{ parse_url($row['website']->website_url, PHP_URL_HOST) ?? Str::limit($row['website']->website_url, 32) }}
+                                <a href="{{ $row['website']->hrefUrl() ?? $row['website']->website_url }}" target="_blank" class="text-primary hover:underline truncate block max-w-[180px]" title="{{ $row['website']->website_url }}">
+                                    {{ $row['website']->displayHost() ?? Str::limit($row['website']->website_url, 32) }}
                                     <i class="fas fa-external-link-alt text-xs ml-0.5"></i>
                                 </a>
                             @else
@@ -133,7 +133,7 @@
                             {{ $row['kind'] === 'loan_repayment' ? 'Loan repayment' : 'Payment' }}
                             · {{ $row['occurred_at']->format('M d, Y H:i') }}
                             @if($row['website'])
-                                · {{ parse_url($row['website']->website_url, PHP_URL_HOST) ?? Str::limit($row['website']->website_url, 24) }}
+                                · {{ $row['website']->displayHost() ?? Str::limit($row['website']->website_url, 24) }}
                             @endif
                         </p>
                     </div>

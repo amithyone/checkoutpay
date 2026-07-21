@@ -12,6 +12,10 @@ class BusinessWebsiteStatsService
 {
     public const UNATTRIBUTED_LABEL = 'Other (bank transfer, invoice, etc.)';
 
+    public function __construct(
+        private PaymentWebsiteAttributionService $attribution,
+    ) {}
+
     public function approvedAtExpression(): Expression
     {
         return DB::raw('COALESCE(matched_at, created_at)');
@@ -115,11 +119,35 @@ class BusinessWebsiteStatsService
     {
         $windows = $this->nigeriaRevenueWindows();
         $rows = [];
+        $business->load('websites');
+
+        $inferredByWebsite = [];
+        $strictlyUnattributed = collect();
+
+        $unattributedPayments = Payment::query()
+            ->where('business_id', $business->id)
+            ->whereNull('business_website_id')
+            ->get();
+
+        foreach ($unattributedPayments as $payment) {
+            $matched = $this->attribution->resolveWebsite($payment);
+            if ($matched) {
+                $inferredByWebsite[$matched->id][] = $payment;
+            } else {
+                $strictlyUnattributed->push($payment);
+            }
+        }
 
         foreach ($business->websites as $website) {
-            $query = $this->paymentsQueryForBusinessWebsite($business->id, $website->id);
+            $directQuery = $this->paymentsQueryForBusinessWebsite($business->id, $website->id);
+            $directStats = $this->buildDashboardRow($directQuery, $windows);
+            $inferredStats = $this->buildDashboardRowFromPayments(
+                collect($inferredByWebsite[$website->id] ?? []),
+                $windows
+            );
+
             $rows[] = array_merge(
-                $this->buildDashboardRow($query, $windows),
+                $this->mergeStatRows($directStats, $inferredStats),
                 [
                     'website' => $website,
                     'is_unattributed' => false,
@@ -128,10 +156,9 @@ class BusinessWebsiteStatsService
             );
         }
 
-        $unattributedQuery = $this->paymentsQueryForBusinessWebsite($business->id, null);
-        if ((clone $unattributedQuery)->exists()) {
+        if ($strictlyUnattributed->isNotEmpty()) {
             $rows[] = array_merge(
-                $this->buildDashboardRow($unattributedQuery, $windows),
+                $this->buildDashboardRowFromPayments($strictlyUnattributed, $windows),
                 [
                     'website' => null,
                     'is_unattributed' => true,
@@ -143,5 +170,59 @@ class BusinessWebsiteStatsService
         usort($rows, fn (array $a, array $b) => $b['total_revenue'] <=> $a['total_revenue']);
 
         return $rows;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Payment>  $payments
+     * @return array<string, mixed>
+     */
+    private function buildDashboardRowFromPayments(\Illuminate\Support\Collection $payments, array $windows): array
+    {
+        $approvedAtFor = fn (Payment $payment) => $payment->matched_at ?? $payment->created_at;
+        $revenueFor = fn (Payment $payment) => (float) ($payment->business_receives ?? $payment->amount);
+
+        $approved = $payments->where('status', Payment::STATUS_APPROVED);
+
+        $inWindow = function (\Illuminate\Support\Collection $collection, $start, $end) use ($approvedAtFor) {
+            return $collection->filter(function (Payment $payment) use ($approvedAtFor, $start, $end) {
+                $at = $approvedAtFor($payment);
+
+                return $at !== null && $at->betweenIncluded($start, $end);
+            });
+        };
+
+        $todayApproved = $inWindow($approved, $windows['today_start'], $windows['today_end']);
+        $monthApproved = $inWindow($approved, $windows['month_start'], $windows['month_end']);
+        $yearApproved = $inWindow($approved, $windows['year_start'], $windows['year_end']);
+
+        return [
+            'total_revenue' => $approved->sum($revenueFor),
+            'total_payments' => $payments->count(),
+            'approved_payments' => $approved->count(),
+            'pending_payments' => $payments->where('status', Payment::STATUS_PENDING)->count(),
+            'today_revenue' => $todayApproved->sum($revenueFor),
+            'today_payments' => $todayApproved->count(),
+            'monthly_revenue' => $monthApproved->sum($revenueFor),
+            'yearly_revenue' => $yearApproved->sum($revenueFor),
+            'monthly_payments' => $monthApproved->count(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $direct
+     * @param  array<string, mixed>  $inferred
+     * @return array<string, mixed>
+     */
+    private function mergeStatRows(array $direct, array $inferred): array
+    {
+        $merged = $direct;
+        foreach ($inferred as $key => $value) {
+            if (! is_numeric($value)) {
+                continue;
+            }
+            $merged[$key] = ($merged[$key] ?? 0) + $value;
+        }
+
+        return $merged;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\WebsiteUrl;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -102,6 +103,16 @@ class BusinessWebsite extends Model
         return $this->dailyRevenues()
             ->whereDate('revenue_date', $date)
             ->first();
+    }
+
+    public function displayHost(): ?string
+    {
+        return WebsiteUrl::hostFrom($this->website_url);
+    }
+
+    public function hrefUrl(): ?string
+    {
+        return WebsiteUrl::hrefFrom($this->website_url);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessWebsite;
 use App\Models\Payment;
 use App\Support\InternalPaymentWebhookUrl;
+use App\Support\WebsiteUrl;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -530,11 +531,6 @@ class PaymentService
 
     protected function normalizeHost(string $url): ?string
     {
-        $host = parse_url($url, PHP_URL_HOST);
-        if (! $host) {
-            return null;
-        }
-
-        return strtolower(preg_replace('/^www\./', '', $host));
+        return WebsiteUrl::hostFrom($url);
     }
 }

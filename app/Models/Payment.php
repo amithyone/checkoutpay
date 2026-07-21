@@ -362,6 +362,14 @@ class Payment extends Model
             $updateData['payment_method_used'] = self::METHOD_BANK_TRANSFER;
         }
 
+        if (! $this->business_website_id && $this->business_id) {
+            $websiteId = app(\App\Services\Business\PaymentWebsiteAttributionService::class)
+                ->resolveWebsiteId($this);
+            if ($websiteId) {
+                $updateData['business_website_id'] = $websiteId;
+            }
+        }
+
         // Update payer_name, bank, and payer_account_number from email_data if provided
         // Map sender_name to payer_name if payer_name is not set (they are the same)
         $payerName = $emailData['payer_name'] ?? $emailData['sender_name'] ?? null;

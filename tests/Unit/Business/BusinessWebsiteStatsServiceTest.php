@@ -14,6 +14,43 @@ class BusinessWebsiteStatsServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_dashboard_breakdown_includes_inferred_unattributed_payments_by_webhook(): void
+    {
+        $business = Business::query()->create([
+            'name' => 'Infer Co',
+            'email' => 'infer@example.test',
+            'password' => Hash::make('secret'),
+            'business_id' => 'INFER1',
+            'phone' => '08055556666',
+            'balance' => 0,
+        ]);
+
+        $website = BusinessWebsite::query()->create([
+            'business_id' => $business->id,
+            'website_url' => 'shop-a.example.test',
+            'webhook_url' => 'https://shop-a.example.test/webhook',
+            'is_approved' => true,
+        ]);
+
+        Payment::query()->create([
+            'transaction_id' => 'TX-INF-001',
+            'amount' => 4000,
+            'business_receives' => 3900,
+            'business_id' => $business->id,
+            'business_website_id' => null,
+            'webhook_url' => 'https://shop-a.example.test/webhook',
+            'status' => Payment::STATUS_APPROVED,
+            'payment_source' => Payment::SOURCE_INTERNAL,
+            'matched_at' => now(),
+        ]);
+
+        $rows = app(BusinessWebsiteStatsService::class)->buildDashboardBreakdown($business->fresh(['websites']));
+
+        $this->assertCount(1, $rows);
+        $this->assertEquals(3900.0, (float) $rows[0]['total_revenue']);
+        $this->assertSame($website->id, $rows[0]['website']->id);
+    }
+
     public function test_dashboard_breakdown_splits_payments_by_website_and_includes_unattributed(): void
     {
         $business = Business::query()->create([

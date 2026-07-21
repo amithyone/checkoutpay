@@ -44,8 +44,8 @@
                 <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Website</label>
                 <p class="text-xs sm:text-sm text-gray-900">
                     @if($transaction->website)
-                        <a href="{{ $transaction->website->website_url }}" target="_blank" class="text-primary hover:underline break-all">
-                            {{ Str::limit($transaction->website->website_url, 40) }}
+                        <a href="{{ $transaction->website->hrefUrl() ?? $transaction->website->website_url }}" target="_blank" class="text-primary hover:underline break-all">
+                            {{ $transaction->website->displayHost() ?? Str::limit($transaction->website->website_url, 40) }}
                             <i class="fas fa-external-link-alt text-xs ml-1"></i>
                         </a>
                     @else

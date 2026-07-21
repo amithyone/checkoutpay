@@ -5,6 +5,7 @@ namespace App\Services\Business;
 use App\Models\Business;
 use App\Models\BusinessTransaction;
 use App\Models\Payment;
+use App\Services\Business\PaymentWebsiteAttributionService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
@@ -12,6 +13,10 @@ use Illuminate\Support\Collection;
 
 final class BusinessActivityFeedService
 {
+    public function __construct(
+        private PaymentWebsiteAttributionService $websiteAttribution,
+    ) {}
+
     /**
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
@@ -75,7 +80,10 @@ final class BusinessActivityFeedService
             $query->where('transaction_id', 'like', '%'.$search.'%');
         }
 
-        return $query->get()->map(fn (Payment $payment) => [
+        return $query->get()->map(function (Payment $payment) {
+            $website = $payment->website ?? $this->websiteAttribution->resolveWebsite($payment);
+
+            return [
             'kind' => 'payment',
             'id' => $payment->id,
             'reference' => $payment->transaction_id,
@@ -85,10 +93,11 @@ final class BusinessActivityFeedService
             'description' => null,
             'status' => $payment->status,
             'occurred_at' => $payment->created_at ?? now(),
-            'website' => $payment->website,
+            'website' => $website,
             'payment' => $payment,
             'loan_transaction' => null,
-        ]);
+        ];
+        });
     }
 
     /**

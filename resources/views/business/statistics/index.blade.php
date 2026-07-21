@@ -161,7 +161,7 @@
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
                                 <a href="{{ $ws['website']->website_url }}" target="_blank" class="text-primary hover:underline font-semibold text-sm sm:text-base md:text-lg truncate">
-                                    {{ parse_url($ws['website']->website_url, PHP_URL_HOST) }}
+                                    {{ $ws['website']->displayHost() ?? Str::limit($ws['website']->website_url, 32) }}
                                     <i class="fas fa-external-link-alt text-xs ml-1"></i>
                                 </a>
                                 @if($ws['website']->is_approved)
