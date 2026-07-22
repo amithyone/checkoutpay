@@ -80,7 +80,14 @@
                             <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </fieldset>
-                    <button type="submit" class="btn-brand w-full">Submit application</button>
+                    @if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+                        <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response" value="">
+                        @error('g-recaptcha-response')
+                            <p class="text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        <p class="text-xs text-slate-500">Protected by reCAPTCHA.</p>
+                    @endif
+                    <button type="submit" id="developerProgramApplyBtn" class="btn-brand w-full">Submit application</button>
                 </form>
             </div>
 
@@ -90,3 +97,37 @@
         </div>
     </x-marketing.product-section>
 @endsection
+
+@if(config('services.recaptcha.enabled') && config('services.recaptcha.site_key'))
+@push('head')
+    <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.site_key') }}" async defer></script>
+@endpush
+@push('scripts')
+    <script>
+        document.querySelector('form[action="{{ route('developers.program.apply.store') }}"]')?.addEventListener('submit', function (e) {
+            var recaptchaInput = document.getElementById('g-recaptcha-response');
+            if (!recaptchaInput || recaptchaInput.value) return;
+
+            e.preventDefault();
+            var btn = document.getElementById('developerProgramApplyBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Please wait…';
+            }
+
+            grecaptcha.ready(function () {
+                grecaptcha.execute({{ json_encode(config('services.recaptcha.site_key')) }}, { action: 'developer_program_apply' }).then(function (token) {
+                    recaptchaInput.value = token;
+                    e.target.submit();
+                }).catch(function () {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = 'Submit application';
+                    }
+                    alert('Could not verify reCAPTCHA. Please refresh and try again.');
+                });
+            });
+        });
+    </script>
+@endpush
+@endif
