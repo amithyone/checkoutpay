@@ -7,6 +7,7 @@ use App\Models\ConsumerAppSession;
 use App\Models\RentalsAdminAppSession;
 use App\Models\BusinessAccountApplication;
 use App\Models\BusinessNameRegistration;
+use App\Models\BusinessVerification;
 use App\Models\Payment;
 use App\Models\WhatsappWalletTransaction;
 use App\Models\Renter;
@@ -151,7 +152,11 @@ class AdminSidebarMenu
             ),
             'businesses_kyc' => array_merge(
                 $this->link('Business KYC', 'admin.businesses-kyc.index', 'fas fa-id-card', ['admin.businesses-kyc.*']),
-                ['visible' => true]
+                [
+                    'visible' => true,
+                    'badge_count' => BusinessVerification::countPendingReview(),
+                    'badge_color' => 'yellow',
+                ]
             ),
             'renters_kyc' => array_merge(
                 $this->link('Renters KYC', 'admin.renters-kyc.index', 'fas fa-id-badge', ['admin.renters-kyc.*']),

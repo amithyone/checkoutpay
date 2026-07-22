@@ -20,10 +20,19 @@ class BusinessVerification extends Model
         'admin_notes',
         'reviewed_by',
         'reviewed_at',
+        'provider_verified_at',
+        'provider_verified_by',
+        'provider_verified_name',
+        'provider_verify_reference',
+        'provider_verify_status',
+        'provider_verify_message',
+        'provider_verify_payload',
     ];
 
     protected $casts = [
         'reviewed_at' => 'datetime',
+        'provider_verified_at' => 'datetime',
+        'provider_verify_payload' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -33,6 +42,9 @@ class BusinessVerification extends Model
     const STATUS_UNDER_REVIEW = 'under_review';
     const STATUS_APPROVED = 'approved';
     const STATUS_REJECTED = 'rejected';
+
+    const PROVIDER_VERIFY_PASSED = 'passed';
+    const PROVIDER_VERIFY_FAILED = 'failed';
 
     const TYPE_BASIC = 'basic';
     const TYPE_BUSINESS_REGISTRATION = 'business_registration';
@@ -114,5 +126,52 @@ class BusinessVerification extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING || $this->status === self::STATUS_UNDER_REVIEW;
+    }
+
+    public static function countPendingReview(): int
+    {
+        return static::query()
+            ->whereIn('verification_type', self::getRequiredTypes())
+            ->whereIn('status', [self::STATUS_PENDING, self::STATUS_UNDER_REVIEW])
+            ->count();
+    }
+
+    public function isTextBased(): bool
+    {
+        return in_array($this->verification_type, [
+            self::TYPE_ACCOUNT_NUMBER,
+            self::TYPE_BVN,
+            self::TYPE_NIN,
+        ], true);
+    }
+
+    public function requiresMevonVerification(): bool
+    {
+        return in_array($this->verification_type, [self::TYPE_BVN, self::TYPE_NIN], true);
+    }
+
+    public function isProviderVerified(): bool
+    {
+        return $this->provider_verify_status === self::PROVIDER_VERIFY_PASSED
+            && $this->provider_verified_at !== null;
+    }
+
+    public function extractSubmittedIdentityNumber(): ?string
+    {
+        if (! $this->requiresMevonVerification()) {
+            return null;
+        }
+
+        $text = (string) $this->document_type;
+        if (preg_match('/(\d{11})/', $text, $matches)) {
+            return $matches[1];
+        }
+
+        return null;
+    }
+
+    public function providerVerifier()
+    {
+        return $this->belongsTo(\App\Models\Admin::class, 'provider_verified_by');
     }
 }

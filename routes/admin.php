@@ -238,6 +238,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
         // Business KYC queue (document review)
         Route::get('businesses-kyc', [BusinessKycController::class, 'index'])->name('businesses-kyc.index');
+        Route::get('businesses-kyc/{verification}/document', [BusinessKycController::class, 'document'])->name('businesses-kyc.document');
+        Route::post('businesses-kyc/{verification}/verify-identity', [BusinessKycController::class, 'verifyIdentity'])->name('businesses-kyc.verify-identity');
 
         // Transaction Logs
         Route::get('transaction-logs', [\App\Http\Controllers\Admin\TransactionLogController::class, 'index'])->name('transaction-logs.index');

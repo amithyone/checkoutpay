@@ -115,6 +115,7 @@ class VerificationController extends Controller
         if (in_array($typeIn, [BusinessVerification::TYPE_BVN, BusinessVerification::TYPE_NIN], true)) {
             $rules['business_phone'] = 'required|string|max:30';
             $rules['legal_name'] = 'required|string|max:255';
+            $rules['signatory_dob'] = 'required|date_format:Y-m-d|before:today';
         }
 
         if (in_array($typeIn, [BusinessVerification::TYPE_CAC_CERTIFICATE, BusinessVerification::TYPE_CAC_APPLICATION], true)) {
@@ -196,9 +197,17 @@ class VerificationController extends Controller
                     $nubanResult['account_name'] ?? ''
                 );
             } elseif ($validated['verification_type'] === BusinessVerification::TYPE_BVN) {
-                $documentType = 'BVN: '.($validated['bvn'] ?? '');
+                $documentType = sprintf(
+                    'BVN: %s, DOB: %s',
+                    $validated['bvn'] ?? '',
+                    $validated['signatory_dob'] ?? optional($business->rubies_signatory_dob)?->format('Y-m-d')
+                );
             } elseif ($validated['verification_type'] === BusinessVerification::TYPE_NIN) {
-                $documentType = 'NIN: '.($validated['nin'] ?? '');
+                $documentType = sprintf(
+                    'NIN: %s, DOB: %s',
+                    $validated['nin'] ?? '',
+                    $validated['signatory_dob'] ?? optional($business->rubies_signatory_dob)?->format('Y-m-d')
+                );
             } else {
                 $documentType = $validated['document_type'] ?? '';
             }

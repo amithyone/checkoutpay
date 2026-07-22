@@ -210,7 +210,7 @@
                 <div class="rounded-lg border-2 border-primary/20 bg-primary/5 p-5 space-y-4">
                     <div>
                         <h4 class="text-base font-semibold text-gray-900">Permanent business pay-in account</h4>
-                        <p class="text-xs text-gray-600 mt-1">Company registration number, business contact phone and email, and signatory date of birth. Use &ldquo;Request pay-in account&rdquo; anytime — you do not need to upload documents in the same step.</p>
+                        <p class="text-xs text-gray-600 mt-1">Company registration number, business contact phone and email, and signatory date of birth. Date of birth is also required when submitting BVN or NIN.</p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -270,7 +270,7 @@
                 <div class="rounded-lg border border-gray-200 bg-slate-50/80 p-5 space-y-4">
                     <div>
                         <h4 class="text-base font-semibold text-gray-900">Personal information</h4>
-                        <p class="text-xs text-gray-600 mt-1">Legal / business name on file. BVN and NIN require the business phone number in the pay-in section above.</p>
+                        <p class="text-xs text-gray-600 mt-1">Legal name as on your BVN/NIN records, date of birth, and phone number. These are used for Mevon identity verification.</p>
                     </div>
                     <div>
                         <label for="legal_name" class="block text-sm font-medium text-gray-700 mb-1">Name <span id="legal-name-required" class="text-red-500 hidden">*</span></label>
@@ -322,6 +322,17 @@
                                 placeholder="Enter your 11-digit NIN"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
                             @error('nin')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div id="identity-dob-field" class="hidden">
+                            <label for="identity_dob" class="block text-sm font-medium text-gray-700 mb-1">Date of birth (as on BVN/NIN) <span class="text-red-500">*</span></label>
+                            <input type="date" id="identity_dob" max="{{ now()->subDay()->format('Y-m-d') }}"
+                                value="{{ old('signatory_dob', optional($business->rubies_signatory_dob)?->format('Y-m-d')) }}"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white max-w-xs">
+                            <p class="mt-1 text-xs text-gray-500">Must match your BVN or NIN record. We use this for identity verification.</p>
+                            @error('signatory_dob')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
@@ -465,12 +476,15 @@ document.getElementById('verification_type').addEventListener('change', function
 
     document.getElementById('bvn-field').classList.add('hidden');
     document.getElementById('nin-field').classList.add('hidden');
+    document.getElementById('identity-dob-field').classList.add('hidden');
     document.getElementById('account-number-field').classList.add('hidden');
     textFields.classList.add('hidden');
     fileFields.classList.add('hidden');
 
     document.getElementById('bvn').required = false;
     document.getElementById('nin').required = false;
+    const identityDob = document.getElementById('identity_dob');
+    if (identityDob) identityDob.required = false;
     document.getElementById('account_number').required = false;
     document.getElementById('bank_code_kyc').removeAttribute('required');
     document.getElementById('document').required = false;
@@ -495,18 +509,36 @@ document.getElementById('verification_type').addEventListener('change', function
         if (type === 'bvn') {
             document.getElementById('bvn-field').classList.remove('hidden');
             document.getElementById('bvn').required = true;
+            document.getElementById('identity-dob-field').classList.remove('hidden');
+            if (identityDob) {
+                identityDob.required = true;
+                if (!identityDob.value && signDob && signDob.value) {
+                    identityDob.value = signDob.value;
+                }
+            }
             if (businessPhoneReq) businessPhoneReq.classList.remove('hidden');
+            if (signatoryDobReq) signatoryDobReq.classList.remove('hidden');
             if (nameReq) nameReq.classList.remove('hidden');
             if (businessPhone) businessPhone.required = true;
             if (legalName) legalName.required = true;
+            if (signDob) signDob.required = true;
         }
         if (type === 'nin') {
             document.getElementById('nin-field').classList.remove('hidden');
             document.getElementById('nin').required = true;
+            document.getElementById('identity-dob-field').classList.remove('hidden');
+            if (identityDob) {
+                identityDob.required = true;
+                if (!identityDob.value && signDob && signDob.value) {
+                    identityDob.value = signDob.value;
+                }
+            }
             if (businessPhoneReq) businessPhoneReq.classList.remove('hidden');
+            if (signatoryDobReq) signatoryDobReq.classList.remove('hidden');
             if (nameReq) nameReq.classList.remove('hidden');
             if (businessPhone) businessPhone.required = true;
             if (legalName) legalName.required = true;
+            if (signDob) signDob.required = true;
         }
         if (type === 'account_number') {
             document.getElementById('account-number-field').classList.remove('hidden');
@@ -571,6 +603,34 @@ if (bankSearchKyc && bankCodeKyc && bankDropdownKyc) {
         sel.dispatchEvent(new Event('change'));
     }
 })();
+
+const signDobPayIn = document.getElementById('signatory_dob');
+const identityDobInput = document.getElementById('identity_dob');
+const verificationForm = document.getElementById('verification-form');
+
+function syncIdentityDobFields() {
+    if (!identityDobInput || !signDobPayIn) return;
+    const identityVisible = !document.getElementById('identity-dob-field').classList.contains('hidden');
+    if (identityVisible && identityDobInput.value) {
+        signDobPayIn.value = identityDobInput.value;
+    }
+}
+
+if (identityDobInput && signDobPayIn) {
+    identityDobInput.addEventListener('change', function () {
+        signDobPayIn.value = this.value;
+    });
+    signDobPayIn.addEventListener('change', function () {
+        const identityVisible = !document.getElementById('identity-dob-field').classList.contains('hidden');
+        if (identityVisible) {
+            identityDobInput.value = this.value;
+        }
+    });
+}
+
+if (verificationForm) {
+    verificationForm.addEventListener('submit', syncIdentityDobFields);
+}
 </script>
 @endpush
 @endsection

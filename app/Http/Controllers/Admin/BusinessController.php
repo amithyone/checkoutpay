@@ -946,6 +946,11 @@ class BusinessController extends Controller
             'admin_notes' => 'nullable|string|max:1000',
         ]);
 
+        if ($verification->requiresMevonVerification() && ! $verification->isProviderVerified()) {
+            return $this->verificationDecisionRedirect($request, $business)
+                ->with('warning', 'Verify BVN/NIN with Mevon and confirm the name matches before approving.');
+        }
+
         $verification->update([
             'status' => BusinessVerification::STATUS_APPROVED,
             'reviewed_by' => auth('admin')->id(),
@@ -986,7 +991,8 @@ class BusinessController extends Controller
             }
         }
 
-        $redirect = redirect()->route('admin.businesses.show', $business)->with('success', $success);
+        $redirect = $this->verificationDecisionRedirect($request, $business);
+        $redirect->with('success', $success);
         if ($warning !== null) {
             $redirect->with('warning', $warning);
         }
@@ -1011,8 +1017,17 @@ class BusinessController extends Controller
             'rejection_reason' => $request->rejection_reason,
         ]);
 
-        return redirect()->route('admin.businesses.show', $business)
+        return $this->verificationDecisionRedirect($request, $business)
             ->with('success', 'Verification rejected');
+    }
+
+    private function verificationDecisionRedirect(Request $request, Business $business): RedirectResponse
+    {
+        if ($request->input('return_to') === 'kyc_queue') {
+            return redirect()->route('admin.businesses-kyc.index', ['status' => 'pending']);
+        }
+
+        return redirect()->route('admin.businesses.show', $business);
     }
 
     public function downloadVerificationDocument(Business $business, BusinessVerification $verification)

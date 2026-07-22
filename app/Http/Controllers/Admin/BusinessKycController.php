@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Business;
 use App\Models\BusinessVerification;
+use App\Services\Admin\BusinessKycMevonVerificationService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class BusinessKycController extends Controller
 {
@@ -15,98 +18,136 @@ class BusinessKycController extends Controller
         $status = (string) $request->query('status', 'pending');
         $requiredTypes = BusinessVerification::getRequiredTypes();
 
-        $query = Business::query()
-            ->with(['verifications' => function ($q) use ($requiredTypes) {
-                $q->whereIn('verification_type', $requiredTypes);
-            }])
-            ->withCount([
-                'verifications as pending_kyc_docs_count' => function ($q) use ($requiredTypes) {
-                    $q->whereIn('verification_type', $requiredTypes)
-                        ->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW]);
-                },
-                'verifications as rejected_kyc_docs_count' => function ($q) use ($requiredTypes) {
-                    $q->whereIn('verification_type', $requiredTypes)
-                        ->where('status', BusinessVerification::STATUS_REJECTED);
-                },
-            ])
+        $query = BusinessVerification::query()
+            ->with(['business', 'reviewer'])
+            ->whereIn('verification_type', $requiredTypes)
             ->orderByDesc('created_at');
 
-        if ($status === 'verified') {
-            // Must have all required types and all approved.
-            foreach ($requiredTypes as $type) {
-                $query->whereHas('verifications', function ($q) use ($type) {
-                    $q->where('verification_type', $type)
-                        ->where('status', BusinessVerification::STATUS_APPROVED);
-                });
-            }
-        } elseif ($status === 'pending') {
-            $query->whereHas('verifications', function ($q) use ($requiredTypes) {
-                $q->whereIn('verification_type', $requiredTypes)
-                    ->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW]);
-            });
+        if ($status === 'approved') {
+            $query->where('status', BusinessVerification::STATUS_APPROVED);
         } elseif ($status === 'rejected') {
-            $query->whereHas('verifications', function ($q) use ($requiredTypes) {
-                $q->whereIn('verification_type', $requiredTypes)
-                    ->where('status', BusinessVerification::STATUS_REJECTED);
-            });
-        } elseif ($status === 'not_submitted') {
-            $query->whereDoesntHave('verifications', function ($q) use ($requiredTypes) {
-                $q->whereIn('verification_type', $requiredTypes);
-            });
+            $query->where('status', BusinessVerification::STATUS_REJECTED);
+        } elseif ($status === 'all') {
+            // no status filter
         } else {
-            // "all" or unknown: no additional filtering
+            $query->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW]);
+            $status = 'pending';
         }
 
-        $businesses = $query->paginate(20)->withQueryString();
-
-        $requiredTypeCount = count($requiredTypes);
-        $businessKycMeta = [];
-
-        foreach ($businesses as $business) {
-            $verifications = $business->verifications;
-            $submittedTypes = $verifications
-                ->pluck('verification_type')
-                ->unique()
-                ->values()
-                ->all();
-
-            $approvedTypes = $verifications
-                ->where('status', BusinessVerification::STATUS_APPROVED)
-                ->pluck('verification_type')
-                ->unique()
-                ->values()
-                ->all();
-
-            $missingDocs = array_values(array_diff($requiredTypes, $submittedTypes));
-            $isAllSubmitted = count($submittedTypes) === $requiredTypeCount;
-            $isAllApproved = count($approvedTypes) === $requiredTypeCount;
-
-            $computed = 'pending';
-            if ($isAllApproved) {
-                $computed = 'verified';
-            } elseif ($verifications->where('status', BusinessVerification::STATUS_REJECTED)->count() > 0) {
-                $computed = 'rejected';
-            } elseif ($isAllSubmitted) {
-                $computed = 'under_review';
-            } elseif (count($missingDocs) > 0) {
-                $computed = 'incomplete';
-            }
-
-            $businessKycMeta[$business->id] = [
-                'computed_status' => $computed,
-                'missing_count' => count($missingDocs),
-                'missing_docs' => $missingDocs,
-                'submitted_count' => count($submittedTypes),
-                'approved_count' => count($approvedTypes),
-            ];
+        if ($request->filled('business_id')) {
+            $query->where('business_id', (int) $request->query('business_id'));
         }
+
+        if ($request->filled('type')) {
+            $query->where('verification_type', (string) $request->query('type'));
+        }
+
+        $verifications = $query->paginate(24)->withQueryString();
+
+        $verifications->getCollection()->transform(function (BusinessVerification $verification) {
+            $verification->document_exists = $this->documentPathExists($verification->document_path);
+
+            return $verification;
+        });
 
         return view('admin.businesses-kyc.index', [
-            'businesses' => $businesses,
+            'verifications' => $verifications,
             'status' => $status,
-            'businessKycMeta' => $businessKycMeta,
-            'requiredTypeCount' => $requiredTypeCount,
+            'requiredTypes' => $requiredTypes,
+            'canDecide' => (bool) auth('admin')->user()?->canDecideBusinessKyc(),
+            'mevonVerifyAvailable' => app(BusinessKycMevonVerificationService::class)->isAvailable(),
         ]);
     }
-}
 
+    public function verifyIdentity(
+        Request $request,
+        BusinessVerification $verification,
+        BusinessKycMevonVerificationService $mevonVerify,
+    ): RedirectResponse {
+        $admin = auth('admin')->user();
+        if (! $admin?->canDecideBusinessKyc()) {
+            abort(403, 'You cannot verify business KYC.');
+        }
+
+        if (! $verification->requiresMevonVerification()) {
+            return back()->with('warning', 'This verification type does not require Mevon identity check.');
+        }
+
+        $request->validate([
+            'signatory_dob' => 'nullable|date_format:Y-m-d|before:today',
+            'return_to' => 'nullable|string|max:50',
+        ]);
+
+        if ($request->filled('signatory_dob') && $verification->business) {
+            $verification->business->update([
+                'rubies_signatory_dob' => $request->input('signatory_dob'),
+            ]);
+            $verification->load('business');
+        }
+
+        $result = $mevonVerify->verify(
+            $verification,
+            $admin,
+            $request->input('signatory_dob'),
+        );
+
+        $redirect = $request->input('return_to') === 'kyc_queue'
+            ? redirect()->route('admin.businesses-kyc.index', ['status' => 'pending'])
+            : back();
+
+        if ($result['ok']) {
+            return $redirect->with('success', $result['message']);
+        }
+
+        return $redirect->with('warning', $result['message']);
+    }
+
+    public function document(BusinessVerification $verification): Response
+    {
+        $requiredTypes = BusinessVerification::getRequiredTypes();
+        if (! in_array($verification->verification_type, $requiredTypes, true)) {
+            abort(404);
+        }
+
+        if ($verification->isTextBased()) {
+            abort(404, 'This verification type has no file document.');
+        }
+
+        $disk = $this->resolveDocumentDisk($verification->document_path);
+        if ($disk === null) {
+            abort(404, 'Document not found');
+        }
+
+        $path = $verification->document_path;
+        $mime = $disk->mimeType($path) ?: 'application/octet-stream';
+        $filename = basename($path);
+
+        return response()->file($disk->path($path), [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function documentPathExists(?string $path): bool
+    {
+        return $this->resolveDocumentDisk($path) !== null;
+    }
+
+    private function resolveDocumentDisk(?string $path): ?\Illuminate\Contracts\Filesystem\Filesystem
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            return Storage::disk('public');
+        }
+
+        if (Storage::disk('local')->exists($path)) {
+            return Storage::disk('local');
+        }
+
+        return null;
+    }
+}

@@ -726,6 +726,17 @@
                                             <p class="text-red-800"><strong>Rejection Reason:</strong> {{ $verification->rejection_reason }}</p>
                                         </div>
                                     @endif
+                                    @if($verification->requiresMevonVerification())
+                                        <div class="mt-2 p-2 rounded border {{ $verification->isProviderVerified() ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-900' }}">
+                                            <strong>Mevon check:</strong>
+                                            @if($verification->isProviderVerified())
+                                                Verified · {{ $verification->provider_verified_name }}
+                                            @else
+                                                Required before approval.
+                                                <a href="{{ route('admin.businesses-kyc.index', ['status' => 'pending', 'type' => $verification->verification_type]) }}" class="underline font-medium">Open KYC queue</a>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </div>
                             @endif
                         </div>
@@ -742,10 +753,19 @@
                                     </span>
                                 @endif
                                 @if(in_array($status, ['pending', 'under_review']) && auth('admin')->user()?->canDecideBusinessKyc())
-                                    <button onclick="showApproveKYCModal({{ $verification->id }})" 
-                                            class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs">
-                                        <i class="fas fa-check mr-1"></i> Approve
-                                    </button>
+                                    @php
+                                        $canApproveFromShow = ! $verification->requiresMevonVerification() || $verification->isProviderVerified();
+                                    @endphp
+                                    @if($canApproveFromShow)
+                                        <button onclick="showApproveKYCModal({{ $verification->id }})" 
+                                                class="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs">
+                                            <i class="fas fa-check mr-1"></i> Approve
+                                        </button>
+                                    @else
+                                        <span class="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-xs text-center" title="Verify with Mevon in the KYC queue first">
+                                            Approve (Mevon required)
+                                        </span>
+                                    @endif
                                     <button onclick="showRejectKYCModal({{ $verification->id }})" 
                                             class="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs">
                                         <i class="fas fa-times mr-1"></i> Reject
