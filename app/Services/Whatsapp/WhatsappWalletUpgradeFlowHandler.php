@@ -4,13 +4,13 @@ namespace App\Services\Whatsapp;
 
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
-use App\Services\MevonRubiesVirtualAccountService;
+use App\Services\MevonPay\PrivateAccountProvisionService;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Tier 2: collect KYC, confirm WhatsApp number, then Mevon Rubies POST /V1/createrubies (no OTP).
- * Personal: fname, lname, dob, gender, bvn, email → account_type=personal.
- * Business: CAC, dob, email (same WhatsApp phone) → account_type=business.
+ * Tier 2: collect KYC, confirm WhatsApp number, then queue Mevon /V1/pivateaccount.
+ * Personal: fname, lname, dob, gender, bvn, email → create_personal_account.
+ * Business: CAC, signatory BVN, dob, email → create_business_account.
  */
 class WhatsappWalletUpgradeFlowHandler
 {
@@ -18,7 +18,7 @@ class WhatsappWalletUpgradeFlowHandler
 
     public function __construct(
         private EvolutionWhatsAppClient $client,
-        private MevonRubiesVirtualAccountService $mevonRubies,
+        private PrivateAccountProvisionService $provision,
         private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
@@ -61,7 +61,7 @@ class WhatsappWalletUpgradeFlowHandler
             return;
         }
 
-        if (! $this->mevonRubies->isConfigured()) {
+        if (! $this->provision->isConfigured()) {
             $this->kycLog('info', 'whatsapp.wallet.kyc.upgrade_requested', [
                 'outcome' => 'tier2_unavailable',
                 'whatsapp_wallet_id' => $wallet->id,
@@ -219,9 +219,9 @@ class WhatsappWalletUpgradeFlowHandler
         }
 
         $ctx['cac'] = $cac;
-        $ctx['step'] = 'dob';
+        $ctx['step'] = 'fname';
         $session->update(['chat_context' => $ctx]);
-        $this->client->sendText($instance, $phone, 'Send *date of birth* for the signatory: *YYYY-MM-DD* (e.g. 1990-05-15).');
+        $this->client->sendText($instance, $phone, 'Send the *signatory first name* (as on BVN).');
     }
 
     /**
@@ -246,7 +246,12 @@ class WhatsappWalletUpgradeFlowHandler
         $ctx['fname'] = $name;
         $ctx['step'] = 'lname';
         $session->update(['chat_context' => $ctx]);
-        $this->client->sendText($instance, $phone, 'Send your *last name* (as on BVN).');
+        $isBusiness = ($ctx['rubies_account_type'] ?? 'personal') === 'business';
+        $this->client->sendText(
+            $instance,
+            $phone,
+            $isBusiness ? 'Send the *signatory last name* (as on BVN).' : 'Send your *last name* (as on BVN).'
+        );
     }
 
     /**
@@ -311,9 +316,9 @@ class WhatsappWalletUpgradeFlowHandler
 
         $ctx['dob'] = $d->format('Y-m-d');
         if (($ctx['rubies_account_type'] ?? 'personal') === 'business') {
-            $ctx['step'] = 'email';
+            $ctx['step'] = 'bvn';
             $session->update(['chat_context' => $ctx]);
-            $this->client->sendText($instance, $phone, 'Send the business *contact email*.');
+            $this->client->sendText($instance, $phone, 'Send the signatory *11-digit BVN* (numbers only).');
 
             return;
         }
@@ -471,42 +476,50 @@ class WhatsappWalletUpgradeFlowHandler
         try {
             $accountType = (string) ($ctx['rubies_account_type'] ?? 'personal');
             if ($accountType === 'business') {
-                $created = $this->mevonRubies->createRubiesBusinessAccount(
-                    (string) ($ctx['cac'] ?? ''),
-                    $apiPhone,
-                    (string) ($ctx['dob'] ?? ''),
-                    (string) ($ctx['email'] ?? ''),
-                );
+                $result = $this->provision->dispatchPersonalBusinessIfReady($wallet, [
+                    'cac' => (string) ($ctx['cac'] ?? ''),
+                    'dob' => (string) ($ctx['dob'] ?? ''),
+                    'email' => (string) ($ctx['email'] ?? ''),
+                    'bvn' => (string) ($ctx['bvn'] ?? ''),
+                    'fname' => (string) ($ctx['fname'] ?? ''),
+                    'lname' => (string) ($ctx['lname'] ?? ''),
+                    'business_name' => (string) ($ctx['cac'] ?? ''),
+                ]);
             } else {
-                $created = $this->mevonRubies->createRubiesPersonalAccount(
-                    (string) ($ctx['fname'] ?? ''),
-                    (string) ($ctx['lname'] ?? ''),
-                    $apiPhone,
-                    (string) ($ctx['dob'] ?? ''),
-                    (string) ($ctx['email'] ?? ''),
-                    (string) ($ctx['bvn'] ?? ''),
-                    null,
-                );
+                $result = $this->provision->dispatchPersonalIfReady($wallet, [
+                    'fname' => (string) ($ctx['fname'] ?? ''),
+                    'lname' => (string) ($ctx['lname'] ?? ''),
+                    'dob' => (string) ($ctx['dob'] ?? ''),
+                    'email' => (string) ($ctx['email'] ?? ''),
+                    'gender' => (string) ($ctx['gender'] ?? ''),
+                    'bvn' => (string) ($ctx['bvn'] ?? ''),
+                ]);
             }
 
-            $this->kycLog('info', 'whatsapp.wallet.kyc.rubies_create_response', [
+            if (! $result['dispatched']) {
+                throw new \RuntimeException($result['message']);
+            }
+
+            $this->kycLog('info', 'whatsapp.wallet.kyc.private_account_queued', [
                 'phone' => $phone,
                 'instance' => $instance,
                 'whatsapp_wallet_id' => $wallet->id,
                 'rubies_account_type' => $accountType,
-                'has_account_number' => ($created['account_number'] ?? '') !== '',
-                'has_reference' => ($created['reference'] ?? '') !== '',
-                'reference_suffix' => ($created['reference'] ?? '') !== ''
-                    ? substr((string) $created['reference'], -8)
-                    : null,
-                'account_suffix' => ($created['account_number'] ?? '') !== ''
-                    ? substr((string) $created['account_number'], -4)
-                    : null,
-                'bank_name' => $created['bank_name'] ?? null,
-                'raw_summary' => $this->summarizeRubiesRaw($created['raw'] ?? []),
             ]);
 
-            $this->finalizeTier2Success($session, $wallet, $instance, $phone, $ctx, $created);
+            $priorCtx = is_array($session->chat_context) ? $session->chat_context : [];
+            $resumePinReset = (bool) ($priorCtx['resume_pin_reset'] ?? false);
+            $session->update(['chat_flow' => null, 'chat_context' => null]);
+
+            $this->client->sendText(
+                $instance,
+                $phone,
+                "*Account setup started*\n\n".
+                "Your permanent bank account is being created. Check *MENU* in a few minutes for your account details.\n\n".
+                ($resumePinReset
+                    ? 'After your account appears, send *PIN RESET* again to continue.'
+                    : 'Use *MENU* anytime to view your wallet.')
+            );
         } catch (\Throwable $e) {
             $this->kycLog('error', 'whatsapp.wallet.kyc.rubies_create_exception', [
                 'phone' => $phone,

@@ -13,7 +13,7 @@
                 </h3>
                 <p class="text-sm text-gray-600 mt-1">
                     Review submitted KYC documents, preview files, and approve or reject each item.
-                    BVN and NIN must be verified via Mevon before approval.
+                    BVN and NIN are verified automatically via Mevon when submitted (platform covers the fee). Pay-in accounts are created in the background after KYC is complete.
                 </p>
             </div>
 
@@ -187,7 +187,7 @@
                                     </div>
                                 @else
                                     <div class="text-amber-900">
-                                        Not verified yet. Run Mevon check to confirm the submitted name matches the BVN/NIN record.
+                                        Not verified yet. Run Mevon BVN/NIN check to confirm the submitted name matches the identity record.
                                     </div>
                                 @endif
                             </div>

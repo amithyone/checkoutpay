@@ -78,6 +78,19 @@
                             <p><span class="text-gray-600">Account name:</span> {{ $business->rubies_business_account_name }}</p>
                         @endif
                     </div>
+                @elseif(in_array($business->rubies_account_provision_status, ['queued', 'processing'], true))
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-900">
+                        <p class="font-semibold mb-1">Pay-in account provisioning</p>
+                        <p>Your permanent account is being created. Refresh this page in a few minutes.</p>
+                        @if($business->rubies_account_provision_queued_at)
+                            <p class="text-xs mt-2 text-blue-800">Queued {{ $business->rubies_account_provision_queued_at->diffForHumans() }}</p>
+                        @endif
+                    </div>
+                @elseif($business->rubies_account_provision_status === 'failed')
+                    <div class="mt-4 p-3 bg-red-50 rounded-lg border border-red-200 text-sm text-red-900">
+                        <p class="font-semibold mb-1">Pay-in account setup failed</p>
+                        <p>{{ $business->rubies_account_provision_error ?? 'Please contact support or try requesting the account again.' }}</p>
+                    </div>
                 @endif
             </div>
         </div>
@@ -270,7 +283,7 @@
                 <div class="rounded-lg border border-gray-200 bg-slate-50/80 p-5 space-y-4">
                     <div>
                         <h4 class="text-base font-semibold text-gray-900">Personal information</h4>
-                        <p class="text-xs text-gray-600 mt-1">Legal name as on your BVN/NIN records, date of birth, and phone number. These are used for Mevon identity verification.</p>
+                        <p class="text-xs text-gray-600 mt-1">Legal name as on your BVN/NIN records, date of birth, and phone number. These are used when we create your pay-in account.</p>
                     </div>
                     <div>
                         <label for="legal_name" class="block text-sm font-medium text-gray-700 mb-1">Name <span id="legal-name-required" class="text-red-500 hidden">*</span></label>

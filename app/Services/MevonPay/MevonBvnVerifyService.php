@@ -3,10 +3,9 @@
 namespace App\Services\MevonPay;
 
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
- * MevonPay standalone BVN verification: POST /V1/bvn-verify.
+ * MevonPay standalone BVN verification: POST /V1/bvn-verify (₦30 per success).
  */
 final class MevonBvnVerifyService
 {
@@ -25,6 +24,7 @@ final class MevonBvnVerifyService
      *   full_name: string,
      *   dob: string,
      *   id_number: string,
+     *   photo: string,
      *   raw: array<string, mixed>
      * }
      */
@@ -33,7 +33,6 @@ final class MevonBvnVerifyService
         string $dobYmd,
         string $firstName,
         string $lastName,
-        ?string $reference = null,
     ): array {
         $bvn = preg_replace('/\D+/', '', $bvn11) ?? '';
         if (strlen($bvn) !== 11) {
@@ -49,18 +48,11 @@ final class MevonBvnVerifyService
         }
 
         $path = (string) config('services.mevonpay.bvn_verify_path', '/V1/bvn-verify');
-        $ref = trim((string) ($reference ?? ''));
-        if ($ref === '') {
-            $ref = 'BVN-'.Str::upper(Str::random(12));
-        }
-
         $payload = [
-            'idNumber' => $bvn,
             'bvn' => $bvn,
             'dob' => $dobYmd,
             'firstName' => $firstName,
             'lastName' => $lastName,
-            'reference' => $ref,
         ];
 
         $result = $this->http->postJson($path, $payload, 'bearer');
@@ -80,19 +72,19 @@ final class MevonBvnVerifyService
 
         /** @var array<string, mixed> $raw */
         $raw = is_array($result['raw'] ?? null) ? $result['raw'] : [];
-        $details = is_array($raw['bvn_details'] ?? null) ? $raw['bvn_details'] : [];
+        $details = is_array($raw['data'] ?? null) ? $raw['data'] : [];
         if ($details === [] && is_array($result['data'] ?? null)) {
-            $data = $result['data'];
-            $details = is_array($data['bvn_details'] ?? null) ? $data['bvn_details'] : $data;
+            $details = $result['data'];
         }
 
-        $idNumber = preg_replace('/\D+/', '', (string) ($details['idNumber'] ?? $details['bvn'] ?? $bvn)) ?? $bvn;
+        $idNumber = preg_replace('/\D+/', '', (string) ($details['idNumber'] ?? $bvn)) ?? $bvn;
 
         return [
-            'reference' => (string) ($raw['reference'] ?? $ref),
-            'full_name' => trim((string) ($details['fullName'] ?? $details['accountName'] ?? '')),
+            'reference' => (string) ($raw['reference'] ?? ''),
+            'full_name' => trim((string) ($details['fullName'] ?? '')),
             'dob' => (string) ($details['dob'] ?? $dobYmd),
             'id_number' => strlen($idNumber) === 11 ? $idNumber : $bvn,
+            'photo' => (string) ($details['photo'] ?? ''),
             'raw' => $raw,
         ];
     }

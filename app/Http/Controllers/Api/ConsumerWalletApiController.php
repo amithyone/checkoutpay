@@ -23,6 +23,7 @@ use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletSavingsService;
 use App\Services\Consumer\ConsumerWalletStatementService;
 use App\Services\Consumer\ConsumerWalletTransferService;
+use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\MavonPayTransferService;
 use App\Contracts\Vtu\VtuProviderContract;
 use App\Services\Vtu\VtuProviderResolver;
@@ -215,6 +216,14 @@ class ConsumerWalletApiController extends Controller
                 'mevon_bank_name' => $isNg ? $wallet->mevon_bank_name : null,
                 'mevon_bank_code' => $isNg ? $wallet->mevon_bank_code : null,
                 'rubies_account_type' => $wallet->rubies_account_type,
+                'private_account_provision_status' => $isNg ? $wallet->private_account_provision_status : null,
+                'private_account_provision_error' => $isNg ? $wallet->private_account_provision_error : null,
+                'kyc_pending_account' => $isNg && $wallet->isTier2()
+                    && trim((string) $wallet->mevon_virtual_account_number) === ''
+                    && in_array((string) ($wallet->private_account_provision_status ?? ''), [
+                        PrivateAccountProvisionService::STATUS_QUEUED,
+                        PrivateAccountProvisionService::STATUS_PROCESSING,
+                    ], true),
                 'pay_in' => $payIn,
                 'business_pay_in' => $isNg ? $this->businessLedger->resolveBusinessPayInPayload($wallet) : null,
                 'business_balance' => $this->businessLedger->resolvedBalance($wallet),
@@ -1684,10 +1693,16 @@ class ConsumerWalletApiController extends Controller
             'cac' => 'required|string|max:100',
             'dob' => 'required|date_format:Y-m-d',
             'email' => 'required|email|max:255',
+            'fname' => 'nullable|string|max:128',
+            'lname' => 'nullable|string|max:128',
+            'bvn' => 'nullable|string|size:11',
+            'business_name' => 'nullable|string|max:255',
         ]);
 
         $wallet = $this->walletFor($request)->fresh();
-        $out = $this->kyc->submitBusinessTier2($wallet, $request->only(['cac', 'dob', 'email']));
+        $out = $this->kyc->submitBusinessTier2($wallet, $request->only([
+            'cac', 'dob', 'email', 'fname', 'lname', 'bvn', 'business_name',
+        ]));
 
         return response()->json([
             'success' => $out['ok'],

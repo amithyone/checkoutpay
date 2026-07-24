@@ -3,8 +3,7 @@
 namespace App\Services\Consumer;
 
 use App\Models\WhatsappWallet;
-use App\Services\MevonPay\MevonNinVerifyService;
-use App\Services\MevonRubiesVirtualAccountService;
+use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use Illuminate\Support\Facades\Log;
@@ -15,8 +14,7 @@ use Illuminate\Support\Facades\Log;
 class ConsumerWalletKycService
 {
     public function __construct(
-        private MevonRubiesVirtualAccountService $rubies,
-        private MevonNinVerifyService $ninVerify,
+        private PrivateAccountProvisionService $provision,
         private WhatsappWalletCountryResolver $walletCountry,
         private KenyaKycVerificationService $kenyaKyc,
     ) {}
@@ -33,13 +31,26 @@ class ConsumerWalletKycService
             default => 'unsupported',
         };
 
+        $hasAccount = trim((string) $wallet->mevon_virtual_account_number) !== '';
+        $provisionStatus = (string) ($wallet->private_account_provision_status ?? '');
+        $pendingAccount = $wallet->isTier2()
+            && ! $hasAccount
+            && in_array($provisionStatus, [
+                PrivateAccountProvisionService::STATUS_QUEUED,
+                PrivateAccountProvisionService::STATUS_PROCESSING,
+            ], true);
+
         return [
             'ok' => true,
             'message' => 'OK',
             'data' => [
                 'tier' => (int) $wallet->tier,
                 'is_tier2' => $wallet->isTier2(),
-                'has_permanent_account' => $wallet->isTier2() && trim((string) $wallet->mevon_virtual_account_number) !== '',
+                'has_permanent_account' => $hasAccount,
+                'kyc_pending_account' => $pendingAccount,
+                'provision_status' => $provisionStatus !== '' ? $provisionStatus : ($hasAccount ? 'completed' : null),
+                'provision_error' => $wallet->private_account_provision_error,
+                'provision_queued_at' => $wallet->private_account_provision_queued_at?->toIso8601String(),
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'kyc_fname' => $wallet->kyc_fname,
                 'kyc_lname' => $wallet->kyc_lname,
@@ -73,11 +84,21 @@ class ConsumerWalletKycService
         if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
             return ['ok' => false, 'message' => 'Tier 2 is only available for Nigeria and Kenya wallet numbers.'];
         }
+
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
             return ['ok' => true, 'message' => 'Already on Tier 2.', 'data' => $this->vaPayload($wallet)];
         }
-        if (! $this->rubies->isConfigured()) {
-            return ['ok' => false, 'message' => 'Tier 2 provisioning is not configured.'];
+
+        $provisionStatus = (string) ($wallet->private_account_provision_status ?? '');
+        if (in_array($provisionStatus, [
+            PrivateAccountProvisionService::STATUS_QUEUED,
+            PrivateAccountProvisionService::STATUS_PROCESSING,
+        ], true)) {
+            return [
+                'ok' => true,
+                'message' => 'Account is being created. Check back shortly.',
+                'data' => $this->vaPayload($wallet),
+            ];
         }
 
         $fname = trim((string) ($input['fname'] ?? ''));
@@ -103,49 +124,31 @@ class ConsumerWalletKycService
             return ['ok' => false, 'message' => 'BVN or NIN (11 digits) is required.'];
         }
 
-        try {
-            if ($useNin) {
-                if (! $this->ninVerify->isConfigured()) {
-                    return ['ok' => false, 'message' => 'NIN verification is not configured.'];
-                }
-                $this->ninVerify->verify($nin, $dob, $fname, $lname);
-            }
+        $payload = [
+            'fname' => $fname,
+            'lname' => $lname,
+            'dob' => $dob,
+            'email' => $email,
+            'gender' => $gender,
+            'bvn' => $useBvn ? $bvn : null,
+            'nin' => $useNin ? $nin : null,
+        ];
 
-            $created = $useBvn
-                ? $this->rubies->createRubiesPersonalAccount($fname, $lname, $apiPhone, $dob, $email, $bvn, null)
-                : $this->rubies->createRubiesPersonalAccount($fname, $lname, $apiPhone, $dob, $email, null, $nin);
-        } catch (\Throwable $e) {
-            Log::warning('consumer_wallet.kyc.personal_failed', [
+        $result = $this->provision->dispatchPersonalIfReady($wallet, $payload);
+        if (! $result['dispatched']) {
+            Log::warning('consumer_wallet.kyc.personal_queue_failed', [
                 'wallet_id' => $wallet->id,
-                'id_type' => $useBvn ? 'bvn' : 'nin',
-                'error' => $e->getMessage(),
+                'message' => $result['message'],
             ]);
 
-            return ['ok' => false, 'message' => $e->getMessage()];
+            return ['ok' => false, 'message' => $result['message']];
         }
 
-        $wallet->update([
-            'tier' => WhatsappWallet::TIER_RUBIES_VA,
-            'rubies_account_type' => 'personal',
-            'kyc_cac' => null,
-            'kyc_fname' => $fname,
-            'kyc_lname' => $lname,
-            'kyc_gender' => $gender,
-            'kyc_dob' => $dob,
-            'kyc_bvn' => $useBvn ? $bvn : null,
-            'kyc_nin' => $useNin ? $nin : null,
-            'kyc_email' => $email,
-            'kyc_verified_at' => now(),
-            'mevon_virtual_account_number' => $created['account_number'],
-            'mevon_account_name' => trim((string) ($created['account_name'] ?? '')) ?: null,
-            'mevon_bank_name' => $created['bank_name'],
-            'mevon_bank_code' => $created['bank_code'],
-            'mevon_reference' => $created['reference'] !== '' ? $created['reference'] : $wallet->mevon_reference,
-            'tier2_provisioned_at' => now(),
-            ...($this->tier2SenderNamePatch($wallet, (string) ($created['account_name'] ?? ''), $fname, $lname)),
-        ]);
-
-        return ['ok' => true, 'message' => 'Tier 2 activated.', 'data' => $this->vaPayload($wallet->fresh())];
+        return [
+            'ok' => true,
+            'message' => $result['message'],
+            'data' => $this->vaPayload($wallet->fresh()),
+        ];
     }
 
     /**
@@ -159,49 +162,50 @@ class ConsumerWalletKycService
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA && $wallet->mevon_virtual_account_number) {
             return ['ok' => true, 'message' => 'Already on Tier 2.', 'data' => $this->vaPayload($wallet)];
         }
-        if (! $this->rubies->isConfigured()) {
-            return ['ok' => false, 'message' => 'Tier 2 provisioning is not configured.'];
+
+        $provisionStatus = (string) ($wallet->private_account_provision_status ?? '');
+        if (in_array($provisionStatus, [
+            PrivateAccountProvisionService::STATUS_QUEUED,
+            PrivateAccountProvisionService::STATUS_PROCESSING,
+        ], true)) {
+            return [
+                'ok' => true,
+                'message' => 'Account is being created. Check back shortly.',
+                'data' => $this->vaPayload($wallet),
+            ];
         }
 
         $cac = strtoupper(trim((string) ($input['cac'] ?? '')));
         $dob = (string) ($input['dob'] ?? '');
         $email = strtolower(trim((string) ($input['email'] ?? '')));
+        $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? '')) ?? '';
+        $fname = trim((string) ($input['fname'] ?? $wallet->kyc_fname ?? ''));
+        $lname = trim((string) ($input['lname'] ?? $wallet->kyc_lname ?? ''));
 
-        $apiPhone = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164);
-        if ($apiPhone === null) {
-            return ['ok' => false, 'message' => 'Could not read wallet phone number.'];
-        }
-
-        try {
-            $created = $this->rubies->createRubiesBusinessAccount($cac, $apiPhone, $dob, $email);
-        } catch (\Throwable $e) {
-            Log::warning('consumer_wallet.kyc.business_failed', ['wallet_id' => $wallet->id, 'error' => $e->getMessage()]);
-
-            return ['ok' => false, 'message' => $e->getMessage()];
-        }
-
-        $wallet->update([
-            'tier' => WhatsappWallet::TIER_RUBIES_VA,
-            'rubies_account_type' => 'business',
-            'kyc_cac' => $cac,
-            'kyc_fname' => null,
-            'kyc_lname' => null,
-            'kyc_gender' => null,
-            'kyc_dob' => $dob,
-            'kyc_bvn' => null,
-            'kyc_nin' => null,
-            'kyc_email' => $email,
-            'kyc_verified_at' => now(),
-            'mevon_virtual_account_number' => $created['account_number'],
-            'mevon_account_name' => trim((string) ($created['account_name'] ?? '')) ?: null,
-            'mevon_bank_name' => $created['bank_name'],
-            'mevon_bank_code' => $created['bank_code'],
-            'mevon_reference' => $created['reference'] !== '' ? $created['reference'] : $wallet->mevon_reference,
-            'tier2_provisioned_at' => now(),
-            ...($this->tier2SenderNamePatch($wallet, (string) ($created['account_name'] ?? ''))),
+        $result = $this->provision->dispatchPersonalBusinessIfReady($wallet, [
+            'cac' => $cac,
+            'dob' => $dob,
+            'email' => $email,
+            'bvn' => $bvn,
+            'fname' => $fname,
+            'lname' => $lname,
+            'business_name' => trim((string) ($input['business_name'] ?? $cac)),
         ]);
 
-        return ['ok' => true, 'message' => 'Business Tier 2 activated.', 'data' => $this->vaPayload($wallet->fresh())];
+        if (! $result['dispatched']) {
+            Log::warning('consumer_wallet.kyc.business_queue_failed', [
+                'wallet_id' => $wallet->id,
+                'message' => $result['message'],
+            ]);
+
+            return ['ok' => false, 'message' => $result['message']];
+        }
+
+        return [
+            'ok' => true,
+            'message' => $result['message'],
+            'data' => $this->vaPayload($wallet->fresh()),
+        ];
     }
 
     private function nigeriaKycIdType(WhatsappWallet $wallet): ?string
@@ -219,29 +223,25 @@ class ConsumerWalletKycService
     }
 
     /**
-     * @return array{sender_name?: string}
-     */
-    private function tier2SenderNamePatch(
-        WhatsappWallet $wallet,
-        string $verifiedAccountName,
-        ?string $kycFname = null,
-        ?string $kycLname = null,
-    ): array {
-        $verifiedSenderName = $wallet->resolveSenderNameAfterTier2($verifiedAccountName, $kycFname, $kycLname);
-
-        return $verifiedSenderName !== null ? ['sender_name' => $verifiedSenderName] : [];
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function vaPayload(WhatsappWallet $wallet): array
     {
+        $hasAccount = trim((string) $wallet->mevon_virtual_account_number) !== '';
+        $provisionStatus = (string) ($wallet->private_account_provision_status ?? '');
+
         return [
             'account_number' => $wallet->mevon_virtual_account_number,
             'bank_name' => $wallet->mevon_bank_name,
             'bank_code' => $wallet->mevon_bank_code,
             'reference' => $wallet->mevon_reference,
+            'is_tier2' => $wallet->isTier2(),
+            'provision_status' => $provisionStatus !== '' ? $provisionStatus : ($hasAccount ? 'completed' : null),
+            'provision_error' => $wallet->private_account_provision_error,
+            'kyc_pending_account' => $wallet->isTier2() && ! $hasAccount && in_array($provisionStatus, [
+                PrivateAccountProvisionService::STATUS_QUEUED,
+                PrivateAccountProvisionService::STATUS_PROCESSING,
+            ], true),
             'kyc_mode' => 'nigeria_rubies',
         ];
     }

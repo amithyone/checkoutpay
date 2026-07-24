@@ -8,7 +8,13 @@ use App\Models\BusinessVerification;
 use App\Services\MevonPay\MevonBvnVerifyService;
 use App\Services\MevonPay\MevonNinVerifyService;
 use App\Services\Whatsapp\WhatsappWalletNameMatcher;
+use Illuminate\Support\Facades\Log;
 
+/**
+ * Business BVN/NIN verification via Mevon /V1/bvn-verify and /V1/nin-verify.
+ * Runs automatically on merchant submission when configured; admin can re-run manually.
+ * Separate from permanent account creation (/V1/pivateaccount).
+ */
 class BusinessKycMevonVerificationService
 {
     public const STATUS_PASSED = BusinessVerification::PROVIDER_VERIFY_PASSED;
@@ -26,9 +32,77 @@ class BusinessKycMevonVerificationService
     }
 
     /**
+     * Auto-run Mevon verify when merchant submits BVN/NIN (platform covers fee).
+     *
+     * @return array{ok: bool, message: string, verification?: BusinessVerification, skipped?: bool}
+     */
+    public function verifyAutomatically(BusinessVerification $verification): array
+    {
+        if ($verification->isProviderVerified()) {
+            return ['ok' => true, 'message' => 'Already verified.', 'verification' => $verification, 'skipped' => true];
+        }
+
+        return $this->runVerification($verification, null, null);
+    }
+
+    /**
      * @return array{ok: bool, message: string, verification?: BusinessVerification}
      */
     public function verify(BusinessVerification $verification, Admin $admin, ?string $dobOverride = null): array
+    {
+        return $this->runVerification($verification, $admin->id, $dobOverride);
+    }
+
+    /**
+     * Verify all submitted BVN/NIN rows for a business that are not yet provider-verified.
+     *
+     * @return array{attempted: int, passed: int, failed: int}
+     */
+    public function verifyPendingIdentityRowsForBusiness(Business $business): array
+    {
+        $stats = ['attempted' => 0, 'passed' => 0, 'failed' => 0];
+
+        if (! $this->isAvailable()) {
+            return $stats;
+        }
+
+        $business->refresh();
+        foreach ([BusinessVerification::TYPE_BVN, BusinessVerification::TYPE_NIN] as $type) {
+            $row = $business->verifications()
+                ->where('verification_type', $type)
+                ->whereNotIn('status', [BusinessVerification::STATUS_REJECTED])
+                ->orderByDesc('created_at')
+                ->first();
+
+            if ($row === null || $row->isProviderVerified()) {
+                continue;
+            }
+
+            $stats['attempted']++;
+            $result = $this->verifyAutomatically($row);
+            if ($result['ok'] && empty($result['skipped'])) {
+                $stats['passed']++;
+            } elseif (! ($result['skipped'] ?? false)) {
+                $stats['failed']++;
+            }
+        }
+
+        if ($stats['attempted'] > 0) {
+            Log::info('business.kyc.auto_identity_verify', [
+                'business_id' => $business->id,
+                'attempted' => $stats['attempted'],
+                'passed' => $stats['passed'],
+                'failed' => $stats['failed'],
+            ]);
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @return array{ok: bool, message: string, verification?: BusinessVerification, skipped?: bool}
+     */
+    private function runVerification(BusinessVerification $verification, ?int $adminId, ?string $dobOverride): array
     {
         if (! $verification->requiresMevonVerification()) {
             return ['ok' => false, 'message' => 'This verification type does not require Mevon identity check.'];
@@ -40,8 +114,8 @@ class BusinessKycMevonVerificationService
         }
 
         $identityNumber = $verification->extractSubmittedIdentityNumber();
-        if ($identityNumber === null) {
-            return ['ok' => false, 'message' => 'Could not read the submitted BVN/NIN number.'];
+        if ($identityNumber === null || strlen($identityNumber) !== 11) {
+            return ['ok' => false, 'message' => 'Could not read a valid 11-digit BVN/NIN from the submission.'];
         }
 
         $nameParts = $this->splitName((string) $business->name);
@@ -51,19 +125,26 @@ class BusinessKycMevonVerificationService
 
         $dob = $this->resolveDob($business, $dobOverride);
         if ($dob === null) {
-            return ['ok' => false, 'message' => 'Date of birth is required. Enter signatory DOB on the verify form or ensure the business profile has it.'];
+            return ['ok' => false, 'message' => 'Date of birth is required before Mevon verification can run.'];
+        }
+
+        if ($verification->verification_type === BusinessVerification::TYPE_BVN && ! $this->bvnVerify->isConfigured()) {
+            return ['ok' => false, 'message' => 'Mevon BVN verification is not configured.'];
+        }
+        if ($verification->verification_type === BusinessVerification::TYPE_NIN && ! $this->ninVerify->isConfigured()) {
+            return ['ok' => false, 'message' => 'Mevon NIN verification is not configured.'];
         }
 
         try {
             $providerResult = match ($verification->verification_type) {
-                BusinessVerification::TYPE_BVN => $this->verifyBvn($identityNumber, $dob, $nameParts['first'], $nameParts['last']),
-                BusinessVerification::TYPE_NIN => $this->verifyNin($identityNumber, $dob, $nameParts['first'], $nameParts['last']),
+                BusinessVerification::TYPE_BVN => $this->bvnVerify->verify($identityNumber, $dob, $nameParts['first'], $nameParts['last']),
+                BusinessVerification::TYPE_NIN => $this->ninVerify->verify($identityNumber, $dob, $nameParts['first'], $nameParts['last']),
                 default => throw new \RuntimeException('Unsupported verification type.'),
             };
         } catch (\Throwable $e) {
             $verification->update([
                 'provider_verified_at' => now(),
-                'provider_verified_by' => $admin->id,
+                'provider_verified_by' => $adminId,
                 'provider_verified_name' => null,
                 'provider_verify_reference' => null,
                 'provider_verify_status' => self::STATUS_FAILED,
@@ -85,7 +166,7 @@ class BusinessKycMevonVerificationService
 
             $verification->update([
                 'provider_verified_at' => now(),
-                'provider_verified_by' => $admin->id,
+                'provider_verified_by' => $adminId,
                 'provider_verified_name' => $providerName !== '' ? $providerName : null,
                 'provider_verify_reference' => (string) ($providerResult['reference'] ?? ''),
                 'provider_verify_status' => self::STATUS_FAILED,
@@ -98,11 +179,13 @@ class BusinessKycMevonVerificationService
 
         $verification->update([
             'provider_verified_at' => now(),
-            'provider_verified_by' => $admin->id,
+            'provider_verified_by' => $adminId,
             'provider_verified_name' => $providerName,
             'provider_verify_reference' => (string) ($providerResult['reference'] ?? ''),
             'provider_verify_status' => self::STATUS_PASSED,
-            'provider_verify_message' => 'Mevon verified identity and name match.',
+            'provider_verify_message' => $adminId === null
+                ? 'Mevon verified identity automatically.'
+                : 'Mevon verified identity and name match.',
             'provider_verify_payload' => $providerResult['raw'] ?? null,
         ]);
 
@@ -111,30 +194,6 @@ class BusinessKycMevonVerificationService
             'message' => 'Identity verified via Mevon. Registered name: '.$providerName,
             'verification' => $verification->fresh(),
         ];
-    }
-
-    /**
-     * @return array{reference: string, full_name: string, raw: array<string, mixed>}
-     */
-    private function verifyBvn(string $bvn, string $dob, string $firstName, string $lastName): array
-    {
-        if (! $this->bvnVerify->isConfigured()) {
-            throw new \RuntimeException('Mevon BVN verification is not configured.');
-        }
-
-        return $this->bvnVerify->verify($bvn, $dob, $firstName, $lastName);
-    }
-
-    /**
-     * @return array{reference: string, full_name: string, raw: array<string, mixed>}
-     */
-    private function verifyNin(string $nin, string $dob, string $firstName, string $lastName): array
-    {
-        if (! $this->ninVerify->isConfigured()) {
-            throw new \RuntimeException('Mevon NIN verification is not configured.');
-        }
-
-        return $this->ninVerify->verify($nin, $dob, $firstName, $lastName);
     }
 
     private function resolveDob(Business $business, ?string $override): ?string

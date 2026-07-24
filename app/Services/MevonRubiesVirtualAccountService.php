@@ -434,6 +434,15 @@ class MevonRubiesVirtualAccountService
      * @param  array<string, mixed>  $json
      * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
      */
+    public function parseVirtualAccountResponse(array $json): array
+    {
+        return $this->parseVaPayload($json);
+    }
+
+    /**
+     * @param  array<string, mixed>  $json
+     * @return array{account_number: string, account_name: string, bank_name: string, bank_code: string, reference: string, raw: array<string, mixed>}
+     */
     protected function parseVaPayload(array $json): array
     {
         $accountNumber = $this->rubiesVaField($json, 'account_number', 'accountNumber', 'nuban');

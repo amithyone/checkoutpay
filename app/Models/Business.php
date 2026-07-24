@@ -101,6 +101,9 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'rubies_business_bank_code',
         'rubies_business_reference',
         'rubies_business_account_created_at',
+        'rubies_account_provision_status',
+        'rubies_account_provision_error',
+        'rubies_account_provision_queued_at',
     ];
 
     protected $hidden = [
@@ -165,6 +168,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'card_payments_enabled' => 'boolean',
         'rubies_signatory_dob' => 'date',
         'rubies_business_account_created_at' => 'datetime',
+        'rubies_account_provision_queued_at' => 'datetime',
     ];
 
     /**

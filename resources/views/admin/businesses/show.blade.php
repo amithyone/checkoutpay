@@ -796,9 +796,28 @@
                             <div><span class="text-gray-600">CAC:</span> {{ $business->cac_registration_number }}</div>
                         @endif
                     </dl>
+                @elseif(in_array($business->rubies_account_provision_status, ['queued', 'processing'], true))
+                    <p class="text-sm text-blue-900">
+                        Pay-in account creation is in progress. Refresh shortly for account details.
+                        @if($business->rubies_account_provision_queued_at)
+                            (Queued {{ $business->rubies_account_provision_queued_at->diffForHumans() }})
+                        @endif
+                    </p>
+                @elseif($business->rubies_account_provision_status === 'failed')
+                    <div class="space-y-2">
+                        <p class="text-sm text-red-900">
+                            Pay-in account creation failed: {{ $business->rubies_account_provision_error ?? 'Unknown error' }}
+                        </p>
+                        <form method="POST" action="{{ route('admin.businesses.retry-pay-in-account', $business) }}">
+                            @csrf
+                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90">
+                                Retry account creation
+                            </button>
+                        </form>
+                    </div>
                 @else
                     <p class="text-sm text-amber-900">
-                        No Rubies business account on file yet. It is created automatically when the last KYC item is approved, if Mevon Rubies is configured and CAC + signatory DOB are present on the merchant profile (from CAC document submission).
+                        No pay-in account on file yet. After all KYC is approved and BVN/NIN identity is confirmed, account creation is queued automatically when profile details (CAC, phone, email, signatory DOB) are complete.
                     </p>
                 @endif
             </div>

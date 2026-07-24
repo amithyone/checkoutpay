@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Services\MavonPayTransferService;
 use App\Services\MevonPayBankService;
 use App\Services\MevonPayVirtualAccountService;
+use App\Services\MevonPay\MevonBvnVerifyService;
+use App\Services\MevonPay\MevonNinVerifyService;
+use App\Services\MevonPay\MevonPrivateAccountService;
 use App\Services\MevonRubiesVirtualAccountService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +21,9 @@ class TestMeveonController extends Controller
         private MevonPayBankService $bankService,
         private MavonPayTransferService $transferService,
         private MevonRubiesVirtualAccountService $rubiesService,
+        private MevonPrivateAccountService $privateAccountService,
+        private MevonBvnVerifyService $bvnVerifyService,
+        private MevonNinVerifyService $ninVerifyService,
     ) {}
 
     public function handle(Request $request): JsonResponse
@@ -25,7 +31,7 @@ class TestMeveonController extends Controller
         $this->authorizeRequest($request);
 
         $validated = $request->validate([
-            'action' => 'required|string|in:ping,createtempva,createdynamic,getBankList,nameEnquiry,createtransfer,createrubies_personal,createrubies_business,rubies_electricity_getInfo,rubies_electricity_verify,rubies_electricity_buy,rubies_cable_getInfo,rubies_cable_verify,rubies_cable_buy',
+            'action' => 'required|string|in:ping,createtempva,createdynamic,getBankList,nameEnquiry,createtransfer,createrubies_personal,createrubies_business,private_account_personal,private_account_business,bvn_verify,nin_verify,rubies_electricity_getInfo,rubies_electricity_verify,rubies_electricity_buy,rubies_cable_getInfo,rubies_cable_verify,rubies_cable_buy',
         ]);
 
         $action = (string) $validated['action'];
@@ -39,6 +45,10 @@ class TestMeveonController extends Controller
             'createtransfer' => $this->createTransfer($request),
             'createrubies_personal' => $this->createRubiesPersonal($request),
             'createrubies_business' => $this->createRubiesBusiness($request),
+            'private_account_personal' => $this->createPrivateAccountPersonal($request),
+            'private_account_business' => $this->createPrivateAccountBusiness($request),
+            'bvn_verify' => $this->verifyBvn($request),
+            'nin_verify' => $this->verifyNin($request),
             'rubies_electricity_getInfo' => $this->rubiesElectricityGetInfo(),
             'rubies_electricity_verify' => $this->rubiesElectricityVerify($request),
             'rubies_electricity_buy' => $this->rubiesElectricityBuy($request),
@@ -72,6 +82,10 @@ class TestMeveonController extends Controller
                 'createtransfer',
                 'createrubies_personal',
                 'createrubies_business',
+                'private_account_personal',
+                'private_account_business',
+                'bvn_verify',
+                'nin_verify',
                 'rubies_electricity_getInfo',
                 'rubies_electricity_verify',
                 'rubies_electricity_buy',
@@ -320,6 +334,197 @@ class TestMeveonController extends Controller
             'success' => true,
             'action' => 'createrubies_business',
             'provider_endpoint' => '/V1/createrubies',
+            'normalized' => $parsed,
+        ]);
+    }
+
+    private function createPrivateAccountPersonal(Request $request): JsonResponse
+    {
+        if (! $this->privateAccountService->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'action' => 'private_account_personal',
+                'message' => 'Mevon private account API is not configured.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'fname' => 'required|string|max:100',
+            'lname' => 'required|string|max:100',
+            'phone' => 'required|string|max:20',
+            'dob' => 'required|date_format:Y-m-d',
+            'email' => 'required|email|max:255',
+            'bvn' => 'nullable|string|max:30',
+            'nin' => 'nullable|string|max:30',
+        ]);
+
+        $bvn = trim((string) ($validated['bvn'] ?? ''));
+        $nin = trim((string) ($validated['nin'] ?? ''));
+        if ($bvn === '' && $nin === '') {
+            return response()->json([
+                'success' => false,
+                'action' => 'private_account_personal',
+                'message' => 'Provide bvn or nin for personal account creation.',
+            ], 422);
+        }
+
+        try {
+            $parsed = $this->privateAccountService->createPersonalAccount(
+                (string) $validated['fname'],
+                (string) $validated['lname'],
+                (string) $validated['phone'],
+                (string) $validated['dob'],
+                strtolower(trim((string) $validated['email'])),
+                $bvn !== '' ? $bvn : null,
+                $nin !== '' ? $nin : null,
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'action' => 'private_account_personal',
+                'provider_endpoint' => (string) config('services.mevonpay.private_account_path', '/V1/pivateaccount'),
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'action' => 'private_account_personal',
+            'provider_endpoint' => (string) config('services.mevonpay.private_account_path', '/V1/pivateaccount'),
+            'normalized' => $parsed,
+        ]);
+    }
+
+    private function createPrivateAccountBusiness(Request $request): JsonResponse
+    {
+        if (! $this->privateAccountService->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'action' => 'private_account_business',
+                'message' => 'Mevon private account API is not configured.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'business_name' => 'required|string|max:255',
+            'cac' => 'required|string|max:100',
+            'phone' => 'required|string|max:20',
+            'dob' => 'required|date_format:Y-m-d',
+            'email' => 'required|email|max:255',
+            'bvn' => 'nullable|string|max:30',
+            'nin' => 'nullable|string|max:30',
+        ]);
+
+        $bvn = trim((string) ($validated['bvn'] ?? ''));
+        $nin = trim((string) ($validated['nin'] ?? ''));
+
+        try {
+            $parsed = $this->privateAccountService->createBusinessAccount(
+                businessName: (string) $validated['business_name'],
+                cac: (string) $validated['cac'],
+                phoneLocal11: (string) $validated['phone'],
+                dobYmd: (string) $validated['dob'],
+                email: strtolower(trim((string) $validated['email'])),
+                bvn11: $bvn !== '' ? $bvn : null,
+                nin11: $nin !== '' ? $nin : null,
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'action' => 'private_account_business',
+                'provider_endpoint' => (string) config('services.mevonpay.private_account_path', '/V1/pivateaccount'),
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'action' => 'private_account_business',
+            'provider_endpoint' => (string) config('services.mevonpay.private_account_path', '/V1/pivateaccount'),
+            'normalized' => $parsed,
+        ]);
+    }
+
+    private function verifyBvn(Request $request): JsonResponse
+    {
+        if (! $this->bvnVerifyService->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'action' => 'bvn_verify',
+                'message' => 'Mevon BVN verify is not configured.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'bvn' => 'required|string|max:30',
+            'dob' => 'required|date_format:Y-m-d',
+            'firstName' => 'required|string|max:100',
+            'lastName' => 'required|string|max:100',
+        ]);
+
+        try {
+            $parsed = $this->bvnVerifyService->verify(
+                (string) $validated['bvn'],
+                (string) $validated['dob'],
+                (string) $validated['firstName'],
+                (string) $validated['lastName'],
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'action' => 'bvn_verify',
+                'provider_endpoint' => (string) config('services.mevonpay.bvn_verify_path', '/V1/bvn-verify'),
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'action' => 'bvn_verify',
+            'provider_endpoint' => (string) config('services.mevonpay.bvn_verify_path', '/V1/bvn-verify'),
+            'normalized' => $parsed,
+        ]);
+    }
+
+    private function verifyNin(Request $request): JsonResponse
+    {
+        if (! $this->ninVerifyService->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'action' => 'nin_verify',
+                'message' => 'Mevon NIN verify is not configured.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'idNumber' => 'required|string|max:30',
+            'dob' => 'required|date_format:Y-m-d',
+            'firstName' => 'required|string|max:100',
+            'lastName' => 'required|string|max:100',
+            'reference' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            $parsed = $this->ninVerifyService->verify(
+                (string) $validated['idNumber'],
+                (string) $validated['dob'],
+                (string) $validated['firstName'],
+                (string) $validated['lastName'],
+                isset($validated['reference']) ? (string) $validated['reference'] : null,
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'action' => 'nin_verify',
+                'provider_endpoint' => (string) config('services.mevonpay.nin_verify_path', '/V1/nin-verify'),
+                'message' => $e->getMessage(),
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'action' => 'nin_verify',
+            'provider_endpoint' => (string) config('services.mevonpay.nin_verify_path', '/V1/nin-verify'),
             'normalized' => $parsed,
         ]);
     }

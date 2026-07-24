@@ -53,8 +53,11 @@ return [
         'transfer_status_path' => env('MEVONPAY_TRANSFER_STATUS_PATH', '/V1/tsk'),
         /** Standalone NIN verify (₦50 / success). Used when Tier 2 personal KYC submits nin. */
         'nin_verify_path' => env('MEVONPAY_NIN_VERIFY_PATH', '/V1/nin-verify'),
-        /** Standalone BVN verify. Used for business KYC admin identity checks. */
+        /** Standalone BVN verify. Legacy — prefer private account queue for new flows. */
         'bvn_verify_path' => env('MEVONPAY_BVN_VERIFY_PATH', '/V1/bvn-verify'),
+        /** Permanent account creation (replaces sync createrubies for new provisioning). */
+        'private_account_path' => env('MEVONPAY_PRIVATE_ACCOUNT_PATH', '/V1/pivateaccount'),
+        'private_account_timeout_seconds' => (int) env('MEVONPAY_PRIVATE_ACCOUNT_TIMEOUT_SECONDS', 90),
         /** bearer (default for /V1/tsk), token (same as payout), or raw */
         'transfer_status_auth' => env('MEVONPAY_TRANSFER_STATUS_AUTH', 'bearer'),
         /** Merchant card checkout (Paga) — POST /V1/card_checkout */

@@ -11,7 +11,7 @@ use App\Models\EmailAccount;
 use App\Notifications\PeerLendingLenderProgramConfiguredNotification;
 use App\Services\Credit\OverdraftFundingService;
 use App\Services\Credit\OverdraftInstallmentService;
-use App\Services\MevonRubiesVirtualAccountService;
+use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\TransactionLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -936,7 +936,7 @@ class BusinessController extends Controller
     }
 
     // KYC Management Methods
-    public function approveVerification(Request $request, Business $business, BusinessVerification $verification, MevonRubiesVirtualAccountService $mevonRubies): RedirectResponse
+    public function approveVerification(Request $request, Business $business, BusinessVerification $verification, PrivateAccountProvisionService $provision): RedirectResponse
     {
         if (! auth('admin')->user()?->canDecideBusinessKyc()) {
             abort(403, 'You cannot approve business KYC.');
@@ -964,30 +964,13 @@ class BusinessController extends Controller
         $warning = null;
 
         if ($business->hasAllKycDocumentsApproved() && empty($business->rubies_business_account_number)) {
-            if (! $mevonRubies->isConfigured()) {
-                Log::warning('business.rubies_business_va.skipped_not_configured', ['business_id' => $business->id]);
-                $warning = 'Full KYC is approved, but Mevon Rubies is not configured — no business pay-in account was created.';
-            } elseif (trim((string) $business->cac_registration_number) === '' || $business->rubies_signatory_dob === null) {
-                $warning = 'Full KYC is approved, but CAC / RC number or signatory date of birth is missing. The merchant must submit CAC documents again with those fields, or you must set them before a Rubies pay-in account can be created.';
+            $result = $provision->dispatchBusinessIfReady($business);
+            if ($result['dispatched']) {
+                $success .= ' Pay-in account creation has been queued — refresh shortly for account details.';
+            } elseif (($result['missing'][0] ?? '') !== 'Pay-in account creation is already in progress.') {
+                $warning = 'Full KYC is approved, but pay-in account could not be queued: '.$result['message'];
             } else {
-                try {
-                    $va = $mevonRubies->createRubiesBusinessAccountForBusiness($business);
-                    $business->update([
-                        'rubies_business_account_number' => $va['account_number'] ?? null,
-                        'rubies_business_account_name' => $va['account_name'] ?? null,
-                        'rubies_business_bank_name' => $va['bank_name'] ?? null,
-                        'rubies_business_bank_code' => $va['bank_code'] ?? null,
-                        'rubies_business_reference' => $va['reference'] ?? null,
-                        'rubies_business_account_created_at' => now(),
-                    ]);
-                    $success .= ' Business pay-in bank account (Rubies) was created.';
-                } catch (\Throwable $e) {
-                    Log::warning('business.rubies_business_va.provision_failed', [
-                        'business_id' => $business->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                    $warning = 'Full KYC is approved, but creating the Rubies business pay-in account failed: '.$e->getMessage();
-                }
+                $success .= ' Pay-in account creation is already in progress.';
             }
         }
 
@@ -1019,6 +1002,23 @@ class BusinessController extends Controller
 
         return $this->verificationDecisionRedirect($request, $business)
             ->with('success', 'Verification rejected');
+    }
+
+    public function retryPayInAccount(Business $business, PrivateAccountProvisionService $provision): RedirectResponse
+    {
+        if (! auth('admin')->user()?->canDecideBusinessKyc()) {
+            abort(403, 'You cannot manage business pay-in accounts.');
+        }
+
+        $result = $provision->dispatchBusinessIfReady($business, forceRetry: true);
+
+        if ($result['dispatched']) {
+            return redirect()->route('admin.businesses.show', $business)
+                ->with('success', $result['message']);
+        }
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('warning', $result['message']);
     }
 
     private function verificationDecisionRedirect(Request $request, Business $business): RedirectResponse

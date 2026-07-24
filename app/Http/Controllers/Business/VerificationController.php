@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
 use App\Models\BusinessVerification;
+use App\Services\Admin\BusinessKycMevonVerificationService;
 use App\Services\BusinessRubiesKycAutoVerificationService;
 use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
@@ -54,6 +55,11 @@ class VerificationController extends Controller
         if ($auto['verified'] && $auto['attempted']) {
             return redirect()->route('business.verification.index')
                 ->with('success', 'Your permanent business pay-in account is ready. Details are shown below.');
+        }
+
+        if ($auto['attempted'] && ! $auto['skipped'] && $this->isProvisionProcessingMessage($auto['message'])) {
+            return redirect()->route('business.verification.index')
+                ->with('info', $auto['message']);
         }
 
         if ($auto['skipped'] && $auto['message'] === '') {
@@ -242,12 +248,31 @@ class VerificationController extends Controller
             'status' => BusinessVerification::STATUS_PENDING,
         ]);
 
+        $identityVerifyNote = null;
+        if ($verification->requiresMevonVerification()) {
+            $mevonVerify = app(BusinessKycMevonVerificationService::class);
+            if ($mevonVerify->isAvailable()) {
+                $identityResult = $mevonVerify->verifyAutomatically($verification->fresh());
+                $verification->refresh();
+                if ($identityResult['ok'] && empty($identityResult['skipped'])) {
+                    $identityVerifyNote = 'Identity verified automatically via Mevon.';
+                } elseif (! ($identityResult['skipped'] ?? false)) {
+                    $identityVerifyNote = 'Identity verification could not be completed yet: '.$identityResult['message'];
+                }
+            }
+        }
+
         $business->refresh();
         $auto = app(BusinessRubiesKycAutoVerificationService::class)->attemptAfterSubmission($business);
 
         if ($auto['verified'] && $auto['attempted']) {
             return redirect()->route('business.verification.index')
                 ->with('success', 'Verification complete. Your permanent business pay-in account is active — details are shown below.');
+        }
+
+        if ($auto['attempted'] && ! $auto['skipped'] && $this->isProvisionProcessingMessage($auto['message'])) {
+            return redirect()->route('business.verification.index')
+                ->with('info', $auto['message'].' Your submissions are saved.');
         }
 
         if ($auto['attempted'] && ! $auto['skipped'] && $auto['message'] !== '') {
@@ -265,6 +290,9 @@ class VerificationController extends Controller
         }
 
         $success = 'Verification document submitted successfully.';
+        if ($identityVerifyNote !== null) {
+            $success .= ' '.$identityVerifyNote;
+        }
         $business->refresh();
         if (! $business->hasAllRequiredKycDocuments()) {
             $success .= ' Submit the remaining required items to finish.';
@@ -333,6 +361,16 @@ class VerificationController extends Controller
             'cac_dob_required' => 'Enter your CAC / RC number and signatory date of birth in the pay-in section.',
             default => $message,
         };
+    }
+
+    private function isProvisionProcessingMessage(string $message): bool
+    {
+        $message = strtolower($message);
+
+        return str_contains($message, 'queued')
+            || str_contains($message, 'being created')
+            || str_contains($message, 'in progress')
+            || str_contains($message, 'refresh shortly');
     }
 
     /**
