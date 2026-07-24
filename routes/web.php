@@ -758,6 +758,7 @@ Route::get('/cron/process-emails', function () {
             'step1_fetch' => ['success' => false, 'message' => '', 'execution_time' => 0],
             'step2_fill_sender' => ['success' => false, 'message' => '', 'execution_time' => 0],
             'step3_match' => ['success' => false, 'message' => '', 'execution_time' => 0],
+            'step4_queue' => ['success' => false, 'message' => '', 'execution_time' => 0],
         ];
 
         // ============================================
@@ -1004,6 +1005,48 @@ Route::get('/cron/process-emails', function () {
             ];
         }
 
+        // ============================================
+        // STEP 4: Drain queued jobs (Tier 2 account provisioning, webhooks, etc.)
+        // ============================================
+        \Illuminate\Support\Facades\Log::info('STEP 4: Draining queued jobs');
+        $step4Start = microtime(true);
+        try {
+            $queueConnection = (string) config('queue.default', 'sync');
+            if ($queueConnection === 'sync') {
+                $results['step4_queue'] = [
+                    'success' => true,
+                    'message' => 'Skipped (QUEUE_CONNECTION=sync)',
+                    'execution_time' => round(microtime(true) - $step4Start, 2),
+                ];
+            } else {
+                \Illuminate\Support\Facades\Artisan::call('queue:work', [
+                    'connection' => $queueConnection,
+                    '--stop-when-empty' => true,
+                    '--max-jobs' => 10,
+                    '--max-time' => 55,
+                    '--timeout' => 120,
+                    '--tries' => 3,
+                ]);
+                $step4Output = trim(\Illuminate\Support\Facades\Artisan::output());
+                $results['step4_queue'] = [
+                    'success' => true,
+                    'message' => 'Queued jobs processed',
+                    'execution_time' => round(microtime(true) - $step4Start, 2),
+                    'connection' => $queueConnection,
+                    'output' => $step4Output !== '' ? $step4Output : null,
+                ];
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('STEP 4 failed: Queue drain', [
+                'error' => $e->getMessage(),
+            ]);
+            $results['step4_queue'] = [
+                'success' => false,
+                'message' => 'Error: '.$e->getMessage(),
+                'execution_time' => round(microtime(true) - $step4Start, 2),
+            ];
+        }
+
         $totalExecutionTime = round(microtime(true) - $overallStartTime, 2);
 
         \Illuminate\Support\Facades\Log::info('Master email processing cron completed', [
@@ -1011,11 +1054,12 @@ Route::get('/cron/process-emails', function () {
             'step1' => $results['step1_fetch']['success'],
             'step2' => $results['step2_fill_sender']['success'],
             'step3' => $results['step3_match']['success'],
+            'step4' => $results['step4_queue']['success'],
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Email processing completed (3 steps)',
+            'message' => 'Email processing completed (4 steps)',
             'method' => 'process_emails_master',
             'timestamp' => now()->toDateTimeString(),
             'total_execution_time_seconds' => $totalExecutionTime,
