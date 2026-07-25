@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Pre-push: allow push, then remind to keep the repo private (Git has no post-push hook).
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+REMINDER="$ROOT/.githooks/remind-repo-private.sh"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  :
+done
+
+if [[ -x "$REMINDER" ]]; then
+  (
+    # pre-push returns before the remote push finishes; brief wait then remind.
+    sleep 2
+    "$REMINDER"
+  ) &
+fi
+
+exit 0

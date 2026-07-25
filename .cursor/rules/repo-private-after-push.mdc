@@ -1,0 +1,15 @@
+---
+description: After git push to checkoutpay, remind user to keep GitHub repo private
+alwaysApply: true
+---
+
+# checkoutpay — private repo reminder
+
+After any successful `git push` to **amithyone/checkoutpay** (or when the user asks to push):
+
+1. Tell the user to confirm the repo is **Private** on GitHub.
+2. Link: https://github.com/amithyone/checkoutpay/settings → **General** → **Danger zone** → **Change repository visibility** → **Private**.
+
+Do this every time after a push completes, even if they did not ask. One short sentence is enough unless they are deploying.
+
+Project git hooks (after `scripts/setup-git-hooks.sh`) also print a terminal reminder on push.

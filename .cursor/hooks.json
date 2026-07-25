@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterShellExecution": [
+      {
+        "command": ".cursor/hooks/remind-repo-private-after-push.sh",
+        "matcher": "git push"
+      }
+    ]
+  }
+}
