@@ -241,6 +241,37 @@ class PrivateAccountJobTest extends TestCase
         Queue::assertPushed(CreatePersonalPrivateAccountJob::class);
     }
 
+    public function test_dispatch_from_stored_kyc_uses_wallet_fields_without_clearing_names(): void
+    {
+        Queue::fake();
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348011112222',
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'balance' => 0,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'kyc_fname' => 'Ada',
+            'kyc_lname' => 'Okonkwo',
+            'kyc_dob' => '1991-08-20',
+            'kyc_email' => 'ada@example.com',
+            'kyc_bvn' => '11223344556',
+            'kyc_gender' => 'female',
+            'rubies_account_type' => 'personal',
+        ]);
+
+        $mock = Mockery::mock(MevonPrivateAccountService::class);
+        $mock->shouldReceive('isConfigured')->andReturn(true);
+        $this->app->instance(MevonPrivateAccountService::class, $mock);
+
+        $result = app(PrivateAccountProvisionService::class)->dispatchPersonalFromStoredKyc($wallet);
+
+        $this->assertTrue($result['dispatched']);
+        $wallet->refresh();
+        $this->assertSame('Ada', $wallet->kyc_fname);
+        $this->assertSame('Okonkwo', $wallet->kyc_lname);
+        Queue::assertPushed(CreatePersonalPrivateAccountJob::class);
+    }
+
     public function test_personal_job_permanent_failure_resets_tier_for_app_retry(): void
     {
         $wallet = WhatsappWallet::query()->create([

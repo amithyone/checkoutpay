@@ -13,7 +13,9 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWalletPushNotificationService;
+use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
+use App\Services\Whatsapp\WhatsappWalletCountryResolver;
 use App\Services\Whatsapp\WhatsappWalletRegionConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,6 +30,8 @@ class WhatsappWalletAdminController extends Controller
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private ConsumerWalletPushNotificationService $walletPush,
         private ConsumerDeviceTrustService $deviceTrust,
+        private PrivateAccountProvisionService $privateAccountProvision,
+        private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
     public function index(): View
@@ -135,6 +139,12 @@ class WhatsappWalletAdminController extends Controller
                 ->count();
         }
 
+        $isNigeriaWallet = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
+        $kycProvisionConfigured = $this->privateAccountProvision->isConfigured();
+        $kycPersonalReadiness = $isNigeriaWallet
+            ? $this->privateAccountProvision->personalReadiness($wallet)
+            : ['ready' => false, 'missing' => ['Tier 2 Rubies accounts are only for Nigeria wallet numbers.']];
+
         return view('admin.whatsapp-wallet.wallets.show', [
             'wallet' => $wallet,
             'recentTx' => $recentTx,
@@ -151,7 +161,48 @@ class WhatsappWalletAdminController extends Controller
             'pendingStepUpSessions' => $pendingStepUpSessions,
             'referralAsReferred' => $wallet->referralAsReferred,
             'referralsMadeCount' => $wallet->referralsAsReferrer->count(),
+            'isNigeriaWallet' => $isNigeriaWallet,
+            'kycProvisionConfigured' => $kycProvisionConfigured,
+            'kycPersonalReadiness' => $kycPersonalReadiness,
         ]);
+    }
+
+    public function queueWalletPayInAccount(WhatsappWallet $wallet): RedirectResponse
+    {
+        if (! auth('admin')->user()?->canMutateWalletAccounts()) {
+            abort(403, 'You cannot queue wallet pay-in accounts.');
+        }
+
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'Rubies pay-in accounts are only available for Nigeria wallet numbers.');
+        }
+
+        $result = $this->privateAccountProvision->dispatchPersonalFromStoredKyc($wallet);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with($result['dispatched'] ? 'success' : 'warning', $result['message']);
+    }
+
+    public function retryWalletPayInAccount(WhatsappWallet $wallet): RedirectResponse
+    {
+        if (! auth('admin')->user()?->canMutateWalletAccounts()) {
+            abort(403, 'You cannot retry wallet pay-in accounts.');
+        }
+
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'Rubies pay-in accounts are only available for Nigeria wallet numbers.');
+        }
+
+        $result = $this->privateAccountProvision->dispatchPersonalFromStoredKyc($wallet, forceRetry: true);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with($result['dispatched'] ? 'success' : 'warning', $result['message']);
     }
 
     public function revokeTrustedDevice(WhatsappWallet $wallet, int $device): RedirectResponse

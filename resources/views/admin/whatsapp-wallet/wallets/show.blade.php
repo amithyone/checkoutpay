@@ -21,6 +21,9 @@
     @if(session('error'))
         <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg text-sm">{{ session('error') }}</div>
     @endif
+    @if(session('warning'))
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-sm">{{ session('warning') }}</div>
+    @endif
 
     <div class="flex flex-wrap items-center gap-3">
         <a href="{{ route('admin.whatsapp-wallet.wallets.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
@@ -148,6 +151,159 @@
                     </div>
                 @endif
             </dl>
+
+            @if($isNigeriaWallet ?? false)
+                @php
+                    $provisionStatus = (string) ($wallet->private_account_provision_status ?? '');
+                    $hasPayIn = trim((string) $wallet->mevon_virtual_account_number) !== '';
+                    $kycReady = ($kycPersonalReadiness['ready'] ?? false) === true;
+                    $kycMissing = $kycPersonalReadiness['missing'] ?? [];
+                    $bvnDigits = preg_replace('/\D+/', '', (string) $wallet->kyc_bvn) ?? '';
+                    $ninDigits = preg_replace('/\D+/', '', (string) $wallet->kyc_nin) ?? '';
+                    $provisionBadge = match ($provisionStatus) {
+                        'queued', 'processing' => 'bg-blue-100 text-blue-900',
+                        'completed', '' => $hasPayIn ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700',
+                        'failed' => 'bg-red-100 text-red-800',
+                        default => 'bg-gray-100 text-gray-700',
+                    };
+                    $provisionLabel = match (true) {
+                        $hasPayIn => 'Completed',
+                        $provisionStatus === 'queued' => 'Queued',
+                        $provisionStatus === 'processing' => 'Processing',
+                        $provisionStatus === 'failed' => 'Failed',
+                        default => 'Not started',
+                    };
+                @endphp
+                <div class="mt-4 p-4 rounded-lg border {{ $hasPayIn ? 'bg-green-50 border-green-200' : ($provisionStatus === 'failed' ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-200') }}">
+                    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <h3 class="text-sm font-semibold text-gray-900">
+                            <i class="fas fa-id-card mr-1"></i> Tier 2 KYC &amp; Rubies pay-in (Mevon)
+                        </h3>
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium {{ $provisionBadge }}">{{ $provisionLabel }}</span>
+                    </div>
+
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4">
+                        <div>
+                            <dt class="text-gray-500">Account type</dt>
+                            <dd class="capitalize">{{ $wallet->rubies_account_type ?? 'personal' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">KYC verified at</dt>
+                            <dd>{{ $wallet->kyc_verified_at?->format('M j, Y H:i') ?? '—' }}</dd>
+                        </div>
+                        @if(($wallet->rubies_account_type ?? 'personal') === 'business')
+                            <div class="sm:col-span-2">
+                                <dt class="text-gray-500">CAC</dt>
+                                <dd class="font-mono">{{ $wallet->kyc_cac ?? '—' }}</dd>
+                            </div>
+                        @endif
+                        <div>
+                            <dt class="text-gray-500">First name</dt>
+                            <dd>{{ $wallet->kyc_fname ?? '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">Last name</dt>
+                            <dd>{{ $wallet->kyc_lname ?? '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">Date of birth</dt>
+                            <dd>{{ $wallet->kyc_dob?->format('Y-m-d') ?? '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">Gender</dt>
+                            <dd class="capitalize">{{ $wallet->kyc_gender ?? '—' }}</dd>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <dt class="text-gray-500">Email</dt>
+                            <dd>{{ $wallet->kyc_email ?? '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">BVN</dt>
+                            <dd class="font-mono">{{ strlen($bvnDigits) === 11 ? ('*******'.substr($bvnDigits, -4)) : '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-gray-500">NIN</dt>
+                            <dd class="font-mono">{{ strlen($ninDigits) === 11 ? ('*******'.substr($ninDigits, -4)) : '—' }}</dd>
+                        </div>
+                        @if($wallet->private_account_provision_queued_at)
+                            <div>
+                                <dt class="text-gray-500">Queue started</dt>
+                                <dd>{{ $wallet->private_account_provision_queued_at->format('M j, Y H:i') }}
+                                    <span class="text-gray-500">({{ $wallet->private_account_provision_queued_at->diffForHumans() }})</span>
+                                </dd>
+                            </div>
+                        @endif
+                        @if($wallet->tier2_provisioned_at)
+                            <div>
+                                <dt class="text-gray-500">Account provisioned</dt>
+                                <dd>{{ $wallet->tier2_provisioned_at->format('M j, Y H:i') }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+
+                    @if($hasPayIn)
+                        <dl class="text-sm space-y-1 mb-2 bg-white/60 rounded-lg p-3 border border-green-100">
+                            <div><span class="text-gray-600">Account number:</span> <span class="font-mono font-semibold">{{ $wallet->mevon_virtual_account_number }}</span></div>
+                            <div><span class="text-gray-600">Bank:</span> {{ $wallet->mevon_bank_name ?? 'Rubies MFB' }} @if($wallet->mevon_bank_code)<span class="text-gray-500">({{ $wallet->mevon_bank_code }})</span>@endif</div>
+                            @if($wallet->mevon_account_name)
+                                <div><span class="text-gray-600">Account name:</span> {{ $wallet->mevon_account_name }}</div>
+                            @endif
+                            @if($wallet->mevon_reference)
+                                <div><span class="text-gray-600">Reference:</span> <span class="font-mono text-xs">{{ $wallet->mevon_reference }}</span></div>
+                            @endif
+                        </dl>
+                    @elseif(in_array($provisionStatus, ['queued', 'processing'], true))
+                        <p class="text-sm text-blue-900 mb-2">
+                            Mevon identity verify + permanent account creation is in progress.
+                            Jobs run on the email/cron queue (Step 4). Refresh this page in a minute.
+                        </p>
+                    @elseif($provisionStatus === 'failed')
+                        <p class="text-sm text-red-900 mb-2">
+                            Account creation failed: {{ $wallet->private_account_provision_error ?? 'Unknown error' }}
+                        </p>
+                    @elseif(!$kycReady && $kycMissing !== [])
+                        <p class="text-sm text-amber-900 mb-2">Missing before queueing:</p>
+                        <ul class="text-sm text-amber-900 list-disc list-inside mb-2 space-y-0.5">
+                            @foreach($kycMissing as $item)
+                                <li>{{ $item }}</li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-sm text-gray-700 mb-2">
+                            KYC is on file. Queue Mevon BVN/NIN verify and Rubies account creation when ready.
+                        </p>
+                    @endif
+
+                    @if(!($kycProvisionConfigured ?? false))
+                        <p class="text-xs text-red-800 bg-red-50 border border-red-100 rounded px-2 py-1.5 mb-2">
+                            Mevon private account API is not configured (<code class="bg-red-100 px-1 rounded">MEVONPAY_PRIVATE_ACCOUNT_PATH</code> / credentials).
+                        </p>
+                    @endif
+
+                    @if(auth('admin')->user()?->canMutateWalletAccounts() && ! $hasPayIn)
+                        <div class="flex flex-wrap gap-2 pt-2 border-t border-black/5">
+                            @if($provisionStatus === 'failed')
+                                <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.retry-pay-in-account', $wallet) }}">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90"
+                                        onclick="return confirm('Retry Mevon verify + Rubies account for {{ $wallet->phone_e164 }}?')">
+                                        <i class="fas fa-redo mr-1"></i> Retry account creation
+                                    </button>
+                                </form>
+                            @elseif(! in_array($provisionStatus, ['queued', 'processing'], true))
+                                <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.queue-pay-in-account', $wallet) }}">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700"
+                                        @disabled(! ($kycProvisionConfigured ?? false) || ! $kycReady)
+                                        onclick="return confirm('Queue Mevon verify + Rubies pay-in account for {{ $wallet->phone_e164 }}?')">
+                                        <i class="fas fa-paper-plane mr-1"></i> Queue pay-in account (Mevon)
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @endif
 
             <div class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
                 <a href="{{ route('admin.whatsapp-wallet.transactions.index', ['wallet_id' => $wallet->id]) }}"

@@ -298,6 +298,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::put('whatsapp-wallet/wallets/{wallet}/link-business', [WhatsappWalletAdminController::class, 'linkBusiness'])->name('whatsapp-wallet.wallets.link-business');
             Route::put('whatsapp-wallet/wallets/{wallet}/bot-pause', [WhatsappWalletAdminController::class, 'updateWalletBotPause'])->name('whatsapp-wallet.wallets.bot-pause');
             Route::post('whatsapp-wallet/wallets/{wallet}/transfer-lock/clear', [WhatsappWalletAdminController::class, 'clearTransferLock'])->name('whatsapp-wallet.wallets.transfer-lock.clear');
+            Route::post('whatsapp-wallet/wallets/{wallet}/queue-pay-in-account', [WhatsappWalletAdminController::class, 'queueWalletPayInAccount'])->name('whatsapp-wallet.wallets.queue-pay-in-account');
+            Route::post('whatsapp-wallet/wallets/{wallet}/retry-pay-in-account', [WhatsappWalletAdminController::class, 'retryWalletPayInAccount'])->name('whatsapp-wallet.wallets.retry-pay-in-account');
 
             Route::put('business-name-registrations/{registration}/status', [BusinessNameRegistrationAdminController::class, 'updateStatus'])
                 ->name('business-name-registrations.status');

@@ -248,19 +248,26 @@ final class PrivateAccountProvisionService
             }
         }
 
-        $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? '')) ?? '';
-        $nin = preg_replace('/\D+/', '', (string) ($input['nin'] ?? '')) ?? '';
+        $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? $wallet->kyc_bvn ?? '')) ?? '';
+        $nin = preg_replace('/\D+/', '', (string) ($input['nin'] ?? $wallet->kyc_nin ?? '')) ?? '';
         $useBvn = strlen($bvn) === 11;
+        $useNin = ! $useBvn && strlen($nin) === 11;
+
+        $fname = trim((string) ($input['fname'] ?? $wallet->kyc_fname ?? ''));
+        $lname = trim((string) ($input['lname'] ?? $wallet->kyc_lname ?? ''));
+        $gender = strtolower(trim((string) ($input['gender'] ?? $wallet->kyc_gender ?? '')));
+        $dob = (string) ($input['dob'] ?? optional($wallet->kyc_dob)?->format('Y-m-d') ?? '');
+        $email = strtolower(trim((string) ($input['email'] ?? $wallet->kyc_email ?? '')));
 
         $wallet->update([
             'tier' => WhatsappWallet::TIER_RUBIES_VA,
-            'kyc_fname' => trim((string) ($input['fname'] ?? '')),
-            'kyc_lname' => trim((string) ($input['lname'] ?? '')),
-            'kyc_gender' => strtolower(trim((string) ($input['gender'] ?? ''))),
-            'kyc_dob' => (string) ($input['dob'] ?? ''),
+            'kyc_fname' => $fname !== '' ? $fname : null,
+            'kyc_lname' => $lname !== '' ? $lname : null,
+            'kyc_gender' => in_array($gender, ['male', 'female'], true) ? $gender : null,
+            'kyc_dob' => $dob !== '' ? $dob : null,
             'kyc_bvn' => $useBvn ? $bvn : null,
-            'kyc_nin' => ! $useBvn && strlen($nin) === 11 ? $nin : null,
-            'kyc_email' => strtolower(trim((string) ($input['email'] ?? ''))),
+            'kyc_nin' => $useNin ? $nin : null,
+            'kyc_email' => $email !== '' ? $email : null,
             'kyc_verified_at' => now(),
             'rubies_account_type' => 'personal',
             'private_account_provision_status' => self::STATUS_QUEUED,
@@ -276,6 +283,46 @@ final class PrivateAccountProvisionService
             'dispatched' => true,
             'message' => 'Account is being created. Check back shortly.',
         ];
+    }
+
+    /**
+     * Queue Mevon /V1/pivateaccount using KYC already stored on the wallet (admin retry / manual push).
+     *
+     * @return array{dispatched: bool, message: string, missing?: list<string>}
+     */
+    public function dispatchPersonalFromStoredKyc(WhatsappWallet $wallet, bool $forceRetry = false): array
+    {
+        $wallet->refresh();
+
+        if (($wallet->rubies_account_type ?? 'personal') === 'business') {
+            $bvn = preg_replace('/\D+/', '', (string) $wallet->kyc_bvn) ?? '';
+
+            return $this->dispatchPersonalBusinessIfReady($wallet, [
+                'cac' => (string) ($wallet->kyc_cac ?? ''),
+                'dob' => optional($wallet->kyc_dob)?->format('Y-m-d') ?? '',
+                'email' => (string) ($wallet->kyc_email ?? ''),
+                'bvn' => $bvn,
+                'fname' => (string) ($wallet->kyc_fname ?? ''),
+                'lname' => (string) ($wallet->kyc_lname ?? ''),
+                'business_name' => trim((string) ($wallet->kyc_cac ?? '')) !== ''
+                    ? (string) $wallet->kyc_cac
+                    : trim((string) ($wallet->kyc_fname ?? '').' '.(string) ($wallet->kyc_lname ?? '')),
+            ], $forceRetry);
+        }
+
+        $bvn = preg_replace('/\D+/', '', (string) $wallet->kyc_bvn) ?? '';
+        $nin = preg_replace('/\D+/', '', (string) $wallet->kyc_nin) ?? '';
+        $useBvn = strlen($bvn) === 11;
+
+        return $this->dispatchPersonalIfReady($wallet, [
+            'fname' => (string) ($wallet->kyc_fname ?? ''),
+            'lname' => (string) ($wallet->kyc_lname ?? ''),
+            'dob' => optional($wallet->kyc_dob)?->format('Y-m-d') ?? '',
+            'email' => (string) ($wallet->kyc_email ?? ''),
+            'gender' => (string) ($wallet->kyc_gender ?? ''),
+            'bvn' => $useBvn ? $bvn : null,
+            'nin' => ! $useBvn && strlen($nin) === 11 ? $nin : null,
+        ], $forceRetry);
     }
 
     /**
