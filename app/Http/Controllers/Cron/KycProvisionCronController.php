@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
 
 class KycProvisionCronController extends Controller
 {
-    public function process(Request $request): JsonResponse
+    public function process(Request $request, PrivateAccountProvisionService $provision): JsonResponse
     {
         if ($response = $this->authorizeCron($request)) {
             return $response;
@@ -36,15 +36,17 @@ class KycProvisionCronController extends Controller
 
         $before = $this->pendingCounts();
 
+        $redispatch = $provision->redispatchOrphanedQueued();
+
         $queueOutput = null;
         $queueError = null;
 
         try {
             Artisan::call('queue:work', [
                 'connection' => $queueConnection,
-                '--queue' => PrivateAccountProvisionService::QUEUE_KYC_PROVISION.',default',
+                '--queue' => PrivateAccountProvisionService::QUEUE_KYC_PROVISION,
                 '--stop-when-empty' => true,
-                '--max-jobs' => 25,
+                '--max-jobs' => 10,
                 '--max-time' => 110,
                 '--timeout' => 120,
                 '--tries' => 3,
@@ -66,7 +68,8 @@ class KycProvisionCronController extends Controller
             'timestamp' => now()->toDateTimeString(),
             'execution_time_seconds' => round(microtime(true) - $start, 2),
             'queue_connection' => $queueConnection,
-            'queue' => PrivateAccountProvisionService::QUEUE_KYC_PROVISION.',default',
+            'queue' => PrivateAccountProvisionService::QUEUE_KYC_PROVISION,
+            'redispatch' => $redispatch,
             'before' => $before,
             'after' => $after,
             'jobs_processed_hint' => max(0, $before['jobs_in_table'] - $after['jobs_in_table']),

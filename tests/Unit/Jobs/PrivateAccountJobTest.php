@@ -65,6 +65,17 @@ class PrivateAccountJobTest extends TestCase
             $table->softDeletes();
         });
 
+        Schema::connection('sqlite')->dropIfExists('jobs');
+        Schema::connection('sqlite')->create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue');
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
         Schema::connection('sqlite')->dropIfExists('whatsapp_wallets');
         Schema::connection('sqlite')->create('whatsapp_wallets', function (Blueprint $table) {
             $table->id();
@@ -269,6 +280,34 @@ class PrivateAccountJobTest extends TestCase
         $wallet->refresh();
         $this->assertSame('Ada', $wallet->kyc_fname);
         $this->assertSame('Okonkwo', $wallet->kyc_lname);
+        Queue::assertPushed(CreatePersonalPrivateAccountJob::class);
+    }
+
+    public function test_redispatch_orphaned_queued_wallet_pushes_missing_job(): void
+    {
+        Queue::fake();
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348022334455',
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'balance' => 0,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'kyc_fname' => 'Tunde',
+            'kyc_lname' => 'Balogun',
+            'kyc_dob' => '1989-04-12',
+            'kyc_email' => 'tunde@example.com',
+            'kyc_bvn' => '55667788990',
+            'kyc_gender' => 'male',
+            'private_account_provision_status' => PrivateAccountProvisionService::STATUS_QUEUED,
+        ]);
+
+        $mock = Mockery::mock(MevonPrivateAccountService::class);
+        $mock->shouldReceive('isConfigured')->andReturn(true);
+        $this->app->instance(MevonPrivateAccountService::class, $mock);
+
+        $out = app(PrivateAccountProvisionService::class)->redispatchOrphanedQueued();
+
+        $this->assertSame(1, $out['wallet_count']);
         Queue::assertPushed(CreatePersonalPrivateAccountJob::class);
     }
 

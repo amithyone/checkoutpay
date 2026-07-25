@@ -886,8 +886,7 @@
                 </div>
                 <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/process-kyc-queue') }}</code>
                 <p class="text-xs text-gray-600 mt-2">
-                    <strong>Runs queued Tier 2 jobs:</strong> Mevon BVN/NIN verify + permanent Rubies account creation for wallet and business KYC.
-                    Requires <code class="bg-gray-100 px-1 rounded">QUEUE_CONNECTION=database</code> and Mevon credentials.
+                    <strong>Runs only Tier 2 KYC jobs</strong> (Mevon verify + Rubies account). Re-queues wallets stuck as “queued” with no job in the database, then processes the <code class="bg-gray-100 px-1 rounded">kyc-provision</code> queue.
                 </p>
                 @php
                     $kycPending = (int) ($stats['kyc_provision']['pending_total'] ?? 0);

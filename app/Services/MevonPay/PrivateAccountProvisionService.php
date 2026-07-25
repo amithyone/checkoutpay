@@ -8,7 +8,9 @@ use App\Models\Business;
 use App\Models\BusinessVerification;
 use App\Models\WhatsappWallet;
 use App\Services\Admin\BusinessKycMevonVerificationService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Gate checks and queue dispatch for Mevon /V1/pivateaccount provisioning.
@@ -417,5 +419,202 @@ final class PrivateAccountProvisionService
             'dispatched' => true,
             'message' => 'Account is being created. Check back shortly.',
         ];
+    }
+
+    /**
+     * Wallets/businesses marked queued but with no row in `jobs` (lost dispatch) get a fresh job pushed.
+     *
+     * @return array{wallet_count: int, business_count: int, wallets: list<array{wallet_id: int, phone: string}>, businesses: list<array{business_id: int, name: string}>}
+     */
+    public function redispatchOrphanedQueued(): array
+    {
+        $out = [
+            'wallet_count' => 0,
+            'business_count' => 0,
+            'wallets' => [],
+            'businesses' => [],
+        ];
+
+        if (Schema::hasColumn('whatsapp_wallets', 'private_account_provision_status')) {
+            WhatsappWallet::query()
+                ->where('private_account_provision_status', self::STATUS_QUEUED)
+                ->where(function ($q): void {
+                    $q->whereNull('mevon_virtual_account_number')
+                        ->orWhere('mevon_virtual_account_number', '');
+                })
+                ->orderBy('id')
+                ->each(function (WhatsappWallet $wallet) use (&$out): void {
+                    $result = $this->requeuePersonalJobIfMissing($wallet);
+                    if ($result['dispatched']) {
+                        $out['wallet_count']++;
+                        $out['wallets'][] = [
+                            'wallet_id' => $wallet->id,
+                            'phone' => (string) $wallet->phone_e164,
+                        ];
+                    }
+                });
+        }
+
+        if (Schema::hasColumn('businesses', 'rubies_account_provision_status')) {
+            Business::query()
+                ->where('rubies_account_provision_status', self::STATUS_QUEUED)
+                ->where(function ($q): void {
+                    $q->whereNull('rubies_business_account_number')
+                        ->orWhere('rubies_business_account_number', '');
+                })
+                ->orderBy('id')
+                ->each(function (Business $business) use (&$out): void {
+                    $result = $this->requeueBusinessJobIfMissing($business);
+                    if ($result['dispatched']) {
+                        $out['business_count']++;
+                        $out['businesses'][] = [
+                            'business_id' => $business->id,
+                            'name' => (string) $business->name,
+                        ];
+                    }
+                });
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{dispatched: bool, message: string, missing?: list<string>}
+     */
+    public function requeuePersonalJobIfMissing(WhatsappWallet $wallet): array
+    {
+        $wallet->refresh();
+
+        if (trim((string) $wallet->mevon_virtual_account_number) !== '') {
+            return ['dispatched' => false, 'message' => 'Permanent account already exists.'];
+        }
+
+        $status = (string) ($wallet->private_account_provision_status ?? '');
+        if ($status === self::STATUS_PROCESSING) {
+            return ['dispatched' => false, 'message' => 'Account creation is already processing.'];
+        }
+
+        if ($this->hasPendingPersonalAccountJob($wallet->id)) {
+            return ['dispatched' => false, 'message' => 'Job already in queue.'];
+        }
+
+        if ($status === self::STATUS_FAILED) {
+            return $this->dispatchPersonalFromStoredKyc($wallet, forceRetry: true);
+        }
+
+        $readiness = $this->personalReadiness($wallet);
+        $blocking = array_values(array_filter(
+            $readiness['missing'],
+            fn (string $item) => $item !== 'Account creation is already in progress.'
+        ));
+        if ($blocking !== []) {
+            return [
+                'dispatched' => false,
+                'message' => implode(' ', $blocking),
+                'missing' => $blocking,
+            ];
+        }
+
+        $options = [];
+        if (($wallet->rubies_account_type ?? 'personal') === 'business') {
+            $cac = strtoupper(trim((string) ($wallet->kyc_cac ?? '')));
+            $options = [
+                'account_kind' => 'business',
+                'business_name' => $cac !== '' ? $cac : trim((string) ($wallet->kyc_fname ?? '').' '.(string) ($wallet->kyc_lname ?? '')),
+                'cac' => $cac,
+            ];
+        }
+
+        CreatePersonalPrivateAccountJob::dispatch($wallet->id, $options);
+
+        $wallet->update([
+            'private_account_provision_status' => self::STATUS_QUEUED,
+            'private_account_provision_error' => null,
+            'private_account_provision_queued_at' => now(),
+        ]);
+
+        Log::info('private_account.personal_requeued', ['wallet_id' => $wallet->id]);
+
+        return ['dispatched' => true, 'message' => 'Job re-queued.'];
+    }
+
+    /**
+     * @return array{dispatched: bool, message: string, missing?: list<string>}
+     */
+    public function requeueBusinessJobIfMissing(Business $business): array
+    {
+        $business->refresh();
+
+        if (trim((string) $business->rubies_business_account_number) !== '') {
+            return ['dispatched' => false, 'message' => 'Pay-in account already exists.'];
+        }
+
+        $status = (string) ($business->rubies_account_provision_status ?? '');
+        if ($status === self::STATUS_PROCESSING) {
+            return ['dispatched' => false, 'message' => 'Pay-in account creation is already processing.'];
+        }
+
+        if ($this->hasPendingBusinessAccountJob($business->id)) {
+            return ['dispatched' => false, 'message' => 'Job already in queue.'];
+        }
+
+        if ($status === self::STATUS_FAILED) {
+            return $this->dispatchBusinessIfReady($business, forceRetry: true);
+        }
+
+        $readiness = $this->businessReadiness($business);
+        $blocking = array_values(array_filter(
+            $readiness['missing'],
+            fn (string $item) => $item !== 'Pay-in account creation is already in progress.'
+        ));
+        if ($blocking !== []) {
+            return [
+                'dispatched' => false,
+                'message' => implode(' ', $blocking),
+                'missing' => $blocking,
+            ];
+        }
+
+        $business->update([
+            'rubies_account_provision_status' => self::STATUS_QUEUED,
+            'rubies_account_provision_error' => null,
+            'rubies_account_provision_queued_at' => now(),
+        ]);
+
+        CreateBusinessPrivateAccountJob::dispatch($business->id);
+
+        Log::info('private_account.business_requeued', ['business_id' => $business->id]);
+
+        return ['dispatched' => true, 'message' => 'Job re-queued.'];
+    }
+
+    public function hasPendingPersonalAccountJob(int $walletId): bool
+    {
+        if (! Schema::hasTable('jobs')) {
+            return false;
+        }
+
+        return DB::table('jobs')
+            ->where('payload', 'like', '%'.CreatePersonalPrivateAccountJob::class.'%')
+            ->where(function ($q) use ($walletId): void {
+                $q->where('payload', 'like', '%walletId";i:'.$walletId.';%')
+                    ->orWhere('payload', 'like', '%walletId\";i:'.$walletId.';%');
+            })
+            ->exists();
+    }
+
+    public function hasPendingBusinessAccountJob(int $businessId): bool
+    {
+        if (! Schema::hasTable('jobs')) {
+            return false;
+        }
+
+        return DB::table('jobs')
+            ->where('payload', 'like', '%'.CreateBusinessPrivateAccountJob::class.'%')
+            ->where(function ($q) use ($businessId): void {
+                $q->where('payload', 'like', '%businessId";i:'.$businessId.';%')
+                    ->orWhere('payload', 'like', '%businessId\";i:'.$businessId.';%');
+            })
+            ->exists();
     }
 }
