@@ -749,6 +749,7 @@ Route::get('/cron/peer-loans/collect-weekly', [\App\Http\Controllers\Cron\PeerLo
 Route::get('/cron/peer-loans/collect-monthly', [\App\Http\Controllers\Cron\PeerLoanCronController::class, 'collectMonthly'])->name('cron.peer-loans.collect-monthly');
 Route::get('/cron/wallet/inactive-reminders/morning', [\App\Http\Controllers\Cron\WalletInactiveReminderCronController::class, 'sendMorning'])->name('cron.wallet.inactive-reminders.morning');
 Route::get('/cron/wallet/inactive-reminders/evening', [\App\Http\Controllers\Cron\WalletInactiveReminderCronController::class, 'sendEvening'])->name('cron.wallet.inactive-reminders.evening');
+Route::get('/cron/process-kyc-queue', [\App\Http\Controllers\Cron\KycProvisionCronController::class, 'process'])->name('cron.process-kyc-queue');
 
 // Master Email Processing Cron (All 3 Steps Sequentially)
 Route::get('/cron/process-emails', function () {
@@ -1021,6 +1022,7 @@ Route::get('/cron/process-emails', function () {
             } else {
                 \Illuminate\Support\Facades\Artisan::call('queue:work', [
                     'connection' => $queueConnection,
+                    '--queue' => \App\Services\MevonPay\PrivateAccountProvisionService::QUEUE_KYC_PROVISION.',default',
                     '--stop-when-empty' => true,
                     '--max-jobs' => 10,
                     '--max-time' => 55,

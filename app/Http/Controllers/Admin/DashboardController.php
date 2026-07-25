@@ -10,7 +10,9 @@ use App\Models\Invoice;
 use App\Models\MatchAttempt;
 use App\Models\Payment;
 use App\Models\ProcessedEmail;
+use App\Models\WhatsappWallet;
 use App\Models\WithdrawalRequest;
+use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\Credit\BusinessPeerLoanService;
 use App\Services\Consumer\VirtualCardFxService;
 use App\Services\MevonPay\MevonPayBalanceSnapshotService;
@@ -18,6 +20,7 @@ use App\Services\MevonPay\MevonPayExchangeRateService;
 use App\Services\NigtaxRevenueStatsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -156,6 +159,7 @@ class DashboardController extends Controller
                     ->limit(10)
                     ->get(),
             ],
+            'kyc_provision' => $this->kycProvisionDashboardStats(),
         ];
 
         // Recent payments
@@ -214,6 +218,53 @@ class DashboardController extends Controller
         }
 
         return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails', 'mevonBalance', 'mevonTodayStats'));
+    }
+
+    /**
+     * @return array{wallet_queued: int, wallet_processing: int, wallet_failed: int, business_queued: int, business_processing: int, business_failed: int, pending_total: int}
+     */
+    private function kycProvisionDashboardStats(): array
+    {
+        $walletQueued = 0;
+        $walletProcessing = 0;
+        $walletFailed = 0;
+        $businessQueued = 0;
+        $businessProcessing = 0;
+        $businessFailed = 0;
+
+        if (Schema::hasColumn('whatsapp_wallets', 'private_account_provision_status')) {
+            $walletQueued = WhatsappWallet::query()
+                ->where('private_account_provision_status', PrivateAccountProvisionService::STATUS_QUEUED)
+                ->count();
+            $walletProcessing = WhatsappWallet::query()
+                ->where('private_account_provision_status', PrivateAccountProvisionService::STATUS_PROCESSING)
+                ->count();
+            $walletFailed = WhatsappWallet::query()
+                ->where('private_account_provision_status', PrivateAccountProvisionService::STATUS_FAILED)
+                ->count();
+        }
+
+        if (Schema::hasColumn('businesses', 'rubies_account_provision_status')) {
+            $businessQueued = Business::query()
+                ->where('rubies_account_provision_status', PrivateAccountProvisionService::STATUS_QUEUED)
+                ->count();
+            $businessProcessing = Business::query()
+                ->where('rubies_account_provision_status', PrivateAccountProvisionService::STATUS_PROCESSING)
+                ->count();
+            $businessFailed = Business::query()
+                ->where('rubies_account_provision_status', PrivateAccountProvisionService::STATUS_FAILED)
+                ->count();
+        }
+
+        return [
+            'wallet_queued' => $walletQueued,
+            'wallet_processing' => $walletProcessing,
+            'wallet_failed' => $walletFailed,
+            'business_queued' => $businessQueued,
+            'business_processing' => $businessProcessing,
+            'business_failed' => $businessFailed,
+            'pending_total' => $walletQueued + $walletProcessing + $businessQueued + $businessProcessing,
+        ];
     }
 
     /**

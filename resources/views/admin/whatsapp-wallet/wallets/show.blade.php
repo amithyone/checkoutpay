@@ -255,7 +255,9 @@
                     @elseif(in_array($provisionStatus, ['queued', 'processing'], true))
                         <p class="text-sm text-blue-900 mb-2">
                             Mevon identity verify + permanent account creation is in progress.
-                            Jobs run on the email/cron queue (Step 4). Refresh this page in a minute.
+                            Jobs run on the KYC queue — process with
+                            <a href="{{ url('/cron/process-kyc-queue') }}" target="_blank" rel="noopener" class="underline font-medium">/cron/process-kyc-queue</a>
+                            (also listed on the admin dashboard cron URLs).
                         </p>
                     @elseif($provisionStatus === 'failed')
                         <p class="text-sm text-red-900 mb-2">

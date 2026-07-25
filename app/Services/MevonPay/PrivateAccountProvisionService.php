@@ -23,6 +23,8 @@ final class PrivateAccountProvisionService
 
     public const STATUS_FAILED = 'failed';
 
+    public const QUEUE_KYC_PROVISION = 'kyc-provision';
+
     public function __construct(
         private MevonPrivateAccountService $privateAccount,
         private BusinessKycMevonVerificationService $businessIdentityVerify,

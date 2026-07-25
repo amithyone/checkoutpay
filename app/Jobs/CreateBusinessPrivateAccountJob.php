@@ -25,7 +25,9 @@ class CreateBusinessPrivateAccountJob implements ShouldQueue
 
     public function __construct(
         public int $businessId,
-    ) {}
+    ) {
+        $this->onQueue(PrivateAccountProvisionService::QUEUE_KYC_PROVISION);
+    }
 
     public function handle(
         MevonPrivateAccountService $privateAccount,

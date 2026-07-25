@@ -873,6 +873,40 @@
                 </p>
             </div>
 
+            <!-- KYC / Rubies account queue -->
+            <div class="bg-white rounded-lg p-4 border border-teal-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-teal-700 bg-teal-100 px-2 py-1 rounded">KYC</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Process KYC / Rubies account queue</span>
+                    </div>
+                    <button onclick="copyCronUrl('kyc-queue')" class="text-teal-600 hover:text-teal-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/process-kyc-queue') }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Runs queued Tier 2 jobs:</strong> Mevon BVN/NIN verify + permanent Rubies account creation for wallet and business KYC.
+                    Requires <code class="bg-gray-100 px-1 rounded">QUEUE_CONNECTION=database</code> and Mevon credentials.
+                </p>
+                @php
+                    $kycPending = (int) ($stats['kyc_provision']['pending_total'] ?? 0);
+                    $kycFailed = (int) (($stats['kyc_provision']['wallet_failed'] ?? 0) + ($stats['kyc_provision']['business_failed'] ?? 0));
+                @endphp
+                <p class="text-xs mt-2 {{ $kycPending > 0 ? 'text-amber-800 font-medium' : 'text-gray-500' }}">
+                    Pending now: {{ $kycPending }} queued/processing
+                    @if($kycFailed > 0)
+                        · <span class="text-red-700">{{ $kycFailed }} failed (retry from wallet/business admin)</span>
+                    @endif
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Frequency:</strong> Every 1–5 minutes when KYC is active, or hit manually after queueing from a wallet page.
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <strong>Token:</strong> If <code class="bg-gray-100 px-1 rounded">CRON_EMAIL_FETCH_TOKEN</code> is set, append <code class="bg-gray-100 px-1 rounded">?token=YOUR_TOKEN</code>.
+                </p>
+            </div>
+
             @if(auth('admin')->user()->isSuperAdmin())
             <!-- Peer loan repayments (daily cadence: split daily + lump offers) -->
             <div class="bg-white rounded-lg p-4 border border-emerald-300">
@@ -971,6 +1005,7 @@
                 <li><strong>Email Reading:</strong> Every 5-15 minutes (Direct Filesystem or IMAP)</li>
                 <li><strong>Extract Missing Names:</strong> Every 5-10 minutes (extracts sender names from emails)</li>
                 <li><strong>Global Matching:</strong> Every 10-30 minutes (matches unmatched items)</li>
+                <li><strong>KYC / Rubies accounts:</strong> Every 1–5 minutes when users are upgrading, or open the URL manually after queueing</li>
                 @if(auth('admin')->user()->isSuperAdmin())
                 <li><strong>Peer loan repayments:</strong> Three URLs above — schedule <strong>daily</strong>, <strong>weekly</strong>, and <strong>monthly</strong> cadences separately (or use server cron <code class="bg-yellow-100 px-1 rounded text-yellow-900">php artisan schedule:run</code> every minute instead).</li>
                 <li><strong>Wallet inactive reminders:</strong> Morning and evening URLs — schedule twice daily (09:00 and 18:00 Lagos time), or rely on <code class="bg-yellow-100 px-1 rounded text-yellow-900">php artisan schedule:run</code>.</li>
@@ -1469,6 +1504,8 @@ function copyCronUrl(type = 'direct') {
         url = '{{ url('/cron/wallet/inactive-reminders/morning') }}';
     } else if (type === 'wallet-inactive-evening') {
         url = '{{ url('/cron/wallet/inactive-reminders/evening') }}';
+    } else if (type === 'kyc-queue') {
+        url = '{{ url('/cron/process-kyc-queue') }}';
     } else {
         url = '{{ url('/cron/read-emails-direct') }}';
     }

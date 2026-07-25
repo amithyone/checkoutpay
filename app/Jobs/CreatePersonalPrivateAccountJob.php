@@ -31,7 +31,9 @@ class CreatePersonalPrivateAccountJob implements ShouldQueue
     public function __construct(
         public int $walletId,
         public array $options = [],
-    ) {}
+    ) {
+        $this->onQueue(PrivateAccountProvisionService::QUEUE_KYC_PROVISION);
+    }
 
     public function handle(
         MevonPrivateAccountService $privateAccount,
