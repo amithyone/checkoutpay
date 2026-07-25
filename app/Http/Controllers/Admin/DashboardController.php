@@ -13,6 +13,7 @@ use App\Models\ProcessedEmail;
 use App\Models\WhatsappWallet;
 use App\Models\WithdrawalRequest;
 use App\Services\MevonPay\PrivateAccountProvisionService;
+use App\Support\Imunify360Ops;
 use App\Services\Credit\BusinessPeerLoanService;
 use App\Services\Consumer\VirtualCardFxService;
 use App\Services\MevonPay\MevonPayBalanceSnapshotService;
@@ -217,7 +218,21 @@ class DashboardController extends Controller
             ];
         }
 
-        return view('admin.dashboard', compact('stats', 'recentPayments', 'pendingWithdrawals', 'recentStoredEmails', 'mevonBalance', 'mevonTodayStats'));
+        $imunify360Ops = [
+            'host' => Imunify360Ops::appHost(),
+            'server_ip' => Imunify360Ops::serverOutboundIp(),
+            'paths' => Imunify360Ops::pathsNeedingWafBypass(),
+        ];
+
+        return view('admin.dashboard', compact(
+            'stats',
+            'recentPayments',
+            'pendingWithdrawals',
+            'recentStoredEmails',
+            'mevonBalance',
+            'mevonTodayStats',
+            'imunify360Ops',
+        ));
     }
 
     /**

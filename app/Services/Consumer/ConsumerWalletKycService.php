@@ -3,6 +3,7 @@
 namespace App\Services\Consumer;
 
 use App\Models\WhatsappWallet;
+use App\Support\Imunify360Ops;
 use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
@@ -49,7 +50,7 @@ class ConsumerWalletKycService
                 'has_permanent_account' => $hasAccount,
                 'kyc_pending_account' => $pendingAccount,
                 'provision_status' => $provisionStatus !== '' ? $provisionStatus : ($hasAccount ? 'completed' : null),
-                'provision_error' => $wallet->private_account_provision_error,
+                'provision_error' => Imunify360Ops::sanitizeConsumerMessage($wallet->private_account_provision_error),
                 'provision_queued_at' => $wallet->private_account_provision_queued_at?->toIso8601String(),
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'kyc_fname' => $wallet->kyc_fname,
@@ -237,7 +238,7 @@ class ConsumerWalletKycService
             'reference' => $wallet->mevon_reference,
             'is_tier2' => $wallet->isTier2(),
             'provision_status' => $provisionStatus !== '' ? $provisionStatus : ($hasAccount ? 'completed' : null),
-            'provision_error' => $wallet->private_account_provision_error,
+            'provision_error' => Imunify360Ops::sanitizeConsumerMessage($wallet->private_account_provision_error),
             'kyc_pending_account' => $wallet->isTier2() && ! $hasAccount && in_array($provisionStatus, [
                 PrivateAccountProvisionService::STATUS_QUEUED,
                 PrivateAccountProvisionService::STATUS_PROCESSING,

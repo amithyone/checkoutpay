@@ -764,6 +764,45 @@
     </div>
     @endif
 
+    <!-- Imunify360 / mobile app API -->
+    <div class="bg-amber-50 border border-amber-300 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-semibold text-amber-950 mb-2">
+            <i class="fas fa-shield-alt mr-2"></i> Imunify360 — mobile app &amp; automation
+        </h3>
+        <p class="text-sm text-amber-900 mb-3">
+            If app users see <strong>Access denied by Imunify360 bot-protection</strong>, the hosting WAF is blocking API/cron traffic.
+            Mobile apps cannot pass Imunify360&apos;s JavaScript challenge — your host must whitelist this site.
+        </p>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
+            <div>
+                <dt class="text-amber-800 font-medium">Site domain</dt>
+                <dd class="font-mono text-amber-950">{{ $imunify360Ops['host'] ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-amber-800 font-medium">Server outbound IP</dt>
+                <dd class="font-mono text-amber-950">{{ $imunify360Ops['server_ip'] ?? 'Unknown — open dashboard again or ask host' }}</dd>
+            </div>
+        </dl>
+        <p class="text-xs font-semibold text-amber-950 mb-1">Ask hosting support (root/WHM) to run:</p>
+        <code class="text-xs block bg-white border border-amber-200 rounded p-2 mb-3 break-all">imunify360-agent whitelist domain add {{ $imunify360Ops['host'] ?? 'your-domain.com' }}</code>
+        <p class="text-xs text-amber-900 mb-2">Also whitelist these automation IPs in Imunify360 → <strong>White List</strong> (Full Access):</p>
+        <ul class="text-xs text-amber-900 list-disc list-inside mb-3 space-y-0.5">
+            <li>This server&apos;s IP above (cron + outbound Mevon API)</li>
+            <li>Your cron service IP (cron-job.org / EasyCron — check their docs)</li>
+            <li>Mevon webhook sender IPs (ask MevonPay support)</li>
+        </ul>
+        <p class="text-xs font-semibold text-amber-950 mb-1">Paths that must not be bot-blocked:</p>
+        <ul class="text-xs font-mono text-amber-950 space-y-1">
+            @foreach($imunify360Ops['paths'] ?? [] as $path)
+                <li class="bg-white/70 border border-amber-100 rounded px-2 py-1">{{ $path }}</li>
+            @endforeach
+        </ul>
+        <p class="text-xs text-amber-800 mt-3">
+            Give Mevon the <strong>server outbound IP</strong> so they allow API calls from this server.
+            After host whitelists the domain, users should retry KYC / login without seeing WAF errors.
+        </p>
+    </div>
+
     <!-- Cron Job Info -->
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 class="text-lg font-semibold text-blue-900 mb-2">

@@ -10,6 +10,7 @@ use App\Models\WhatsappWalletPendingTopup;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerAppSessionService;
 use App\Models\ConsumerAppSessionEvent;
+use App\Support\Imunify360Ops;
 use App\Services\Consumer\ConsumerBusinessActivityService;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
@@ -217,7 +218,9 @@ class ConsumerWalletApiController extends Controller
                 'mevon_bank_code' => $isNg ? $wallet->mevon_bank_code : null,
                 'rubies_account_type' => $wallet->rubies_account_type,
                 'private_account_provision_status' => $isNg ? $wallet->private_account_provision_status : null,
-                'private_account_provision_error' => $isNg ? $wallet->private_account_provision_error : null,
+                'private_account_provision_error' => $isNg
+                    ? Imunify360Ops::sanitizeConsumerMessage($wallet->private_account_provision_error)
+                    : null,
                 'kyc_pending_account' => $isNg && $wallet->isTier2()
                     && trim((string) $wallet->mevon_virtual_account_number) === ''
                     && in_array((string) ($wallet->private_account_provision_status ?? ''), [

@@ -128,6 +128,11 @@ class MevonPrivateAccountService
 
         $json = $resp->json();
         if (! is_array($json)) {
+            $body = (string) $resp->body();
+            if (\App\Support\Imunify360Ops::looksLikeWafBlock($body)) {
+                Log::warning('mevonpay.private_account_waf_blocked', ['kind' => $kind, 'http_status' => $resp->status()]);
+                throw new \RuntimeException(\App\Support\Imunify360Ops::wafBlockMessage());
+            }
             $json = [];
         }
 
