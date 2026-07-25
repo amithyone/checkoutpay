@@ -304,6 +304,115 @@
                             @endif
                         </div>
                     @endif
+
+                    @if(auth('admin')->user()?->canMutateWalletAccounts())
+                        <details class="mt-4 pt-4 border-t border-black/5">
+                            <summary class="text-sm font-semibold text-gray-900 cursor-pointer select-none">
+                                <i class="fas fa-tools mr-1"></i> Ops: edit KYC / pay-in &amp; test Mevon
+                            </summary>
+                            <p class="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-3 mb-3">
+                                If Mevon API calls fail with Imunify360 / access denied, whitelist this server&apos;s <strong>outbound IP</strong> with Mevon and allow HTTPS to the Mevon API host in hosting WAF.
+                                For inbound credits, ensure Mevon webhook IPs can reach <code class="bg-amber-100 px-1 rounded">/api/mevonpay/webhook</code> (Imunify360 must not block them).
+                            </p>
+                            <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.kyc-pay-in', $wallet) }}" class="space-y-3 mt-2">
+                                @csrf
+                                @method('PUT')
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">First name</label>
+                                        <input type="text" name="kyc_fname" value="{{ old('kyc_fname', $wallet->kyc_fname) }}"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">Last name</label>
+                                        <input type="text" name="kyc_lname" value="{{ old('kyc_lname', $wallet->kyc_lname) }}"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">Date of birth</label>
+                                        <input type="date" name="kyc_dob" value="{{ old('kyc_dob', $wallet->kyc_dob?->format('Y-m-d')) }}"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">Gender</label>
+                                        <select name="kyc_gender" class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                            <option value="">—</option>
+                                            <option value="male" @selected(old('kyc_gender', $wallet->kyc_gender) === 'male')>Male</option>
+                                            <option value="female" @selected(old('kyc_gender', $wallet->kyc_gender) === 'female')>Female</option>
+                                        </select>
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-gray-600 mb-1">Email</label>
+                                        <input type="email" name="kyc_email" value="{{ old('kyc_email', $wallet->kyc_email) }}"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">BVN (11 digits)</label>
+                                        <input type="text" name="kyc_bvn" value="{{ old('kyc_bvn', $wallet->kyc_bvn) }}"
+                                               inputmode="numeric" maxlength="11" autocomplete="off"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono">
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">NIN (11 digits)</label>
+                                        <input type="text" name="kyc_nin" value="{{ old('kyc_nin', $wallet->kyc_nin) }}"
+                                               inputmode="numeric" maxlength="11" autocomplete="off"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono">
+                                    </div>
+                                </div>
+                                <div class="pt-2 border-t border-gray-200">
+                                    <p class="text-xs font-semibold text-gray-700 mb-2">Pay-in account (manual — use when Mevon returns account number outside queue)</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                        <div>
+                                            <label class="block text-gray-600 mb-1">Account number</label>
+                                            <input type="text" name="mevon_virtual_account_number"
+                                                   value="{{ old('mevon_virtual_account_number', $wallet->mevon_virtual_account_number) }}"
+                                                   inputmode="numeric" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono">
+                                        </div>
+                                        <div>
+                                            <label class="block text-gray-600 mb-1">Bank name</label>
+                                            <input type="text" name="mevon_bank_name"
+                                                   value="{{ old('mevon_bank_name', $wallet->mevon_bank_name ?? 'Rubies MFB') }}"
+                                                   class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                        </div>
+                                        <div>
+                                            <label class="block text-gray-600 mb-1">Bank code</label>
+                                            <input type="text" name="mevon_bank_code"
+                                                   value="{{ old('mevon_bank_code', $wallet->mevon_bank_code) }}"
+                                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono">
+                                        </div>
+                                        <div>
+                                            <label class="block text-gray-600 mb-1">Account name</label>
+                                            <input type="text" name="mevon_account_name"
+                                                   value="{{ old('mevon_account_name', $wallet->mevon_account_name) }}"
+                                                   class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                        </div>
+                                        <div class="sm:col-span-2">
+                                            <label class="block text-gray-600 mb-1">Mevon reference</label>
+                                            <input type="text" name="mevon_reference"
+                                                   value="{{ old('mevon_reference', $wallet->mevon_reference) }}"
+                                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs">
+                                        </div>
+                                    </div>
+                                    <label class="flex items-start gap-2 text-xs text-gray-700 mt-2">
+                                        <input type="checkbox" name="mark_provision_completed" value="1" class="mt-0.5 rounded border-gray-300"
+                                               @checked(old('mark_provision_completed', $hasPayIn))>
+                                        <span>Mark tier 2 provision completed (sets tier 2 + clears provision error; required for webhook credits even without account number)</span>
+                                    </label>
+                                </div>
+                                <div class="flex flex-wrap gap-2 pt-1">
+                                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800"
+                                        onclick="return confirm('Save KYC / pay-in changes for wallet #{{ $wallet->id }}?')">
+                                        <i class="fas fa-save mr-1"></i> Save KYC &amp; pay-in
+                                    </button>
+                                    <button type="submit" formaction="{{ route('admin.whatsapp-wallet.wallets.test-mevon-identity', $wallet) }}" formmethod="POST"
+                                        class="px-3 py-1.5 rounded-lg bg-slate-600 text-white text-xs font-semibold hover:bg-slate-700"
+                                        @disabled(! ($kycProvisionConfigured ?? false))>
+                                        <i class="fas fa-vial mr-1"></i> Test Mevon identity verify (uses fields above)
+                                    </button>
+                                </div>
+                            </form>
+                        </details>
+                    @endif
                 </div>
             @endif
 

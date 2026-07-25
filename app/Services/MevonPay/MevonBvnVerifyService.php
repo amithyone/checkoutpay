@@ -72,9 +72,13 @@ final class MevonBvnVerifyService
 
         /** @var array<string, mixed> $raw */
         $raw = is_array($result['raw'] ?? null) ? $result['raw'] : [];
-        $details = is_array($raw['data'] ?? null) ? $raw['data'] : [];
+        $details = is_array($raw['bvn_details'] ?? null) ? $raw['bvn_details'] : [];
+        if ($details === [] && is_array($raw['data'] ?? null)) {
+            $details = $raw['data'];
+        }
         if ($details === [] && is_array($result['data'] ?? null)) {
-            $details = $result['data'];
+            $data = $result['data'];
+            $details = is_array($data['bvn_details'] ?? null) ? $data['bvn_details'] : $data;
         }
 
         $idNumber = preg_replace('/\D+/', '', (string) ($details['idNumber'] ?? $bvn)) ?? $bvn;

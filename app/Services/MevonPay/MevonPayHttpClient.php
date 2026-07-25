@@ -102,10 +102,20 @@ final class MevonPayHttpClient
     {
         $json = $response->json();
         if (! is_array($json)) {
+            $body = (string) $response->body();
+            $wafMessage = $this->wafBlockedMessage($body);
+
+            if ($wafMessage !== null) {
+                Log::warning('mevonpay.waf_blocked', [
+                    'operation' => $operation,
+                    'http_status' => $response->status(),
+                ]);
+            }
+
             return [
                 'ok' => false,
-                'message' => 'Invalid response from MevonPay.',
-                'raw' => $response->body(),
+                'message' => $wafMessage ?? 'Invalid response from MevonPay.',
+                'raw' => $body,
                 'http_status' => $response->status(),
             ];
         }
@@ -175,5 +185,18 @@ final class MevonPayHttpClient
         }
 
         return false;
+    }
+
+    private function wafBlockedMessage(string $body): ?string
+    {
+        $lower = strtolower($body);
+        $needles = ['imunify360', 'imunify', 'bot protection', 'access denied'];
+        foreach ($needles as $needle) {
+            if (str_contains($lower, $needle)) {
+                return 'Blocked by server WAF (Imunify360). Whitelist this server\'s outbound IP with Mevon/hosting, or allow HTTPS to the Mevon API host.';
+            }
+        }
+
+        return null;
     }
 }

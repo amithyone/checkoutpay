@@ -13,6 +13,7 @@ use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWalletPushNotificationService;
+use App\Services\MevonPay\MevonIdentityVerificationService;
 use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\Whatsapp\WhatsappCrossBorderP2pFxService;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
@@ -203,6 +204,156 @@ class WhatsappWalletAdminController extends Controller
         return redirect()
             ->route('admin.whatsapp-wallet.wallets.show', $wallet)
             ->with($result['dispatched'] ? 'success' : 'warning', $result['message']);
+    }
+
+    public function updateWalletKycPayIn(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        if (! auth('admin')->user()?->canMutateWalletAccounts()) {
+            abort(403, 'You cannot update wallet KYC or pay-in details.');
+        }
+
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'KYC pay-in updates are only available for Nigeria wallet numbers.');
+        }
+
+        $request->validate([
+            'kyc_fname' => ['nullable', 'string', 'max:100'],
+            'kyc_lname' => ['nullable', 'string', 'max:100'],
+            'kyc_dob' => ['nullable', 'date_format:Y-m-d'],
+            'kyc_email' => ['nullable', 'email', 'max:255'],
+            'kyc_gender' => ['nullable', 'in:male,female,Male,Female'],
+            'kyc_bvn' => ['nullable', 'string', 'max:20'],
+            'kyc_nin' => ['nullable', 'string', 'max:20'],
+            'mevon_virtual_account_number' => ['nullable', 'string', 'max:20'],
+            'mevon_bank_name' => ['nullable', 'string', 'max:100'],
+            'mevon_bank_code' => ['nullable', 'string', 'max:20'],
+            'mevon_account_name' => ['nullable', 'string', 'max:200'],
+            'mevon_reference' => ['nullable', 'string', 'max:100'],
+            'mark_provision_completed' => ['nullable', 'boolean'],
+        ]);
+
+        $updates = [];
+
+        foreach (['kyc_fname', 'kyc_lname', 'kyc_email', 'mevon_bank_name', 'mevon_bank_code', 'mevon_account_name', 'mevon_reference'] as $field) {
+            if ($request->has($field)) {
+                $value = trim((string) $request->input($field));
+                $updates[$field] = $value !== '' ? $value : null;
+            }
+        }
+
+        if ($request->has('kyc_dob')) {
+            $updates['kyc_dob'] = $request->filled('kyc_dob') ? $request->input('kyc_dob') : null;
+        }
+
+        if ($request->has('kyc_gender')) {
+            $gender = strtolower(trim((string) $request->input('kyc_gender')));
+            $updates['kyc_gender'] = in_array($gender, ['male', 'female'], true) ? $gender : null;
+        }
+
+        if ($request->has('kyc_bvn')) {
+            $bvn = preg_replace('/\D+/', '', (string) $request->input('kyc_bvn')) ?? '';
+            $updates['kyc_bvn'] = strlen($bvn) === 11 ? $bvn : null;
+        }
+
+        if ($request->has('kyc_nin')) {
+            $nin = preg_replace('/\D+/', '', (string) $request->input('kyc_nin')) ?? '';
+            $updates['kyc_nin'] = strlen($nin) === 11 ? $nin : null;
+        }
+
+        if ($request->has('mevon_virtual_account_number')) {
+            $accountNumber = preg_replace('/\D+/', '', (string) $request->input('mevon_virtual_account_number')) ?? '';
+            $updates['mevon_virtual_account_number'] = strlen($accountNumber) >= 10 ? $accountNumber : null;
+        }
+
+        $shouldCompleteProvision = $request->boolean('mark_provision_completed')
+            || (! empty($updates['mevon_virtual_account_number'] ?? null));
+
+        if ($shouldCompleteProvision) {
+            $updates['tier'] = WhatsappWallet::TIER_RUBIES_VA;
+            $updates['private_account_provision_status'] = PrivateAccountProvisionService::STATUS_COMPLETED;
+            $updates['private_account_provision_error'] = null;
+
+            if ($wallet->tier2_provisioned_at === null) {
+                $updates['tier2_provisioned_at'] = now();
+            }
+
+            if ($wallet->kyc_verified_at === null) {
+                $updates['kyc_verified_at'] = now();
+            }
+        }
+
+        if ($updates === []) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('warning', 'No KYC or pay-in changes were submitted.');
+        }
+
+        $wallet->update($updates);
+
+        Log::info('admin.wallet.kyc_pay_in_updated', [
+            'wallet_id' => $wallet->id,
+            'admin_id' => auth('admin')->id(),
+            'fields' => array_keys($updates),
+            'has_account_number' => trim((string) ($updates['mevon_virtual_account_number'] ?? $wallet->mevon_virtual_account_number)) !== '',
+        ]);
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', 'Wallet KYC and pay-in details updated. Mevon credit webhooks will match on mevon_virtual_account_number when tier is 2.');
+    }
+
+    public function testWalletMevonIdentity(Request $request, WhatsappWallet $wallet): RedirectResponse
+    {
+        if (! auth('admin')->user()?->canMutateWalletAccounts()) {
+            abort(403, 'You cannot test Mevon identity verification.');
+        }
+
+        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('error', 'Mevon identity verify is only available for Nigeria wallet numbers.');
+        }
+
+        $firstName = trim((string) $request->input('kyc_fname', $wallet->kyc_fname));
+        $lastName = trim((string) $request->input('kyc_lname', $wallet->kyc_lname));
+        $dob = $request->filled('kyc_dob')
+            ? (string) $request->input('kyc_dob')
+            : ($wallet->kyc_dob?->format('Y-m-d') ?? '');
+        $bvn = $request->filled('kyc_bvn')
+            ? (string) $request->input('kyc_bvn')
+            : (string) $wallet->kyc_bvn;
+        $nin = $request->filled('kyc_nin')
+            ? (string) $request->input('kyc_nin')
+            : (string) $wallet->kyc_nin;
+
+        $result = app(MevonIdentityVerificationService::class)->verifyPersonal(
+            $firstName,
+            $lastName,
+            $dob,
+            $bvn !== '' ? $bvn : null,
+            $nin !== '' ? $nin : null,
+        );
+
+        Log::info('admin.wallet.mevon_identity_test', [
+            'wallet_id' => $wallet->id,
+            'admin_id' => auth('admin')->id(),
+            'ok' => $result['ok'] ?? false,
+            'message' => $result['message'] ?? '',
+        ]);
+
+        $message = ($result['ok'] ?? false)
+            ? 'Mevon identity verify succeeded: '.($result['message'] ?? 'OK')
+            : 'Mevon identity verify failed: '.($result['message'] ?? 'Unknown error');
+
+        if (! empty($result['full_name'])) {
+            $message .= ' (Registry name: '.$result['full_name'].')';
+        }
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with(($result['ok'] ?? false) ? 'success' : 'error', $message);
     }
 
     public function revokeTrustedDevice(WhatsappWallet $wallet, int $device): RedirectResponse
