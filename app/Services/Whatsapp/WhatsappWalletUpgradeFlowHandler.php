@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Tier 2: collect KYC, confirm WhatsApp number, then queue Mevon /V1/pivateaccount.
- * Business: CAC, signatory BVN, dob, email → create_business_account.
- * Personal: fname, lname, dob, gender, bvn, email → createrubies (Mevon has no personal pivateaccount action).
+ * Personal: fname, lname, dob, gender, bvn, email → create_business_account with person name in business_name.
+ * Business: CAC, signatory BVN, dob, email → create_business_account with company name.
  */
 class WhatsappWalletUpgradeFlowHandler
 {

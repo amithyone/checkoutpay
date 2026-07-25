@@ -8,9 +8,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Mevon permanent account provisioning.
- * Business: POST /V1/pivateaccount (create_business_account).
- * Personal: POST /V1/createrubies — Mevon does not accept personal actions on pivateaccount yet.
+ * Mevon permanent account provisioning via POST /V1/pivateaccount.
+ * Both business and personal use action create_business_account; pass company name or person full name in business_name.
  */
 class MevonPrivateAccountService
 {
@@ -94,16 +93,16 @@ class MevonPrivateAccountService
         }
 
         $phoneLocal11 = $this->normalizeToLocal11($phoneLocal11);
+        $body = [
+            'action' => 'create_business_account',
+            'business_name' => trim($fname.' '.$lname),
+            'phone' => $phoneLocal11,
+            'dob' => $dobYmd,
+            'email' => $email,
+        ];
+        $this->attachIdentityNumber($body, $bvn11, $nin11);
 
-        return $this->vaParser->createRubiesPersonalAccount(
-            fname: $fname,
-            lname: $lname,
-            phoneLocal11: $phoneLocal11,
-            dobYmd: $dobYmd,
-            email: $email,
-            bvn11: $bvn11,
-            nin: $nin11,
-        );
+        return $this->postAndParse($body, 'personal');
     }
 
     /**
