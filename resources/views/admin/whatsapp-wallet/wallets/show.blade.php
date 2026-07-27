@@ -590,6 +590,62 @@
             </div>
 
             <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+                <h3 class="font-semibold text-gray-900 mb-2">Login OTP lockout</h3>
+                <p class="text-sm text-gray-600 mb-3">
+                    Clear users stuck on <span class="font-medium">“Too many unused login codes”</span> or
+                    <span class="font-medium">“Too many wrong codes”</span> in the CheckoutNow app or WhatsApp email-link flow.
+                </p>
+
+                @php($otp = $otpLockout ?? [])
+                <dl class="text-xs text-gray-600 space-y-1 mb-4">
+                    <div class="flex justify-between gap-2">
+                        <dt>App OTP blocked</dt>
+                        <dd class="{{ !empty($otp['app_otp_blocked']) ? 'text-red-700 font-medium' : 'text-green-700 font-medium' }}">
+                            {{ !empty($otp['app_otp_blocked']) ? 'Yes — too many unused codes' : 'No' }}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt>Unused OTP sends (24h)</dt>
+                        <dd>{{ $otp['unused_otp_sends'] ?? 0 }} / {{ $otp['unused_otp_sends_max'] ?? 3 }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt>Wrong verify attempts</dt>
+                        <dd class="{{ !empty($otp['verify_locked']) ? 'text-red-700 font-medium' : '' }}">
+                            {{ $otp['verify_attempts'] ?? 0 }} / {{ $otp['verify_attempts_max'] ?? 5 }}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt>Pending app OTP in cache</dt>
+                        <dd>{{ !empty($otp['has_pending_app_otp']) ? 'Yes' : 'No' }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-2">
+                        <dt>WhatsApp session OTP attempts</dt>
+                        <dd class="{{ !empty($otp['whatsapp_otp_locked']) ? 'text-red-700 font-medium' : '' }}">
+                            {{ $otp['whatsapp_otp_attempts'] ?? 0 }}
+                            @if(!empty($otp['whatsapp_session_state']))
+                                <span class="text-gray-500">({{ $otp['whatsapp_session_state'] }})</span>
+                            @endif
+                        </dd>
+                    </div>
+                </dl>
+
+                @if(!empty($otp['is_stuck']))
+                    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                        This user appears locked out of OTP login. Clear below so they can request a fresh code.
+                    </p>
+                @endif
+
+                <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.otp-lockout.clear', $wallet) }}">
+                    @csrf
+                    <button type="submit"
+                        class="w-full {{ !empty($otp['is_stuck']) ? 'bg-amber-600 hover:bg-amber-700' : 'border border-gray-300 text-gray-800 hover:bg-gray-50' }} px-4 py-2 rounded-lg text-sm {{ !empty($otp['is_stuck']) ? 'text-white' : '' }}"
+                        onclick="return confirm('Clear OTP lockout for {{ $wallet->phone_e164 }}? They can request a new login code immediately.')">
+                        <i class="fas fa-key mr-1"></i> Clear OTP lockout
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
                 <h3 class="font-semibold text-gray-900 mb-2">App push notification</h3>
                 <p class="text-sm text-gray-600 mb-3">
                     Send a Firebase (FCM) alert to this user&apos;s CheckoutNow app.

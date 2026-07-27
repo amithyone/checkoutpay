@@ -6,6 +6,7 @@ use App\Models\WhatsappWallet;
 use App\Services\Whatsapp\EvolutionWhatsAppClient;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappEvolutionConfigResolver;
+use App\Models\WhatsappSession;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -45,6 +46,85 @@ class ConsumerWalletOtpService
     public function clearUnusedOtpSends(string $e164): void
     {
         Cache::forget($this->unusedSendsKey($e164));
+    }
+
+    /**
+     * Admin/support: current OTP lockout state for a wallet phone.
+     *
+     * @return array{
+     *     app_otp_blocked: bool,
+     *     unused_otp_sends: int,
+     *     unused_otp_sends_max: int,
+     *     verify_attempts: int,
+     *     verify_attempts_max: int,
+     *     verify_locked: bool,
+     *     has_pending_app_otp: bool,
+     *     whatsapp_session_state: string|null,
+     *     whatsapp_otp_attempts: int,
+     *     whatsapp_otp_locked: bool,
+     *     is_stuck: bool
+     * }
+     */
+    public function lockoutStatusForAdmin(string $e164): array
+    {
+        $maxUnused = $this->maxUnusedOtpSends();
+        $unusedCount = (int) Cache::get($this->unusedSendsKey($e164), 0);
+        $verifyAttempts = (int) Cache::get($this->attemptsKey($e164), 0);
+        $maxVerify = max(3, (int) config('consumer_wallet.otp_max_attempts', 5));
+
+        $session = WhatsappSession::query()->where('phone_e164', $e164)->first();
+        $whatsappOtpAttempts = (int) ($session?->otp_attempts ?? 0);
+        $whatsappOtpMax = max(1, (int) config('whatsapp.otp.max_attempts', 5));
+        $whatsappOtpLocked = $session !== null
+            && $session->state === WhatsappSession::STATE_AWAIT_OTP
+            && $whatsappOtpAttempts >= $whatsappOtpMax;
+
+        $blocked = $this->isOtpBlocked($e164);
+        $verifyLocked = $verifyAttempts >= $maxVerify;
+
+        return [
+            'app_otp_blocked' => $blocked,
+            'unused_otp_sends' => $unusedCount,
+            'unused_otp_sends_max' => $maxUnused,
+            'verify_attempts' => $verifyAttempts,
+            'verify_attempts_max' => $maxVerify,
+            'verify_locked' => $verifyLocked,
+            'has_pending_app_otp' => Cache::has($this->otpKey($e164)),
+            'whatsapp_session_state' => $session?->state,
+            'whatsapp_otp_attempts' => $whatsappOtpAttempts,
+            'whatsapp_otp_locked' => $whatsappOtpLocked,
+            'is_stuck' => $blocked || $verifyLocked || $whatsappOtpLocked,
+        ];
+    }
+
+    /**
+     * Admin/support: clear app OTP caches and WhatsApp email-link OTP attempt counters.
+     *
+     * @return array{cleared_unused_sends: bool, cleared_verify_attempts: bool, cleared_pending_otp: bool, cleared_whatsapp_session_otp: bool}
+     */
+    public function clearAllLockouts(string $e164): array
+    {
+        $hadUnused = Cache::has($this->unusedSendsKey($e164));
+        $hadAttempts = Cache::has($this->attemptsKey($e164));
+        $hadPending = Cache::has($this->otpKey($e164));
+
+        Cache::forget($this->unusedSendsKey($e164));
+        Cache::forget($this->attemptsKey($e164));
+        Cache::forget($this->otpKey($e164));
+
+        $clearedSession = false;
+        $session = WhatsappSession::query()->where('phone_e164', $e164)->first();
+        if ($session !== null && (int) $session->otp_attempts > 0) {
+            $session->update(['otp_attempts' => 0]);
+            $clearedSession = true;
+        }
+
+        return [
+            'cleared_unused_sends' => $hadUnused,
+            'cleared_verify_attempts' => $hadAttempts,
+            'cleared_pending_otp' => $hadPending,
+            'cleared_whatsapp_session_otp' => $clearedSession,
+        ];
     }
 
     private function maxUnusedOtpSends(): int

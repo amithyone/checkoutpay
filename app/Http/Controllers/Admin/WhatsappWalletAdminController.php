@@ -12,6 +12,7 @@ use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
+use App\Services\Consumer\ConsumerWalletOtpService;
 use App\Services\Consumer\ConsumerWalletPushNotificationService;
 use App\Services\MevonPay\MevonIdentityVerificationService;
 use App\Services\MevonPay\PrivateAccountProvisionService;
@@ -33,6 +34,7 @@ class WhatsappWalletAdminController extends Controller
         private ConsumerDeviceTrustService $deviceTrust,
         private PrivateAccountProvisionService $privateAccountProvision,
         private WhatsappWalletCountryResolver $walletCountry,
+        private ConsumerWalletOtpService $walletOtp,
     ) {}
 
     public function index(): View
@@ -146,6 +148,8 @@ class WhatsappWalletAdminController extends Controller
             ? $this->privateAccountProvision->personalReadiness($wallet)
             : ['ready' => false, 'missing' => ['Tier 2 Rubies accounts are only for Nigeria wallet numbers.']];
 
+        $otpLockout = $this->walletOtp->lockoutStatusForAdmin((string) $wallet->phone_e164);
+
         return view('admin.whatsapp-wallet.wallets.show', [
             'wallet' => $wallet,
             'recentTx' => $recentTx,
@@ -165,7 +169,33 @@ class WhatsappWalletAdminController extends Controller
             'isNigeriaWallet' => $isNigeriaWallet,
             'kycProvisionConfigured' => $kycProvisionConfigured,
             'kycPersonalReadiness' => $kycPersonalReadiness,
+            'otpLockout' => $otpLockout,
         ]);
+    }
+
+    public function clearOtpLockout(WhatsappWallet $wallet): RedirectResponse
+    {
+        $e164 = (string) $wallet->phone_e164;
+        $before = $this->walletOtp->lockoutStatusForAdmin($e164);
+        $result = $this->walletOtp->clearAllLockouts($e164);
+
+        Log::info('admin.wallet.otp_lockout_cleared', [
+            'wallet_id' => $wallet->id,
+            'phone_e164' => $e164,
+            'admin_id' => Auth::guard('admin')->id(),
+            'before' => $before,
+            'result' => $result,
+        ]);
+
+        if (! $before['is_stuck'] && ! ($result['cleared_pending_otp'] ?? false)) {
+            return redirect()
+                ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+                ->with('success', 'No OTP lockout was active for this user. Pending OTP cache cleared anyway.');
+        }
+
+        return redirect()
+            ->route('admin.whatsapp-wallet.wallets.show', $wallet)
+            ->with('success', 'OTP lockout cleared. User can request a new login code on the app or WhatsApp.');
     }
 
     public function queueWalletPayInAccount(WhatsappWallet $wallet): RedirectResponse
