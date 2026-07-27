@@ -146,4 +146,37 @@ final class WhatsappCloudConfigResolver
     {
         return 'https://graph.facebook.com/'.self::graphVersion();
     }
+
+    /**
+     * HMAC-SHA256 proof required for server-side Graph API calls when app secret proof is enabled.
+     *
+     * @see https://developers.facebook.com/docs/graph-api/securing-requests
+     */
+    public static function appSecretProof(?string $accessToken = null): string
+    {
+        $secret = self::appSecret();
+        $token = trim($accessToken ?? self::accessToken());
+        if ($secret === '' || $token === '') {
+            return '';
+        }
+
+        return hash_hmac('sha256', $token, $secret);
+    }
+
+    /**
+     * Query params for authenticated Graph API requests from the server.
+     *
+     * @return array<string, string>
+     */
+    public static function graphAuthQuery(?string $accessToken = null): array
+    {
+        $token = trim($accessToken ?? self::accessToken());
+        $query = ['access_token' => $token];
+        $proof = self::appSecretProof($token);
+        if ($proof !== '') {
+            $query['appsecret_proof'] = $proof;
+        }
+
+        return $query;
+    }
 }

@@ -35,7 +35,7 @@ class MetaCloudWhatsAppClient extends EvolutionWhatsAppClient
         $url = WhatsappCloudConfigResolver::graphBaseUrl().'/'.$phoneNumberId.'/messages';
 
         try {
-            $response = Http::withToken($token)
+            $response = $this->graphHttp($token)
                 ->timeout(25)
                 ->post($url, [
                     'messaging_product' => 'whatsapp',
@@ -130,7 +130,7 @@ class MetaCloudWhatsAppClient extends EvolutionWhatsAppClient
 
         try {
             $url = WhatsappCloudConfigResolver::graphBaseUrl().'/'.$phoneNumberId.'/messages';
-            $response = Http::withToken($token)
+            $response = $this->graphHttp($token)
                 ->timeout(60)
                 ->post($url, $payload);
 
@@ -155,7 +155,7 @@ class MetaCloudWhatsAppClient extends EvolutionWhatsAppClient
     {
         try {
             $url = WhatsappCloudConfigResolver::graphBaseUrl().'/'.$phoneNumberId.'/media';
-            $response = Http::withToken($token)
+            $response = $this->graphHttp($token)
                 ->timeout(60)
                 ->attach('file', $binary, $fileName)
                 ->post($url, [
@@ -180,5 +180,12 @@ class MetaCloudWhatsAppClient extends EvolutionWhatsAppClient
 
             return null;
         }
+    }
+
+    private function graphHttp(string $token): \Illuminate\Http\Client\PendingRequest
+    {
+        return Http::withOptions([
+            'query' => WhatsappCloudConfigResolver::graphAuthQuery($token),
+        ]);
     }
 }
