@@ -596,7 +596,9 @@
                     <span class="font-medium">“Too many wrong codes”</span> in the CheckoutNow app or WhatsApp email-link flow.
                 </p>
 
-                @php($otp = $otpLockout ?? [])
+                @php
+                    $otp = $otpLockout ?? [];
+                @endphp
                 <dl class="text-xs text-gray-600 space-y-1 mb-4">
                     <div class="flex justify-between gap-2">
                         <dt>App OTP blocked</dt>
