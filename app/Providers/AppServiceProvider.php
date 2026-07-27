@@ -5,6 +5,9 @@ namespace App\Providers;
 use App\Models\WhatsappWalletTransaction;
 use App\Observers\WhatsappWalletTransactionReferralObserver;
 use App\Services\Admin\AdminSidebarMenu;
+use App\Services\Whatsapp\EvolutionWhatsAppClient;
+use App\Services\Whatsapp\MetaCloudWhatsAppClient;
+use App\Services\Whatsapp\WhatsappCloudConfigResolver;
 use App\Support\SiteBranding;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Config;
@@ -24,11 +27,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(EvolutionWhatsAppClient::class, function () {
-            if (\App\Services\Whatsapp\WhatsappCloudConfigResolver::isEnabled()) {
-                return new \App\Services\Whatsapp\MetaCloudWhatsAppClient();
+            if (WhatsappCloudConfigResolver::isEnabled()) {
+                return new MetaCloudWhatsAppClient;
             }
 
-            return new \App\Services\Whatsapp\EvolutionWhatsAppClient();
+            return new EvolutionWhatsAppClient;
         });
     }
 
