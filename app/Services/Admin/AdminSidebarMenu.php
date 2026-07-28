@@ -257,6 +257,10 @@ class AdminSidebarMenu
                 $this->link('Audits', 'admin.audits.index', 'fas fa-clipboard-check', ['admin.audits.*']),
                 ['visible' => $admin->canManageSettings()]
             ),
+            'mevon_balance_monitor' => array_merge(
+                $this->link('Mevon Balance Monitor', 'admin.audits.mevonpay.monitor', 'fas fa-chart-line', ['admin.audits.mevonpay.monitor*']),
+                ['visible' => $admin->canManageSettings()]
+            ),
             'honeypot' => array_merge(
                 $this->link('Honeypot', 'admin.honeypot.index', 'fas fa-spider text-amber-700', ['admin.honeypot.*']),
                 [

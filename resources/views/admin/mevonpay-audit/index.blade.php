@@ -5,10 +5,13 @@
 
 @section('content')
 <div class="space-y-6">
-    <nav class="text-sm text-gray-500">
+    <nav class="text-sm text-gray-500 flex flex-wrap items-center gap-x-1">
         <a href="{{ route('admin.audits.index') }}" class="text-indigo-600 hover:underline">Audits</a>
-        <span class="mx-1">/</span>
+        <span>/</span>
         <span class="text-gray-700">Mevon Pay</span>
+        <span class="ml-auto">
+            <a href="{{ route('admin.audits.mevonpay.monitor') }}" class="text-indigo-600 hover:underline">Balance Monitor →</a>
+        </span>
     </nav>
     <form method="get" class="bg-white rounded-lg border border-gray-200 p-4 shadow-sm flex flex-wrap gap-3 items-end">
         <div>

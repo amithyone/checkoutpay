@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminAnnouncementController;
 use App\Http\Controllers\Admin\AdminSidebarMenuController;
 use App\Http\Controllers\Admin\AuditsController;
 use App\Http\Controllers\Admin\MevonPayAuditController;
+use App\Http\Controllers\Admin\MevonPayBalanceMonitorController;
 use App\Http\Controllers\Admin\AccountNumberController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
 use App\Http\Controllers\Admin\BankLogoController;
@@ -252,6 +253,10 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::get('audits', [AuditsController::class, 'index'])->name('audits.index');
             Route::get('audits/mevonpay', [MevonPayAuditController::class, 'index'])->name('audits.mevonpay.index');
             Route::get('audits/mevonpay/export', [MevonPayAuditController::class, 'exportCsv'])->name('audits.mevonpay.export');
+            Route::get('audits/mevonpay/monitor', [MevonPayBalanceMonitorController::class, 'index'])->name('audits.mevonpay.monitor');
+            Route::post('audits/mevonpay/monitor/baseline', [MevonPayBalanceMonitorController::class, 'initializeBaseline'])->name('audits.mevonpay.monitor.baseline');
+            Route::post('audits/mevonpay/monitor/baseline/reset', [MevonPayBalanceMonitorController::class, 'resetBaseline'])->name('audits.mevonpay.monitor.baseline.reset');
+            Route::post('audits/mevonpay/monitor/check', [MevonPayBalanceMonitorController::class, 'checkNow'])->name('audits.mevonpay.monitor.check');
             Route::redirect('mevonpay-audit', '/'.\App\Support\AdminPath::prefix().'/audits/mevonpay')->name('mevonpay-audit.index');
             Route::get('mevonpay-audit/export', fn () => redirect()->route('admin.audits.mevonpay.export', request()->query()));
 

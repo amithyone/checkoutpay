@@ -29,6 +29,7 @@ return [
         'processed_emails',
         'transaction_logs',
         'audits',
+        'mevon_balance_monitor',
         'honeypot',
         'match_attempts',
         'invoices',

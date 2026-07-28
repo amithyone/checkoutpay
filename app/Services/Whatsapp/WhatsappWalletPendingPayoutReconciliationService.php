@@ -4,6 +4,8 @@ namespace App\Services\Whatsapp;
 
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
+use App\Models\MevonPayLedgerEntry;
+use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\MevonPay\MevonPayPayoutMetaNormalizer;
 use App\Services\MevonPay\MevonPayTransferStatusService;
 use App\Services\MavonPayTransferService;
@@ -18,6 +20,7 @@ class WhatsappWalletPendingPayoutReconciliationService
     public function __construct(
         private MevonPayTransferStatusService $transferStatus,
         private WhatsappWalletBankPayoutRefundService $refundService,
+        private MevonPayLedgerRecorder $ledgerRecorder,
     ) {}
 
     /**
@@ -150,6 +153,8 @@ class WhatsappWalletPendingPayoutReconciliationService
         $meta = $this->applyStatusToMeta($transaction, $result, $newBucket, $adminId, $alreadyReversed);
 
         $transaction->update(['meta' => $meta]);
+
+        $this->syncLedgerPayoutBucket($transaction->fresh() ?? $transaction, $reference, $payoutApi, $meta);
 
         $fresh = $transaction->fresh() ?? $transaction;
         $failedConfirmations = (int) ((is_array($fresh->meta) ? $fresh->meta : [])['provider_failed_confirmations'] ?? 0);
@@ -315,6 +320,41 @@ class WhatsappWalletPendingPayoutReconciliationService
         );
 
         return $meta;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function syncLedgerPayoutBucket(
+        WhatsappWalletTransaction $transaction,
+        string $reference,
+        ?string $payoutApi,
+        array $meta,
+    ): void {
+        $bucket = (string) ($meta['payout_bucket'] ?? '');
+        if ($bucket === '') {
+            return;
+        }
+
+        $amount = abs((float) $transaction->amount);
+        if ($amount <= 0) {
+            return;
+        }
+
+        $api = $payoutApi !== null && $payoutApi !== ''
+            ? $payoutApi
+            : (string) ($meta['payout_api'] ?? MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER);
+
+        $this->ledgerRecorder->recordOutbound(
+            MevonPayLedgerEntry::FLOW_WHATSAPP_BANK_TRANSFER,
+            $amount,
+            $reference,
+            $api,
+            $bucket,
+            null,
+            $transaction,
+            ['provider_status_sync' => true],
+        );
     }
 
     /**

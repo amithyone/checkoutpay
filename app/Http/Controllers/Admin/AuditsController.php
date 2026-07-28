@@ -23,6 +23,12 @@ class AuditsController extends Controller
                     'route' => 'admin.audits.mevonpay.index',
                     'icon' => 'fa-wallet',
                 ],
+                [
+                    'name' => 'Mevon Balance Monitor',
+                    'description' => 'Live balance tracking from a deploy baseline, running expected balance, and discrepancy alerts.',
+                    'route' => 'admin.audits.mevonpay.monitor',
+                    'icon' => 'fa-chart-line',
+                ],
             ],
         ]);
     }

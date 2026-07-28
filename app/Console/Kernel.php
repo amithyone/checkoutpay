@@ -59,6 +59,10 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Lagos')
             ->withoutOverlapping(10);
 
+        $schedule->command('mevon:check-balance')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping(10);
+
         if (config('virtual_card.fx_hourly_capture_enabled', false)) {
             $schedule->command('virtual-cards:capture-fx-rates')
                 ->hourly()
