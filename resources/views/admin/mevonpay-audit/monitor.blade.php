@@ -81,22 +81,75 @@
     @endif
 
     @if($b['active'])
+        @php
+            $totalCharges = ($s['total_fees'] ?? ($s['inbound_fees'] + $s['outbound_fees'])) + $s['outbound_gross'];
+            $variance = $s['variance_amount'] ?? 0;
+            $varianceBad = abs($variance) > ($s['tolerance'] ?? 0.01);
+        @endphp
+
+        {{-- Primary figures: charges, expected, live --}}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide text-amber-800">Total charges (since baseline)</p>
+                <p class="mt-2 text-3xl font-bold text-amber-950">{{ $fmt($totalCharges) }}</p>
+                <dl class="mt-3 space-y-1 text-sm text-amber-900">
+                    <div class="flex justify-between gap-4">
+                        <dt>Mevon fees (in + out)</dt>
+                        <dd class="font-semibold tabular-nums">{{ $fmt($s['total_fees'] ?? ($s['inbound_fees'] + $s['outbound_fees'])) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt>Payouts sent</dt>
+                        <dd class="font-semibold tabular-nums">{{ $fmt($s['outbound_gross']) }}</dd>
+                    </div>
+                </dl>
+                <p class="mt-3 text-xs text-amber-800/80">Fees ₦{{ number_format($s['inbound_fees'], 0) }} inbound · ₦{{ number_format($s['outbound_fees'], 0) }} outbound API</p>
+            </div>
+
+            <div class="rounded-xl border-2 border-indigo-300 bg-indigo-50 p-5 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide text-indigo-800">Should be in balance</p>
+                <p class="mt-2 text-3xl font-bold text-indigo-950">{{ $fmt($s['expected_balance']) }}</p>
+                <p class="mt-3 text-sm text-indigo-900">
+                    Opening {{ $fmt($s['opening_balance'] ?? $b['opening_balance']) }}
+                    <span class="text-indigo-700">− ledger impact {{ $fmt(abs($s['net_mevon_impact'])) }}</span>
+                </p>
+                <p class="mt-2 text-xs text-indigo-800/80">Expected = baseline opening + net Mevon impact ({{ number_format($s['entry_count']) }} entries)</p>
+            </div>
+
+            <div class="rounded-xl border-2 {{ $varianceBad ? 'border-red-400 bg-red-50' : 'border-green-400 bg-green-50' }} p-5 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-wide {{ $varianceBad ? 'text-red-800' : 'text-green-800' }}">Money in Mevon now (live)</p>
+                <p class="mt-2 text-3xl font-bold {{ $varianceBad ? 'text-red-950' : 'text-green-950' }}">
+                    @if($s['live_naira_balance'] !== null){{ $fmt($s['live_naira_balance']) }}@else—@endif
+                </p>
+                @if($s['live_naira_balance'] !== null)
+                    <p class="mt-3 text-sm font-semibold {{ $varianceBad ? 'text-red-800' : 'text-green-800' }}">
+                        Variance {{ $fmt($variance) }}
+                        @if($varianceBad)
+                            <span class="font-normal">· does not match expected</span>
+                        @else
+                            <span class="font-normal">· matches expected</span>
+                        @endif
+                    </p>
+                @elseif(!$s['balance_ok'])
+                    <p class="mt-3 text-sm text-red-700">{{ $s['balance_message'] }}</p>
+                @endif
+                @if($s['last_checked_at'])
+                    <p class="mt-2 text-xs {{ $varianceBad ? 'text-red-800/70' : 'text-green-800/70' }}">Last checked {{ \Illuminate\Support\Carbon::parse($s['last_checked_at'])->format('Y-m-d H:i:s') }}</p>
+                @endif
+            </div>
+        </div>
+
         <div class="rounded-lg border p-4 {{ $s['within_tolerance'] ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200' }}">
             <p class="font-semibold text-gray-900">
-                Live status: {{ $s['within_tolerance'] ? 'Within tolerance' : 'Variance detected' }}
+                Reconciliation: {{ $s['within_tolerance'] ? 'Within tolerance' : 'Variance detected' }}
             </p>
             @if(!$s['balance_ok'])
                 <p class="text-sm text-red-700 mt-1">{{ $s['balance_message'] }}</p>
             @else
                 <p class="text-sm text-gray-600 mt-1">
-                    Expected {{ $fmt($s['expected_balance']) }}
-                    · Live {{ $fmt($s['live_naira_balance']) }}
-                    · Variance {{ $fmt($s['variance_amount']) }}
-                    · Tolerance ±{{ $fmt($s['tolerance']) }}
+                    Tolerance ±{{ $fmt($s['tolerance']) }}
+                    · Net ledger impact {{ $fmt($s['net_mevon_impact']) }}
+                    · Inbound volume {{ $fmt($s['inbound_gross']) }}
                 </p>
-            @endif
-            @if($s['last_checked_at'])
-                <p class="text-xs text-gray-500 mt-1">Last alert check: {{ \Illuminate\Support\Carbon::parse($s['last_checked_at'])->format('Y-m-d H:i:s') }}</p>
             @endif
         </div>
 
