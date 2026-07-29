@@ -57,7 +57,7 @@ class SettingsController extends Controller
         if ($request->has('payment_time_window_minutes') && $request->has('transaction_pending_time_minutes')) {
             $validated = $request->validate([
                 'payment_time_window_minutes' => 'required|integer|min:1|max:1440', // Max 24 hours
-                'transaction_pending_time_minutes' => 'required|integer|min:5|max:10080', // 5 minutes to 7 days
+                'transaction_pending_time_minutes' => 'required|integer|min:5|max:2400',
                 'account_release_after_success_minutes' => 'nullable|integer|min:1|max:1440',
                 'account_same_payer_similarity_percent' => 'nullable|integer|min:50|max:100',
             ]);

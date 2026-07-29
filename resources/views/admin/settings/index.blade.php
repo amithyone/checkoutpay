@@ -53,18 +53,19 @@
                     type="number" 
                     id="transaction_pending_time_minutes" 
                     name="transaction_pending_time_minutes" 
-                    value="{{ $settings['payment']['transaction_pending_time_minutes'] ?? 1440 }}"
+                    value="{{ $settings['payment']['transaction_pending_time_minutes'] ?? 2400 }}"
                     min="5" 
-                    max="10080"
+                    max="2400"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     required
                 >
                 <p class="mt-2 text-sm text-gray-500">
-                    Time (in minutes) before a pending transaction expires. After expiration, transaction will be automatically marked as expired and <strong>cannot be matched</strong>. 
-                    <span class="font-medium">Default: 1440 minutes (24 hours)</span>
+                    Time (in minutes) before a pending transaction expires. After expiration, transaction will be automatically marked as expired and <strong>cannot be matched</strong>.
+                    Invoice and membership payments are exempt.
+                    <span class="font-medium">Default: 2400 minutes (40 hours).</span>
                 </p>
                 <p class="mt-1 text-xs text-gray-400">
-                    Range: 5 minutes to 10080 minutes (7 days). 
+                    Range: 5–2400 minutes. Non-invoice/membership payments cannot be matched after 2400 minutes.
                     <strong>Note:</strong> Once expired, transactions cannot be matched even if payment email arrives later.
                 </p>
             </div>
@@ -185,7 +186,7 @@
             
             <!-- Hidden fields to preserve payment settings when updating email settings -->
             <input type="hidden" name="payment_time_window_minutes" value="{{ $settings['payment']['payment_time_window_minutes'] ?? 120 }}">
-            <input type="hidden" name="transaction_pending_time_minutes" value="{{ $settings['payment']['transaction_pending_time_minutes'] ?? 1440 }}">
+            <input type="hidden" name="transaction_pending_time_minutes" value="{{ $settings['payment']['transaction_pending_time_minutes'] ?? 2400 }}">
 
             <div class="flex items-center space-x-3">
                 <input 

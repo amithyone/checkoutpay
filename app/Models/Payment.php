@@ -251,9 +251,14 @@ class Payment extends Model
         return $this->isInvoicePayment() || $this->isMembershipPayment();
     }
 
+    /** Hard cap: non-invoice/membership bank-transfer checkouts cannot stay matchable beyond this age. */
+    public const PENDING_MAX_AGE_MINUTES = 2400;
+
     public static function pendingExpiryMinutes(): int
     {
-        return max(5, (int) \App\Models\Setting::get('transaction_pending_time_minutes', 1440));
+        $configured = max(5, (int) \App\Models\Setting::get('transaction_pending_time_minutes', self::PENDING_MAX_AGE_MINUTES));
+
+        return min($configured, self::PENDING_MAX_AGE_MINUTES);
     }
 
     public static function defaultExpiresAtForService(?string $service, bool $useInvoicePool = false): ?\Carbon\Carbon
@@ -266,9 +271,27 @@ class Payment extends Model
         return now()->addMinutes(self::pendingExpiryMinutes());
     }
 
+    /** Non-invoice/membership payments older than {@see PENDING_MAX_AGE_MINUTES} must not auto-match. */
+    public function isWithinMatchWindow(): bool
+    {
+        if ($this->shouldStayPendingIndefinitely()) {
+            return true;
+        }
+
+        if (! $this->created_at) {
+            return false;
+        }
+
+        return $this->created_at->gte(now()->subMinutes(self::PENDING_MAX_AGE_MINUTES));
+    }
+
     public function isMatchEligible(): bool
     {
         if ($this->status !== self::STATUS_PENDING || $this->isExpired()) {
+            return false;
+        }
+
+        if (! $this->isWithinMatchWindow()) {
             return false;
         }
 

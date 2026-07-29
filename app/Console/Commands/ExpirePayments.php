@@ -54,7 +54,7 @@ class ExpirePayments extends Command
      */
     private function legacyExpiredPendingPayments()
     {
-        $cutoff = now()->subMinutes(Payment::pendingExpiryMinutes());
+        $cutoff = now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES);
 
         return Payment::query()
             ->where('status', Payment::STATUS_PENDING)

@@ -205,6 +205,10 @@ class PaymentMatchingService
             
             // Try to match each payment using proper matching order
             foreach ($potentialPayments as $payment) {
+                if (! $payment->isMatchEligible()) {
+                    continue;
+                }
+
                 $matchResult = $this->matchPayment($payment, $extractedInfo, $emailDate, $emailData);
                 
                 // Log match attempt
@@ -265,6 +269,11 @@ class PaymentMatchingService
         // Expired transactions must never be automatically matched
         if ($payment->isExpired()) {
             $result['reason'] = 'Transaction has expired';
+            return $result;
+        }
+
+        if (! $payment->isWithinMatchWindow()) {
+            $result['reason'] = 'Transaction is outside the '.Payment::PENDING_MAX_AGE_MINUTES.' minute match window';
             return $result;
         }
         

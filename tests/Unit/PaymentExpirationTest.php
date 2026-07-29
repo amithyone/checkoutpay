@@ -91,8 +91,8 @@ class PaymentExpirationTest extends TestCase
             'email_data' => ['service' => 'general'],
         ]);
         $stale->forceFill([
-            'created_at' => now()->subHours(3),
-            'updated_at' => now()->subHours(3),
+            'created_at' => now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES + 1),
+            'updated_at' => now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES + 1),
         ])->saveQuietly();
 
         $membership = Payment::create([
@@ -115,5 +115,26 @@ class PaymentExpirationTest extends TestCase
 
         $this->assertSame(Payment::STATUS_REJECTED, $stale->status);
         $this->assertSame(Payment::STATUS_PENDING, $membership->status);
+    }
+
+    public function test_regular_payment_not_matchable_after_2400_minutes(): void
+    {
+        $business = $this->makeBusiness();
+
+        $old = Payment::create([
+            'transaction_id' => 'TXN-OLD-1',
+            'amount' => 1500,
+            'business_id' => $business->id,
+            'status' => Payment::STATUS_PENDING,
+            'webhook_url' => '',
+            'email_data' => ['service' => 'general'],
+        ]);
+        $old->forceFill([
+            'created_at' => now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES + 1),
+            'updated_at' => now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES + 1),
+        ])->saveQuietly();
+
+        $this->assertFalse($old->fresh()->isWithinMatchWindow());
+        $this->assertFalse($old->fresh()->isMatchEligible());
     }
 }
