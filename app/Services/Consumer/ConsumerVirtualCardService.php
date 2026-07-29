@@ -565,9 +565,9 @@ final class ConsumerVirtualCardService
     /**
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function topupCard(WhatsappWallet $wallet, string $pin, float $amountUsd): array
+    public function topupCard(WhatsappWallet $wallet, string $pin, float $amountUsd, bool $skipPinVerification = false): array
     {
-        $gate = $this->gateOperableCard($wallet, $pin);
+        $gate = $this->gateOperableCard($wallet, $pin, $skipPinVerification);
         if (! $gate['ok']) {
             return $gate;
         }
@@ -698,9 +698,9 @@ final class ConsumerVirtualCardService
     /**
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function cardDetails(WhatsappWallet $wallet, string $pin): array
+    public function cardDetails(WhatsappWallet $wallet, string $pin, bool $skipPinVerification = false): array
     {
-        $gate = $this->gateOperableCard($wallet, $pin);
+        $gate = $this->gateOperableCard($wallet, $pin, $skipPinVerification);
         if (! $gate['ok']) {
             return $gate;
         }
@@ -2007,13 +2007,13 @@ final class ConsumerVirtualCardService
      * @param  'freeze'|'unfreeze'  $action
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function setCardFrozen(WhatsappWallet $wallet, string $pin, string $action): array
+    public function setCardFrozen(WhatsappWallet $wallet, string $pin, string $action, bool $skipPinVerification = false): array
     {
         if (! in_array($action, ['freeze', 'unfreeze'], true)) {
             return ['ok' => false, 'message' => 'Invalid card status action.'];
         }
 
-        $gate = $this->gateOperableCard($wallet, $pin);
+        $gate = $this->gateOperableCard($wallet, $pin, $skipPinVerification);
         if (! $gate['ok']) {
             return $gate;
         }
@@ -2069,9 +2069,9 @@ final class ConsumerVirtualCardService
     /**
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function withdrawFromCard(WhatsappWallet $wallet, string $pin, float $amountUsd, ?string $reason = null): array
+    public function withdrawFromCard(WhatsappWallet $wallet, string $pin, float $amountUsd, ?string $reason = null, bool $skipPinVerification = false): array
     {
-        $gate = $this->gateOperableCard($wallet, $pin);
+        $gate = $this->gateOperableCard($wallet, $pin, $skipPinVerification);
         if (! $gate['ok']) {
             return $gate;
         }
@@ -2266,7 +2266,7 @@ final class ConsumerVirtualCardService
     /**
      * @return array{ok: bool, message: string, card?: VirtualCardRequest}
      */
-    private function gateOperableCard(WhatsappWallet $wallet, string $pin): array
+    private function gateOperableCard(WhatsappWallet $wallet, string $pin, bool $skipPinVerification = false): array
     {
         if (! $this->isEnabled()) {
             return ['ok' => false, 'message' => 'Dollar Virtual Card is not available right now.'];
@@ -2274,7 +2274,7 @@ final class ConsumerVirtualCardService
         if (! $wallet->isTier2()) {
             return ['ok' => false, 'message' => 'Complete Tier 2 KYC before managing your Dollar Virtual Card.'];
         }
-        if (! $this->pinVerifier->verify($wallet, $pin)) {
+        if (! $skipPinVerification && ! $this->pinVerifier->verify($wallet, $pin)) {
             return ['ok' => false, 'message' => 'Invalid PIN.'];
         }
 

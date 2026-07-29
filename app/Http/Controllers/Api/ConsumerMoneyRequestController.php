@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWalletMoneyRequest;
+use App\Services\Consumer\ConsumerPaymentAuthService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Whatsapp\WhatsappWalletMoneyRequestService;
@@ -54,12 +55,10 @@ class ConsumerMoneyRequestController extends Controller
         Request $request,
         string $id,
         WhatsappWalletMoneyRequestService $moneyRequests,
-        ConsumerWalletPinVerifier $pinVerifier,
+        ConsumerPaymentAuthService $paymentAuth,
         ConsumerDeviceTrustService $deviceTrust,
     ): JsonResponse {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
-        ]);
+        $request->validate($paymentAuth->validationRules());
 
         $user = $request->user();
         $pending = $moneyRequests->findByPublicId($id);
@@ -71,11 +70,9 @@ class ConsumerMoneyRequestController extends Controller
         }
 
         $wallet = $this->walletFor($request)->fresh();
-        if ($wallet->isPinLocked()) {
-            return response()->json(['success' => false, 'message' => 'PIN locked. Try later.'], 423);
-        }
-        if (! $pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        $auth = $paymentAuth->authorize($wallet, $user, $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
         }
 
         $result = $moneyRequests->accept($wallet, $id);

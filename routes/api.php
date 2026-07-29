@@ -139,6 +139,8 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/session/end', [ConsumerWalletAuthController::class, 'endAppSession']);
         Route::post('auth/passkey/register/options', [ConsumerDeviceAuthController::class, 'passkeyRegisterOptions']);
         Route::post('auth/passkey/register/verify', [ConsumerDeviceAuthController::class, 'passkeyRegisterVerify']);
+        Route::post('auth/passkey/transaction/options', [ConsumerDeviceAuthController::class, 'passkeyTransactionOptions']);
+        Route::post('auth/passkey/transaction/verify', [ConsumerDeviceAuthController::class, 'passkeyTransactionVerify']);
         Route::post('auth/device/stepup/push/approve', [ConsumerDeviceAuthController::class, 'stepupPushApprove']);
         Route::post('auth/device/stepup/push/deny', [ConsumerDeviceAuthController::class, 'stepupPushDeny']);
         Route::get('auth/devices', [ConsumerDeviceAuthController::class, 'listDevices']);

@@ -130,6 +130,56 @@ class ConsumerDeviceAuthController extends Controller
         ]);
     }
 
+    public function passkeyTransactionOptions(Request $request, ConsumerWebAuthnService $webauthn): JsonResponse
+    {
+        $request->validate([
+            'intent' => 'required|array',
+            'intent.action' => 'required|string|max:64',
+        ]);
+
+        $account = $this->accountFor($request);
+        $result = $webauthn->transactionOptions($account, (array) $request->input('intent'));
+
+        if (! $result['ok']) {
+            return $this->webauthnFailureResponse($result);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['options'],
+        ]);
+    }
+
+    public function passkeyTransactionVerify(Request $request, ConsumerWebAuthnService $webauthn): JsonResponse
+    {
+        $request->validate([
+            'credential' => 'required|array',
+            'challenge_token' => 'required|string|max:64',
+            'intent' => 'required|array',
+            'intent.action' => 'required|string|max:64',
+        ]);
+
+        $account = $this->accountFor($request);
+        $result = $webauthn->transactionVerify(
+            $account,
+            (string) $request->input('challenge_token'),
+            (array) $request->input('credential'),
+            (array) $request->input('intent'),
+        );
+
+        if (! $result['ok']) {
+            return $this->webauthnFailureResponse($result);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'payment_token' => $result['payment_token'],
+                'expires_at' => $result['expires_at'] ?? null,
+            ],
+        ]);
+    }
+
     public function stepupStart(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse
     {
         $request->validate([

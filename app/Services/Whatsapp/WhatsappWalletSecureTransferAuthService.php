@@ -575,17 +575,17 @@ class WhatsappWalletSecureTransferAuthService
      *
      * @return array{ok: bool, error?: string}
      */
-    public function confirmViaWebPinForConsumerApp(WhatsappWallet $wallet, string $token, string $pinDigits): array
+    public function confirmViaWebPinForConsumerApp(WhatsappWallet $wallet, string $token, string $pinDigits, bool $skipPinVerification = false): array
     {
         $payload = Cache::get($this->cacheKey($token));
         if (! is_array($payload) || (int) ($payload['wallet_id'] ?? 0) !== (int) $wallet->id) {
             return ['ok' => false, 'error' => 'Invalid or expired confirmation for this wallet.'];
         }
 
-        return $this->confirmViaWebPin($token, $pinDigits);
+        return $this->confirmViaWebPin($token, $pinDigits, $skipPinVerification);
     }
 
-    public function confirmViaWebPin(string $token, string $pinDigits): array
+    public function confirmViaWebPin(string $token, string $pinDigits, bool $skipPinVerification = false): array
     {
         $payload = Cache::get($this->cacheKey($token));
         if (! is_array($payload)) {
@@ -625,23 +625,25 @@ class WhatsappWalletSecureTransferAuthService
             return ['ok' => false, 'error' => 'Wallet PIN is locked. Try again later in WhatsApp.'];
         }
 
-        if (! $wallet->pin_hash || ! Hash::check($pinDigits, (string) $wallet->pin_hash)) {
-            $wallet->increment('pin_failed_attempts');
-            $wallet->refresh();
-            if ((int) $wallet->pin_failed_attempts >= 5) {
-                $wallet->pin_locked_until = now()->addMinutes(15);
-                $wallet->save();
-                Cache::forget($this->cacheKey($token));
+        if (! $skipPinVerification) {
+            if (! $wallet->pin_hash || ! Hash::check($pinDigits, (string) $wallet->pin_hash)) {
+                $wallet->increment('pin_failed_attempts');
+                $wallet->refresh();
+                if ((int) $wallet->pin_failed_attempts >= 5) {
+                    $wallet->pin_locked_until = now()->addMinutes(15);
+                    $wallet->save();
+                    Cache::forget($this->cacheKey($token));
 
-                return ['ok' => false, 'error' => 'Too many wrong PIN attempts. Wallet PIN locked for 15 minutes. Open WhatsApp when ready.'];
+                    return ['ok' => false, 'error' => 'Too many wrong PIN attempts. Wallet PIN locked for 15 minutes. Open WhatsApp when ready.'];
+                }
+
+                return ['ok' => false, 'error' => 'Incorrect wallet PIN.'];
             }
 
-            return ['ok' => false, 'error' => 'Incorrect wallet PIN.'];
+            $wallet->pin_failed_attempts = 0;
+            $wallet->pin_locked_until = null;
+            $wallet->save();
         }
-
-        $wallet->pin_failed_attempts = 0;
-        $wallet->pin_locked_until = null;
-        $wallet->save();
 
         Cache::forget($this->cacheKey($token));
         if ($session !== null) {

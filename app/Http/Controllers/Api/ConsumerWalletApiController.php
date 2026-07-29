@@ -20,6 +20,7 @@ use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
 use App\Services\Consumer\ConsumerWalletPayQrService;
+use App\Services\Consumer\ConsumerPaymentAuthService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletSavingsService;
 use App\Services\Consumer\ConsumerWalletStatementService;
@@ -72,6 +73,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerDeviceTrustService $deviceTrust,
         private ConsumerAppSessionService $appSessions,
         private ConsumerWalletElectricityReceiptEnricher $electricityReceiptEnricher,
+        private ConsumerPaymentAuthService $paymentAuth,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -1041,11 +1043,10 @@ class ConsumerWalletApiController extends Controller
 
     public function transferP2p(Request $request): JsonResponse
     {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'to_phone' => 'required|string|min:10|max:20',
             'amount' => 'required|numeric|min:1',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $user = $request->user();
         if ($user instanceof ConsumerWalletApiAccount) {
@@ -1056,11 +1057,8 @@ class ConsumerWalletApiController extends Controller
         }
 
         $wallet = $this->walletFor($request)->fresh();
-        if ($wallet->isPinLocked()) {
-            return response()->json(['success' => false, 'message' => 'PIN locked. Try later.'], 423);
-        }
-        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
+            return $authResponse;
         }
 
         $result = $this->transfers->p2p(
@@ -1092,8 +1090,7 @@ class ConsumerWalletApiController extends Controller
 
     public function transferBank(Request $request): JsonResponse
     {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'amount' => 'required|numeric|min:1',
             'account_number' => 'required|string|size:10',
             'bank_code' => 'required|string|max:20',
@@ -1101,7 +1098,7 @@ class ConsumerWalletApiController extends Controller
             'account_name' => 'required|string|max:120',
             'remark' => 'nullable|string|max:255',
             'from_ledger' => 'nullable|string|in:personal,business',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $user = $request->user();
         if ($user instanceof ConsumerWalletApiAccount) {
@@ -1112,11 +1109,8 @@ class ConsumerWalletApiController extends Controller
         }
 
         $wallet = $this->walletFor($request)->fresh();
-        if ($wallet->isPinLocked()) {
-            return response()->json(['success' => false, 'message' => 'PIN locked. Try later.'], 423);
-        }
-        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
+            return $authResponse;
         }
 
         $result = $this->transfers->bankTransfer(
@@ -1162,16 +1156,22 @@ class ConsumerWalletApiController extends Controller
      */
     public function confirmTransferWebToken(Request $request): JsonResponse
     {
-        $request->validate([
+        $request->validate(array_merge([
             'token' => 'required|string|max:128',
-            'pin' => ['required', 'regex:/^\d{4}$/'],
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
+        $auth = $this->paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
+
+        $skipPin = (bool) ($auth['via_payment_token'] ?? false);
         $result = $this->waTransferAuth->confirmViaWebPinForConsumerApp(
             $wallet,
             (string) $request->input('token'),
-            (string) $request->input('pin')
+            $skipPin ? '' : (string) $request->input('pin'),
+            $skipPin
         );
 
         $ok = (bool) ($result['ok'] ?? false);
@@ -1271,16 +1271,15 @@ class ConsumerWalletApiController extends Controller
 
     public function vtuAirtime(Request $request): JsonResponse
     {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'network_id' => 'required|string|max:40',
             'phone' => 'required|string|min:10|max:20',
             'amount' => 'required|numeric|min:1',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
-        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
+            return $authResponse;
         }
 
         $e164 = PhoneNormalizer::canonicalNgE164Digits((string) $request->input('phone'));
@@ -1304,17 +1303,16 @@ class ConsumerWalletApiController extends Controller
 
     public function vtuData(Request $request): JsonResponse
     {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'network_id' => 'required|string|max:40',
             'phone' => 'required|string|min:10|max:20',
             'variation_id' => 'required|integer|min:1',
             'expected_price' => 'required|numeric|min:1',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
-        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
+            return $authResponse;
         }
 
         $e164 = PhoneNormalizer::canonicalNgE164Digits((string) $request->input('phone'));
@@ -1383,20 +1381,19 @@ class ConsumerWalletApiController extends Controller
 
     public function vtuElectricity(Request $request): JsonResponse
     {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'service_id' => 'required|string|max:64',
             'customer_id' => 'required|string|max:64',
             'variation_id' => 'required|string|in:prepaid,postpaid',
             'amount' => 'required|numeric|min:1',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
         if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
             return $block;
         }
-        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
+            return $authResponse;
         }
 
         $serviceId = (string) $request->input('service_id');
@@ -1498,20 +1495,19 @@ class ConsumerWalletApiController extends Controller
 
     public function vtuTv(Request $request): JsonResponse
     {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'service_id' => 'required|string|max:40',
             'customer_id' => 'required|string|max:64',
             'variation_id' => 'required',
             'expected_price' => 'required|numeric|min:1',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
         if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
             return $block;
         }
-        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
+            return $authResponse;
         }
 
         $serviceId = (string) $request->input('service_id');
@@ -1571,19 +1567,18 @@ class ConsumerWalletApiController extends Controller
 
     public function vtuBetting(Request $request): JsonResponse
     {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'service_id' => 'required|string|max:64',
             'customer_id' => 'required|string|max:128',
             'amount' => 'required|numeric|between:100,100000',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
         if ($block = $this->consumerVtuPreconditionResponse($wallet)) {
             return $block;
         }
-        if (! $this->pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
+            return $authResponse;
         }
 
         $serviceId = (string) $request->input('service_id');
@@ -1744,5 +1739,23 @@ class ConsumerWalletApiController extends Controller
         }
 
         return [$from, $to];
+    }
+
+    /**
+     * @return JsonResponse|null Null when authorized.
+     */
+    private function authorizeWalletPaymentOrFail(Request $request, WhatsappWallet $wallet): ?JsonResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof ConsumerWalletApiAccount) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized.'], 401);
+        }
+
+        $auth = $this->paymentAuth->authorize($wallet, $user, $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
+
+        return null;
     }
 }

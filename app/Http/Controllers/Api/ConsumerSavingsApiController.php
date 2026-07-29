@@ -8,6 +8,7 @@ use App\Http\Requests\Consumer\UpdateSavingsGoalRequest;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WalletSavingsLock;
 use App\Models\WhatsappWallet;
+use App\Services\Consumer\ConsumerPaymentAuthService;
 use App\Services\Consumer\ConsumerWalletSavingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class ConsumerSavingsApiController extends Controller
 {
     public function __construct(
         private ConsumerWalletSavingsService $savings,
+        private ConsumerPaymentAuthService $paymentAuth,
     ) {}
 
     public function show(Request $request): JsonResponse
@@ -130,12 +132,17 @@ class ConsumerSavingsApiController extends Controller
     public function deposit(Request $request): JsonResponse
     {
         $wallet = $this->walletFor($request);
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'amount' => 'required|numeric|min:1',
             'goal_id' => 'sometimes|nullable|integer|min:1',
             'lock_type' => 'sometimes|string|in:flexible,locked',
             'ledger_scope' => 'sometimes|string|in:personal,business',
-        ]);
+        ], $this->paymentAuth->validationRules()));
+
+        $auth = $this->paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
 
         $lockType = $validated['lock_type'] ?? WalletSavingsLock::LOCK_TYPE_LOCKED;
         $ledgerScope = $validated['ledger_scope'] ?? 'personal';
@@ -167,10 +174,15 @@ class ConsumerSavingsApiController extends Controller
     public function withdraw(Request $request): JsonResponse
     {
         $wallet = $this->walletFor($request);
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'amount' => 'required|numeric|min:1',
             'ledger_scope' => 'sometimes|string|in:personal,business',
-        ]);
+        ], $this->paymentAuth->validationRules()));
+
+        $auth = $this->paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
 
         $result = $this->savings->withdrawFlexible(
             $wallet,

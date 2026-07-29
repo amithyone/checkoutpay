@@ -52,6 +52,9 @@ return [
     /** Hours to lock high-value transfers after binding a new trusted device. */
     'transfer_lock_hours' => (int) env('CONSUMER_TRANSFER_LOCK_HOURS', 24),
 
+    /** Short-lived passkey payment_token TTL (minutes). */
+    'payment_token_ttl_minutes' => (int) env('CONSUMER_PAYMENT_TOKEN_TTL_MINUTES', 5),
+
     /** Sanctum token name for consumer mobile sessions. */
     'token_name' => env('CONSUMER_WALLET_TOKEN_NAME', 'consumer_mobile'),
 

@@ -37,6 +37,26 @@ class ConsumerWebAuthnService
 
     private const CACHE_LOGIN = 'consumer_webauthn_login:';
 
+    private const CACHE_TX = 'consumer_webauthn_tx:';
+
+    /** @var list<string> */
+    public const TRANSACTION_ACTIONS = [
+        'transfer_p2p',
+        'transfer_bank',
+        'card_details',
+        'card_topup',
+        'card_withdraw',
+        'card_status',
+        'savings_deposit',
+        'savings_withdraw',
+        'vtu_airtime',
+        'vtu_data',
+        'vtu_electricity',
+        'vtu_tv',
+        'vtu_betting',
+        'wallet_transfer_web',
+    ];
+
     private ?SerializerInterface $serializer = null;
 
     private ?AuthenticatorAttestationResponseValidator $attestationValidator = null;
@@ -334,6 +354,213 @@ class ConsumerWebAuthnService
 
             return ['ok' => false, 'message' => 'Could not verify passkey.'];
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $intent
+     * @return array{ok: bool, message?: string, options?: array<string, mixed>, unavailable?: bool}
+     */
+    public function transactionOptions(ConsumerWalletApiAccount $account, array $intent): array
+    {
+        if (! $this->isEnabled()) {
+            return ['ok' => false, 'message' => 'Device trust is disabled.'];
+        }
+
+        if ($this->normalizeTransactionIntent($intent) === null) {
+            return ['ok' => false, 'message' => 'Unsupported payment action.'];
+        }
+
+        try {
+            $this->ensureInitialized();
+        } catch (WebAuthnNotConfiguredException $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'unavailable' => true];
+        }
+
+        $credentials = $this->existingCredentialDescriptors($account);
+        if ($credentials === []) {
+            return ['ok' => false, 'message' => 'No passkey registered on this account.'];
+        }
+
+        $challenge = random_bytes(32);
+        $options = PublicKeyCredentialRequestOptions::create(
+            $challenge,
+            $this->rpId(),
+            $credentials,
+            PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_REQUIRED,
+            120_000,
+        );
+
+        $challengeToken = (string) Str::uuid();
+        Cache::put($this->txCacheKey($challengeToken), [
+            'options' => $this->optionsToArray($options),
+            'account_id' => $account->id,
+            'intent_hash' => self::intentHash($intent),
+        ], now()->addMinutes(5));
+
+        $payload = $this->optionsToArray($options);
+        $payload['challenge_token'] = $challengeToken;
+
+        return [
+            'ok' => true,
+            'options' => $payload,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $credentialPayload
+     * @param  array<string, mixed>  $intent
+     * @return array{ok: bool, message?: string, payment_token?: string, expires_at?: string, unavailable?: bool}
+     */
+    public function transactionVerify(
+        ConsumerWalletApiAccount $account,
+        string $challengeToken,
+        array $credentialPayload,
+        array $intent,
+    ): array {
+        if (! $this->isEnabled()) {
+            return ['ok' => false, 'message' => 'Device trust is disabled.'];
+        }
+
+        if ($this->normalizeTransactionIntent($intent) === null) {
+            return ['ok' => false, 'message' => 'Unsupported payment action.'];
+        }
+
+        try {
+            $this->ensureInitialized();
+        } catch (WebAuthnNotConfiguredException $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'unavailable' => true];
+        }
+
+        $cached = Cache::get($this->txCacheKey($challengeToken));
+        if (! is_array($cached)
+            || (int) ($cached['account_id'] ?? 0) !== (int) $account->id
+            || ! isset($cached['options']) || ! is_array($cached['options'])
+            || ! hash_equals((string) ($cached['intent_hash'] ?? ''), self::intentHash($intent))) {
+            return ['ok' => false, 'message' => 'Payment authorization session expired. Try again.'];
+        }
+
+        $assertion = $this->verifyAssertionForAccount($account, $cached['options'], $credentialPayload, 'transaction');
+        if (! ($assertion['ok'] ?? false)) {
+            return $assertion;
+        }
+
+        Cache::forget($this->txCacheKey($challengeToken));
+
+        $account->loadMissing('wallet');
+        $walletId = (int) ($account->wallet?->id ?? $account->whatsapp_wallet_id ?? 0);
+        if ($walletId <= 0) {
+            return ['ok' => false, 'message' => 'Wallet not linked.'];
+        }
+
+        $issued = app(ConsumerPaymentAuthService::class)->issuePaymentToken(
+            (int) $account->id,
+            $walletId,
+            $intent,
+        );
+
+        return [
+            'ok' => true,
+            'payment_token' => $issued['payment_token'],
+            'expires_at' => $issued['expires_at'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $intent
+     */
+    public static function intentHash(array $intent): string
+    {
+        $normalized = $intent;
+        ksort($normalized);
+
+        return hash('sha256', json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * @param  array<string, mixed>  $intent
+     */
+    private function normalizeTransactionIntent(array $intent): ?string
+    {
+        $action = trim((string) ($intent['action'] ?? ''));
+        if ($action === '' || ! in_array($action, self::TRANSACTION_ACTIONS, true)) {
+            return null;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  array<string, mixed>  $credentialPayload
+     * @return array{ok: bool, message?: string}
+     */
+    private function verifyAssertionForAccount(
+        ConsumerWalletApiAccount $account,
+        array $cachedOptions,
+        array $credentialPayload,
+        string $flow,
+    ): array {
+        try {
+            $credentialPayload = $this->normalizeCredentialPayload($credentialPayload);
+            /** @var PublicKeyCredential $publicKeyCredential */
+            $publicKeyCredential = $this->serializer()->denormalize(
+                $credentialPayload,
+                PublicKeyCredential::class,
+                'json'
+            );
+            $response = $publicKeyCredential->response;
+            if (! $response instanceof AuthenticatorAssertionResponse) {
+                return ['ok' => false, 'message' => 'Invalid passkey response.'];
+            }
+
+            $storedCredential = $this->findStoredCredential($account, $publicKeyCredential->rawId);
+            if ($storedCredential === null) {
+                return ['ok' => false, 'message' => 'Unknown passkey.'];
+            }
+
+            $record = $this->credentialRecordFromStorage($storedCredential->credential_record);
+            /** @var PublicKeyCredentialRequestOptions $options */
+            $options = $this->serializer()->denormalize(
+                $cachedOptions,
+                PublicKeyCredentialRequestOptions::class,
+                'json'
+            );
+
+            $updated = $this->assertionValidator()->check(
+                $record,
+                $response,
+                $options,
+                $this->rpId(),
+                $record->userHandle,
+            );
+
+            $storedCredential->counter = $updated->counter;
+            $storedCredential->credential_record = $this->credentialRecordToStorage($updated);
+            $storedCredential->save();
+
+            $device = $storedCredential->device;
+            if ($device) {
+                $device->last_active_at = now();
+                $device->save();
+            }
+
+            return ['ok' => true];
+        } catch (AuthenticatorResponseVerificationException $e) {
+            $this->logVerificationFailure($flow, $account->id, $e, $credentialPayload);
+
+            return ['ok' => false, 'message' => 'Passkey verification failed.'];
+        } catch (\Throwable $e) {
+            Log::warning('consumer_webauthn.'.$flow.'_verify_error', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['ok' => false, 'message' => 'Could not verify passkey.'];
+        }
+    }
+
+    private function txCacheKey(string $challengeToken): string
+    {
+        return self::CACHE_TX.$challengeToken;
     }
 
     /**

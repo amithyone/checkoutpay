@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConsumerWalletApiAccount;
+use App\Services\Consumer\ConsumerPaymentAuthService;
 use App\Services\Consumer\ConsumerVirtualCardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,7 @@ class ConsumerVirtualCardController extends Controller
 {
     public function __construct(
         private ConsumerVirtualCardService $cards,
+        private ConsumerPaymentAuthService $paymentAuth,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -102,16 +104,21 @@ class ConsumerVirtualCardController extends Controller
 
     public function topup(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $validated = $request->validate(array_merge([
             'amount_usd' => 'required|numeric|min:0.01|max:10000',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
+        $auth = $this->paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
+
         $result = $this->cards->topupCard(
             $wallet,
-            (string) $validated['pin'],
+            (string) ($request->input('pin') ?? ''),
             (float) $validated['amount_usd'],
+            (bool) ($auth['via_payment_token'] ?? false),
         );
 
         return response()->json([
@@ -123,16 +130,21 @@ class ConsumerVirtualCardController extends Controller
 
     public function setStatus(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $validated = $request->validate(array_merge([
             'action' => 'required|string|in:freeze,unfreeze',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
+        $auth = $this->paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
+
         $result = $this->cards->setCardFrozen(
             $wallet,
-            (string) $validated['pin'],
+            (string) ($request->input('pin') ?? ''),
             (string) $validated['action'],
+            (bool) ($auth['via_payment_token'] ?? false),
         );
 
         return response()->json([
@@ -160,12 +172,19 @@ class ConsumerVirtualCardController extends Controller
 
     public function details(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
-        ]);
+        $request->validate($this->paymentAuth->validationRules());
 
         $wallet = $this->walletFor($request)->fresh();
-        $result = $this->cards->cardDetails($wallet, (string) $validated['pin']);
+        $auth = $this->paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
+
+        $result = $this->cards->cardDetails(
+            $wallet,
+            (string) ($request->input('pin') ?? ''),
+            (bool) ($auth['via_payment_token'] ?? false),
+        );
 
         return response()->json([
             'success' => $result['ok'],
@@ -176,18 +195,23 @@ class ConsumerVirtualCardController extends Controller
 
     public function withdraw(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $validated = $request->validate(array_merge([
             'amount_usd' => 'required|numeric|min:0.01|max:10000',
             'reason' => 'nullable|string|max:120',
-        ]);
+        ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
+        $auth = $this->paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
+        }
+
         $result = $this->cards->withdrawFromCard(
             $wallet,
-            (string) $validated['pin'],
+            (string) ($request->input('pin') ?? ''),
             (float) $validated['amount_usd'],
             $validated['reason'] ?? null,
+            (bool) ($auth['via_payment_token'] ?? false),
         );
 
         return response()->json([

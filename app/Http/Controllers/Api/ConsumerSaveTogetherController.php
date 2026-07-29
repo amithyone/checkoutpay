@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WalletSaveTogetherPot;
 use App\Services\Consumer\ConsumerDeviceTrustService;
-use App\Services\Consumer\ConsumerWalletPinVerifier;
+use App\Services\Consumer\ConsumerPaymentAuthService;
 use App\Services\Consumer\SaveTogetherService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -78,13 +78,12 @@ class ConsumerSaveTogetherController extends Controller
         Request $request,
         string $id,
         SaveTogetherService $saveTogether,
-        ConsumerWalletPinVerifier $pinVerifier,
+        ConsumerPaymentAuthService $paymentAuth,
         ConsumerDeviceTrustService $deviceTrust,
     ): JsonResponse {
-        $request->validate([
+        $request->validate(array_merge([
             'amount' => 'required|numeric|min:1',
-            'pin' => ['required', 'regex:/^\d{4}$/'],
-        ]);
+        ], $paymentAuth->validationRules()));
 
         $user = $request->user();
         $amount = (float) $request->input('amount');
@@ -96,11 +95,9 @@ class ConsumerSaveTogetherController extends Controller
         }
 
         $wallet = $this->walletFor($request)->fresh();
-        if ($wallet->isPinLocked()) {
-            return response()->json(['success' => false, 'message' => 'PIN locked. Try later.'], 423);
-        }
-        if (! $pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        $auth = $paymentAuth->authorize($wallet, $user, $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
         }
 
         $result = $saveTogether->contribute($wallet, $id, $amount);
@@ -116,19 +113,16 @@ class ConsumerSaveTogetherController extends Controller
         Request $request,
         string $id,
         SaveTogetherService $saveTogether,
-        ConsumerWalletPinVerifier $pinVerifier,
+        ConsumerPaymentAuthService $paymentAuth,
     ): JsonResponse {
-        $request->validate([
-            'pin' => ['required', 'regex:/^\d{4}$/'],
+        $request->validate(array_merge([
             'amount' => 'nullable|numeric|min:1',
-        ]);
+        ], $paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
-        if ($wallet->isPinLocked()) {
-            return response()->json(['success' => false, 'message' => 'PIN locked. Try later.'], 423);
-        }
-        if (! $pinVerifier->verify($wallet, (string) $request->input('pin'))) {
-            return response()->json(['success' => false, 'message' => 'Invalid PIN.'], 422);
+        $auth = $paymentAuth->authorize($wallet, $request->user(), $request);
+        if (! $auth['ok']) {
+            return $auth['response'];
         }
 
         $amount = $request->filled('amount') ? (float) $request->input('amount') : null;
