@@ -375,6 +375,82 @@ class MevonPayVirtualCardWebhookTest extends TestCase
         $this->assertSame(10.0, (float) $row->card_balance_usd);
     }
 
+    public function test_card_created_success_matches_when_webhook_reference_is_uuid_but_provider_reference_is_req(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '+2348012345678',
+            'display_name' => 'Miracle Oha',
+            'balance' => 30000,
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        $mevonReq = 'REQ1785348853524';
+        $mevonUuid = '4e6265f9-b57e-4b42-ba88-5e3ea09dbd69';
+        $cardId = 'dbc0fb44-ae26-4ecc-8852-392f90fae119';
+
+        $row = VirtualCardRequest::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'status' => VirtualCardRequest::STATUS_PREPARING,
+            'fee_usd' => 5,
+            'fee_ngn' => 6925,
+            'external_reference' => 'VCARD-MIRACLE-001',
+            'provider_reference' => $mevonReq,
+            'card_name' => 'Miracle Oha',
+            'request_payload' => [
+                'email' => 'miracle@example.com',
+                'phoneNumber' => '08012345678',
+                'cardName' => 'Miracle Oha',
+            ],
+            'response_payload' => [
+                'status' => false,
+                'message' => 'Card creation request processed successfully',
+                'data' => ['request_id' => $mevonReq],
+            ],
+        ]);
+        $this->createHeldFeeTransaction($wallet, $row);
+
+        // Decoy open requests should not steal the webhook match.
+        for ($i = 0; $i < 11; $i++) {
+            VirtualCardRequest::query()->create([
+                'whatsapp_wallet_id' => $wallet->id,
+                'status' => VirtualCardRequest::STATUS_PREPARING,
+                'fee_usd' => 5,
+                'fee_ngn' => 6925,
+                'external_reference' => 'VCARD-DECOY-'.$i,
+                'card_name' => 'Other User '.$i,
+                'request_payload' => [
+                    'email' => 'decoy'.$i.'@example.com',
+                    'phoneNumber' => '0809999000'.$i,
+                ],
+            ]);
+        }
+
+        $response = $this->postJson('/api/v1/webhook/mevonpay', [
+            'event' => 'card.created.success',
+            'data' => [
+                'request_id' => $mevonReq,
+                'card_id' => $cardId,
+                'card_brand' => 'visa',
+                'card_type' => 'virtual',
+                'card_name' => 'Miracle Oha',
+                'card_number' => '4865550146451802',
+                'last4' => '1802',
+                'expiry' => '07/2029',
+                'cvv' => '677',
+                'balance' => 5,
+                'reference' => $mevonUuid,
+            ],
+        ]);
+
+        $response->assertOk()->assertJsonPath('message', 'Virtual card activated');
+
+        $row->refresh();
+        $this->assertSame(VirtualCardRequest::STATUS_ACTIVE, $row->status);
+        $this->assertSame($cardId, $row->card_external_id);
+        $this->assertSame($mevonReq, $row->provider_reference);
+        $this->assertSame('4865550146451802', data_get($row->card_details_payload, 'card_number'));
+    }
+
     public function test_card_webhook_no_match_returns_clear_message_not_ignored(): void
     {
         $response = $this->postJson('/api/v1/webhook/mevonpay', [

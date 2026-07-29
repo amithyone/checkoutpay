@@ -99,6 +99,14 @@ final class VirtualCardMevonWebhookService
             }
         }
 
+        $mevonRequestId = $this->providerResponse->extractMevonRequestId($payload);
+        if ($mevonRequestId !== null && strcasecmp($mevonRequestId, $reference) !== 0) {
+            $row = $this->findRequestByProviderReference($mevonRequestId);
+            if ($row) {
+                return $this->activateFromWebhook($row, $payload, $cardId, $rawBody);
+            }
+        }
+
         if ($reference !== '' && $this->isCheckoutExternalReference($reference)) {
             $row = VirtualCardRequest::query()
                 ->where('external_reference', $reference)
@@ -109,7 +117,8 @@ final class VirtualCardMevonWebhookService
         }
 
         $candidates = $this->openRequestCandidates($cardId);
-        $row = $this->pickBestCandidate($candidates, $reference, $cardId, $email, $phone);
+        $cardName = $this->extractWebhookCardName($payload);
+        $row = $this->pickBestCandidate($candidates, $reference, $cardId, $email, $phone, $cardName, $mevonRequestId);
 
         if (! $row && $cardId !== '') {
             $row = $this->fallbackLatestOpenRequest($cardId);
@@ -119,9 +128,11 @@ final class VirtualCardMevonWebhookService
             $context = $this->cardLogs->withMevonWebhook($payload, $rawBody, [
                 'event' => $this->extractWebhookEvent($payload),
                 'reference' => $reference,
+                'request_id' => $mevonRequestId,
                 'card_id' => $cardId,
                 'email' => $email,
                 'phone' => $phone,
+                'card_name' => $cardName,
                 'candidate_count' => $candidates->count(),
             ]);
             Log::warning('virtual_card.webhook.no_match', $context);
@@ -390,9 +401,24 @@ final class VirtualCardMevonWebhookService
         string $cardId,
         string $email,
         string $phone,
+        string $cardName = '',
+        ?string $mevonRequestId = null,
     ): ?VirtualCardRequest {
         if ($candidates->isEmpty()) {
             return null;
+        }
+
+        if ($mevonRequestId !== null && $mevonRequestId !== '') {
+            foreach ($candidates as $candidate) {
+                if (strcasecmp((string) ($candidate->provider_reference ?? ''), $mevonRequestId) === 0) {
+                    return $candidate;
+                }
+            }
+            foreach ($candidates as $candidate) {
+                if ($this->payloadContainsReference($candidate, $mevonRequestId)) {
+                    return $candidate;
+                }
+            }
         }
 
         foreach ($candidates as $candidate) {
@@ -410,6 +436,19 @@ final class VirtualCardMevonWebhookService
         foreach ($candidates as $candidate) {
             if ($reference !== '' && $this->payloadContainsReference($candidate, $reference)) {
                 return $candidate;
+            }
+        }
+
+        if ($cardName !== '') {
+            $normalizedName = $this->normalizeCardholderName($cardName);
+            $named = $candidates->filter(function (VirtualCardRequest $row) use ($normalizedName) {
+                return $this->normalizeCardholderName((string) ($row->card_name ?? '')) === $normalizedName;
+            });
+            if ($named->count() === 1) {
+                return $named->first();
+            }
+            if ($named->isNotEmpty()) {
+                return $this->pickMostRecentOpenAttempt($named);
             }
         }
 
@@ -507,6 +546,15 @@ final class VirtualCardMevonWebhookService
             ->first();
         if ($row) {
             return $row;
+        }
+
+        if (preg_match('/^REQ\d{6,}$/i', $reference) === 1) {
+            $row = VirtualCardRequest::query()
+                ->where('provider_reference', strtoupper($reference))
+                ->first();
+            if ($row) {
+                return $row;
+            }
         }
 
         return VirtualCardRequest::query()
@@ -655,6 +703,59 @@ final class VirtualCardMevonWebhookService
         }
 
         return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function extractWebhookCardName(array $payload): string
+    {
+        $candidates = [
+            data_get($payload, 'data.card_name'),
+            data_get($payload, 'data.cardName'),
+            data_get($payload, 'data.cardholder_name'),
+            data_get($payload, 'data.cardholder.name'),
+            data_get($payload, 'card_name'),
+        ];
+
+        foreach ($candidates as $value) {
+            $name = trim((string) $value);
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        return '';
+    }
+
+    private function normalizeCardholderName(string $name): string
+    {
+        $collapsed = preg_replace('/\s+/', ' ', trim($name)) ?? '';
+
+        return strtolower($collapsed);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, VirtualCardRequest>  $rows
+     */
+    private function pickMostRecentOpenAttempt($rows): ?VirtualCardRequest
+    {
+        $openStatuses = [
+            VirtualCardRequest::STATUS_PENDING,
+            VirtualCardRequest::STATUS_PREPARING,
+            VirtualCardRequest::STATUS_SUBMITTED,
+        ];
+
+        $prioritized = $rows->sortByDesc(function (VirtualCardRequest $row) use ($openStatuses) {
+            $score = in_array($row->status, $openStatuses, true) ? 100 : 0;
+            if ($row->status === VirtualCardRequest::STATUS_FAILED) {
+                $score += 10;
+            }
+
+            return ($score * 1_000_000_000_000) + (int) $row->id;
+        });
+
+        return $prioritized->first();
     }
 
     /**
