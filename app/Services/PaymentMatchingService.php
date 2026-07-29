@@ -158,9 +158,7 @@ class PaymentMatchingService
             if (!isset($extractedInfo['amount']) || $extractedInfo['amount'] <= 0) {
                 return null;
             }
-            
-            // Get pending payments sorted by creation time (oldest first)
-            // CRITICAL: Only check payments created BEFORE email was received
+
             $query = Payment::where('status', Payment::STATUS_PENDING)
                 ->whereNotIn('payment_source', [
                     Payment::SOURCE_EXTERNAL_MEVONPAY,
@@ -171,37 +169,35 @@ class PaymentMatchingService
                 ->where(function ($q) {
                     $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                 });
-            
-            // CRITICAL: Email must be received AFTER transaction creation
+
             if ($emailDate) {
                 $query->where('created_at', '<=', $emailDate);
             }
-            
-            // Filter by amount - use ±3% tolerance for Moniepoint emails, ±1 naira for others
+
             $isMoniepoint = $this->isMoniepointEmail($emailData);
             if ($isMoniepoint && isset($extractedInfo['amount']) && $extractedInfo['amount'] > 0) {
-                // For Moniepoint: ±3% tolerance
                 $tolerance = ($extractedInfo['amount'] * 3) / 100;
                 $query->whereBetween('amount', [
                     $extractedInfo['amount'] - $tolerance,
-                    $extractedInfo['amount'] + $tolerance
+                    $extractedInfo['amount'] + $tolerance,
                 ]);
             } else {
-                // For other banks: ±1 naira tolerance
                 $query->whereBetween('amount', [
                     $extractedInfo['amount'] - 1,
-                    $extractedInfo['amount'] + 1
+                    $extractedInfo['amount'] + 1,
                 ]);
             }
-            
-            // Filter by email account if available
+
             if (isset($emailData['email_account_id'])) {
                 $query->whereHas('business', function ($q) use ($emailData) {
                     $q->where('email_account_id', $emailData['email_account_id']);
                 });
             }
-            
-            $potentialPayments = $query->orderBy('created_at', 'desc')->get();
+
+            // Newest pending payment first; skip superseded duplicates on same account+amount.
+            $potentialPayments = $this->filterSupersededPendingPayments(
+                $query->orderBy('created_at', 'desc')->get()
+            );
             
             if ($potentialPayments->isEmpty()) {
                 return null;
@@ -1294,6 +1290,38 @@ class PaymentMatchingService
     }
 
     /**
+     * Drop older pending duplicates when a newer pending payment exists for the same business, account, and amount.
+     * Keeps invoice rows (split slices may share an account with different amounts).
+     *
+     * @param  \Illuminate\Support\Collection<int, Payment>  $payments
+     * @return \Illuminate\Support\Collection<int, Payment>
+     */
+    protected function filterSupersededPendingPayments($payments)
+    {
+        return $payments->filter(function (Payment $payment) use ($payments) {
+            if ($payment->isInvoicePayment()) {
+                return true;
+            }
+
+            $superseded = $payments->contains(function (Payment $other) use ($payment) {
+                if ($other->id === $payment->id) {
+                    return false;
+                }
+
+                if ($other->created_at <= $payment->created_at) {
+                    return false;
+                }
+
+                return (int) $other->business_id === (int) $payment->business_id
+                    && (string) $other->account_number === (string) $payment->account_number
+                    && abs((float) $other->amount - (float) $payment->amount) <= 1;
+            });
+
+            return ! $superseded;
+        })->values();
+    }
+
+    /**
      * Match payment to stored emails
      */
     public function matchPaymentToStoredEmail(Payment $payment): ?ProcessedEmail
@@ -1315,7 +1343,7 @@ class PaymentMatchingService
                 $query->where('email_account_id', $payment->business->email_account_id);
             }
             
-            $potentialEmails = $query->orderBy('email_date', 'asc')->get();
+            $potentialEmails = $query->orderBy('email_date', 'desc')->get();
             
             foreach ($potentialEmails as $email) {
                 $emailData = [
@@ -1386,7 +1414,7 @@ class PaymentMatchingService
                 $query->where('email_account_id', $payment->business->email_account_id);
             }
             
-            $potentialEmails = $query->orderBy('email_date', 'asc')->get();
+            $potentialEmails = $query->orderBy('email_date', 'desc')->get();
             
             // Normalize payer name for searching (uppercase, remove extra spaces)
             $payerNameNormalized = strtoupper(trim($payment->payer_name));

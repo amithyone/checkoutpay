@@ -59,6 +59,10 @@ class Kernel extends ConsoleKernel
             ->timezone('Africa/Lagos')
             ->withoutOverlapping(10);
 
+        $schedule->command('payment:expire')
+            ->everyFiveMinutes()
+            ->withoutOverlapping(10);
+
         $schedule->command('mevon:check-balance')
             ->everyFifteenMinutes()
             ->withoutOverlapping(10);

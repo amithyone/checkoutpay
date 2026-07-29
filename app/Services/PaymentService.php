@@ -226,6 +226,11 @@ class PaymentService
             : null;
 
         $isExternalAssigned = (bool) ($account->is_external ?? false);
+        $serviceTag = (string) ($data['service'] ?? ($useInvoicePool ? 'invoice' : 'general'));
+        $expiresAt = Payment::defaultExpiresAtForService($serviceTag, $useInvoicePool);
+        if ($isExternalAssigned && $externalExpiresAt) {
+            $expiresAt = $externalExpiresAt;
+        }
 
         $payment = Payment::create([
             'payment_source' => $isExternalAssigned
@@ -241,6 +246,7 @@ class PaymentService
             'business_website_id' => $businessWebsiteId,
             'developer_program_partner_business_id' => $partnerBusinessId,
             'status' => Payment::STATUS_PENDING,
+            'expires_at' => $expiresAt,
             'email_data' => array_filter([
                 'service' => $data['service'] ?? null,
                 'return_url' => $data['return_url'] ?? null,
@@ -254,11 +260,6 @@ class PaymentService
             'business_receives' => $businessReceives,
             'charges_paid_by_customer' => $chargesPaidByCustomer,
         ]);
-
-        if ($isExternalAssigned && $externalExpiresAt) {
-            $payment->expires_at = $externalExpiresAt;
-            $payment->save();
-        }
 
         try {
             app(\App\Services\Admin\VirtualCardFxRateCaptureTriggerService::class)->recordPaymentAccountAssigned();

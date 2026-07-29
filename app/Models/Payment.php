@@ -224,6 +224,66 @@ class Payment extends Model
         return $this->status === self::STATUS_REJECTED;
     }
 
+    public function isInvoicePayment(): bool
+    {
+        if (($this->email_data['service'] ?? null) === 'invoice') {
+            return true;
+        }
+
+        if ($this->relationLoaded('invoicePayment')) {
+            return $this->invoicePayment !== null;
+        }
+
+        return InvoicePayment::where('payment_id', $this->id)->exists();
+    }
+
+    public function isMembershipPayment(): bool
+    {
+        $emailData = is_array($this->email_data) ? $this->email_data : [];
+
+        return ($emailData['service'] ?? null) === 'membership'
+            || ! empty($emailData['membership_id']);
+    }
+
+    /** Invoice and membership checkout links stay open until paid or manually closed. */
+    public function shouldStayPendingIndefinitely(): bool
+    {
+        return $this->isInvoicePayment() || $this->isMembershipPayment();
+    }
+
+    public static function pendingExpiryMinutes(): int
+    {
+        return max(5, (int) \App\Models\Setting::get('transaction_pending_time_minutes', 1440));
+    }
+
+    public static function defaultExpiresAtForService(?string $service, bool $useInvoicePool = false): ?\Carbon\Carbon
+    {
+        $normalized = strtolower(trim((string) ($service ?? '')));
+        if ($useInvoicePool || in_array($normalized, ['invoice', 'membership'], true)) {
+            return null;
+        }
+
+        return now()->addMinutes(self::pendingExpiryMinutes());
+    }
+
+    public function isMatchEligible(): bool
+    {
+        if ($this->status !== self::STATUS_PENDING || $this->isExpired()) {
+            return false;
+        }
+
+        if ($this->isExternalGatewayPayment()) {
+            return false;
+        }
+
+        $emailData = is_array($this->email_data) ? $this->email_data : [];
+        if (! empty($emailData['skip_auto_match'])) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function isExternalGatewayPayment(): bool
     {
         return in_array($this->payment_source, [
