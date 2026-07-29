@@ -309,6 +309,16 @@
             </form>
             @endif
 
+            @if($canRetryWebhookSync ?? false)
+            <form method="POST" action="{{ route('admin.virtual-cards.retry-webhook-sync', $card) }}"
+                onsubmit="return confirm('Replay the stored MevonPay card-created webhook for this request?');">
+                @csrf
+                <button type="submit" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 text-sm">
+                    <i class="fas fa-link mr-1"></i> Sync from webhook logs
+                </button>
+            </form>
+            @endif
+
             @if($canRefund)
             <form method="POST" action="{{ route('admin.virtual-cards.refund-fee', $card) }}"
                 onsubmit="return confirm('Refund the card fee to the customer wallet?');">
@@ -319,7 +329,7 @@
             </form>
             @endif
 
-            @if(!$canMarkActive && !$canMarkFailed && !$canRetry && !$canRefund)
+            @if(!$canMarkActive && !$canMarkFailed && !$canRetry && !($canRetryWebhookSync ?? false) && !$canRefund)
             <p class="text-sm text-gray-500">No actions available for this status.</p>
             @endif
         </div>

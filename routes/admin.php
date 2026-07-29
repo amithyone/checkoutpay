@@ -330,6 +330,7 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::post('virtual-cards/{virtualCardRequest}/mark-active', [VirtualCardAdminController::class, 'markActive'])->name('virtual-cards.mark-active');
             Route::post('virtual-cards/{virtualCardRequest}/mark-failed', [VirtualCardAdminController::class, 'markFailed'])->name('virtual-cards.mark-failed');
             Route::post('virtual-cards/{virtualCardRequest}/retry', [VirtualCardAdminController::class, 'retry'])->name('virtual-cards.retry');
+            Route::post('virtual-cards/{virtualCardRequest}/retry-webhook-sync', [VirtualCardAdminController::class, 'retryWebhookSync'])->name('virtual-cards.retry-webhook-sync');
             Route::post('virtual-cards/{virtualCardRequest}/refund-fee', [VirtualCardAdminController::class, 'refundFee'])->name('virtual-cards.refund-fee');
 
             // Email Templates

@@ -193,6 +193,18 @@ class ConsumerVirtualCardController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
+    public function retrySync(Request $request): JsonResponse
+    {
+        $wallet = $this->walletFor($request)->fresh();
+        $result = $this->cards->retryActivationSync($wallet);
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => $result['data'] ?? null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
     public function withdraw(Request $request): JsonResponse
     {
         $validated = $request->validate(array_merge([

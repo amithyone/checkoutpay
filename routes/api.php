@@ -199,6 +199,8 @@ Route::prefix('v1')->group(function () {
         Route::get('cards/prefill', [ConsumerVirtualCardController::class, 'prefill']);
         Route::get('cards/quote', [ConsumerVirtualCardController::class, 'quote']);
         Route::post('cards/request', [ConsumerVirtualCardController::class, 'request']);
+        Route::post('cards/retry-sync', [ConsumerVirtualCardController::class, 'retrySync'])
+            ->middleware('throttle:6,1');
         Route::post('cards/topup', [ConsumerVirtualCardController::class, 'topup']);
         Route::post('cards/status', [ConsumerVirtualCardController::class, 'setStatus']);
         Route::post('cards/auto-freeze', [ConsumerVirtualCardController::class, 'setAutoFreeze']);

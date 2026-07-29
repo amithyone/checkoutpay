@@ -266,6 +266,15 @@ class VirtualCardAdminController extends Controller
             ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
+    public function retryWebhookSync(VirtualCardRequest $virtualCardRequest): RedirectResponse
+    {
+        $result = $this->cards->retryWebhookSync($virtualCardRequest);
+
+        return redirect()
+            ->route('admin.virtual-cards.show', $virtualCardRequest)
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
     public function refundFee(VirtualCardRequest $virtualCardRequest): RedirectResponse
     {
         $admin = auth('admin')->user();

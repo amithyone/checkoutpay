@@ -7,6 +7,7 @@ use App\Models\VirtualCardRequest;
 use App\Models\VirtualCardRequestLog;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerVirtualCardService;
+use App\Services\Consumer\VirtualCardActivationRecoveryService;
 use App\Services\Consumer\VirtualCardFeeRefundService;
 use App\Services\Consumer\VirtualCardProviderResponseService;
 use App\Services\MevonPay\MevonPayUsdAutoFundService;
@@ -127,7 +128,7 @@ final class AdminVirtualCardService
     }
 
     /**
-     * @return array{card: VirtualCardRequest, feeTransaction: ?WhatsappWalletTransaction, canMarkActive: bool, canMarkFailed: bool, canRetry: bool, canRefund: bool, cardTransactions: array}
+     * @return array{card: VirtualCardRequest, feeTransaction: ?WhatsappWalletTransaction, canMarkActive: bool, canMarkFailed: bool, canRetry: bool, canRetryWebhookSync: bool, canRefund: bool, cardTransactions: array}
      */
     public function showContext(VirtualCardRequest $card): array
     {
@@ -156,8 +157,34 @@ final class AdminVirtualCardService
             'canMarkActive' => $this->canMarkActive($card),
             'canMarkFailed' => $this->canMarkFailed($card),
             'canRetry' => $this->canRetry($card),
+            'canRetryWebhookSync' => $this->canRetryWebhookSync($card),
             'canRefund' => $this->canRefund($card, $feeTxn),
         ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    public function retryWebhookSync(VirtualCardRequest $card): array
+    {
+        if (! $this->canRetryWebhookSync($card)) {
+            return [
+                'ok' => false,
+                'message' => 'Webhook sync is not available for this card request.',
+            ];
+        }
+
+        $result = app(VirtualCardActivationRecoveryService::class)->retrySync($card);
+
+        return [
+            'ok' => (bool) ($result['ok'] ?? false),
+            'message' => (string) ($result['message'] ?? 'Webhook sync failed.'),
+        ];
+    }
+
+    public function canRetryWebhookSync(VirtualCardRequest $card): bool
+    {
+        return app(VirtualCardActivationRecoveryService::class)->canRetrySync($card);
     }
 
     public function logsQuery(Request $request): LengthAwarePaginator

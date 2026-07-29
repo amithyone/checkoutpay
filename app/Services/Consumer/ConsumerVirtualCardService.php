@@ -37,6 +37,38 @@ final class ConsumerVirtualCardService
         private WhatsappWalletCountryResolver $walletCountry,
     ) {}
 
+    public function retryActivationSync(WhatsappWallet $wallet): array
+    {
+        if (! $this->isEnabled()) {
+            return [
+                'ok' => false,
+                'message' => 'Dollar virtual cards are not available right now.',
+                'data' => null,
+            ];
+        }
+
+        $blocking = $this->blockingCardRequest($wallet);
+        if ($blocking === null || ! $this->isPreparingRequest($blocking)) {
+            return [
+                'ok' => false,
+                'message' => 'No card activation is in progress.',
+                'data' => $this->statusPayload($wallet),
+            ];
+        }
+
+        $recovery = app(VirtualCardActivationRecoveryService::class);
+        $result = $recovery->retrySync($blocking);
+        if ($result['ok']) {
+            return $this->status($wallet, false);
+        }
+
+        return [
+            'ok' => false,
+            'message' => $result['message'],
+            'data' => $this->statusPayload($wallet),
+        ];
+    }
+
     public function isEnabled(): bool
     {
         $stored = Setting::get('virtual_card_enabled');
