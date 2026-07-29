@@ -157,6 +157,66 @@ final class ConsumerWalletPushNotificationService
     }
 
     /**
+     * Referral programme launch announcement (admin / one-time blast).
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function sendReferralLaunch(WhatsappWallet $wallet, string $title, string $body): array
+    {
+        if (! $this->push->isConfigured(PushNotificationService::PROFILE_CHECKOUTNOW)) {
+            return [
+                'ok' => false,
+                'message' => 'CheckoutNow Firebase is not configured. Set CHECKOUTNOW_FCM_PROJECT_ID and CHECKOUTNOW_FCM_SERVICE_ACCOUNT_JSON on the server.',
+            ];
+        }
+
+        $target = $this->resolvePushTarget($wallet);
+        if ($target === null) {
+            return [
+                'ok' => false,
+                'message' => 'No mobile push token for this wallet. The user must open the CheckoutNow app and allow notifications while signed in.',
+            ];
+        }
+
+        $data = [
+            'type' => 'referral_launch',
+            'screen' => 'profile',
+            'scroll_to' => 'refer_and_earn',
+            'wallet_id' => (string) $wallet->id,
+        ];
+
+        try {
+            $failed = $this->push->sendToTokens(
+                [$target],
+                $title,
+                $body,
+                $data,
+                (string) config('consumer_wallet.credit_push_channel', 'money_received'),
+                PushNotificationService::PROFILE_CHECKOUTNOW,
+            );
+            $this->clearTokenIfInvalid($target['token'], $failed);
+            if (in_array($target['token'], $failed, true)) {
+                return [
+                    'ok' => false,
+                    'message' => 'Push rejected the device token (expired or unregistered). Ask the user to open the app again.',
+                ];
+            }
+
+            return ['ok' => true, 'message' => 'Push notification sent.'];
+        } catch (\Throwable $e) {
+            Log::warning('consumer_wallet.referral_launch_push_failed', [
+                'wallet_id' => $wallet->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'ok' => false,
+                'message' => 'Could not send push: '.$e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * @return array{configured: bool, has_token: bool, platform: ?string, updated_at: ?string}
      */
     public function tokenStatus(WhatsappWallet $wallet): array

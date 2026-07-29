@@ -46,24 +46,22 @@ class ConsumerReferralController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'enabled' => $this->settings->enabled(),
                 'pay_code' => $code,
                 'phone_e164' => (string) $wallet->phone_e164,
-                'stats' => [
-                    'referred_count' => $referredCount,
-                    'active_referrals' => $activeCount,
-                    'counted_tx_total' => $countedTx,
-                    'bonuses_earned_total' => round($earned, 2),
-                    'leaderboard_rank' => $pos['rank'],
-                    'leaderboard_score' => $pos['score'],
-                ],
+                'referred_count' => $referredCount,
+                'active_referred_count' => $activeCount,
+                'total_bonus_ngn' => round($earned, 2),
+                'was_referred' => $myReferral !== null,
+                'rules' => $this->settings->publicRules(),
+                'counted_tx_total' => $countedTx,
+                'leaderboard_rank' => $pos['rank'],
+                'leaderboard_score' => $pos['score'],
                 'referred_by' => $myReferral ? [
                     'attribution_source' => $myReferral->attribution_source,
                     'attributed_at' => $myReferral->attributed_at?->toIso8601String(),
                     'bonus_ends_at' => $myReferral->bonus_ends_at?->toIso8601String(),
                     'window_active' => $myReferral->isBonusWindowOpen(),
                 ] : null,
-                'rules' => $this->settings->publicRules(),
             ],
         ]);
     }

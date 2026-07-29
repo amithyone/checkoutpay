@@ -40,7 +40,41 @@ Optional field: `referral_code` — referrer **pay code** or **phone**. Registra
 
 `GET referrals/me` (auth)
 
-Returns pay code, phone, aggregate stats, whether this wallet was referred, and embedded `rules`.
+Returns pay code, phone, header stats, whether this wallet was referred, and embedded `rules`.
+
+```json
+{
+  "success": true,
+  "data": {
+    "pay_code": "AB12CD",
+    "phone_e164": "2348012345678",
+    "referred_count": 12,
+    "active_referred_count": 5,
+    "total_bonus_ngn": 15000,
+    "was_referred": false,
+    "rules": {
+      "enabled": true,
+      "bonus_months": 6,
+      "first_deposit_percent": 5,
+      "first_deposit_max_ngn": null,
+      "first_deposit_min_ngn": 0,
+      "milestone_every": 100,
+      "milestone_amount_ngn": 200,
+      "milestone_currency": "NGN",
+      "leaderboard_enabled": true,
+      "leaderboard_top_n": 10,
+      "terms_url": "https://check-outpay.com/terms-and-conditions#referral-programme",
+      "faq_url": "https://check-outpay.com/faqs?category=whatsapp-wallet"
+    },
+    "counted_tx_total": 420,
+    "leaderboard_rank": 3,
+    "leaderboard_score": 180,
+    "referred_by": null
+  }
+}
+```
+
+Header stats for Refer & Earn UI: `referred_count`, `active_referred_count`, `total_bonus_ngn` (NGN amount, not kobo). Programme on/off: `rules.enabled`.
 
 ## Invite share payload
 

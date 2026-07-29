@@ -296,6 +296,10 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::get('whatsapp-wallet/settings', [WhatsappWalletAdminController::class, 'settings'])->name('whatsapp-wallet.settings');
             Route::put('whatsapp-wallet/referrals/settings', [\App\Http\Controllers\Admin\WhatsappWalletReferralAdminController::class, 'updateSettings'])
                 ->name('whatsapp-wallet.referrals.settings');
+            Route::post('whatsapp-wallet/referrals/notify-launch', [\App\Http\Controllers\Admin\WhatsappWalletReferralAdminController::class, 'notifyLaunch'])
+                ->name('whatsapp-wallet.referrals.notify-launch');
+            Route::post('whatsapp-wallet/referrals/launch-reach', [\App\Http\Controllers\Admin\WhatsappWalletReferralAdminController::class, 'launchReach'])
+                ->name('whatsapp-wallet.referrals.launch-reach');
             Route::put('whatsapp-wallet', [WhatsappWalletAdminController::class, 'update'])->name('whatsapp-wallet.update');
             Route::put('whatsapp-wallet/fx-rates', [WhatsappWalletAdminController::class, 'updateFxRates'])->name('whatsapp-wallet.fx-rates.update');
             Route::put('whatsapp-wallet/wallets/{wallet}/status', [WhatsappWalletAdminController::class, 'updateWalletStatus'])->name('whatsapp-wallet.wallets.status');

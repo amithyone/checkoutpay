@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\WhatsappWalletReferral;
 use App\Models\WhatsappWalletReferralBonus;
 use App\Services\Consumer\WalletReferralLeaderboardService;
+use App\Services\Consumer\WalletReferralLaunchNotificationService;
 use App\Services\Consumer\WalletReferralSettingsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,5 +60,65 @@ class WhatsappWalletReferralAdminController extends Controller
         }
 
         return back()->with('success', $result['message'] ?? 'Saved.');
+    }
+
+    public function notifyLaunch(
+        Request $request,
+        WalletReferralLaunchNotificationService $launch,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'dry_run' => ['nullable', 'boolean'],
+            'force' => ['nullable', 'boolean'],
+            'channel_email' => ['nullable', 'boolean'],
+            'channel_push' => ['nullable', 'boolean'],
+        ]);
+
+        $dryRun = filter_var($validated['dry_run'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $force = filter_var($validated['force'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $sendEmail = filter_var($validated['channel_email'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        $sendPush = filter_var($validated['channel_push'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+        if (! $sendEmail && ! $sendPush) {
+            return back()->with('error', 'Select email and/or app push.');
+        }
+
+        try {
+            $counts = $launch->sendAll($dryRun, $force, $sendEmail, $sendPush);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $summary = sprintf(
+            'Eligible: %d · Emails: %d sent, %d skipped, %d failed · Push: %d sent, %d skipped, %d failed · Marked notified: %d',
+            $counts['eligible'],
+            $counts['emails_sent'],
+            $counts['emails_skipped'],
+            $counts['emails_failed'],
+            $counts['pushes_sent'],
+            $counts['pushes_skipped'],
+            $counts['pushes_failed'],
+            $counts['marked_notified'],
+        );
+
+        return back()->with('success', ($dryRun ? '[Dry run] ' : '').$summary);
+    }
+
+    public function launchReach(WalletReferralLaunchNotificationService $launch): RedirectResponse
+    {
+        try {
+            $counts = $launch->estimate(false);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with(
+            'success',
+            sprintf(
+                'Pending launch reach (not yet notified): %d wallets · ~%d emails · ~%d push tokens',
+                $counts['eligible'],
+                $counts['emails_sent'],
+                $counts['pushes_sent'],
+            )
+        );
     }
 }

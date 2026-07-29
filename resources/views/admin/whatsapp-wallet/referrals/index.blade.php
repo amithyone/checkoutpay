@@ -40,6 +40,44 @@
 
     @if(auth('admin')->user()?->canManageSettings())
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+        <h4 class="font-semibold text-gray-900 mb-1">Launch announcement</h4>
+        <p class="text-xs text-gray-500 mb-4">
+            Email and/or app push telling wallet users we now have a referral programme. Message directs them to
+            <strong>Profile → Refer and Earn</strong> for their code. Each wallet is marked once (<code>referral_launch_notified_at</code>); use force to resend.
+        </p>
+        <form method="POST" action="{{ route('admin.whatsapp-wallet.referrals.launch-reach') }}" class="mb-4">
+            @csrf
+            <button type="submit" class="text-sm px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Estimate pending reach</button>
+        </form>
+        <form method="POST" action="{{ route('admin.whatsapp-wallet.referrals.notify-launch') }}" class="space-y-4">
+            @csrf
+            <div class="flex flex-wrap gap-4 text-sm text-gray-800">
+                <label class="flex items-center gap-2">
+                    <input type="hidden" name="channel_email" value="0">
+                    <input type="checkbox" name="channel_email" value="1" checked class="rounded border-gray-300"> Email
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="hidden" name="channel_push" value="0">
+                    <input type="checkbox" name="channel_push" value="1" checked class="rounded border-gray-300"> App push
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="hidden" name="dry_run" value="0">
+                    <input type="checkbox" name="dry_run" value="1" class="rounded border-gray-300"> Dry run (no send)
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="hidden" name="force" value="0">
+                    <input type="checkbox" name="force" value="1" class="rounded border-gray-300"> Force (include already notified)
+                </label>
+            </div>
+            <button type="submit" class="text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700" onclick="return confirm('Send referral launch notifications?');">
+                Send launch notifications
+            </button>
+        </form>
+    </div>
+    @endif
+
+    @if(auth('admin')->user()?->canManageSettings())
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
         <h4 class="font-semibold text-gray-900 mb-3">Programme settings</h4>
         <p class="text-xs text-gray-500 mb-4">All commercial numbers are editable here — services never hardcode rates.</p>
         <form method="POST" action="{{ route('admin.whatsapp-wallet.referrals.settings') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
