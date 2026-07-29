@@ -23,40 +23,30 @@ class PaymentController extends Controller
         
         if ($request->filled('status')) {
             if ($request->status === 'pending') {
-                // For pending, only show non-expired (unless searching)
                 $query->where('status', Payment::STATUS_PENDING);
-                if (!$isSearching) {
-                    $query->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                    });
+                if (! $isSearching) {
+                    $query->matchablePending();
                 }
             } else {
                 $query->where('status', $request->status);
             }
         } else {
-            // Default: show all including expired (unless searching, then show everything)
-            if (!$isSearching) {
+            if (! $isSearching) {
                 $query->where(function ($q) {
-                    // Include all statuses, but for pending, exclude expired
                     $q->where('status', '!=', Payment::STATUS_PENDING)
                         ->orWhere(function ($pendingQ) {
                             $pendingQ->where('status', Payment::STATUS_PENDING)
-                                ->where(function ($expQ) {
-                                    $expQ->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                                });
+                                ->matchablePending();
                         });
                 });
             }
-            // If searching, don't apply default expiration filter - show all
         }
 
         // Filter for unmatched pending transactions
         if ($request->filled('unmatched') && $request->unmatched === '1') {
             $query->where('status', Payment::STATUS_PENDING);
-            if (!$isSearching) {
-                $query->where(function ($q) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                });
+            if (! $isSearching) {
+                $query->matchablePending();
             }
             $query->whereNotExists(function ($subQuery) {
                 $subQuery->select(DB::raw(1))
@@ -69,10 +59,8 @@ class PaymentController extends Controller
         // Filter for transactions needing review (multiple API status checks)
         if ($request->filled('needs_review') && $request->needs_review === '1') {
             $query->where('status', Payment::STATUS_PENDING);
-            if (!$isSearching) {
-                $query->where(function ($q) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                });
+            if (! $isSearching) {
+                $query->matchablePending();
             }
             $query->withCount('statusChecks')
                 ->having('status_checks_count', '>=', 3); // 3 or more API checks
@@ -603,9 +591,8 @@ class PaymentController extends Controller
     {
         $query = Payment::with(['business', 'website'])
             ->withCount(['matchAttempts', 'statusChecks'])
-            ->where('status', Payment::STATUS_PENDING)
-            ->where('expires_at', '<=', now())
-            ->latest('expires_at');
+            ->stalePending()
+            ->latest('created_at');
 
         // Filter by business
         if ($request->filled('business_id')) {
@@ -653,9 +640,7 @@ class PaymentController extends Controller
             }])
             ->with('accountNumberDetails')
             ->where('status', Payment::STATUS_PENDING)
-            ->where(function ($q) {
-                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
+            ->matchablePending()
             ->withCount('statusChecks')
             ->having('status_checks_count', '>=', 3)
             ->latest();

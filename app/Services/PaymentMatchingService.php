@@ -160,15 +160,13 @@ class PaymentMatchingService
             }
 
             $query = Payment::where('status', Payment::STATUS_PENDING)
+                ->matchablePending()
                 ->whereNotIn('payment_source', [
                     Payment::SOURCE_EXTERNAL_MEVONPAY,
                     Payment::SOURCE_EXTERNAL_SLA,
                     Payment::SOURCE_EXTERNAL_MAVONPAY,
                     Payment::SOURCE_WHATSAPP_WALLET,
-                ])
-                ->where(function ($q) {
-                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                });
+                ]);
 
             if ($emailDate) {
                 $query->where('created_at', '<=', $emailDate);

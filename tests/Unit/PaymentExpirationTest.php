@@ -117,24 +117,29 @@ class PaymentExpirationTest extends TestCase
         $this->assertSame(Payment::STATUS_PENDING, $membership->status);
     }
 
-    public function test_regular_payment_not_matchable_after_2400_minutes(): void
+    public function test_stale_pending_with_null_expires_at_is_detected(): void
     {
         $business = $this->makeBusiness();
 
-        $old = Payment::create([
-            'transaction_id' => 'TXN-OLD-1',
-            'amount' => 1500,
+        $stale = Payment::create([
+            'transaction_id' => 'TXN-STALE-NULL-EXP',
+            'amount' => 900,
             'business_id' => $business->id,
             'status' => Payment::STATUS_PENDING,
             'webhook_url' => '',
+            'expires_at' => null,
             'email_data' => ['service' => 'general'],
         ]);
-        $old->forceFill([
-            'created_at' => now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES + 1),
-            'updated_at' => now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES + 1),
+        $stale->forceFill([
+            'created_at' => now()->subMinutes(3222),
+            'updated_at' => now()->subMinutes(3222),
         ])->saveQuietly();
 
-        $this->assertFalse($old->fresh()->isWithinMatchWindow());
-        $this->assertFalse($old->fresh()->isMatchEligible());
+        $this->assertTrue($stale->fresh()->isStalePending());
+        $this->assertSame(1, Payment::stalePending()->where('id', $stale->id)->count());
+
+        $this->artisan('payment:expire')->assertSuccessful();
+
+        $this->assertSame(Payment::STATUS_REJECTED, $stale->fresh()->status);
     }
 }

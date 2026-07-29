@@ -172,14 +172,71 @@ class Payment extends Model
     }
 
     /**
-     * Get pending payments
+     * Get pending payments eligible for bank-email matching (excludes stale non-invoice/membership rows).
      */
     public static function pending()
     {
-        return static::where('status', self::STATUS_PENDING)
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
+        return static::where('status', self::STATUS_PENDING)->matchablePending();
+    }
+
+    /**
+     * Pending rows that can still receive automatic bank-transfer matching.
+     */
+    public function scopeMatchablePending($query)
+    {
+        $cutoff = now()->subMinutes(self::PENDING_MAX_AGE_MINUTES);
+
+        return $query->where(function ($eligible) use ($cutoff) {
+            $eligible->where(function ($exempt) {
+                $exempt->whereJsonContains('email_data->service', 'invoice')
+                    ->orWhereJsonContains('email_data->service', 'membership')
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(email_data, '$.membership_id')) IS NOT NULL")
+                    ->orWhereExists(function ($sub) {
+                        $sub->from('invoice_payments')
+                            ->selectRaw('1')
+                            ->whereColumn('invoice_payments.payment_id', 'payments.id');
+                    });
+            })->orWhere(function ($regular) use ($cutoff) {
+                $regular->where('created_at', '>', $cutoff)
+                    ->where(function ($exp) {
+                        $exp->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    });
+            });
+        });
+    }
+
+    public function isStalePending(): bool
+    {
+        return $this->status === self::STATUS_PENDING
+            && ! $this->shouldStayPendingIndefinitely()
+            && ($this->isExpired() || ! $this->isWithinMatchWindow());
+    }
+
+    /** Pending checkout rows past expiry or max age (excluding invoice/membership). */
+    public function scopeStalePending($query)
+    {
+        $cutoff = now()->subMinutes(self::PENDING_MAX_AGE_MINUTES);
+
+        return $query->where('status', self::STATUS_PENDING)
+            ->where(function ($q) use ($cutoff) {
+                $q->where(function ($exp) {
+                    $exp->whereNotNull('expires_at')->where('expires_at', '<=', now());
+                })->orWhere('created_at', '<=', $cutoff);
+            })
+            ->where(function ($q) {
+                $q->where(function ($row) {
+                    $row->whereNull('email_data')
+                        ->orWhere(function ($service) {
+                            $service->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(email_data, '$.service')) NOT IN ('invoice', 'membership')")
+                                ->orWhereRaw("JSON_EXTRACT(email_data, '$.service') IS NULL");
+                        });
+                })
+                    ->whereRaw("JSON_EXTRACT(email_data, '$.membership_id') IS NULL")
+                    ->whereNotExists(function ($sub) {
+                        $sub->from('invoice_payments')
+                            ->selectRaw('1')
+                            ->whereColumn('invoice_payments.payment_id', 'payments.id');
+                    });
             });
     }
 

@@ -9,29 +9,47 @@ use Illuminate\Console\Command;
 
 class ExpirePayments extends Command
 {
-    protected $signature = 'payment:expire';
+    protected $signature = 'payment:expire {--dry-run : List payments that would expire without rejecting them}';
 
-    protected $description = 'Expire pending payments that have passed their expiration time';
+    protected $description = 'Expire pending payments that have passed their expiration time or max age';
 
-    public function handle(TransactionLogService $logService): void
+    public function handle(TransactionLogService $logService): int
     {
         $this->info('Checking for expired payments...');
 
-        $expiredPayments = Payment::expired()->get();
-        $legacyExpired = $this->legacyExpiredPendingPayments();
+        $candidates = Payment::query()
+            ->where('status', Payment::STATUS_PENDING)
+            ->whereNotIn('payment_source', [
+                Payment::SOURCE_EXTERNAL_MEVONPAY,
+                Payment::SOURCE_EXTERNAL_SLA,
+                Payment::SOURCE_EXTERNAL_MAVONPAY,
+                Payment::SOURCE_WHATSAPP_WALLET,
+            ])
+            ->where(function ($query) {
+                $query->where(function ($q) {
+                    $q->whereNotNull('expires_at')->where('expires_at', '<=', now());
+                })->orWhere('created_at', '<=', now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES));
+            })
+            ->orderBy('created_at')
+            ->get()
+            ->filter(fn (Payment $payment) => $payment->isStalePending());
 
-        $all = $expiredPayments->concat($legacyExpired)->unique('id');
-
-        if ($all->isEmpty()) {
+        if ($candidates->isEmpty()) {
             $this->info('No expired payments found.');
 
-            return;
+            return self::SUCCESS;
         }
 
-        $this->info("Found {$all->count()} expired payment(s)");
+        $this->info("Found {$candidates->count()} expired payment(s)");
 
-        foreach ($all as $payment) {
-            if (! $payment->isPending() || $payment->shouldStayPendingIndefinitely()) {
+        foreach ($candidates as $payment) {
+            $age = (int) $payment->created_at->diffInMinutes(now());
+            $line = "Expired payment: {$payment->transaction_id} (age {$age} min, expires_at="
+                .($payment->expires_at?->toDateTimeString() ?? 'null').')';
+
+            if ($this->option('dry-run')) {
+                $this->line('[dry-run] '.$line);
+
                 continue;
             }
 
@@ -39,34 +57,17 @@ class ExpirePayments extends Command
 
             $logService->logPaymentExpired($payment);
 
-            $this->line("Expired payment: {$payment->transaction_id}");
+            $this->line($line);
 
             event(new PaymentExpired($payment));
         }
 
-        $this->info('Expired payments processed successfully.');
-    }
+        if ($this->option('dry-run')) {
+            $this->warn('Dry run only — no payments were rejected.');
+        } else {
+            $this->info('Expired payments processed successfully.');
+        }
 
-    /**
-     * Pending rows created before auto-expiry existed: null expires_at but older than the admin window.
-     *
-     * @return \Illuminate\Support\Collection<int, Payment>
-     */
-    private function legacyExpiredPendingPayments()
-    {
-        $cutoff = now()->subMinutes(Payment::PENDING_MAX_AGE_MINUTES);
-
-        return Payment::query()
-            ->where('status', Payment::STATUS_PENDING)
-            ->whereNull('expires_at')
-            ->where('created_at', '<=', $cutoff)
-            ->whereNotIn('payment_source', [
-                Payment::SOURCE_EXTERNAL_MEVONPAY,
-                Payment::SOURCE_EXTERNAL_SLA,
-                Payment::SOURCE_EXTERNAL_MAVONPAY,
-                Payment::SOURCE_WHATSAPP_WALLET,
-            ])
-            ->get()
-            ->filter(fn (Payment $payment) => ! $payment->shouldStayPendingIndefinitely());
+        return self::SUCCESS;
     }
 }

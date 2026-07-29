@@ -124,9 +124,7 @@ class DashboardController extends Controller
                 // Get pending payments that haven't been matched and are not expired
                 // A payment is considered unmatched if status is pending and no processed_email has matched_payment_id = payment.id
                 'total' => Payment::where('status', Payment::STATUS_PENDING)
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                    })
+                    ->matchablePending()
                     ->whereNotExists(function ($query) {
                         $query->select(DB::raw(1))
                             ->from('processed_emails')
@@ -146,9 +144,7 @@ class DashboardController extends Controller
                     })
                     ->count(),
                 'recent' => Payment::where('status', Payment::STATUS_PENDING)
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                    })
+                    ->matchablePending()
                     ->whereNotExists(function ($query) {
                         $query->select(DB::raw(1))
                             ->from('processed_emails')
