@@ -6,7 +6,7 @@ Native / POS base URL:
 EXPO_PUBLIC_CHECKOUT_BROADCAST_API=https://check-outpay.com/api/v1/broadcast
 ```
 
-Laravel-native implementation of the open `checkout_broadcast` bank_api (Option B).
+CheckoutNow **Pay at shop** posts signed BLE packets to `POST /verify-broadcast`. Merchant POS terminals use **Ed25519**; the open `checkout_broadcast` SDK (v2.0) still supports **HMAC-SHA256**.
 
 ## Endpoints
 
@@ -23,17 +23,50 @@ Laravel-native implementation of the open `checkout_broadcast` bank_api (Option 
 ```bash
 cd ~/public_html
 git pull
-php artisan migrate --force --path=database/migrations/2026_07_18_140000_create_broadcast_terminals_tables.php
+php artisan migrate --force
+php artisan config:clear
 ```
 
-Set in `.env` (then `php artisan config:clear`):
+Set in `.env`:
 
 ```env
 BROADCAST_ADMIN_KEY=long-random-secret
 BROADCAST_RATE_LIMIT_VERIFY=120
 ```
 
-## Register a test terminal
+## Terminal credentials (CheckoutNow / POS)
+
+When you register a terminal (`POST /terminals/register` with `signature_alg: ed25519`), the API returns the credentials to provision on the POS:
+
+| Field | Description |
+|-------|-------------|
+| **terminal_id** | Unique POS identifier, e.g. `TERM-001` |
+| **merchant_id** | Merchant identifier, e.g. `MCH-TERM-001` |
+| **api_key** | Terminal API key (`bk_…`) for CheckoutPay integrations |
+| **signing_key** | Ed25519 private key (base64) — **shown once** at registration; store on POS only |
+
+The server stores only the **public key** for Ed25519 verification.
+
+### Register a terminal (Ed25519 — CheckoutNow default)
+
+```bash
+curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' \
+  -H 'Content-Type: application/json' \
+  -H "X-Admin-Key: $BROADCAST_ADMIN_KEY" \
+  -d '{
+    "terminal_id": "TERM-001",
+    "signature_alg": "ed25519",
+    "merchant_name": "Amithy Store",
+    "bank_name": "GTBank",
+    "masked_account_suffix": "***1234",
+    "account_number": "0123456789",
+    "recipient_bank_code": "058"
+  }'
+```
+
+Response includes `terminal_id`, `merchant_id`, `api_key`, and `signing_key` (one-time).
+
+### Register a terminal (HMAC-SHA256 — checkout_broadcast SDK v2.0)
 
 ```bash
 curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' \
@@ -41,29 +74,64 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
   -H "X-Admin-Key: $BROADCAST_ADMIN_KEY" \
   -d '{
     "terminal_id": "POS-DEMO-001",
+    "signature_alg": "HMAC-SHA256",
     "signing_key": "your-terminal-secret-min-16-chars",
     "merchant_name": "Demo Shop",
     "bank_name": "CheckoutPay",
     "masked_account_suffix": "***1234",
     "account_number": "0123456789",
-    "recipient_bank_code": "058",
-    "business_id": null
+    "recipient_bank_code": "058"
   }'
 ```
 
-Optional: set `business_id` to link the terminal to an existing `businesses` row.
+## Verify-broadcast contract (CheckoutNow app)
 
-## CLI (from checkout_broadcast repo)
+**Request:** `POST /api/v1/broadcast/verify-broadcast` — no auth header.
 
-```bash
-export CHECKOUT_BANK_ADMIN_KEY="…"
-export CHECKOUT_SIGNING_KEY="your-terminal-secret-min-16-chars"
-PYTHONPATH="sdk/python:." python -m checkout_broadcast.cli register-terminal \
-  --bank-url https://check-outpay.com/api/v1/broadcast
-
-PYTHONPATH="sdk/python:." python -m checkout_broadcast.cli demo-send \
-  --amount 2500 --bank-url https://check-outpay.com/api/v1/broadcast
+```json
+{
+  "payload": {
+    "protocol_version": 1,
+    "timestamp_ms": 1738123456789,
+    "session_uuid_v4": "550e8400-e29b-41d4-a716-446655440000",
+    "terminal_id": "TERM-001",
+    "transaction_details": {
+      "currency_code": "NGN",
+      "total_amount_ngn": 5000,
+      "item_count": 3
+    },
+    "account_info_public_display": {
+      "bank_name_hash": "sha256:…",
+      "masked_account_suffix": "***1234"
+    }
+  },
+  "signature_alg": "ed25519",
+  "signature": "<base64-or-hex>"
+}
 ```
+
+**Success (200):**
+
+```json
+{
+  "valid": true,
+  "merchant_name": "Amithy Store",
+  "amount_ngn": 5000,
+  "masked_account_suffix": "***1234",
+  "session_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "terminal_id": "TERM-001",
+  "recipient_account": "0123456789",
+  "recipient_bank_code": "058"
+}
+```
+
+**Failure:**
+
+```json
+{ "valid": false, "error": "Invalid signature" }
+```
+
+HTTP 429 when rate-limited.
 
 ## Security
 
@@ -71,3 +139,13 @@ PYTHONPATH="sdk/python:." python -m checkout_broadcast.cli demo-send \
 - Keep `BROADCAST_ADMIN_KEY` and terminal `signing_key` out of git
 - Verify endpoint is rate-limited per IP
 - Session UUIDs are persisted in `broadcast_used_sessions` (replay protection)
+- Timestamp window: 10 minutes
+
+## CLI (HMAC terminals — checkout_broadcast repo)
+
+```bash
+export CHECKOUT_BANK_ADMIN_KEY="…"
+export CHECKOUT_SIGNING_KEY="your-terminal-secret-min-16-chars"
+PYTHONPATH="sdk/python:." python -m checkout_broadcast.cli register-terminal \
+  --bank-url https://check-outpay.com/api/v1/broadcast
+```
