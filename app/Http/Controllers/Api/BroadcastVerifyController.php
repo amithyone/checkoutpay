@@ -251,6 +251,25 @@ class BroadcastVerifyController extends Controller
         $this->recordSession($session, $terminalId);
 
         $maskedSuffix = (string) $terminal->masked_account_suffix;
+        $connectivity = (string) ($payload['connectivity'] ?? 'online');
+        $offlineSettlement = is_array($payload['offline_settlement'] ?? null)
+            ? $payload['offline_settlement']
+            : null;
+
+        $recipientAccount = (string) $terminal->account_number;
+        $recipientBankCode = $terminal->recipient_bank_code;
+        $bankName = (string) $terminal->bank_name;
+        $recipientAccountName = (string) $terminal->merchant_name;
+
+        if ($connectivity === 'offline' && is_array($offlineSettlement)) {
+            $recipientAccount = (string) ($offlineSettlement['recipient_account'] ?? $recipientAccount);
+            $recipientBankCode = (string) ($offlineSettlement['recipient_bank_code'] ?? $recipientBankCode);
+            $bankName = (string) ($offlineSettlement['bank_name'] ?? $bankName);
+            $recipientAccountName = (string) ($offlineSettlement['recipient_account_name'] ?? $recipientAccountName);
+            $logBase['connectivity'] = 'offline';
+        } else {
+            $logBase['connectivity'] = 'online';
+        }
 
         $this->logVerifyAttempt($logBase, [
             'valid' => true,
@@ -263,15 +282,16 @@ class BroadcastVerifyController extends Controller
         return response()->json([
             'valid' => true,
             'merchant_name' => $terminal->merchant_name,
-            'recipient_account_name' => $terminal->merchant_name,
+            'recipient_account_name' => $recipientAccountName,
             'amount_ngn' => $amount,
-            'bank_name' => $terminal->bank_name,
+            'bank_name' => $bankName,
             'masked_account_suffix' => $maskedSuffix,
             'session_uuid' => $session,
             'session_status' => BroadcastSessionService::STATUS_OPEN,
             'terminal_id' => $terminalId,
-            'recipient_account' => $terminal->account_number,
-            'recipient_bank_code' => $terminal->recipient_bank_code,
+            'connectivity' => $connectivity,
+            'recipient_account' => $recipientAccount,
+            'recipient_bank_code' => $recipientBankCode,
         ]);
     }
 
