@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Broadcast\BroadcastSessionService;
 use App\Services\Broadcast\BroadcastSignatureVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class BroadcastVerifyController extends Controller
 
     public function __construct(
         private readonly BroadcastSignatureVerifier $signatures,
+        private readonly BroadcastSessionService $sessions,
     ) {}
 
     public function health(): JsonResponse
@@ -139,16 +141,6 @@ class BroadcastVerifyController extends Controller
             return response()->json(['valid' => false, 'error' => 'Missing timestamp_ms in payload']);
         }
 
-        if (abs((int) (microtime(true) * 1000) - $timestampMs) > self::MAX_AGE_MS) {
-            $this->logVerifyAttempt($logBase, [
-                'valid' => false,
-                'error' => 'Timestamp outside allowed window',
-                'http_status' => 200,
-            ]);
-
-            return response()->json(['valid' => false, 'error' => 'Timestamp outside allowed window']);
-        }
-
         if ($session === '' || ! Str::isUuid($session)) {
             $this->logVerifyAttempt($logBase, [
                 'valid' => false,
@@ -159,12 +151,76 @@ class BroadcastVerifyController extends Controller
             return response()->json(['valid' => false, 'error' => 'Invalid session UUID']);
         }
 
+        $existingSession = $this->sessions->find($session);
+        if ($existingSession !== null) {
+            if ($existingSession->status === BroadcastSessionService::STATUS_PAID) {
+                $this->logVerifyAttempt($logBase, [
+                    'valid' => false,
+                    'error' => 'Session already paid',
+                    'session_status' => BroadcastSessionService::STATUS_PAID,
+                    'http_status' => 200,
+                ]);
+
+                return response()->json([
+                    'valid' => false,
+                    'error' => 'Session already paid',
+                    'session_status' => BroadcastSessionService::STATUS_PAID,
+                ]);
+            }
+
+            if ($existingSession->status === BroadcastSessionService::STATUS_CANCELLED) {
+                $this->logVerifyAttempt($logBase, [
+                    'valid' => false,
+                    'error' => 'Session cancelled',
+                    'session_status' => BroadcastSessionService::STATUS_CANCELLED,
+                    'http_status' => 200,
+                ]);
+
+                return response()->json([
+                    'valid' => false,
+                    'error' => 'Session cancelled',
+                    'session_status' => BroadcastSessionService::STATUS_CANCELLED,
+                ]);
+            }
+
+            if ($existingSession->terminal_id !== $terminalId) {
+                $this->logVerifyAttempt($logBase, [
+                    'valid' => false,
+                    'error' => 'Session terminal mismatch',
+                    'http_status' => 200,
+                ]);
+
+                return response()->json(['valid' => false, 'error' => 'Session terminal mismatch']);
+            }
+        }
+
+        $sessionIsOpen = $existingSession !== null
+            && $existingSession->status === BroadcastSessionService::STATUS_OPEN;
+
+        if (! $sessionIsOpen && abs((int) (microtime(true) * 1000) - $timestampMs) > self::MAX_AGE_MS) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Timestamp outside allowed window',
+                'http_status' => 200,
+            ]);
+
+            return response()->json(['valid' => false, 'error' => 'Timestamp outside allowed window']);
+        }
+
         $display = $payload['account_info_public_display'] ?? [];
-        if (! is_array($display) || ($display['bank_name_hash'] ?? '') !== $terminal->bank_name_hash) {
+        $receivedBankNameHash = is_array($display) ? (string) ($display['bank_name_hash'] ?? '') : '';
+        if (! is_array($display) || $receivedBankNameHash !== $terminal->bank_name_hash) {
             $this->logVerifyAttempt($logBase, [
                 'valid' => false,
                 'error' => 'Bank name hash mismatch',
                 'http_status' => 200,
+                'received_bank_name_hash' => $receivedBankNameHash !== '' ? $receivedBankNameHash : null,
+                'expected_bank_name_hash' => $terminal->bank_name_hash,
+                'expected_bank_name' => $terminal->bank_name,
+                'received_masked_account_suffix' => is_array($display)
+                    ? ($display['masked_account_suffix'] ?? null)
+                    : null,
+                'expected_masked_account_suffix' => $terminal->masked_account_suffix,
             ]);
 
             return response()->json(['valid' => false, 'error' => 'Bank name hash mismatch']);
@@ -189,7 +245,8 @@ class BroadcastVerifyController extends Controller
             return response()->json(['valid' => false, 'error' => 'Invalid signature']);
         }
 
-        $sessionReplay = $this->sessionAlreadyUsed($session);
+        $sessionReplay = $existingSession !== null;
+        $this->sessions->open($session, $terminalId, $amount);
         $this->recordSession($session, $terminalId);
 
         $maskedSuffix = (string) data_get(
@@ -201,6 +258,7 @@ class BroadcastVerifyController extends Controller
         $this->logVerifyAttempt($logBase, [
             'valid' => true,
             'http_status' => 200,
+            'session_status' => BroadcastSessionService::STATUS_OPEN,
             'recipient_account_suffix' => $maskedSuffix,
             'idempotent_replay' => $sessionReplay,
         ]);
@@ -212,9 +270,47 @@ class BroadcastVerifyController extends Controller
             'bank_name' => $terminal->bank_name,
             'masked_account_suffix' => $maskedSuffix,
             'session_uuid' => $session,
+            'session_status' => BroadcastSessionService::STATUS_OPEN,
             'terminal_id' => $terminalId,
             'recipient_account' => $terminal->account_number,
             'recipient_bank_code' => $terminal->recipient_bank_code,
+        ]);
+    }
+
+    public function cancelSession(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'session_uuid_v4' => 'required|uuid',
+            'terminal_id' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'],
+        ]);
+
+        $sessionUuid = (string) $data['session_uuid_v4'];
+        $terminalId = (string) $data['terminal_id'];
+
+        $existing = $this->sessions->find($sessionUuid);
+        if ($existing === null) {
+            return response()->json([
+                'ok' => true,
+                'session_status' => BroadcastSessionService::STATUS_CANCELLED,
+            ]);
+        }
+
+        if ($existing->terminal_id !== $terminalId) {
+            return response()->json(['error' => 'Session terminal mismatch'], 422);
+        }
+
+        if ($existing->status === BroadcastSessionService::STATUS_PAID) {
+            return response()->json([
+                'error' => 'Session already paid',
+                'session_status' => BroadcastSessionService::STATUS_PAID,
+            ], 409);
+        }
+
+        $this->sessions->markCancelled($sessionUuid, $terminalId);
+
+        return response()->json([
+            'ok' => true,
+            'session_status' => BroadcastSessionService::STATUS_CANCELLED,
         ]);
     }
 
@@ -388,11 +484,6 @@ class BroadcastVerifyController extends Controller
         $provided = (string) ($request->header('X-Admin-Key') ?? '');
 
         return $provided !== '' && hash_equals($configured, $provided);
-    }
-
-    private function sessionAlreadyUsed(string $sessionUuid): bool
-    {
-        return DB::table('broadcast_used_sessions')->where('session_uuid', $sessionUuid)->exists();
     }
 
     private function recordSession(string $sessionUuid, string $terminalId): void

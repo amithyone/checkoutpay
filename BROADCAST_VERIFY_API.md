@@ -120,6 +120,7 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
   "bank_name": "GTBank",
   "masked_account_suffix": "***1234",
   "session_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "session_status": "open",
   "terminal_id": "TERM-001",
   "recipient_account": "0123456789",
   "recipient_bank_code": "058"
@@ -134,11 +135,15 @@ Native apps should display `bank_name` on the transfer confirmation screen. `rec
 { "valid": false, "error": "Invalid signature" }
 ```
 
-Common errors: `Missing timestamp_ms in payload`, `Invalid signature`, `Bank name hash mismatch`, `Timestamp outside allowed window`, `Pay at shop is not active for this merchant`.
+Common errors: `Missing timestamp_ms in payload`, `Invalid signature`, `Bank name hash mismatch`, `Timestamp outside allowed window`, `Pay at shop is not active for this merchant`, `Session already paid`, `Session cancelled`.
+
+**Session lifecycle:** While `session_status` is `open`, verify accepts re-signed packets with the same `session_uuid_v4` even if `timestamp_ms` is older than 10 minutes (POS keeps broadcasting until paid/cancelled). Closed sessions return `session_status` `paid` or `cancelled`. POS cancels via `POST /broadcast/sessions/cancel` with `{ session_uuid_v4, terminal_id }`. Bank transfer marks paid when the app sends `idempotency_key` = `session_uuid` on `POST /consumer/transfers/bank`.
+
+On `Bank name hash mismatch`, the server logs `received_bank_name_hash`, `expected_bank_name_hash`, and `expected_bank_name` to `storage/logs/broadcast-verify-*.log` so you can see what the POS sent vs what the merchant dashboard expects.
 
 **Missing `timestamp_ms`:** The POS must set `payload.timestamp_ms` to current epoch milliseconds (`Date.now()` / `time.time() * 1000`) **before** signing. The CheckoutNow app must POST the signed packet unchanged — do not rebuild the payload without this field.
 
-The app may retry verify with the same signed BLE packet (e.g. network blip or double tap). Valid signed packets return `valid: true` idempotently; session UUIDs are logged in `broadcast_used_sessions` for audit, not to block retries.
+The app may retry verify with the same signed BLE packet (e.g. network blip or double tap). Valid signed packets return `valid: true` with `session_status: open` while the checkout is still open.
 
 HTTP 429 when rate-limited.
 

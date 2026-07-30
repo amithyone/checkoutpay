@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Broadcast\BroadcastSessionService;
 use App\Models\Bank;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
@@ -74,6 +75,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerAppSessionService $appSessions,
         private ConsumerWalletElectricityReceiptEnricher $electricityReceiptEnricher,
         private ConsumerPaymentAuthService $paymentAuth,
+        private BroadcastSessionService $broadcastSessions,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -1098,6 +1100,7 @@ class ConsumerWalletApiController extends Controller
             'account_name' => 'required|string|max:120',
             'remark' => 'nullable|string|max:255',
             'from_ledger' => 'nullable|string|in:personal,business',
+            'idempotency_key' => 'nullable|uuid',
         ], $this->paymentAuth->validationRules()));
 
         $user = $request->user();
@@ -1130,6 +1133,10 @@ class ConsumerWalletApiController extends Controller
         }
 
         if ($result['ok'] && $user instanceof ConsumerWalletApiAccount) {
+            if ($request->filled('idempotency_key')) {
+                $this->broadcastSessions->markPaid((string) $request->input('idempotency_key'));
+            }
+
             $this->appSessions->recordForAccount(
                 $user,
                 $request,
