@@ -136,14 +136,14 @@ class BroadcastVerifyController extends Controller
             return response()->json(['valid' => false, 'error' => 'Timestamp outside allowed window']);
         }
 
-        if ($session === '' || ! $this->consumeSession($session, $terminalId)) {
+        if ($session === '' || ! Str::isUuid($session)) {
             $this->logVerifyAttempt($logBase, [
                 'valid' => false,
-                'error' => 'Session UUID already used (replay)',
+                'error' => 'Invalid session UUID',
                 'http_status' => 200,
             ]);
 
-            return response()->json(['valid' => false, 'error' => 'Session UUID already used (replay)']);
+            return response()->json(['valid' => false, 'error' => 'Invalid session UUID']);
         }
 
         $display = $payload['account_info_public_display'] ?? [];
@@ -176,6 +176,9 @@ class BroadcastVerifyController extends Controller
             return response()->json(['valid' => false, 'error' => 'Invalid signature']);
         }
 
+        $sessionReplay = $this->sessionAlreadyUsed($session);
+        $this->recordSession($session, $terminalId);
+
         $maskedSuffix = (string) data_get(
             $display,
             'masked_account_suffix',
@@ -186,6 +189,7 @@ class BroadcastVerifyController extends Controller
             'valid' => true,
             'http_status' => 200,
             'recipient_account_suffix' => $maskedSuffix,
+            'idempotent_replay' => $sessionReplay,
         ]);
 
         return response()->json([
@@ -372,22 +376,25 @@ class BroadcastVerifyController extends Controller
         return $provided !== '' && hash_equals($configured, $provided);
     }
 
-    private function consumeSession(string $sessionUuid, string $terminalId): bool
+    private function sessionAlreadyUsed(string $sessionUuid): bool
+    {
+        return DB::table('broadcast_used_sessions')->where('session_uuid', $sessionUuid)->exists();
+    }
+
+    private function recordSession(string $sessionUuid, string $terminalId): void
     {
         if (! Str::isUuid($sessionUuid)) {
-            return false;
+            return;
         }
 
         try {
-            $inserted = DB::table('broadcast_used_sessions')->insertOrIgnore([
+            DB::table('broadcast_used_sessions')->insertOrIgnore([
                 'session_uuid' => $sessionUuid,
                 'terminal_id' => $terminalId,
                 'used_at' => (int) (microtime(true) * 1000),
             ]);
-
-            return (int) $inserted > 0;
         } catch (\Throwable) {
-            return false;
+            // Audit-only; verification outcome must not depend on insert success.
         }
     }
 

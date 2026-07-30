@@ -131,6 +131,10 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
 { "valid": false, "error": "Invalid signature" }
 ```
 
+Common errors: `Invalid signature`, `Bank name hash mismatch`, `Timestamp outside allowed window`, `Pay at shop is not active for this merchant`.
+
+The app may retry verify with the same signed BLE packet (e.g. network blip or double tap). Valid signed packets return `valid: true` idempotently; session UUIDs are logged in `broadcast_used_sessions` for audit, not to block retries.
+
 HTTP 429 when rate-limited.
 
 ## Monitoring (server logs)
