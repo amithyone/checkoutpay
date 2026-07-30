@@ -193,7 +193,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             ->assertJson(['valid' => false, 'error' => 'Missing timestamp_ms in payload']);
     }
 
-    public function test_verify_broadcast_rejects_bank_name_hash_mismatch(): void
+    public function test_verify_broadcast_ignores_bank_name_hash_mismatch_when_signature_valid(): void
     {
         $signatures = new BroadcastSignatureVerifier;
         $keypair = $signatures->generateEd25519Keypair();
@@ -231,7 +231,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             ],
             'account_info_public_display' => [
                 'bank_name_hash' => $wrongBankNameHash,
-                'masked_account_suffix' => '***4863',
+                'masked_account_suffix' => '***9876',
             ],
         ];
 
@@ -243,7 +243,12 @@ class BroadcastVerifyBroadcastTest extends TestCase
 
         $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
             ->assertOk()
-            ->assertJson(['valid' => false, 'error' => 'Bank name hash mismatch']);
+            ->assertJson([
+                'valid' => true,
+                'bank_name' => 'RUBIES MFB',
+                'masked_account_suffix' => '***4863',
+                'recipient_account' => '1000004863',
+            ]);
     }
 
     public function test_verify_broadcast_accepts_checkoutpay_slug_for_rubies_terminal(): void

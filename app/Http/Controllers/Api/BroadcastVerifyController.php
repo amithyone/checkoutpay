@@ -210,27 +210,19 @@ class BroadcastVerifyController extends Controller
         }
 
         $display = $payload['account_info_public_display'] ?? [];
-        $receivedBankNameHash = is_array($display) ? (string) ($display['bank_name_hash'] ?? '') : '';
-        $bankNameMatch = $this->bankNameHashes->evaluate($receivedBankNameHash, $terminal);
-        if (! is_array($display) || ! $bankNameMatch['matched']) {
-            $this->logVerifyAttempt($logBase, [
-                'valid' => false,
-                'error' => 'Bank name hash mismatch',
-                'http_status' => 200,
-                'received_bank_name_hash' => $receivedBankNameHash !== '' ? $receivedBankNameHash : null,
-                'expected_bank_name_hash' => $terminal->bank_name_hash,
-                'expected_bank_name' => $terminal->bank_name,
-                'acceptable_bank_name_hashes' => $bankNameMatch['acceptable_hashes'],
-                'received_masked_account_suffix' => is_array($display)
-                    ? ($display['masked_account_suffix'] ?? null)
-                    : null,
-                'expected_masked_account_suffix' => $terminal->masked_account_suffix,
-            ]);
-
-            return response()->json(['valid' => false, 'error' => 'Bank name hash mismatch']);
+        if (! is_array($display)) {
+            $display = [];
         }
 
-        if ($bankNameMatch['matched_bank_name'] !== null
+        $receivedBankNameHash = (string) ($display['bank_name_hash'] ?? '');
+        $bankNameMatch = $this->bankNameHashes->evaluate($receivedBankNameHash, $terminal);
+
+        // BLE bank_name_hash is optional — authoritative bank/account come from terminal registry after signature check.
+        if ($receivedBankNameHash !== '' && ! $bankNameMatch['matched']) {
+            $logBase['bank_name_hash_ignored'] = true;
+            $logBase['received_bank_name_hash'] = $receivedBankNameHash;
+            $logBase['settlement_bank_name'] = $terminal->bank_name;
+        } elseif ($bankNameMatch['matched_bank_name'] !== null
             && BroadcastBankNameHashMatcher::hashBankName($bankNameMatch['matched_bank_name']) !== $terminal->bank_name_hash) {
             $logBase['bank_name_hash_matched_via'] = $bankNameMatch['matched_bank_name'];
         }
@@ -258,11 +250,7 @@ class BroadcastVerifyController extends Controller
         $this->sessions->open($session, $terminalId, $amount);
         $this->recordSession($session, $terminalId);
 
-        $maskedSuffix = (string) data_get(
-            $display,
-            'masked_account_suffix',
-            $terminal->masked_account_suffix,
-        );
+        $maskedSuffix = (string) $terminal->masked_account_suffix;
 
         $this->logVerifyAttempt($logBase, [
             'valid' => true,

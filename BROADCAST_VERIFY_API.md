@@ -186,11 +186,13 @@ Native apps should display `bank_name` and `merchant_name` / `recipient_account_
 { "valid": false, "error": "Invalid signature" }
 ```
 
-Common errors: `Missing timestamp_ms in payload`, `Invalid signature`, `Bank name hash mismatch`, `Timestamp outside allowed window`, `Pay at shop is not active for this merchant`, `Session already paid`, `Session cancelled`.
+Common errors: `Missing timestamp_ms in payload`, `Invalid signature`, `Timestamp outside allowed window`, `Pay at shop is not active for this merchant`, `Session already paid`, `Session cancelled`.
+
+**Bank name in BLE:** `account_info_public_display.bank_name_hash` is optional for CheckoutPay terminals. After a valid signature, the server always returns settlement `bank_name`, `masked_account_suffix`, and `recipient_account` from the terminal registry — POS does not need to configure bank name or suffix.
 
 **Session lifecycle:** While `session_status` is `open`, verify accepts re-signed packets with the same `session_uuid_v4` even if `timestamp_ms` is older than 10 minutes (POS keeps broadcasting until paid/cancelled). Closed sessions return `session_status` `paid` or `cancelled`. POS cancels via `POST /broadcast/sessions/cancel` with `{ session_uuid_v4, terminal_id }`. Bank transfer marks paid when the app sends `idempotency_key` = `session_uuid` on `POST /consumer/transfers/bank`.
 
-On `Bank name hash mismatch`, the server logs `received_bank_name_hash`, `expected_bank_name_hash`, and `expected_bank_name` to `storage/logs/broadcast-verify-*.log` so you can see what the POS sent vs what the merchant dashboard expects.
+On `Invalid signature`, check POS uses `ed25519` and the dashboard signing key. Legacy `bank_name_hash` mismatches are logged but no longer block verify.
 
 **Missing `timestamp_ms`:** The POS must set `payload.timestamp_ms` to current epoch milliseconds (`Date.now()` / `time.time() * 1000`) **before** signing. The CheckoutNow app must POST the signed packet unchanged — do not rebuild the payload without this field.
 

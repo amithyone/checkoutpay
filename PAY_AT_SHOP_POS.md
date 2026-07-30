@@ -19,23 +19,31 @@ This document is the single source of truth for **what the POS must do** vs what
                                                     (idempotency_key = session_uuid)
 ```
 
-1. **POS** broadcasts amount, `terminal_id`, `bank_name_hash`, `masked_account_suffix`, `session_uuid_v4`, signed with **Ed25519**.
+1. **POS** broadcasts amount, `terminal_id`, `session_uuid_v4`, signed with **Ed25519** (legacy `bank_name_hash` in BLE is ignored by CheckoutPay).
 2. **Phone** reads BLE GATT and POSTs the **unchanged** signed packet to verify.
-3. **Server** returns merchant name, full settlement account, bank code, `session_status: open`.
+3. **Server** returns merchant name, bank, full settlement account, bank code, `session_status: open` — from your business account on CheckoutPay.
 4. **Customer** pays in CheckoutNow (transfer uses `idempotency_key` = `session_uuid`).
 5. **POS** polls session status until `paid` or cashier cancels.
 
-## What goes in BLE (POS credentials)
+## What the POS must configure
 
 | Field | Source | Notes |
 |-------|--------|-------|
 | `terminal_id` | Pay at shop dashboard | e.g. `CP-1RK8Z` |
 | `signature_alg` | Always `ed25519` | Not HMAC |
 | Signing key | Dashboard (shown once) | Ed25519 private key — keep secret |
-| `bank_name_hash` | `sha256:` + SHA256(lowercase bank name) | Bank name from dashboard, e.g. `RUBIES MFB` |
-| `masked_account_suffix` | Dashboard | e.g. `***4863` — last 4 digits only |
+| API key | Dashboard | For polling `GET /sessions/{uuid}` |
 | `timestamp_ms` | POS clock | Set **before** signing; refresh on each broadcast |
 | `session_uuid_v4` | POS generates once per checkout | Reuse until paid/cancelled |
+
+**You do not need to configure bank name or account suffix in the POS.** CheckoutPay returns the settlement bank and account after verify.
+
+## Legacy BLE fields (optional — server ignores mismatches)
+
+| Field | Notes |
+|-------|-------|
+| `bank_name_hash` | Open SDK may send kuda/CheckoutPay hash — server uses registry bank anyway |
+| `masked_account_suffix` | Server returns real suffix from settlement account |
 
 ## What must NOT be in BLE
 
@@ -89,10 +97,9 @@ curl -sS "https://check-outpay.com/api/v1/broadcast/sessions/SESSION-UUID?termin
 
 | Symptom | Fix |
 |---------|-----|
-| `Bank name hash mismatch` | Set bank name in POS to **exact** dashboard value (`RUBIES MFB`, not `kuda` or `CheckoutPay`) |
 | `Invalid signature` | Use `ed25519` + dashboard signing key; sign canonical JSON payload |
 | `Missing timestamp_ms` | Set `timestamp_ms` before signing |
-| Wrong account on phone | Do not embed account in BLE — server reads business settlement account |
+| Wrong account on phone | Server reads business settlement — ensure Pay at shop is active on dashboard |
 | POS never sees paid | Poll `GET /sessions/{uuid}` with API key; ensure app sends `idempotency_key` = session UUID |
 | `Session already paid` | Generate new `session_uuid_v4` for next sale |
 
