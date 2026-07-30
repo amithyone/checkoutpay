@@ -133,6 +133,25 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
 
 HTTP 429 when rate-limited.
 
+## Monitoring (server logs)
+
+Every `POST /verify-broadcast` attempt is written to:
+
+```
+storage/logs/broadcast-verify-YYYY-MM-DD.log
+```
+
+Each line includes client IP, `User-Agent`, `terminal_id`, `session_uuid`, `amount_ngn`, `valid`, and `error` (if any). Use `User-Agent` to distinguish the CheckoutNow native app from curl or web tests.
+
+Successful verifications are also recorded in the `broadcast_used_sessions` table (replay protection).
+
+```sql
+SELECT session_uuid, terminal_id, FROM_UNIXTIME(used_at / 1000) AS used_at
+FROM broadcast_used_sessions
+ORDER BY used_at DESC
+LIMIT 20;
+```
+
 ## Security
 
 - HTTPS only in production

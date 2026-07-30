@@ -44,6 +44,13 @@ return [
             'days' => 60,
             'replace_placeholders' => true,
         ],
+        'broadcast_verify' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/broadcast-verify.log'),
+            'level' => 'info',
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,

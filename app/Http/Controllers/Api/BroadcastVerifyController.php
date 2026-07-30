@@ -7,6 +7,7 @@ use App\Services\Broadcast\BroadcastSignatureVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
@@ -37,11 +38,21 @@ class BroadcastVerifyController extends Controller
 
     public function verifyBroadcast(Request $request): JsonResponse
     {
+        $logBase = [
+            'ip' => $request->ip(),
+            'user_agent' => Str::limit((string) $request->userAgent(), 256),
+        ];
+
         $key = 'broadcast-verify:'.$request->ip();
         $limit = max(1, (int) config('broadcast.rate_limit_verify', 120));
 
         if (RateLimiter::tooManyAttempts($key, $limit)) {
             $retry = RateLimiter::availableIn($key);
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Rate limit exceeded',
+                'http_status' => 429,
+            ]);
 
             return response()->json([
                 'valid' => false,
@@ -54,20 +65,48 @@ class BroadcastVerifyController extends Controller
         $packet = $request->all();
         $payload = $packet['payload'] ?? null;
         if (! is_array($payload)) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Invalid packet',
+                'http_status' => 422,
+            ]);
+
             return response()->json(['valid' => false, 'error' => 'Invalid packet'], 422);
         }
 
         $terminalId = (string) ($payload['terminal_id'] ?? '');
+        $session = (string) ($payload['session_uuid_v4'] ?? '');
+        $amount = (int) data_get($payload, 'transaction_details.total_amount_ngn', 0);
+        $logBase['terminal_id'] = $terminalId;
+        $logBase['session_uuid'] = $session;
+        $logBase['amount_ngn'] = $amount;
+        $logBase['signature_alg'] = (string) ($packet['signature_alg'] ?? '');
+
         $terminal = DB::table('broadcast_terminals')
             ->where('terminal_id', $terminalId)
             ->where('active', 1)
             ->first();
 
         if (! $terminal) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Unknown terminal_id',
+                'http_status' => 200,
+            ]);
+
             return response()->json(['valid' => false, 'error' => 'Unknown terminal_id']);
         }
 
+        $logBase['business_id'] = $terminal->business_id;
+        $logBase['merchant_name'] = $terminal->merchant_name;
+
         if (! $terminal->active) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Terminal is disabled',
+                'http_status' => 200,
+            ]);
+
             return response()->json(['valid' => false, 'error' => 'Terminal is disabled']);
         }
 
@@ -76,22 +115,45 @@ class BroadcastVerifyController extends Controller
                 ->where('id', $terminal->business_id)
                 ->first(['broadcast_pay_at_shop_enabled', 'broadcast_pay_at_shop_active', 'is_active']);
             if (! $owner || ! $owner->is_active || ! $owner->broadcast_pay_at_shop_enabled || ! $owner->broadcast_pay_at_shop_active) {
+                $this->logVerifyAttempt($logBase, [
+                    'valid' => false,
+                    'error' => 'Pay at shop is not active for this merchant',
+                    'http_status' => 200,
+                ]);
+
                 return response()->json(['valid' => false, 'error' => 'Pay at shop is not active for this merchant']);
             }
         }
 
         $timestampMs = (int) ($payload['timestamp_ms'] ?? 0);
         if (abs((int) (microtime(true) * 1000) - $timestampMs) > self::MAX_AGE_MS) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Timestamp outside allowed window',
+                'http_status' => 200,
+            ]);
+
             return response()->json(['valid' => false, 'error' => 'Timestamp outside allowed window']);
         }
 
-        $session = (string) ($payload['session_uuid_v4'] ?? '');
         if ($session === '' || ! $this->consumeSession($session, $terminalId)) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Session UUID already used (replay)',
+                'http_status' => 200,
+            ]);
+
             return response()->json(['valid' => false, 'error' => 'Session UUID already used (replay)']);
         }
 
         $display = $payload['account_info_public_display'] ?? [];
         if (! is_array($display) || ($display['bank_name_hash'] ?? '') !== $terminal->bank_name_hash) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Bank name hash mismatch',
+                'http_status' => 200,
+            ]);
+
             return response()->json(['valid' => false, 'error' => 'Bank name hash mismatch']);
         }
 
@@ -105,15 +167,26 @@ class BroadcastVerifyController extends Controller
         );
 
         if (! $verified) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Invalid signature',
+                'http_status' => 200,
+            ]);
+
             return response()->json(['valid' => false, 'error' => 'Invalid signature']);
         }
 
-        $amount = (int) data_get($payload, 'transaction_details.total_amount_ngn', 0);
         $maskedSuffix = (string) data_get(
             $display,
             'masked_account_suffix',
             $terminal->masked_account_suffix,
         );
+
+        $this->logVerifyAttempt($logBase, [
+            'valid' => true,
+            'http_status' => 200,
+            'recipient_account_suffix' => $maskedSuffix,
+        ]);
 
         return response()->json([
             'valid' => true,
@@ -325,5 +398,14 @@ class BroadcastVerifyController extends Controller
             'hmac-sha256' => 'HMAC-SHA256',
             default => strtoupper(trim($alg)),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $base
+     * @param  array<string, mixed>  $result
+     */
+    private function logVerifyAttempt(array $base, array $result): void
+    {
+        Log::channel('broadcast_verify')->info('verify-broadcast', array_merge($base, $result));
     }
 }
