@@ -38,7 +38,7 @@ class BroadcastTerminalProvisioner
      */
     public function resolveSettlementAccount(Business $business): ?array
     {
-        $primary = $business->getPrimaryAccountNumber();
+        $primary = $business->primaryAccountNumber();
         if ($primary?->account_number) {
             return $this->formatAccount(
                 (string) $primary->account_number,
