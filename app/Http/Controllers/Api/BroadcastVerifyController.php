@@ -413,6 +413,18 @@ class BroadcastVerifyController extends Controller
      */
     private function logVerifyAttempt(array $base, array $result): void
     {
-        Log::channel('broadcast_verify')->info('verify-broadcast', array_merge($base, $result));
+        $context = array_merge($base, $result);
+
+        try {
+            if (config('logging.channels.broadcast_verify')) {
+                Log::channel('broadcast_verify')->info('verify-broadcast', $context);
+
+                return;
+            }
+        } catch (\Throwable) {
+            // Stale config cache or partial deploy — fall back below.
+        }
+
+        Log::info('verify-broadcast', $context);
     }
 }
