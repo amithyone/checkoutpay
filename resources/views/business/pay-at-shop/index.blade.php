@@ -95,9 +95,21 @@
         @if($terminal)
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h3 class="text-lg font-semibold text-gray-900 mb-2">POS credentials</h3>
-                <p class="text-sm text-gray-600 mb-6">
+                <p class="text-sm text-gray-600 mb-4">
                     Enter these in your Checkout Broadcast–compatible POS app. Keep the signing key secret — it proves broadcasts came from your terminal.
                 </p>
+
+                <div class="mb-6 bg-sky-50 border border-sky-200 rounded-lg p-4 text-sm text-sky-900">
+                    <p class="font-semibold mb-2"><i class="fas fa-info-circle mr-2"></i>POS setup checklist</p>
+                    <ol class="list-decimal list-inside space-y-1.5 text-sky-800">
+                        <li>Set <strong>Terminal ID</strong> and <strong>Signing key</strong> below in your POS app.</li>
+                        <li>Set <strong>Signature algorithm</strong> to <code class="bg-white/80 px-1 rounded">ed25519</code> (CheckoutPay terminals — not HMAC).</li>
+                        <li>Set <strong>Bank name (POS)</strong> to the exact value below — spelling and spacing must match or customers will see “Bank name hash mismatch”.</li>
+                        <li>Set <strong>Masked account suffix</strong> to match (e.g. <code class="bg-white/80 px-1 rounded">{{ $settlement['masked_account_suffix'] }}</code>).</li>
+                        <li>Verify API URL: <code class="bg-white/80 px-1 rounded text-xs">https://check-outpay.com/api/v1/broadcast</code></li>
+                        <li>Turn on Pay at shop below only after the POS is configured.</li>
+                    </ol>
+                </div>
 
                 @if($revealedSigningKey)
                     <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -113,6 +125,9 @@
                         ['label' => 'Terminal ID', 'value' => $terminal->terminal_id, 'id' => 'terminal-id'],
                         ['label' => 'Merchant ID', 'value' => $terminal->merchant_id, 'id' => 'merchant-id'],
                         ['label' => 'API key', 'value' => $terminal->api_key, 'id' => 'broadcast-api-key'],
+                        ['label' => 'Signature algorithm (POS)', 'value' => 'ed25519', 'id' => 'signature-alg'],
+                        ['label' => 'Bank name (POS — must match exactly)', 'value' => $terminal->bank_name, 'id' => 'bank-name-pos'],
+                        ['label' => 'Masked account suffix (POS)', 'value' => $terminal->masked_account_suffix, 'id' => 'masked-suffix-pos'],
                     ] as $field)
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ $field['label'] }}</label>
@@ -153,6 +168,9 @@
 
                 <div class="mt-6 pt-6 border-t border-gray-100">
                     <h4 class="text-sm font-semibold text-gray-900 mb-2">Settlement account (from CheckoutPay)</h4>
+                    <p class="text-xs text-gray-500 mb-3">
+                        After a customer scans your POS broadcast, CheckoutNow calls verify and receives your merchant name, bank, and account for the transfer screen.
+                    </p>
                     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                         <div>
                             <dt class="text-gray-500">Account</dt>

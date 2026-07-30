@@ -65,6 +65,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
                 'valid' => true,
                 'merchant_name' => 'Amithy Store',
                 'amount_ngn' => 5000,
+                'bank_name' => 'CheckoutPay',
                 'masked_account_suffix' => '***1234',
                 'session_uuid' => '550e8400-e29b-41d4-a716-446655440000',
                 'terminal_id' => 'TERM-001',
@@ -137,6 +138,57 @@ class BroadcastVerifyBroadcastTest extends TestCase
         $this->postJson('/api/v1/broadcast/verify-broadcast', $goodPacket)
             ->assertOk()
             ->assertJson(['valid' => true, 'amount_ngn' => 2500]);
+    }
+
+    public function test_verify_broadcast_rejects_missing_timestamp_ms(): void
+    {
+        $signatures = new BroadcastSignatureVerifier;
+        $keypair = $signatures->generateEd25519Keypair();
+        $bankName = 'CheckoutPay';
+        $bankNameHash = 'sha256:'.hash('sha256', strtolower(trim($bankName)));
+
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'TERM-NO-TS',
+            'merchant_id' => 'MCH-TERM-NO-TS',
+            'api_key' => 'bk_test_api_key_123456789012345678901236',
+            'signing_key' => '',
+            'public_key' => $keypair['public_key'],
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'No Timestamp Shop',
+            'bank_name' => $bankName,
+            'bank_name_hash' => $bankNameHash,
+            'masked_account_suffix' => '***1234',
+            'account_number' => '0123456789',
+            'recipient_bank_code' => '058',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payload = [
+            'protocol_version' => 1,
+            'session_uuid_v4' => '770e8400-e29b-41d4-a716-446655440002',
+            'terminal_id' => 'TERM-NO-TS',
+            'transaction_details' => [
+                'currency_code' => 'NGN',
+                'total_amount_ngn' => 1000,
+                'item_count' => 1,
+            ],
+            'account_info_public_display' => [
+                'bank_name_hash' => $bankNameHash,
+                'masked_account_suffix' => '***1234',
+            ],
+        ];
+
+        $packet = [
+            'payload' => $payload,
+            'signature_alg' => 'ed25519',
+            'signature' => $signatures->signEd25519($payload, $keypair['signing_key']),
+        ];
+
+        $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
+            ->assertOk()
+            ->assertJson(['valid' => false, 'error' => 'Missing timestamp_ms in payload']);
     }
 
     public function test_register_terminal_returns_checkoutnow_credentials(): void

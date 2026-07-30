@@ -117,6 +117,7 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
   "valid": true,
   "merchant_name": "Amithy Store",
   "amount_ngn": 5000,
+  "bank_name": "GTBank",
   "masked_account_suffix": "***1234",
   "session_uuid": "550e8400-e29b-41d4-a716-446655440000",
   "terminal_id": "TERM-001",
@@ -125,13 +126,17 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
 }
 ```
 
+Native apps should display `bank_name` on the transfer confirmation screen. `recipient_account` and `recipient_bank_code` remain the authoritative transfer destination from the server registry.
+
 **Failure:**
 
 ```json
 { "valid": false, "error": "Invalid signature" }
 ```
 
-Common errors: `Invalid signature`, `Bank name hash mismatch`, `Timestamp outside allowed window`, `Pay at shop is not active for this merchant`.
+Common errors: `Missing timestamp_ms in payload`, `Invalid signature`, `Bank name hash mismatch`, `Timestamp outside allowed window`, `Pay at shop is not active for this merchant`.
+
+**Missing `timestamp_ms`:** The POS must set `payload.timestamp_ms` to current epoch milliseconds (`Date.now()` / `time.time() * 1000`) **before** signing. The CheckoutNow app must POST the signed packet unchanged — do not rebuild the payload without this field.
 
 The app may retry verify with the same signed BLE packet (e.g. network blip or double tap). Valid signed packets return `valid: true` idempotently; session UUIDs are logged in `broadcast_used_sessions` for audit, not to block retries.
 

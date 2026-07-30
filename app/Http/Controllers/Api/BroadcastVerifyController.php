@@ -81,6 +81,9 @@ class BroadcastVerifyController extends Controller
         $logBase['session_uuid'] = $session;
         $logBase['amount_ngn'] = $amount;
         $logBase['signature_alg'] = (string) ($packet['signature_alg'] ?? '');
+        $logBase['payload_timestamp_ms'] = array_key_exists('timestamp_ms', $payload)
+            ? $payload['timestamp_ms']
+            : null;
 
         $terminal = DB::table('broadcast_terminals')
             ->where('terminal_id', $terminalId)
@@ -125,7 +128,17 @@ class BroadcastVerifyController extends Controller
             }
         }
 
-        $timestampMs = (int) ($payload['timestamp_ms'] ?? 0);
+        $timestampMs = $this->parsePayloadTimestampMs($payload);
+        if ($timestampMs === null) {
+            $this->logVerifyAttempt($logBase, [
+                'valid' => false,
+                'error' => 'Missing timestamp_ms in payload',
+                'http_status' => 200,
+            ]);
+
+            return response()->json(['valid' => false, 'error' => 'Missing timestamp_ms in payload']);
+        }
+
         if (abs((int) (microtime(true) * 1000) - $timestampMs) > self::MAX_AGE_MS) {
             $this->logVerifyAttempt($logBase, [
                 'valid' => false,
@@ -196,6 +209,7 @@ class BroadcastVerifyController extends Controller
             'valid' => true,
             'merchant_name' => $terminal->merchant_name,
             'amount_ngn' => $amount,
+            'bank_name' => $terminal->bank_name,
             'masked_account_suffix' => $maskedSuffix,
             'session_uuid' => $session,
             'terminal_id' => $terminalId,
@@ -405,6 +419,25 @@ class BroadcastVerifyController extends Controller
             'hmac-sha256' => 'HMAC-SHA256',
             default => strtoupper(trim($alg)),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function parsePayloadTimestampMs(array $payload): ?int
+    {
+        if (! array_key_exists('timestamp_ms', $payload)) {
+            return null;
+        }
+
+        $raw = $payload['timestamp_ms'];
+        if ($raw === null || $raw === '' || ! is_numeric($raw)) {
+            return null;
+        }
+
+        $timestampMs = (int) $raw;
+
+        return $timestampMs > 0 ? $timestampMs : null;
     }
 
     /**
