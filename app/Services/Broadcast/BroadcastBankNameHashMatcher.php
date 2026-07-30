@@ -87,10 +87,13 @@ class BroadcastBankNameHashMatcher
             $names[] = $alias;
         }
 
-        // CheckoutPay-branded terminals: POS SDK default is often "CheckoutPay" or "kuda".
+        // CheckoutPay-branded terminals: open SDK ships with kuda / CheckoutPay defaults.
         if (str_starts_with((string) ($terminal->terminal_id ?? ''), 'CP-')) {
-            $names[] = 'CheckoutPay';
-            $names[] = 'checkoutpay';
+            foreach (config('broadcast.pos_sdk_default_bank_names', []) as $defaultName) {
+                if (is_string($defaultName) && $defaultName !== '') {
+                    $names[] = $defaultName;
+                }
+            }
         }
 
         $names = array_values(array_unique(array_filter(array_map(

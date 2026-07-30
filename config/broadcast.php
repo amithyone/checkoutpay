@@ -18,6 +18,22 @@ return [
             'Rubies Microfinance Bank',
             'CheckoutPay',
             'checkoutpay',
+            'kuda',
+            'Kuda',
         ],
+    ],
+
+    /**
+     * Open SDK demo defaults — accepted on CP-* terminals during POS rollout.
+     */
+    'pos_sdk_default_bank_names' => [
+        'kuda',
+        'Kuda',
+        'CheckoutPay',
+        'checkoutpay',
+        'GTBank',
+        'gtbank',
+        'OPay',
+        'opay',
     ],
 ];
