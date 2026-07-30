@@ -198,7 +198,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
         $keypair = $signatures->generateEd25519Keypair();
         $expectedBankName = 'RUBIES MFB';
         $expectedBankNameHash = 'sha256:'.hash('sha256', strtolower(trim($expectedBankName)));
-        $wrongBankNameHash = 'sha256:'.hash('sha256', 'checkoutpay');
+        $wrongBankNameHash = 'sha256:'.hash('sha256', 'kuda');
 
         DB::table('broadcast_terminals')->insert([
             'terminal_id' => 'TERM-HASH',
@@ -243,6 +243,63 @@ class BroadcastVerifyBroadcastTest extends TestCase
         $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
             ->assertOk()
             ->assertJson(['valid' => false, 'error' => 'Bank name hash mismatch']);
+    }
+
+    public function test_verify_broadcast_accepts_checkoutpay_slug_for_rubies_terminal(): void
+    {
+        $signatures = new BroadcastSignatureVerifier;
+        $keypair = $signatures->generateEd25519Keypair();
+        $expectedBankName = 'RUBIES MFB';
+        $expectedBankNameHash = 'sha256:'.hash('sha256', strtolower(trim($expectedBankName)));
+        $checkoutPayHash = 'sha256:'.hash('sha256', 'checkoutpay');
+
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'CP-TEST',
+            'merchant_id' => 'MCH-CP-TEST',
+            'api_key' => 'bk_test_api_key_123456789012345678901241',
+            'signing_key' => '',
+            'public_key' => $keypair['public_key'],
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'Slug Test Shop',
+            'bank_name' => $expectedBankName,
+            'bank_name_hash' => $expectedBankNameHash,
+            'masked_account_suffix' => '***4863',
+            'account_number' => '1000004863',
+            'recipient_bank_code' => '090175',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payload = [
+            'protocol_version' => 2.0,
+            'timestamp_ms' => (int) (microtime(true) * 1000),
+            'session_uuid_v4' => 'cc0e8400-e29b-41d4-a716-446655440007',
+            'terminal_id' => 'CP-TEST',
+            'transaction_details' => [
+                'currency_code' => 'NGN',
+                'total_amount_ngn' => 1,
+                'item_count' => 1,
+            ],
+            'account_info_public_display' => [
+                'bank_name_hash' => $checkoutPayHash,
+                'masked_account_suffix' => '***4863',
+            ],
+        ];
+
+        $packet = [
+            'payload' => $payload,
+            'signature_alg' => 'ed25519',
+            'signature' => $signatures->signEd25519($payload, $keypair['signing_key']),
+        ];
+
+        $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
+            ->assertOk()
+            ->assertJson([
+                'valid' => true,
+                'bank_name' => 'RUBIES MFB',
+                'session_status' => 'open',
+            ]);
     }
 
     public function test_open_session_accepts_stale_timestamp_on_retry(): void

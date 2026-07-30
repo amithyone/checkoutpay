@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Broadcast\BroadcastBankNameHashMatcher;
 use App\Services\Broadcast\BroadcastSessionService;
 use App\Services\Broadcast\BroadcastSignatureVerifier;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ class BroadcastVerifyController extends Controller
     public function __construct(
         private readonly BroadcastSignatureVerifier $signatures,
         private readonly BroadcastSessionService $sessions,
+        private readonly BroadcastBankNameHashMatcher $bankNameHashes,
     ) {}
 
     public function health(): JsonResponse
@@ -209,7 +211,8 @@ class BroadcastVerifyController extends Controller
 
         $display = $payload['account_info_public_display'] ?? [];
         $receivedBankNameHash = is_array($display) ? (string) ($display['bank_name_hash'] ?? '') : '';
-        if (! is_array($display) || $receivedBankNameHash !== $terminal->bank_name_hash) {
+        $bankNameMatch = $this->bankNameHashes->evaluate($receivedBankNameHash, $terminal);
+        if (! is_array($display) || ! $bankNameMatch['matched']) {
             $this->logVerifyAttempt($logBase, [
                 'valid' => false,
                 'error' => 'Bank name hash mismatch',
@@ -217,6 +220,7 @@ class BroadcastVerifyController extends Controller
                 'received_bank_name_hash' => $receivedBankNameHash !== '' ? $receivedBankNameHash : null,
                 'expected_bank_name_hash' => $terminal->bank_name_hash,
                 'expected_bank_name' => $terminal->bank_name,
+                'acceptable_bank_name_hashes' => $bankNameMatch['acceptable_hashes'],
                 'received_masked_account_suffix' => is_array($display)
                     ? ($display['masked_account_suffix'] ?? null)
                     : null,
@@ -224,6 +228,11 @@ class BroadcastVerifyController extends Controller
             ]);
 
             return response()->json(['valid' => false, 'error' => 'Bank name hash mismatch']);
+        }
+
+        if ($bankNameMatch['matched_bank_name'] !== null
+            && BroadcastBankNameHashMatcher::hashBankName($bankNameMatch['matched_bank_name']) !== $terminal->bank_name_hash) {
+            $logBase['bank_name_hash_matched_via'] = $bankNameMatch['matched_bank_name'];
         }
 
         $signatureAlg = (string) ($packet['signature_alg'] ?? $terminal->signature_alg ?? 'HMAC-SHA256');
