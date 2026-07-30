@@ -64,6 +64,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             ->assertJson([
                 'valid' => true,
                 'merchant_name' => 'Amithy Store',
+                'recipient_account_name' => 'Amithy Store',
                 'amount_ngn' => 5000,
                 'bank_name' => 'CheckoutPay',
                 'masked_account_suffix' => '***1234',
@@ -198,7 +199,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
         $keypair = $signatures->generateEd25519Keypair();
         $expectedBankName = 'RUBIES MFB';
         $expectedBankNameHash = 'sha256:'.hash('sha256', strtolower(trim($expectedBankName)));
-        $wrongBankNameHash = 'sha256:'.hash('sha256', 'kuda');
+        $wrongBankNameHash = 'sha256:'.hash('sha256', 'totally-wrong-bank-name');
 
         DB::table('broadcast_terminals')->insert([
             'terminal_id' => 'TERM-HASH',
@@ -561,5 +562,109 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'merchant_name' => 'Demo Shop',
             'signature_alg' => 'ED25519',
         ]);
+    }
+
+    public function test_session_status_returns_awaiting_scan_before_verify(): void
+    {
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'TERM-POLL',
+            'merchant_id' => 'MCH-TERM-POLL',
+            'api_key' => 'bk_test_api_key_poll_session_status',
+            'signing_key' => '',
+            'public_key' => 'dummy',
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'Poll Shop',
+            'bank_name' => 'GTBank',
+            'bank_name_hash' => 'sha256:abc',
+            'masked_account_suffix' => '***1111',
+            'account_number' => '0123456789',
+            'recipient_bank_code' => '058',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $sessionUuid = 'ee0e8400-e29b-41d4-a716-446655440009';
+
+        $this->getJson("/api/v1/broadcast/sessions/{$sessionUuid}?terminal_id=TERM-POLL", [
+            'X-Terminal-Api-Key' => 'bk_test_api_key_poll_session_status',
+        ])->assertOk()->assertJson([
+            'session_uuid' => $sessionUuid,
+            'session_status' => 'awaiting_scan',
+            'terminal_id' => 'TERM-POLL',
+            'merchant_name' => 'Poll Shop',
+        ]);
+    }
+
+    public function test_session_status_returns_paid_with_settlement_details(): void
+    {
+        $sessionUuid = 'ff0e8400-e29b-41d4-a716-446655440010';
+        $paidAt = (int) (microtime(true) * 1000);
+
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'TERM-PAID',
+            'merchant_id' => 'MCH-TERM-PAID',
+            'api_key' => 'bk_test_api_key_paid_session_status',
+            'signing_key' => '',
+            'public_key' => 'dummy',
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'Paid Poll Shop',
+            'bank_name' => 'RUBIES MFB',
+            'bank_name_hash' => 'sha256:'.hash('sha256', 'rubies mfb'),
+            'masked_account_suffix' => '***4863',
+            'account_number' => '1000004863',
+            'recipient_bank_code' => '090175',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('broadcast_sessions')->insert([
+            'session_uuid' => $sessionUuid,
+            'terminal_id' => 'TERM-PAID',
+            'status' => 'paid',
+            'amount_ngn' => 2500,
+            'opened_at' => $paidAt - 60000,
+            'closed_at' => $paidAt,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->getJson("/api/v1/broadcast/sessions/{$sessionUuid}?terminal_id=TERM-PAID", [
+            'X-Terminal-Api-Key' => 'bk_test_api_key_paid_session_status',
+        ])->assertOk()->assertJson([
+            'session_uuid' => $sessionUuid,
+            'session_status' => 'paid',
+            'amount_ngn' => 2500,
+            'terminal_id' => 'TERM-PAID',
+            'merchant_name' => 'Paid Poll Shop',
+            'recipient_account' => '1000004863',
+            'recipient_account_name' => 'Paid Poll Shop',
+            'recipient_bank_code' => '090175',
+            'paid_at_ms' => $paidAt,
+        ]);
+    }
+
+    public function test_session_status_rejects_wrong_api_key(): void
+    {
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'TERM-AUTH',
+            'merchant_id' => 'MCH-TERM-AUTH',
+            'api_key' => 'bk_test_api_key_auth_session',
+            'signing_key' => '',
+            'public_key' => 'dummy',
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'Auth Shop',
+            'bank_name' => 'GTBank',
+            'bank_name_hash' => 'sha256:abc',
+            'masked_account_suffix' => '***2222',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->getJson('/api/v1/broadcast/sessions/550e8400-e29b-41d4-a716-446655440000?terminal_id=TERM-AUTH', [
+            'X-Terminal-Api-Key' => 'wrong-key',
+        ])->assertUnauthorized();
     }
 }

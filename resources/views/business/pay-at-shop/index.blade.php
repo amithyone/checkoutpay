@@ -100,14 +100,21 @@
                 </p>
 
                 <div class="mb-6 bg-sky-50 border border-sky-200 rounded-lg p-4 text-sm text-sky-900">
-                    <p class="font-semibold mb-2"><i class="fas fa-info-circle mr-2"></i>POS setup checklist</p>
+                    <p class="font-semibold mb-2"><i class="fas fa-info-circle mr-2"></i>How Pay at shop works</p>
+                    <ol class="list-decimal list-inside space-y-1.5 text-sky-800 mb-4">
+                        <li><strong>POS broadcasts</strong> a signed Bluetooth packet: amount, terminal ID, bank name hash, masked suffix only — <em>never</em> the full account number.</li>
+                        <li><strong>Customer phone</strong> scans the broadcast and calls verify on CheckoutPay.</li>
+                        <li><strong>Server returns</strong> merchant name, full settlement account, bank code — the app pre-fills the transfer.</li>
+                        <li><strong>Customer pays</strong> in CheckoutNow; POS polls session status until <code class="bg-white/80 px-1 rounded">paid</code>.</li>
+                    </ol>
+                    <p class="font-semibold mb-2">POS setup checklist</p>
                     <ol class="list-decimal list-inside space-y-1.5 text-sky-800">
-                        <li>Set <strong>Terminal ID</strong> and <strong>Signing key</strong> below in your POS app.</li>
-                        <li>Set <strong>Signature algorithm</strong> to <code class="bg-white/80 px-1 rounded">ed25519</code> (CheckoutPay terminals — not HMAC).</li>
-                        <li>Set <strong>Bank name (POS)</strong> to the exact value below — spelling and spacing must match or customers will see “Bank name hash mismatch”.</li>
-                        <li>Set <strong>Masked account suffix</strong> to match (e.g. <code class="bg-white/80 px-1 rounded">{{ $settlement['masked_account_suffix'] }}</code>).</li>
-                        <li>Verify API URL: <code class="bg-white/80 px-1 rounded text-xs">https://check-outpay.com/api/v1/broadcast</code></li>
-                        <li>Turn on Pay at shop below only after the POS is configured.</li>
+                        <li>Set <strong>Terminal ID</strong>, <strong>API key</strong>, and <strong>Signing key</strong> below in your POS app.</li>
+                        <li>Set <strong>Signature algorithm</strong> to <code class="bg-white/80 px-1 rounded">ed25519</code> (not HMAC).</li>
+                        <li>Set <strong>Bank name (POS)</strong> to the exact value below — used only to compute the hash in the BLE packet.</li>
+                        <li>Set <strong>Masked account suffix</strong> to <code class="bg-white/80 px-1 rounded">{{ $terminal->masked_account_suffix }}</code> (last 4 digits of your settlement account).</li>
+                        <li>Do <strong>not</strong> put the full account number in the BLE broadcast — the server supplies it after verify.</li>
+                        <li>Poll <code class="bg-white/80 px-1 rounded text-xs">GET /api/v1/broadcast/sessions/{uuid}?terminal_id=…</code> with header <code class="bg-white/80 px-1 rounded text-xs">X-Terminal-Api-Key</code> until status is <code class="bg-white/80 px-1 rounded">paid</code>.</li>
                     </ol>
                 </div>
 

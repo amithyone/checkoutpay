@@ -16,7 +16,8 @@ CheckoutNow **Pay at shop** posts signed BLE packets to `POST /verify-broadcast`
 | `/api/v1/broadcast/verify-broadcast` | POST | Public (rate-limited) |
 | `/api/v1/broadcast/terminals/register` | POST | `X-Admin-Key` |
 | `/api/v1/broadcast/terminals` | GET | `X-Admin-Key` |
-| `/api/v1/broadcast/terminals/{id}` | GET | `X-Admin-Key` |
+| `/api/v1/broadcast/sessions/cancel` | POST | Body: `session_uuid_v4`, `terminal_id` |
+| `/api/v1/broadcast/sessions/{uuid}` | GET | `X-Terminal-Api-Key` + query `terminal_id` |
 
 ## Live deploy
 
@@ -116,6 +117,7 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
 {
   "valid": true,
   "merchant_name": "Amithy Store",
+  "recipient_account_name": "Amithy Store",
   "amount_ngn": 5000,
   "bank_name": "GTBank",
   "masked_account_suffix": "***1234",
@@ -127,7 +129,56 @@ curl -sS -X POST 'https://check-outpay.com/api/v1/broadcast/terminals/register' 
 }
 ```
 
-Native apps should display `bank_name` on the transfer confirmation screen. `recipient_account` and `recipient_bank_code` remain the authoritative transfer destination from the server registry.
+Native apps should display `bank_name` and `merchant_name` / `recipient_account_name` on the transfer confirmation screen. `recipient_account` and `recipient_bank_code` remain the authoritative transfer destination from the server registry (business settlement account).
+
+### Session status (POS polling)
+
+**Request:** `GET /api/v1/broadcast/sessions/{session_uuid}?terminal_id=TERM-001`
+
+**Headers:** `X-Terminal-Api-Key: bk_…` (terminal API key from merchant dashboard)
+
+**Before customer scans:**
+
+```json
+{
+  "session_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "session_status": "awaiting_scan",
+  "terminal_id": "TERM-001",
+  "merchant_name": "Amithy Store"
+}
+```
+
+**After verify, before payment:**
+
+```json
+{
+  "session_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "session_status": "open",
+  "amount_ngn": 5000,
+  "terminal_id": "TERM-001",
+  "merchant_name": "Amithy Store",
+  "bank_name": "GTBank",
+  "masked_account_suffix": "***1234"
+}
+```
+
+**After customer pays:**
+
+```json
+{
+  "session_uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "session_status": "paid",
+  "amount_ngn": 5000,
+  "terminal_id": "TERM-001",
+  "merchant_name": "Amithy Store",
+  "bank_name": "GTBank",
+  "masked_account_suffix": "***1234",
+  "recipient_account": "0123456789",
+  "recipient_account_name": "Amithy Store",
+  "recipient_bank_code": "058",
+  "paid_at_ms": 1738123456789
+}
+```
 
 **Failure:**
 

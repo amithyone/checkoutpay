@@ -275,6 +275,7 @@ class BroadcastVerifyController extends Controller
         return response()->json([
             'valid' => true,
             'merchant_name' => $terminal->merchant_name,
+            'recipient_account_name' => $terminal->merchant_name,
             'amount_ngn' => $amount,
             'bank_name' => $terminal->bank_name,
             'masked_account_suffix' => $maskedSuffix,
@@ -284,6 +285,50 @@ class BroadcastVerifyController extends Controller
             'recipient_account' => $terminal->account_number,
             'recipient_bank_code' => $terminal->recipient_bank_code,
         ]);
+    }
+
+    public function sessionStatus(Request $request, string $sessionUuid): JsonResponse
+    {
+        if (! Str::isUuid($sessionUuid)) {
+            return response()->json(['error' => 'Invalid session UUID'], 422);
+        }
+
+        $terminalId = (string) $request->query('terminal_id', '');
+        $terminal = $this->terminalAuthorized($request, $terminalId);
+        if ($terminal === null) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $session = $this->sessions->find($sessionUuid);
+        if ($session === null || $session->terminal_id !== $terminalId) {
+            return response()->json([
+                'session_uuid' => $sessionUuid,
+                'session_status' => 'awaiting_scan',
+                'terminal_id' => $terminalId,
+                'merchant_name' => $terminal->merchant_name,
+            ]);
+        }
+
+        $payload = [
+            'session_uuid' => $sessionUuid,
+            'session_status' => $session->status,
+            'amount_ngn' => (int) $session->amount_ngn,
+            'terminal_id' => $terminalId,
+            'merchant_name' => $terminal->merchant_name,
+            'bank_name' => $terminal->bank_name,
+            'masked_account_suffix' => $terminal->masked_account_suffix,
+        ];
+
+        if ($session->status === BroadcastSessionService::STATUS_PAID) {
+            $payload['recipient_account'] = $terminal->account_number;
+            $payload['recipient_account_name'] = $terminal->merchant_name;
+            $payload['recipient_bank_code'] = $terminal->recipient_bank_code;
+            if (! empty($session->closed_at)) {
+                $payload['paid_at_ms'] = (int) $session->closed_at;
+            }
+        }
+
+        return response()->json($payload);
     }
 
     public function cancelSession(Request $request): JsonResponse
@@ -493,6 +538,29 @@ class BroadcastVerifyController extends Controller
         $provided = (string) ($request->header('X-Admin-Key') ?? '');
 
         return $provided !== '' && hash_equals($configured, $provided);
+    }
+
+    private function terminalAuthorized(Request $request, string $terminalId): ?object
+    {
+        if ($terminalId === '') {
+            return null;
+        }
+
+        $provided = (string) ($request->header('X-Terminal-Api-Key') ?? $request->header('X-Api-Key') ?? '');
+        if ($provided === '') {
+            return null;
+        }
+
+        $terminal = DB::table('broadcast_terminals')
+            ->where('terminal_id', $terminalId)
+            ->where('active', 1)
+            ->first();
+
+        if ($terminal === null || ! hash_equals((string) $terminal->api_key, $provided)) {
+            return null;
+        }
+
+        return $terminal;
     }
 
     private function recordSession(string $sessionUuid, string $terminalId): void

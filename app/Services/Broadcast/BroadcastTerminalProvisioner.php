@@ -67,6 +67,37 @@ class BroadcastTerminalProvisioner
     }
 
     /**
+     * Keep broadcast terminal registry aligned with the business settlement account.
+     * Full account number lives on the server — never in the BLE packet.
+     */
+    public function syncSettlementAccount(Business $business): ?object
+    {
+        $settlement = $this->resolveSettlementAccount($business);
+        if ($settlement === null) {
+            return null;
+        }
+
+        $terminalId = $this->terminalIdFor($business);
+        $terminal = DB::table('broadcast_terminals')->where('terminal_id', $terminalId)->first();
+        if (! $terminal) {
+            return null;
+        }
+
+        DB::table('broadcast_terminals')->where('terminal_id', $terminalId)->update([
+            'merchant_name' => $business->name,
+            'bank_name' => $settlement['bank_name'],
+            'bank_name_hash' => 'sha256:'.hash('sha256', strtolower(trim($settlement['bank_name']))),
+            'masked_account_suffix' => $settlement['masked_account_suffix'],
+            'account_number' => $settlement['account_number'],
+            'recipient_bank_code' => $settlement['bank_code'],
+            'business_id' => $business->id,
+            'updated_at' => now(),
+        ]);
+
+        return DB::table('broadcast_terminals')->where('terminal_id', $terminalId)->first();
+    }
+
+    /**
      * @return array{terminal: object, signing_key: ?string}
      */
     public function provision(Business $business, bool $active = true): array

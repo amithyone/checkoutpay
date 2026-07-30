@@ -18,6 +18,9 @@ class PayAtShopController extends Controller
     public function index(): View
     {
         $business = Auth::guard('business')->user();
+        if ($this->provisioner->findForBusiness($business)) {
+            $this->provisioner->syncSettlementAccount($business);
+        }
         $terminal = $this->provisioner->findForBusiness($business);
         $settlement = $this->provisioner->resolveSettlementAccount($business);
         $canEnable = $business->broadcast_pay_at_shop_enabled && $settlement !== null;
