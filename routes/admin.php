@@ -121,6 +121,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             ->name('businesses.toggle-whatsapp-wallet-api');
         Route::post('businesses/{business}/toggle-card-payments', [BusinessController::class, 'toggleCardPayments'])
             ->name('businesses.toggle-card-payments');
+        Route::post('businesses/{business}/toggle-broadcast-pay-at-shop', [BusinessController::class, 'toggleBroadcastPayAtShop'])
+            ->name('businesses.toggle-broadcast-pay-at-shop');
         Route::post('businesses/{business}/update-balance', [BusinessController::class, 'updateBalance'])
             ->middleware('super_admin')
             ->name('businesses.update-balance');

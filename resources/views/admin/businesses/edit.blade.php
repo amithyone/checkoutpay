@@ -103,6 +103,17 @@
                     </label>
                 </div>
 
+                <div id="pay-at-shop" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
+                    <h4 class="text-sm font-semibold text-gray-900">
+                        <i class="fas fa-broadcast-tower text-sky-600 mr-1"></i> Pay at shop (CheckoutNow BLE)
+                    </h4>
+                    <p class="text-xs text-gray-600">Allows the merchant to enable in-store CheckoutNow payments from their dashboard and receive POS credentials (terminal ID, signing key).</p>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="broadcast_pay_at_shop_enabled" value="1" {{ old('broadcast_pay_at_shop_enabled', $business->broadcast_pay_at_shop_enabled) ? 'checked' : '' }} class="mt-1">
+                        <span class="text-sm text-gray-800"><strong>Allow</strong> Pay at shop for this merchant</span>
+                    </label>
+                </div>
+
                 <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200">
                     <a href="{{ route('admin.businesses.show', $business) }}" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                         Cancel

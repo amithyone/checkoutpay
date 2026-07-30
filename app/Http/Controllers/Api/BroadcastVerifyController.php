@@ -67,6 +67,19 @@ class BroadcastVerifyController extends Controller
             return response()->json(['valid' => false, 'error' => 'Unknown terminal_id']);
         }
 
+        if (! $terminal->active) {
+            return response()->json(['valid' => false, 'error' => 'Terminal is disabled']);
+        }
+
+        if ($terminal->business_id) {
+            $owner = DB::table('businesses')
+                ->where('id', $terminal->business_id)
+                ->first(['broadcast_pay_at_shop_enabled', 'broadcast_pay_at_shop_active', 'is_active']);
+            if (! $owner || ! $owner->is_active || ! $owner->broadcast_pay_at_shop_enabled || ! $owner->broadcast_pay_at_shop_active) {
+                return response()->json(['valid' => false, 'error' => 'Pay at shop is not active for this merchant']);
+            }
+        }
+
         $timestampMs = (int) ($payload['timestamp_ms'] ?? 0);
         if (abs((int) (microtime(true) * 1000) - $timestampMs) > self::MAX_AGE_MS) {
             return response()->json(['valid' => false, 'error' => 'Timestamp outside allowed window']);

@@ -346,6 +346,52 @@
         </div>
     </div>
 
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6" id="pay-at-shop">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-broadcast-tower mr-2 text-sky-600"></i> Pay at shop (CheckoutNow)
+                </h3>
+                <p class="text-sm text-gray-600 mt-1 max-w-2xl">
+                    When allowed, the merchant can turn on in-store BLE payments from
+                    <strong>Dashboard → Pay at shop</strong>, copy POS credentials (terminal ID, signing key), and receive CheckoutNow transfers to their settlement account.
+                </p>
+                @php $broadcastTerminal = \Illuminate\Support\Facades\DB::table('broadcast_terminals')->where('business_id', $business->id)->first(); @endphp
+                @if($broadcastTerminal)
+                    <p class="text-xs text-gray-500 mt-2 font-mono">Terminal: {{ $broadcastTerminal->terminal_id }} · {{ $broadcastTerminal->active ? 'POS active' : 'POS off' }}</p>
+                @endif
+            </div>
+            <div class="flex flex-wrap items-center gap-3 shrink-0">
+                @if($business->broadcast_pay_at_shop_enabled)
+                    <span class="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">Allowed</span>
+                    @if($business->broadcast_pay_at_shop_active)
+                        <span class="px-3 py-1 text-sm font-medium bg-sky-100 text-sky-800 rounded-full">Merchant on</span>
+                    @else
+                        <span class="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-700 rounded-full">Merchant off</span>
+                    @endif
+                    <form action="{{ route('admin.businesses.toggle-broadcast-pay-at-shop', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 text-sm"
+                            onclick="return confirm('Revoke Pay at shop for this business? Their POS broadcasts will stop verifying.')">
+                            Revoke access
+                        </button>
+                    </form>
+                @else
+                    <span class="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-700 rounded-full">Not allowed</span>
+                    <form action="{{ route('admin.businesses.toggle-broadcast-pay-at-shop', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 text-sm">
+                            Allow Pay at shop
+                        </button>
+                    </form>
+                @endif
+                <a href="{{ route('admin.businesses.edit', $business) }}#pay-at-shop" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">
+                    <i class="fas fa-edit mr-1"></i> Edit on form
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- Charge Settings Section -->
     @if(auth('admin')->user()->canUpdateBusinessBalance())
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

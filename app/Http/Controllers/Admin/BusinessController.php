@@ -99,10 +99,12 @@ class BusinessController extends Controller
             'uses_external_account_numbers' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
             'card_payments_enabled' => 'boolean',
+            'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
+        $validated['broadcast_pay_at_shop_enabled'] = $request->has('broadcast_pay_at_shop_enabled');
 
         Business::create($validated);
 
@@ -165,10 +167,17 @@ class BusinessController extends Controller
             'uses_external_account_numbers' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
             'card_payments_enabled' => 'boolean',
+            'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
+        $validated['broadcast_pay_at_shop_enabled'] = $request->has('broadcast_pay_at_shop_enabled');
+
+        if (! $validated['broadcast_pay_at_shop_enabled']) {
+            $validated['broadcast_pay_at_shop_active'] = false;
+            app(\App\Services\Broadcast\BroadcastTerminalProvisioner::class)->setActive($business, false);
+        }
 
         $business->update($validated);
 
@@ -362,6 +371,25 @@ class BusinessController extends Controller
         $msg = $business->card_payments_enabled
             ? 'Card payments are now enabled for this business. Merchants may send payment_method=card on payment-request.'
             : 'Card payments are now disabled for this business.';
+
+        return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
+    }
+
+    public function toggleBroadcastPayAtShop(Business $business): RedirectResponse
+    {
+        $enabling = ! $business->broadcast_pay_at_shop_enabled;
+        $business->update([
+            'broadcast_pay_at_shop_enabled' => $enabling,
+            'broadcast_pay_at_shop_active' => $enabling ? $business->broadcast_pay_at_shop_active : false,
+        ]);
+
+        if (! $enabling) {
+            app(\App\Services\Broadcast\BroadcastTerminalProvisioner::class)->setActive($business, false);
+        }
+
+        $msg = $enabling
+            ? 'Pay at shop is now allowed for this business. They can turn it on from their dashboard.'
+            : 'Pay at shop is now disabled for this business. POS broadcasts will no longer verify.';
 
         return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
     }

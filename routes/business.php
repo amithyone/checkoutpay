@@ -11,6 +11,7 @@ use App\Http\Controllers\Business\TeamController;
 use App\Http\Controllers\Business\SettingsController;
 use App\Http\Controllers\Business\KeysController;
 use App\Http\Controllers\Business\WebsitesController;
+use App\Http\Controllers\Business\PayAtShopController;
 use App\Http\Controllers\Business\WhatsappWalletController;
 use Illuminate\Support\Facades\Route;
 
@@ -127,6 +128,10 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::post('/settings/2fa/disable', [SettingsController::class, 'disableTwoFactor'])->name('settings.2fa.disable');
 
         // API Keys & Integration
+        Route::get('/pay-at-shop', [PayAtShopController::class, 'index'])->name('pay-at-shop.index');
+        Route::post('/pay-at-shop/toggle', [PayAtShopController::class, 'toggle'])->name('pay-at-shop.toggle');
+        Route::post('/pay-at-shop/regenerate-signing-key', [PayAtShopController::class, 'regenerateSigningKey'])->name('pay-at-shop.regenerate-signing-key');
+
         Route::get('/keys', [KeysController::class, 'index'])->name('keys.index');
         Route::post('/keys/regenerate-api-key', [KeysController::class, 'regenerateApiKey'])->name('keys.regenerate-api-key');
         Route::post('/keys/request-account-number', [KeysController::class, 'requestAccountNumber'])->name('keys.request-account-number');
