@@ -43,7 +43,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'terminal_id' => 'TERM-001',
             'transaction_details' => [
                 'currency_code' => 'NGN',
-                'total_amount_ngn' => 5000,
+                'total_amount_ngn' => 500_000,
                 'item_count' => 3,
             ],
             'account_info_public_display' => [
@@ -112,7 +112,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'terminal_id' => 'TERM-002',
             'transaction_details' => [
                 'currency_code' => 'NGN',
-                'total_amount_ngn' => 2500,
+                'total_amount_ngn' => 250_000,
                 'item_count' => 1,
             ],
             'account_info_public_display' => [
@@ -173,7 +173,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'terminal_id' => 'TERM-NO-TS',
             'transaction_details' => [
                 'currency_code' => 'NGN',
-                'total_amount_ngn' => 1000,
+                'total_amount_ngn' => 100_000,
                 'item_count' => 1,
             ],
             'account_info_public_display' => [
@@ -392,7 +392,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'terminal_id' => 'TERM-01',
             'transaction_details' => [
                 'currency_code' => 'NGN',
-                'total_amount_ngn' => 1500,
+                'total_amount_ngn' => 150_000,
                 'item_count' => 2,
             ],
             'account_info_public_display' => [
@@ -466,7 +466,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'terminal_id' => 'TERM-02',
             'transaction_details' => [
                 'currency_code' => 'NGN',
-                'total_amount_ngn' => 500,
+                'total_amount_ngn' => 50_000,
                 'item_count' => 1,
             ],
             'account_info_public_display' => [
@@ -562,7 +562,7 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'terminal_id' => 'CP-ONLINE',
             'transaction_details' => [
                 'currency_code' => 'NGN',
-                'total_amount_ngn' => 2500,
+                'total_amount_ngn' => 250_000,
                 'item_count' => 2,
             ],
         ];
@@ -579,8 +579,63 @@ class BroadcastVerifyBroadcastTest extends TestCase
                 'valid' => true,
                 'connectivity' => 'online',
                 'terminal_id' => 'CP-ONLINE',
+                'terminal_label' => 'CP-ONLINE',
+                'amount_ngn' => 2500,
                 'recipient_account' => '1000004863',
                 'bank_name' => 'RUBIES MFB',
+            ]);
+    }
+
+    public function test_verify_broadcast_cp_terminal_label_and_kobo_amount(): void
+    {
+        $signatures = new BroadcastSignatureVerifier;
+        $keypair = $signatures->generateEd25519Keypair();
+
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'CP-1RK8Z',
+            'merchant_id' => 'MCH-CP-1RK8Z',
+            'api_key' => 'bk_test_api_key_cp_1rk8z',
+            'signing_key' => '',
+            'public_key' => $keypair['public_key'],
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'MIDAS AGRO',
+            'bank_name' => 'RUBIES MFB',
+            'bank_name_hash' => 'sha256:'.hash('sha256', 'rubies mfb'),
+            'masked_account_suffix' => '***4863',
+            'account_number' => '1000004863',
+            'recipient_bank_code' => '090175',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payload = [
+            'protocol_version' => 2.1,
+            'connectivity' => 'online',
+            'timestamp_ms' => (int) (microtime(true) * 1000),
+            'session_uuid_v4' => '110e8400-e29b-41d4-a716-446655440012',
+            'terminal_id' => 'CP-1RK8Z',
+            'transaction_details' => [
+                'currency_code' => 'NGN',
+                'total_amount_ngn' => 900_376,
+                'item_count' => 1,
+            ],
+        ];
+
+        $packet = [
+            'payload' => $payload,
+            'signature_alg' => 'ed25519',
+            'signature' => $signatures->signEd25519($payload, $keypair['signing_key']),
+        ];
+
+        $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
+            ->assertOk()
+            ->assertJson([
+                'valid' => true,
+                'merchant_name' => 'MIDAS AGRO',
+                'terminal_id' => 'CP-1RK8Z',
+                'terminal_label' => 'CP-1RK8Z',
+                'amount_ngn' => 9003.76,
             ]);
     }
 

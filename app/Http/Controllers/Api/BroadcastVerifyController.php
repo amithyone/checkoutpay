@@ -82,11 +82,11 @@ class BroadcastVerifyController extends Controller
 
         $terminalId = (string) ($payload['terminal_id'] ?? '');
         $session = (string) ($payload['session_uuid_v4'] ?? '');
-        $amount = (int) data_get($payload, 'transaction_details.total_amount_ngn', 0);
+        $packetAmount = (int) data_get($payload, 'transaction_details.total_amount_ngn', 0);
+        $signatureAlg = (string) ($packet['signature_alg'] ?? '');
         $logBase['terminal_id'] = $terminalId;
         $logBase['session_uuid'] = $session;
-        $logBase['amount_ngn'] = $amount;
-        $logBase['signature_alg'] = (string) ($packet['signature_alg'] ?? '');
+        $logBase['signature_alg'] = $signatureAlg;
         $logBase['payload_timestamp_ms'] = array_key_exists('timestamp_ms', $payload)
             ? $payload['timestamp_ms']
             : null;
@@ -108,6 +108,14 @@ class BroadcastVerifyController extends Controller
 
         $logBase['business_id'] = $terminal->business_id;
         $logBase['merchant_name'] = $terminal->merchant_name;
+
+        if ($signatureAlg === '') {
+            $signatureAlg = (string) ($terminal->signature_alg ?? 'HMAC-SHA256');
+        }
+        $sessionAmountKobo = $packetAmount;
+        $displayAmountNgn = $this->displayAmountNgn($packetAmount, $signatureAlg);
+        $logBase['amount_ngn'] = $displayAmountNgn;
+        $logBase['signature_alg'] = $signatureAlg;
 
         if (! $terminal->active) {
             $this->logVerifyAttempt($logBase, [
@@ -233,7 +241,6 @@ class BroadcastVerifyController extends Controller
             $logBase['bank_name_hash_matched_via'] = $bankNameMatch['matched_bank_name'];
         }
 
-        $signatureAlg = (string) ($packet['signature_alg'] ?? $terminal->signature_alg ?? 'HMAC-SHA256');
         $verified = $this->signatures->verify(
             $payload,
             $signatureAlg,
@@ -280,7 +287,7 @@ class BroadcastVerifyController extends Controller
             $recipientAccount,
         );
 
-        $this->sessions->open($session, $terminalId, $amount, $settlementMode, $settlementAccount);
+        $this->sessions->open($session, $terminalId, $sessionAmountKobo, $settlementMode, $settlementAccount);
         $this->recordSession($session, $terminalId);
 
         $this->logVerifyAttempt($logBase, [
@@ -295,12 +302,13 @@ class BroadcastVerifyController extends Controller
             'valid' => true,
             'merchant_name' => $terminal->merchant_name,
             'recipient_account_name' => $recipientAccountName,
-            'amount_ngn' => $amount,
+            'amount_ngn' => $displayAmountNgn,
             'bank_name' => $bankName,
             'masked_account_suffix' => $maskedSuffix,
             'session_uuid' => $session,
             'session_status' => BroadcastSessionService::STATUS_OPEN,
             'terminal_id' => $terminalId,
+            'terminal_label' => $this->terminalPickerLabel($terminalId),
             'connectivity' => $connectivity,
             'recipient_account' => $recipientAccount,
             'recipient_bank_code' => $recipientBankCode,
@@ -605,6 +613,31 @@ class BroadcastVerifyController extends Controller
                 'active' => (bool) $t->active,
             ])->values(),
         ]);
+    }
+
+    private function terminalPickerLabel(string $terminalId): string
+    {
+        $upper = strtoupper($terminalId);
+        if (str_starts_with($upper, 'CP-')) {
+            return $terminalId;
+        }
+        if (str_starts_with($upper, 'TERM-')) {
+            $suffix = substr($terminalId, strrpos($terminalId, '-') + 1);
+            if (ctype_digit($suffix)) {
+                return str_pad(substr($suffix, -2), 2, '0', STR_PAD_LEFT);
+            }
+        }
+
+        return substr($terminalId, 0, 8);
+    }
+
+    private function displayAmountNgn(int $packetAmount, string $signatureAlg): float
+    {
+        if (strtolower(trim($signatureAlg)) === 'ed25519') {
+            return round($packetAmount / 100, 2);
+        }
+
+        return (float) $packetAmount;
     }
 
     private function adminAuthorized(Request $request): bool
