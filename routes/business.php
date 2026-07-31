@@ -131,6 +131,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/pay-at-shop', [PayAtShopController::class, 'index'])->name('pay-at-shop.index');
         Route::post('/pay-at-shop/toggle', [PayAtShopController::class, 'toggle'])->name('pay-at-shop.toggle');
         Route::post('/pay-at-shop/regenerate-signing-key', [PayAtShopController::class, 'regenerateSigningKey'])->name('pay-at-shop.regenerate-signing-key');
+        Route::post('/pay-at-shop/sync-pos-signing-key', [PayAtShopController::class, 'syncPosSigningKey'])->name('pay-at-shop.sync-pos-signing-key');
 
         Route::get('/keys', [KeysController::class, 'index'])->name('keys.index');
         Route::post('/keys/regenerate-api-key', [KeysController::class, 'regenerateApiKey'])->name('keys.regenerate-api-key');

@@ -7,8 +7,10 @@ use App\Services\Broadcast\BroadcastBankNameHashMatcher;
 use App\Services\Broadcast\BroadcastSessionPaymentMatcher;
 use App\Services\Broadcast\BroadcastSessionService;
 use App\Services\Broadcast\BroadcastSignatureVerifier;
+use App\Services\Broadcast\BroadcastTerminalProvisioner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -29,6 +31,7 @@ class BroadcastVerifyController extends Controller
         private readonly BroadcastSessionService $sessions,
         private readonly BroadcastBankNameHashMatcher $bankNameHashes,
         private readonly BroadcastSessionPaymentMatcher $paymentMatcher,
+        private readonly BroadcastTerminalProvisioner $terminalProvisioner,
     ) {}
 
     public function health(): JsonResponse
@@ -241,12 +244,11 @@ class BroadcastVerifyController extends Controller
             $logBase['bank_name_hash_matched_via'] = $bankNameMatch['matched_bank_name'];
         }
 
-        $verified = $this->signatures->verify(
+        $verified = $this->verifyPacketSignature(
             $payload,
             $signatureAlg,
             (string) ($packet['signature'] ?? ''),
-            (string) $terminal->signing_key,
-            $terminal->public_key ?? null,
+            $terminal,
         );
 
         if (! $verified) {
@@ -455,6 +457,41 @@ class BroadcastVerifyController extends Controller
         ]);
     }
 
+    /**
+     * POS / Cheko: register the Ed25519 seed from this machine on CheckoutPay.
+     * Auth: X-Terminal-Api-Key for the terminal_id in the body.
+     */
+    public function syncSigningKey(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'terminal_id' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'signing_key' => 'required|string|min:32|max:256',
+        ]);
+
+        $terminalId = (string) $data['terminal_id'];
+        $terminal = $this->terminalAuthorized($request, $terminalId);
+        if ($terminal === null) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $result = $this->terminalProvisioner->syncSigningKeyFromPos(
+                $terminalId,
+                (string) $data['signing_key'],
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'terminal_id' => $terminalId,
+            'signature_alg' => 'ED25519',
+            'public_key_prefix' => substr($result['public_key'], 0, 12),
+            'message' => 'Signing key synced — CheckoutPay verify will accept packets signed on this POS.',
+        ]);
+    }
+
     public function registerTerminal(Request $request): JsonResponse
     {
         if (! $this->adminAuthorized($request)) {
@@ -483,14 +520,21 @@ class BroadcastVerifyController extends Controller
         $signingKey = $data['signing_key'] ?? null;
 
         if ($signatureAlg === 'ED25519') {
-            if ($publicKey === null && ($data['generate_signing_key'] ?? true)) {
+            if ($signingKey !== null && $signingKey !== '' && $publicKey === null) {
+                $derived = $this->signatures->derivePublicKeyFromSigningKey($signingKey);
+                if ($derived === null) {
+                    return response()->json(['error' => 'Invalid Ed25519 signing_key'], 422);
+                }
+                $publicKey = $derived;
+                $signingKey = Crypt::encryptString($signingKey);
+            } elseif ($publicKey === null && ($data['generate_signing_key'] ?? true)) {
                 $keypair = $this->signatures->generateEd25519Keypair();
                 $publicKey = $keypair['public_key'];
                 $generatedSigningKey = $keypair['signing_key'];
-                $signingKey = '';
+                $signingKey = Crypt::encryptString($keypair['signing_key']);
             } elseif ($publicKey === null) {
                 return response()->json([
-                    'error' => 'public_key is required for ed25519 terminals (or set generate_signing_key=true)',
+                    'error' => 'public_key or signing_key is required for ed25519 terminals',
                 ], 422);
             }
         } elseif ($signingKey === null || $signingKey === '') {
@@ -638,6 +682,51 @@ class BroadcastVerifyController extends Controller
         }
 
         return (float) $packetAmount;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function verifyPacketSignature(array $payload, string $signatureAlg, string $signature, object $terminal): bool
+    {
+        $alg = strtoupper(trim($signatureAlg));
+
+        if ($alg !== 'ED25519') {
+            return $this->signatures->verify(
+                $payload,
+                $signatureAlg,
+                $signature,
+                (string) $terminal->signing_key,
+                null,
+            );
+        }
+
+        $storedPublic = trim((string) ($terminal->public_key ?? ''));
+        if ($storedPublic !== '' && $this->signatures->verify($payload, $signatureAlg, $signature, '', $storedPublic)) {
+            return true;
+        }
+
+        $posSecret = $this->terminalProvisioner->decryptSigningKey($terminal);
+        if ($posSecret === null) {
+            return false;
+        }
+
+        $derivedPublic = $this->signatures->derivePublicKeyFromSigningKey($posSecret);
+        if ($derivedPublic === null) {
+            return false;
+        }
+
+        if (! $this->signatures->verify($payload, $signatureAlg, $signature, '', $derivedPublic)) {
+            return false;
+        }
+
+        if ($storedPublic !== $derivedPublic) {
+            DB::table('broadcast_terminals')
+                ->where('terminal_id', $terminal->terminal_id)
+                ->update(['public_key' => $derivedPublic, 'updated_at' => now()]);
+        }
+
+        return true;
     }
 
     private function adminAuthorized(Request $request): bool

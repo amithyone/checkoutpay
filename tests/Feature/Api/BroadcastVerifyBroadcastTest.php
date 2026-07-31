@@ -780,4 +780,67 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'X-Terminal-Api-Key' => 'wrong-key',
         ])->assertUnauthorized();
     }
+
+    public function test_sync_signing_key_aligns_public_key_for_verify(): void
+    {
+        $signatures = new BroadcastSignatureVerifier;
+        $posKeypair = $signatures->generateEd25519Keypair();
+        $wrongKeypair = $signatures->generateEd25519Keypair();
+
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'CP-SYNC',
+            'merchant_id' => 'MCH-CP-SYNC',
+            'api_key' => 'bk_test_api_key_sync_signing_key',
+            'signing_key' => '',
+            'public_key' => $wrongKeypair['public_key'],
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'Sync Shop',
+            'bank_name' => 'RUBIES MFB',
+            'bank_name_hash' => 'sha256:'.hash('sha256', 'rubies mfb'),
+            'masked_account_suffix' => '***4863',
+            'account_number' => '1000004863',
+            'recipient_bank_code' => '090175',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payload = [
+            'protocol_version' => 2.1,
+            'connectivity' => 'online',
+            'timestamp_ms' => (int) (microtime(true) * 1000),
+            'session_uuid_v4' => '220e8400-e29b-41d4-a716-446655440013',
+            'terminal_id' => 'CP-SYNC',
+            'transaction_details' => [
+                'currency_code' => 'NGN',
+                'total_amount_ngn' => 100_000,
+                'item_count' => 1,
+            ],
+        ];
+
+        $packet = [
+            'payload' => $payload,
+            'signature_alg' => 'ed25519',
+            'signature' => $signatures->signEd25519($payload, $posKeypair['signing_key']),
+        ];
+
+        $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
+            ->assertOk()
+            ->assertJson(['valid' => false, 'error' => 'Invalid signature']);
+
+        $this->postJson('/api/v1/broadcast/terminals/sync-signing-key', [
+            'terminal_id' => 'CP-SYNC',
+            'signing_key' => $posKeypair['signing_key'],
+        ], [
+            'X-Terminal-Api-Key' => 'bk_test_api_key_sync_signing_key',
+        ])->assertOk()->assertJson(['ok' => true, 'terminal_id' => 'CP-SYNC']);
+
+        $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
+            ->assertOk()
+            ->assertJson([
+                'valid' => true,
+                'terminal_id' => 'CP-SYNC',
+                'amount_ngn' => 1000,
+            ]);
+    }
 }

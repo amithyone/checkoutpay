@@ -93,4 +93,30 @@ class PayAtShopController extends Controller
             ->with('success', 'Signing key regenerated. Update your POS with the new key below.')
             ->with('broadcast_signing_key', $result['signing_key']);
     }
+
+    public function syncPosSigningKey(Request $request): RedirectResponse
+    {
+        $business = Auth::guard('business')->user();
+
+        $data = $request->validate([
+            'signing_key' => 'required|string|min:32|max:256',
+        ]);
+
+        if (! $business->broadcast_pay_at_shop_enabled || ! $business->broadcast_pay_at_shop_active) {
+            return redirect()->route('business.pay-at-shop.index')
+                ->with('error', 'Enable Pay at shop before syncing a POS signing key.');
+        }
+
+        $terminalId = $this->provisioner->terminalIdFor($business);
+
+        try {
+            $this->provisioner->syncSigningKeyFromPos($terminalId, (string) $data['signing_key']);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('business.pay-at-shop.index')
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('business.pay-at-shop.index')
+            ->with('success', 'POS signing key synced. CheckoutPay will now accept broadcasts signed with this key.');
+    }
 }

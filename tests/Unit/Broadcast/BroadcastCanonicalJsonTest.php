@@ -72,4 +72,13 @@ class BroadcastCanonicalJsonTest extends TestCase
             $keypair['public_key'],
         ));
     }
+
+    public function test_derive_public_key_from_signing_key_matches_keypair(): void
+    {
+        $keypair = $this->signatures->generateEd25519Keypair();
+
+        $derived = $this->signatures->derivePublicKeyFromSigningKey($keypair['signing_key']);
+
+        $this->assertSame($keypair['public_key'], $derived);
+    }
 }

@@ -66,6 +66,30 @@ class BroadcastSignatureVerifier
     }
 
     /**
+     * Derive Ed25519 public key (base64) from a POS signing key (32-byte seed or 64-byte secret).
+     */
+    public function derivePublicKeyFromSigningKey(string $signingKeyB64): ?string
+    {
+        if (! function_exists('sodium_crypto_sign_publickey_from_secretkey')) {
+            return null;
+        }
+
+        $secretKey = $this->decodeKeyMaterial($signingKeyB64, 64);
+        if ($secretKey !== null) {
+            return base64_encode(sodium_crypto_sign_publickey_from_secretkey($secretKey));
+        }
+
+        $seed = $this->decodeKeyMaterial($signingKeyB64, 32);
+        if ($seed === null) {
+            return null;
+        }
+
+        $keypair = sodium_crypto_sign_seed_keypair($seed);
+
+        return base64_encode(sodium_crypto_sign_publickey($keypair));
+    }
+
+    /**
      * @return array{public_key: string, signing_key: string}
      */
     public function generateEd25519Keypair(): array

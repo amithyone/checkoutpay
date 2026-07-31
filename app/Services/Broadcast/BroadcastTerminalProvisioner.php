@@ -201,11 +201,53 @@ class BroadcastTerminalProvisioner
             return null;
         }
 
+        $raw = (string) $terminal->signing_key;
+
         try {
-            return Crypt::decryptString((string) $terminal->signing_key);
+            return Crypt::decryptString($raw);
         } catch (\Throwable) {
-            return null;
+            // Legacy admin rows may store the raw base64 Ed25519 secret.
+            return trim($raw) !== '' ? trim($raw) : null;
         }
+    }
+
+    /**
+     * Align CheckoutPay registry with the Ed25519 key configured on the POS.
+     *
+     * @return array{terminal: object, public_key: string}
+     */
+    public function syncSigningKeyFromPos(string $terminalId, string $signingKeyPlain): array
+    {
+        $terminal = DB::table('broadcast_terminals')
+            ->where('terminal_id', $terminalId)
+            ->where('active', 1)
+            ->first();
+
+        if ($terminal === null) {
+            throw new \RuntimeException('Unknown terminal_id');
+        }
+
+        $signingKeyPlain = trim($signingKeyPlain);
+        if ($signingKeyPlain === '') {
+            throw new \RuntimeException('signing_key is required');
+        }
+
+        $publicKey = $this->signatures->derivePublicKeyFromSigningKey($signingKeyPlain);
+        if ($publicKey === null) {
+            throw new \RuntimeException('Invalid Ed25519 signing key');
+        }
+
+        DB::table('broadcast_terminals')->where('terminal_id', $terminalId)->update([
+            'public_key' => $publicKey,
+            'signing_key' => Crypt::encryptString($signingKeyPlain),
+            'signature_alg' => 'ED25519',
+            'updated_at' => now(),
+        ]);
+
+        return [
+            'terminal' => DB::table('broadcast_terminals')->where('terminal_id', $terminalId)->first(),
+            'public_key' => $publicKey,
+        ];
     }
 
     /**
