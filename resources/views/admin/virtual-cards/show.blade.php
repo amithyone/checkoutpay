@@ -67,6 +67,29 @@
         </dl>
     </div>
 
+    @if($card->status === \App\Models\VirtualCardRequest::STATUS_PREPARING && auth('admin')->user()?->canManageVirtualCards())
+    <div class="bg-violet-50 border border-violet-200 rounded-lg p-5">
+        <h3 class="text-base font-semibold text-violet-900 mb-1">Card still preparing</h3>
+        <p class="text-sm text-violet-800 mb-4">
+            MevonPay accepted the request but the card may not have activated yet (webhook delay or mismatch).
+            Try <strong>Sync from MevonPay webhook</strong> first if a webhook was logged.
+            Use <strong>Retry MevonPay request</strong> only when no provider card ID exists yet.
+            Refund the setup fee if you need to cancel and return money to the customer wallet.
+        </p>
+        @include('admin.virtual-cards._card-actions', [
+            'card' => $card,
+            'flags' => [
+                'isPreparing' => true,
+                'canRetry' => $canRetry,
+                'canRetryWebhookSync' => $canRetryWebhookSync ?? false,
+                'canRefund' => $canRefund,
+                'canMarkActive' => $canMarkActive,
+                'canMarkFailed' => $canMarkFailed,
+            ],
+        ])
+    </div>
+    @endif
+
     @if($card->wallet)
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Customer / wallet</h3>
@@ -275,64 +298,21 @@
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-        <div class="flex flex-wrap gap-4">
-            @if($canMarkActive)
-            <form method="POST" action="{{ route('admin.virtual-cards.mark-active', $card) }}"
-                onsubmit="return confirm('Mark this card as active?');">
-                @csrf
-                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                    <i class="fas fa-check mr-1"></i> Mark as active
-                </button>
-            </form>
-            @endif
+        @include('admin.virtual-cards._card-actions', [
+            'card' => $card,
+            'flags' => [
+                'isPreparing' => $card->status === \App\Models\VirtualCardRequest::STATUS_PREPARING,
+                'canRetry' => $canRetry,
+                'canRetryWebhookSync' => $canRetryWebhookSync ?? false,
+                'canRefund' => $canRefund,
+                'canMarkActive' => $canMarkActive,
+                'canMarkFailed' => $canMarkFailed,
+            ],
+        ])
 
-            @if($canMarkFailed)
-            <form method="POST" action="{{ route('admin.virtual-cards.mark-failed', $card) }}" class="flex flex-wrap items-end gap-2">
-
-                @csrf
-                <input type="text" name="failure_reason" required maxlength="500" placeholder="Failure reason"
-                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[240px]">
-                <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm"
-                    onclick="return confirm('Mark this request as failed?');">
-                    Mark as failed
-                </button>
-            </form>
-            @endif
-
-            @if($canRetry)
-            <form method="POST" action="{{ route('admin.virtual-cards.retry', $card) }}"
-                onsubmit="return confirm('Resend create request to {{ ($card->provider ?? 'mevonpay') === 'cashwyre' ? 'Cashwyre' : 'MevonPay' }}? Wallet will not be debited again.');">
-                @csrf
-                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
-                    <i class="fas fa-redo mr-1"></i> Retry provider request
-                </button>
-            </form>
-            @endif
-
-            @if($canRetryWebhookSync ?? false)
-            <form method="POST" action="{{ route('admin.virtual-cards.retry-webhook-sync', $card) }}"
-                onsubmit="return confirm('Replay the stored MevonPay card-created webhook for this request?');">
-                @csrf
-                <button type="submit" class="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 text-sm">
-                    <i class="fas fa-link mr-1"></i> Sync from webhook logs
-                </button>
-            </form>
-            @endif
-
-            @if($canRefund)
-            <form method="POST" action="{{ route('admin.virtual-cards.refund-fee', $card) }}"
-                onsubmit="return confirm('Refund the card fee to the customer wallet?');">
-                @csrf
-                <button type="submit" class="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 text-sm">
-                    <i class="fas fa-undo mr-1"></i> Refund fee
-                </button>
-            </form>
-            @endif
-
-            @if(!$canMarkActive && !$canMarkFailed && !$canRetry && !($canRetryWebhookSync ?? false) && !$canRefund)
-            <p class="text-sm text-gray-500">No actions available for this status.</p>
-            @endif
-        </div>
+        @if(!$canMarkActive && !$canMarkFailed && !$canRetry && !($canRetryWebhookSync ?? false) && !$canRefund)
+        <p class="text-sm text-gray-500 mt-3">No actions available for this status.</p>
+        @endif
     </div>
     @elseif(!empty($card->admin_notes))
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

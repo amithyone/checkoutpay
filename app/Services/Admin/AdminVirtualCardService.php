@@ -93,11 +93,43 @@ final class AdminVirtualCardService
 
     public function indexQuery(Request $request): LengthAwarePaginator
     {
-        return $this->filteredQuery($request)
+        $paginator = $this->filteredQuery($request)
             ->with('wallet')
             ->latest('id')
             ->paginate(20)
             ->withQueryString();
+
+        $paginator->getCollection()->transform(function (VirtualCardRequest $card) {
+            $card->setAttribute('admin_action_flags', $this->actionFlags($card));
+
+            return $card;
+        });
+
+        return $paginator;
+    }
+
+    /**
+     * @return array{
+     *     isPreparing: bool,
+     *     canRetry: bool,
+     *     canRetryWebhookSync: bool,
+     *     canRefund: bool,
+     *     canMarkActive: bool,
+     *     canMarkFailed: bool
+     * }
+     */
+    public function actionFlags(VirtualCardRequest $card): array
+    {
+        $feeTxn = $this->feeTransaction($card);
+
+        return [
+            'isPreparing' => $card->status === VirtualCardRequest::STATUS_PREPARING,
+            'canRetry' => $this->canRetry($card),
+            'canRetryWebhookSync' => $this->canRetryWebhookSync($card),
+            'canRefund' => $this->canRefund($card, $feeTxn),
+            'canMarkActive' => $this->canMarkActive($card),
+            'canMarkFailed' => $this->canMarkFailed($card),
+        ];
     }
 
     public function usersQuery(Request $request): LengthAwarePaginator

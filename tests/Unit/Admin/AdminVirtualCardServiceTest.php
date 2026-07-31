@@ -170,4 +170,40 @@ class AdminVirtualCardServiceTest extends TestCase
         $this->assertSame(VirtualCardRequest::STATUS_SUBMITTED, $card->status);
         $this->assertSame('CARD-99', $card->card_external_id);
     }
+
+    public function test_preparing_with_provider_card_id_allows_webhook_sync(): void
+    {
+        $wallet = $this->createWallet();
+        $card = $this->createCard($wallet, VirtualCardRequest::STATUS_PREPARING);
+        $card->update(['card_external_id' => 'CARD-PREP-1']);
+
+        $svc = app(AdminVirtualCardService::class);
+        $recovery = app(\App\Services\Consumer\VirtualCardActivationRecoveryService::class);
+
+        $this->assertTrue($recovery->canRetrySync($card->fresh()));
+        $this->assertTrue($svc->canRetryWebhookSync($card->fresh()));
+        $this->assertFalse($svc->canRetry($card->fresh()));
+    }
+
+    public function test_preparing_without_card_id_allows_mevon_retry_and_refund(): void
+    {
+        $wallet = $this->createWallet();
+        $card = $this->createCard($wallet, VirtualCardRequest::STATUS_PREPARING);
+
+        WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'sender_name' => 'Test User',
+            'type' => WhatsappWalletTransaction::TYPE_VIRTUAL_CARD_FEE,
+            'amount' => 8000,
+            'balance_after' => 42000,
+            'external_reference' => $card->external_reference,
+        ]);
+
+        $svc = app(AdminVirtualCardService::class);
+        $feeTxn = WhatsappWalletTransaction::query()->where('external_reference', $card->external_reference)->first();
+
+        $this->assertTrue($svc->canRetry($card));
+        $this->assertTrue($svc->canRetryWebhookSync($card));
+        $this->assertTrue($svc->canRefund($card, $feeTxn));
+    }
 }

@@ -14,13 +14,17 @@ final class VirtualCardActivationRecoveryService
 
     public function canRetrySync(VirtualCardRequest $request): bool
     {
+        // Preparing may already have a Mevon card_id in the API response — replay webhook to activate.
+        if ($request->status === VirtualCardRequest::STATUS_PREPARING) {
+            return true;
+        }
+
         if (trim((string) ($request->card_external_id ?? '')) !== '') {
             return false;
         }
 
         return in_array($request->status, [
             VirtualCardRequest::STATUS_PENDING,
-            VirtualCardRequest::STATUS_PREPARING,
             VirtualCardRequest::STATUS_SUBMITTED,
             VirtualCardRequest::STATUS_FAILED,
         ], true);

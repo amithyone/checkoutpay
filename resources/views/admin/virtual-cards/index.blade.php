@@ -345,7 +345,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider ID</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
@@ -377,8 +377,20 @@
                         <td class="px-6 py-4 text-xs font-mono text-gray-600">{{ $card->external_reference ?? '—' }}</td>
                         <td class="px-6 py-4 text-xs font-mono text-gray-600">{{ $card->card_external_id ?? '—' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $card->created_at->format('M d, Y H:i') }}</td>
-                        <td class="px-6 py-4">
-                            <a href="{{ route('admin.virtual-cards.show', $card) }}" class="text-primary hover:underline text-sm">View</a>
+                        <td class="px-6 py-4 text-sm">
+                            <div class="flex flex-col gap-2 min-w-[12rem]">
+                                <a href="{{ route('admin.virtual-cards.show', $card) }}" class="text-primary hover:underline">View details</a>
+                                @if(auth('admin')->user()?->canManageVirtualCards())
+                                    @php $flags = $card->admin_action_flags ?? []; @endphp
+                                    @if(($flags['isPreparing'] ?? false) || ($flags['canRetry'] ?? false) || ($flags['canRetryWebhookSync'] ?? false) || ($flags['canRefund'] ?? false))
+                                        @include('admin.virtual-cards._card-actions', [
+                                            'card' => $card,
+                                            'flags' => $flags,
+                                            'compact' => true,
+                                        ])
+                                    @endif
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty
