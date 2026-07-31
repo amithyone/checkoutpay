@@ -168,6 +168,24 @@
                             </form>
                         @endif
                     </div>
+
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <h4 class="text-sm font-semibold text-gray-900 mb-2">Sync POS signing key</h4>
+                        <p class="text-xs text-gray-500 mb-3">
+                            If your POS already has an Ed25519 key (Settings → Signing key), paste it here so CheckoutPay accepts broadcasts from that device.
+                            This fixes &ldquo;Invalid signature&rdquo; when the key on the POS differs from the one CheckoutPay has on file.
+                        </p>
+                        <form method="POST" action="{{ route('business.pay-at-shop.sync-pos-signing-key') }}" class="flex flex-col sm:flex-row gap-2">
+                            @csrf
+                            <input type="text" name="signing_key" required minlength="32" maxlength="256"
+                                placeholder="Paste Ed25519 signing key from your POS (88 characters)"
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                                autocomplete="off">
+                            <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm whitespace-nowrap">
+                                Sync POS key
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
                 <div class="mt-6 pt-6 border-t border-gray-100">
