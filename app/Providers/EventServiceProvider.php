@@ -21,6 +21,7 @@ class EventServiceProvider extends ServiceProvider
             \App\Listeners\CreateNigtaxProUserFromPendingOnPaymentApproved::class,
             \App\Listeners\ProcessTicketOrderOnPayment::class,
             \App\Listeners\HandleNigtaxCertifiedPaymentApproved::class,
+            \App\Listeners\MarkBroadcastSessionPaidOnPaymentApproved::class,
         ],
     ];
 

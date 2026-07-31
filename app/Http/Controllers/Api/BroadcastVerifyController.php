@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\Broadcast\BroadcastBankNameHashMatcher;
+use App\Services\Broadcast\BroadcastSessionPaymentMatcher;
 use App\Services\Broadcast\BroadcastSessionService;
 use App\Services\Broadcast\BroadcastSignatureVerifier;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,7 @@ class BroadcastVerifyController extends Controller
         private readonly BroadcastSignatureVerifier $signatures,
         private readonly BroadcastSessionService $sessions,
         private readonly BroadcastBankNameHashMatcher $bankNameHashes,
+        private readonly BroadcastSessionPaymentMatcher $paymentMatcher,
     ) {}
 
     public function health(): JsonResponse
@@ -197,7 +199,11 @@ class BroadcastVerifyController extends Controller
         }
 
         $sessionIsOpen = $existingSession !== null
-            && $existingSession->status === BroadcastSessionService::STATUS_OPEN;
+            && in_array($existingSession->status, [
+                BroadcastSessionService::STATUS_OPEN,
+                BroadcastSessionPaymentMatcher::STATUS_PARTIAL,
+                BroadcastSessionPaymentMatcher::STATUS_AWAITING_PAYMENT,
+            ], true);
 
         if (! $sessionIsOpen && abs((int) (microtime(true) * 1000) - $timestampMs) > self::MAX_AGE_MS) {
             $this->logVerifyAttempt($logBase, [
@@ -247,8 +253,6 @@ class BroadcastVerifyController extends Controller
         }
 
         $sessionReplay = $existingSession !== null;
-        $this->sessions->open($session, $terminalId, $amount);
-        $this->recordSession($session, $terminalId);
 
         $maskedSuffix = (string) $terminal->masked_account_suffix;
         $connectivity = (string) ($payload['connectivity'] ?? 'online');
@@ -270,6 +274,14 @@ class BroadcastVerifyController extends Controller
         } else {
             $logBase['connectivity'] = 'online';
         }
+
+        [$settlementMode, $settlementAccount] = $this->resolveSessionSettlement(
+            $terminal,
+            $recipientAccount,
+        );
+
+        $this->sessions->open($session, $terminalId, $amount, $settlementMode, $settlementAccount);
+        $this->recordSession($session, $terminalId);
 
         $this->logVerifyAttempt($logBase, [
             'valid' => true,
@@ -321,6 +333,11 @@ class BroadcastVerifyController extends Controller
             'session_uuid' => $sessionUuid,
             'session_status' => $session->status,
             'amount_ngn' => (int) $session->amount_ngn,
+            'amount_received_ngn' => (int) ($session->amount_received_ngn ?? 0),
+            'amount_due_ngn' => max(0, (int) $session->amount_ngn - (int) ($session->amount_received_ngn ?? 0)),
+            'settlement_mode' => $session->settlement_mode ?? 'permanent',
+            'awaiting_payment' => ($session->settlement_mode ?? 'permanent') === 'permanent'
+                && empty($session->expecting_payment_at),
             'terminal_id' => $terminalId,
             'merchant_name' => $terminal->merchant_name,
             'bank_name' => $terminal->bank_name,
@@ -337,6 +354,49 @@ class BroadcastVerifyController extends Controller
         }
 
         return response()->json($payload);
+    }
+
+    public function expectPayment(Request $request, string $sessionUuid): JsonResponse
+    {
+        if (! Str::isUuid($sessionUuid)) {
+            return response()->json(['error' => 'Invalid session UUID'], 422);
+        }
+
+        $data = $request->validate([
+            'terminal_id' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'],
+        ]);
+
+        $terminalId = (string) $data['terminal_id'];
+        $terminal = $this->terminalAuthorized($request, $terminalId);
+        if ($terminal === null) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $session = $this->sessions->find($sessionUuid);
+        if ($session === null || $session->terminal_id !== $terminalId) {
+            return response()->json(['error' => 'Session not found'], 404);
+        }
+
+        if ($session->status === BroadcastSessionService::STATUS_PAID) {
+            return response()->json([
+                'ok' => true,
+                'session_status' => BroadcastSessionService::STATUS_PAID,
+            ]);
+        }
+
+        if ($session->status === BroadcastSessionService::STATUS_CANCELLED) {
+            return response()->json(['error' => 'Session cancelled'], 409);
+        }
+
+        $this->paymentMatcher->markExpectingPayment($sessionUuid, $terminalId);
+        $updated = $this->sessions->find($sessionUuid);
+
+        return response()->json([
+            'ok' => true,
+            'session_uuid' => $sessionUuid,
+            'session_status' => $updated->status ?? BroadcastSessionPaymentMatcher::STATUS_AWAITING_PAYMENT,
+            'amount_ngn' => (int) ($updated->amount_ngn ?? 0),
+        ]);
     }
 
     public function cancelSession(Request $request): JsonResponse
@@ -366,6 +426,17 @@ class BroadcastVerifyController extends Controller
                 'error' => 'Session already paid',
                 'session_status' => BroadcastSessionService::STATUS_PAID,
             ], 409);
+        }
+
+        if (! in_array($existing->status, [
+            BroadcastSessionService::STATUS_OPEN,
+            BroadcastSessionPaymentMatcher::STATUS_PARTIAL,
+            BroadcastSessionPaymentMatcher::STATUS_AWAITING_PAYMENT,
+        ], true)) {
+            return response()->json([
+                'ok' => true,
+                'session_status' => $existing->status,
+            ]);
         }
 
         $this->sessions->markCancelled($sessionUuid, $terminalId);
@@ -546,6 +617,26 @@ class BroadcastVerifyController extends Controller
         $provided = (string) ($request->header('X-Admin-Key') ?? '');
 
         return $provided !== '' && hash_equals($configured, $provided);
+    }
+
+    /**
+     * @return array{0: string, 1: ?string}
+     */
+    private function resolveSessionSettlement(object $terminal, string $recipientAccount): array
+    {
+        $settlementMode = 'permanent';
+        if (! empty($terminal->business_id)) {
+            $business = DB::table('businesses')
+                ->where('id', $terminal->business_id)
+                ->first(['broadcast_pay_at_shop_permanent_settlement']);
+            if ($business !== null && ! (bool) ($business->broadcast_pay_at_shop_permanent_settlement ?? true)) {
+                $settlementMode = 'temporary';
+            }
+        }
+
+        $account = preg_replace('/\D/', '', $recipientAccount) ?: null;
+
+        return [$settlementMode, $account !== '' ? $account : null];
     }
 
     private function terminalAuthorized(Request $request, string $terminalId): ?object
