@@ -28,13 +28,194 @@ class BankLogoService
     public function listForApi(): array
     {
         return Cache::remember($this->cacheKey(), now()->addHours(6), function () {
-            return Bank::query()
+            $rows = Bank::query()
                 ->orderBy('name')
                 ->get(['code', 'name', 'logo_path'])
                 ->map(fn (Bank $bank) => $bank->toApiArray())
                 ->values()
                 ->all();
+
+            return $this->dedupeApiBankRows($rows);
         });
+    }
+
+    /**
+     * Collapse legacy short codes and duplicate institution names into one row per bank.
+     *
+     * @param  list<array{code: string, name: string, logo_url: string|null}>  $rows
+     * @return list<array{code: string, name: string, logo_url: string|null}>
+     */
+    private function dedupeApiBankRows(array $rows): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $byNip = [];
+        foreach ($rows as $row) {
+            $nip = NigerianBankCodeNormalizer::toNipTransferCode((string) ($row['code'] ?? ''));
+            if ($nip === '') {
+                continue;
+            }
+            $this->mergeApiBankCandidate($byNip, $nip, $row, $nip);
+        }
+
+        $deduped = array_values(array_map(fn (array $row) => $this->finalizeApiBankRow($row), $byNip));
+
+        $byInstitution = [];
+        foreach ($deduped as $row) {
+            $key = $this->institutionKey((string) ($row['name'] ?? ''));
+            if ($key === '') {
+                $key = 'code:'.($row['code'] ?? '');
+            }
+            $nip = NigerianBankCodeNormalizer::toNipTransferCode((string) ($row['code'] ?? ''));
+            $this->mergeApiBankCandidate($byInstitution, $key, $row, $nip);
+        }
+
+        $final = array_values(array_map(fn (array $row) => $this->finalizeApiBankRow($row), $byInstitution));
+        usort($final, fn (array $a, array $b) => strcasecmp($a['name'], $b['name']));
+
+        return $final;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $bucket
+     * @param  array{code: string, name: string, logo_url: string|null}  $row
+     */
+    private function mergeApiBankCandidate(array &$bucket, string $key, array $row, string $nip): void
+    {
+        $candidate = [
+            'code' => (string) ($row['code'] ?? ''),
+            'name' => (string) ($row['name'] ?? ''),
+            'logo_url' => $row['logo_url'] ?? null,
+            '_nip' => $nip,
+            '_score' => $this->apiBankRowScore($row, $nip),
+        ];
+
+        if (! isset($bucket[$key])) {
+            $bucket[$key] = $candidate;
+
+            return;
+        }
+
+        if ($candidate['_score'] > $bucket[$key]['_score']) {
+            $bucket[$key] = $candidate;
+
+            return;
+        }
+
+        if ($candidate['_score'] === $bucket[$key]['_score']) {
+            $existingNip = (string) ($bucket[$key]['_nip'] ?? '');
+            if ($this->isCanonicalNipCode($nip) && ! $this->isCanonicalNipCode($existingNip)) {
+                $bucket[$key] = $candidate;
+
+                return;
+            }
+            if ($this->displayNameScore($candidate['name']) > $this->displayNameScore($bucket[$key]['name'])) {
+                $bucket[$key]['name'] = $candidate['name'];
+            }
+            if ($candidate['logo_url'] && ! $bucket[$key]['logo_url']) {
+                $bucket[$key]['logo_url'] = $candidate['logo_url'];
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{code: string, name: string, logo_url: string|null}
+     */
+    private function finalizeApiBankRow(array $row): array
+    {
+        $nip = (string) ($row['_nip'] ?? '');
+        $code = (string) ($row['code'] ?? '');
+        $apiCode = strlen($nip) >= 6 ? $nip : $code;
+
+        return [
+            'code' => $apiCode,
+            'name' => $this->formatBankDisplayName((string) ($row['name'] ?? '')),
+            'logo_url' => $row['logo_url'] ?? null,
+        ];
+    }
+
+    /**
+     * @param  array{code: string, name: string, logo_url: string|null}  $row
+     */
+    private function apiBankRowScore(array $row, string $nip): int
+    {
+        $code = (string) ($row['code'] ?? '');
+        $digits = preg_replace('/\D/', '', $code) ?? '';
+        $score = 0;
+
+        if (! empty($row['logo_url'])) {
+            $score += 100;
+        }
+        if ($nip !== '' && $code === $nip) {
+            $score += 50;
+        }
+        if (strlen($digits) >= 6) {
+            $score += 25;
+        }
+        if ($this->isCanonicalNipCode($nip)) {
+            $score += 40;
+        }
+        $score += $this->displayNameScore((string) ($row['name'] ?? ''));
+
+        return $score;
+    }
+
+    private function isCanonicalNipCode(string $nip): bool
+    {
+        if ($nip === '') {
+            return false;
+        }
+
+        $legacyMap = config('nigerian_bank_legacy_to_nip', []);
+        if (is_array($legacyMap) && in_array($nip, array_values($legacyMap), true)) {
+            return true;
+        }
+
+        $byCode = config('bank_logos.by_code', []);
+        if (is_array($byCode) && array_key_exists($nip, $byCode)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function displayNameScore(string $name): int
+    {
+        $trimmed = trim($name);
+        if ($trimmed === '') {
+            return 0;
+        }
+
+        return $trimmed !== strtoupper($trimmed) ? 10 : 5;
+    }
+
+    private function institutionKey(string $name): string
+    {
+        $n = $this->normalizeName($name);
+        if ($n === '') {
+            return '';
+        }
+
+        $stop = ['microfinance bank', 'microfinance', 'mfb', 'plc', 'ltd', 'limited', 'nigeria', 'ng', 'bank'];
+        foreach ($stop as $word) {
+            $n = preg_replace('/\b'.preg_quote($word, '/').'\b/', ' ', $n) ?? $n;
+        }
+        $n = preg_replace('/\s+/', ' ', $n) ?? $n;
+
+        return trim($n);
+    }
+
+    private function formatBankDisplayName(string $name): string
+    {
+        $trimmed = trim($name);
+        if ($trimmed === '' || $trimmed !== strtoupper($trimmed)) {
+            return $trimmed;
+        }
+
+        return ucwords(strtolower($trimmed));
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Bank;
 use App\Models\Renter;
 use App\Services\BankLogoService;
 use App\Services\MevonPayBankService;
+use App\Services\NigerianBankCodeNormalizer;
 use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
 
@@ -40,9 +41,10 @@ class KycController extends Controller
                 if (! $code || ! $name) {
                     continue;
                 }
+                $nip = NigerianBankCodeNormalizer::toNipTransferCode((string) $code);
                 Bank::updateOrCreate(
-                    ['code' => $code],
-                    ['name' => $name],
+                    ['code' => $nip],
+                    ['name' => trim((string) $name)],
                 );
             }
         }

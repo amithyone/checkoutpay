@@ -8,7 +8,7 @@ return [
     'disk' => 'public',
     'directory' => 'bank-logos',
     'library_path' => resource_path('bank-logos/library'),
-    'cache_key' => 'banks:list:with-logos:v1',
+    'cache_key' => 'banks:list:with-logos:v2',
 
     /**
      * NIP 6-digit code => library filename.
