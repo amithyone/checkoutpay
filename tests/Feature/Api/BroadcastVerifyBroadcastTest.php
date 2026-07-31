@@ -127,9 +127,10 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'signature' => 'invalid-signature',
         ];
 
-        $this->postJson('/api/v1/broadcast/verify-broadcast', $badPacket)
-            ->assertOk()
-            ->assertJson(['valid' => false, 'error' => 'Invalid signature']);
+        $badResponse = $this->postJson('/api/v1/broadcast/verify-broadcast', $badPacket)
+            ->assertOk();
+        $this->assertFalse($badResponse->json('valid'));
+        $this->assertStringStartsWith('Invalid signature', (string) $badResponse->json('error'));
 
         $goodPacket = [
             'payload' => $payload,
@@ -824,9 +825,10 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'signature' => $signatures->signEd25519($payload, $posKeypair['signing_key']),
         ];
 
-        $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
-            ->assertOk()
-            ->assertJson(['valid' => false, 'error' => 'Invalid signature']);
+        $mismatchResponse = $this->postJson('/api/v1/broadcast/verify-broadcast', $packet)
+            ->assertOk();
+        $this->assertFalse($mismatchResponse->json('valid'));
+        $this->assertStringContainsString('sync-signing-key', (string) $mismatchResponse->json('error'));
 
         $this->postJson('/api/v1/broadcast/terminals/sync-signing-key', [
             'terminal_id' => 'CP-SYNC',

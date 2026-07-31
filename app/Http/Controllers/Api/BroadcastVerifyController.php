@@ -8,6 +8,7 @@ use App\Services\Broadcast\BroadcastSessionPaymentMatcher;
 use App\Services\Broadcast\BroadcastSessionService;
 use App\Services\Broadcast\BroadcastSignatureVerifier;
 use App\Services\Broadcast\BroadcastTerminalProvisioner;
+use App\Services\Broadcast\BroadcastWireExpand;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -26,12 +27,15 @@ class BroadcastVerifyController extends Controller
 {
     private const MAX_AGE_MS = 600_000;
 
+    private const VERIFY_PROFILE = '2026-07-31-v2.1';
+
     public function __construct(
         private readonly BroadcastSignatureVerifier $signatures,
         private readonly BroadcastSessionService $sessions,
         private readonly BroadcastBankNameHashMatcher $bankNameHashes,
         private readonly BroadcastSessionPaymentMatcher $paymentMatcher,
         private readonly BroadcastTerminalProvisioner $terminalProvisioner,
+        private readonly BroadcastWireExpand $wireExpand,
     ) {}
 
     public function health(): JsonResponse
@@ -42,6 +46,13 @@ class BroadcastVerifyController extends Controller
             'ok' => true,
             'status' => 'ok',
             'terminals' => $terminals,
+            'verify_profile' => self::VERIFY_PROFILE,
+            'features' => [
+                'sync-signing-key',
+                'wire-expand',
+                'ed25519-kobo-amounts',
+                'optional-bank-hash',
+            ],
         ]);
     }
 
@@ -71,7 +82,7 @@ class BroadcastVerifyController extends Controller
         }
         RateLimiter::hit($key, 60);
 
-        $packet = $request->all();
+        $packet = $this->wireExpand->normalizeForVerify($request->all());
         $payload = $packet['payload'] ?? null;
         if (! is_array($payload)) {
             $this->logVerifyAttempt($logBase, [
@@ -86,7 +97,7 @@ class BroadcastVerifyController extends Controller
         $terminalId = (string) ($payload['terminal_id'] ?? '');
         $session = (string) ($payload['session_uuid_v4'] ?? '');
         $packetAmount = (int) data_get($payload, 'transaction_details.total_amount_ngn', 0);
-        $signatureAlg = (string) ($packet['signature_alg'] ?? '');
+        $signatureAlg = (string) ($packet['signature_alg'] ?? $packet['alg'] ?? '');
         $logBase['terminal_id'] = $terminalId;
         $logBase['session_uuid'] = $session;
         $logBase['signature_alg'] = $signatureAlg;
@@ -113,7 +124,9 @@ class BroadcastVerifyController extends Controller
         $logBase['merchant_name'] = $terminal->merchant_name;
 
         if ($signatureAlg === '') {
-            $signatureAlg = (string) ($terminal->signature_alg ?? 'HMAC-SHA256');
+            $signatureAlg = str_starts_with(strtoupper($terminalId), 'CP-')
+                ? 'ed25519'
+                : (string) ($terminal->signature_alg ?? 'HMAC-SHA256');
         }
         $sessionAmountKobo = $packetAmount;
         $displayAmountNgn = $this->displayAmountNgn($packetAmount, $signatureAlg);
@@ -254,11 +267,15 @@ class BroadcastVerifyController extends Controller
         if (! $verified) {
             $this->logVerifyAttempt($logBase, [
                 'valid' => false,
-                'error' => 'Invalid signature',
+                'error' => $this->signatureFailureReason($terminal, $signatureAlg),
                 'http_status' => 200,
+                'verify_profile' => self::VERIFY_PROFILE,
             ]);
 
-            return response()->json(['valid' => false, 'error' => 'Invalid signature']);
+            return response()->json([
+                'valid' => false,
+                'error' => $this->signatureFailureReason($terminal, $signatureAlg),
+            ]);
         }
 
         $sessionReplay = $existingSession !== null;
@@ -702,31 +719,52 @@ class BroadcastVerifyController extends Controller
         }
 
         $storedPublic = trim((string) ($terminal->public_key ?? ''));
-        if ($storedPublic !== '' && $this->signatures->verify($payload, $signatureAlg, $signature, '', $storedPublic)) {
-            return true;
+        $candidates = array_values(array_unique(array_filter([
+            $storedPublic !== '' ? $storedPublic : null,
+            $this->maybePublicKeyFromSecretField($storedPublic),
+            ($secret = $this->terminalProvisioner->decryptSigningKey($terminal)) !== null
+                ? $this->signatures->derivePublicKeyFromSigningKey($secret)
+                : null,
+        ])));
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== null && $candidate !== ''
+                && $this->signatures->verify($payload, $signatureAlg, $signature, '', $candidate)) {
+                if ($candidate !== $storedPublic) {
+                    DB::table('broadcast_terminals')
+                        ->where('terminal_id', $terminal->terminal_id)
+                        ->update(['public_key' => $candidate, 'updated_at' => now()]);
+                }
+
+                return true;
+            }
         }
 
-        $posSecret = $this->terminalProvisioner->decryptSigningKey($terminal);
-        if ($posSecret === null) {
-            return false;
+        return false;
+    }
+
+    private function signatureFailureReason(object $terminal, string $signatureAlg): string
+    {
+        if (strtoupper(trim($signatureAlg)) !== 'ED25519') {
+            return 'Invalid signature';
         }
 
-        $derivedPublic = $this->signatures->derivePublicKeyFromSigningKey($posSecret);
-        if ($derivedPublic === null) {
-            return false;
+        $storedPublic = trim((string) ($terminal->public_key ?? ''));
+        if ($storedPublic === '' && $this->terminalProvisioner->decryptSigningKey($terminal) === null) {
+            return 'Invalid signature — terminal has no Ed25519 public key; sync POS signing key on CheckoutPay';
         }
 
-        if (! $this->signatures->verify($payload, $signatureAlg, $signature, '', $derivedPublic)) {
-            return false;
+        return 'Invalid signature — POS signing key does not match CheckoutPay terminal registry (use sync-signing-key)';
+    }
+
+    /** Some rows accidentally store the 64-byte secret in public_key — derive the real public key. */
+    private function maybePublicKeyFromSecretField(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
         }
 
-        if ($storedPublic !== $derivedPublic) {
-            DB::table('broadcast_terminals')
-                ->where('terminal_id', $terminal->terminal_id)
-                ->update(['public_key' => $derivedPublic, 'updated_at' => now()]);
-        }
-
-        return true;
+        return $this->signatures->derivePublicKeyFromSigningKey($value);
     }
 
     private function adminAuthorized(Request $request): bool
