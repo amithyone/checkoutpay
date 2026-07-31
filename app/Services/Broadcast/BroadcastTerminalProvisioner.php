@@ -227,7 +227,7 @@ class BroadcastTerminalProvisioner
             throw new \RuntimeException('Unknown terminal_id');
         }
 
-        $signingKeyPlain = trim($signingKeyPlain);
+        $signingKeyPlain = $this->signatures->normalizeSigningKeyMaterial($signingKeyPlain);
         if ($signingKeyPlain === '') {
             throw new \RuntimeException('signing_key is required');
         }

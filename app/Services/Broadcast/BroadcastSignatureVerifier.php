@@ -111,7 +111,12 @@ class BroadcastSignatureVerifier
     {
         $secretKey = $this->decodeKeyMaterial($secretKeyB64, 64);
         if ($secretKey === null) {
-            throw new \InvalidArgumentException('Invalid Ed25519 secret key');
+            $seed = $this->decodeKeyMaterial($secretKeyB64, 32);
+            if ($seed === null) {
+                throw new \InvalidArgumentException('Invalid Ed25519 secret key');
+            }
+            $keypair = sodium_crypto_sign_seed_keypair($seed);
+            $secretKey = sodium_crypto_sign_secretkey($keypair);
         }
 
         $message = $this->canonicalJson($this->sortKeysRecursive($payload));
@@ -160,7 +165,7 @@ class BroadcastSignatureVerifier
 
     private function decodeKeyMaterial(string $value, int $expectedLength): ?string
     {
-        $trimmed = trim($value);
+        $trimmed = $this->normalizeSigningKeyMaterial($value);
         if ($trimmed === '') {
             return null;
         }
@@ -177,5 +182,11 @@ class BroadcastSignatureVerifier
         }
 
         return null;
+    }
+
+    /** Strip whitespace; keep standard base64 (+ / =) intact. */
+    public function normalizeSigningKeyMaterial(string $value): string
+    {
+        return preg_replace('/\s+/', '', trim($value)) ?? trim($value);
     }
 }
