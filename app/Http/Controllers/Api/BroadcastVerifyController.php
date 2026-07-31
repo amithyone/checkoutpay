@@ -27,7 +27,7 @@ class BroadcastVerifyController extends Controller
 {
     private const MAX_AGE_MS = 600_000;
 
-    private const VERIFY_PROFILE = '2026-07-31-v2.1';
+    private const VERIFY_PROFILE = '2026-07-31-v2.1-presence';
 
     public function __construct(
         private readonly BroadcastSignatureVerifier $signatures,
@@ -52,6 +52,8 @@ class BroadcastVerifyController extends Controller
                 'wire-expand',
                 'ed25519-kobo-amounts',
                 'optional-bank-hash',
+                'presence-idle',
+                'compact-wire-vsidtid',
             ],
         ]);
     }
@@ -129,8 +131,11 @@ class BroadcastVerifyController extends Controller
                 : (string) ($terminal->signature_alg ?? 'HMAC-SHA256');
         }
         $sessionAmountKobo = $packetAmount;
-        $displayAmountNgn = $this->displayAmountNgn($packetAmount, $signatureAlg);
+        $sessionKind = $this->resolveSessionKind($payload, $sessionAmountKobo);
+        $isPresence = $sessionKind === 'presence';
+        $displayAmountNgn = $isPresence ? 0.0 : $this->displayAmountNgn($packetAmount, $signatureAlg);
         $logBase['amount_ngn'] = $displayAmountNgn;
+        $logBase['session_kind'] = $sessionKind;
         $logBase['signature_alg'] = $signatureAlg;
 
         if (! $terminal->active) {
@@ -306,8 +311,10 @@ class BroadcastVerifyController extends Controller
             $recipientAccount,
         );
 
-        $this->sessions->open($session, $terminalId, $sessionAmountKobo, $settlementMode, $settlementAccount);
-        $this->recordSession($session, $terminalId);
+        if (! $isPresence) {
+            $this->sessions->open($session, $terminalId, $sessionAmountKobo, $settlementMode, $settlementAccount);
+            $this->recordSession($session, $terminalId);
+        }
 
         $this->logVerifyAttempt($logBase, [
             'valid' => true,
@@ -322,6 +329,7 @@ class BroadcastVerifyController extends Controller
             'merchant_name' => $terminal->merchant_name,
             'recipient_account_name' => $recipientAccountName,
             'amount_ngn' => $displayAmountNgn,
+            'session_kind' => $sessionKind,
             'bank_name' => $bankName,
             'masked_account_suffix' => $maskedSuffix,
             'session_uuid' => $session,
@@ -837,6 +845,23 @@ class BroadcastVerifyController extends Controller
         } catch (\Throwable) {
             // Audit-only; verification outcome must not depend on insert success.
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveSessionKind(array $payload, int $packetAmountKobo): string
+    {
+        $kind = strtolower(trim((string) ($payload['session_kind'] ?? '')));
+        if (in_array($kind, ['presence', 'idle', 'beacon'], true)) {
+            return 'presence';
+        }
+
+        if ($packetAmountKobo <= 0) {
+            return 'presence';
+        }
+
+        return 'pos_checkout';
     }
 
     private function normalizeSignatureAlg(string $alg): string

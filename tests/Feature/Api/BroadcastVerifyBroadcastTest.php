@@ -843,6 +843,76 @@ class BroadcastVerifyBroadcastTest extends TestCase
                 'valid' => true,
                 'terminal_id' => 'CP-SYNC',
                 'amount_ngn' => 1000,
+                'session_kind' => 'pos_checkout',
             ]);
+    }
+
+    public function test_verify_presence_compact_wire_skips_session_burn(): void
+    {
+        $signatures = new BroadcastSignatureVerifier;
+        $keypair = $signatures->generateEd25519Keypair();
+
+        DB::table('broadcast_terminals')->insert([
+            'terminal_id' => 'CP-PRES',
+            'merchant_id' => 'MCH-CP-PRES',
+            'api_key' => 'bk_test_api_key_presence_wire',
+            'signing_key' => '',
+            'public_key' => $keypair['public_key'],
+            'signature_alg' => 'ED25519',
+            'merchant_name' => 'Presence Shop',
+            'bank_name' => 'RUBIES MFB',
+            'bank_name_hash' => 'sha256:'.hash('sha256', 'rubies mfb'),
+            'masked_account_suffix' => '***4863',
+            'account_number' => '1000004863',
+            'recipient_bank_code' => '090175',
+            'active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $session = '660e8400-e29b-41d4-a716-446655440099';
+        $ts = (int) (microtime(true) * 1000);
+        $signPayload = [
+            'protocol_version' => 2.1,
+            'timestamp_ms' => $ts,
+            'session_uuid_v4' => $session,
+            'terminal_id' => 'CP-PRES',
+            'transaction_details' => ['total_amount_ngn' => 0],
+            'account_info_public_display' => ['masked_account_suffix' => '***4863'],
+        ];
+        $sig = $signatures->signEd25519($signPayload, $keypair['signing_key']);
+
+        $wire = [
+            'p' => [
+                'v' => 2.1,
+                'sid' => $session,
+                'tid' => 'CP-PRES',
+                'ts' => $ts,
+                'msk' => '***4863',
+            ],
+            'alg' => 'ed25519',
+            'sig' => $sig,
+        ];
+
+        $this->postJson('/api/v1/broadcast/verify-broadcast', $wire)
+            ->assertOk()
+            ->assertJson([
+                'valid' => true,
+                'session_kind' => 'presence',
+                'amount_ngn' => 0,
+                'terminal_id' => 'CP-PRES',
+                'merchant_name' => 'Presence Shop',
+            ]);
+
+        $this->postJson('/api/v1/broadcast/verify-broadcast', $wire)
+            ->assertOk()
+            ->assertJson(['valid' => true, 'session_kind' => 'presence']);
+
+        $this->assertDatabaseMissing('broadcast_used_sessions', [
+            'session_uuid' => $session,
+        ]);
+        $this->assertDatabaseMissing('broadcast_sessions', [
+            'session_uuid' => $session,
+        ]);
     }
 }

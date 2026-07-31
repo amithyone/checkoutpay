@@ -1134,7 +1134,10 @@ class ConsumerWalletApiController extends Controller
 
         if ($result['ok'] && $user instanceof ConsumerWalletApiAccount) {
             if ($request->filled('idempotency_key')) {
-                $this->broadcastSessions->markPaid((string) $request->input('idempotency_key'));
+                $broadcastSession = $this->broadcastSessions->find((string) $request->input('idempotency_key'));
+                if ($broadcastSession !== null && (int) $broadcastSession->amount_ngn > 0) {
+                    $this->broadcastSessions->markPaid((string) $request->input('idempotency_key'));
+                }
             }
 
             $this->appSessions->recordForAccount(

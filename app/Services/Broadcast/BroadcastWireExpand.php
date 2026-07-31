@@ -19,6 +19,7 @@ class BroadcastWireExpand
         'offline_settlement',
         'broadcast_kind',
         'wallet_receive',
+        'session_kind',
     ];
 
     /**
@@ -63,6 +64,52 @@ class BroadcastWireExpand
     }
 
     /**
+     * @param  array<string, mixed>  $wire
+     * @return array<string, mixed>
+     */
+    public function expandCompactWirePayload(array $wire): array
+    {
+        $amountKobo = 0;
+        if (array_key_exists('amt', $wire) && $wire['amt'] !== null && $wire['amt'] !== '') {
+            $amountKobo = (int) $wire['amt'];
+        }
+
+        $expanded = [
+            'protocol_version' => is_numeric($wire['v'] ?? null) ? (float) $wire['v'] : 2.1,
+            'timestamp_ms' => (int) ($wire['ts'] ?? 0),
+            'session_uuid_v4' => (string) ($wire['sid'] ?? ''),
+            'terminal_id' => (string) ($wire['tid'] ?? ''),
+            'transaction_details' => [
+                'total_amount_ngn' => $amountKobo,
+            ],
+        ];
+
+        if (isset($wire['msk']) && (string) $wire['msk'] !== '') {
+            $expanded['account_info_public_display'] = [
+                'masked_account_suffix' => (string) $wire['msk'],
+            ];
+        }
+
+        if (isset($wire['k']) && (string) $wire['k'] !== '') {
+            $expanded['session_kind'] = (string) $wire['k'];
+        }
+
+        return $expanded;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function isCompactWirePayload(array $payload): bool
+    {
+        if (isset($payload['protocol_version']) || isset($payload['session_uuid_v4']) || isset($payload['terminal_id'])) {
+            return false;
+        }
+
+        return isset($payload['v']) || isset($payload['sid']) || isset($payload['tid']);
+    }
+
+    /**
      * @param  array<string, mixed>  $envelope
      * @return array<string, mixed>
      */
@@ -70,8 +117,13 @@ class BroadcastWireExpand
     {
         $alg = (string) ($envelope['signature_alg'] ?? $envelope['signatureAlg'] ?? $envelope['alg'] ?? 'ed25519');
 
+        $payload = $envelope['payload'];
+        if (is_array($payload) && $this->isCompactWirePayload($payload)) {
+            $payload = $this->expandCompactWirePayload($payload);
+        }
+
         return [
-            'payload' => $envelope['payload'],
+            'payload' => $payload,
             'signature_alg' => $alg !== '' ? $alg : 'ed25519',
             'signature' => (string) ($envelope['signature'] ?? $envelope['sig'] ?? ''),
         ];
