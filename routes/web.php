@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\TestEmailController;
+use App\Http\Controllers\Api\BroadcastVerifyController;
 use Illuminate\Support\Facades\Route;
 
 // Rental storefront hostnames: same app, no redirect — browser stays on the host the user typed
@@ -23,6 +24,10 @@ Route::get('/sitemap.xml', [\App\Http\Controllers\Public\SeoController::class, '
 Route::get('/llms.txt', [\App\Http\Controllers\Public\SeoController::class, 'llmsTxt'])->name('seo.llms');
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
+
+/** SDK legacy path: bankApiUrl + /verify-broadcast when base is https://check-outpay.com */
+Route::post('/verify-broadcast', [BroadcastVerifyController::class, 'verifyBroadcast'])
+    ->middleware('throttle:120,1');
 
 Route::get('/whatsapp/link', [\App\Http\Controllers\WhatsappMagicLinkController::class, 'confirm'])
     ->middleware('throttle:30,1')
