@@ -57,6 +57,7 @@ database/__MACOSX/
 storage/app/public/invoices/
 storage/app/public/rental-items/
 storage/app/public/settings/
+storage/app/public/bank-logos/
 storage/app/rentals/
 error_log
 app.zip
