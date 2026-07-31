@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Broadcast\BroadcastPayAtShopProximityPushService;
 use App\Services\Broadcast\BroadcastBankNameHashMatcher;
 use App\Services\Broadcast\BroadcastSessionPaymentMatcher;
 use App\Services\Broadcast\BroadcastSessionService;
@@ -36,6 +37,7 @@ class BroadcastVerifyController extends Controller
         private readonly BroadcastSessionPaymentMatcher $paymentMatcher,
         private readonly BroadcastTerminalProvisioner $terminalProvisioner,
         private readonly BroadcastWireExpand $wireExpand,
+        private readonly BroadcastPayAtShopProximityPushService $proximityPush,
     ) {}
 
     public function health(): JsonResponse
@@ -54,7 +56,50 @@ class BroadcastVerifyController extends Controller
                 'optional-bank-hash',
                 'presence-idle',
                 'compact-wire-vsidtid',
+                'proximity-push',
             ],
+        ]);
+    }
+
+    /**
+     * POS: FCM nudge to CheckoutNow wallets while idle/presence beacon is active.
+     * Auth: X-Terminal-Api-Key. Ignores device hostname — uses merchant_name from registry.
+     */
+    public function presenceNudge(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'terminal_id' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'session_kind' => 'nullable|string|in:presence,pos_checkout',
+        ]);
+
+        $terminalId = (string) $data['terminal_id'];
+        $terminal = $this->terminalAuthorized($request, $terminalId);
+        if ($terminal === null) {
+            return response()->json(['ok' => false, 'error' => 'Unauthorized'], 401);
+        }
+
+        $result = $this->proximityPush->notifyFromTerminal(
+            $terminalId,
+            (string) ($data['session_kind'] ?? 'presence'),
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            $status = ($result['error'] ?? '') === 'Unauthorized' ? 401 : 200;
+
+            return response()->json([
+                'ok' => false,
+                'error' => $result['error'] ?? 'Push not sent',
+                'merchant_name' => $result['merchant_name'] ?? null,
+            ], $status === 401 ? 401 : 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'sent' => $result['sent'],
+            'skipped' => $result['skipped'],
+            'merchant_name' => $result['merchant_name'],
+            'title' => config('broadcast.pay_at_shop_proximity_push_title'),
+            'body' => $this->proximityPush->buildBody($result['merchant_name']),
         ]);
     }
 

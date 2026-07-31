@@ -36,4 +36,22 @@ return [
         'OPay',
         'opay',
     ],
+
+    /** FCM nudge when a Pay at Shop till broadcasts idle/presence (native CheckoutNow). */
+    'pay_at_shop_proximity_push_enabled' => filter_var(
+        env('BROADCAST_PAY_AT_SHOP_PROXIMITY_PUSH_ENABLED', true),
+        FILTER_VALIDATE_BOOL,
+    ),
+    'pay_at_shop_proximity_push_title' => env(
+        'BROADCAST_PAY_AT_SHOP_PROXIMITY_PUSH_TITLE',
+        'Checkout Nearby Available',
+    ),
+    'pay_at_shop_proximity_push_channel' => env(
+        'BROADCAST_PAY_AT_SHOP_PROXIMITY_PUSH_CHANNEL',
+        'wallet_alerts',
+    ),
+    'pay_at_shop_proximity_push_cooldown_seconds' => (int) env(
+        'BROADCAST_PAY_AT_SHOP_PROXIMITY_PUSH_COOLDOWN',
+        300,
+    ),
 ];

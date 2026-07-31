@@ -363,6 +363,63 @@ final class ConsumerWalletPushNotificationService
         }
     }
 
+    /**
+     * Pay at Shop proximity nudge (idle till nearby) — FCM to native CheckoutNow app.
+     */
+    public function notifyPayAtShopProximity(
+        WhatsappWallet $wallet,
+        string $terminalId,
+        string $merchantName,
+        string $sessionKind = 'presence',
+    ): bool {
+        if (! (bool) config('broadcast.pay_at_shop_proximity_push_enabled', true)) {
+            return false;
+        }
+
+        if (! $this->push->isConfigured(PushNotificationService::PROFILE_CHECKOUTNOW)) {
+            return false;
+        }
+
+        $target = $this->resolvePushTarget($wallet);
+        if ($target === null) {
+            return false;
+        }
+
+        $displayName = trim($merchantName) !== '' ? trim($merchantName) : 'Shop';
+        $title = (string) config('broadcast.pay_at_shop_proximity_push_title', 'Checkout Nearby Available');
+        $body = sprintf('%s is open — tap to pay', $displayName);
+        $kind = in_array($sessionKind, ['presence', 'pos_checkout'], true) ? $sessionKind : 'presence';
+
+        try {
+            $failed = $this->push->sendToTokens(
+                [$target],
+                $title,
+                $body,
+                [
+                    'type' => 'pay_at_shop',
+                    'screen' => 'pay_at_shop',
+                    'terminal_id' => $terminalId,
+                    'merchant_name' => $displayName,
+                    'session_kind' => $kind,
+                    'wallet_id' => (string) $wallet->id,
+                ],
+                (string) config('broadcast.pay_at_shop_proximity_push_channel', 'wallet_alerts'),
+                PushNotificationService::PROFILE_CHECKOUTNOW,
+            );
+            $this->clearTokenIfInvalid($target['token'], $failed);
+
+            return ! in_array($target['token'], $failed, true);
+        } catch (\Throwable $e) {
+            Log::warning('consumer_wallet.pay_at_shop_proximity_push_failed', [
+                'wallet_id' => $wallet->id,
+                'terminal_id' => $terminalId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
     private function enabled(): bool
     {
         return (bool) config('consumer_wallet.credit_push_enabled', true);
