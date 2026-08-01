@@ -18,6 +18,7 @@ use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWalletElectricityReceiptEnricher;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
+use App\Services\Consumer\ConsumerWalletTransferService;
 use App\Services\Consumer\ConsumerWalletKycService;
 use App\Services\Consumer\ConsumerWalletPayCodeService;
 use App\Services\Consumer\ConsumerWalletPayQrService;
