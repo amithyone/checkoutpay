@@ -18,9 +18,14 @@ class SupportTicket extends Model
 
     public const CHANNEL_BUSINESS_DASHBOARD = 'business_dashboard';
 
+    public const QUEUE_PAYMENT = 'payment';
+
+    public const QUEUE_WALLET = 'wallet';
+
     protected $fillable = [
         'channel',
         'issue_type',
+        'support_queue',
         'payment_id',
         'payment_transaction_id',
         'payment_amount_reported',

@@ -7,6 +7,7 @@ use App\Models\ConsumerWalletApiAccount;
 use App\Models\SupportTicket;
 use App\Services\Support\SupportCountryOptionsService;
 use App\Services\Support\SupportIntakeService;
+use App\Services\Support\WalletSupportStaffResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,12 +16,21 @@ class ConsumerSupportIntakeController extends Controller
     public function __construct(
         private SupportIntakeService $intake,
         private SupportCountryOptionsService $countries,
+        private WalletSupportStaffResolver $staffResolver,
     ) {}
 
     public function start(Request $request): JsonResponse
     {
         /** @var ConsumerWalletApiAccount $account */
         $account = $request->user();
+
+        if ($this->staffResolver->isStaffAccount($account)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wallet support staff should use the support inbox, not start a customer ticket.',
+                'mode' => 'staff',
+            ], 403);
+        }
 
         $result = $this->intake->start(
             SupportTicket::CHANNEL_CHECKOUTNOW_APP,

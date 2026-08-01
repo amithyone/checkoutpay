@@ -1,11 +1,11 @@
 <div id="wallet-support-fields" class="space-y-4 border border-teal-200 bg-teal-50/40 rounded-lg p-4 {{ in_array(old('role', $role ?? ''), ['wallet_support']) ? '' : 'hidden' }}">
-    <h4 class="text-sm font-semibold text-teal-900">Wallet support alerts</h4>
+    <h4 class="text-sm font-semibold text-teal-900">Wallet support</h4>
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">WhatsApp number</label>
         <input type="text" name="whatsapp_e164" value="{{ old('whatsapp_e164', $whatsapp ?? '') }}"
             placeholder="e.g. 08012345678"
             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
-        <p class="mt-1 text-xs text-gray-500">Used for new wallet signup alerts. Required for wallet support role.</p>
+        <p class="mt-1 text-xs text-gray-500">Must match the number on your CheckoutNow wallet. Used for signup alerts and in-app customer support inbox.</p>
     </div>
     <div>
         <label class="flex items-center space-x-2">
@@ -13,6 +13,14 @@
                 {{ old('notify_wallet_signup', $notifySignup ?? true) ? 'checked' : '' }}
                 class="rounded border-gray-300 text-primary focus:ring-primary">
             <span class="text-sm text-gray-700">Notify on new wallet signup</span>
+        </label>
+    </div>
+    <div>
+        <label class="flex items-center space-x-2">
+            <input type="checkbox" name="handles_wallet_support_in_app" value="1"
+                {{ old('handles_wallet_support_in_app', $handlesInApp ?? true) ? 'checked' : '' }}
+                class="rounded border-gray-300 text-primary focus:ring-primary">
+            <span class="text-sm text-gray-700">Handle wallet support in CheckoutNow app (staff inbox)</span>
         </label>
     </div>
 </div>

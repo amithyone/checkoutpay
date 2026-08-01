@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketReply;
 use App\Models\WhatsappWallet;
+use App\Services\Admin\WalletSupportTicketNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,6 +19,7 @@ final class SupportConversationService
         private SupportCountryOptionsService $countries,
         private SupportIssueOptionsService $issues,
         private SupportPaymentLookupService $payments,
+        private WalletSupportTicketNotifier $walletSupportNotifier,
     ) {}
 
     /**
@@ -47,6 +49,7 @@ final class SupportConversationService
         $paymentTransactionId = null;
         $paymentAmountReported = null;
         $issueMeta = $this->issues->metaFor($issueType);
+        $supportQueue = $this->issues->queueFor($issueType);
 
         if ($issueType !== null && $this->issues->requiresPayment($issueType)) {
             $paymentTransactionId = trim((string) ($input['payment_transaction_id'] ?? $input['transaction_id'] ?? ''));
@@ -162,13 +165,15 @@ final class SupportConversationService
             $paymentAmountReported,
             $priority,
             $userNote,
-            $whatsappEligibleAt
+            $whatsappEligibleAt,
+            $supportQueue
         ) {
             $token = (string) Str::uuid();
 
             $ticket = SupportTicket::create([
                 'channel' => $channel,
                 'issue_type' => $issueType,
+                'support_queue' => $supportQueue,
                 'intake_status' => isset($input['intake_status']) ? (string) $input['intake_status'] : null,
                 'payment_id' => $payment?->id,
                 'payment_transaction_id' => $paymentTransactionId,
@@ -202,7 +207,8 @@ final class SupportConversationService
             ]);
 
             if ($firstMessage !== '' && ($userNote !== '' || $issueType !== null)) {
-                $this->createVisitorReply($ticket, $firstMessage);
+                $notifyStaff = $supportQueue === SupportIssueOptionsService::QUEUE_WALLET;
+                $this->createVisitorReply($ticket, $firstMessage, notifyStaff: $notifyStaff);
             }
 
             $skipWhatsappWelcome = ! empty($input['skip_whatsapp_welcome']);
@@ -280,6 +286,18 @@ final class SupportConversationService
     }
 
     /**
+     * @return array{ok: bool, message?: string, reply?: SupportTicketReply}
+     */
+    public function addAdminReplyForAdmin(
+        SupportTicket $ticket,
+        string $message,
+        int $adminId,
+        bool $isInternal = false,
+    ): array {
+        return $this->addAdminReply($ticket, $message, $isInternal, $adminId);
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function listMessagesForVisitor(SupportTicket $ticket, ?int $afterId = null): array
@@ -337,8 +355,12 @@ final class SupportConversationService
     /**
      * @return array{ok: bool, message?: string, reply?: SupportTicketReply}
      */
-    public function addAdminReply(SupportTicket $ticket, string $message, bool $isInternal = false): array
-    {
+    public function addAdminReply(
+        SupportTicket $ticket,
+        string $message,
+        bool $isInternal = false,
+        ?int $adminId = null,
+    ): array {
         $message = trim($message);
         if ($message === '') {
             return ['ok' => false, 'message' => 'Message cannot be empty.'];
@@ -346,7 +368,7 @@ final class SupportConversationService
 
         $reply = SupportTicketReply::create([
             'ticket_id' => $ticket->id,
-            'user_id' => auth('admin')->id(),
+            'user_id' => $adminId ?? auth('admin')->id(),
             'user_type' => 'admin',
             'message' => $message,
             'is_internal_note' => $isInternal,
@@ -382,8 +404,11 @@ final class SupportConversationService
         return $this->addBotReply($ticket, $message);
     }
 
-    private function createVisitorReply(SupportTicket $ticket, string $message): SupportTicketReply
-    {
+    private function createVisitorReply(
+        SupportTicket $ticket,
+        string $message,
+        bool $notifyStaff = true,
+    ): SupportTicketReply {
         $reply = SupportTicketReply::create([
             'ticket_id' => $ticket->id,
             'user_id' => null,
@@ -394,6 +419,10 @@ final class SupportConversationService
 
         $ticket->increment('admin_unread_count');
         $this->touchTicketAfterMessage($ticket, 'visitor');
+
+        if ($notifyStaff) {
+            $this->walletSupportNotifier->notifyStaffOfVisitorMessage($ticket->fresh(), $message);
+        }
 
         if (in_array($ticket->status, [SupportTicket::STATUS_RESOLVED, SupportTicket::STATUS_CLOSED], true)) {
             $ticket->update(['status' => SupportTicket::STATUS_OPEN]);

@@ -55,6 +55,7 @@ final class SupportCountryOptionsService
             'countries' => $countries,
             'suggested_country' => $suggested,
             'default_country' => in_array($default, $supportedIsos, true) ? $default : $suggested,
+            'support_categories' => $this->issues->supportCategories(),
             'issue_types' => $this->issues->issueTypes(),
             'payment_session_label' => 'Bank session ID',
             'payment_session_hint' => 'On your bank app transfer receipt or SMS — not the checkout website URL',

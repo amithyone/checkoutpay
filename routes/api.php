@@ -246,6 +246,8 @@ Route::prefix('v1')->group(function () {
         Route::get('savings/locks', [\App\Http\Controllers\Api\ConsumerSavingsApiController::class, 'locks']);
 
         Route::prefix('support')->group(function () {
+            Route::get('context', [\App\Http\Controllers\Api\ConsumerSupportContextController::class, 'show'])
+                ->middleware('throttle:support-options');
             Route::get('options', [ConsumerSupportController::class, 'options'])
                 ->middleware('throttle:support-options');
             Route::post('intake/start', [\App\Http\Controllers\Api\ConsumerSupportIntakeController::class, 'start'])
@@ -264,6 +266,20 @@ Route::prefix('v1')->group(function () {
                 ->middleware('throttle:support-poll');
             Route::post('conversations/{token}/messages', [ConsumerSupportController::class, 'sendMessage'])
                 ->middleware('throttle:support-write');
+
+            Route::prefix('staff')->group(function () {
+                Route::get('inbox', [\App\Http\Controllers\Api\ConsumerSupportStaffController::class, 'inbox'])
+                    ->middleware('throttle:support-poll');
+                Route::get('tickets/{ticketId}/messages', [\App\Http\Controllers\Api\ConsumerSupportStaffController::class, 'messages'])
+                    ->middleware('throttle:support-poll')
+                    ->whereNumber('ticketId');
+                Route::post('tickets/{ticketId}/reply', [\App\Http\Controllers\Api\ConsumerSupportStaffController::class, 'reply'])
+                    ->middleware('throttle:support-write')
+                    ->whereNumber('ticketId');
+                Route::post('tickets/{ticketId}/status', [\App\Http\Controllers\Api\ConsumerSupportStaffController::class, 'updateStatus'])
+                    ->middleware('throttle:support-write')
+                    ->whereNumber('ticketId');
+            });
         });
     });
 

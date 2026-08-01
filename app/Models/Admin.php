@@ -21,6 +21,7 @@ class Admin extends Authenticatable
         'sidebar_menu_order',
         'whatsapp_e164',
         'notify_wallet_signup',
+        'handles_wallet_support_in_app',
         'admin_page_permissions',
     ];
 
@@ -35,6 +36,7 @@ class Admin extends Authenticatable
         'password' => 'hashed',
         'sidebar_menu_order' => 'array',
         'notify_wallet_signup' => 'boolean',
+        'handles_wallet_support_in_app' => 'boolean',
         'admin_page_permissions' => 'array',
     ];
 
@@ -231,6 +233,15 @@ class Admin extends Authenticatable
         }
 
         return (bool) $this->notify_wallet_signup
+            && is_string($this->whatsapp_e164)
+            && trim($this->whatsapp_e164) !== '';
+    }
+
+    public function handlesWalletSupportInApp(): bool
+    {
+        return $this->is_active
+            && $this->isWalletSupport()
+            && (bool) ($this->handles_wallet_support_in_app ?? true)
             && is_string($this->whatsapp_e164)
             && trim($this->whatsapp_e164) !== '';
     }

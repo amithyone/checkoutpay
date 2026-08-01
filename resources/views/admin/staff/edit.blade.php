@@ -50,6 +50,7 @@
                 'role' => old('role', $staff->role),
                 'whatsapp' => old('whatsapp_e164', $staff->whatsapp_e164),
                 'notifySignup' => old('notify_wallet_signup', $staff->notify_wallet_signup),
+                'handlesInApp' => old('handles_wallet_support_in_app', $staff->handles_wallet_support_in_app ?? true),
                 'pagePermissions' => old('page_permissions', $staff->admin_page_permissions ?? []),
                 'pageCatalog' => $pageCatalog ?? [],
             ])

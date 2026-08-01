@@ -152,6 +152,7 @@ class StaffController extends Controller
             'is_active' => 'boolean',
             'whatsapp_e164' => 'nullable|string|max:20',
             'notify_wallet_signup' => 'boolean',
+            'handles_wallet_support_in_app' => 'boolean',
             'page_permissions' => 'nullable|array',
             'page_permissions.*' => 'string',
         ];
@@ -166,7 +167,7 @@ class StaffController extends Controller
     }
 
     /**
-     * @return array{whatsapp_e164: ?string, notify_wallet_signup: bool}
+     * @return array{whatsapp_e164: ?string, notify_wallet_signup: bool, handles_wallet_support_in_app: bool}
      */
     private function walletSupportFieldsFromRequest(Request $request, string $role): array
     {
@@ -174,6 +175,7 @@ class StaffController extends Controller
             return [
                 'whatsapp_e164' => null,
                 'notify_wallet_signup' => false,
+                'handles_wallet_support_in_app' => false,
             ];
         }
 
@@ -189,6 +191,7 @@ class StaffController extends Controller
         return [
             'whatsapp_e164' => $phone,
             'notify_wallet_signup' => $request->boolean('notify_wallet_signup', true),
+            'handles_wallet_support_in_app' => $request->boolean('handles_wallet_support_in_app', true),
         ];
     }
 

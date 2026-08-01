@@ -9,6 +9,7 @@ use App\Services\Support\SupportConversationService;
 use App\Services\Support\SupportCountryOptionsService;
 use App\Services\Support\SupportIssueOptionsService;
 use App\Services\Support\SupportWalletOnboardingService;
+use App\Services\Support\WalletSupportStaffResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,13 +20,24 @@ class ConsumerSupportController extends Controller
         private SupportConversationService $conversations,
         private SupportCountryOptionsService $countryOptions,
         private SupportIssueOptionsService $issues,
+        private WalletSupportStaffResolver $staffResolver,
     ) {}
 
     public function options(Request $request): JsonResponse
     {
+        $data = $this->countryOptions->optionsForRequest($request);
+
+        /** @var ConsumerWalletApiAccount|null $account */
+        $account = $request->user();
+        if ($account && $this->staffResolver->isStaffAccount($account)) {
+            $data['mode'] = 'staff';
+        } else {
+            $data['mode'] = 'customer';
+        }
+
         return response()->json([
             'success' => true,
-            'data' => $this->countryOptions->optionsForRequest($request),
+            'data' => $data,
         ]);
     }
 
@@ -33,12 +45,21 @@ class ConsumerSupportController extends Controller
     {
         /** @var ConsumerWalletApiAccount|null $account */
         $account = $request->user();
+
+        if ($account && $this->staffResolver->isStaffAccount($account)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wallet support staff should use the support inbox, not start a customer ticket.',
+                'mode' => 'staff',
+            ], 403);
+        }
         $wallet = $this->conversations->resolveWalletForAccount($account);
         $hasLinkedWallet = $wallet !== null;
         $linkWallet = $request->has('link_whatsapp_wallet')
             ? $request->boolean('link_whatsapp_wallet')
             : $hasLinkedWallet;
         $issueType = $request->input('issue_type');
+        $isWalletIssue = $issueType && $this->issues->isWalletQueue((string) $issueType);
 
         $rules = [
             'link_whatsapp_wallet' => 'required|boolean',
@@ -67,6 +88,10 @@ class ConsumerSupportController extends Controller
 
         $validated = $request->validate($rules);
 
+        if ($isWalletIssue) {
+            $linkWallet = true;
+        }
+
         $payload = [
             'channel' => SupportTicket::CHANNEL_CHECKOUTNOW_APP,
             'link_whatsapp_wallet' => $linkWallet,
@@ -81,6 +106,7 @@ class ConsumerSupportController extends Controller
 
         if ($linkWallet && $wallet) {
             $payload['wallet'] = $wallet;
+            $payload['skip_whatsapp_welcome'] = true;
         } elseif ($linkWallet) {
             $payload['phone'] = $validated['phone'] ?? null;
             $payload['country_iso'] = $validated['country_iso'] ?? null;

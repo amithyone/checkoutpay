@@ -102,9 +102,15 @@ return [
         'checkoutnow_logged_in_intro' => 'You are logged in. Messages stay in this app and our team sees your linked wallet.',
     ],
 
+    'support_categories' => [
+        ['key' => 'payment', 'label' => 'Payment / checkout transfer'],
+        ['key' => 'wallet', 'label' => 'Wallet support'],
+    ],
+
     /*
     | Quick support issue types (widget / CheckoutNow). Keys stored on support_tickets.issue_type.
     | requires_payment: visitor must submit session ID (transaction_id) + amount paid.
+    | queue: payment (default) or wallet — routes ticket to the wallet support desk.
     */
     'issue_types' => [
         'payment_pending_transfer' => [
@@ -114,6 +120,7 @@ return [
             'requires_payment' => true,
             'quick' => true,
             'priority' => 'high',
+            'queue' => 'payment',
         ],
         'payment_not_confirmed' => [
             'label' => 'Payment not confirmed / no success page',
@@ -122,6 +129,7 @@ return [
             'requires_payment' => true,
             'quick' => true,
             'priority' => 'high',
+            'queue' => 'payment',
         ],
         'payment_wrong_amount' => [
             'label' => 'Wrong amount or mismatch',
@@ -130,6 +138,7 @@ return [
             'requires_payment' => true,
             'quick' => true,
             'priority' => 'high',
+            'queue' => 'payment',
         ],
         'payment_expired' => [
             'label' => 'Session expired but I already paid',
@@ -138,6 +147,7 @@ return [
             'requires_payment' => true,
             'quick' => true,
             'priority' => 'high',
+            'queue' => 'payment',
         ],
         'general' => [
             'label' => 'Other question',
@@ -146,6 +156,7 @@ return [
             'requires_payment' => false,
             'quick' => false,
             'priority' => 'medium',
+            'queue' => 'payment',
         ],
         'account_deletion' => [
             'label' => 'Delete my account and data',
@@ -154,6 +165,52 @@ return [
             'requires_payment' => false,
             'quick' => true,
             'priority' => 'medium',
+            'queue' => 'wallet',
+        ],
+        'wallet_transfer' => [
+            'label' => 'Transfer / payout problem',
+            'hint' => 'Describe the transfer, recipient, and any error message you saw.',
+            'subject_prefix' => 'Wallet transfer',
+            'requires_payment' => false,
+            'quick' => true,
+            'priority' => 'high',
+            'queue' => 'wallet',
+        ],
+        'wallet_balance' => [
+            'label' => 'Balance / top-up issue',
+            'hint' => 'Tell us what you tried to add and what happened to your balance.',
+            'subject_prefix' => 'Wallet balance',
+            'requires_payment' => false,
+            'quick' => true,
+            'priority' => 'high',
+            'queue' => 'wallet',
+        ],
+        'wallet_card' => [
+            'label' => 'Virtual card issue',
+            'hint' => 'Describe the card problem (create, fund, withdraw, or decline).',
+            'subject_prefix' => 'Virtual card',
+            'requires_payment' => false,
+            'quick' => true,
+            'priority' => 'medium',
+            'queue' => 'wallet',
+        ],
+        'wallet_account' => [
+            'label' => 'PIN, login, or account help',
+            'hint' => 'Describe the account or security issue (do not share your PIN).',
+            'subject_prefix' => 'Wallet account',
+            'requires_payment' => false,
+            'quick' => true,
+            'priority' => 'medium',
+            'queue' => 'wallet',
+        ],
+        'wallet_other' => [
+            'label' => 'Other wallet question',
+            'hint' => 'General CheckoutNow wallet or app help.',
+            'subject_prefix' => 'Wallet support',
+            'requires_payment' => false,
+            'quick' => true,
+            'priority' => 'medium',
+            'queue' => 'wallet',
         ],
     ],
 ];
