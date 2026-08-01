@@ -58,8 +58,9 @@ return [
 
     'intake_messages' => [
         'disclaimer' => "Hi — we're CheckoutPay (Checkout Now Ltd), a payment gateway. We process bank transfers only. We are not the shop or website you paid — we don't deliver products or handle merchant service issues.",
-        'ask_payment_issue' => 'Is this about a bank transfer you made to pay for something online (instant payment)?',
-        'rejected_non_payment' => 'We only help with instant bank transfer problems (money sent to our checkout account). For product, delivery, or service issues, please contact the website or seller where you started checkout.',
+        'ask_payment_issue' => 'What do you need help with?',
+        'ask_wallet_issue_type' => 'Choose a wallet or CheckoutNow app topic:',
+        'rejected_non_payment' => 'We only help with instant bank transfer problems (money sent to our checkout account) and CheckoutPay wallet/app support. For product, delivery, or service issues, please contact the website or seller where you started checkout.',
         'ask_destination_account' => 'What is the account number you sent money TO? (From your bank receipt.)',
         'account_confirmed_ours' => 'Yes — that is one of our CheckoutPay collection accounts.',
         'pending_payment_found' => 'We found :count pending checkout payment(s) waiting on that account. We will try to match your transfer.',
@@ -105,6 +106,12 @@ return [
     'support_categories' => [
         ['key' => 'payment', 'label' => 'Payment / checkout transfer'],
         ['key' => 'wallet', 'label' => 'Wallet support'],
+    ],
+
+    'payment_issue_options' => [
+        ['value' => 'payment', 'label' => 'Yes — bank transfer issue'],
+        ['value' => 'wallet', 'label' => 'Wallet / app support'],
+        ['value' => 'other', 'label' => 'No — something else'],
     ],
 
     /*

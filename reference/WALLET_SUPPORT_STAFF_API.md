@@ -24,9 +24,17 @@ Poll every `poll_interval_seconds` (default 5).
 
 ## Customer wallet support
 
-1. Category **Wallet support**
+1. Category **Wallet support** (or intake option **Wallet / app support**)
 2. Pick issue type where `queue === "wallet"`
 3. `POST /api/v1/consumer/support/conversations` with `issue_type`, `consent_accepted`, `link_whatsapp_wallet: true` — no bank session ID
+
+Intake (`POST …/support/intake/start` → advance) exposes `payment_issue_options` on every payload:
+
+- `payment` — bank transfer issue (existing flow)
+- `wallet` — wallet issue picker then direct chat
+- `other` — not handled (merchant/product issues)
+
+After choosing `wallet`, advance with `step: wallet_issue_type` and the issue `key`.
 
 ## FCM
 

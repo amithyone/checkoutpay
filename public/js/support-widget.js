@@ -5,6 +5,7 @@
     const POLL_MS = window.CP_SUPPORT_POLL_MS || 4000;
 
     const STEP_PAYMENT_ISSUE = 'payment_issue';
+    const STEP_WALLET_ISSUE_TYPE = 'wallet_issue_type';
     const STEP_PAYEE_BANK = 'payee_bank';
     const STEP_DESTINATION_ACCOUNT = 'destination_account';
     const STEP_SESSION_ID = 'session_id';
@@ -301,11 +302,23 @@
 
         if (step === STEP_PAYMENT_ISSUE) {
             actions.appendChild(actionButton('Yes — bank transfer issue', function (btn) {
-                advanceIntake(STEP_PAYMENT_ISSUE, true, btn);
+                advanceIntake(STEP_PAYMENT_ISSUE, 'payment', btn);
+            }));
+            actions.appendChild(actionButton('Wallet / app support', function (btn) {
+                advanceIntake(STEP_PAYMENT_ISSUE, 'wallet', btn);
             }));
             actions.appendChild(actionButton('No — something else', function (btn) {
-                advanceIntake(STEP_PAYMENT_ISSUE, false, btn);
+                advanceIntake(STEP_PAYMENT_ISSUE, 'other', btn);
             }));
+        } else if (step === STEP_WALLET_ISSUE_TYPE) {
+            const walletIssues = intakeState.wallet_issue_types || [];
+            walletIssues.forEach(function (issue) {
+                actions.appendChild(
+                    actionButton(issue.label, function (btn) {
+                        advanceIntake(STEP_WALLET_ISSUE_TYPE, issue.key, btn);
+                    })
+                );
+            });
         } else if (step === STEP_PAYEE_BANK) {
             const banks = intakeState.payee_banks || [];
             banks.forEach(function (bank) {

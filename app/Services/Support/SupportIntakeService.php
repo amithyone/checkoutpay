@@ -19,6 +19,8 @@ final class SupportIntakeService
 
     public const STEP_PAYMENT_ISSUE = 'payment_issue';
 
+    public const STEP_WALLET_ISSUE_TYPE = 'wallet_issue_type';
+
     public const STEP_PAYEE_BANK = 'payee_bank';
 
     public const STEP_DESTINATION_ACCOUNT = 'destination_account';
@@ -151,16 +153,30 @@ final class SupportIntakeService
         }
 
         if ($step === self::STEP_PAYMENT_ISSUE) {
-            $isPayment = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-            $session->is_payment_issue = $isPayment;
-            $messages[] = $this->userLine($isPayment ? 'Yes, payment issue' : 'No, something else');
+            $choice = $this->parsePaymentIssueChoice($value);
+            $session->is_payment_issue = $choice === 'payment';
+            $messages[] = $this->userLine(match ($choice) {
+                'payment' => 'Yes, bank transfer issue',
+                'wallet' => 'Wallet / app support',
+                default => 'No, something else',
+            });
 
-            if (! $isPayment) {
+            if ($choice === 'other') {
                 $reject = (string) config('support.intake_messages.rejected_non_payment', '');
                 $messages[] = $this->botLine($reject);
                 $session->fill([
                     'intake_status' => SupportIntakeSession::STATUS_REJECTED_NON_PAYMENT,
                     'current_step' => self::STEP_DONE,
+                    'bot_messages' => $messages,
+                ])->save();
+
+                return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+            }
+
+            if ($choice === 'wallet') {
+                $messages[] = $this->botLine((string) config('support.intake_messages.ask_wallet_issue_type', ''));
+                $session->fill([
+                    'current_step' => self::STEP_WALLET_ISSUE_TYPE,
                     'bot_messages' => $messages,
                 ])->save();
 
@@ -175,6 +191,27 @@ final class SupportIntakeService
             ])->save();
 
             return ['ok' => true, 'session' => $session->fresh(), 'payload' => $this->sessionPayload($session, $request)];
+        }
+
+        if ($step === self::STEP_WALLET_ISSUE_TYPE) {
+            $issueKey = trim((string) $value);
+            if (! $this->issues->isWalletQueue($issueKey)) {
+                return ['ok' => false, 'message' => 'Please choose a wallet support topic.'];
+            }
+
+            $meta = $this->issues->metaFor($issueKey);
+            $messages[] = $this->userLine((string) ($meta['label'] ?? $issueKey));
+            $session->issue_type = $issueKey;
+            $session->is_payment_issue = false;
+
+            if ($session->channel === SupportTicket::CHANNEL_CHECKOUTNOW_APP && $session->consumer_wallet_api_account_id) {
+                $session->link_whatsapp_wallet = true;
+            }
+
+            $session->bot_messages = $messages;
+            $session->save();
+
+            return $this->complete($session, $request, $messages);
         }
 
         if ($step === self::STEP_PAYEE_BANK) {
@@ -662,7 +699,8 @@ final class SupportIntakeService
                 'payment_receipt_path' => $session->payment_receipt_path,
                 'account_on_session' => $session->account_on_session,
                 'payment_id' => $session->payment_id,
-                'skip_whatsapp_welcome' => ! $session->isWhatsappEligible(),
+                'skip_whatsapp_welcome' => ! $session->isWhatsappEligible()
+                    || $this->issues->isWalletQueue($session->issue_type),
             ], $request);
 
             if (! $result['ok']) {
@@ -988,6 +1026,83 @@ final class SupportIntakeService
                 ? ['browser', 'whatsapp']
                 : ['browser'],
             'max_wrong_account_attempts' => $max,
+            'payment_issue_options' => $this->paymentIssueOptions(),
+            'wallet_issue_types' => $this->walletIssueTypeOptions(),
         ];
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    private function paymentIssueOptions(): array
+    {
+        $rows = config('support.payment_issue_options', []);
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $value = (string) ($row['value'] ?? '');
+            if ($value === '') {
+                continue;
+            }
+            $out[] = [
+                'value' => $value,
+                'label' => (string) ($row['label'] ?? $value),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{key: string, label: string, hint: string}>
+     */
+    private function walletIssueTypeOptions(): array
+    {
+        return array_values(array_map(
+            fn (array $row) => [
+                'key' => (string) $row['key'],
+                'label' => (string) $row['label'],
+                'hint' => (string) ($row['hint'] ?? ''),
+            ],
+            array_filter(
+                $this->issues->issueTypes(),
+                fn (array $row) => ($row['queue'] ?? '') === SupportIssueOptionsService::QUEUE_WALLET
+            )
+        ));
+    }
+
+    /**
+     * @return 'payment'|'wallet'|'other'
+     */
+    private function parsePaymentIssueChoice(mixed $value): string
+    {
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+            if (in_array($normalized, ['wallet', 'app', 'wallet_support'], true)) {
+                return 'wallet';
+            }
+            if (in_array($normalized, ['other', 'no', 'false', '0'], true)) {
+                return 'other';
+            }
+            if (in_array($normalized, ['payment', 'yes', 'true', '1'], true)) {
+                return 'payment';
+            }
+        }
+
+        if ($value === true || $value === 1) {
+            return 'payment';
+        }
+
+        if ($value === false || $value === 0) {
+            return 'other';
+        }
+
+        return 'other';
     }
 }

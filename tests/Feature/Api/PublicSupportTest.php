@@ -116,6 +116,7 @@ class PublicSupportTest extends TestCase
                 $table->id();
                 $table->string('channel', 32)->default('business_dashboard');
                 $table->string('issue_type', 64)->nullable();
+                $table->string('support_queue', 20)->nullable();
                 $table->unsignedBigInteger('payment_id')->nullable();
                 $table->string('payment_transaction_id', 64)->nullable();
                 $table->decimal('payment_amount_reported', 14, 2)->nullable();
@@ -533,6 +534,44 @@ class PublicSupportTest extends TestCase
             ->assertJsonPath('data.is_terminal', true);
 
         $this->assertDatabaseCount('support_tickets', 0);
+    }
+
+    /** @test */
+    public function intake_wallet_support_starts_ticket_without_payment_fields(): void
+    {
+        $start = $this->postJson('/api/v1/public/support/intake/start', [
+            'channel' => 'checkout_web',
+        ])->assertOk();
+
+        $token = (string) $start->json('data.intake_token');
+
+        $this->postJson('/api/v1/public/support/intake/'.$token.'/advance', [
+            'step' => 'payment_issue',
+            'value' => 'wallet',
+        ])->assertOk()
+            ->assertJsonPath('data.current_step', 'wallet_issue_type');
+
+        $this->postJson('/api/v1/public/support/intake/'.$token.'/advance', [
+            'step' => 'wallet_issue_type',
+            'value' => 'wallet_transfer',
+        ])->assertOk()
+            ->assertJsonPath('data.intake_status', SupportIntakeSession::STATUS_COMPLETED);
+
+        $this->assertDatabaseHas('support_tickets', [
+            'issue_type' => 'wallet_transfer',
+            'support_queue' => SupportTicket::QUEUE_WALLET,
+        ]);
+    }
+
+    /** @test */
+    public function intake_start_includes_payment_issue_options(): void
+    {
+        $this->postJson('/api/v1/public/support/intake/start', [
+            'channel' => 'checkout_web',
+        ])->assertOk()
+            ->assertJsonPath('data.payment_issue_options.0.value', 'payment')
+            ->assertJsonPath('data.payment_issue_options.1.value', 'wallet')
+            ->assertJsonPath('data.payment_issue_options.2.value', 'other');
     }
 
     /** @test */

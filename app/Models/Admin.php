@@ -297,19 +297,18 @@ class Admin extends Authenticatable
             return false;
         }
 
+        foreach (config('admin_pages.always_allowed_routes', []) as $pattern) {
+            if (\Illuminate\Support\Str::is($pattern, $routeName)) {
+                return true;
+            }
+        }
+
         foreach (config('admin_pages.pages', []) as $key => $def) {
             $patterns = is_array($def['route_patterns'] ?? null) ? $def['route_patterns'] : [];
             foreach ($patterns as $pattern) {
                 if (\Illuminate\Support\Str::is($pattern, $routeName)) {
                     return $this->canAccessPage($key);
                 }
-            }
-        }
-
-        $alwaysAllowed = config('admin_pages.always_allowed_routes', []);
-        foreach ($alwaysAllowed as $pattern) {
-            if (\Illuminate\Support\Str::is($pattern, $routeName)) {
-                return true;
             }
         }
 
