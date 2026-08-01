@@ -10,37 +10,38 @@ use Illuminate\Validation\Rules\Password;
 
 class ProfileController extends Controller
 {
-    /**
-     * Display admin profile page
-     */
     public function index()
     {
         $admin = Auth::guard('admin')->user();
-        
+
         return view('admin.profile.index', compact('admin'));
     }
 
-    /**
-     * Update admin profile
-     */
     public function update(Request $request)
     {
         $admin = Auth::guard('admin')->user();
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:admins,email,' . $admin->id,
+            'email' => 'required|email|unique:admins,email,'.$admin->id,
+            'notify_wallet_signup' => 'sometimes|boolean',
         ]);
 
-        $admin->update($validated);
+        $data = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ];
+
+        if ($admin->isWalletSupport() && $request->has('notify_wallet_signup')) {
+            $data['notify_wallet_signup'] = $request->boolean('notify_wallet_signup');
+        }
+
+        $admin->update($data);
 
         return redirect()->route('admin.profile.index')
             ->with('success', 'Profile updated successfully');
     }
 
-    /**
-     * Update admin password
-     */
     public function updatePassword(Request $request)
     {
         $admin = Auth::guard('admin')->user();
@@ -50,7 +51,7 @@ class ProfileController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        if (!Hash::check($validated['current_password'], $admin->password)) {
+        if (! Hash::check($validated['current_password'], $admin->password)) {
             return back()->withErrors(['current_password' => 'Current password is incorrect']);
         }
 

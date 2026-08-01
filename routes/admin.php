@@ -141,6 +141,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
         Route::get('overdraft-applications', [\App\Http\Controllers\Admin\OverdraftApplicationsController::class, 'index'])
             ->name('overdraft-applications.index');
+        Route::get('business-payroll', [\App\Http\Controllers\Admin\BusinessPayrollAdminController::class, 'index'])
+            ->name('business-payroll.index');
 
         Route::get('developer-program', [DeveloperProgramController::class, 'index'])->name('developer-program.index');
         Route::put('developer-program/settings', [DeveloperProgramController::class, 'updateSettings'])

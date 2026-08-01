@@ -92,6 +92,13 @@
             <div class="md:col-span-2">
                 <label class="text-xs text-gray-600">Overdraft</label>
                 <p class="text-xs text-gray-500 mt-0.5">Eligible to apply: {{ $business->overdraft_eligible ? 'Yes' : 'No' }} · Repayment mode on file: {{ $business->overdraft_repayment_mode ?? '—' }}</p>
+                @if($business->overdraft_volume_computed_at)
+                    <p class="text-xs text-gray-500 mt-1">90d outbound volume: ₦{{ number_format((float) $business->overdraft_volume_90d, 2) }}
+                        @if($business->overdraft_volume_tier)
+                            · Tier: {{ str_replace('_', ' ', $business->overdraft_volume_tier) }}
+                        @endif
+                    </p>
+                @endif
                 <div class="mt-1 flex flex-wrap items-center gap-2">
                     @if($business->hasOverdraftApproved())
                         <span class="text-sm font-medium text-green-700">Approved</span>

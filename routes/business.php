@@ -89,8 +89,16 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.update-password');
 
-        // Team
+        // Team & payroll
         Route::get('/team', [TeamController::class, 'index'])->name('team.index');
+        Route::post('/team/employees', [TeamController::class, 'store'])->name('team.employees.store');
+        Route::put('/team/employees/{employee}', [TeamController::class, 'update'])->name('team.employees.update');
+        Route::delete('/team/employees/{employee}', [TeamController::class, 'destroy'])->name('team.employees.destroy');
+        Route::get('/team/payroll', [\App\Http\Controllers\Business\PayrollController::class, 'index'])->name('team.payroll.index');
+        Route::get('/team/payroll/bulk', [\App\Http\Controllers\Business\PayrollController::class, 'bulkForm'])->name('team.payroll.bulk');
+        Route::post('/team/payroll/bulk', [\App\Http\Controllers\Business\PayrollController::class, 'bulkStore'])->name('team.payroll.bulk.store');
+        Route::get('/team/payroll/schedule', [\App\Http\Controllers\Business\PayrollController::class, 'scheduleForm'])->name('team.payroll.schedule');
+        Route::post('/team/payroll/schedule', [\App\Http\Controllers\Business\PayrollController::class, 'scheduleStore'])->name('team.payroll.schedule.store');
 
         // Settings
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');

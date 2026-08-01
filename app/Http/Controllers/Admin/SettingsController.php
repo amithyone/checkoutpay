@@ -217,6 +217,28 @@ class SettingsController extends Controller
             }
         }
 
+        if ($request->input('settings_section') === 'credit_overdraft') {
+            foreach ([
+                'overdraft_tier_1_volume_threshold' => 'Tier 1 volume threshold (90d)',
+                'overdraft_tier_2_volume_threshold' => 'Tier 2 volume threshold (90d)',
+                'overdraft_tier_1_max_limit' => 'Tier 1 max overdraft limit',
+                'overdraft_tier_2_max_limit' => 'Tier 2 max overdraft limit',
+            ] as $key => $label) {
+                if ($request->has($key)) {
+                    Setting::set($key, $request->input($key) ?: null, 'string', 'credit', $label);
+                }
+            }
+            if ($request->has('wallet_signup_staff_alerts_enabled')) {
+                Setting::set(
+                    'wallet_signup_staff_alerts_enabled',
+                    $request->boolean('wallet_signup_staff_alerts_enabled') ? 1 : 0,
+                    'boolean',
+                    'notifications',
+                    'Send WhatsApp signup alerts to wallet-support staff'
+                );
+            }
+        }
+
         if ($request->input('settings_section') === 'vtu') {
             $validated = $request->validate([
                 'vtu_provider' => 'required|in:vtu_ng,mevonpay',

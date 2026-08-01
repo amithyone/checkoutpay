@@ -43,6 +43,9 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_status',
         'overdraft_requested_at',
         'overdraft_eligible',
+        'overdraft_volume_90d',
+        'overdraft_volume_tier',
+        'overdraft_volume_computed_at',
         'overdraft_repayment_mode',
         'overdraft_application_notes',
         'overdraft_funding_source',
@@ -126,6 +129,8 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_interest_last_charged_at' => 'datetime',
         'overdraft_requested_at' => 'datetime',
         'overdraft_eligible' => 'boolean',
+        'overdraft_volume_90d' => 'decimal:2',
+        'overdraft_volume_computed_at' => 'datetime',
         'overdraft_repayment_started_at' => 'datetime',
         'peer_lending_lend_eligible' => 'boolean',
         'peer_lending_borrow_eligible' => 'boolean',
@@ -297,6 +302,16 @@ class Business extends Authenticatable implements CanResetPasswordContract
     public function overdraftInstallments()
     {
         return $this->hasMany(BusinessOverdraftInstallment::class);
+    }
+
+    public function employees()
+    {
+        return $this->hasMany(BusinessEmployee::class);
+    }
+
+    public function disbursementBatches()
+    {
+        return $this->hasMany(BusinessDisbursementBatch::class);
     }
 
     public function lendingOffers()

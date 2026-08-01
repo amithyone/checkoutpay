@@ -52,6 +52,14 @@
                 </p>
             </div>
 
+            @include('admin.staff._form_extras', [
+                'role' => old('role'),
+                'whatsapp' => old('whatsapp_e164'),
+                'notifySignup' => old('notify_wallet_signup', true),
+                'pagePermissions' => old('page_permissions', []),
+                'pageCatalog' => $pageCatalog ?? [],
+            ])
+
             <div>
                 <label class="flex items-center space-x-2">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }}

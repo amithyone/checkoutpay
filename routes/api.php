@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ConsumerBusinessOverdraftController;
 use App\Http\Controllers\Api\ConsumerBusinessNameRegistrationController;
 use App\Http\Controllers\Api\ConsumerBusinessAccountOnboardingController;
 use App\Http\Controllers\Api\ConsumerSupportController;
@@ -226,6 +227,8 @@ Route::prefix('v1')->group(function () {
         Route::get('business-account/onboarding', [ConsumerBusinessAccountOnboardingController::class, 'index']);
         Route::post('business-account/onboarding', [ConsumerBusinessAccountOnboardingController::class, 'store']);
         Route::post('business-account/onboarding/password', [ConsumerBusinessAccountOnboardingController::class, 'setPassword']);
+        Route::get('business/overdraft', [ConsumerBusinessOverdraftController::class, 'show']);
+        Route::post('business/overdraft/apply', [ConsumerBusinessOverdraftController::class, 'apply']);
         /** @deprecated Prefer POST consumer/wallet/conversation; kept for older app bundles. */
         Route::get('chat/messages', [ConsumerChatController::class, 'index']);
         Route::post('chat/messages', [ConsumerChatController::class, 'store']);

@@ -333,7 +333,8 @@ final class ConsumerBusinessWalletLedgerService
         }
 
         $current = round((float) $business->balance, 2);
-        if ($current + 0.0001 < $amount) {
+        $available = round((float) $business->getAvailableBalance(), 2);
+        if ($available + 0.0001 < $amount) {
             return ['ok' => false, 'message' => 'Insufficient business balance.'];
         }
 

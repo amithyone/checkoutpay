@@ -46,6 +46,14 @@
                 </select>
             </div>
 
+            @include('admin.staff._form_extras', [
+                'role' => old('role', $staff->role),
+                'whatsapp' => old('whatsapp_e164', $staff->whatsapp_e164),
+                'notifySignup' => old('notify_wallet_signup', $staff->notify_wallet_signup),
+                'pagePermissions' => old('page_permissions', $staff->admin_page_permissions ?? []),
+                'pageCatalog' => $pageCatalog ?? [],
+            ])
+
             <div>
                 <label class="flex items-center space-x-2">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', $staff->is_active) ? 'checked' : '' }}

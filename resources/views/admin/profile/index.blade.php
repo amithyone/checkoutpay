@@ -62,6 +62,19 @@
                 <p class="mt-1 text-xs text-gray-500">Role cannot be changed</p>
             </div>
 
+            @if($admin->isWalletSupport())
+            <div class="border border-teal-200 bg-teal-50/40 rounded-lg p-4">
+                <h4 class="text-sm font-semibold text-teal-900 mb-3">Wallet signup alerts</h4>
+                <p class="text-xs text-gray-600 mb-3">WhatsApp number: <strong>{{ $admin->whatsapp_e164 ?: 'Not set — ask super admin' }}</strong></p>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="notify_wallet_signup" value="1"
+                        {{ old('notify_wallet_signup', $admin->notify_wallet_signup) ? 'checked' : '' }}
+                        class="rounded border-gray-300 text-primary focus:ring-primary">
+                    <span class="text-sm text-gray-700">Send me WhatsApp alerts when a customer completes wallet signup</span>
+                </label>
+            </div>
+            @endif
+
             <!-- Status (Read-only) -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">

@@ -1597,6 +1597,8 @@ class WhatsappWaWalletMenuHandler
         $wallet->sender_name = $raw;
         $wallet->save();
 
+        app(\App\Services\Admin\WalletSignupStaffNotifier::class)->notifyIfFirstComplete($wallet);
+
         $session->update(['chat_context' => ['step' => 'submenu']]);
         $this->client->sendText($instance, $phone, "Send name saved.\n\n{$raw}\n\n");
         $this->sendSubmenu($instance, $phone, $wallet->fresh());

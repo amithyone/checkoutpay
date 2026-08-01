@@ -55,6 +55,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp / Alerts</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -87,6 +88,18 @@
                             @endif">
                             {{ str_replace('_', ' ', ucfirst($member->role)) }}
                         </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        @if($member->role === 'wallet_support')
+                            <div>{{ $member->whatsapp_e164 ?: '—' }}</div>
+                            @if($member->notify_wallet_signup && $member->whatsapp_e164)
+                                <span class="text-xs text-teal-700">Signup alerts ON</span>
+                            @elseif($member->whatsapp_e164)
+                                <span class="text-xs text-gray-500">Signup alerts OFF</span>
+                            @endif
+                        @else
+                            —
+                        @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         @if($member->is_active)
@@ -129,7 +142,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="7" class="px-6 py-4 text-center text-gray-500">
                         No staff members found.
                     </td>
                 </tr>

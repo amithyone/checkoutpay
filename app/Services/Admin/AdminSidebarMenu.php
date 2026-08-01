@@ -36,6 +36,10 @@ class AdminSidebarMenu
                 continue;
             }
 
+            if (! $admin->canAccessPage($key)) {
+                continue;
+            }
+
             $items[] = array_merge($def, ['key' => $key, 'type' => 'link']);
         }
 

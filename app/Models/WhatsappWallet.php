@@ -75,6 +75,7 @@ class WhatsappWallet extends Model
         'admin_bot_paused',
         'support_whatsapp_welcome_sent_at',
         'referral_launch_notified_at',
+        'wallet_signup_notified_at',
     ];
 
     protected $casts = [
@@ -103,6 +104,7 @@ class WhatsappWallet extends Model
         'admin_bot_paused' => 'boolean',
         'support_whatsapp_welcome_sent_at' => 'datetime',
         'referral_launch_notified_at' => 'datetime',
+        'wallet_signup_notified_at' => 'datetime',
     ];
 
     public function renter(): BelongsTo

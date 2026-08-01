@@ -25,7 +25,7 @@ use App\Services\Consumer\ConsumerPaymentAuthService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletSavingsService;
 use App\Services\Consumer\ConsumerWalletStatementService;
-use App\Services\Consumer\ConsumerWalletTransferService;
+use App\Services\Credit\OverdraftEligibilityService;
 use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\MavonPayTransferService;
 use App\Contracts\Vtu\VtuProviderContract;
@@ -235,6 +235,7 @@ class ConsumerWalletApiController extends Controller
                 'business_pay_in' => $isNg ? $this->businessLedger->resolveBusinessPayInPayload($wallet) : null,
                 'business_balance' => $this->businessLedger->resolvedBalance($wallet),
                 'business_wallet_enabled' => $this->businessLedger->walletHasBusinessActivity($wallet),
+                'business_overdraft' => $this->businessOverdraftSummary($wallet),
                 'linked_business_id' => $wallet->linked_business_id,
                 'linked_business_name' => $wallet->linkedBusiness?->name,
                 'vtu' => [
@@ -1767,5 +1768,31 @@ class ConsumerWalletApiController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function businessOverdraftSummary(WhatsappWallet $wallet): ?array
+    {
+        $business = $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet);
+        if ($business === null) {
+            return null;
+        }
+
+        $eligibility = app(OverdraftEligibilityService::class);
+        $business = $eligibility->syncBusiness($business);
+        $balance = (float) $this->businessLedger->resolvedBalance($wallet);
+
+        return [
+            'eligible' => (bool) $business->overdraft_eligible,
+            'volume_90d' => (float) $business->overdraft_volume_90d,
+            'volume_tier' => $business->overdraft_volume_tier,
+            'can_apply' => $business->canApplyForOverdraft(),
+            'status' => $business->overdraft_status ?? 'none',
+            'limit' => (float) $business->overdraft_limit,
+            'available_balance' => (float) $business->getAvailableBalance(),
+            'overdraft_used' => $balance < 0 ? min((float) $business->overdraft_limit, abs($balance)) : 0.0,
+        ];
     }
 }

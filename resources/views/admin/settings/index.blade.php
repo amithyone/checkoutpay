@@ -174,6 +174,38 @@
         </form>
     </div>
 
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Credit &amp; wallet alerts</h3>
+        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+            @csrf
+            <input type="hidden" name="settings_section" value="credit_overdraft">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 volume (90d, ₦)</label>
+                    <input type="number" name="overdraft_tier_1_volume_threshold" value="{{ \App\Models\Setting::get('overdraft_tier_1_volume_threshold', 5000000) }}" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 max limit (₦)</label>
+                    <input type="number" name="overdraft_tier_1_max_limit" value="{{ \App\Models\Setting::get('overdraft_tier_1_max_limit', 5000000) }}" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 2 volume (90d, ₦)</label>
+                    <input type="number" name="overdraft_tier_2_volume_threshold" value="{{ \App\Models\Setting::get('overdraft_tier_2_volume_threshold', 10000000) }}" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 2 max limit (₦)</label>
+                    <input type="number" name="overdraft_tier_2_max_limit" value="{{ \App\Models\Setting::get('overdraft_tier_2_max_limit', 10000000) }}" class="w-full border rounded-lg px-3 py-2">
+                </div>
+            </div>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="wallet_signup_staff_alerts_enabled" value="1"
+                    {{ \App\Models\Setting::get('wallet_signup_staff_alerts_enabled', '1') ? 'checked' : '' }} class="rounded">
+                Enable wallet signup WhatsApp alerts to wallet-support staff
+            </label>
+            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg">Save credit settings</button>
+        </form>
+    </div>
+
     <!-- Email Settings -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
