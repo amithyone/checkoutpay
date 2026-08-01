@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Overdraft applications')
-@section('page-title', 'Overdraft applications')
+@section('title', 'Overdraft loan applications')
+@section('page-title', 'Overdraft loan applications')
 
 @section('content')
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

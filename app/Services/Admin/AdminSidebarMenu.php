@@ -234,7 +234,7 @@ class AdminSidebarMenu
                 ['visible' => ! $admin->isWalletSupport()]
             ),
             'overdraft' => array_merge(
-                $this->link('Overdraft queue', 'admin.overdraft-applications.index', 'fas fa-file-invoice-dollar', ['admin.overdraft-applications.*']),
+                $this->link('Overdraft loan queue', 'admin.overdraft-applications.index', 'fas fa-file-invoice-dollar', ['admin.overdraft-applications.*']),
                 ['visible' => ! $admin->isWalletSupport()]
             ),
             'peer_lending_offers' => array_merge(

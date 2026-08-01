@@ -116,7 +116,7 @@ return [
             'default_roles' => ['super_admin', 'admin', 'staff'],
         ],
         'overdraft' => [
-            'label' => 'Overdraft queue',
+            'label' => 'Overdraft loan queue',
             'group' => 'Finance',
             'route_patterns' => ['admin.overdraft-applications.*'],
             'default_roles' => ['super_admin', 'admin', 'staff'],

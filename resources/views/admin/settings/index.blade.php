@@ -175,18 +175,21 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Credit &amp; wallet alerts</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-file-invoice-dollar mr-2 text-primary"></i>Overdraft loan
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">Volume tiers and limits for business overdraft loan eligibility.</p>
         <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
             @csrf
             @method('PUT')
-            <input type="hidden" name="settings_section" value="credit_overdraft">
+            <input type="hidden" name="settings_section" value="overdraft_loan">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 volume (90d, ₦)</label>
                     <input type="number" name="overdraft_tier_1_volume_threshold" value="{{ \App\Models\Setting::get('overdraft_tier_1_volume_threshold', 5000000) }}" class="w-full border rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 max limit (₦)</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 1 max overdraft loan limit (₦)</label>
                     <input type="number" name="overdraft_tier_1_max_limit" value="{{ \App\Models\Setting::get('overdraft_tier_1_max_limit', 5000000) }}" class="w-full border rounded-lg px-3 py-2">
                 </div>
                 <div>
@@ -194,16 +197,28 @@
                     <input type="number" name="overdraft_tier_2_volume_threshold" value="{{ \App\Models\Setting::get('overdraft_tier_2_volume_threshold', 10000000) }}" class="w-full border rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 2 max limit (₦)</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tier 2 max overdraft loan limit (₦)</label>
                     <input type="number" name="overdraft_tier_2_max_limit" value="{{ \App\Models\Setting::get('overdraft_tier_2_max_limit', 10000000) }}" class="w-full border rounded-lg px-3 py-2">
                 </div>
             </div>
+            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg">Save overdraft loan settings</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fab fa-whatsapp mr-2 text-primary"></i>Wallet alerts
+        </h3>
+        <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
+            <input type="hidden" name="settings_section" value="wallet_alerts">
             <label class="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="wallet_signup_staff_alerts_enabled" value="1"
                     {{ \App\Models\Setting::get('wallet_signup_staff_alerts_enabled', '1') ? 'checked' : '' }} class="rounded">
                 Enable wallet signup WhatsApp alerts to wallet-support staff
             </label>
-            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg">Save credit settings</button>
+            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg">Save wallet alerts</button>
         </form>
     </div>
 
