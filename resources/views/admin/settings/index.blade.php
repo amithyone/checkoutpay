@@ -178,6 +178,7 @@
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Credit &amp; wallet alerts</h3>
         <form action="{{ route('admin.settings.update') }}" method="POST" class="space-y-4">
             @csrf
+            @method('PUT')
             <input type="hidden" name="settings_section" value="credit_overdraft">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
