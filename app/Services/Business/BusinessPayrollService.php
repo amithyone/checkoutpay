@@ -12,11 +12,13 @@ use App\Models\MevonPayLedgerEntry;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransaction;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
+use App\Services\Consumer\ConsumerWalletPushNotificationService;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\MavonPayTransferService;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\NigerianBankCodeNormalizer;
 use App\Services\Payout\BankPayoutNarration;
+use App\Services\Whatsapp\WhatsappWalletMoneyFormatter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -32,6 +34,7 @@ final class BusinessPayrollService
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private MavonPayTransferService $mavon,
         private MevonPayLedgerRecorder $ledger,
+        private ConsumerWalletPushNotificationService $walletPush,
     ) {}
 
     public function linkedWallet(Business $business): ?WhatsappWallet
@@ -55,7 +58,10 @@ final class BusinessPayrollService
             ->where('business_id', $business->id)
             ->where('is_active', true);
 
-        if ($employeeIds !== null && $employeeIds !== []) {
+        if ($employeeIds !== null) {
+            if ($employeeIds === []) {
+                return ['ok' => false, 'message' => 'No active employees selected.'];
+            }
             $query->whereIn('id', $employeeIds);
         }
 
@@ -66,18 +72,28 @@ final class BusinessPayrollService
 
         $amounts = [];
         $total = 0.0;
+        $skippedFullyPaid = 0;
         foreach ($employees as $employee) {
-            $amount = $amountMode === 'monthly'
+            $requested = $amountMode === 'monthly'
                 ? $employee->monthlyAmount()
                 : $employee->amountPerPayCycle();
-            $amount = round(max(0, $amount), 2);
+            $amount = round(min(max(0, $requested), $employee->remainingSalaryThisMonth()), 2);
+            if ($amount <= 0) {
+                $skippedFullyPaid++;
+                continue;
+            }
             $amounts[$employee->id] = $amount;
             $total += $amount;
         }
         $total = round($total, 2);
 
         if ($total <= 0) {
-            return ['ok' => false, 'message' => 'Total salary amount must be greater than zero.'];
+            return [
+                'ok' => false,
+                'message' => $skippedFullyPaid > 0
+                    ? 'Selected staff already received their full monthly salary this month.'
+                    : 'Total salary amount must be greater than zero.',
+            ];
         }
 
         $available = $this->availableBusinessBalance($business);
@@ -91,7 +107,7 @@ final class BusinessPayrollService
                 'kind' => 'bulk',
                 'status' => 'pending',
                 'total_amount_ngn' => $total,
-                'item_count' => $employees->count(),
+                'item_count' => count($amounts),
                 'notes' => trim(($notes ?: '').' [amount_mode='.$amountMode.']'),
             ]);
 
@@ -172,6 +188,37 @@ final class BusinessPayrollService
             return false;
         }
 
+        $employee = $item->employee;
+        if ($employee) {
+            $remaining = $employee->remainingSalaryThisMonth();
+            $requested = round((float) $item->amount_ngn, 2);
+            if ($remaining <= 0 || $requested < 1) {
+                $item->update([
+                    'status' => 'skipped',
+                    'error_message' => $remaining <= 0
+                        ? 'Monthly salary already fully paid for this month.'
+                        : 'Amount too small to pay.',
+                    'processed_at' => now(),
+                ]);
+
+                return false;
+            }
+            if ($requested > $remaining + 0.0001) {
+                $capped = $remaining;
+                if ($capped < 1) {
+                    $item->update([
+                        'status' => 'skipped',
+                        'error_message' => 'Monthly salary already fully paid for this month.',
+                        'processed_at' => now(),
+                    ]);
+
+                    return false;
+                }
+                $item->update(['amount_ngn' => $capped]);
+                $item->amount_ngn = $capped;
+            }
+        }
+
         try {
             if ($item->payment_method === BusinessEmployee::METHOD_WALLET) {
                 $result = $this->payToWalletFromBusiness($business, $item);
@@ -187,6 +234,13 @@ final class BusinessPayrollService
                     'processed_at' => now(),
                     'error_message' => null,
                 ]);
+
+                $this->notifyPayrollReceived(
+                    $business,
+                    $item,
+                    round((float) $item->amount_ngn, 2),
+                    $result['recipient_wallet'] ?? null,
+                );
 
                 return true;
             }
@@ -213,7 +267,7 @@ final class BusinessPayrollService
     }
 
     /**
-     * @return array{ok: bool, message?: string, transaction_id?: int, reference?: string}
+     * @return array{ok: bool, message?: string, transaction_id?: int, reference?: string, recipient_wallet?: WhatsappWallet}
      */
     private function payToWalletFromBusiness(Business $business, BusinessDisbursementItem $item): array
     {
@@ -227,7 +281,9 @@ final class BusinessPayrollService
             return ['ok' => false, 'message' => 'Invalid amount.'];
         }
 
-        return DB::transaction(function () use ($business, $recipientPhone, $amount, $item) {
+        $narration = BankPayoutNarration::forPayroll($business, (string) $item->recipient_name);
+
+        return DB::transaction(function () use ($business, $recipientPhone, $amount, $item, $narration) {
             $lockedBusiness = Business::query()->lockForUpdate()->find($business->id);
             if (! $lockedBusiness) {
                 return ['ok' => false, 'message' => 'Business not found.'];
@@ -255,9 +311,10 @@ final class BusinessPayrollService
             $recipient->balance = round((float) $recipient->balance + $amount, 2);
             $recipient->save();
 
+            $bizName = trim((string) ($lockedBusiness->name ?? 'Business')) ?: 'Business';
             $creditTxn = WhatsappWalletTransaction::query()->create([
                 'whatsapp_wallet_id' => $recipient->id,
-                'sender_name' => (string) ($lockedBusiness->name ?? 'Business'),
+                'sender_name' => $bizName,
                 'type' => WhatsappWalletTransaction::TYPE_P2P_CREDIT,
                 'ledger_scope' => ConsumerWalletTransactionScope::SCOPE_PERSONAL,
                 'amount' => $amount,
@@ -268,10 +325,16 @@ final class BusinessPayrollService
                     'source' => 'business_payroll',
                     'funded_from' => 'business_balance',
                     'business_id' => $lockedBusiness->id,
+                    'narration' => $narration,
+                    'description' => $narration,
                 ],
             ]);
 
-            return ['ok' => true, 'transaction_id' => $creditTxn->id];
+            return [
+                'ok' => true,
+                'transaction_id' => $creditTxn->id,
+                'recipient_wallet' => $recipient->fresh(),
+            ];
         });
     }
 
@@ -298,7 +361,9 @@ final class BusinessPayrollService
             ?? Bank::query()->where('code', $bankCode)->value('name')
             ?? 'Bank';
 
-        return DB::transaction(function () use ($business, $item, $amount, $accountNumber, $nip, $bankName, $accountName) {
+        $narration = BankPayoutNarration::forPayroll($business, $accountName);
+
+        return DB::transaction(function () use ($business, $item, $amount, $accountNumber, $nip, $bankName, $accountName, $narration) {
             $lockedBusiness = Business::query()->lockForUpdate()->find($business->id);
             if (! $lockedBusiness) {
                 return ['ok' => false, 'message' => 'Business not found.'];
@@ -311,7 +376,6 @@ final class BusinessPayrollService
 
             $reference = 'pr_'.$item->id.'_'.Str::lower(Str::random(10));
             $sessionId = 'PR'.$item->id.'_'.now()->format('YmdHis');
-            $narration = BankPayoutNarration::forBusinessWithdrawal($lockedBusiness, 'Salary '.$accountName);
 
             $result = $this->mavon->createTransfer([
                 'amount' => $amount,
@@ -339,6 +403,7 @@ final class BusinessPayrollService
                     'payroll_item_id' => $item->id,
                     'batch_id' => $item->batch_id,
                     'narration' => $narration,
+                    'description' => $narration,
                     'response_code' => $result['response_code'] ?? null,
                     'source' => 'business_payroll',
                 ],
@@ -471,7 +536,7 @@ final class BusinessPayrollService
             ->where('status', 'pending')
             ->whereNotNull('due_at')
             ->where('due_at', '<=', now())
-            ->with(['batch.business'])
+            ->with(['batch.business', 'employee'])
             ->limit(100)
             ->get();
 
@@ -494,6 +559,77 @@ final class BusinessPayrollService
         $business->refresh();
 
         return round((float) $business->getAvailableBalance(), 2);
+    }
+
+    private function notifyPayrollReceived(
+        Business $business,
+        BusinessDisbursementItem $item,
+        float $amount,
+        ?WhatsappWallet $creditedWallet = null,
+    ): void {
+        if ($amount <= 0) {
+            return;
+        }
+
+        try {
+            $wallet = $creditedWallet ?? $this->resolveNotifyWallet($item);
+            if (! $wallet) {
+                return;
+            }
+
+            $bizName = trim((string) ($business->name ?? '')) ?: 'Your employer';
+            $amountLabel = WhatsappWalletMoneyFormatter::format($amount, 'NGN');
+            $body = $item->payment_method === BusinessEmployee::METHOD_WALLET
+                ? sprintf('%s paid you %s salary.', $bizName, $amountLabel)
+                : sprintf('%s paid %s salary to your bank.', $bizName, $amountLabel);
+
+            $this->walletPush->notifyMoneyReceived(
+                $wallet,
+                $amount,
+                (float) $wallet->fresh()->balance,
+                $body,
+                [
+                    'credit_source' => 'business_payroll',
+                    'sender_name' => $bizName,
+                    'currency' => 'NGN',
+                ],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('business_payroll_push_failed', [
+                'item_id' => $item->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function resolveNotifyWallet(BusinessDisbursementItem $item): ?WhatsappWallet
+    {
+        $phone = trim((string) $item->phone_e164);
+        if ($phone === '' && $item->employee) {
+            $phone = trim((string) $item->employee->phone_e164);
+        }
+        if ($phone !== '') {
+            $byPhone = WhatsappWallet::query()
+                ->where('phone_e164', $phone)
+                ->where('status', WhatsappWallet::STATUS_ACTIVE)
+                ->first();
+            if ($byPhone) {
+                return $byPhone;
+            }
+        }
+
+        $account = preg_replace('/\D+/', '', (string) $item->account_number) ?? '';
+        if (strlen($account) === 10) {
+            return WhatsappWallet::query()
+                ->where('status', WhatsappWallet::STATUS_ACTIVE)
+                ->where(function ($q) use ($account) {
+                    $q->where('mevon_virtual_account_number', $account)
+                        ->orWhere('business_pay_in_account_number', $account);
+                })
+                ->first();
+        }
+
+        return null;
     }
 
     private function syncLinkedWalletCache(Business $business): void

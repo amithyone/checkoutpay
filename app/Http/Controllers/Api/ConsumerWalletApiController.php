@@ -696,6 +696,14 @@ class ConsumerWalletApiController extends Controller
             return $this->electricityReceiptEnricher->enrich($tx, $row);
         }
 
+        // Expose meta narration for P2P / payroll credits and any other types that set it.
+        if (! isset($row['narration']) || trim((string) $row['narration']) === '') {
+            $metaNarration = trim((string) ($meta['narration'] ?? $meta['description'] ?? ''));
+            if ($metaNarration !== '') {
+                $row['narration'] = $metaNarration;
+            }
+        }
+
         return $row;
     }
 

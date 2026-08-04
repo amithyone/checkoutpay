@@ -196,7 +196,10 @@
                                 @endif
                             </td>
                             <td class="py-3 pr-4">{{ $employee->frequencyLabel() }}</td>
-                            <td class="py-3 pr-4">₦{{ number_format($employee->monthlyAmount(), 2) }}</td>
+                            <td class="py-3 pr-4">
+                                ₦{{ number_format($employee->monthlyAmount(), 2) }}
+                                <div class="text-xs text-gray-500">Left: ₦{{ number_format($employee->remainingSalaryThisMonth(), 2) }}</div>
+                            </td>
                             <td class="py-3 pr-4 font-medium text-gray-900">₦{{ number_format($employee->dailyAmount(), 2) }}</td>
                             <td class="py-3 pr-4">₦{{ number_format($employee->amountPerPayCycle(), 2) }}</td>
                             <td class="py-3 pr-4">

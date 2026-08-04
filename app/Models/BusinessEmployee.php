@@ -116,4 +116,26 @@ class BusinessEmployee extends Model
 
         return trim(($this->account_name ?: 'Bank').$acct);
     }
+
+    public function disbursementItems(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BusinessDisbursementItem::class, 'business_employee_id');
+    }
+
+    /** Completed payroll paid to this staff in the given calendar month (default: current). */
+    public function paidInCalendarMonth(?\Carbon\CarbonInterface $month = null): float
+    {
+        $start = ($month ? \Carbon\Carbon::parse($month) : now())->copy()->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+
+        return round((float) $this->disbursementItems()
+            ->where('status', 'completed')
+            ->whereBetween('processed_at', [$start, $end])
+            ->sum('amount_ngn'), 2);
+    }
+
+    public function remainingSalaryThisMonth(?\Carbon\CarbonInterface $month = null): float
+    {
+        return max(0, round($this->monthlyAmount() - $this->paidInCalendarMonth($month), 2));
+    }
 }

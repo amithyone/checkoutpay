@@ -41,6 +41,25 @@ final class BankPayoutNarration
         return $name !== '' ? self::trimAndCap($name) : self::BUSINESS_FALLBACK;
     }
 
+    /** Bank / ledger narration for staff salary disbursements. */
+    public static function forPayroll(Business $business, ?string $staffName = null, ?string $periodLabel = null): string
+    {
+        $biz = trim((string) $business->name);
+        if ($biz === '') {
+            $biz = 'Employer';
+        }
+        $period = trim((string) $periodLabel);
+        if ($period === '') {
+            $period = now()->format('M Y');
+        }
+        $staff = trim((string) $staffName);
+        $base = $staff !== ''
+            ? sprintf('Salary from %s for %s (%s)', $biz, $staff, $period)
+            : sprintf('Salary from %s (%s)', $biz, $period);
+
+        return self::trimAndCap($base);
+    }
+
     private static function trimAndCap(?string $value): string
     {
         $trimmed = trim((string) $value);

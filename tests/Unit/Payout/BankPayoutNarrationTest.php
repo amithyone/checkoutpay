@@ -41,4 +41,22 @@ class BankPayoutNarrationTest extends TestCase
         $business = new Business(['name' => '']);
         $this->assertSame('Business withdrawal', BankPayoutNarration::forBusinessWithdrawal($business, null));
     }
+
+    public function test_for_payroll_includes_business_staff_and_period(): void
+    {
+        $business = new Business(['name' => 'Acme Ltd']);
+        $this->assertSame(
+            'Salary from Acme Ltd for Ada (Aug 2026)',
+            BankPayoutNarration::forPayroll($business, 'Ada', 'Aug 2026'),
+        );
+    }
+
+    public function test_for_payroll_without_staff_name(): void
+    {
+        $business = new Business(['name' => 'Acme Ltd']);
+        $this->assertSame(
+            'Salary from Acme Ltd (Aug 2026)',
+            BankPayoutNarration::forPayroll($business, null, 'Aug 2026'),
+        );
+    }
 }
