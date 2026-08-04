@@ -47,12 +47,23 @@ class PayrollController extends Controller
     public function bulkStore(Request $request): RedirectResponse
     {
         $business = Auth::guard('business')->user();
-        $employeeIds = $request->input('employee_ids', []);
+        $validated = $request->validate([
+            'employee_ids' => ['nullable', 'array'],
+            'employee_ids.*' => ['integer'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'amount_mode' => ['nullable', 'in:cycle,monthly'],
+        ]);
+        $employeeIds = $validated['employee_ids'] ?? [];
         if (! is_array($employeeIds)) {
             $employeeIds = [];
         }
 
-        $result = $this->payroll->createBulkBatch($business, $employeeIds, $request->input('notes'));
+        $result = $this->payroll->createBulkBatch(
+            $business,
+            $employeeIds,
+            $validated['notes'] ?? null,
+            (string) ($validated['amount_mode'] ?? 'cycle'),
+        );
         if (! ($result['ok'] ?? false)) {
             return back()->with('error', $result['message'] ?? 'Could not create payroll batch.');
         }

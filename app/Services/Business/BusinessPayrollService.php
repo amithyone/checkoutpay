@@ -41,9 +41,16 @@ final class BusinessPayrollService
 
     /**
      * @param  list<int>|null  $employeeIds
+     * @param  'cycle'|'monthly'  $amountMode  cycle = each staff's pay-frequency slice; monthly = full month
      */
-    public function createBulkBatch(Business $business, ?array $employeeIds = null, ?string $notes = null): array
-    {
+    public function createBulkBatch(
+        Business $business,
+        ?array $employeeIds = null,
+        ?string $notes = null,
+        string $amountMode = 'cycle',
+    ): array {
+        $amountMode = in_array($amountMode, ['cycle', 'monthly'], true) ? $amountMode : 'cycle';
+
         $query = BusinessEmployee::query()
             ->where('business_id', $business->id)
             ->where('is_active', true);
@@ -57,7 +64,18 @@ final class BusinessPayrollService
             return ['ok' => false, 'message' => 'No active employees selected.'];
         }
 
-        $total = round($employees->sum(fn (BusinessEmployee $e) => (float) $e->monthly_salary_ngn), 2);
+        $amounts = [];
+        $total = 0.0;
+        foreach ($employees as $employee) {
+            $amount = $amountMode === 'monthly'
+                ? $employee->monthlyAmount()
+                : $employee->amountPerPayCycle();
+            $amount = round(max(0, $amount), 2);
+            $amounts[$employee->id] = $amount;
+            $total += $amount;
+        }
+        $total = round($total, 2);
+
         if ($total <= 0) {
             return ['ok' => false, 'message' => 'Total salary amount must be greater than zero.'];
         }
@@ -67,17 +85,21 @@ final class BusinessPayrollService
             return ['ok' => false, 'message' => 'Insufficient business balance for this payroll run. Available: ₦'.number_format($available, 2)];
         }
 
-        return DB::transaction(function () use ($business, $employees, $total, $notes) {
+        return DB::transaction(function () use ($business, $employees, $total, $notes, $amounts, $amountMode) {
             $batch = BusinessDisbursementBatch::query()->create([
                 'business_id' => $business->id,
                 'kind' => 'bulk',
                 'status' => 'pending',
                 'total_amount_ngn' => $total,
                 'item_count' => $employees->count(),
-                'notes' => $notes,
+                'notes' => trim(($notes ?: '').' [amount_mode='.$amountMode.']'),
             ]);
 
             foreach ($employees as $employee) {
+                $amount = $amounts[$employee->id] ?? 0;
+                if ($amount <= 0) {
+                    continue;
+                }
                 BusinessDisbursementItem::query()->create([
                     'batch_id' => $batch->id,
                     'business_employee_id' => $employee->id,
@@ -86,9 +108,9 @@ final class BusinessPayrollService
                     'phone_e164' => $employee->phone_e164,
                     'bank_code' => $employee->bank_code,
                     'account_number' => $employee->account_number,
-                    'amount_ngn' => $employee->monthly_salary_ngn,
+                    'amount_ngn' => $amount,
                     'status' => 'pending',
-                    'idempotency_key' => 'payroll:'.$batch->id.':emp:'.$employee->id,
+                    'idempotency_key' => 'payroll:'.$batch->id.':emp:'.$employee->id.':'.$amountMode,
                     'due_at' => now(),
                 ]);
             }
