@@ -74,9 +74,9 @@ class PayrollController extends Controller
         $business = Auth::guard('business')->user();
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'cadence' => 'required|in:weekly,biweekly,monthly',
+            'cadence' => 'required|in:daily,weekly,biweekly,monthly',
             'total_monthly_amount_ngn' => 'nullable|numeric|min:0',
-            'installment_count' => 'required|integer|min:1|max:12',
+            'installment_count' => 'required|integer|min:1|max:31',
             'start_date' => 'required|date',
             'employee_ids' => 'nullable|array',
             'employee_ids.*' => 'integer',

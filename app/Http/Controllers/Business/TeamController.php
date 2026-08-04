@@ -78,6 +78,13 @@ class TeamController extends Controller
             'account_number' => 'nullable|string|max:20',
             'account_name' => 'nullable|string|max:255',
             'monthly_salary_ngn' => 'required|numeric|min:0',
+            'pay_frequency' => ['required', Rule::in([
+                BusinessEmployee::FREQUENCY_MONTHLY,
+                BusinessEmployee::FREQUENCY_BIWEEKLY,
+                BusinessEmployee::FREQUENCY_WEEKLY,
+                BusinessEmployee::FREQUENCY_DAILY,
+            ])],
+            'pay_day_hint' => 'nullable|string|max:40',
             'is_active' => 'boolean',
             'notes' => 'nullable|string|max:2000',
         ]);
@@ -90,6 +97,9 @@ class TeamController extends Controller
                 ]);
             }
             $validated['phone_e164'] = $phone;
+            $validated['bank_code'] = null;
+            $validated['account_number'] = null;
+            $validated['account_name'] = null;
         } else {
             if (trim((string) ($validated['bank_code'] ?? '')) === '' || trim((string) ($validated['account_number'] ?? '')) === '') {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -97,9 +107,11 @@ class TeamController extends Controller
                 ]);
             }
             $validated['bank_code'] = NigerianBankCodeNormalizer::toNipTransferCode((string) $validated['bank_code']);
+            $validated['phone_e164'] = null;
         }
 
         $validated['is_active'] = $request->boolean('is_active', true);
+        $validated['pay_day_hint'] = isset($validated['pay_day_hint']) ? trim((string) $validated['pay_day_hint']) ?: null : null;
 
         return $validated;
     }

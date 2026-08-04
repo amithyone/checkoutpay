@@ -297,6 +297,7 @@ final class BusinessPayrollService
 
         $perInstallment = round($monthlyTotal / max(1, (int) $schedule->installment_count), 2);
         $cadenceDays = match ($schedule->cadence) {
+            'daily' => 1,
             'biweekly' => 14,
             'monthly' => 30,
             default => 7,
