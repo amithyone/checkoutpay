@@ -10,16 +10,21 @@
 @endphp
 <div class="bg-white rounded-lg border p-6 max-w-2xl space-y-4">
     <p class="text-sm text-gray-600">
-        Pay <strong>full monthly salary</strong> to selected employees immediately from your business wallet.
+        Pay <strong>full monthly salary</strong> to selected employees immediately from your
+        <strong>business balance</strong> (not personal wallet balance).
         Daily figures are estimates (monthly ÷ 30) for planning only — this run pays the monthly amount.
     </p>
 
     <div class="rounded-lg bg-gray-50 border px-4 py-3 text-sm grid grid-cols-2 gap-3">
         <div>
+            <p class="text-xs text-gray-500">Business balance available</p>
+            <p class="font-semibold">₦{{ number_format($businessBalance ?? $business->getAvailableBalance(), 2) }}</p>
+        </div>
+        <div>
             <p class="text-xs text-gray-500">Selected monthly total</p>
             <p class="font-semibold" id="bulk-monthly">₦{{ number_format($monthlyTotal, 2) }}</p>
         </div>
-        <div>
+        <div class="col-span-2">
             <p class="text-xs text-gray-500">Est. daily (all selected)</p>
             <p class="font-semibold" id="bulk-daily">₦{{ number_format($dailyTotal, 2) }}</p>
         </div>

@@ -36,8 +36,9 @@ class PayrollController extends Controller
     {
         $business = Auth::guard('business')->user();
         $employees = $business->employees()->where('is_active', true)->orderBy('name')->get();
+        $businessBalance = $this->payroll->availableBusinessBalance($business);
 
-        return view('business.team.payroll.bulk', compact('business', 'employees'));
+        return view('business.team.payroll.bulk', compact('business', 'employees', 'businessBalance'));
     }
 
     public function bulkStore(Request $request): RedirectResponse

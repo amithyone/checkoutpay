@@ -27,9 +27,16 @@
         </div>
     @endif
 
+    @if(isset($businessBalance))
+        <div class="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
+            Payroll is funded from your <strong>business balance</strong>
+            (available: <strong>₦{{ number_format($businessBalance, 2) }}</strong>), not your personal CheckoutNow wallet.
+        </div>
+    @endif
+
     @if(!$linkedWallet)
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
-            Link your CheckoutNow business wallet before running payroll.
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
+            Optional: link a CheckoutNow wallet for app visibility. Staff payouts still debit this business account balance.
         </div>
     @endif
 

@@ -30,8 +30,9 @@ class TeamController extends Controller
             ->get();
         $linkedWallet = $this->payroll->linkedWallet($business);
         $banks = $this->bankLogos->listForApi();
+        $businessBalance = $this->payroll->availableBusinessBalance($business);
 
-        return view('business.team.index', compact('business', 'employees', 'linkedWallet', 'banks'));
+        return view('business.team.index', compact('business', 'employees', 'linkedWallet', 'banks', 'businessBalance'));
     }
 
     public function store(Request $request): RedirectResponse
