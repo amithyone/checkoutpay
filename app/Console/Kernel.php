@@ -32,7 +32,9 @@ class Kernel extends ConsoleKernel
         $schedule->command('overdraft:charge-interest')->weekly();
         $schedule->command('overdraft:process-installments')->daily();
         $schedule->command('overdraft:sync-volume-eligibility')->dailyAt('02:15');
-        $schedule->command('payroll:run-due')->hourly();
+        $schedule->command('payroll:run-due')
+            ->everyFiveMinutes()
+            ->withoutOverlapping(4);
         // Peer loans: one scheduler pass per repayment rhythm (offer frequency). Lump-sum loans run with the daily pass.
         $schedule->command('business-loans:collect-due --frequency=daily')
             ->dailyAt('06:30')

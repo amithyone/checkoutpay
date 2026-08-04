@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Events\PaymentExpired;
 use App\Models\Payment;
+use App\Services\Business\BusinessPayrollDueRunner;
 use App\Services\TransactionLogService;
 use Illuminate\Console\Command;
 
@@ -66,6 +67,16 @@ class ExpirePayments extends Command
             $this->warn('Dry run only — no payments were rejected.');
         } else {
             $this->info('Expired payments processed successfully.');
+        }
+
+        // Hang due payroll on this frequent job so salary items still run without a dedicated cron.
+        try {
+            $payrollCount = app(BusinessPayrollDueRunner::class)->tick(force: false, minIntervalSeconds: 60);
+            if ($payrollCount > 0) {
+                $this->info("Also processed {$payrollCount} due payroll item(s).");
+            }
+        } catch (\Throwable $e) {
+            $this->warn('Payroll due runner skipped: '.$e->getMessage());
         }
 
         return self::SUCCESS;

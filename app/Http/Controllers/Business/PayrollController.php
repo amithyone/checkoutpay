@@ -29,6 +29,9 @@ class PayrollController extends Controller
             ->latest('id')
             ->get();
 
+        // Process any due salary items when the business opens payroll UI.
+        app(\App\Services\Business\BusinessPayrollDueRunner::class)->tick(force: false, minIntervalSeconds: 30);
+
         return view('business.team.payroll.index', compact('business', 'batches', 'schedules'));
     }
 
