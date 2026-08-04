@@ -48,8 +48,18 @@
                 <input type="text" name="phone_e164" class="w-full border border-gray-300 rounded-lg px-3 py-2">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Bank code</label>
-                <input type="text" name="bank_code" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Bank</label>
+                <select name="bank_code" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                    <option value="">Select bank…</option>
+                    @foreach($banks as $bank)
+                        <option value="{{ $bank['code'] }}" @selected(old('bank_code') === $bank['code'])>
+                            {{ $bank['name'] }} ({{ $bank['code'] }})
+                        </option>
+                    @endforeach
+                </select>
+                @error('bank_code')
+                    <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                @enderror
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Account number</label>

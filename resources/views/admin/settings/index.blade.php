@@ -109,6 +109,26 @@
                         </p>
                         <p class="mt-1 text-xs text-gray-400">Default: 70%. Range: 50–100.</p>
                     </div>
+                    <div>
+                        <label for="account_daily_trickle_limit_ngn" class="block text-sm font-medium text-gray-700 mb-2">
+                            Daily trickle limit per pool account (₦)
+                        </label>
+                        <input 
+                            type="number" 
+                            id="account_daily_trickle_limit_ngn" 
+                            name="account_daily_trickle_limit_ngn" 
+                            value="{{ $settings['payment']['account_daily_trickle_limit_ngn'] ?? 0 }}"
+                            min="0" 
+                            step="0.01"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        >
+                        <p class="mt-2 text-sm text-gray-500">
+                            Payments keep landing on a pool account until today’s approved volume reaches this amount, then assignment trickles to the next available account.
+                        </p>
+                        <p class="mt-1 text-xs text-gray-400">
+                            Default: 0 (disabled). Example: for about ₦100,000/month on one account, set ~₦3,333–3,600 (monthly ÷ days). Use your bank’s safe daily volume, not a fixed product rule.
+                        </p>
+                    </div>
                 </div>
             </div>
 

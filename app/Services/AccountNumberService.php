@@ -149,11 +149,13 @@ class AccountNumberService
         }
 
         // In-use = pending (non-expired) union recently approved (matched within release window)
+        // Daily-capped = approved volume today >= daily trickle limit (skip so payments spill to next account)
         $pendingAccountNumbers = $this->getPendingAccountNumbers();
         $recentlyApproved = $this->getRecentlyApprovedAccountNumbers($releaseMinutes);
-        $inUseSet = array_flip(array_merge($pendingAccountNumbers, $recentlyApproved));
+        $dailyCapped = $this->getDailyCappedAccountNumbers($poolNumbers);
+        $inUseSet = array_flip(array_merge($pendingAccountNumbers, $recentlyApproved, $dailyCapped));
 
-        // Pool order: first to last by id. Pick first account (by id) that is not in use.
+        // Pool order: first to last by id. Pick first account (by id) that is not in use / daily-capped.
         $selectedAccount = null;
         foreach ($poolAccounts as $account) {
             if (!isset($inUseSet[$account->account_number])) {
@@ -162,11 +164,15 @@ class AccountNumberService
             }
         }
 
-        // If all in use, wrap: use next after last used (by creation order of pending)
+        // If all in use or daily-capped, wrap to the next least-loaded account under the daily cap when possible.
         $lastUsedAccountNumber = $this->getLastUsedAccountNumber();
         if (!$selectedAccount) {
             $poolAccountsArray = $poolAccounts->values()->all();
             $poolCount = count($poolAccountsArray);
+            $dailyVolumes = $this->getTodayApprovedVolumeByAccount($poolNumbers);
+            $dailyLimit = $this->getDailyTrickleLimitNgn();
+            $cappedSet = array_flip($dailyCapped);
+
             $lastUsedAccountId = $lastUsedAccountNumber && isset($poolAccountsByNumber[$lastUsedAccountNumber])
                 ? $poolAccountsByNumber[$lastUsedAccountNumber]->id
                 : null;
@@ -177,7 +183,39 @@ class AccountNumberService
                     $startIndex = ($lastUsedIndex + 1) % $poolCount;
                 }
             }
-            $selectedAccount = $poolAccountsArray[$startIndex];
+
+            $bestUnderCap = null;
+            $bestUnderCapVolume = null;
+            $bestAny = null;
+            $bestAnyVolume = null;
+
+            for ($i = 0; $i < $poolCount; $i++) {
+                $candidate = $poolAccountsArray[($startIndex + $i) % $poolCount];
+                $number = (string) $candidate->account_number;
+                $volume = (float) ($dailyVolumes[$number] ?? 0);
+
+                if ($bestAny === null || $volume < $bestAnyVolume) {
+                    $bestAny = $candidate;
+                    $bestAnyVolume = $volume;
+                }
+
+                if ($dailyLimit > 0 && isset($cappedSet[$number])) {
+                    continue;
+                }
+
+                if ($bestUnderCap === null || $volume < $bestUnderCapVolume) {
+                    $bestUnderCap = $candidate;
+                    $bestUnderCapVolume = $volume;
+                }
+
+                // First wrap candidate still under the daily cap wins.
+                $selectedAccount = $candidate;
+                break;
+            }
+
+            if (! $selectedAccount) {
+                $selectedAccount = $bestUnderCap ?? $bestAny ?? $poolAccountsArray[$startIndex];
+            }
         }
 
         $duration = (microtime(true) - $startTime) * 1000;
@@ -187,6 +225,7 @@ class AccountNumberService
             'account_id' => $selectedAccount->id,
             'pool_size' => $poolAccounts->count(),
             'in_use_count' => count($inUseSet),
+            'daily_capped_count' => count($dailyCapped),
             'duration_ms' => round($duration, 2),
         ]);
 
@@ -232,6 +271,74 @@ class AccountNumberService
     protected function getSamePayerSimilarityPercent(): int
     {
         return (int) Setting::get('account_same_payer_similarity_percent', 70);
+    }
+
+    /**
+     * Max approved NGN that may trickle onto one pool account per calendar day (Africa/Lagos).
+     * 0 disables the daily trickle cap (default — set per ops needs, e.g. ₦100k/mo ≈ ₦3,333–3,600/day).
+     */
+    protected function getDailyTrickleLimitNgn(): float
+    {
+        return max(0, (float) Setting::get('account_daily_trickle_limit_ngn', 0));
+    }
+
+    /**
+     * @param  list<string>  $poolNumbers
+     * @return list<string>
+     */
+    protected function getDailyCappedAccountNumbers(array $poolNumbers): array
+    {
+        $limit = $this->getDailyTrickleLimitNgn();
+        if ($limit <= 0 || $poolNumbers === []) {
+            return [];
+        }
+
+        $volumes = $this->getTodayApprovedVolumeByAccount($poolNumbers);
+        $capped = [];
+        foreach ($volumes as $accountNumber => $volume) {
+            if ((float) $volume >= $limit) {
+                $capped[] = (string) $accountNumber;
+            }
+        }
+
+        return $capped;
+    }
+
+    /**
+     * @param  list<string>  $poolNumbers
+     * @return array<string, float> account_number => today's approved volume
+     */
+    protected function getTodayApprovedVolumeByAccount(array $poolNumbers): array
+    {
+        if ($poolNumbers === [] || ! class_exists(Payment::class)) {
+            return [];
+        }
+
+        $dayStart = now('Africa/Lagos')->startOfDay()->timezone('UTC');
+        $dayEnd = now('Africa/Lagos')->endOfDay()->timezone('UTC');
+
+        $rows = Payment::query()
+            ->where('status', Payment::STATUS_APPROVED)
+            ->whereNotNull('account_number')
+            ->whereIn('account_number', $poolNumbers)
+            ->where(function ($q) use ($dayStart, $dayEnd) {
+                $q->whereBetween('matched_at', [$dayStart, $dayEnd])
+                    ->orWhere(function ($q2) use ($dayStart, $dayEnd) {
+                        $q2->whereNull('matched_at')
+                            ->whereBetween('updated_at', [$dayStart, $dayEnd]);
+                    });
+            })
+            ->selectRaw('account_number, SUM(COALESCE(received_amount, amount, 0)) as volume')
+            ->groupBy('account_number')
+            ->pluck('volume', 'account_number')
+            ->all();
+
+        $out = [];
+        foreach ($rows as $accountNumber => $volume) {
+            $out[(string) $accountNumber] = (float) $volume;
+        }
+
+        return $out;
     }
 
     /**

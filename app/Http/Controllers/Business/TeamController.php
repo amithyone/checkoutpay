@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
 use App\Models\BusinessEmployee;
+use App\Services\BankLogoService;
 use App\Services\Business\BusinessPayrollService;
+use App\Services\NigerianBankCodeNormalizer;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,6 +18,7 @@ class TeamController extends Controller
 {
     public function __construct(
         private BusinessPayrollService $payroll,
+        private BankLogoService $bankLogos,
     ) {}
 
     public function index(): View
@@ -26,8 +29,9 @@ class TeamController extends Controller
             ->orderBy('name')
             ->get();
         $linkedWallet = $this->payroll->linkedWallet($business);
+        $banks = $this->bankLogos->listForApi();
 
-        return view('business.team.index', compact('business', 'employees', 'linkedWallet'));
+        return view('business.team.index', compact('business', 'employees', 'linkedWallet', 'banks'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -89,9 +93,10 @@ class TeamController extends Controller
         } else {
             if (trim((string) ($validated['bank_code'] ?? '')) === '' || trim((string) ($validated['account_number'] ?? '')) === '') {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'account_number' => 'Bank code and account number are required for bank payments.',
+                    'account_number' => 'Bank and account number are required for bank payments.',
                 ]);
             }
+            $validated['bank_code'] = NigerianBankCodeNormalizer::toNipTransferCode((string) $validated['bank_code']);
         }
 
         $validated['is_active'] = $request->boolean('is_active', true);

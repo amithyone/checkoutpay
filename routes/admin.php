@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AuditsController;
 use App\Http\Controllers\Admin\MevonPayAuditController;
 use App\Http\Controllers\Admin\MevonPayBalanceMonitorController;
 use App\Http\Controllers\Admin\AccountNumberController;
+use App\Http\Controllers\Admin\BankAccountPrefixController;
 use App\Http\Controllers\Admin\BankEmailTemplateController;
 use App\Http\Controllers\Admin\BankLogoController;
 use App\Http\Controllers\Admin\BusinessNameRegistrationAdminController;
@@ -410,6 +411,12 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::post('bank-logos/{bank}/assign', [BankLogoController::class, 'assign'])->name('bank-logos.assign');
             Route::delete('bank-logos/{bank}', [BankLogoController::class, 'clear'])->name('bank-logos.clear');
         });
+
+        // Bank account prefix suggestions (CheckoutNow app fallback API)
+        Route::get('bank-account-prefixes', [BankAccountPrefixController::class, 'index'])->name('bank-account-prefixes.index');
+        Route::post('bank-account-prefixes', [BankAccountPrefixController::class, 'store'])->name('bank-account-prefixes.store');
+        Route::put('bank-account-prefixes/{bankAccountPrefix}', [BankAccountPrefixController::class, 'update'])->name('bank-account-prefixes.update');
+        Route::delete('bank-account-prefixes/{bankAccountPrefix}', [BankAccountPrefixController::class, 'destroy'])->name('bank-account-prefixes.destroy');
 
         // Email Monitoring
         Route::post('email-monitor/fetch', [\App\Http\Controllers\Admin\EmailMonitorController::class, 'fetchEmails'])->name('email-monitor.fetch');

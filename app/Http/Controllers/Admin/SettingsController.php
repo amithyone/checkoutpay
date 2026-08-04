@@ -60,6 +60,7 @@ class SettingsController extends Controller
                 'transaction_pending_time_minutes' => 'required|integer|min:5|max:2400',
                 'account_release_after_success_minutes' => 'nullable|integer|min:1|max:1440',
                 'account_same_payer_similarity_percent' => 'nullable|integer|min:50|max:100',
+                'account_daily_trickle_limit_ngn' => 'nullable|numeric|min:0|max:100000000',
             ]);
 
             // Update payment time window (for email matching)
@@ -96,6 +97,15 @@ class SettingsController extends Controller
                     'integer',
                     'payment',
                     'Name similarity percentage to treat two payers as the same person for account reuse.'
+                );
+            }
+            if (array_key_exists('account_daily_trickle_limit_ngn', $validated) && $validated['account_daily_trickle_limit_ngn'] !== null) {
+                Setting::set(
+                    'account_daily_trickle_limit_ngn',
+                    $validated['account_daily_trickle_limit_ngn'],
+                    'float',
+                    'payment',
+                    'Max approved NGN that may trickle onto one pool account per day before assignment moves to the next account. 0 disables.'
                 );
             }
         }

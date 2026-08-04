@@ -392,6 +392,7 @@ Route::prefix('v1')->group(function () {
         // Dynamic possible banks for an account number (NUBAN-backed)
         Route::post('kyc/banks', [\App\Http\Controllers\Api\Rentals\KycController::class, 'banksForAccount']);
         // All known banks from Checkout DB (cached from NUBAN responses)
+        Route::get('banks/suggestions', [\App\Http\Controllers\Api\Rentals\KycController::class, 'bankSuggestionsForAccount']);
         Route::get('banks', [\App\Http\Controllers\Api\Rentals\KycController::class, 'banksFromDatabase']);
 
         // Renter auth (token-based)

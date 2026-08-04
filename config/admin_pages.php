@@ -211,6 +211,12 @@ return [
             'route_patterns' => ['admin.bank-logos.*'],
             'default_roles' => ['super_admin', 'admin'],
         ],
+        'bank_account_prefixes' => [
+            'label' => 'Bank account prefixes',
+            'group' => 'Wallet',
+            'route_patterns' => ['admin.bank-account-prefixes.*'],
+            'default_roles' => ['super_admin', 'admin', 'wallet_support'],
+        ],
         'test_transaction' => [
             'label' => 'Test Transaction',
             'group' => 'System',

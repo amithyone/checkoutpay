@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Rentals;
 use App\Http\Controllers\Controller;
 use App\Models\Bank;
 use App\Models\Renter;
+use App\Services\BankAccountSuggestionService;
 use App\Services\BankLogoService;
 use App\Services\MevonPayBankService;
 use App\Services\NigerianBankCodeNormalizer;
@@ -17,6 +18,7 @@ class KycController extends Controller
         protected NubanValidationService $nubanService,
         protected MevonPayBankService $mevonBankService,
         protected BankLogoService $bankLogos,
+        protected BankAccountSuggestionService $accountSuggestions,
     ) {}
 
     /**
@@ -51,6 +53,36 @@ class KycController extends Controller
 
         return response()->json([
             'banks' => is_array($banks) ? $this->bankLogos->enrichRowsWithLogoUrl($banks) : $banks,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/rentals/banks/suggestions?account={digits}
+     * Fallback bank suggestions from server-side account prefixes (CheckoutNow app).
+     */
+    public function bankSuggestionsForAccount(Request $request)
+    {
+        $validated = $request->validate([
+            'account' => [
+                'required',
+                'string',
+                'max:20',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $digits = preg_replace('/\D+/', '', (string) $value) ?? '';
+                    if (strlen($digits) < 2) {
+                        $fail('The account must contain at least 2 digits.');
+                    }
+                },
+            ],
+        ]);
+
+        $banks = $this->accountSuggestions->suggest((string) $validated['account']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'banks' => $banks,
+            ],
         ]);
     }
 
