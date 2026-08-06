@@ -107,6 +107,9 @@
                         <span class="text-xs text-gray-500">Funding: {{ $business->overdraft_funding_source ?? 'platform' }}</span>
                     @elseif($business->overdraft_status === 'pending')
                         <span class="text-sm font-medium text-amber-600">Pending application</span>
+                        @if($business->overdraft_requested_amount)
+                            <span class="text-sm text-gray-700">Requested: ₦{{ number_format((float) $business->overdraft_requested_amount, 2) }}</span>
+                        @endif
                         @if($business->overdraft_application_notes)
                             <span class="text-xs text-gray-600 block w-full">Notes: {{ \Illuminate\Support\Str::limit($business->overdraft_application_notes, 200) }}</span>
                         @endif

@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessActivityLog;
 use App\Models\BusinessVerification;
 use App\Models\BusinessWebsite;
+use App\Models\CreditFacilityRequest;
 use App\Models\EmailAccount;
 use App\Notifications\PeerLendingLenderProgramConfiguredNotification;
 use App\Services\Credit\OverdraftFundingService;
@@ -565,6 +566,11 @@ class BusinessController extends Controller
             'overdraft_approval_notes' => $request->overdraft_approval_notes,
         ]);
         $business->refresh();
+        CreditFacilityRequest::query()
+            ->where('business_id', $business->id)
+            ->where('kind', CreditFacilityRequest::KIND_OVERDRAFT)
+            ->where('status', CreditFacilityRequest::STATUS_PENDING)
+            ->update(['status' => CreditFacilityRequest::STATUS_APPROVED]);
         $logService->logOverdraftApproved($business, [
             'overdraft_limit' => $limit,
             'overdraft_funding_source' => $fundingSource,
@@ -601,6 +607,11 @@ class BusinessController extends Controller
             'overdraft_status' => 'rejected',
             'overdraft_requested_at' => $business->overdraft_requested_at, // keep for history
         ]);
+        CreditFacilityRequest::query()
+            ->where('business_id', $business->id)
+            ->where('kind', CreditFacilityRequest::KIND_OVERDRAFT)
+            ->where('status', CreditFacilityRequest::STATUS_PENDING)
+            ->update(['status' => CreditFacilityRequest::STATUS_REJECTED]);
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Overdraft application rejected.');
