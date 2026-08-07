@@ -142,6 +142,14 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
         Route::get('overdraft-applications', [\App\Http\Controllers\Admin\OverdraftApplicationsController::class, 'index'])
             ->name('overdraft-applications.index');
+        Route::get('credit-facility-applications', [\App\Http\Controllers\Admin\CreditFacilityApplicationsController::class, 'index'])
+            ->name('credit-facility-applications.index');
+        Route::post('credit-facility-applications/{creditFacilityRequest}/approve', [\App\Http\Controllers\Admin\CreditFacilityApplicationsController::class, 'approve'])
+            ->middleware('super_admin')
+            ->name('credit-facility-applications.approve');
+        Route::post('credit-facility-applications/{creditFacilityRequest}/reject', [\App\Http\Controllers\Admin\CreditFacilityApplicationsController::class, 'reject'])
+            ->middleware('super_admin')
+            ->name('credit-facility-applications.reject');
         Route::get('business-payroll', [\App\Http\Controllers\Admin\BusinessPayrollAdminController::class, 'index'])
             ->name('business-payroll.index');
 
@@ -150,6 +158,14 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             ->middleware('admin_or_super')
             ->name('developer-program.settings.update');
         Route::patch('developer-program/applications/{application}', [DeveloperProgramController::class, 'updateApplication'])->name('developer-program.applications.update');
+
+        Route::middleware('super_admin')->prefix('investor-pitch-access')->name('investor-pitch-access.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\InvestorPitchAccessController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\Admin\InvestorPitchAccessController::class, 'store'])->name('store');
+            Route::put('{investor_pitch_access}', [\App\Http\Controllers\Admin\InvestorPitchAccessController::class, 'update'])->name('update');
+            Route::post('{investor_pitch_access}/regenerate-link', [\App\Http\Controllers\Admin\InvestorPitchAccessController::class, 'regenerateLink'])->name('regenerate');
+            Route::delete('{investor_pitch_access}', [\App\Http\Controllers\Admin\InvestorPitchAccessController::class, 'destroy'])->name('destroy');
+        });
 
         Route::middleware('super_admin')->prefix('peer-lending')->name('peer-lending.')->group(function () {
             Route::get('offers', [\App\Http\Controllers\Admin\PeerLendingAdminController::class, 'offersIndex'])->name('offers.index');

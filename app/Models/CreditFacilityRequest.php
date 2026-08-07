@@ -24,17 +24,24 @@ class CreditFacilityRequest extends Model
         'public_id',
         'whatsapp_wallet_id',
         'business_id',
+        'funder_business_id',
         'kind',
         'amount',
+        'approved_amount',
         'currency',
         'note',
+        'admin_notes',
         'status',
+        'approved_at',
+        'approved_by_admin_id',
         'meta',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'approved_amount' => 'decimal:2',
         'meta' => 'array',
+        'approved_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -54,6 +61,11 @@ class CreditFacilityRequest extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function funder(): BelongsTo
+    {
+        return $this->belongsTo(Business::class, 'funder_business_id');
     }
 
     /**

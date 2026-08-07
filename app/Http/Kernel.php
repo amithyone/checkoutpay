@@ -74,6 +74,7 @@ class Kernel extends HttpKernel
         'tax_admin_redirect' => \App\Http\Middleware\RedirectTaxAdminFromCheckoutPanel::class,
         'tax_admin_api' => \App\Http\Middleware\EnsureTaxAdminApi::class,
         'rentals_admin_api' => \App\Http\Middleware\EnsureRentalsAdminApi::class,
+        'investor.pitch' => \App\Http\Middleware\EnsureInvestorPitchAccess::class,
         'touch.consumer.app.session' => \App\Http\Middleware\TouchConsumerAppSession::class,
         'touch.rentals.admin.app.session' => \App\Http\Middleware\TouchRentalsAdminAppSession::class,
     ];

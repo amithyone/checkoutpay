@@ -238,8 +238,18 @@ class AdminSidebarMenu
                 ]
             ),
             'withdrawals' => $this->link('Withdrawals', 'admin.withdrawals.index', 'fas fa-hand-holding-usd', ['admin.withdrawals.*']),
-            'overdraft' => $this->link('Overdraft loan queue', 'admin.overdraft-applications.index', 'fas fa-file-invoice-dollar', ['admin.overdraft-applications.*']),
+            'overdraft' => array_merge(
+                $this->link('Loan & overdraft queue', 'admin.credit-facility-applications.index', 'fas fa-file-invoice-dollar', ['admin.credit-facility-applications.*', 'admin.overdraft-applications.*']),
+                [
+                    'badge_count' => \App\Models\CreditFacilityRequest::query()->where('status', 'pending')->count(),
+                    'badge_color' => 'yellow',
+                ]
+            ),
             'business_payroll' => $this->link('Business payroll', 'admin.business-payroll.index', 'fas fa-users-cog text-green-600', ['admin.business-payroll.*']),
+            'investor_pitch_access' => array_merge(
+                $this->link('Investor pitch access', 'admin.investor-pitch-access.index', 'fas fa-user-lock text-indigo-700', ['admin.investor-pitch-access.*']),
+                ['visible' => $admin->isSuperAdmin()]
+            ),
             'peer_lending_offers' => array_merge(
                 $this->link('Peer lending offers', 'admin.peer-lending.offers.index', 'fas fa-hand-holding-usd', ['admin.peer-lending.offers.*']),
                 ['visible' => $admin->isSuperAdmin()]

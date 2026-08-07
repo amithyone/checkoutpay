@@ -116,9 +116,9 @@ return [
             'default_roles' => ['super_admin', 'admin', 'staff'],
         ],
         'overdraft' => [
-            'label' => 'Overdraft loan queue',
+            'label' => 'Loan & overdraft queue',
             'group' => 'Finance',
-            'route_patterns' => ['admin.overdraft-applications.*'],
+            'route_patterns' => ['admin.credit-facility-applications.*', 'admin.overdraft-applications.*'],
             'default_roles' => ['super_admin', 'admin', 'staff'],
         ],
         'business_payroll' => [
@@ -258,6 +258,12 @@ return [
             'group' => 'System',
             'route_patterns' => ['admin.developer-program.*'],
             'default_roles' => ['super_admin', 'admin', 'staff'],
+        ],
+        'investor_pitch_access' => [
+            'label' => 'Investor pitch access',
+            'group' => 'System',
+            'route_patterns' => ['admin.investor-pitch-access.*'],
+            'default_roles' => ['super_admin'],
         ],
         'desktop_telemetry' => [
             'label' => 'Desktop DRM',

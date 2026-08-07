@@ -35,16 +35,51 @@ final class CreditFacilityRequestService
             return ['ok' => false, 'message' => 'Amount must be at least ₦1.', 'status' => 422];
         }
 
-        $business = $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet);
-
-        if ($kind === CreditFacilityRequest::KIND_OVERDRAFT) {
-            return $this->submitOverdraft($wallet, $business, $amount, $note);
+        // Personal wallets are allowed. Linked business uses business volume; otherwise personal 90d volume.
+        $business = $wallet->linked_business_id
+            ? $this->businessLedger->resolveLinkedOrMatchedBusiness($wallet)
+            : null;
+        if ($business && ! $business->is_active) {
+            $business = null;
         }
 
-        return $this->submitLoan($wallet, $business, $amount, $note);
+        $eligibility = $this->eligibility->computeForWallet($wallet, $business instanceof Business ? $business : null);
+        if ($eligibility['tier'] === null || $eligibility['tier_max_limit'] <= 0) {
+            $need = number_format($this->eligibility->tier1Threshold(), 0);
+
+            return [
+                'ok' => false,
+                'message' => sprintf(
+                    'Not eligible yet. Your last 90 days of %s transactions (₦%s) must reach at least ₦%s.',
+                    $eligibility['source'],
+                    number_format($eligibility['volume_90d'], 2),
+                    $need
+                ),
+                'status' => 422,
+            ];
+        }
+        if ($amount > $eligibility['tier_max_limit'] + 0.0001) {
+            return [
+                'ok' => false,
+                'message' => sprintf(
+                    'Amount exceeds your tier max of ₦%s (90d %s volume ₦%s).',
+                    number_format($eligibility['tier_max_limit'], 2),
+                    $eligibility['source'],
+                    number_format($eligibility['volume_90d'], 2)
+                ),
+                'status' => 422,
+            ];
+        }
+
+        if ($kind === CreditFacilityRequest::KIND_OVERDRAFT) {
+            return $this->submitOverdraft($wallet, $business, $amount, $note, $eligibility);
+        }
+
+        return $this->submitLoan($wallet, $business, $amount, $note, $eligibility);
     }
 
     /**
+     * @param  array{volume_90d: float, tier: ?string, tier_max_limit: float, source: string}  $eligibility
      * @return array{ok: bool, message: string, status?: int, request?: CreditFacilityRequest}
      */
     private function submitOverdraft(
@@ -52,23 +87,18 @@ final class CreditFacilityRequestService
         ?Business $business,
         float $amount,
         ?string $note,
+        array $eligibility,
     ): array {
-        if (! $business instanceof Business) {
-            return ['ok' => false, 'message' => 'Business wallet not linked.', 'status' => 422];
-        }
+        if ($business instanceof Business) {
+            $this->eligibility->syncBusiness($business);
+            $business = $business->fresh() ?? $business;
 
-        $this->eligibility->syncBusiness($business);
-        $business = $business->fresh() ?? $business;
-
-        if (! $business->canApplyForOverdraft()) {
             if ($business->overdraft_status === 'pending') {
                 return ['ok' => false, 'message' => 'You already have a pending overdraft application.', 'status' => 422];
             }
             if ($business->hasOverdraftApproved()) {
                 return ['ok' => false, 'message' => 'Overdraft is already approved.', 'status' => 422];
             }
-
-            return ['ok' => false, 'message' => 'Not eligible to apply for overdraft.', 'status' => 422];
         }
 
         $pending = CreditFacilityRequest::query()
@@ -80,10 +110,10 @@ final class CreditFacilityRequestService
             return ['ok' => false, 'message' => 'You already have a pending overdraft application.', 'status' => 422];
         }
 
-        $row = DB::transaction(function () use ($wallet, $business, $amount, $note) {
+        $row = DB::transaction(function () use ($wallet, $business, $amount, $note, $eligibility) {
             $request = CreditFacilityRequest::query()->create([
                 'whatsapp_wallet_id' => $wallet->id,
-                'business_id' => $business->id,
+                'business_id' => $business?->id,
                 'kind' => CreditFacilityRequest::KIND_OVERDRAFT,
                 'amount' => $amount,
                 'currency' => 'NGN',
@@ -92,17 +122,24 @@ final class CreditFacilityRequestService
                 'meta' => [
                     'source' => 'consumer_app',
                     'path' => 'wallet/credit-facility/request',
+                    'ledger' => $business ? 'business' : 'personal',
+                    'volume_90d' => $eligibility['volume_90d'],
+                    'volume_tier' => $eligibility['tier'],
+                    'tier_max_limit' => $eligibility['tier_max_limit'],
+                    'volume_source' => $eligibility['source'],
                 ],
             ]);
 
-            $business->update([
-                'overdraft_status' => 'pending',
-                'overdraft_requested_at' => now(),
-                'overdraft_requested_amount' => $amount,
-                'overdraft_repayment_mode' => $business->overdraft_repayment_mode
-                    ?: OverdraftInstallmentService::MODE_SINGLE,
-                'overdraft_application_notes' => $note,
-            ]);
+            if ($business instanceof Business) {
+                $business->update([
+                    'overdraft_status' => 'pending',
+                    'overdraft_requested_at' => now(),
+                    'overdraft_requested_amount' => $amount,
+                    'overdraft_repayment_mode' => $business->overdraft_repayment_mode
+                        ?: OverdraftInstallmentService::MODE_SINGLE,
+                    'overdraft_application_notes' => $note,
+                ]);
+            }
 
             return $request;
         });
@@ -115,6 +152,7 @@ final class CreditFacilityRequestService
     }
 
     /**
+     * @param  array{volume_90d: float, tier: ?string, tier_max_limit: float, source: string}  $eligibility
      * @return array{ok: bool, message: string, status?: int, request?: CreditFacilityRequest}
      */
     private function submitLoan(
@@ -122,6 +160,7 @@ final class CreditFacilityRequestService
         ?Business $business,
         float $amount,
         ?string $note,
+        array $eligibility,
     ): array {
         $pending = CreditFacilityRequest::query()
             ->where('whatsapp_wallet_id', $wallet->id)
@@ -143,6 +182,11 @@ final class CreditFacilityRequestService
             'meta' => [
                 'source' => 'consumer_app',
                 'path' => 'wallet/credit-facility/request',
+                'ledger' => $business ? 'business' : 'personal',
+                'volume_90d' => $eligibility['volume_90d'],
+                'volume_tier' => $eligibility['tier'],
+                'tier_max_limit' => $eligibility['tier_max_limit'],
+                'volume_source' => $eligibility['source'],
             ],
         ]);
 

@@ -105,6 +105,12 @@
                         <span class="text-sm text-gray-700">Limit: ₦{{ number_format($business->overdraft_limit, 2) }}</span>
                         <span class="text-xs text-gray-500">Available: ₦{{ number_format($business->getAvailableBalance(), 2) }}</span>
                         <span class="text-xs text-gray-500">Funding: {{ $business->overdraft_funding_source ?? 'platform' }}</span>
+                        @if($business->overdraft_funder_business_id)
+                            @php $funderBiz = \App\Models\Business::query()->find($business->overdraft_funder_business_id); @endphp
+                            @if($funderBiz)
+                                <span class="text-xs text-gray-500">Master: {{ $funderBiz->name }}</span>
+                            @endif
+                        @endif
                     @elseif($business->overdraft_status === 'pending')
                         <span class="text-sm font-medium text-amber-600">Pending application</span>
                         @if($business->overdraft_requested_amount)
@@ -184,6 +190,10 @@
                         <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" name="overdraft_eligible" value="1" class="rounded border-gray-300" {{ $business->overdraft_eligible ? 'checked' : '' }}>
                             Overdraft (can apply)
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="is_master_loan_account" value="1" class="rounded border-gray-300" {{ $business->is_master_loan_account ? 'checked' : '' }}>
+                            Master loan account (holds float for OD/loans)
                         </label>
                         <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                             <input type="checkbox" name="peer_lending_lend_eligible" value="1" class="rounded border-gray-300" {{ $business->peer_lending_lend_eligible ? 'checked' : '' }}>

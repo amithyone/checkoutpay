@@ -25,6 +25,27 @@ Route::get('/llms.txt', [\App\Http\Controllers\Public\SeoController::class, 'llm
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
+/** Confidential investor pitch (password + NDA gate). Admin: Investor pitch access */
+Route::get('/investor/access', [\App\Http\Controllers\Public\InvestorPitchGateController::class, 'lookup'])
+    ->name('investor.gate.lookup');
+Route::get('/investor/access/{token}', [\App\Http\Controllers\Public\InvestorPitchGateController::class, 'show'])
+    ->where('token', '[A-Za-z0-9]+')
+    ->middleware('throttle:30,1')
+    ->name('investor.gate');
+Route::post('/investor/access/{token}', [\App\Http\Controllers\Public\InvestorPitchGateController::class, 'unlock'])
+    ->where('token', '[A-Za-z0-9]+')
+    ->middleware('throttle:12,1')
+    ->name('investor.gate.unlock');
+Route::post('/investor/logout', [\App\Http\Controllers\Public\InvestorPitchGateController::class, 'logout'])
+    ->name('investor.logout');
+
+Route::middleware('investor.pitch')->group(function () {
+    Route::get('/investor', [\App\Http\Controllers\Public\InvestorPitchController::class, 'show'])
+        ->name('investor.pitch');
+    Route::get('/investor/summary', [\App\Http\Controllers\Public\InvestorPitchController::class, 'summary'])
+        ->name('investor.summary');
+});
+
 /** SDK legacy path: bankApiUrl + /verify-broadcast when base is https://check-outpay.com */
 Route::post('/verify-broadcast', [BroadcastVerifyController::class, 'verifyBroadcast'])
     ->middleware('throttle:120,1');

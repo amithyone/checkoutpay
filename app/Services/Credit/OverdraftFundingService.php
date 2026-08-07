@@ -5,9 +5,15 @@ namespace App\Services\Credit;
 use App\Models\Business;
 use App\Models\Setting;
 use App\Models\TransactionLog;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Central / master loan account backs overdraft:
+ * - Borrower draws (balance goes more negative) → debit master
+ * - Borrower repays (balance recovers) → credit master
+ */
 class OverdraftFundingService
 {
     public const FUNDING_PLATFORM = 'platform';
@@ -15,6 +21,9 @@ class OverdraftFundingService
     public const FUNDING_PEER_POOL = 'peer_pool';
 
     public const FUNDING_CAPITAL_RESERVE = 'capital_reserve';
+
+    /** Any chosen master loan business account. */
+    public const FUNDING_MASTER_LOAN = 'master_loan';
 
     public const SETTING_KEY = 'overdraft_capital_reserve_email';
 
@@ -27,40 +36,93 @@ class OverdraftFundingService
 
     public function fundingBusiness(string $source): ?Business
     {
-        if ($source !== self::FUNDING_CAPITAL_RESERVE) {
-            return null;
+        if ($source === self::FUNDING_CAPITAL_RESERVE) {
+            return Business::query()->where('email', $this->capitalReserveEmail())->first();
         }
 
-        return Business::query()->where('email', $this->capitalReserveEmail())->first();
+        return null;
     }
 
     /**
-     * Capacity available from the funding business for new overdraft.
-     * For capital reserve: their current balance (cannot loan what they do not have).
+     * Master account that funds this borrower's overdraft draws / receives repayments.
      */
-    public function availableCapacity(string $source): float
+    public function resolveFunder(Business $borrower): ?Business
     {
-        $funder = $this->fundingBusiness($source);
+        $funderId = (int) ($borrower->overdraft_funder_business_id ?? 0);
+        if ($funderId > 0) {
+            $funder = Business::query()->find($funderId);
+            if ($funder) {
+                return $funder;
+            }
+        }
+
+        $source = (string) ($borrower->overdraft_funding_source ?? '');
+        if (in_array($source, [self::FUNDING_CAPITAL_RESERVE, self::FUNDING_MASTER_LOAN], true)) {
+            return $this->fundingBusiness(self::FUNDING_CAPITAL_RESERVE);
+        }
+
+        return null;
+    }
+
+    public function isMasterBacked(Business $borrower): bool
+    {
+        return $this->resolveFunder($borrower) !== null;
+    }
+
+    /**
+     * Capacity available on a master account (cannot back more than current balance).
+     */
+    public function availableCapacityForFunder(?Business $funder): float
+    {
         if (! $funder) {
             return 0.0;
         }
 
-        return max(0.0, (float) $funder->balance);
+        return max(0.0, round((float) $funder->balance, 2));
+    }
+
+    public function availableCapacity(string $source): float
+    {
+        return $this->availableCapacityForFunder($this->fundingBusiness($source));
+    }
+
+    /**
+     * Businesses an admin can pick as the central loan / overdraft float account.
+     *
+     * @return Collection<int, Business>
+     */
+    public function masterLoanAccounts(): Collection
+    {
+        $reserveEmail = $this->capitalReserveEmail();
+
+        return Business::query()
+            ->where('is_active', true)
+            ->where(function ($q) use ($reserveEmail) {
+                $q->where('is_master_loan_account', true)
+                    ->orWhere('email', $reserveEmail);
+            })
+            ->orderBy('name')
+            ->get();
     }
 
     /**
      * Sync funding business balance with how much overdraft principal the borrower
-     * currently uses, when funding source is capital_reserve.
+     * currently uses (master-backed overdraft only).
      *
-     * - Borrower goes more negative -> debit the funder by the new draw.
-     * - Borrower recovers toward zero -> refund the funder by the recovered amount.
+     * - Borrower goes more negative → debit the master account
+     * - Borrower recovers toward zero → credit the master account
      */
     public function syncOnBalanceChange(Business $borrower, float $previousBalance, float $newBalance): void
     {
         if (! $borrower->hasOverdraftApproved()) {
             return;
         }
-        if ($borrower->overdraft_funding_source !== self::FUNDING_CAPITAL_RESERVE) {
+
+        $funder = $this->resolveFunder($borrower);
+        if (! $funder) {
+            return;
+        }
+        if ($funder->id === $borrower->id) {
             return;
         }
 
@@ -70,20 +132,6 @@ class OverdraftFundingService
         $delta = round($newDraw - $priorDraw, 2);
 
         if (abs($delta) < 0.01) {
-            return;
-        }
-
-        $funder = $this->fundingBusiness(self::FUNDING_CAPITAL_RESERVE);
-        if (! $funder) {
-            Log::warning('Overdraft capital reserve funding business not found', [
-                'email' => $this->capitalReserveEmail(),
-                'borrower_id' => $borrower->id,
-                'delta' => $delta,
-            ]);
-
-            return;
-        }
-        if ($funder->id === $borrower->id) {
             return;
         }
 
@@ -104,11 +152,12 @@ class OverdraftFundingService
                 ? TransactionLog::EVENT_OVERDRAFT_FUNDING_DEBIT
                 : TransactionLog::EVENT_OVERDRAFT_FUNDING_CREDIT,
             'description' => $delta > 0
-                ? 'Overdraft draw funded by capital reserve: ₦'.number_format($delta, 2)
-                : 'Overdraft repaid to capital reserve: ₦'.number_format(abs($delta), 2),
+                ? 'Overdraft draw funded by master loan account: ₦'.number_format($delta, 2)
+                : 'Overdraft repaid to master loan account: ₦'.number_format(abs($delta), 2),
             'metadata' => [
                 'borrower_business_id' => $borrower->id,
                 'borrower_email' => $borrower->email,
+                'funder_business_id' => $funder->id,
                 'delta' => $delta,
                 'previous_balance' => $previousBalance,
                 'new_balance' => $newBalance,

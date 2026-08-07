@@ -563,6 +563,9 @@ class BusinessController extends Controller
             'overdraft_approved_by' => $admin->id,
             'overdraft_status' => 'approved',
             'overdraft_funding_source' => $fundingSource,
+            'overdraft_funder_business_id' => $fundingSource === OverdraftFundingService::FUNDING_CAPITAL_RESERVE
+                ? ($fundingService->fundingBusiness(OverdraftFundingService::FUNDING_CAPITAL_RESERVE)?->id)
+                : null,
             'overdraft_approval_notes' => $request->overdraft_approval_notes,
         ]);
         $business->refresh();
@@ -645,6 +648,7 @@ class BusinessController extends Controller
 
         $business->update([
             'overdraft_eligible' => $request->has('overdraft_eligible'),
+            'is_master_loan_account' => $request->has('is_master_loan_account'),
             'peer_lending_lend_eligible' => $request->has('peer_lending_lend_eligible'),
             'peer_lending_borrow_eligible' => $request->has('peer_lending_borrow_eligible'),
             'peer_lending_lender_max_offer_amount' => $request->filled('peer_lending_lender_max_offer_amount')

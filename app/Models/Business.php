@@ -50,8 +50,10 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_repayment_mode',
         'overdraft_application_notes',
         'overdraft_funding_source',
+        'overdraft_funder_business_id',
         'overdraft_approval_notes',
         'overdraft_repayment_started_at',
+        'is_master_loan_account',
         'peer_lending_lend_eligible',
         'peer_lending_borrow_eligible',
         'peer_lending_lender_max_offer_amount',
@@ -131,6 +133,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'overdraft_interest_last_charged_at' => 'datetime',
         'overdraft_requested_at' => 'datetime',
         'overdraft_eligible' => 'boolean',
+        'is_master_loan_account' => 'boolean',
         'overdraft_volume_90d' => 'decimal:2',
         'overdraft_volume_computed_at' => 'datetime',
         'overdraft_repayment_started_at' => 'datetime',
@@ -244,7 +247,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
             $newBalance = (float) $business->balance;
 
             if ($business->hasOverdraftApproved()
-                && $business->overdraft_funding_source === \App\Services\Credit\OverdraftFundingService::FUNDING_CAPITAL_RESERVE) {
+                && app(\App\Services\Credit\OverdraftFundingService::class)->isMasterBacked($business)) {
                 app(\App\Services\Credit\OverdraftFundingService::class)
                     ->syncOnBalanceChange($business, $previousBalance, $newBalance);
             }

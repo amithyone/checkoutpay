@@ -100,6 +100,71 @@ class ConsumerCreditFacilityRequestTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
+    public function test_personal_wallet_blocked_without_90d_volume(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '2348099990099',
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'balance' => 1000,
+            'linked_business_id' => null,
+        ]);
+        $account = ConsumerWalletApiAccount::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'phone_e164' => '2348099990099',
+        ]);
+
+        Sanctum::actingAs($account, ['consumer']);
+
+        $this->postJson('/api/v1/consumer/wallet/credit-facility/request', [
+            'kind' => 'loan',
+            'amount' => 5000,
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        $message = (string) $this->postJson('/api/v1/consumer/wallet/credit-facility/request', [
+            'kind' => 'overdraft',
+            'amount' => 5000,
+        ])->json('message');
+        $this->assertStringContainsString('Not eligible yet', $message);
+        $this->assertStringContainsString('personal', $message);
+    }
+
+    public function test_personal_wallet_can_apply_when_90d_volume_meets_tier(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '2348099990088',
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'balance' => 1000,
+            'linked_business_id' => null,
+        ]);
+        $account = ConsumerWalletApiAccount::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'phone_e164' => '2348099990088',
+        ]);
+
+        // Seed enough personal outbound volume (≥ ₦5m) within 90 days.
+        \App\Models\WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'type' => \App\Models\WhatsappWalletTransaction::TYPE_P2P_DEBIT,
+            'ledger_scope' => 'personal',
+            'amount' => 5_000_000,
+            'balance_after' => 0,
+            'created_at' => now()->subDays(10),
+            'updated_at' => now()->subDays(10),
+        ]);
+
+        Sanctum::actingAs($account, ['consumer']);
+
+        $this->postJson('/api/v1/consumer/wallet/credit-facility/request', [
+            'kind' => 'loan',
+            'amount' => 100_000,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.kind', 'loan');
+    }
+
     /**
      * @return array{0: ConsumerWalletApiAccount, 1: Business, 2: WhatsappWallet}
      */
@@ -121,6 +186,17 @@ class ConsumerCreditFacilityRequestTest extends TestCase
             'status' => WhatsappWallet::STATUS_ACTIVE,
             'balance' => 0,
             'linked_business_id' => $business->id,
+        ]);
+
+        // Meet Tier 1 90d business volume for overdraft/loan eligibility.
+        \App\Models\WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'type' => \App\Models\WhatsappWalletTransaction::TYPE_P2P_DEBIT,
+            'ledger_scope' => 'business',
+            'amount' => 5_000_000,
+            'balance_after' => 0,
+            'created_at' => now()->subDays(5),
+            'updated_at' => now()->subDays(5),
         ]);
 
         $account = ConsumerWalletApiAccount::query()->create([
@@ -238,7 +314,20 @@ class ConsumerCreditFacilityRequestTest extends TestCase
                 $table->string('type');
                 $table->string('ledger_scope')->nullable();
                 $table->decimal('amount', 14, 2)->default(0);
+                $table->decimal('balance_after', 14, 2)->nullable();
+                $table->string('sender_name')->nullable();
+                $table->json('meta')->nullable();
                 $table->timestamps();
+            });
+        } elseif (! $schema->hasColumn('whatsapp_wallet_transactions', 'balance_after')) {
+            $schema->table('whatsapp_wallet_transactions', function (Blueprint $table) {
+                $table->decimal('balance_after', 14, 2)->nullable();
+                if (! Schema::connection('sqlite')->hasColumn('whatsapp_wallet_transactions', 'sender_name')) {
+                    $table->string('sender_name')->nullable();
+                }
+                if (! Schema::connection('sqlite')->hasColumn('whatsapp_wallet_transactions', 'meta')) {
+                    $table->json('meta')->nullable();
+                }
             });
         }
 

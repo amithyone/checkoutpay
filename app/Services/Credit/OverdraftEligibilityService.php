@@ -17,7 +17,7 @@ final class OverdraftEligibilityService
     public const TIER_2 = 'tier_2';
 
     /**
-     * @return array{volume_90d: float, tier: ?string, tier_max_limit: float}
+     * @return array{volume_90d: float, tier: ?string, tier_max_limit: float, source: string}
      */
     public function computeForBusiness(Business $business): array
     {
@@ -29,7 +29,41 @@ final class OverdraftEligibilityService
             'volume_90d' => $volume,
             'tier' => $tier,
             'tier_max_limit' => $max,
+            'source' => 'business',
         ];
+    }
+
+    /**
+     * Personal wallet eligibility from that wallet's own 90-day outbound spend.
+     *
+     * @return array{volume_90d: float, tier: ?string, tier_max_limit: float, source: string}
+     */
+    public function computeForPersonalWallet(WhatsappWallet $wallet): array
+    {
+        $volume = $this->rollingPersonalOutboundVolume90d($wallet);
+        $tier = $this->resolveTier($volume);
+        $max = $this->tierMaxLimit($tier);
+
+        return [
+            'volume_90d' => $volume,
+            'tier' => $tier,
+            'tier_max_limit' => $max,
+            'source' => 'personal',
+        ];
+    }
+
+    /**
+     * Business wallet → business volume; otherwise personal wallet volume.
+     *
+     * @return array{volume_90d: float, tier: ?string, tier_max_limit: float, source: string}
+     */
+    public function computeForWallet(WhatsappWallet $wallet, ?Business $business = null): array
+    {
+        if ($business instanceof Business) {
+            return $this->computeForBusiness($business);
+        }
+
+        return $this->computeForPersonalWallet($wallet);
     }
 
     public function syncBusiness(Business $business): Business
@@ -57,21 +91,10 @@ final class OverdraftEligibilityService
 
         $txnVolume = 0.0;
         if ($walletIds->isNotEmpty()) {
-            $outboundTypes = [
-                WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
-                WhatsappWalletTransaction::TYPE_P2P_DEBIT,
-                WhatsappWalletTransaction::TYPE_VTU_AIRTIME,
-                WhatsappWalletTransaction::TYPE_VTU_DATA,
-                WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY,
-                WhatsappWalletTransaction::TYPE_VTU_CABLE,
-                WhatsappWalletTransaction::TYPE_VTU_BETTING,
-                WhatsappWalletTransaction::TYPE_PARTNER_MERCHANT_PAY,
-            ];
-
             $txnVolume = (float) WhatsappWalletTransaction::query()
                 ->whereIn('whatsapp_wallet_id', $walletIds)
                 ->where('ledger_scope', ConsumerWalletTransactionScope::SCOPE_BUSINESS)
-                ->whereIn('type', $outboundTypes)
+                ->whereIn('type', $this->outboundTypes())
                 ->where('created_at', '>=', $since)
                 ->sum('amount');
         }
@@ -83,6 +106,41 @@ final class OverdraftEligibilityService
             ->sum('amount');
 
         return round($txnVolume + $withdrawalVolume, 2);
+    }
+
+    public function rollingPersonalOutboundVolume90d(WhatsappWallet $wallet): float
+    {
+        $since = Carbon::now()->subDays(90);
+
+        $txnVolume = (float) WhatsappWalletTransaction::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where(function ($q) {
+                $q->where('ledger_scope', ConsumerWalletTransactionScope::SCOPE_PERSONAL)
+                    ->orWhereNull('ledger_scope')
+                    ->orWhere('ledger_scope', '');
+            })
+            ->whereIn('type', $this->outboundTypes())
+            ->where('created_at', '>=', $since)
+            ->sum('amount');
+
+        return round($txnVolume, 2);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function outboundTypes(): array
+    {
+        return [
+            WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
+            WhatsappWalletTransaction::TYPE_P2P_DEBIT,
+            WhatsappWalletTransaction::TYPE_VTU_AIRTIME,
+            WhatsappWalletTransaction::TYPE_VTU_DATA,
+            WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY,
+            WhatsappWalletTransaction::TYPE_VTU_CABLE,
+            WhatsappWalletTransaction::TYPE_VTU_BETTING,
+            WhatsappWalletTransaction::TYPE_PARTNER_MERCHANT_PAY,
+        ];
     }
 
     public function resolveTier(float $volume): ?string
