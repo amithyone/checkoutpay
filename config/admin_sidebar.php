@@ -24,6 +24,7 @@ return [
         'withdrawals',
         'overdraft',
         'business_payroll',
+        'investor_pitch_access',
         'peer_lending_offers',
         'peer_lending_loans',
         'external_apis',
