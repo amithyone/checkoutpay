@@ -5,6 +5,13 @@ use Illuminate\Support\Str;
 return [
     'driver' => env('SESSION_DRIVER', 'database'),
     'lifetime' => env('SESSION_LIFETIME', 120),
+    /**
+     * Admin panel + investor pitch use at least this many minutes (whichever is higher
+     * vs lifetime) so password/forms stay valid through long review sessions.
+     */
+    'admin_investor_lifetime' => max(120, (int) env('SESSION_ADMIN_INVESTOR_LIFETIME', 720)),
+    /** How often open admin/investor pages refresh CSRF via /session/keepalive (seconds). */
+    'keepalive_interval_seconds' => max(60, (int) env('SESSION_KEEPALIVE_INTERVAL', 300)),
     'expire_on_close' => false,
     'encrypt' => env('SESSION_ENCRYPT', false),
     'files' => storage_path('framework/sessions'),

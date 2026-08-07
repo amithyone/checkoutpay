@@ -25,6 +25,11 @@ Route::get('/llms.txt', [\App\Http\Controllers\Public\SeoController::class, 'llm
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
+/** Keep CSRF/session fresh for long-lived browser tabs (admin + investor forms). */
+Route::get('/session/keepalive', \App\Http\Controllers\SessionKeepAliveController::class)
+    ->middleware('throttle:60,1')
+    ->name('session.keepalive');
+
 /** Confidential investor pitch (password + NDA gate). Admin: Investor pitch access */
 Route::get('/investor/access', [\App\Http\Controllers\Public\InvestorPitchGateController::class, 'lookup'])
     ->name('investor.gate.lookup');

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Checkout Now — Executive Summary · Checkout Now LTD</title>
     <meta name="robots" content="noindex, nofollow">
     <meta name="description" content="Executive summary for Checkout Now LTD: CheckoutPay, CheckoutNow, Cheko, Proximity Pay, and seed ask.">
@@ -369,5 +370,6 @@
             <p style="margin-top:0.65rem;font-size:0.75rem;">Confidential. Protected under NDA. Do not circulate.</p>
         </div>
     </footer>
+    @include('partials.session-keepalive')
 </body>
 </html>

@@ -4,8 +4,10 @@ namespace App\Exceptions;
 
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Log;
+use App\Support\AdminPath;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
@@ -64,5 +66,51 @@ class Handler extends ExceptionHandler
                 ]);
             }
         });
+
+        $this->renderable(function (TokenMismatchException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Your session expired. Refresh the page and try again.',
+                    'csrf_token' => csrf_token(),
+                ], 419);
+            }
+
+            if (! $this->shouldSoftRecoverCsrf($request)) {
+                return null;
+            }
+
+            return redirect()
+                ->to($this->csrfRecoverUrl($request))
+                ->withInput($request->except($this->dontFlash))
+                ->with('error', 'Your session refreshed. Please submit the form again.');
+        });
+    }
+
+    private function shouldSoftRecoverCsrf(Request $request): bool
+    {
+        return AdminPath::requestIsAdminPanel($request)
+            || $request->is('investor', 'investor/*');
+    }
+
+    private function csrfRecoverUrl(Request $request): string
+    {
+        if ($request->is('investor/access/*') && $request->isMethod('POST')) {
+            return $request->url();
+        }
+
+        $referer = $request->headers->get('referer');
+        if (is_string($referer) && $referer !== '') {
+            return $referer;
+        }
+
+        if (AdminPath::requestIsAdminPanel($request)) {
+            return url(AdminPath::urlPrefix());
+        }
+
+        if ($request->is('investor', 'investor/*')) {
+            return route('investor.gate.lookup');
+        }
+
+        return url('/');
     }
 }

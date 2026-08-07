@@ -442,6 +442,7 @@
     </script>
     @include('partials.admin-support-sound')
     @stack('scripts')
+    @include('partials.session-keepalive')
     @include('partials.pwa-sw')
     @includeIf('components.beta-badge')
 </body>
