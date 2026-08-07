@@ -43,6 +43,18 @@ class ConsumerWalletOtpService
         return (int) Cache::get($this->unusedSendsKey($e164), 0) >= $this->maxUnusedOtpSends();
     }
 
+    /**
+     * Seconds remaining on the unused-OTP lockout (0 if not locked).
+     */
+    public function otpLockoutRetryAfterSeconds(string $e164): int
+    {
+        if (! $this->isOtpBlocked($e164)) {
+            return 0;
+        }
+
+        return $this->lockoutMinutes() * 60;
+    }
+
     public function clearUnusedOtpSends(string $e164): void
     {
         Cache::forget($this->unusedSendsKey($e164));
@@ -129,14 +141,36 @@ class ConsumerWalletOtpService
 
     private function maxUnusedOtpSends(): int
     {
-        return max(2, min(5, (int) config('consumer_wallet.otp_max_unused_sends', 3)));
+        return max(2, min(10, (int) config('consumer_wallet.otp_max_unused_sends', 3)));
+    }
+
+    private function lockoutMinutes(): int
+    {
+        return max(1, min(60, (int) config('consumer_wallet.otp_lockout_minutes', 10)));
     }
 
     private function recordUnusedOtpSend(string $e164): void
     {
         $key = $this->unusedSendsKey($e164);
         $n = (int) Cache::get($key, 0);
-        Cache::put($key, $n + 1, now()->addHours(24));
+        Cache::put($key, $n + 1, now()->addMinutes($this->lockoutMinutes()));
+    }
+
+    /**
+     * @return array{ok: false, message: string, otp_blocked: true, retry_after_seconds: int, lockout_minutes: int}
+     */
+    private function otpBlockedPayload(string $e164): array
+    {
+        $minutes = $this->lockoutMinutes();
+        $retryAfter = max(60, $this->otpLockoutRetryAfterSeconds($e164) ?: ($minutes * 60));
+
+        return [
+            'ok' => false,
+            'message' => "Too many unused login codes. Please wait {$minutes} minutes, then request a new code.",
+            'otp_blocked' => true,
+            'retry_after_seconds' => $retryAfter,
+            'lockout_minutes' => $minutes,
+        ];
     }
 
     /**
@@ -156,7 +190,7 @@ class ConsumerWalletOtpService
         $walletExists = $wallet !== null;
         $needsRegistration = $wallet === null || $wallet->needsRegistrationProfile();
 
-        return [
+        $payload = [
             'ok' => true,
             'message' => 'OK',
             'whatsapp' => ! $otpBlocked,
@@ -167,6 +201,15 @@ class ConsumerWalletOtpService
             'wallet_exists' => $walletExists,
             'needs_registration' => $needsRegistration,
         ];
+
+        if ($otpBlocked) {
+            $minutes = $this->lockoutMinutes();
+            $payload['message'] = "Too many unused login codes. Please wait {$minutes} minutes, then request a new code.";
+            $payload['retry_after_seconds'] = max(60, $this->otpLockoutRetryAfterSeconds($e164) ?: ($minutes * 60));
+            $payload['lockout_minutes'] = $minutes;
+        }
+
+        return $payload;
     }
 
     /**
@@ -185,11 +228,7 @@ class ConsumerWalletOtpService
         }
 
         if ($this->isOtpBlocked($e164)) {
-            return [
-                'ok' => false,
-                'message' => 'Too many unused login codes. Sign in with your wallet PIN or use Forgot PIN.',
-                'otp_blocked' => true,
-            ];
+            return $this->otpBlockedPayload($e164);
         }
 
         $ttl = max(60, (int) config('consumer_wallet.otp_ttl_seconds', 600));
@@ -350,20 +389,28 @@ class ConsumerWalletOtpService
         $attemptsKey = $this->attemptsKey($e164);
         $attempts = (int) Cache::get($attemptsKey, 0);
         $maxAttempts = max(3, (int) config('consumer_wallet.otp_max_attempts', 5));
+        $attemptTtl = $this->lockoutMinutes() * 60;
         if ($attempts >= $maxAttempts) {
-            return ['ok' => false, 'message' => 'Too many wrong codes. Tap back and send a new code to try again.'];
+            $minutes = $this->lockoutMinutes();
+
+            return [
+                'ok' => false,
+                'message' => "Too many wrong codes. Wait {$minutes} minutes, then request a new code.",
+                'retry_after_seconds' => $attemptTtl,
+                'lockout_minutes' => $minutes,
+            ];
         }
 
         $payload = Cache::get($this->otpKey($e164));
         if (! is_array($payload) || empty($payload['code_hash'])) {
-            Cache::put($attemptsKey, $attempts + 1, 3600);
+            Cache::put($attemptsKey, $attempts + 1, $attemptTtl);
 
             return ['ok' => false, 'message' => 'Invalid or expired OTP.'];
         }
 
         $code = trim($code);
         if ($code === '' || ! hash_equals((string) $payload['code_hash'], hash('sha256', $code))) {
-            Cache::put($attemptsKey, $attempts + 1, 3600);
+            Cache::put($attemptsKey, $attempts + 1, $attemptTtl);
 
             return ['ok' => false, 'message' => 'Invalid OTP.'];
         }

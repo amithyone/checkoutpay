@@ -80,6 +80,15 @@ return [
      */
     'app_session_idle_minutes' => max(1, (int) env('CONSUMER_APP_SESSION_IDLE_MINUTES', 60)),
 
+    /** App login / registration OTP. */
+    'otp_ttl_seconds' => max(60, (int) env('CONSUMER_OTP_TTL_SECONDS', 600)),
+    'otp_length' => max(4, min(8, (int) env('CONSUMER_OTP_LENGTH', 6))),
+    'otp_max_attempts' => max(3, (int) env('CONSUMER_OTP_MAX_ATTEMPTS', 5)),
+    /** Unused OTP requests (codes sent but never verified) before temporary lockout. */
+    'otp_max_unused_sends' => max(2, min(10, (int) env('CONSUMER_OTP_MAX_UNUSED_SENDS', 3))),
+    /** How long unused-OTP / wrong-code lockouts last (minutes). */
+    'otp_lockout_minutes' => max(1, min(60, (int) env('CONSUMER_OTP_LOCKOUT_MINUTES', 10))),
+
     /**
      * Hard Sanctum token lifetime (minutes). Extended on every authenticated request.
      * Must be >> idle minutes so active users are not kicked by a fixed clock.

@@ -38,7 +38,8 @@ class ConsumerWalletAuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
+            'message' => $result['message'] ?? 'OK',
+            'data' => array_filter([
                 'whatsapp' => (bool) ($result['whatsapp'] ?? true),
                 'email' => (bool) ($result['email'] ?? false),
                 'email_masked' => $result['email_masked'] ?? null,
@@ -47,7 +48,9 @@ class ConsumerWalletAuthController extends Controller
                 'wallet_exists' => (bool) ($result['wallet_exists'] ?? false),
                 'needs_registration' => (bool) ($result['needs_registration'] ?? false),
                 'region' => $region,
-            ],
+                'retry_after_seconds' => $result['retry_after_seconds'] ?? null,
+                'lockout_minutes' => $result['lockout_minutes'] ?? null,
+            ], fn ($v) => $v !== null),
         ]);
     }
 
@@ -73,6 +76,8 @@ class ConsumerWalletAuthController extends Controller
                 'otp_blocked' => ($result['otp_blocked'] ?? false) ? true : null,
                 'email_masked' => $result['email_masked'] ?? null,
                 'fallback_from_whatsapp' => ($result['fallback_from_whatsapp'] ?? false) ? true : null,
+                'retry_after_seconds' => $result['retry_after_seconds'] ?? null,
+                'lockout_minutes' => $result['lockout_minutes'] ?? null,
             ], fn ($v) => $v !== null),
         ], $result['ok'] ? 200 : ($result['otp_blocked'] ?? false ? 429 : 422));
     }

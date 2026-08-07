@@ -20,8 +20,9 @@ return new class extends Migration
             $table->timestamp('viewed_at');
             $table->timestamps();
 
-            $table->index(['investor_pitch_access_id', 'viewed_at']);
-            $table->index(['page_key', 'viewed_at']);
+            // MySQL max identifier length is 64; default name exceeds it.
+            $table->index(['investor_pitch_access_id', 'viewed_at'], 'ippv_access_viewed_idx');
+            $table->index(['page_key', 'viewed_at'], 'ippv_page_viewed_idx');
         });
     }
 

@@ -44,7 +44,8 @@ class ConsumerWalletPinRecoveryTest extends TestCase
         $blocked = $service->requestOtp(self::PHONE);
         $this->assertFalse($blocked['ok']);
         $this->assertTrue($blocked['otp_blocked'] ?? false);
-        $this->assertStringContainsString('wallet PIN', $blocked['message']);
+        $this->assertStringContainsString('10 minutes', $blocked['message']);
+        $this->assertSame(10, $blocked['lockout_minutes'] ?? null);
     }
 
     public function test_successful_otp_verify_clears_unused_send_counter(): void
