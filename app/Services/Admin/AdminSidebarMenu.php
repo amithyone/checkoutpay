@@ -122,9 +122,6 @@ class AdminSidebarMenu
     {
         $needsReviewCount = Payment::query()
             ->where('status', Payment::STATUS_PENDING)
-            ->where(function ($q) {
-                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
             ->has('statusChecks', '>=', 3)
             ->count();
 

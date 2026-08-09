@@ -18,51 +18,28 @@ class PaymentController extends Controller
             ->withCount(['matchAttempts', 'statusChecks'])
             ->latest();
 
-        // If searching, show all payments regardless of expiration
-        $isSearching = $request->filled('search');
-        
+        // Admin lists show every payment by status. Do not use matchablePending() here —
+        // that scope is for bank-email matching only and was hiding still-pending rows
+        // after expires_at (short pending window from settings).
         if ($request->filled('status')) {
-            if ($request->status === 'pending') {
-                $query->where('status', Payment::STATUS_PENDING);
-                if (! $isSearching) {
-                    $query->matchablePending();
-                }
-            } else {
-                $query->where('status', $request->status);
-            }
-        } else {
-            if (! $isSearching) {
-                $query->where(function ($q) {
-                    $q->where('status', '!=', Payment::STATUS_PENDING)
-                        ->orWhere(function ($pendingQ) {
-                            $pendingQ->where('status', Payment::STATUS_PENDING)
-                                ->matchablePending();
-                        });
-                });
-            }
+            $query->where('status', $request->status);
         }
 
         // Filter for unmatched pending transactions
         if ($request->filled('unmatched') && $request->unmatched === '1') {
-            $query->where('status', Payment::STATUS_PENDING);
-            if (! $isSearching) {
-                $query->matchablePending();
-            }
-            $query->whereNotExists(function ($subQuery) {
-                $subQuery->select(DB::raw(1))
-                    ->from('processed_emails')
-                    ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
-                    ->where('processed_emails.is_matched', true);
-            });
+            $query->where('status', Payment::STATUS_PENDING)
+                ->whereNotExists(function ($subQuery) {
+                    $subQuery->select(DB::raw(1))
+                        ->from('processed_emails')
+                        ->whereColumn('processed_emails.matched_payment_id', 'payments.id')
+                        ->where('processed_emails.is_matched', true);
+                });
         }
 
         // Filter for transactions needing review (multiple API status checks)
         if ($request->filled('needs_review') && $request->needs_review === '1') {
-            $query->where('status', Payment::STATUS_PENDING);
-            if (! $isSearching) {
-                $query->matchablePending();
-            }
-            $query->withCount('statusChecks')
+            $query->where('status', Payment::STATUS_PENDING)
+                ->withCount('statusChecks')
                 ->having('status_checks_count', '>=', 3); // 3 or more API checks
         }
 
@@ -640,7 +617,6 @@ class PaymentController extends Controller
             }])
             ->with('accountNumberDetails')
             ->where('status', Payment::STATUS_PENDING)
-            ->matchablePending()
             ->withCount('statusChecks')
             ->having('status_checks_count', '>=', 3)
             ->latest();
