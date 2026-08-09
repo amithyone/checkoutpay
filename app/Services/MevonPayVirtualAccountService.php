@@ -10,12 +10,14 @@ class MevonPayVirtualAccountService
     protected string $baseUrl;
     protected string $secretKey;
     protected int $timeoutSeconds;
+    protected int $connectTimeoutSeconds;
 
     public function __construct()
     {
         $this->baseUrl = (string) config('services.mevonpay.base_url', '');
         $this->secretKey = (string) config('services.mevonpay.secret_key', '');
         $this->timeoutSeconds = (int) config('services.mevonpay.timeout_seconds', 20);
+        $this->connectTimeoutSeconds = (int) config('services.mevonpay.connect_timeout_seconds', 3);
     }
 
     public function isConfigured(): bool
@@ -75,13 +77,19 @@ class MevonPayVirtualAccountService
             ]);
         }
 
-        $resp = Http::withHeaders([
-                'Authorization' => $authorization,
-            ])
-            ->acceptJson()
-            ->asJson()
-            ->timeout($this->timeoutSeconds)
-            ->post($url, $payload);
+        try {
+            $resp = Http::withHeaders([
+                    'Authorization' => $authorization,
+                ])
+                ->acceptJson()
+                ->asJson()
+                ->timeout($this->timeoutSeconds)
+                ->connectTimeout($this->connectTimeoutSeconds)
+                ->post($url, $payload);
+        } catch (\Throwable $e) {
+            Log::warning('MevonPay createtempva unreachable', ['error' => $e->getMessage()]);
+            throw new \RuntimeException('MevonPay is unreachable (timeout). Temporary account numbers cannot be created right now.');
+        }
 
         $json = $resp->json();
 
@@ -158,13 +166,19 @@ class MevonPayVirtualAccountService
             ]);
         }
 
-        $resp = Http::withHeaders([
-            'Authorization' => $authorization,
-        ])
-            ->acceptJson()
-            ->asJson()
-            ->timeout($this->timeoutSeconds)
-            ->post($url, $payload);
+        try {
+            $resp = Http::withHeaders([
+                'Authorization' => $authorization,
+            ])
+                ->acceptJson()
+                ->asJson()
+                ->timeout($this->timeoutSeconds)
+                ->connectTimeout($this->connectTimeoutSeconds)
+                ->post($url, $payload);
+        } catch (\Throwable $e) {
+            Log::warning('MevonPay createdynamic unreachable', ['error' => $e->getMessage()]);
+            throw new \RuntimeException('MevonPay is unreachable (timeout). Dynamic account numbers cannot be created right now.');
+        }
 
         $json = $resp->json();
 

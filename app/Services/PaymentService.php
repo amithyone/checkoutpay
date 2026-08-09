@@ -8,6 +8,7 @@ use App\Models\BusinessWebsite;
 use App\Models\Payment;
 use App\Support\InternalPaymentWebhookUrl;
 use App\Support\WebsiteUrl;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -159,12 +160,23 @@ class PaymentService
                     }
                 }
             } catch (\Throwable $e) {
+                Log::warning('MevonPay VA creation failed during payment request', [
+                    'business_id' => $business->id,
+                    'mode' => $mode,
+                    'va_mode' => $vaMode ?? null,
+                    'error' => $e->getMessage(),
+                ]);
+
                 if ($preferExternal) {
                     // In hybrid mode, fall back to internal pools if external VA creation fails.
                     $account = null;
                     $externalExpiresAt = null;
                 } else {
-                    throw $e;
+                    throw new \RuntimeException(
+                        'Could not get a MevonPay account number right now (provider timeout/network). Please retry in a minute.',
+                        0,
+                        $e
+                    );
                 }
             }
         }

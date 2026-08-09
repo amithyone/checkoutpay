@@ -573,13 +573,16 @@
                         <i class="fas fa-wallet text-indigo-600 mr-2"></i>
                         MevonPay live balances
                     </h3>
-                    <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot from MevonPay API (refreshed on each dashboard load).
+                    <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot (cached ~2 min; last good value kept if Mevon is unreachable).
                         <a href="{{ route('admin.audits.index') }}" class="text-indigo-600 hover:underline ml-1">Open audits</a>
                     </p>
                 </div>
                 @if(($mevonBalance['fetched_at'] ?? null))
                     <span class="text-xs text-gray-500">
                         Updated {{ \Carbon\Carbon::parse($mevonBalance['fetched_at'])->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
+                        @if($mevonBalance['stale'] ?? false)
+                            · <span class="text-amber-700 font-semibold">stale</span>
+                        @endif
                     </span>
                 @endif
             </div>
@@ -593,6 +596,11 @@
                     {{ $mevonBalance['message'] ?? 'Could not load balance.' }}
                 </p>
             @else
+                @if($mevonBalance['stale'] ?? false)
+                    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+                        {{ $mevonBalance['message'] }}
+                    </p>
+                @endif
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     <div class="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Naira balance</p>

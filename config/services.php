@@ -47,6 +47,8 @@ return [
         'current_password' => env('MEVONPAY_CURRENT_PASSWORD', ''),
         'timeout_seconds' => (int) env('MEVONPAY_TIMEOUT_SECONDS', 20),
         'connect_timeout_seconds' => (int) env('MEVONPAY_CONNECT_TIMEOUT_SECONDS', 3),
+        /** Cache successful /V1/balance snapshots for the admin dashboard (seconds). */
+        'balance_cache_seconds' => (int) env('MEVONPAY_BALANCE_CACHE_SECONDS', 120),
         'temp_va_registration_number' => env('MEVONPAY_TEMP_VA_REGISTRATION_NUMBER', ''),
         'account_logs_enabled' => (bool) env('MEVONPAY_ACCOUNT_LOGS_ENABLED', false),
         /** TSQ (transaction status) path — POST with { "reference": "..." }. */

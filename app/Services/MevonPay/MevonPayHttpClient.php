@@ -56,15 +56,18 @@ final class MevonPayHttpClient
         $url = $this->url($path);
         $timeout = (int) config('services.mevonpay.timeout_seconds', 20);
 
+        $connect = (int) config('services.mevonpay.connect_timeout_seconds', 3);
+
         try {
             $response = Http::timeout($timeout)
+                ->connectTimeout($connect)
                 ->acceptJson()
                 ->withHeaders($this->authHeaders('raw'))
                 ->post($url, []);
         } catch (\Throwable $e) {
             Log::warning('mevonpay.balance_failed', ['error' => $e->getMessage()]);
 
-            return ['ok' => false, 'message' => 'Could not reach MevonPay.'];
+            return ['ok' => false, 'message' => 'Could not reach MevonPay (timeout or network).'];
         }
 
         return $this->parseResponse($response, 'balance');

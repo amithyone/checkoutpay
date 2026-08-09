@@ -20,6 +20,7 @@ use App\Services\MevonPay\MevonPayBalanceSnapshotService;
 use App\Services\MevonPay\MevonPayExchangeRateService;
 use App\Services\NigtaxRevenueStatsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -191,16 +192,19 @@ class DashboardController extends Controller
         $mevonTodayStats = null;
         $admin = auth('admin')->user();
         if ($admin && ($admin->isSuperAdmin() || $admin->role === 'admin')) {
-            $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard();
-            $publish = app(\App\Services\Consumer\VirtualCardFxPublishService::class)->syncFromMevon();
+            // Prefer cached/stale Mevon data — never block the dashboard on live /V1/exchange.
+            $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard(allowStale: true);
             $cardFx = app(VirtualCardFxService::class);
+            $cachedMevonRate = Cache::get(MevonPayExchangeRateService::CACHE_KEY)
+                ?? Cache::get(MevonPayExchangeRateService::STALE_CACHE_KEY);
             $mevonTodayStats = [
                 'configured' => $mevonBalance['configured'],
                 'ok' => $mevonBalance['ok'],
                 'message' => $mevonBalance['message'],
+                'stale' => (bool) ($mevonBalance['stale'] ?? false),
                 'naira_balance' => $mevonBalance['naira_balance'],
                 'usd_balance' => $mevonBalance['usd_balance'],
-                'mevon_ngn_per_usd' => $publish['live_mevon'] ?? app(MevonPayExchangeRateService::class)->ngnPerUsd(),
+                'mevon_ngn_per_usd' => is_numeric($cachedMevonRate) ? (float) $cachedMevonRate : $cardFx->midUsdNgnRate(),
                 'mid_rate' => $cardFx->midUsdNgnRate(),
                 'mid_auto_sync' => $cardFx->isMidAutoSyncEnabled(),
                 'mid_source' => $cardFx->midSource(),
@@ -209,7 +213,7 @@ class DashboardController extends Controller
                 'sell_rate' => $cardFx->sellRate(),
                 'buy_rate' => $cardFx->buyRate(),
                 'fx_published_at' => $cardFx->publishedAt(),
-                'fx_publish_ok' => $publish['ok'] ?? false,
+                'fx_publish_ok' => $cardFx->publishedAt() !== null,
                 'fetched_at' => $mevonBalance['fetched_at'],
             ];
         }
