@@ -95,11 +95,11 @@ class MevonPayPayoutService
             : 'Token '.$this->secretKey;
 
         try {
-            $resp = Http::withHeaders([
+            $resp = Http::withHeaders(\App\Support\MevonPayEgress::mergeClientHeaders([
                 'Authorization' => $authHeader,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
-            ])
+            ]))
                 ->acceptJson()
                 ->asJson()
                 ->connectTimeout($this->connectTimeoutSeconds)

@@ -35,9 +35,9 @@ class MevonPayBankService
         $url = rtrim($this->baseUrl, '/') . '/V1/bank_service';
 
         try {
-            $resp = Http::withHeaders([
+            $resp = Http::withHeaders(\App\Support\MevonPayEgress::mergeClientHeaders([
                     'Authorization' => $this->secretKey,
-                ])
+                ]))
                 ->acceptJson()
                 ->asJson()
                 ->connectTimeout($this->connectTimeoutSeconds)
@@ -77,9 +77,9 @@ class MevonPayBankService
         $url = rtrim($this->baseUrl, '/') . '/V1/bank_service';
 
         try {
-            $resp = Http::withHeaders([
+            $resp = Http::withHeaders(\App\Support\MevonPayEgress::mergeClientHeaders([
                     'Authorization' => $this->secretKey,
-                ])
+                ]))
                 ->acceptJson()
                 ->asJson()
                 ->connectTimeout($this->connectTimeoutSeconds)

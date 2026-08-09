@@ -57,11 +57,11 @@ class MevonPayTransferStatusService
         try {
             $response = Http::timeout((int) config('services.mevonpay.timeout_seconds', 30))
                 ->connectTimeout((int) config('services.mevonpay.connect_timeout_seconds', 3))
-                ->withHeaders([
+                ->withHeaders(\App\Support\MevonPayEgress::mergeClientHeaders([
                     'Authorization' => $this->authorizationHeader(),
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
-                ])
+                ]))
                 ->post($url, $body);
 
             $json = $response->json();

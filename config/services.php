@@ -66,6 +66,18 @@ return [
         'card_checkout_path' => env('MEVONPAY_CARD_CHECKOUT_PATH', '/V1/card_checkout'),
         /** raw (Authorization: secret) or bearer (Authorization: Bearer secret) */
         'card_checkout_auth' => env('MEVONPAY_CARD_CHECKOUT_AUTH', 'raw'),
+
+        /**
+         * Contabo (Mevon-reachable) egress proxy — enable only on the host that can
+         * open TCP to mevonpay.com.ng. Live shared hosting points MEVONPAY_BASE_URL
+         * at https://check-outnow.com/mevon-egress and sets egress_client_token.
+         */
+        'egress_proxy_enabled' => (bool) env('MEVONPAY_EGRESS_PROXY_ENABLED', false),
+        'egress_proxy_token' => env('MEVONPAY_EGRESS_PROXY_TOKEN', ''),
+        'egress_proxy_allowed_ips' => env('MEVONPAY_EGRESS_PROXY_ALLOWED_IPS', '199.188.201.182,199.188.201.190'),
+        'egress_upstream' => env('MEVONPAY_EGRESS_UPSTREAM', 'https://mevonpay.com.ng'),
+        /** Live client: send this as X-Mevon-Egress-Token when calling the Contabo proxy. */
+        'egress_client_token' => env('MEVONPAY_EGRESS_CLIENT_TOKEN', ''),
     ],
 
     'mevonrubies' => [

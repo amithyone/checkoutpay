@@ -56,9 +56,9 @@ class MevonRubiesVirtualAccountService
             throw new \RuntimeException('MevonRubies is not configured (base_url/secret_key missing).');
         }
 
-        $resp = Http::withHeaders([
+        $resp = Http::withHeaders(\App\Support\MevonPayEgress::mergeClientHeaders([
             'Authorization' => $this->authorizationHeaderValue(),
-        ])
+        ]))
             ->acceptJson()
             ->asJson()
             ->timeout($this->timeoutSeconds)

@@ -2,6 +2,7 @@
 
 namespace App\Services\MevonPay;
 
+use App\Support\MevonPayEgress;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +33,7 @@ final class MevonPayHttpClient
             $response = Http::timeout($timeout)
                 ->connectTimeout($connect)
                 ->acceptJson()
-                ->withHeaders($this->authHeaders($authStyle))
+                ->withHeaders(MevonPayEgress::mergeClientHeaders($this->authHeaders($authStyle)))
                 ->post($url, $payload);
         } catch (\Throwable $e) {
             Log::warning('mevonpay.http_failed', ['path' => $path, 'error' => $e->getMessage()]);
@@ -62,7 +63,7 @@ final class MevonPayHttpClient
             $response = Http::timeout($timeout)
                 ->connectTimeout($connect)
                 ->acceptJson()
-                ->withHeaders($this->authHeaders('raw'))
+                ->withHeaders(MevonPayEgress::mergeClientHeaders($this->authHeaders('raw')))
                 ->post($url, []);
         } catch (\Throwable $e) {
             Log::warning('mevonpay.balance_failed', ['error' => $e->getMessage()]);

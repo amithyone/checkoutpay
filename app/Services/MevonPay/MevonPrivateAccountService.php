@@ -118,9 +118,9 @@ class MevonPrivateAccountService
         $url = $this->endpointUrl();
         $timeout = (int) config('services.mevonpay.private_account_timeout_seconds', 90);
 
-        $resp = Http::withHeaders([
+        $resp = Http::withHeaders(\App\Support\MevonPayEgress::mergeClientHeaders([
             'Authorization' => $this->authorizationHeaderValue(),
-        ])
+        ]))
             ->acceptJson()
             ->asJson()
             ->timeout($timeout)

@@ -30,6 +30,15 @@ Route::get('/session/keepalive', \App\Http\Controllers\SessionKeepAliveControlle
     ->middleware('throttle:60,1')
     ->name('session.keepalive');
 
+/**
+ * Contabo-only Mevon egress: live hosting cannot TCP to mevonpay.com.ng, so it
+ * posts here and we forward upstream. Disabled unless MEVONPAY_EGRESS_PROXY_ENABLED=true.
+ */
+Route::match(['get', 'post', 'put', 'patch', 'delete'], '/mevon-egress/{path}', \App\Http\Controllers\MevonEgressProxyController::class)
+    ->where('path', '.*')
+    ->middleware('throttle:120,1')
+    ->name('mevon.egress');
+
 /** Confidential investor pitch (password + NDA gate). Admin: Investor pitch access */
 Route::get('/investor/access', [\App\Http\Controllers\Public\InvestorPitchGateController::class, 'lookup'])
     ->name('investor.gate.lookup');

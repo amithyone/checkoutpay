@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\MevonPayEgress;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -78,9 +79,9 @@ class MevonPayVirtualAccountService
         }
 
         try {
-            $resp = Http::withHeaders([
+            $resp = Http::withHeaders(MevonPayEgress::mergeClientHeaders([
                     'Authorization' => $authorization,
-                ])
+                ]))
                 ->acceptJson()
                 ->asJson()
                 ->timeout($this->timeoutSeconds)
@@ -167,9 +168,9 @@ class MevonPayVirtualAccountService
         }
 
         try {
-            $resp = Http::withHeaders([
+            $resp = Http::withHeaders(MevonPayEgress::mergeClientHeaders([
                 'Authorization' => $authorization,
-            ])
+            ]))
                 ->acceptJson()
                 ->asJson()
                 ->timeout($this->timeoutSeconds)

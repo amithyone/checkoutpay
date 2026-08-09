@@ -20,5 +20,7 @@ class VerifyCsrfToken extends Middleware
         'wallet/whatsapp/reset-pin/*',
         'wallet/whatsapp/vtu-confirm/*',
         'wallet/partner-pay/*',
+        'mevon-egress',
+        'mevon-egress/*',
     ];
 }
