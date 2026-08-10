@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\EmailAccountController;
 use App\Http\Controllers\Admin\ExternalApiController;
 use App\Http\Controllers\Admin\GmailAuthController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\PaymentImportController;
 use App\Http\Controllers\Admin\ProcessedEmailController;
 use App\Http\Controllers\Admin\RenterController;
 use App\Http\Controllers\Admin\RenterKycController;
@@ -218,6 +219,9 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::get('payments/needs-review', [PaymentController::class, 'needsReview'])->name('payments.needs-review');
         Route::get('payments/expired', [PaymentController::class, 'expired'])->name('payments.expired');
+        Route::get('payments/import', [PaymentImportController::class, 'create'])->name('payments.import');
+        Route::get('payments/import/sample.csv', [PaymentImportController::class, 'downloadSample'])->name('payments.import.sample');
+        Route::post('payments/import', [PaymentImportController::class, 'store'])->name('payments.import.store');
         Route::get('payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
         Route::post('payments/{payment}/check-match', [PaymentController::class, 'checkMatch'])->name('payments.check-match');
         Route::post('payments/{payment}/manual-verify', [PaymentController::class, 'manualVerify'])->name('payments.manual-verify');

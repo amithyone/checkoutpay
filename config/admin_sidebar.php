@@ -7,6 +7,7 @@ return [
         'dashboard',
         'payments',
         'payments_needs_review',
+        'payments_import',
         'businesses',
         'support',
         'virtual_cards',

@@ -115,6 +115,9 @@ class Payment extends Model
     /** Debit customer WhatsApp wallet, credit merchant via X-API-Key partner API (no chat PIN). */
     const SOURCE_PARTNER_WALLET_API = 'partner_wallet_api';
 
+    /** Historical rows imported from CSV / legacy database dump. */
+    const SOURCE_LEGACY_IMPORT = 'legacy_import';
+
     const METHOD_BANK_TRANSFER = 'bank_transfer';
 
     const METHOD_CARD = 'card';

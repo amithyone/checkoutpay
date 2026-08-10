@@ -43,6 +43,11 @@ resources/views/components/beta-badge.blade.php
 # Database backups (too large for git)
 database/backups/*.sql
 database/backups/*.zip
+database/backups/imports/*.csv
+database/backups/imports/*.csv.gz
+
+# Prepared payment import CSVs (large)
+/storage/app/payment-imports/
 
 # Business JSON exports (PII, API keys; never commit)
 /storage/app/business-exports/

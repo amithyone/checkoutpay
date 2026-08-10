@@ -150,6 +150,11 @@ class AdminSidebarMenu
                     'badge_color' => 'red',
                 ]
             ),
+            'payments_import' => $this->link('Import payments', 'admin.payments.import', 'fas fa-file-upload', [
+                'admin.payments.import',
+                'admin.payments.import.store',
+                'admin.payments.import.sample',
+            ]),
             'businesses' => $this->link('Businesses', 'admin.businesses.index', 'fas fa-building', ['admin.businesses.*']),
             'support' => array_merge(
                 $this->link('Support Tickets', 'admin.support.index', 'fas fa-comments', ['admin.support.*']),

@@ -12,6 +12,9 @@
             <p class="text-sm text-gray-600 mt-1">Manage all payment transactions</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('admin.payments.import') }}" class="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 flex items-center text-sm">
+                <i class="fas fa-file-upload mr-2"></i> <span class="hidden sm:inline">Import</span><span class="sm:hidden">Import</span>
+            </a>
             @if(request('status') === 'approved' || !request('status'))
             <button onclick="resendFailedWebhooks()" class="bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 flex items-center text-sm">
                 <i class="fas fa-redo mr-2"></i> <span class="hidden sm:inline">Resend Failed Webhooks</span><span class="sm:hidden">Resend</span>
