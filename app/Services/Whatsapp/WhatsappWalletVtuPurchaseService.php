@@ -79,7 +79,7 @@ class WhatsappWalletVtuPurchaseService
         WhatsappWallet $wallet,
         string $networkId,
         string $recipientE164,
-        int $variationId,
+        int|string $variationId,
         float $expectedPrice
     ): array {
         $phone11 = PhoneNormalizer::e164DigitsToNgLocal11($recipientE164);

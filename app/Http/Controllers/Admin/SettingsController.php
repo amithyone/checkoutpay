@@ -254,9 +254,10 @@ class SettingsController extends Controller
 
         if ($request->input('settings_section') === 'vtu') {
             $validated = $request->validate([
-                'vtu_provider' => 'required|in:vtu_ng,mevonpay',
+                'vtu_provider' => 'required|in:vtu_ng,mevonpay,squad',
                 'vtu_ng_enabled' => 'nullable|boolean',
                 'mevonpay_vtu_enabled' => 'nullable|boolean',
+                'squad_vtu_enabled' => 'nullable|boolean',
             ]);
 
             Setting::set('vtu_provider', $validated['vtu_provider'], 'string', 'vtu', 'Active VTU bill payment provider');
@@ -273,6 +274,13 @@ class SettingsController extends Controller
                 'boolean',
                 'vtu',
                 'Allow MevonPay VTU when selected'
+            );
+            Setting::set(
+                'squad_vtu_enabled',
+                $request->boolean('squad_vtu_enabled') ? 1 : 0,
+                'boolean',
+                'vtu',
+                'Allow Squad (GTB) VTU when selected'
             );
         }
 

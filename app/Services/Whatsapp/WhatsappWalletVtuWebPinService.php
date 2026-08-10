@@ -118,9 +118,9 @@ class WhatsappWalletVtuWebPinService
         if ($kind === 'data') {
             $net = (string) ($ctx['vtu_network'] ?? '');
             $recipient = (string) ($ctx['vtu_recipient_e164'] ?? '');
-            $vid = (int) ($ctx['vtu_sel_variation_id'] ?? 0);
+            $vid = trim((string) ($ctx['vtu_sel_variation_id'] ?? ''));
             $price = (float) ($ctx['vtu_sel_price'] ?? 0);
-            if ($net === '' || $recipient === '' || $vid < 1 || $price < 1) {
+            if ($net === '' || $recipient === '' || $vid === '' || $vid === '0' || $price < 1) {
                 return null;
             }
 
@@ -304,7 +304,7 @@ class WhatsappWalletVtuWebPinService
                 $wallet,
                 (string) $payload['vtu_network'],
                 (string) $payload['vtu_recipient_e164'],
-                (int) $payload['vtu_sel_variation_id'],
+                $payload['vtu_sel_variation_id'],
                 (float) $payload['vtu_sel_price']
             ),
             'electricity' => $this->purchase->purchaseElectricity(

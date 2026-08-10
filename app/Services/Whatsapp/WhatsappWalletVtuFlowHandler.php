@@ -543,7 +543,7 @@ class WhatsappWalletVtuFlowHandler
             return;
         }
         $row = $plans[$idx];
-        $ctx['vtu_sel_variation_id'] = (int) ($row['variation_id'] ?? 0);
+        $ctx['vtu_sel_variation_id'] = (string) ($row['variation_id'] ?? '');
         $ctx['vtu_sel_label'] = (string) ($row['label'] ?? '');
         $ctx['vtu_sel_price'] = round((float) ($row['price'] ?? 0), 2);
         $presetRecipient = trim((string) ($ctx['vtu_recipient_e164'] ?? ''));

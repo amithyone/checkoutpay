@@ -878,8 +878,13 @@
                             {{ ($vtuProvider ?? '') === 'mevonpay' ? 'checked' : '' }}>
                         MevonPay
                     </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="vtu_provider" value="squad" class="mr-2"
+                            {{ ($vtuProvider ?? '') === 'squad' ? 'checked' : '' }}>
+                        Squad (GTB)
+                    </label>
                 </div>
-                <p class="mt-1 text-xs text-gray-500">Requires env credentials for the chosen provider.</p>
+                <p class="mt-1 text-xs text-gray-500">Requires env credentials for the chosen provider. Squad currently supports airtime &amp; data only.</p>
             </div>
 
             <div class="flex flex-wrap gap-6">
@@ -894,6 +899,12 @@
                     <input type="checkbox" name="mevonpay_vtu_enabled" value="1" class="mr-2 rounded"
                         {{ \App\Models\Setting::get('mevonpay_vtu_enabled', true) ? 'checked' : '' }}>
                     MevonPay VTU enabled
+                </label>
+                <label class="inline-flex items-center text-sm">
+                    <input type="hidden" name="squad_vtu_enabled" value="0">
+                    <input type="checkbox" name="squad_vtu_enabled" value="1" class="mr-2 rounded"
+                        {{ \App\Models\Setting::get('squad_vtu_enabled', true) ? 'checked' : '' }}>
+                    Squad VTU enabled
                 </label>
             </div>
 

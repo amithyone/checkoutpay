@@ -1326,7 +1326,7 @@ class ConsumerWalletApiController extends Controller
         $request->validate(array_merge([
             'network_id' => 'required|string|max:40',
             'phone' => 'required|string|min:10|max:20',
-            'variation_id' => 'required|integer|min:1',
+            'variation_id' => 'required',
             'expected_price' => 'required|numeric|min:1',
         ], $this->paymentAuth->validationRules()));
 
@@ -1340,11 +1340,21 @@ class ConsumerWalletApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid phone.'], 422);
         }
 
+        $variationId = $request->input('variation_id');
+        if (is_numeric($variationId)) {
+            $variationId = (string) (0 + $variationId);
+        } else {
+            $variationId = trim((string) $variationId);
+        }
+        if ($variationId === '' || $variationId === '0') {
+            return response()->json(['success' => false, 'message' => 'Invalid data plan.'], 422);
+        }
+
         $out = $this->vtuPurchase->purchaseData(
             $wallet,
             (string) $request->input('network_id'),
             $e164,
-            (int) $request->input('variation_id'),
+            $variationId,
             (float) $request->input('expected_price')
         );
 

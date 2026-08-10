@@ -11,15 +11,18 @@ final class VtuProviderResolver
 
     public const PROVIDER_MEVONPAY = 'mevonpay';
 
+    public const PROVIDER_SQUAD = 'squad';
+
     public function __construct(
         private VtuNgProvider $vtuNg,
         private MevonPayVtuProvider $mevonPay,
+        private SquadVtuProvider $squad,
     ) {}
 
     public function activeKey(): string
     {
         $key = (string) Setting::get('vtu_provider', self::PROVIDER_VTU_NG);
-        if (! in_array($key, [self::PROVIDER_VTU_NG, self::PROVIDER_MEVONPAY], true)) {
+        if (! in_array($key, [self::PROVIDER_VTU_NG, self::PROVIDER_MEVONPAY, self::PROVIDER_SQUAD], true)) {
             return self::PROVIDER_VTU_NG;
         }
 
@@ -35,6 +38,7 @@ final class VtuProviderResolver
     {
         return match ($key) {
             self::PROVIDER_MEVONPAY => $this->mevonPay,
+            self::PROVIDER_SQUAD => $this->squad,
             default => $this->vtuNg,
         };
     }
@@ -47,6 +51,7 @@ final class VtuProviderResolver
         return [
             self::PROVIDER_VTU_NG => $this->vtuNg,
             self::PROVIDER_MEVONPAY => $this->mevonPay,
+            self::PROVIDER_SQUAD => $this->squad,
         ];
     }
 }

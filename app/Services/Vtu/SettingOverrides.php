@@ -19,4 +19,11 @@ final class SettingOverrides
 
         return $v === null ? null : (bool) $v;
     }
+
+    public static function squadVtuEnabledOverride(): ?bool
+    {
+        $v = Setting::get('squad_vtu_enabled');
+
+        return $v === null ? null : (bool) $v;
+    }
 }

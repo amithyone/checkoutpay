@@ -4,6 +4,7 @@ namespace Tests\Unit\Vtu;
 
 use App\Models\Setting;
 use App\Services\Vtu\MevonPayVtuProvider;
+use App\Services\Vtu\SquadVtuProvider;
 use App\Services\Vtu\VtuNgProvider;
 use App\Services\Vtu\VtuProviderResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,5 +27,13 @@ class VtuProviderResolverTest extends TestCase
         $resolver = app(VtuProviderResolver::class);
         $this->assertSame(VtuProviderResolver::PROVIDER_MEVONPAY, $resolver->activeKey());
         $this->assertInstanceOf(MevonPayVtuProvider::class, $resolver->active());
+    }
+
+    public function test_resolves_squad_when_setting_set(): void
+    {
+        Setting::set('vtu_provider', VtuProviderResolver::PROVIDER_SQUAD, 'string', 'vtu');
+        $resolver = app(VtuProviderResolver::class);
+        $this->assertSame(VtuProviderResolver::PROVIDER_SQUAD, $resolver->activeKey());
+        $this->assertInstanceOf(SquadVtuProvider::class, $resolver->active());
     }
 }
