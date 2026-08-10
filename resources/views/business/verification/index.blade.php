@@ -223,15 +223,29 @@
                 <div class="rounded-lg border-2 border-primary/20 bg-primary/5 p-5 space-y-4">
                     <div>
                         <h4 class="text-base font-semibold text-gray-900">Permanent business pay-in account</h4>
-                        <p class="text-xs text-gray-600 mt-1">Company registration number, business contact phone and email, and signatory date of birth. Date of birth is also required when submitting BVN or NIN.</p>
+                        <p class="text-xs text-gray-600 mt-1">
+                            We create the account with your <strong>registered business name</strong> and CAC <strong>RC or BN</strong> number
+                            (so the account title is the company, not a personal name). Also provide business contact phone/email and signatory date of birth.
+                        </p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label for="business_registered_name" class="block text-sm font-medium text-gray-700 mb-1">Registered business name <span class="text-red-500">*</span></label>
+                            <input type="text" name="business_registered_name" id="business_registered_name" maxlength="255"
+                                placeholder="Exact company / business name on CAC"
+                                value="{{ old('business_registered_name', $business->name) }}"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
+                            @error('business_registered_name')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
                         <div>
-                            <label for="cac_registration_number" class="block text-sm font-medium text-gray-700 mb-1">CAC / RC number <span id="cac-reg-required" class="text-red-500 hidden">*</span></label>
+                            <label for="cac_registration_number" class="block text-sm font-medium text-gray-700 mb-1">CAC RC or BN number <span id="cac-reg-required" class="text-red-500 hidden">*</span></label>
                             <input type="text" name="cac_registration_number" id="cac_registration_number" maxlength="100"
-                                placeholder="e.g. RC123456"
+                                placeholder="e.g. RC1234567 or BN1234567"
                                 value="{{ old('cac_registration_number', $business->cac_registration_number) }}"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
+                            <p class="mt-1 text-xs text-gray-500">Use RC for limited companies or BN for business names. This is sent as the registration number when creating the pay-in account.</p>
                             @error('cac_registration_number')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -283,13 +297,16 @@
                 <div class="rounded-lg border border-gray-200 bg-slate-50/80 p-5 space-y-4">
                     <div>
                         <h4 class="text-base font-semibold text-gray-900">Personal information</h4>
-                        <p class="text-xs text-gray-600 mt-1">Legal name as on your BVN/NIN records, date of birth, and phone number. These are used when we create your pay-in account.</p>
+                        <p class="text-xs text-gray-600 mt-1">
+                            Signatory legal name as on BVN/NIN (for identity checks only).
+                            This is <strong>not</strong> used as the permanent pay-in account title — that uses the registered business name above.
+                        </p>
                     </div>
                     <div>
-                        <label for="legal_name" class="block text-sm font-medium text-gray-700 mb-1">Name <span id="legal-name-required" class="text-red-500 hidden">*</span></label>
+                        <label for="legal_name" class="block text-sm font-medium text-gray-700 mb-1">Signatory name (BVN/NIN) <span id="legal-name-required" class="text-red-500 hidden">*</span></label>
                         <input type="text" name="legal_name" id="legal_name"
-                            placeholder="Legal / business name as on records"
-                            value="{{ old('legal_name', $business->name) }}"
+                            placeholder="Full name as on BVN or NIN"
+                            value="{{ old('legal_name', $business->rubies_signatory_name) }}"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white max-w-xl">
                         @error('legal_name')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -506,12 +523,14 @@ document.getElementById('verification_type').addEventListener('change', function
     const bizEmail = document.getElementById('business_email');
     const businessPhone = document.getElementById('business_phone');
     const legalName = document.getElementById('legal_name');
+    const registeredName = document.getElementById('business_registered_name');
     if (cacReg && signDob && bizEmail && businessPhone) {
         cacReg.required = false;
         signDob.required = false;
         bizEmail.required = false;
         businessPhone.required = false;
     }
+    if (registeredName) registeredName.required = false;
     [businessPhoneReq, cacRegReq, signatoryDobReq, nameReq, emailReq].forEach(function(el) {
         if (el) el.classList.add('hidden');
     });
@@ -566,6 +585,7 @@ document.getElementById('verification_type').addEventListener('change', function
             signDob.required = true;
             bizEmail.required = true;
             businessPhone.required = true;
+            if (registeredName) registeredName.required = true;
             if (cacRegReq) cacRegReq.classList.remove('hidden');
             if (signatoryDobReq) signatoryDobReq.classList.remove('hidden');
             if (businessPhoneReq) businessPhoneReq.classList.remove('hidden');

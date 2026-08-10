@@ -104,6 +104,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'rental_global_caution_fee_percent',
         'cac_registration_number',
         'rubies_signatory_dob',
+        'rubies_signatory_name',
         'rubies_business_account_number',
         'rubies_business_account_name',
         'rubies_business_bank_name',
@@ -475,6 +476,40 @@ class Business extends Authenticatable implements CanResetPasswordContract
         }
 
         return true;
+    }
+
+    /**
+     * Company / registered business name used for permanent pay-in VA (Mevon business_name).
+     */
+    public function registeredBusinessNameForPayIn(): string
+    {
+        return trim((string) $this->name);
+    }
+
+    /**
+     * Signatory personal name for BVN/NIN Mevon verify (not the company name on the VA).
+     */
+    public function signatoryNameForIdentityVerify(): string
+    {
+        $signatory = trim((string) ($this->rubies_signatory_name ?? ''));
+        if ($signatory !== '') {
+            return $signatory;
+        }
+
+        // Legacy rows may have stored the signatory in name before we split the fields.
+        return trim((string) $this->name);
+    }
+
+    /**
+     * Normalize CAC RC / BN registration numbers for Mevon `cac`.
+     */
+    public static function normalizeCacRegistrationNumber(string $value): string
+    {
+        $normalized = strtoupper(preg_replace('/\s+/', '', trim($value)) ?? '');
+        // Allow optional separators like RC-123456 / BN 1234567
+        $normalized = preg_replace('/[^A-Z0-9]/', '', $normalized) ?? '';
+
+        return $normalized;
     }
 
     /**

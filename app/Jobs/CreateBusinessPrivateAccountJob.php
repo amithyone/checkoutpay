@@ -63,8 +63,8 @@ class CreateBusinessPrivateAccountJob implements ShouldQueue
 
         try {
             $va = $privateAccount->createBusinessAccount(
-                businessName: trim((string) $business->name),
-                cac: strtoupper(trim((string) $business->cac_registration_number)),
+                businessName: $business->registeredBusinessNameForPayIn(),
+                cac: Business::normalizeCacRegistrationNumber((string) $business->cac_registration_number),
                 phoneLocal11: trim((string) $business->phone),
                 dobYmd: $dobYmd,
                 email: strtolower(trim((string) $business->email)),

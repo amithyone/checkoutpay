@@ -118,9 +118,10 @@ class BusinessKycMevonVerificationService
             return ['ok' => false, 'message' => 'Could not read a valid 11-digit BVN/NIN from the submission.'];
         }
 
-        $nameParts = $this->splitName((string) $business->name);
+        $identityName = $business->signatoryNameForIdentityVerify();
+        $nameParts = $this->splitName($identityName);
         if ($nameParts['first'] === '' || $nameParts['last'] === '') {
-            return ['ok' => false, 'message' => 'Business legal name is required to verify identity.'];
+            return ['ok' => false, 'message' => 'Signatory legal name (as on BVN/NIN) is required to verify identity.'];
         }
 
         $dob = $this->resolveDob($business, $dobOverride);
@@ -156,7 +157,7 @@ class BusinessKycMevonVerificationService
         }
 
         $providerName = trim((string) ($providerResult['full_name'] ?? ''));
-        $submittedName = trim((string) $business->name);
+        $submittedName = $business->signatoryNameForIdentityVerify();
         $nameMatches = $providerName !== '' && WhatsappWalletNameMatcher::passes($submittedName, $providerName);
 
         if (! $nameMatches) {

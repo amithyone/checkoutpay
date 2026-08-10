@@ -32,12 +32,21 @@ class VerificationController extends Controller
         $business = auth('business')->user();
 
         $validated = $request->validate([
+            'business_registered_name' => 'required|string|max:255',
             'cac_registration_number' => 'required|string|max:100',
             'business_phone' => 'required|string|max:30',
             'business_email' => 'required|email|max:255',
             'signatory_dob' => 'required|date_format:Y-m-d|before:today',
             'legal_name' => 'nullable|string|max:255',
         ]);
+
+        $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) $validated['cac_registration_number']);
+        if (strlen($cac) < 3 || ! preg_match('/^(RC|BN|IT)?[A-Z0-9]{2,}$/', $cac)) {
+            return back()->withErrors([
+                'cac_registration_number' => 'Enter a valid CAC RC or BN number (e.g. RC1234567 or BN1234567).',
+            ])->withInput();
+        }
+        $validated['cac_registration_number'] = $cac;
 
         try {
             $this->normalizeNigerianPhoneToLocal11((string) $validated['business_phone']);
@@ -113,6 +122,7 @@ class VerificationController extends Controller
             'nin' => 'nullable|string|max:11|min:11',
             'business_phone' => 'nullable|string|max:30',
             'legal_name' => 'nullable|string|max:255',
+            'business_registered_name' => 'nullable|string|max:255',
             'business_email' => 'nullable|email|max:255',
             'cac_registration_number' => 'nullable|string|max:100',
             'signatory_dob' => 'nullable|date_format:Y-m-d|before:today',
@@ -126,12 +136,23 @@ class VerificationController extends Controller
 
         if (in_array($typeIn, [BusinessVerification::TYPE_CAC_CERTIFICATE, BusinessVerification::TYPE_CAC_APPLICATION], true)) {
             $rules['cac_registration_number'] = 'required|string|max:100';
+            $rules['business_registered_name'] = 'required|string|max:255';
             $rules['signatory_dob'] = 'required|date_format:Y-m-d|before:today';
             $rules['business_phone'] = 'required|string|max:30';
             $rules['business_email'] = 'required|email|max:255';
         }
 
         $validated = $request->validate($rules);
+
+        if (! empty($validated['cac_registration_number'])) {
+            $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) $validated['cac_registration_number']);
+            if (strlen($cac) < 3) {
+                return back()->withErrors([
+                    'cac_registration_number' => 'Enter a valid CAC RC or BN number (e.g. RC1234567 or BN1234567).',
+                ])->withInput();
+            }
+            $validated['cac_registration_number'] = $cac;
+        }
 
         if (! empty($validated['business_phone'])) {
             try {
@@ -194,7 +215,7 @@ class VerificationController extends Controller
                     'account_number' => $accountNumber,
                     'bank_code' => $nubanResult['bank_code'] ?? $validated['bank_code'],
                     'bank_name' => $nubanResult['bank_name'] ?? null,
-                    'name' => $nubanResult['account_name'] ?? $business->name,
+                    // Do not overwrite businesses.name (company name used for permanent pay-in VA).
                 ]);
                 $documentType = sprintf(
                     'Account: %s, Bank: %s, Name: %s (NUBAN verified)',
@@ -334,15 +355,21 @@ class VerificationController extends Controller
         }
 
         if (array_key_exists('cac_registration_number', $validated) && trim((string) $validated['cac_registration_number']) !== '') {
-            $updates['cac_registration_number'] = strtoupper(trim((string) $validated['cac_registration_number']));
+            $updates['cac_registration_number'] = \App\Models\Business::normalizeCacRegistrationNumber((string) $validated['cac_registration_number']);
         }
 
         if (! empty($validated['signatory_dob'])) {
             $updates['rubies_signatory_dob'] = $validated['signatory_dob'];
         }
 
+        // Company / registered name for Mevon create_business_account business_name + cac.
+        if (array_key_exists('business_registered_name', $validated) && trim((string) $validated['business_registered_name']) !== '') {
+            $updates['name'] = trim((string) $validated['business_registered_name']);
+        }
+
+        // Signatory personal name for BVN/NIN only — never used as the pay-in account title.
         if (array_key_exists('legal_name', $validated) && trim((string) $validated['legal_name']) !== '') {
-            $updates['name'] = trim((string) $validated['legal_name']);
+            $updates['rubies_signatory_name'] = trim((string) $validated['legal_name']);
         }
 
         if (! empty($validated['business_email'])) {
@@ -358,7 +385,7 @@ class VerificationController extends Controller
     {
         return match ($message) {
             'pay_in_unavailable' => 'Pay-in account setup is temporarily unavailable. Try again later or contact support.',
-            'cac_dob_required' => 'Enter your CAC / RC number and signatory date of birth in the pay-in section.',
+            'cac_dob_required' => 'Enter your registered business name, CAC RC or BN number, and signatory date of birth in the pay-in section.',
             default => $message,
         };
     }

@@ -62,7 +62,7 @@ final class PrivateAccountProvisionService
         }
 
         if (trim((string) $business->name) === '') {
-            $missing[] = 'Business legal name is required.';
+            $missing[] = 'Registered business name is required.';
         }
 
         if (trim((string) $business->phone) === '') {
@@ -79,7 +79,7 @@ final class PrivateAccountProvisionService
         }
 
         if (trim((string) $business->cac_registration_number) === '') {
-            $missing[] = 'CAC / RC registration number is required.';
+            $missing[] = 'CAC RC or BN registration number is required.';
         }
 
         $status = (string) ($business->rubies_account_provision_status ?? '');
