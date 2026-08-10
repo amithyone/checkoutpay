@@ -193,6 +193,42 @@
         @media print {
             /* Replaced by investor.partials.no-print */
         }
+
+        @media (max-width: 720px) {
+            .wrap,
+            .topbar-inner { width: min(var(--max), calc(100% - 1.5rem)); }
+            body { overflow-x: hidden; }
+            .topbar-inner {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                padding: 0.7rem 0;
+            }
+            .brand-mark span { display: none; }
+            .nav-actions {
+                margin-left: auto;
+                gap: 0.35rem;
+            }
+            .nav-actions .viewer-name { display: none; }
+            .confidential {
+                font-size: 0.62rem;
+                padding: 0.28rem 0.5rem;
+            }
+            header.page-hero { padding: 1.75rem 0 1.25rem; }
+            h1 { font-size: clamp(1.75rem, 8vw, 2.25rem); }
+            .lede { font-size: 0.98rem; }
+            .stats { gap: 0.55rem; margin-top: 1.25rem; }
+            .stat { padding: 0.85rem 0.7rem; }
+            .stat .n { font-size: 1.2rem; word-break: break-word; }
+            .stat .l { font-size: 0.7rem; line-height: 1.3; }
+            main { padding: 1.5rem 0 2.75rem; }
+            article section { padding: 1.25rem 0; }
+            .cta-band { padding: 1.25rem; }
+            .cta-row .btn { flex: 1 1 auto; min-width: min(100%, 9rem); }
+        }
+
+        @media (max-width: 420px) {
+            .cta-row .btn { width: 100%; }
+        }
     </style>
     @include('investor.partials.no-print')
 </head>
@@ -205,7 +241,7 @@
             </a>
             <div class="nav-actions">
                 @if(!empty($investorPitchViewer))
-                    <span style="font-size:0.78rem;font-weight:600;color:#3a4558;">{{ $investorPitchViewer->name }}</span>
+                    <span class="viewer-name" style="font-size:0.78rem;font-weight:600;color:#3a4558;">{{ $investorPitchViewer->name }}</span>
                     <form action="{{ route('investor.logout') }}" method="post" style="margin:0;">
                         @csrf
                         <button type="submit" class="btn btn-ghost" style="padding:0.4rem 0.75rem;font-size:0.75rem;">Sign out</button>

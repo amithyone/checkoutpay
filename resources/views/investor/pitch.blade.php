@@ -277,9 +277,38 @@
             margin-top: 2rem;
         }
         @media (max-width: 900px) {
-            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
             .top-nav { display: none; }
         }
+
+        .topbar-actions {
+            display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .mobile-nav {
+            display: none;
+            gap: 0.45rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding: 0 0 0.75rem;
+            margin-top: -0.15rem;
+        }
+        .mobile-nav::-webkit-scrollbar { display: none; }
+        .mobile-nav a {
+            flex: 0 0 auto;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: var(--ink-soft);
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 0.4rem 0.75rem;
+            white-space: nowrap;
+        }
+        .mobile-nav a:hover { color: var(--brand); border-color: rgba(0,27,202,0.25); }
 
         .metric {
             background: rgba(255,255,255,0.72);
@@ -288,6 +317,7 @@
             padding: 1.35rem 1.25rem;
             position: relative; overflow: hidden;
             animation: riseIn 0.7s ease both;
+            min-width: 0;
         }
         .metric:nth-child(2) { animation-delay: 0.08s; }
         .metric:nth-child(3) { animation-delay: 0.16s; }
@@ -643,6 +673,91 @@
                 animation: none !important; transition: none !important;
             }
         }
+
+        /* ——— Mobile / small screens ——— */
+        @media (max-width: 720px) {
+            .wrap { width: min(var(--max), calc(100% - 1.5rem)); }
+            body { overflow-x: hidden; }
+
+            .topbar-inner {
+                flex-wrap: wrap;
+                gap: 0.55rem;
+                padding: 0.7rem 0 0.35rem;
+            }
+            .brand-mark strong { font-size: 1rem; }
+            .brand-mark span { display: none; }
+            .confidential {
+                font-size: 0.62rem;
+                padding: 0.28rem 0.5rem;
+            }
+            .topbar-actions {
+                margin-left: auto;
+                gap: 0.35rem;
+            }
+            .topbar-actions .viewer-name { display: none; }
+            .mobile-nav { display: flex; }
+
+            .hero {
+                min-height: auto;
+                align-items: end;
+            }
+            .hero-copy {
+                padding: 3.25rem 0 2rem;
+                max-width: none;
+            }
+            .hero-copy .eyebrow {
+                font-size: 0.68rem;
+                letter-spacing: 0.1em;
+                margin-bottom: 0.75rem;
+                line-height: 1.35;
+            }
+            .hero-copy h1 {
+                font-size: clamp(2.1rem, 11vw, 2.75rem);
+                margin-bottom: 0.75rem;
+            }
+            .hero-copy p {
+                font-size: 0.98rem;
+                margin-bottom: 1.25rem;
+                line-height: 1.5;
+            }
+            .cta-row .btn {
+                flex: 1 1 auto;
+                min-width: min(100%, 9.5rem);
+                padding: 0.8rem 1rem;
+                font-size: 0.88rem;
+            }
+
+            section { padding: 2.75rem 0; }
+            h2 {
+                font-size: clamp(1.45rem, 6.5vw, 1.85rem);
+                line-height: 1.2;
+            }
+            .lede { font-size: 0.98rem; }
+
+            .metric { padding: 1rem 0.9rem; }
+            .metric .value { font-size: clamp(1.35rem, 6vw, 1.75rem); }
+            .metric .label { font-size: 0.78rem; line-height: 1.35; }
+
+            .panel { padding: 1.15rem; }
+            .panel p, .panel li { font-size: 0.9rem; }
+
+            .flow-node { min-height: 0; padding: 0.9rem; }
+            .ask { padding: 1.5rem 1.15rem; border-radius: var(--radius); }
+            .ask-card .v { font-size: 1rem; line-height: 1.4; word-break: break-word; }
+
+            .photo-slot { min-height: 160px; }
+            .quote { padding: 1rem; font-size: 0.9rem; }
+
+            .chart { min-height: 140px; }
+            footer.pitch-foot { padding: 1.75rem 0 2.25rem; font-size: 0.8rem; }
+        }
+
+        @media (max-width: 420px) {
+            .grid-4 { gap: 0.55rem; }
+            .metric { padding: 0.85rem 0.7rem; }
+            .metric .value { font-size: 1.25rem; }
+            .cta-row .btn { width: 100%; min-width: 0; }
+        }
     </style>
     @include('investor.partials.no-print')
 </head>
@@ -660,9 +775,9 @@
                 <a href="#loans">Loans</a>
                 <a href="#ask">Seed use</a>
             </nav>
-            <div style="display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
+            <div class="topbar-actions">
                 @if(!empty($investorPitchViewer))
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--ink-soft);">{{ $investorPitchViewer->name }}</span>
+                    <span class="viewer-name" style="font-size:0.75rem;font-weight:600;color:var(--ink-soft);">{{ $investorPitchViewer->name }}</span>
                     <form action="{{ route('investor.logout') }}" method="post" style="margin:0;">
                         @csrf
                         <button type="submit" style="font-size:0.7rem;font-weight:700;border:1px solid var(--line);background:#fff;border-radius:999px;padding:0.3rem 0.65rem;cursor:pointer;">Sign out</button>
@@ -671,6 +786,14 @@
                 <div class="confidential">Confidential · NDA</div>
             </div>
         </div>
+        <nav class="wrap mobile-nav" aria-label="Sections (mobile)">
+            <a href="{{ route('investor.summary') }}">Exec summary</a>
+            <a href="#flows">Flows</a>
+            <a href="#ecosystem">Ecosystem</a>
+            <a href="#traction">Traction</a>
+            <a href="#loans">Loans</a>
+            <a href="#ask">Seed use</a>
+        </nav>
     </header>
 
     <main id="top">
