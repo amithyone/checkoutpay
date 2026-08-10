@@ -9,7 +9,7 @@
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-gray-900">View Statistics</h2>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('admin.stats.index', ['period' => 'daily']) }}" 
                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ $period === 'daily' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
                     Daily
@@ -22,9 +22,43 @@
                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ $period === 'yearly' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
                     Yearly
                 </a>
+                <a href="{{ route('admin.stats.index', ['period' => 'all']) }}" 
+                   class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {{ $period === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    All time
+                </a>
             </div>
         </div>
     </div>
+
+    @if(!empty($stats['lifetime']) && $period !== 'all')
+    <div class="bg-slate-900 text-white rounded-lg p-4 sm:p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <div>
+                <p class="text-sm text-slate-300">All-time totals (includes legacy imports)</p>
+                <p class="text-xs text-slate-400 mt-0.5">Daily/Monthly windows ignore older <code class="text-slate-300">created_at</code> dates — use All time for the full approved count.</p>
+            </div>
+            <a href="{{ route('admin.stats.index', ['period' => 'all']) }}" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg self-start">Open All time →</a>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+            <div>
+                <p class="text-slate-400">Approved</p>
+                <p class="text-2xl font-semibold">{{ number_format($stats['lifetime']['approved_transactions']) }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400">All transactions</p>
+                <p class="text-2xl font-semibold">{{ number_format($stats['lifetime']['total_transactions']) }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400">Approved amount</p>
+                <p class="text-2xl font-semibold">₦{{ number_format($stats['lifetime']['total_amount'], 2) }}</p>
+            </div>
+            <div>
+                <p class="text-slate-400">Pending</p>
+                <p class="text-2xl font-semibold">{{ number_format($stats['lifetime']['pending_transactions']) }}</p>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Summary Cards - Row 1 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -44,8 +78,10 @@
                     Last 30 days
                 @elseif($period === 'monthly')
                     Last 12 months
-                @else
+                @elseif($period === 'yearly')
                     Last 5 years
+                @else
+                    All time
                 @endif
             </div>
         </div>
@@ -95,8 +131,10 @@
                             Average Daily
                         @elseif($period === 'monthly')
                             Average Monthly
-                        @else
+                        @elseif($period === 'yearly')
                             Average Yearly
+                        @else
+                            Average / txn
                         @endif
                     </p>
                     <h3 class="text-3xl font-bold text-gray-900">₦{{ number_format($stats['summary']['average_transaction'], 2) }}</h3>
@@ -180,8 +218,10 @@
                 Today's Performance
             @elseif($period === 'monthly')
                 Current Month Performance
-            @else
+            @elseif($period === 'yearly')
                 Current Year Performance
+            @else
+                Current Year (within all-time view)
             @endif
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

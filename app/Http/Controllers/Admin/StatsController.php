@@ -17,36 +17,41 @@ class StatsController extends Controller
 {
     public function index(Request $request)
     {
-        $period = $request->get('period', 'daily'); // daily, monthly, yearly
-        
+        $period = $request->get('period', 'daily'); // daily, monthly, yearly, all
+        if (! in_array($period, ['daily', 'monthly', 'yearly', 'all'], true)) {
+            $period = 'daily';
+        }
+
         $stats = $this->getStats($period);
-        
+
         return view('admin.stats.index', compact('stats', 'period'));
     }
-    
+
     private function getStats($period)
     {
-        $stats = [];
-        
-        switch ($period) {
-            case 'daily':
-                $stats = $this->getDailyStats();
-                break;
-            case 'monthly':
-                $stats = $this->getMonthlyStats();
-                break;
-            case 'yearly':
-                $stats = $this->getYearlyStats();
-                break;
-        }
-        
+        $stats = match ($period) {
+            'monthly' => $this->getMonthlyStats(),
+            'yearly' => $this->getYearlyStats(),
+            'all' => $this->getAllTimeStats(),
+            default => $this->getDailyStats(),
+        };
+
+        // Lifetime totals (always shown — includes legacy imports outside the period window)
+        $stats['lifetime'] = [
+            'total_amount' => (float) Payment::where('status', Payment::STATUS_APPROVED)
+                ->sum(DB::raw('COALESCE(received_amount, amount)')),
+            'total_transactions' => (int) Payment::count(),
+            'approved_transactions' => (int) Payment::where('status', Payment::STATUS_APPROVED)->count(),
+            'pending_transactions' => (int) Payment::where('status', Payment::STATUS_PENDING)->count(),
+        ];
+
         // Add match similarity score (applies to all periods)
         $stats['match_similarity'] = [
             'total_score' => MatchAttempt::whereNotNull('name_similarity_percent')->sum('name_similarity_percent'),
             'total_attempts' => MatchAttempt::whereNotNull('name_similarity_percent')->count(),
             'average_score' => MatchAttempt::whereNotNull('name_similarity_percent')->avg('name_similarity_percent') ?: 0,
         ];
-        
+
         // Add average matching time (applies to all periods)
         // Only include payments that were actually matched (have a linked processed_email); exclude unmatched/manually approved
         $matchedBase = Payment::where('status', Payment::STATUS_APPROVED)
@@ -63,7 +68,7 @@ class StatsController extends Controller
                 ->avg() ?: 0,
             'total_matched' => (clone $matchedBase)->count(),
         ];
-        
+
         // Add account numbers payment stats (applies to all periods)
         $stats['account_numbers'] = [
             'total' => AccountNumber::active()->count(), // Only count active account numbers
@@ -76,7 +81,7 @@ class StatsController extends Controller
                 ->whereNotNull('account_number')
                 ->sum(DB::raw('COALESCE(received_amount, amount)')),
         ];
-        
+
         return $stats;
     }
     
@@ -311,7 +316,76 @@ class StatsController extends Controller
                 ->get(),
         ];
     }
-    
+
+    private function getAllTimeStats()
+    {
+        $since = Payment::query()->min('created_at');
+        $sinceCarbon = $since ? Carbon::parse($since)->startOfDay() : now()->startOfYear();
+
+        // Group by year for the chart (full history)
+        $yearlyAmounts = Payment::where('status', Payment::STATUS_APPROVED)
+            ->selectRaw('YEAR(created_at) as year, SUM(COALESCE(received_amount, amount)) as total')
+            ->groupBy('year')
+            ->orderBy('year')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'date' => (string) $item->year,
+                    'amount' => (float) $item->total,
+                ];
+            });
+
+        $yearlyCounts = Payment::query()
+            ->selectRaw('YEAR(created_at) as year, COUNT(*) as count')
+            ->groupBy('year')
+            ->orderBy('year')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'date' => (string) $item->year,
+                    'count' => (int) $item->count,
+                ];
+            });
+
+        $approvedCount = (int) Payment::where('status', Payment::STATUS_APPROVED)->count();
+        $totalCount = (int) Payment::count();
+        $totalAmount = (float) Payment::where('status', Payment::STATUS_APPROVED)
+            ->sum(DB::raw('COALESCE(received_amount, amount)'));
+
+        return [
+            'period' => 'all',
+            'summary' => [
+                'total_amount' => $totalAmount,
+                'total_transactions' => $totalCount,
+                'approved_transactions' => $approvedCount,
+                'pending_transactions' => (int) Payment::where('status', Payment::STATUS_PENDING)->count(),
+                'average_yearly' => $approvedCount > 0 ? $totalAmount / max(1, $yearlyAmounts->count()) : 0,
+                'average_transaction' => (float) (Payment::where('status', Payment::STATUS_APPROVED)
+                    ->selectRaw('AVG(COALESCE(received_amount, amount)) as avg')
+                    ->value('avg') ?: 0),
+            ],
+            'current_year' => [
+                'amount' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->where('created_at', '>=', now()->startOfYear())
+                    ->sum(DB::raw('COALESCE(received_amount, amount)')),
+                'transactions' => Payment::where('created_at', '>=', now()->startOfYear())->count(),
+                'approved' => Payment::where('status', Payment::STATUS_APPROVED)
+                    ->where('created_at', '>=', now()->startOfYear())
+                    ->count(),
+            ],
+            'chart_data' => [
+                'amounts' => $yearlyAmounts,
+                'counts' => $yearlyCounts,
+            ],
+            'top_businesses' => $this->getTopBusinesses($sinceCarbon),
+            'top_account_numbers' => $this->getTopAccountNumbers($sinceCarbon),
+            'recent_payments' => Payment::with('business')
+                ->latest()
+                ->limit(10)
+                ->get(),
+        ];
+    }
+
     private function getTopAccountNumbers($since)
     {
         return AccountNumber::active() // Only get active account numbers
