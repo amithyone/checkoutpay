@@ -80,7 +80,11 @@ final class ConsumerBusinessWalletLedgerService
     }
 
     /**
-     * MevonPay payout API debit side — must not use personal VA/name for business-ledger sends.
+     * MevonPay payout API debit side.
+     *
+     * Business-ledger app sends: use the account assigned to the business (Rubies / BNR pay-in).
+     * Only when the business has no assigned account: fall back to the platform main debit account.
+     * Personal-ledger sends: use the wallet personal VA.
      *
      * @return array{debit_account_name: string, debit_account_number: string}
      */
@@ -98,16 +102,22 @@ final class ConsumerBusinessWalletLedgerService
         $accountNumber = is_array($payIn)
             ? trim((string) ($payIn['account_number'] ?? ''))
             : '';
+        $accountName = is_array($payIn)
+            ? trim((string) ($payIn['account_name'] ?? $payIn['business_name'] ?? ''))
+            : '';
 
         if ($accountNumber !== '') {
             return [
-                'debit_account_name' => $businessName !== '' ? $businessName : $this->checkoutPoolDebitName(),
+                'debit_account_name' => $accountName !== ''
+                    ? $accountName
+                    : ($businessName !== '' ? $businessName : $this->checkoutPoolDebitName()),
                 'debit_account_number' => $accountNumber,
             ];
         }
 
+        // No business VA yet — debit platform main account number (same pool withdrawals use).
         return [
-            'debit_account_name' => $this->checkoutPoolDebitName(),
+            'debit_account_name' => $businessName !== '' ? $businessName : $this->checkoutPoolDebitName(),
             'debit_account_number' => $this->checkoutPoolDebitNumber(),
         ];
     }

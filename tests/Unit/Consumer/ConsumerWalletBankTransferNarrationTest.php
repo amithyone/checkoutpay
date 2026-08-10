@@ -88,7 +88,7 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
             'name' => 'Acme Ventures Ltd',
             'email' => 'acme@example.com',
             'password' => bcrypt('secret'),
-            'business_id' => 'ACME99',
+            'business_id' => 'ACME1',
             'phone' => '08012345678',
             'balance' => 100000,
         ]);
@@ -131,15 +131,16 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
 
     public function test_business_bank_transfer_uses_merchant_rubies_va_as_debit_account(): void
     {
+        $capturedNarration = null;
         $capturedDebitName = null;
         $capturedDebitNumber = null;
-        $this->mockPayout(null, $capturedDebitName, $capturedDebitNumber);
+        $this->mockPayout($capturedNarration, $capturedDebitName, $capturedDebitNumber);
 
         $business = \App\Models\Business::query()->create([
             'name' => 'Acme Ventures Ltd',
             'email' => 'acme-rubies@example.com',
             'password' => bcrypt('secret'),
-            'business_id' => 'ACME-RUB',
+            'business_id' => 'RUB01',
             'phone' => '08012345679',
             'balance' => 100000,
             'rubies_business_account_number' => '8888777766',
@@ -170,11 +171,53 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
         $this->assertNotSame('1111222233', $capturedDebitNumber);
     }
 
-    public function test_personal_bank_transfer_uses_wallet_va_as_debit_account(): void
+    public function test_business_bank_transfer_uses_merchant_va_without_personal_mevon_va(): void
     {
+        $capturedNarration = null;
         $capturedDebitName = null;
         $capturedDebitNumber = null;
-        $this->mockPayout(null, $capturedDebitName, $capturedDebitNumber);
+        $this->mockPayout($capturedNarration, $capturedDebitName, $capturedDebitNumber);
+
+        $business = \App\Models\Business::query()->create([
+            'name' => 'Solo Merchant Ltd',
+            'email' => 'solo-merchant@example.com',
+            'password' => bcrypt('secret'),
+            'business_id' => 'SOLO1',
+            'phone' => '08012345680',
+            'balance' => 100000,
+            'rubies_business_account_number' => '7777666655',
+            'rubies_business_account_name' => 'Solo Merchant Ltd',
+        ]);
+
+        $wallet = $this->makeNigeriaWallet([
+            'linked_business_id' => $business->id,
+            'business_balance' => 100000,
+            'sender_name' => 'Owner Personal',
+            'mevon_virtual_account_number' => null,
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+        ]);
+
+        app(ConsumerWalletTransferService::class)->bankTransfer(
+            $wallet,
+            1000,
+            '0123456789',
+            '058',
+            'GTBank',
+            'Test Beneficiary',
+            null,
+            ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+        );
+
+        $this->assertSame('Solo Merchant Ltd', $capturedDebitName);
+        $this->assertSame('7777666655', $capturedDebitNumber);
+    }
+
+    public function test_personal_bank_transfer_uses_wallet_va_as_debit_account(): void
+    {
+        $capturedNarration = null;
+        $capturedDebitName = null;
+        $capturedDebitNumber = null;
+        $this->mockPayout($capturedNarration, $capturedDebitName, $capturedDebitNumber);
 
         $wallet = $this->makeNigeriaWallet([
             'sender_name' => 'Jane Personal',

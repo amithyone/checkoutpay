@@ -469,6 +469,12 @@ class WhatsappWalletBankPayoutService
     }
 
     /**
+     * Bank send via Mevon.
+     *
+     * - Explicit debit overrides (business-ledger app sends): always /V1/payout with that VA.
+     * - Personal Tier-2 wallet VA: /V1/payout debiting the personal VA.
+     * - Otherwise (withdrawals, no VA): /V1/createtransfer debiting the platform main account only.
+     *
      * @return array{bucket: string, response_code: ?string, response_message: ?string, reference: ?string, raw: mixed, payout_api?: string}
      */
     public function sendTransfer(
@@ -486,16 +492,23 @@ class WhatsappWalletBankPayoutService
     ): array {
         $bankCode = NigerianBankCodeNormalizer::toNipTransferCode($bankCode);
 
-        if ($wallet !== null && $wallet->canUseMevonPayoutApi()) {
-            $sessionId = 'WAW'.now()->format('YmdHis').Str::upper(Str::random(4));
-            $debitName = trim((string) $debitAccountNameOverride);
+        $debitName = trim((string) $debitAccountNameOverride);
+        $debitNumber = trim((string) $debitAccountNumberOverride);
+
+        if ($debitNumber === '' && $wallet !== null && $wallet->canUseMevonPayoutApi()) {
+            $debitName = $wallet->mevonDebitAccountName();
+            $debitNumber = trim((string) $wallet->mevon_virtual_account_number);
+        }
+
+        // Specific debit VA (business assigned account or personal VA) → /V1/payout.
+        if ($debitNumber !== '' && $this->payout->isConfigured()) {
             if ($debitName === '') {
-                $debitName = $wallet->mevonDebitAccountName();
+                $debitName = $wallet !== null
+                    ? $wallet->mevonDebitAccountName()
+                    : (string) config('services.mevonpay.debit_account_name', 'Checkout');
             }
-            $debitNumber = trim((string) $debitAccountNumberOverride);
-            if ($debitNumber === '') {
-                $debitNumber = (string) $wallet->mevon_virtual_account_number;
-            }
+
+            $sessionId = 'WAW'.now()->format('YmdHis').Str::upper(Str::random(4));
             $result = $this->payout->createPayout([
                 'amount' => $amount,
                 'bankCode' => $bankCode,
@@ -514,6 +527,7 @@ class WhatsappWalletBankPayoutService
             return $result;
         }
 
+        // Platform pool createtransfer — used for withdrawals and when no debit VA is available.
         $sessionId = 'WAW'.now()->format('YmdHis').Str::upper(Str::random(4));
 
         $result = $this->mavon->createTransfer([

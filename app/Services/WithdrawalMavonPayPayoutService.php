@@ -44,6 +44,9 @@ class WithdrawalMavonPayPayoutService
 
     /**
      * Attempt instant payout. Updates withdrawal payout_* fields and status; decrements business balance on success.
+     *
+     * Always debits the platform main Mevon account (MEVONPAY_DEBIT_ACCOUNT_*), never the
+     * merchant Rubies VA — business app bank sends use that VA separately via /V1/payout.
      */
     public function processWithdrawal(WithdrawalRequest $withdrawal, Business $business, ?string $bankCode): void
     {
