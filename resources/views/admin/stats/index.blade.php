@@ -31,30 +31,30 @@
     </div>
 
     @if(!empty($stats['lifetime']) && $period !== 'all')
-    <div class="bg-slate-900 text-white rounded-lg p-4 sm:p-5">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+    <div class="bg-white rounded-lg p-4 sm:p-5 border-2 border-slate-200 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
-                <p class="text-sm text-slate-300">All-time totals (includes legacy imports)</p>
-                <p class="text-xs text-slate-400 mt-0.5">Daily/Monthly windows ignore older <code class="text-slate-300">created_at</code> dates — use All time for the full approved count.</p>
+                <p class="text-sm font-semibold text-slate-900">All-time totals (includes legacy imports)</p>
+                <p class="text-xs text-slate-600 mt-0.5">Daily/Monthly windows ignore older <code class="text-slate-700 bg-slate-100 px-1 rounded">created_at</code> dates — use All time for the full approved count.</p>
             </div>
-            <a href="{{ route('admin.stats.index', ['period' => 'all']) }}" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg self-start">Open All time →</a>
+            <a href="{{ route('admin.stats.index', ['period' => 'all']) }}" class="text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg self-start border border-blue-100">Open All time →</a>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-            <div>
-                <p class="text-slate-400">Approved</p>
-                <p class="text-2xl font-semibold">{{ number_format($stats['lifetime']['approved_transactions']) }}</p>
+            <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+                <p class="text-slate-600">Approved</p>
+                <p class="text-2xl font-semibold text-slate-900">{{ number_format($stats['lifetime']['approved_transactions']) }}</p>
             </div>
-            <div>
-                <p class="text-slate-400">All transactions</p>
-                <p class="text-2xl font-semibold">{{ number_format($stats['lifetime']['total_transactions']) }}</p>
+            <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+                <p class="text-slate-600">All transactions</p>
+                <p class="text-2xl font-semibold text-slate-900">{{ number_format($stats['lifetime']['total_transactions']) }}</p>
             </div>
-            <div>
-                <p class="text-slate-400">Approved amount</p>
-                <p class="text-2xl font-semibold">₦{{ number_format($stats['lifetime']['total_amount'], 2) }}</p>
+            <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+                <p class="text-slate-600">Approved amount</p>
+                <p class="text-2xl font-semibold text-slate-900">₦{{ number_format($stats['lifetime']['total_amount'], 2) }}</p>
             </div>
-            <div>
-                <p class="text-slate-400">Pending</p>
-                <p class="text-2xl font-semibold">{{ number_format($stats['lifetime']['pending_transactions']) }}</p>
+            <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+                <p class="text-slate-600">Pending</p>
+                <p class="text-2xl font-semibold text-slate-900">{{ number_format($stats['lifetime']['pending_transactions']) }}</p>
             </div>
         </div>
     </div>
