@@ -80,17 +80,28 @@
             </select>
         </div>
 
+        @php
+            $defaultSource = old('source', count($preparedFiles) > 0 ? 'prepared' : 'upload');
+        @endphp
+        {{-- Always submit a source (disabled radios are omitted by browsers). --}}
+        <input type="hidden" name="source" value="{{ $defaultSource }}" id="payment-import-source">
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="border border-gray-200 rounded-lg p-4">
-                <label class="flex items-start gap-2 cursor-pointer">
-                    <input type="radio" name="source" value="prepared" class="mt-1" @checked(old('source', 'prepared') === 'prepared')
-                        {{ $preparedFiles === [] ? 'disabled' : '' }}>
+                <label class="flex items-start gap-2 {{ count($preparedFiles) > 0 ? 'cursor-pointer' : 'opacity-60' }}">
+                    <input type="radio" name="source_ui" value="prepared" class="mt-1 payment-import-source-radio"
+                        @checked($defaultSource === 'prepared')
+                        {{ count($preparedFiles) === 0 ? 'disabled' : '' }}
+                        data-source="prepared">
                     <span>
                         <span class="font-medium text-gray-900">Prepared server file</span>
                         <span class="block text-xs text-gray-500 mt-0.5">From <code>storage/app/payment-imports/</code></span>
+                        @if(count($preparedFiles) === 0)
+                            <span class="block text-xs text-amber-700 mt-1">No prepared files on this server — use Upload, or copy CSVs into storage/app/payment-imports/.</span>
+                        @endif
                     </span>
                 </label>
-                <select name="prepared_file" class="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" @disabled($preparedFiles === [])>
+                <select name="prepared_file" class="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" @disabled(count($preparedFiles) === 0)>
                     <option value="">Choose file…</option>
                     @foreach($preparedFiles as $file)
                         <option value="{{ $file['name'] }}" @selected(old('prepared_file') === $file['name'])>
@@ -102,7 +113,9 @@
 
             <div class="border border-gray-200 rounded-lg p-4">
                 <label class="flex items-start gap-2 cursor-pointer">
-                    <input type="radio" name="source" value="upload" class="mt-1" @checked(old('source') === 'upload')>
+                    <input type="radio" name="source_ui" value="upload" class="mt-1 payment-import-source-radio"
+                        @checked($defaultSource === 'upload')
+                        data-source="upload">
                     <span>
                         <span class="font-medium text-gray-900">Upload CSV / CSV.GZ</span>
                         <span class="block text-xs text-gray-500 mt-0.5">Max ~50MB if PHP allows; prefer gzip for large sets</span>
@@ -111,6 +124,15 @@
                 <input type="file" name="csv_file" accept=".csv,.gz,.csv.gz,text/csv" class="mt-3 block w-full text-sm text-gray-700">
             </div>
         </div>
+        <script>
+            document.querySelectorAll('.payment-import-source-radio').forEach(function (el) {
+                el.addEventListener('change', function () {
+                    if (el.checked) {
+                        document.getElementById('payment-import-source').value = el.getAttribute('data-source');
+                    }
+                });
+            });
+        </script>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>

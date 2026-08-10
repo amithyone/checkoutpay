@@ -33,7 +33,7 @@ class PaymentImportController extends Controller
     {
         $validated = $request->validate([
             'business_id' => 'required|integer|exists:businesses,id',
-            'source' => 'required|in:upload,prepared',
+            'source' => 'nullable|in:upload,prepared',
             'csv_file' => 'nullable|file|max:51200',
             'prepared_file' => 'nullable|string|max:255',
             'dry_run' => 'nullable|boolean',
@@ -42,6 +42,11 @@ class PaymentImportController extends Controller
             'only_status' => 'nullable|in:pending,approved,rejected',
             'limit' => 'nullable|integer|min:1|max:200000',
         ]);
+
+        $source = (string) ($validated['source'] ?? '');
+        if ($source === '') {
+            $source = $request->hasFile('csv_file') ? 'upload' : 'prepared';
+        }
 
         $options = [
             'business_id' => (int) $validated['business_id'],
@@ -52,7 +57,7 @@ class PaymentImportController extends Controller
             'limit' => isset($validated['limit']) ? (int) $validated['limit'] : null,
         ];
 
-        if ($validated['source'] === 'upload') {
+        if ($source === 'upload') {
             if (! $request->hasFile('csv_file')) {
                 return back()->withInput()->with('error', 'Choose a CSV or .csv.gz file to upload.');
             }
