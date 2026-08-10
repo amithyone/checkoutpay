@@ -26,6 +26,7 @@ use App\Services\Consumer\ConsumerPaymentAuthService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletSavingsService;
 use App\Services\Consumer\ConsumerWalletStatementService;
+use App\Services\Consumer\ConsumerWalletTransactionStatusNormalizer;
 use App\Services\Credit\OverdraftEligibilityService;
 use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\MavonPayTransferService;
@@ -77,6 +78,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerWalletElectricityReceiptEnricher $electricityReceiptEnricher,
         private ConsumerPaymentAuthService $paymentAuth,
         private BroadcastSessionService $broadcastSessions,
+        private ConsumerWalletTransactionStatusNormalizer $txStatusNormalizer,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -693,7 +695,10 @@ class ConsumerWalletApiController extends Controller
         }
 
         if ($tx->type === WhatsappWalletTransaction::TYPE_VTU_ELECTRICITY) {
-            return $this->electricityReceiptEnricher->enrich($tx, $row);
+            return $this->txStatusNormalizer->apply(
+                $this->electricityReceiptEnricher->enrich($tx, $row),
+                $tx
+            );
         }
 
         // Expose meta narration for P2P / payroll credits and any other types that set it.
@@ -704,14 +709,14 @@ class ConsumerWalletApiController extends Controller
             }
         }
 
-        return $row;
+        return $this->txStatusNormalizer->apply($row, $tx);
     }
 
     private function enrichSyntheticActivityRow(array $row, WhatsappWallet $wallet): array
     {
         $type = (string) ($row['type'] ?? '');
         if ($type !== 'merchant_withdrawal_out') {
-            return $row;
+            return $this->txStatusNormalizer->apply($row);
         }
 
         $meta = is_array($row['meta'] ?? null) ? $row['meta'] : [];
@@ -754,7 +759,7 @@ class ConsumerWalletApiController extends Controller
             $row['sender_account_number'] = $senderAcct;
         }
 
-        return $row;
+        return $this->txStatusNormalizer->apply($row);
     }
 
     private function resolveSenderAccountForReceipt(WhatsappWallet $wallet, string $ledgerScope): ?string

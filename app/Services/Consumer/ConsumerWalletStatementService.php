@@ -17,6 +17,7 @@ final class ConsumerWalletStatementService
         private ConsumerBusinessActivityService $businessActivity,
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private WhatsappWalletCountryResolver $walletCountry,
+        private ConsumerWalletTransactionStatusNormalizer $txStatusNormalizer,
     ) {}
 
     /**
@@ -140,7 +141,7 @@ final class ConsumerWalletStatementService
                 ->where('created_at', '<=', $toAt)
                 ->orderByDesc('id')
                 ->get()
-                ->map(static fn (WhatsappWalletTransaction $tx): array => $tx->toArray())
+                ->map(fn (WhatsappWalletTransaction $tx): array => $this->txStatusNormalizer->apply($tx->toArray(), $tx))
                 ->all();
         }
 
@@ -152,7 +153,7 @@ final class ConsumerWalletStatementService
             ->where('created_at', '<=', $toAt)
             ->orderByDesc('id')
             ->get()
-            ->map(static fn (WhatsappWalletTransaction $tx): array => $tx->toArray())
+            ->map(fn (WhatsappWalletTransaction $tx): array => $this->txStatusNormalizer->apply($tx->toArray(), $tx))
             ->all();
     }
 
@@ -180,7 +181,8 @@ final class ConsumerWalletStatementService
                 false,
             );
             foreach ($result['items'] as $item) {
-                $rows[] = $item['row'];
+                $tx = $item['wallet_tx'] instanceof WhatsappWalletTransaction ? $item['wallet_tx'] : null;
+                $rows[] = $this->txStatusNormalizer->apply($item['row'], $tx);
             }
             $total = (int) $result['total'];
             $page++;
