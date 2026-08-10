@@ -22,32 +22,133 @@ final class PaymentImportService
     public const SOURCE = 'legacy_import';
 
     /**
-     * @return list<array{name: string, path: string, size: int, modified: int}>
+     * @return list<array{name: string, path: string, size: int, modified: int, absolute: string}>
      */
     public function listPreparedFiles(): array
     {
-        $disk = Storage::disk('local');
-        if (! $disk->exists(self::DISK_DIR)) {
-            return [];
-        }
+        $dirs = [
+            self::DISK_DIR,
+            self::DISK_DIR.'/uploads',
+        ];
 
         $files = [];
-        foreach ($disk->files(self::DISK_DIR) as $path) {
-            $base = basename($path);
-            if (! preg_match('/\.(csv|csv\.gz)$/i', $base)) {
+        $seen = [];
+
+        foreach ($dirs as $dir) {
+            foreach ($this->scanImportDirectory($dir) as $row) {
+                $key = strtolower($row['name']);
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $files[] = $row;
+            }
+        }
+
+        // Fallback: absolute glob (helps when Storage disk root differs on some hosts)
+        $absoluteDirs = [
+            storage_path('app/'.self::DISK_DIR),
+            storage_path('app/private/'.self::DISK_DIR),
+            base_path('database/backups/imports'),
+        ];
+        foreach ($absoluteDirs as $absDir) {
+            if (! is_dir($absDir)) {
                 continue;
             }
-            $files[] = [
-                'name' => $base,
-                'path' => $path,
-                'size' => (int) $disk->size($path),
-                'modified' => (int) $disk->lastModified($path),
-            ];
+            foreach (glob($absDir.'/*.{csv,gz,CSV,GZ}', GLOB_BRACE) ?: [] as $abs) {
+                if (! is_file($abs) || ! $this->isImportFilename(basename($abs))) {
+                    continue;
+                }
+                $base = basename($abs);
+                $key = strtolower($base);
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $files[] = [
+                    'name' => $base,
+                    'path' => $abs,
+                    'size' => (int) filesize($abs),
+                    'modified' => (int) filemtime($abs),
+                    'absolute' => $abs,
+                ];
+            }
         }
 
         usort($files, fn ($a, $b) => $b['modified'] <=> $a['modified']);
 
         return $files;
+    }
+
+    public function preparedFilesDirectoryHint(): string
+    {
+        return storage_path('app/'.self::DISK_DIR);
+    }
+
+    /**
+     * @return list<array{name: string, path: string, size: int, modified: int, absolute: string}>
+     */
+    private function scanImportDirectory(string $dir): array
+    {
+        $disk = Storage::disk('local');
+        if (! $disk->exists($dir)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($disk->files($dir) as $path) {
+            $base = basename($path);
+            if (! $this->isImportFilename($base)) {
+                continue;
+            }
+            $absolute = $disk->path($path);
+            $out[] = [
+                'name' => $base,
+                'path' => $path,
+                'size' => (int) $disk->size($path),
+                'modified' => (int) $disk->lastModified($path),
+                'absolute' => $absolute,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function isImportFilename(string $base): bool
+    {
+        return (bool) preg_match('/\.csv(\.gz)?$/i', $base);
+    }
+
+    /**
+     * @param  array{
+     *   business_id: int,
+     *   dry_run?: bool,
+     *   update_existing?: bool,
+     *   credit_balances?: bool,
+     *   only_status?: string|null,
+     *   limit?: int|null
+     * }  $options
+     * @return array{ok: bool, message: string, created: int, updated: int, skipped: int, errors: list<string>, dry_run: bool}
+     */
+    public function importFromPreparedName(string $preparedName, array $options): array
+    {
+        $preparedName = basename($preparedName);
+        foreach ($this->listPreparedFiles() as $file) {
+            if (strcasecmp($file['name'], $preparedName) === 0) {
+                if (! empty($file['absolute']) && is_file($file['absolute'])) {
+                    return $this->importFromAbsolutePath($file['absolute'], $options);
+                }
+
+                return $this->importFromStoragePath((string) $file['path'], $options);
+            }
+        }
+
+        $fallback = self::DISK_DIR.'/'.$preparedName;
+        if (Storage::disk('local')->exists($fallback)) {
+            return $this->importFromStoragePath($fallback, $options);
+        }
+
+        return $this->result(false, 'Prepared file not found: '.$preparedName, dryRun: (bool) ($options['dry_run'] ?? false));
     }
 
     /**

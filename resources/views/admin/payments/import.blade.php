@@ -25,6 +25,9 @@
     @if(session('success'))
         <div class="bg-green-50 border border-green-200 text-green-800 rounded-lg p-3 text-sm">{{ session('success') }}</div>
     @endif
+    @if(session('warning'))
+        <div class="bg-amber-50 border border-amber-300 text-amber-950 rounded-lg p-3 text-sm font-medium">{{ session('warning') }}</div>
+    @endif
     @if(session('error'))
         <div class="bg-red-50 border border-red-200 text-red-800 rounded-lg p-3 text-sm">{{ session('error') }}</div>
     @endif
@@ -51,11 +54,11 @@
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
         <p class="font-medium mb-1">Before you import</p>
         <ul class="list-disc ml-5 space-y-1">
+            <li><strong>Preview only</strong> must be <em>unticked</em> to write rows into the payments table. If Mode shows “Dry run”, nothing was saved.</li>
+            <li>Prepared files must live on <strong>this</strong> app server at:<br><code class="text-xs break-all">{{ $preparedDirHint ?? 'storage/app/payment-imports' }}</code></li>
             <li>Legacy status mapping: <code>success</code> → approved, <code>pending</code> → pending, <code>failed</code> → rejected.</li>
-            <li>Rows attach to the business you select. This Contabo DB currently needs at least one business.</li>
-            <li><strong>Credit balances</strong> is off by default — historical approved rows will appear in Payments without changing wallet balance.</li>
-            <li>Large files (&gt;2MB): use a <strong>prepared server file</strong> below (or upload <code>.csv.gz</code>). Full approved set is ~3.6MB gzipped / ~33MB CSV.</li>
-            <li>Start with a dry run and/or the sample file (<code>checzspw_transactions_sample_100.csv</code>).</li>
+            <li><strong>Credit balances</strong> stays off unless you want historical approved rows to increase the merchant wallet.</li>
+            <li>Start with the sample (100 rows) or set Limit to 100, then import the full approved set.</li>
         </ul>
     </div>
 
@@ -95,9 +98,9 @@
                         data-source="prepared">
                     <span>
                         <span class="font-medium text-gray-900">Prepared server file</span>
-                        <span class="block text-xs text-gray-500 mt-0.5">From <code>storage/app/payment-imports/</code></span>
+                        <span class="block text-xs text-gray-500 mt-0.5">Exact path: <code class="break-all">{{ $preparedDirHint }}</code></span>
                         @if(count($preparedFiles) === 0)
-                            <span class="block text-xs text-amber-700 mt-1">No prepared files on this server — use Upload, or copy CSVs into storage/app/payment-imports/.</span>
+                            <span class="block text-xs text-amber-700 mt-1">No CSV files found in that folder on this server. Upload below, or copy files into that path on the same host that serves this admin (live vs Contabo are different).</span>
                         @endif
                     </span>
                 </label>
@@ -149,9 +152,9 @@
                 <input type="number" name="limit" value="{{ old('limit') }}" min="1" max="200000" placeholder="No limit"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
             </div>
-            <label class="flex items-center gap-2 text-sm text-gray-800 mt-6 sm:mt-8">
-                <input type="checkbox" name="dry_run" value="1" class="rounded" @checked(old('dry_run', true))>
-                Dry run (no writes)
+            <label class="flex items-start gap-2 text-sm text-amber-950 mt-6 sm:mt-8 bg-amber-50 border border-amber-200 rounded-lg p-2 sm:col-span-1">
+                <input type="checkbox" name="dry_run" value="1" class="rounded mt-0.5" @checked(old('dry_run'))>
+                <span><span class="font-medium">Preview only</span> — leave <strong>unchecked</strong> to insert into payments. Checked = count only, no DB writes.</span>
             </label>
             <label class="flex items-center gap-2 text-sm text-gray-800 mt-6 sm:mt-8">
                 <input type="checkbox" name="update_existing" value="1" class="rounded" @checked(old('update_existing'))>

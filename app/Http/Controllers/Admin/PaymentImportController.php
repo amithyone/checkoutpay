@@ -21,6 +21,7 @@ class PaymentImportController extends Controller
         return view('admin.payments.import', [
             'businesses' => Business::query()->orderBy('name')->get(['id', 'name', 'email']),
             'preparedFiles' => $this->imports->listPreparedFiles(),
+            'preparedDirHint' => $this->imports->preparedFilesDirectoryHint(),
             'sampleHeaders' => [
                 'legacy_id', 'transaction_id', 'external_reference', 'amount', 'status', 'payment_method',
                 'payer_name', 'payer_email', 'site_id', 'site_name', 'description', 'charge', 'received_amount',
@@ -72,8 +73,14 @@ class PaymentImportController extends Controller
             if ($prepared === '' || preg_match('/[\\\\\\/]/', $prepared)) {
                 return back()->withInput()->with('error', 'Choose a prepared file from the list.');
             }
-            $path = PaymentImportService::DISK_DIR.'/'.$prepared;
-            $result = $this->imports->importFromStoragePath($path, $options);
+            $result = $this->imports->importFromPreparedName($prepared, $options);
+        }
+
+        if (! empty($result['dry_run'])) {
+            $message = 'DRY RUN — nothing was written to the payments table. '.$result['message']
+                .' Untick “Preview only” and run again to actually insert rows.';
+
+            return back()->with('warning', $message)->with('import_stats', $result);
         }
 
         $flash = $result['ok'] ? 'success' : 'error';
