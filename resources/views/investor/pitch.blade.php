@@ -684,7 +684,7 @@
             <div class="wrap hero-copy">
                 <p class="eyebrow">Checkout Now LTD · CheckoutPay · CheckoutNow · Cheko</p>
                 <h1>Checkout Now</h1>
-                <p>Bootstrapped to ₦700M+ in transactions — raising seed to win the market and push contactless Proximity Pay.</p>
+                <p>Bootstrapped to {{ $metrics['volume'] }} volume and {{ $metrics['tx_count'] }} transactions in the {{ $metrics['tx_period'] }} — raising seed to win the market and push contactless Proximity Pay.</p>
                 <div class="cta-row">
                     <a class="btn btn-exec" href="{{ route('investor.summary') }}">Executive summary</a>
                     <a class="btn btn-primary" href="#intro">Explore</a>
@@ -706,7 +706,7 @@
                 <div class="grid-3" style="margin-top:2rem;">
                     <div class="panel">
                         <h3>Where we are</h3>
-                        <p>Over <strong style="color:var(--ink);">₦700M</strong> in processed transactions, live apps on App Store &amp; Google Play, ~70 merchants, 700+ wallets — and more than <strong style="color:var(--ink);">80% of the core development roadmap already shipped</strong>.</p>
+                        <p>Over <strong style="color:var(--ink);">{{ $metrics['volume'] }}</strong> processed volume and nearly <strong style="color:var(--ink);">{{ $metrics['tx_count'] }}</strong> transactions in the {{ $metrics['tx_period'] }}, live apps on App Store &amp; Google Play, {{ $metrics['merchants'] }} merchants, {{ $metrics['wallets'] }} wallets — and more than <strong style="color:var(--ink);">80% of the core development roadmap already shipped</strong>.</p>
                     </div>
                     <div class="panel">
                         <h3>How we got here</h3>
@@ -1000,10 +1000,14 @@
         <section id="traction" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
             <div class="wrap">
                 <p class="section-label">What we have done</p>
-                <h2>Over ₦700M in transactions — self-funded.</h2>
-                <p class="lede">Real volume on a live dual-sided product. This was accomplished without loans and without prior share dilution.</p>
+                <h2>{{ $metrics['tx_count'] }} transactions in the {{ $metrics['tx_period'] }} — self-funded.</h2>
+                <p class="lede">Real throughput on a live dual-sided product: {{ $metrics['volume'] }} cumulative volume. Built without loans and without prior share dilution.</p>
 
                 <div class="grid-4">
+                    <div class="metric">
+                        <div class="value">{{ $metrics['tx_count'] }}</div>
+                        <div class="label">Transactions · {{ $metrics['tx_period'] }}</div>
+                    </div>
                     <div class="metric">
                         <div class="value">{{ $metrics['volume'] }}</div>
                         <div class="label">Transaction volume</div>
@@ -1011,10 +1015,6 @@
                     <div class="metric">
                         <div class="value">{{ $metrics['daily'] }}</div>
                         <div class="label">Daily average</div>
-                    </div>
-                    <div class="metric">
-                        <div class="value">80%+</div>
-                        <div class="label">Core development done</div>
                     </div>
                     <div class="metric">
                         <div class="value">0</div>
@@ -1032,12 +1032,12 @@
                             <li><strong>No diluted shares</strong> from earlier fundraising rounds</li>
                             <li>Consumer apps <strong>live</strong> on App Store &amp; Google Play</li>
                             <li><strong>Cheko Windows</strong> ready · WordPress plugin · business web app</li>
-                            <li>~70 merchants · 700+ wallet users · rentals expansion underway</li>
+                            <li>{{ $metrics['merchants'] }} merchants · {{ $metrics['wallets'] }} wallet users · {{ $metrics['tx_count'] }} txns in the {{ $metrics['tx_period'] }} · rentals expansion underway</li>
                         </ul>
                     </div>
                     <div class="panel">
                         <h3>Growth</h3>
-                        <p style="margin-bottom: 0.5rem;">Volume trajectory toward {{ $metrics['volume'] }} lifetime.</p>
+                        <p style="margin-bottom: 0.5rem;">{{ $metrics['tx_count'] }} transactions in the {{ $metrics['tx_period'] }} · volume toward {{ $metrics['volume'] }} lifetime.</p>
                         <div class="chart" aria-hidden="true">
                             @foreach ([18, 28, 35, 42, 55, 68, 78, 92] as $i => $h)
                                 <div class="bar" style="height: {{ $h }}%; animation-delay: {{ $i * 0.06 }}s">

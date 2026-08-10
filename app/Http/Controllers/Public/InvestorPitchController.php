@@ -81,6 +81,8 @@ class InvestorPitchController extends Controller
             'photos' => $photos,
             'metrics' => [
                 'volume' => '₦700M+',
+                'tx_count' => '~100K',
+                'tx_period' => 'past 6 months',
                 'daily' => '~₦3M',
                 'merchants' => '~70',
                 'wallets' => '700+',

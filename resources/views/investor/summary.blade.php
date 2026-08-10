@@ -225,9 +225,9 @@
                 Checkout Now — dual-sided payments, Proximity Pay, and seed plans in one short brief.
             </p>
             <div class="stats">
+                <div class="stat"><div class="n">{{ $metrics['tx_count'] }}</div><div class="l">Txns · {{ $metrics['tx_period'] }}</div></div>
                 <div class="stat"><div class="n">{{ $metrics['volume'] }}</div><div class="l">Transaction volume</div></div>
                 <div class="stat"><div class="n">{{ $metrics['daily'] }}</div><div class="l">Daily average</div></div>
-                <div class="stat"><div class="n">80%+</div><div class="l">Core product shipped</div></div>
                 <div class="stat"><div class="n">0</div><div class="l">Prior dilution / build debt</div></div>
             </div>
         </div>
@@ -288,11 +288,13 @@
             <section>
                 <h2>Traction &amp; bootstrap</h2>
                 <p>
+                    Nearly <strong>{{ $metrics['tx_count'] }}</strong> transactions in the <strong>{{ $metrics['tx_period'] }}</strong> ·
                     <strong>{{ $metrics['volume'] }}</strong> cumulative transaction volume ·
                     <strong>{{ $metrics['daily'] }}</strong> daily average ·
                     <strong>{{ $metrics['merchants'] }}</strong> merchants ·
                     <strong>{{ $metrics['wallets'] }}</strong> wallet users.
                     Implied run-rate if daily holds: roughly <strong>{{ $metrics['runrate'] }}/year</strong>.
+                    Core product is <strong>80%+</strong> shipped.
                 </p>
                 <p>
                     This stage was reached from the <strong>founder’s pocket</strong>:
