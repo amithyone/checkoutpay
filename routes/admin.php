@@ -212,6 +212,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             ->name('businesses.verification.reject');
         Route::post('businesses/{business}/retry-pay-in-account', [BusinessController::class, 'retryPayInAccount'])
             ->name('businesses.retry-pay-in-account');
+        Route::post('businesses/{business}/clear-pay-in-account', [BusinessController::class, 'clearPayInAccount'])
+            ->name('businesses.clear-pay-in-account');
         Route::get('businesses/{business}/verifications/{verification}/download', [BusinessController::class, 'downloadVerificationDocument'])
             ->name('businesses.verification.download');
 

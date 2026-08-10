@@ -140,6 +140,46 @@ final class PrivateAccountProvisionService
     }
 
     /**
+     * Remove stored permanent pay-in VA fields so creation can be retried
+     * (does not call Mevon to close the old NUBAN — local record only).
+     */
+    public function clearBusinessPayInAccount(Business $business, ?string $reason = null): bool
+    {
+        $business->refresh();
+        $hadAnything = trim((string) ($business->rubies_business_account_number ?? '')) !== ''
+            || trim((string) ($business->rubies_account_provision_status ?? '')) !== ''
+            || trim((string) ($business->rubies_account_provision_error ?? '')) !== '';
+
+        if (! $hadAnything) {
+            return false;
+        }
+
+        $previousAccount = trim((string) ($business->rubies_business_account_number ?? ''));
+        $previousName = trim((string) ($business->rubies_business_account_name ?? ''));
+
+        $business->update([
+            'rubies_business_account_number' => null,
+            'rubies_business_account_name' => null,
+            'rubies_business_bank_name' => null,
+            'rubies_business_bank_code' => null,
+            'rubies_business_reference' => null,
+            'rubies_business_account_created_at' => null,
+            'rubies_account_provision_status' => null,
+            'rubies_account_provision_error' => null,
+            'rubies_account_provision_queued_at' => null,
+        ]);
+
+        Log::warning('private_account.business_cleared', [
+            'business_id' => $business->id,
+            'previous_account_suffix' => $previousAccount !== '' ? substr($previousAccount, -4) : null,
+            'previous_account_name' => $previousName !== '' ? $previousName : null,
+            'reason' => $reason,
+        ]);
+
+        return true;
+    }
+
+    /**
      * @return array{bvn: ?string, nin: ?string}
      */
     public function verifiedBusinessIdentity(Business $business): ?array

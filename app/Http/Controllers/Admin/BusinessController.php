@@ -1064,6 +1064,52 @@ class BusinessController extends Controller
             ->with('warning', $result['message']);
     }
 
+    /**
+     * Clear a permanent business pay-in VA so it can be re-provisioned
+     * (e.g. wrong personal-name account — retry with registered business name + RC/BN).
+     */
+    public function clearPayInAccount(Request $request, Business $business, PrivateAccountProvisionService $provision): RedirectResponse
+    {
+        if (! auth('admin')->user()?->canDecideBusinessKyc()) {
+            abort(403, 'You cannot manage business pay-in accounts.');
+        }
+
+        $request->validate([
+            'confirm' => 'nullable|string|max:20',
+            'queue_retry' => 'nullable|boolean',
+        ]);
+
+        $hadAccount = trim((string) ($business->rubies_business_account_number ?? '')) !== '';
+        $cleared = $provision->clearBusinessPayInAccount(
+            $business,
+            'Cleared by admin '.auth('admin')->user()->email.' so permanent pay-in can be recreated with registered business name + RC/BN.'
+        );
+
+        if (! $cleared) {
+            return redirect()->route('admin.businesses.show', $business)
+                ->with('warning', 'No permanent pay-in account fields to clear.');
+        }
+
+        $message = $hadAccount
+            ? 'Permanent pay-in account cleared. Confirm registered business name and CAC RC/BN, then retry creation.'
+            : 'Pay-in provision state cleared. You can retry account creation.';
+
+        if ($request->boolean('queue_retry')) {
+            $business->refresh();
+            $result = $provision->dispatchBusinessIfReady($business, forceRetry: true);
+            if ($result['dispatched']) {
+                return redirect()->route('admin.businesses.show', $business)
+                    ->with('success', $message.' '.$result['message']);
+            }
+
+            return redirect()->route('admin.businesses.show', $business)
+                ->with('warning', $message.' Retry not queued yet: '.$result['message']);
+        }
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->with('success', $message);
+    }
+
     private function verificationDecisionRedirect(Request $request, Business $business): RedirectResponse
     {
         if ($request->input('return_to') === 'kyc_queue') {

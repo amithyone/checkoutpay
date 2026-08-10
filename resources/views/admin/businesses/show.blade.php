@@ -853,15 +853,39 @@
                 <h4 class="text-sm font-semibold text-gray-900 mb-2">
                     <i class="fas fa-building-columns mr-1"></i> Rubies business pay-in account (KYC)
                 </h4>
+                <dl class="text-xs text-gray-700 space-y-1 mb-3">
+                    <div><span class="text-gray-500">Registered business name (for VA):</span> <span class="font-medium text-gray-900">{{ $business->name ?: '—' }}</span></div>
+                    <div><span class="text-gray-500">CAC RC/BN:</span> <span class="font-medium text-gray-900">{{ $business->cac_registration_number ?: '—' }}</span></div>
+                    @if(!empty($business->rubies_signatory_name))
+                        <div><span class="text-gray-500">Signatory (BVN/NIN only):</span> {{ $business->rubies_signatory_name }}</div>
+                    @endif
+                </dl>
                 @if(!empty($business->rubies_business_account_number))
                     <dl class="text-sm text-gray-800 space-y-1">
                         <div><span class="text-gray-600">Account:</span> <span class="font-mono font-medium">{{ $business->rubies_business_account_number }}</span></div>
                         <div><span class="text-gray-600">Bank:</span> {{ $business->rubies_business_bank_name ?? '—' }}</div>
                         <div><span class="text-gray-600">Name:</span> {{ $business->rubies_business_account_name ?? '—' }}</div>
-                        @if($business->cac_registration_number)
-                            <div><span class="text-gray-600">CAC:</span> {{ $business->cac_registration_number }}</div>
-                        @endif
                     </dl>
+                    @if(auth('admin')->user()?->canDecideBusinessKyc())
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <form method="POST" action="{{ route('admin.businesses.clear-pay-in-account', $business) }}"
+                                onsubmit="return confirm('Clear this pay-in account from Checkout so you can recreate it with the registered business name + RC/BN?\n\nThis only clears our local record — it does not close the NUBAN at the bank.');">
+                                @csrf
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700">
+                                    Clear pay-in account
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.businesses.clear-pay-in-account', $business) }}"
+                                onsubmit="return confirm('Clear the current pay-in account and immediately queue a new one using registered business name + RC/BN?');">
+                                @csrf
+                                <input type="hidden" name="queue_retry" value="1">
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700">
+                                    Clear &amp; retry creation
+                                </button>
+                            </form>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Use this if the account was opened under a personal name. Fix registered business name / RC-BN above first if needed (edit business profile), then clear &amp; retry.</p>
+                    @endif
                 @elseif(in_array($business->rubies_account_provision_status, ['queued', 'processing'], true))
                     <p class="text-sm text-blue-900">
                         Pay-in account creation is in progress. Refresh shortly for account details.
@@ -869,22 +893,50 @@
                             (Queued {{ $business->rubies_account_provision_queued_at->diffForHumans() }})
                         @endif
                     </p>
+                    @if(auth('admin')->user()?->canDecideBusinessKyc())
+                        <form method="POST" action="{{ route('admin.businesses.clear-pay-in-account', $business) }}" class="mt-2"
+                            onsubmit="return confirm('Reset stuck provision state so you can retry?');">
+                            @csrf
+                            <button type="submit" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-800 text-xs font-semibold hover:bg-gray-50">
+                                Reset provision state
+                            </button>
+                        </form>
+                    @endif
                 @elseif($business->rubies_account_provision_status === 'failed')
                     <div class="space-y-2">
                         <p class="text-sm text-red-900">
                             Pay-in account creation failed: {{ $business->rubies_account_provision_error ?? 'Unknown error' }}
                         </p>
-                        <form method="POST" action="{{ route('admin.businesses.retry-pay-in-account', $business) }}">
-                            @csrf
-                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90">
-                                Retry account creation
-                            </button>
-                        </form>
+                        @if(auth('admin')->user()?->canDecideBusinessKyc())
+                            <div class="flex flex-wrap gap-2">
+                                <form method="POST" action="{{ route('admin.businesses.retry-pay-in-account', $business) }}">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90">
+                                        Retry account creation
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('admin.businesses.clear-pay-in-account', $business) }}"
+                                    onsubmit="return confirm('Clear failed provision state?');">
+                                    @csrf
+                                    <button type="submit" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-800 text-xs font-semibold hover:bg-gray-50">
+                                        Clear failed state
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
                     </div>
                 @else
                     <p class="text-sm text-amber-900">
-                        No pay-in account on file yet. After all KYC is approved and BVN/NIN identity is confirmed, account creation is queued automatically when profile details (CAC, phone, email, signatory DOB) are complete.
+                        No pay-in account on file yet. After all KYC is approved and BVN/NIN identity is confirmed, account creation is queued automatically when profile details (registered business name, CAC RC/BN, phone, email, signatory DOB) are complete.
                     </p>
+                    @if(auth('admin')->user()?->canDecideBusinessKyc())
+                        <form method="POST" action="{{ route('admin.businesses.retry-pay-in-account', $business) }}" class="mt-2">
+                            @csrf
+                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90">
+                                Queue account creation
+                            </button>
+                        </form>
+                    @endif
                 @endif
             </div>
         @endif
