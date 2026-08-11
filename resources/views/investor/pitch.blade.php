@@ -833,7 +833,7 @@
                     </div>
                     <div class="panel">
                         <h3>How we got here</h3>
-                        <p>We got here by investing over <strong style="color:var(--ink);">{{ $invested['labor'] }}</strong> in timed product, engineering, and market-research labor, and over <strong style="color:var(--ink);">{{ $invested['build'] }}</strong> in development, licensing, and operating build cost — weighing competition and growth at every step. <strong style="color:var(--ink);">No bank loans. No outside equity.</strong> We reached this stage without debt liabilities, and we keep the same standards for verification, licensing, and security as we scale.</p>
+                        <p>We have invested over <strong style="color:var(--ink);">{{ $invested['cash'] }}</strong> in cash into product, licensing, and operations — including a <strong style="color:var(--ink);">{{ $invested['fccpc_deposit'] }}</strong> hold deposit toward Nigeria’s digital lending license (FCCPC). The estimated share value of what we have already put into the company is over <strong style="color:var(--ink);">{{ $invested['equity_value'] }}</strong>. <strong style="color:var(--ink);">No bank loans. No outside equity.</strong> We reached this stage without debt liabilities, and we keep the same standards for verification, licensing, and security as we scale.</p>
                     </div>
                     <div class="panel">
                         <h3>Ownership today</h3>
@@ -1149,8 +1149,9 @@
                     <div class="panel">
                         <h3>Invested capital to this stage</h3>
                         <ul>
-                            <li>Over <strong>{{ $invested['labor'] }}</strong> in timed product, engineering, and market-research labor</li>
-                            <li>Over <strong>{{ $invested['build'] }}</strong> in development, licensing, tooling, and operating build cost</li>
+                            <li>Over <strong>{{ $invested['cash'] }}</strong> cash into product, licensing, and operations</li>
+                            <li>Including a <strong>{{ $invested['fccpc_deposit'] }}</strong> hold deposit toward Nigeria’s digital lending license (FCCPC)</li>
+                            <li>Estimated share value of what we have put into the company: over <strong>{{ $invested['equity_value'] }}</strong></li>
                             <li><strong>No bank loans</strong> · <strong>no outside equity</strong> · <strong>no build debt</strong> on the balance sheet</li>
                             <li>Standards kept for verification, licensing, and security — the same discipline we scale with</li>
                             <li>Consumer apps <strong>live</strong> on App Store &amp; Google Play</li>

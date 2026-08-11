@@ -334,9 +334,9 @@
                     Core product is <strong>80%+</strong> shipped.
                 </p>
                 <p>
-                    We got here by investing over <strong>{{ $invested['labor'] }}</strong> in timed product, engineering, and market-research labor,
-                    and over <strong>{{ $invested['build'] }}</strong> in development, licensing, and operating build cost —
-                    weighing competition and growth at every step.
+                    We have invested over <strong>{{ $invested['cash'] }}</strong> in cash into product, licensing, and operations —
+                    including a <strong>{{ $invested['fccpc_deposit'] }}</strong> hold deposit toward Nigeria’s digital lending license (FCCPC).
+                    The estimated share value of what we have already put into the company is over <strong>{{ $invested['equity_value'] }}</strong>.
                     <strong>No bank loans</strong>, <strong>no prior outside equity</strong>, and <strong>no build debt</strong>.
                     Seed is the first outside capital raise into the business for growth — with the same discipline on verification, licensing, and security as we scale.
                 </p>

@@ -18,7 +18,7 @@ class InvestorPitchController extends Controller
     }
 
     /**
-     * @return array{photos: array<string, array<string, mixed>>, metrics: array<string, string>, invested: array{labor: string, build: string}, funds: list<array{label: string, pct: int, tone: string}>}
+     * @return array{photos: array<string, array<string, mixed>>, metrics: array<string, string>, invested: array{cash: string, fccpc_deposit: string, equity_value: string}, funds: list<array{label: string, pct: int, tone: string}>}
      */
     private function pitchData(): array
     {
@@ -89,8 +89,9 @@ class InvestorPitchController extends Controller
                 'runrate' => '~₦1.1B',
             ],
             'invested' => [
-                'labor' => '₦100 million',
-                'build' => '₦50 million',
+                'cash' => '₦30 million',
+                'fccpc_deposit' => '₦20 million',
+                'equity_value' => '₦100 million',
             ],
             'funds' => [
                 ['label' => 'Cheko + contactless', 'pct' => 35, 'tone' => '#0B3D91'],
