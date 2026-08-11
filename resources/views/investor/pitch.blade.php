@@ -772,6 +772,7 @@
                 <a href="{{ route('investor.summary') }}">Exec summary</a>
                 <a href="#flows">Flows</a>
                 <a href="#ecosystem">Ecosystem</a>
+                <a href="#breakin">Break-in</a>
                 <a href="#loans">Loans</a>
                 <a href="#ask">Seed use</a>
             </nav>
@@ -791,6 +792,7 @@
             <a href="#flows">Flows</a>
             <a href="#ecosystem">Ecosystem</a>
             <a href="#traction">Traction</a>
+            <a href="#breakin">Break-in</a>
             <a href="#loans">Loans</a>
             <a href="#ask">Seed use</a>
         </nav>
@@ -1265,6 +1267,77 @@
             </div>
         </section>
 
+        {{-- MARKET BREAK-IN --}}
+        <section id="breakin" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
+            <div class="wrap">
+                <p class="section-label">Market break-in</p>
+                <h2>Peers became unicorns with small POS devices. We break in with a full desktop shop system.</h2>
+                <p class="lede">
+                    In a few years, competitors became unicorns largely by putting hardware in shops, owning the payment flow, then lending.
+                    We run the same break-in logic — with a <strong style="color:var(--ink);">bigger wedge</strong>: a full Windows POS that runs the store, not just a payment gadget.
+                </p>
+
+                <div class="grid-3" style="margin-top:2rem;">
+                    <div class="metric">
+                        <div class="value" style="font-size:1.5rem;">$1B+</div>
+                        <div class="label">Moniepoint unicorn · ~$200M Series C (2025) · publicly reported</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value" style="font-size:1.5rem;">~$3B</div>
+                        <div class="label">OPay valuation band · agent / POS density play · publicly reported</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value" style="font-size:1.5rem;">$1B+</div>
+                        <div class="label">PalmPay unicorn-scale · merchant device push · publicly reported</div>
+                    </div>
+                </div>
+                <p style="margin-top:0.85rem;font-size:0.8rem;color:var(--ink-soft);">
+                    Same model (publicly reported): put hardware in the shop → own payments → lend. Figures are approximate market reporting, not Checkout diligence.
+                </p>
+
+                <div class="panel" style="margin-top:1.75rem;">
+                    <h3>How they won Nigeria</h3>
+                    <ul>
+                        <li><strong>Flood the street with devices</strong> — small POS / agent terminals into shops (sometimes free or discounted).</li>
+                        <li><strong>Own daily money movement</strong> — become how the shop gets paid and does cash-out.</li>
+                        <li><strong>Stack credit</strong> — lend working capital from real transaction history.</li>
+                        <li><strong>Scale to national density</strong> — millions of businesses / agents; unicorn valuations followed.</li>
+                    </ul>
+                </div>
+
+                <div class="grid-3" style="margin-top:1.75rem;">
+                    <div class="panel">
+                        <h3>What we give the shop</h3>
+                        <p>
+                            A <strong style="color:var(--ink);">Windows hardware + Cheko software</strong> till kit for new and growing stores:
+                            inventory, staff, ring up sales, collect payment, and Proximity Pay — under a merchant agreement.
+                            How many kits we place scales with seed capacity.
+                        </p>
+                    </div>
+                    <div class="panel">
+                        <h3>Why bigger than a small POS</h3>
+                        <p>
+                            Peers mostly deploy a <strong style="color:var(--ink);">handheld payment device</strong>.
+                            We deploy a <strong style="color:var(--ink);">full desktop POS system</strong> that runs the store —
+                            inventory + till + payments in one place. Stronger trust for supermarket and retail floors.
+                        </p>
+                    </div>
+                    <div class="panel">
+                        <h3>What we get back</h3>
+                        <p>
+                            Shop density, daily ops lock-in, and volume data.
+                            Then <strong style="color:var(--ink);">loans to eligible merchants</strong> after FCCPC —
+                            and a long-term path to become a bank as capital and licenses allow.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="quote" style="margin-top:1.75rem;">
+                    Hardware builds trust. Software runs the shop. Payments + loans keep the merchant on Checkout — the Moniepoint / OPay playbook, with a full desktop system instead of a small POS gadget.
+                </div>
+            </div>
+        </section>
+
         {{-- BUSINESS LOANS --}}
         <section id="loans" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
             <div class="wrap">
@@ -1343,12 +1416,16 @@
                         <span>Overdraft / loan / peer lending built and held back until registration issues.</span>
                     </div>
                     <div class="tl-item">
-                        <strong>Optional — Own Central Bank licenses later</strong>
+                        <strong>Next — Own Central Bank licenses</strong>
                         <span>Processor (PSSP), own e-money (MMO), or terminal estate (PTSP) as Checkout Now scales independently.</span>
+                    </div>
+                    <div class="tl-item">
+                        <strong>Long-term goal — Become a bank</strong>
+                        <span>Climb the Central Bank ladder toward fuller banking capacity as volume, capital, and licenses allow — after FCCPC lending and shop density prove the model. We are not a bank today.</span>
                     </div>
                 </div>
                 <blockquote class="quote">
-                    “Checkout Now LTD operates CheckoutPay, CheckoutNow, and Cheko. We process merchant and wallet volume today through licensed payment partners under service agreements — including METRAVON INNOVATION LTD. Consumer and merchant credit products are built and held back pending Nigeria’s digital lending license (FCCPC), which is underway. Proceeds will fund more Cheko shops live, compliance capital, and — post-approval — a controlled credit book.”
+                    “Checkout Now LTD operates CheckoutPay, CheckoutNow, and Cheko. We process merchant and wallet volume today through licensed payment partners under service agreements — including METRAVON INNOVATION LTD. Consumer and merchant credit products are built and held back pending Nigeria’s digital lending license (FCCPC), which is underway. Proceeds will fund Windows + Cheko till kits in more shops, compliance capital, and — post-approval — a controlled credit book. Long-term, we aim to become a bank as capacity and licenses allow.”
                 </blockquote>
             </div>
         </section>
@@ -1364,7 +1441,7 @@
                         <p class="section-label" style="color:#8fd0ef;">Seed investment</p>
                         <h2>How investor money is used</h2>
                         <p class="lede">
-                            Seed funds <strong style="color:#fff;">competitive scale and trust</strong> — more shops live, contactless Proximity Pay, security &amp; compliance —
+                            Seed funds <strong style="color:#fff;">competitive scale and trust</strong> — Windows + Cheko till kits in more shops, contactless Proximity Pay, security &amp; compliance —
                             not rebuilding what is already live. We are past <strong style="color:#fff;">80%+</strong> of core development; capital wins the market and hardens the payment path shoppers and merchants rely on.
                         </p>
 
@@ -1380,11 +1457,11 @@
                             <div class="ask-grid" style="margin-top:0.5rem;">
                                 <div class="ask-card">
                                     <div class="k">01 · Competitive access</div>
-                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Sales, merchant acquisition, more tills in more cities, and distribution so Checkout can out-execute acquirers and wallets that only own one side of the loop.</div>
+                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Place Windows + Cheko till kits in supermarket and retail shops (break-in marketing), plus sales and city coverage so Checkout can out-execute acquirers and wallets that only own one side of the loop.</div>
                                 </div>
                                 <div class="ask-card">
                                     <div class="k">02 · Contactless push</div>
-                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Roll Cheko tills, expand Proximity Pay, and grow the open Checkout Broadcast Protocol so more phones can pay more shops — faster than typing account numbers.</div>
+                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Till kits ship Proximity Pay–ready: expand contactless at the till and grow the open Checkout Broadcast Protocol so more phones can pay more shops — faster than typing account numbers.</div>
                                 </div>
                                 <div class="ask-card">
                                     <div class="k">03 · Security, licensing &amp; compliance</div>

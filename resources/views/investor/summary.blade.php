@@ -343,6 +343,26 @@
             </section>
 
             <section>
+                <h2>Market break-in</h2>
+                <p>
+                    In a few years, competitors became unicorns largely by giving businesses <strong>small POS devices</strong>,
+                    owning the payment flow, then lending —
+                    <strong>Moniepoint ($1B+ unicorn)</strong>, <strong>OPay (~$3B valuation band)</strong>, and <strong>PalmPay (unicorn-scale)</strong>
+                    are publicly reported examples of that playbook.
+                </p>
+                <p>
+                    Checkout uses the same break-in logic with a bigger wedge: seed funds placing
+                    <strong>Windows hardware + Cheko full desktop POS</strong> kits in supermarket and retail shops
+                    (inventory + till + collect payment + Proximity Pay), then
+                    <strong>loans to eligible merchants</strong> after FCCPC.
+                    Kit volume scales with raise capacity. Long-term goal: <strong>become a bank</strong> as licenses and capital allow.
+                </p>
+                <div class="callout">
+                    Peers: small payment gadgets. Checkout: a full desktop shop system merchants can trust — then credit, then bank.
+                </div>
+            </section>
+
+            <section>
                 <h2>Why lending works — and who we compete with</h2>
                 <p>
                     Payment fees are thin. Combining <strong>payment + POS</strong> means we process the shop’s transactions,
@@ -356,7 +376,7 @@
                     </div>
                     <div class="card">
                         <h3>vs Moniepoint (loans)</h3>
-                        <p>Moniepoint and similar compete on small-business working capital. We layer credit on dual-sided Checkout volume + more Cheko / Proximity Pay shops live — not a loan-only product.</p>
+                        <p>Moniepoint and similar compete on small-business working capital and small POS density. We layer credit on dual-sided Checkout volume + full Windows Cheko / Proximity Pay shops — not a loan-only or gadget-only product.</p>
                     </div>
                 </div>
                 <div class="callout">
@@ -369,7 +389,8 @@
                 <p>
                     <strong>Today:</strong> payments via licensed partners under service agreements (Central Bank licenses sit with partners such as Metavon).
                     <strong>In progress:</strong> Nigeria’s digital lending license (FCCPC) — credit products are built and held back until issued.
-                    <strong>Later:</strong> optional own Central Bank licenses (processor / e-money / terminals) as Checkout Now scales.
+                    <strong>Next:</strong> optional own Central Bank licenses (processor / e-money / terminals).
+                    <strong>Long-term:</strong> become a bank as volume, capital, and licenses allow — we are not a bank today.
                 </p>
             </section>
 
@@ -377,7 +398,7 @@
                 <h2>The ask — how seed is used</h2>
                 <p>
                     Seeking <strong>$750,000 – $1,500,000</strong> seed (SAFE or priced equity).
-                    Capital funds competitive market access, more Cheko / contactless shops live,
+                    Capital funds placing <strong>Windows + Cheko till kits</strong> (break-in marketing), contactless Proximity Pay,
                     <strong>security, licensing &amp; compliance</strong>, and — after FCCPC — a controlled credit book.
                     Shoppers should not type account numbers; merchants settle faster; banks can verify before money moves.
                 </p>
