@@ -18,7 +18,7 @@ class InvestorPitchController extends Controller
     }
 
     /**
-     * @return array{photos: array<string, array<string, mixed>>, metrics: array<string, string>, funds: list<array{label: string, pct: int, tone: string}>}
+     * @return array{photos: array<string, array<string, mixed>>, metrics: array<string, string>, invested: array{labor: string, build: string}, funds: list<array{label: string, pct: int, tone: string}>}
      */
     private function pitchData(): array
     {
@@ -88,9 +88,13 @@ class InvestorPitchController extends Controller
                 'wallets' => '700+',
                 'runrate' => '~₦1.1B',
             ],
+            'invested' => [
+                'labor' => '₦100 million',
+                'build' => '₦50 million',
+            ],
             'funds' => [
                 ['label' => 'Cheko + contactless', 'pct' => 35, 'tone' => '#0B3D91'],
-                ['label' => 'Compliance & licensing', 'pct' => 25, 'tone' => '#1A6BB5'],
+                ['label' => 'Compliance, licensing & security', 'pct' => 25, 'tone' => '#1A6BB5'],
                 ['label' => 'Credit liquidity*', 'pct' => 20, 'tone' => '#3D9AD1'],
                 ['label' => 'Market / growth', 'pct' => 20, 'tone' => '#7EC4E8'],
             ],

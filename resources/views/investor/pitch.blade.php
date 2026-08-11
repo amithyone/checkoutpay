@@ -807,7 +807,7 @@
             <div class="wrap hero-copy">
                 <p class="eyebrow">Checkout Now LTD · CheckoutPay · CheckoutNow · Cheko</p>
                 <h1>Checkout Now</h1>
-                <p>Bootstrapped to {{ $metrics['volume'] }} volume and {{ $metrics['tx_count'] }} transactions in the {{ $metrics['tx_period'] }} — raising seed to win the market and push contactless Proximity Pay.</p>
+                <p>Self-funded to {{ $metrics['volume'] }} volume and {{ $metrics['tx_count'] }} transactions in the {{ $metrics['tx_period'] }} — raising seed to win the market, harden trust &amp; security, and push contactless Proximity Pay.</p>
                 <div class="cta-row">
                     <a class="btn btn-exec" href="{{ route('investor.summary') }}">Executive summary</a>
                     <a class="btn btn-primary" href="#intro">Explore</a>
@@ -820,11 +820,11 @@
         <section id="intro">
             <div class="wrap">
                 <p class="section-label">Introduction</p>
-                <h2>Built from the founder’s pocket. Live. Scaling.</h2>
+                <h2>Invested to this stage. Live. Scaling.</h2>
                 <p class="lede">
                     Checkout Now LTD is Nigeria’s dual-sided money company: <strong style="color:var(--ink);">CheckoutPay</strong> for merchants,
                     <strong style="color:var(--ink);">CheckoutNow</strong> for consumers, and <strong style="color:var(--ink);">Cheko</strong> for the shop floor —
-                    with <strong style="color:var(--ink);">Proximity Pay</strong> (near-contactless) as the in-store rail.
+                    with <strong style="color:var(--ink);">Proximity Pay</strong> as the in-store pay method (phone near the till, no account typing).
                 </p>
                 <div class="grid-3" style="margin-top:2rem;">
                     <div class="panel">
@@ -833,11 +833,11 @@
                     </div>
                     <div class="panel">
                         <h3>How we got here</h3>
-                        <p>No bank loans. No outside equity rounds. Progress has been funded from the <strong style="color:var(--ink);">founder’s pocket</strong>. We reached this stage <strong style="color:var(--ink);">without debt liabilities</strong> weighing on the company.</p>
+                        <p>We got here by investing over <strong style="color:var(--ink);">{{ $invested['labor'] }}</strong> in timed product, engineering, and market-research labor, and over <strong style="color:var(--ink);">{{ $invested['build'] }}</strong> in development, licensing, and operating build cost — weighing competition and growth at every step. <strong style="color:var(--ink);">No bank loans. No outside equity.</strong> We reached this stage without debt liabilities, and we keep the same standards for verification, licensing, and security as we scale.</p>
                     </div>
                     <div class="panel">
-                        <h3>Cap table today</h3>
-                        <p>There have been <strong style="color:var(--ink);">no prior diluted share rounds</strong> — ownership has not been sold down to earlier investors. Seed is the first capital raise into the business for growth.</p>
+                        <h3>Ownership today</h3>
+                        <p>There have been <strong style="color:var(--ink);">no prior share sales to outside investors</strong> — ownership has not been sold down. Seed is the first capital raise into the business for growth.</p>
                     </div>
                 </div>
             </div>
@@ -847,20 +847,20 @@
         <section id="problem" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
             <div class="wrap">
                 <p class="section-label">The problem</p>
-                <h2>Commerce still stalls between bank transfer and cash.</h2>
-                <p class="lede">Nigeria moves a huge share of daily trade through transfers and cash at the till — but the experience is fragmented for both sides of the counter.</p>
+                <h2>Paying at a shop is still slower than it should be.</h2>
+                <p class="lede">Nigeria moves a huge share of daily trade through transfers and cash at the till — but shoppers and merchants both feel the friction.</p>
                 <div class="grid-3" style="margin-top:2rem;">
                     <div class="panel">
                         <h3>Merchants</h3>
-                        <p>Need reliable collection and settlement without depending on expensive card terminals everywhere — plus tools to grow (invoices, payroll, team).</p>
+                        <p>Need reliable collection and settlement without expensive card machines at every counter — plus tools to grow (invoices, payroll, team).</p>
                     </div>
                     <div class="panel">
-                        <h3>Consumers</h3>
-                        <p>Need a wallet that pays those merchants and covers daily money jobs: P2P, bills, savings, cards — not five disconnected apps.</p>
+                        <h3>Shoppers</h3>
+                        <p>Need one wallet that pays those shops and covers daily money jobs: send money, pay bills, save, spend — not five disconnected apps.</p>
                     </div>
                     <div class="panel">
-                        <h3>In-shop UX</h3>
-                        <p>Typing account numbers at the till is slow. Card POS is costly to deploy at every counter. Nigeria needs a lighter path to <strong style="color:var(--ink);">contactless-speed pay</strong>.</p>
+                        <h3>At the till</h3>
+                        <p>Typing account numbers is slow. Card machines are costly to put on every counter. Nigeria needs a lighter path to <strong style="color:var(--ink);">pay in seconds</strong>.</p>
                     </div>
                 </div>
             </div>
@@ -870,8 +870,8 @@
         <section id="solution">
             <div class="wrap">
                 <p class="section-label">The solution</p>
-                <h2>One stack. Both sides. Contactless at the till.</h2>
-                <p class="lede">Checkout owns the loop: merchant collect → consumer pay → in-shop Proximity Pay — on bank-transfer-first rails under partner SLA. The product surface is already live across desktop, mobile, web, and WordPress.</p>
+                <h2>One system for shops and shoppers. Pay at the till without typing numbers.</h2>
+                <p class="lede">Checkout owns the loop: merchant collects → shopper pays → in-shop Proximity Pay — on bank-transfer-first payment paths run by licensed partners. Live across desktop, mobile, web, and WordPress.</p>
 
                 <div class="grid-2">
                     <div class="panel">
@@ -882,12 +882,12 @@
                             <li><strong>Business web app</strong> — full business management in the browser</li>
                             <li><strong>WordPress plugin</strong> — CheckoutPay / COPN for WooCommerce stores</li>
                             <li><strong>Cheko</strong> — <strong>ready on Windows</strong> POS for supermarket, hotel, retail</li>
-                            <li><strong>Proximity Pay</strong> — near-contactless till↔phone (signed BLE)</li>
-                            <li><strong>Checkout Broadcast Protocol</strong> — open rail for banks / wallets / POS</li>
+                            <li><strong>Proximity Pay</strong> — phone near the till; signed Bluetooth session (no card-tap hardware)</li>
+                            <li><strong>Checkout Broadcast Protocol</strong> — open pay standard for banks, wallets, and POS</li>
                         </ul>
                         <p style="margin-top:1rem;font-size:0.85rem;color:var(--ink-soft);">
                             <strong style="color:var(--ink);">Checkout Now LTD</strong> owns these products.
-                            Payments run under SLA with partner <strong style="color:var(--ink);">METRAVON INNOVATION LTD</strong>.
+                            Money moves through licensed payment partners — notably <strong style="color:var(--ink);">METRAVON INNOVATION LTD</strong> — under service agreements.
                         </p>
                     </div>
                     @include('investor.partials.photo-slot', ['slot' => $photos['retail'], 'aspect' => '16 / 10'])
@@ -921,11 +921,11 @@
             <div class="wrap">
                 <p class="section-label">How it works</p>
                 <h2>Flows for business, shoppers, and online stores.</h2>
-                <p class="lede">Three entry points — same Checkout ledger underneath. Each path feeds volume, stickiness, and (later) loan eligibility.</p>
+                <p class="lede">Three entry points — same Checkout money system underneath. Each path feeds volume, stickiness, and (later) who can borrow.</p>
 
                 <div class="diagram-block">
                     <h3>1 · Business + Cheko (Windows POS)</h3>
-                    <p>Shop floor: ring up sale → broadcast Proximity Pay → customer pays → settle to business.</p>
+                    <p>Shop floor: ring up sale → send Proximity Pay request → customer pays → settle to business.</p>
                     <div class="vflow" role="img" aria-label="Cheko business flow">
                         <div class="v-node">
                             <div class="tag">01</div>
@@ -941,7 +941,7 @@
                         <div class="v-arrow" aria-hidden="true">→</div>
                         <div class="v-node accent">
                             <div class="tag">03</div>
-                            <strong>BLE broadcast</strong>
+                            <strong>Bluetooth pay request</strong>
                             <span>Signed Proximity Pay session</span>
                         </div>
                         <div class="v-arrow" aria-hidden="true">→</div>
@@ -961,12 +961,12 @@
 
                 <div class="diagram-block">
                     <h3>2 · User + CheckoutNow (iOS / Android)</h3>
-                    <p>Consumer wallet: fund → pay shops / P2P / bills → optional pay at till via Proximity Pay.</p>
+                    <p>Consumer wallet: fund → pay shops / send money / bills → optional pay at till via Proximity Pay.</p>
                     <div class="vflow" role="img" aria-label="CheckoutNow mobile flow">
                         <div class="v-node">
                             <div class="tag">01</div>
                             <strong>Install app</strong>
-                            <span>iOS · Android · KYC tiers</span>
+                            <span>iOS · Android · identity checks</span>
                         </div>
                         <div class="v-arrow" aria-hidden="true">→</div>
                         <div class="v-node">
@@ -978,13 +978,13 @@
                         <div class="v-node accent">
                             <div class="tag">03</div>
                             <strong>Spend</strong>
-                            <span>P2P · bills · merchant pay</span>
+                            <span>Send money · bills · merchant pay</span>
                         </div>
                         <div class="v-arrow" aria-hidden="true">→</div>
                         <div class="v-node">
                             <div class="tag">04</div>
                             <strong>Pay at shop</strong>
-                            <span>Read Cheko BLE · pay</span>
+                            <span>Phone near Cheko · confirm pay</span>
                         </div>
                         <div class="v-arrow" aria-hidden="true">→</div>
                         <div class="v-node">
@@ -1047,7 +1047,7 @@
                         <div class="eco-chip">
                             <div class="who">Business · shop</div>
                             <strong>Cheko Windows</strong>
-                            <span>POS · inventory · staff · Proximity Pay broadcast</span>
+                            <span>POS · inventory · staff · Proximity Pay</span>
                         </div>
                         <div class="eco-chip">
                             <div class="who">Business · online</div>
@@ -1062,14 +1062,14 @@
                     </div>
                     <div class="eco-core">
                         <div class="eyebrow">Checkout Now LTD</div>
-                        <strong>One ledger</strong>
-                        <p>Payments · wallets · POS data · (soon) rentals — partner SLA rails underneath</p>
+                        <strong>One money system</strong>
+                        <p>Payments · wallets · POS data · (soon) rentals — licensed partners move the money underneath</p>
                     </div>
                     <div class="eco-col right">
                         <div class="eco-chip">
                             <div class="who">Consumer</div>
                             <strong>CheckoutNow mobile</strong>
-                            <span>iOS · Android · P2P · bills · pay at shop</span>
+                            <span>iOS · Android · send money · bills · pay at shop</span>
                         </div>
                         <div class="eco-chip">
                             <div class="who">Consumer</div>
@@ -1087,9 +1087,9 @@
                 <div class="eco-loops" aria-label="Feedback loops">
                     <span class="eco-loop">Till ↔ phone (Proximity Pay)</span>
                     <span class="eco-loop">Store ↔ CheckoutPay (WordPress)</span>
-                    <span class="eco-loop">Volume → loan eligibility</span>
+                    <span class="eco-loop">Volume → who can borrow</span>
                     <span class="eco-loop">Retail today → rentals next</span>
-                    <span class="eco-loop">Open protocol → more wallets / POS</span>
+                    <span class="eco-loop">Open pay standard → more wallets / POS</span>
                 </div>
 
                 <div class="grid-2" style="margin-top:2rem;">
@@ -1100,7 +1100,7 @@
                             <li><strong>CheckoutNow</strong> on App Store &amp; Google Play</li>
                             <li><strong>Business web app</strong> for day-to-day management</li>
                             <li><strong>WordPress / WooCommerce plugin</strong> for online merchants</li>
-                            <li>WhatsApp Wallet · Proximity Pay · open broadcast protocol</li>
+                            <li>WhatsApp Wallet · Proximity Pay · open pay standard</li>
                         </ul>
                     </div>
                     <div class="panel">
@@ -1108,7 +1108,7 @@
                         <ul>
                             <li>We are expanding into <strong>rentals</strong> (inventory, bookings, payouts).</li>
                             <li>Building a <strong>dedicated rentals management app</strong> on the same Checkout Now backend.</li>
-                            <li>Same thesis: own the vertical’s operations + payments → volume data → stickiness → credit eligibility later.</li>
+                            <li>Same idea: own the vertical’s operations + payments → sales history → stickiness → who can borrow later.</li>
                             <li>An ecosystem of tools so businesses and consumers stay inside Checkout Now because leaving means losing the stack.</li>
                         </ul>
                     </div>
@@ -1124,7 +1124,7 @@
             <div class="wrap">
                 <p class="section-label">What we have done</p>
                 <h2>{{ $metrics['tx_count'] }} transactions in the {{ $metrics['tx_period'] }} — self-funded.</h2>
-                <p class="lede">Real throughput on a live dual-sided product: {{ $metrics['volume'] }} cumulative volume. Built without loans and without prior share dilution.</p>
+                <p class="lede">Real throughput on a live dual-sided product: {{ $metrics['volume'] }} cumulative volume. Built without loans and without selling shares to earlier investors.</p>
 
                 <div class="grid-4">
                     <div class="metric">
@@ -1141,18 +1141,18 @@
                     </div>
                     <div class="metric">
                         <div class="value">0</div>
-                        <div class="label">Debt / prior dilution</div>
+                        <div class="label">Debt / prior share sales</div>
                     </div>
                 </div>
 
                 <div class="grid-2" style="margin-top: 2rem;">
                     <div class="panel">
-                        <h3>Bootstrap proof</h3>
+                        <h3>Invested capital to this stage</h3>
                         <ul>
-                            <li>Funded from the <strong>founder’s pocket</strong> to this stage</li>
-                            <li><strong>No bank loans</strong> taken to build the product</li>
-                            <li>Company reached live volume <strong>without balance-sheet liabilities</strong> from borrowing</li>
-                            <li><strong>No diluted shares</strong> from earlier fundraising rounds</li>
+                            <li>Over <strong>{{ $invested['labor'] }}</strong> in timed product, engineering, and market-research labor</li>
+                            <li>Over <strong>{{ $invested['build'] }}</strong> in development, licensing, tooling, and operating build cost</li>
+                            <li><strong>No bank loans</strong> · <strong>no outside equity</strong> · <strong>no build debt</strong> on the balance sheet</li>
+                            <li>Standards kept for verification, licensing, and security — the same discipline we scale with</li>
                             <li>Consumer apps <strong>live</strong> on App Store &amp; Google Play</li>
                             <li><strong>Cheko Windows</strong> ready · WordPress plugin · business web app</li>
                             <li>{{ $metrics['merchants'] }} merchants · {{ $metrics['wallets'] }} wallet users · {{ $metrics['tx_count'] }} txns in the {{ $metrics['tx_period'] }} · rentals expansion underway</li>
@@ -1180,14 +1180,14 @@
         <section id="product">
             <div class="wrap">
                 <p class="section-label">Contactless push</p>
-                <h2>Proximity Pay — near-contactless at the till.</h2>
-                <p class="lede">Till broadcasts a signed session over BLE. The customer phone verifies and pays into merchant settlement. Seed accelerates this rail across shops — and opens it to other banks and wallets via the protocol.</p>
+                <h2>Proximity Pay — pay at the till without typing account numbers.</h2>
+                <p class="lede">The till sends a signed pay request over Bluetooth. The customer’s phone checks it and pays into merchant settlement. Seed rolls this pay method out across more shops — and opens it to other banks and wallets via our open pay standard.</p>
 
                 <div class="flow" role="img" aria-label="Proximity Pay payment flow">
                     <div class="flow-node">
                         <div class="step">01</div>
                         <strong>Cheko / till</strong>
-                        <span>Signed BLE broadcast</span>
+                        <span>Signed Bluetooth request</span>
                     </div>
                     <svg class="flow-arrow" viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M8 18h18M20 10l8 8-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <div class="flow-node">
@@ -1209,6 +1209,16 @@
                     </div>
                 </div>
 
+                <div class="panel" style="margin-top: 2rem;">
+                    <h3>Trust &amp; security — what users feel</h3>
+                    <ul>
+                        <li><strong>Shoppers:</strong> no account numbers to type; the phone only pays after the request is checked</li>
+                        <li><strong>Merchants:</strong> a signed till session they can trust; money settles through licensed partners</li>
+                        <li><strong>Banks &amp; wallets:</strong> same open pay standard — verify before money moves</li>
+                        <li><strong>Built-in checks:</strong> signed sessions, short-lived requests (harder to replay), identity and fraud ops as we scale</li>
+                    </ul>
+                </div>
+
                 <div class="grid-2" style="margin-top: 2rem;">
                     @include('investor.partials.photo-slot', ['slot' => $photos['product_pay'], 'aspect' => '4 / 3'])
                     @include('investor.partials.photo-slot', ['slot' => $photos['product_cheko'], 'aspect' => '4 / 3'])
@@ -1219,9 +1229,9 @@
         {{-- PROTOCOL --}}
         <section id="protocol" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
             <div class="wrap">
-                <p class="section-label">Open rail</p>
+                <p class="section-label">Open pay standard</p>
                 <h2>Checkout Broadcast Protocol</h2>
-                <p class="lede">We are open-sourcing the protocol so banks, wallets, and POS vendors can adopt the same Proximity Pay rail — pioneer the category, stay interoperable.</p>
+                <p class="lede">We are open-sourcing this pay standard so banks, wallets, and POS vendors can adopt the same in-store pay method — shared contactless pay without each bank rebuilding Bluetooth from scratch. Pioneer the category, stay interoperable.</p>
 
                 <div class="protocol">
                     <div class="hub">
@@ -1243,13 +1253,13 @@
         <section>
             <div class="wrap">
                 <p class="section-label">Why we win</p>
-                <h2>Two-sided ledger + open proximity rail.</h2>
+                <h2>One system for shops and shoppers + an open in-store pay standard.</h2>
                 <div class="win-list">
-                    <div class="win"><div class="win-num">01</div><div><strong>Two-sided ledger</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Merchant collect and consumer spend share infrastructure; Proximity Pay closes the loop in-store.</p></div></div>
-                    <div class="win"><div class="win-num">02</div><div><strong>Bank-transfer-first Nigeria fit</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Aligns with how Nigerians already pay; lower card-scheme dependency for core checkout.</p></div></div>
+                    <div class="win"><div class="win-num">01</div><div><strong>One system for both sides</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Merchant collect and shopper spend share infrastructure; Proximity Pay closes the loop in-store.</p></div></div>
+                    <div class="win"><div class="win-num">02</div><div><strong>Bank-transfer-first Nigeria fit</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Aligns with how Nigerians already pay; less dependency on card networks for core checkout.</p></div></div>
                     <div class="win"><div class="win-num">03</div><div><strong>Distribution stack</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Dashboard + WooCommerce + WhatsApp + native apps + Cheko POS.</p></div></div>
-                    <div class="win"><div class="win-num">04</div><div><strong>Open Proximity Pay standard</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Protocol for banks and wallets — category pioneer, not a walled garden.</p></div></div>
-                    <div class="win"><div class="win-num">05</div><div><strong>Credit as a wedge (licensed)</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Overdraft/loan after FCCPC clearance — sticky product on observed volume.</p></div></div>
+                    <div class="win"><div class="win-num">04</div><div><strong>Open Proximity Pay standard</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Banks and wallets can adopt the same pay method — category pioneer, not a walled garden.</p></div></div>
+                    <div class="win"><div class="win-num">05</div><div><strong>Credit as the high-margin next product (licensed)</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Overdraft/loan after Nigeria’s digital lending license (FCCPC) — sticky product on observed shop volume.</p></div></div>
                 </div>
             </div>
         </section>
@@ -1260,8 +1270,9 @@
                 <p class="section-label">Business loans</p>
                 <h2>Payment + POS → who deserves credit.</h2>
                 <p class="lede">
-                    Regular payment take-rates are thin. Lending to merchants who already settle on Checkout is a higher-margin wedge —
-                    gated until <strong style="color:var(--ink);">FCCPC</strong> registration — underwritten from real transaction history, not guesswork.
+                    Regular payment fees are thin. Lending to merchants who already settle on Checkout is a higher-margin next product —
+                    gated until Nigeria’s <strong style="color:var(--ink);">digital lending license (FCCPC)</strong> —
+                    decided from real shop sales history, not guesswork.
                 </p>
 
                 <div class="grid-2" style="margin-top:2rem;">
@@ -1270,8 +1281,8 @@
                         <ul>
                             <li><strong>We see the cashflow.</strong> Combining CheckoutPay (payments) with Cheko (POS) means we process the shop’s transactions — volume, consistency, and settlement behaviour are visible.</li>
                             <li><strong>Fit for the loan program.</strong> Merchants who run payments + POS on Checkout naturally surface as eligible (or not) for overdraft / business loans — volume tiers already exist in product.</li>
-                            <li><strong>Better economics.</strong> Interest / facility fees on lending typically out-earn thin pay-in / pay-out take rates on the same merchant.</li>
-                            <li><strong>Sticky loop.</strong> Credit keeps the merchant on our rails; more transactions improve underwriting further.</li>
+                            <li><strong>Better economics.</strong> Interest / facility fees on lending typically out-earn thin pay-in / pay-out fees on the same merchant.</li>
+                            <li><strong>Sticky loop.</strong> Credit keeps the merchant paying and settling through Checkout; more transactions improve who we can lend to next.</li>
                             <li><strong>Merchant benefit.</strong> One stack for till + payments + (later) capital — not a separate POS vendor and a separate lender.</li>
                         </ul>
                     </div>
@@ -1279,7 +1290,7 @@
                         <h3>Why we are unique vs POS-only</h3>
                         <p style="margin-bottom:0.75rem;">
                             Players like <strong style="color:var(--ink);">RetailMan</strong> focus on POS software: point of sale, inventory, and staff management.
-                            They do not own the payment rail — so they do not sit on the transaction flow that proves repayment capacity.
+                            They do not run the payments — so they do not see the cashflow that proves who can repay a loan.
                         </p>
                         <p>
                             <strong style="color:var(--ink);">Checkout combines payment + POS.</strong> The business gets a clear benefit (one system to sell and get paid).
@@ -1291,20 +1302,20 @@
                 <div class="grid-3" style="margin-top:1.5rem;">
                     <div class="panel">
                         <h3>Loan competitors</h3>
-                        <p><strong style="color:var(--ink);">Moniepoint</strong> (and similar agent / merchant lenders) compete on business loans and working capital for MSMEs. We differentiate with dual-sided CheckoutNow + Cheko Proximity Pay and open protocol density — credit as a layer on observed Checkout volume.</p>
+                        <p><strong style="color:var(--ink);">Moniepoint</strong> (and similar agent / merchant lenders) compete on business loans and working capital for small businesses. We layer credit on dual-sided Checkout volume + more Cheko / Proximity Pay shops live — not a loan-only product.</p>
                     </div>
                     <div class="panel">
                         <h3>POS competitors</h3>
-                        <p><strong style="color:var(--ink);">RetailMan</strong> and classic POS suites sell inventory / staff / till software. We are not “just POS” — payments are native, so the till is also the credit-underwriting sensor.</p>
+                        <p><strong style="color:var(--ink);">RetailMan</strong> and classic POS suites sell inventory / staff / till software. We are not “just POS” — payments are native, so the till also shows the sales history that decides credit.</p>
                     </div>
                     <div class="panel">
                         <h3>Payments competitors</h3>
-                        <p><strong style="color:var(--ink);">Paystack / Flutterwave</strong>-class acquirers collect well but do not close the in-shop contactless loop with our Cheko + Proximity Pay stack the same way.</p>
+                        <p><strong style="color:var(--ink);">Paystack / Flutterwave</strong>-class collectors do well online but do not close the in-shop contactless loop with our Cheko + Proximity Pay stack the same way.</p>
                     </div>
                 </div>
 
                 <div class="quote" style="margin-top:1.75rem;">
-                    Payments get us into the shop. POS keeps us in the shop. Loans monetise trust earned from real volume — at higher profit than regular payment-to-payment fees alone.
+                    Payments get us into the shop. POS keeps us in the shop. Loans monetise trust earned from real volume — at higher profit than regular payment fees alone.
                 </div>
             </div>
         </section>
@@ -1323,20 +1334,20 @@
                 <h2>Payments under partners. Lending gated on FCCPC.</h2>
                 <div class="timeline">
                     <div class="tl-item">
-                        <strong>Today — Partner SLAs</strong>
-                        <span>Merchant &amp; wallet volume via licensed payment partners under SLA — notably <strong>METRAVON INNOVATION LTD</strong> (CBN-licensed rails sit with the partner, not as Checkout Now LTD’s own license).</span>
+                        <strong>Today — Licensed payment partners</strong>
+                        <span>Merchant &amp; wallet volume via licensed payment partners under service agreements — notably <strong>METRAVON INNOVATION LTD</strong> (Central Bank–licensed partners handle the actual transfers; Checkout Now LTD does not hold that license itself today).</span>
                     </div>
                     <div class="tl-item">
-                        <strong>In progress — FCCPC digital lending</strong>
-                        <span>Overdraft / loan / peer lending built and gated until registration issues.</span>
+                        <strong>In progress — Nigeria’s digital lending license (FCCPC)</strong>
+                        <span>Overdraft / loan / peer lending built and held back until registration issues.</span>
                     </div>
                     <div class="tl-item">
-                        <strong>Optional — Own CBN ladder</strong>
-                        <span>PSSP (processor), MMO (own e-money), or PTSP (terminal estate) as Checkout Now scales independently.</span>
+                        <strong>Optional — Own Central Bank licenses later</strong>
+                        <span>Processor (PSSP), own e-money (MMO), or terminal estate (PTSP) as Checkout Now scales independently.</span>
                     </div>
                 </div>
                 <blockquote class="quote">
-                    “Checkout Now LTD operates CheckoutPay, CheckoutNow, and Cheko. We process merchant and wallet volume today through licensed payment partners under SLA — including METRAVON INNOVATION LTD. Consumer and merchant credit products are built and gated pending FCCPC digital lending registration, which is underway. Proceeds will fund Cheko density, compliance capital, and — post-approval — a controlled credit book.”
+                    “Checkout Now LTD operates CheckoutPay, CheckoutNow, and Cheko. We process merchant and wallet volume today through licensed payment partners under service agreements — including METRAVON INNOVATION LTD. Consumer and merchant credit products are built and held back pending Nigeria’s digital lending license (FCCPC), which is underway. Proceeds will fund more Cheko shops live, compliance capital, and — post-approval — a controlled credit book.”
                 </blockquote>
             </div>
         </section>
@@ -1352,14 +1363,14 @@
                         <p class="section-label" style="color:#8fd0ef;">Seed investment</p>
                         <h2>How investor money is used</h2>
                         <p class="lede">
-                            Seed capital goes into the <strong style="color:#fff;">business</strong> — market access, Cheko density, and pushing contactless Proximity Pay —
-                            not into rebuilding what is already live. We are past <strong style="color:#fff;">80%+</strong> of core development; capital is for competitive scale.
+                            Seed funds <strong style="color:#fff;">competitive scale and trust</strong> — more shops live, contactless Proximity Pay, security &amp; compliance —
+                            not rebuilding what is already live. We are past <strong style="color:#fff;">80%+</strong> of core development; capital wins the market and hardens the payment path shoppers and merchants rely on.
                         </p>
 
                         <div class="ask-grid">
                             <div class="ask-card"><div class="k">Raise</div><div class="v">$750k – $1.5M</div></div>
                             <div class="ask-card"><div class="k">Instrument</div><div class="v">SAFE or priced equity</div></div>
-                            <div class="ask-card"><div class="k">Today’s ownership</div><div class="v">No prior dilution</div></div>
+                            <div class="ask-card"><div class="k">Today’s ownership</div><div class="v">No prior share sales</div></div>
                             <div class="ask-card"><div class="k">Build status</div><div class="v">80%+ shipped</div></div>
                         </div>
 
@@ -1368,15 +1379,15 @@
                             <div class="ask-grid" style="margin-top:0.5rem;">
                                 <div class="ask-card">
                                     <div class="k">01 · Competitive access</div>
-                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Sales, merchant acquisition, city density, and distribution so Checkout can out-execute acquirers and wallets that only own one side of the loop.</div>
+                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Sales, merchant acquisition, more tills in more cities, and distribution so Checkout can out-execute acquirers and wallets that only own one side of the loop.</div>
                                 </div>
                                 <div class="ask-card">
                                     <div class="k">02 · Contactless push</div>
-                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Roll Cheko tills, expand Proximity Pay, and evangelise the open Checkout Broadcast Protocol so more phones can pay more shops — faster than typing account numbers.</div>
+                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Roll Cheko tills, expand Proximity Pay, and grow the open Checkout Broadcast Protocol so more phones can pay more shops — faster than typing account numbers.</div>
                                 </div>
                                 <div class="ask-card">
-                                    <div class="k">03 · Compliance runway</div>
-                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Finish FCCPC digital lending registration and keep partner-SLA payments clean — unlocking credit products on observed volume.</div>
+                                    <div class="k">03 · Security, licensing &amp; compliance</div>
+                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Harden signed sessions, fraud and identity ops, and partner custody; finish Nigeria’s digital lending license (FCCPC) — so shoppers, merchants, and banks can trust Pay-at-Shop at scale.</div>
                                 </div>
                                 <div class="ask-card">
                                     <div class="k">04 · Controlled credit*</div>
@@ -1410,7 +1421,7 @@
     <footer class="pitch-foot">
         <div class="wrap">
             <p><strong>Checkout Now LTD</strong> · CheckoutPay · CheckoutNow · Cheko</p>
-            <p style="margin-top:0.35rem;">Payments SLA partner: <strong>METRAVON INNOVATION LTD</strong></p>
+            <p style="margin-top:0.35rem;">Licensed payments partner: <strong>METRAVON INNOVATION LTD</strong></p>
             <p style="margin-top:0.35rem;"><a href="https://check-outpay.com">check-outpay.com</a></p>
             <p style="margin-top:0.75rem;font-size:0.78rem;">Confidential. Protected under NDA. Do not circulate.</p>
         </div>

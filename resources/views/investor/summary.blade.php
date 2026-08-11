@@ -264,7 +264,7 @@
                 <div class="stat"><div class="n">{{ $metrics['tx_count'] }}</div><div class="l">Txns · {{ $metrics['tx_period'] }}</div></div>
                 <div class="stat"><div class="n">{{ $metrics['volume'] }}</div><div class="l">Transaction volume</div></div>
                 <div class="stat"><div class="n">{{ $metrics['daily'] }}</div><div class="l">Daily average</div></div>
-                <div class="stat"><div class="n">0</div><div class="l">Prior dilution / build debt</div></div>
+                <div class="stat"><div class="n">0</div><div class="l">Prior share sales / build debt</div></div>
             </div>
         </div>
     </header>
@@ -278,16 +278,16 @@
                     <strong>CheckoutPay</strong> for merchants (collect, settle, grow),
                     <strong>CheckoutNow</strong> for consumers (wallet, pay, save, spend),
                     and <strong>Cheko</strong> Windows POS for the shop floor — with
-                    <strong>Proximity Pay</strong> as the near-contactless in-store rail
-                    (signed BLE broadcast; no card-tap hardware required).
+                    <strong>Proximity Pay</strong> as the near-contactless in-store pay method
+                    (phone near the till; signed Bluetooth request; no card-tap hardware required).
                 </p>
                 <p>
-                    Payments volume runs through licensed partners under SLA — notably
-                    <strong>METRAVON INNOVATION LTD</strong>, which provides licensed rails.
+                    Payments volume runs through licensed partners under service agreements — notably
+                    <strong>METRAVON INNOVATION LTD</strong>, which provides Central Bank–licensed transfers.
                     Metavon is our <strong>licensed payments partner</strong>; Checkout Now LTD owns the products.
                 </p>
                 <div class="callout">
-                    Merchants collect, consumers pay, shops settle with Proximity Pay — one ledger, bank-transfer-first.
+                    Merchants collect, shoppers pay, shops settle with Proximity Pay — one system, bank-transfer-first.
                 </div>
             </section>
 
@@ -295,13 +295,14 @@
                 <h2>The problem &amp; solution</h2>
                 <p>
                     A large share of Nigerian commerce still runs on bank transfers and cash at the till.
-                    Merchants need reliable collection without deploying card terminals everywhere;
-                    consumers need a wallet that pays those merchants; in-shop transfer UX (typing account numbers) is slow.
+                    Merchants need reliable collection without card machines everywhere;
+                    shoppers need a wallet that pays those merchants; typing account numbers at the till is slow.
                 </p>
                 <p>
                     Checkout owns both sides of that loop and closes it in-store with Cheko + Proximity Pay,
                     online with a WordPress / WooCommerce plugin, and in the browser with a business management web app.
-                    We are also open-sourcing the <strong>Checkout Broadcast Protocol</strong> so other banks, wallets, and POS vendors can adopt the same proximity rail.
+                    We are also open-sourcing the <strong>Checkout Broadcast Protocol</strong> — an open pay standard —
+                    so other banks, wallets, and POS vendors can adopt the same in-store pay method.
                 </p>
             </section>
 
@@ -312,7 +313,7 @@
                     <li><strong>CheckoutNow</strong> — native apps on <strong>iOS and Android</strong> (App Store &amp; Google Play)</li>
                     <li><strong>Business web app</strong> — day-to-day merchant management</li>
                     <li><strong>WordPress plugin</strong> — CheckoutPay / COPN for WooCommerce</li>
-                    <li>WhatsApp Wallet · Proximity Pay · open broadcast protocol</li>
+                    <li>WhatsApp Wallet · Proximity Pay · open broadcast pay standard</li>
                     <li><strong>80%+</strong> of the core development roadmap already shipped</li>
                 </ul>
                 <p style="margin-top:0.85rem;">
@@ -322,7 +323,7 @@
             </section>
 
             <section>
-                <h2>Traction &amp; bootstrap</h2>
+                <h2>Traction &amp; invested capital</h2>
                 <p>
                     Nearly <strong>{{ $metrics['tx_count'] }}</strong> transactions in the <strong>{{ $metrics['tx_period'] }}</strong> ·
                     <strong>{{ $metrics['volume'] }}</strong> cumulative transaction volume ·
@@ -333,27 +334,29 @@
                     Core product is <strong>80%+</strong> shipped.
                 </p>
                 <p>
-                    This stage was reached from the <strong>founder’s pocket</strong>:
-                    <strong>no bank loans</strong>, <strong>no prior diluted share rounds</strong>, and
-                    <strong>no build debt liabilities</strong>. Seed is the first outside capital raise into the business for growth.
+                    We got here by investing over <strong>{{ $invested['labor'] }}</strong> in timed product, engineering, and market-research labor,
+                    and over <strong>{{ $invested['build'] }}</strong> in development, licensing, and operating build cost —
+                    weighing competition and growth at every step.
+                    <strong>No bank loans</strong>, <strong>no prior outside equity</strong>, and <strong>no build debt</strong>.
+                    Seed is the first outside capital raise into the business for growth — with the same discipline on verification, licensing, and security as we scale.
                 </p>
             </section>
 
             <section>
                 <h2>Why lending works — and who we compete with</h2>
                 <p>
-                    Payment take-rates are thin. Combining <strong>payment + POS</strong> means we process the shop’s transactions,
+                    Payment fees are thin. Combining <strong>payment + POS</strong> means we process the shop’s transactions,
                     so we see volume and can score who fits a business loan / overdraft program.
-                    Lending (after <strong>FCCPC</strong> registration) is typically <strong>higher profit</strong> than regular payment fees alone.
+                    Lending (after Nigeria’s <strong>digital lending license — FCCPC</strong>) is typically <strong>higher profit</strong> than regular payment fees alone.
                 </p>
                 <div class="two">
                     <div class="card">
                         <h3>vs RetailMan (POS)</h3>
-                        <p>RetailMan-style tools sell POS, inventory, and staff management. They do not own the payment rail — so they do not sit on the cashflow that underwrites credit. We do.</p>
+                        <p>RetailMan-style tools sell POS, inventory, and staff management. They do not run the payments — so they do not see the cashflow that proves who can repay a loan. We do.</p>
                     </div>
                     <div class="card">
                         <h3>vs Moniepoint (loans)</h3>
-                        <p>Moniepoint and similar compete on MSME working capital. We layer credit on dual-sided Checkout volume + Cheko / Proximity Pay density — not a loan-only wedge.</p>
+                        <p>Moniepoint and similar compete on small-business working capital. We layer credit on dual-sided Checkout volume + more Cheko / Proximity Pay shops live — not a loan-only product.</p>
                     </div>
                 </div>
                 <div class="callout">
@@ -364,9 +367,9 @@
             <section>
                 <h2>Regulatory posture</h2>
                 <p>
-                    <strong>Today:</strong> payments under partner SLAs (CBN licenses sit with partners such as Metavon).
-                    <strong>In progress:</strong> FCCPC digital lending registration — credit products are built and gated until issued.
-                    <strong>Later:</strong> optional own CBN licenses (PSSP / MMO / PTSP) as Checkout Now scales.
+                    <strong>Today:</strong> payments via licensed partners under service agreements (Central Bank licenses sit with partners such as Metavon).
+                    <strong>In progress:</strong> Nigeria’s digital lending license (FCCPC) — credit products are built and held back until issued.
+                    <strong>Later:</strong> optional own Central Bank licenses (processor / e-money / terminals) as Checkout Now scales.
                 </p>
             </section>
 
@@ -374,7 +377,9 @@
                 <h2>The ask — how seed is used</h2>
                 <p>
                     Seeking <strong>$750,000 – $1,500,000</strong> seed (SAFE or priced equity).
-                    Capital funds competitive market access, contactless / Cheko density, compliance, and — after FCCPC — a controlled credit book.
+                    Capital funds competitive market access, more Cheko / contactless shops live,
+                    <strong>security, licensing &amp; compliance</strong>, and — after FCCPC — a controlled credit book.
+                    Shoppers should not type account numbers; merchants settle faster; banks can verify before money moves.
                 </p>
                 @foreach ($funds as $f)
                     <div class="fund-row">
@@ -404,7 +409,7 @@
     <footer>
         <div class="wrap">
             <p><strong>Checkout Now LTD</strong> · CheckoutPay · CheckoutNow · Cheko</p>
-            <p style="margin-top:0.3rem;">Payments SLA partner: METRAVON INNOVATION LTD</p>
+            <p style="margin-top:0.3rem;">Licensed payments partner: METRAVON INNOVATION LTD</p>
             <p style="margin-top:0.65rem;font-size:0.75rem;">Confidential. Protected under NDA. Do not circulate.</p>
         </div>
     </footer>
