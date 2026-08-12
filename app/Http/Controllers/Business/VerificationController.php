@@ -9,6 +9,7 @@ use App\Services\BusinessRubiesKycAutoVerificationService;
 use App\Services\NubanValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class VerificationController extends Controller
@@ -369,7 +370,10 @@ class VerificationController extends Controller
 
         // Signatory personal name for BVN/NIN only — never used as the pay-in account title.
         if (array_key_exists('legal_name', $validated) && trim((string) $validated['legal_name']) !== '') {
-            $updates['rubies_signatory_name'] = trim((string) $validated['legal_name']);
+            // Some environments may not have the column added yet; avoid 500s.
+            if (Schema::hasColumn('businesses', 'rubies_signatory_name')) {
+                $updates['rubies_signatory_name'] = trim((string) $validated['legal_name']);
+            }
         }
 
         if (! empty($validated['business_email'])) {
