@@ -92,6 +92,17 @@
                     <p class="text-xs text-gray-500">Webhook URL on pay/start must match an approved website or business webhook. Customer must confirm payment with wallet PIN on Checkout (no API-only debit).</p>
                 </div>
 
+                <div id="payout-api" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
+                    <h4 class="text-sm font-semibold text-gray-900">
+                        <i class="fas fa-university text-emerald-600 mr-1"></i> Payout API
+                    </h4>
+                    <p class="text-xs text-gray-600">Allows this business to send money from their Checkout balance to a bank account via <code class="bg-white px-1 rounded">POST /api/v1/withdrawal</code> (X-API-Key). Dashboard withdrawals stay available. You can also toggle this on the business detail page.</p>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="payout_api_enabled" value="1" {{ old('payout_api_enabled', $business->payout_api_enabled) ? 'checked' : '' }} class="mt-1">
+                        <span class="text-sm text-gray-800"><strong>Enable</strong> Payout API for integrations</span>
+                    </label>
+                </div>
+
                 <div id="card-payments" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
                     <h4 class="text-sm font-semibold text-gray-900">
                         <i class="fas fa-credit-card text-indigo-600 mr-1"></i> Card payments

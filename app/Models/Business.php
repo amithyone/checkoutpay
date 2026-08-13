@@ -28,6 +28,8 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'webhook_url',
         'uses_external_account_numbers',
         'whatsapp_wallet_api_enabled',
+        'payout_api_enabled',
+        'withdrawal_debit_source',
         'card_payments_enabled',
         'broadcast_pay_at_shop_enabled',
         'broadcast_pay_at_shop_active',
@@ -179,6 +181,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'balance_audit_exempt' => 'boolean',
         'uses_external_account_numbers' => 'boolean',
         'whatsapp_wallet_api_enabled' => 'boolean',
+        'payout_api_enabled' => 'boolean',
         'card_payments_enabled' => 'boolean',
         'broadcast_pay_at_shop_enabled' => 'boolean',
         'broadcast_pay_at_shop_active' => 'boolean',
@@ -371,6 +374,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
             ->where('is_pool', false)
             ->where('is_external', false)
             ->exists();
+    }
+
+    /**
+     * Permanent Rubies settlement VA used when withdrawals show the business name as sender.
+     */
+    public function hasPermanentSettlementAccount(): bool
+    {
+        return trim((string) $this->rubies_business_account_number) !== '';
     }
 
     /**

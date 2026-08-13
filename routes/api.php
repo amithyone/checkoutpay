@@ -50,10 +50,11 @@ Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)-
     Route::patch('/payment/{transactionId}/amount', [PaymentController::class, 'updateAmount']);
     Route::get('/payments', [PaymentController::class, 'index']);
 
-    // Withdrawal routes (require API key)
+    // Withdrawal / payout routes (require API key; POST /withdrawal and GET /banks need payout_api_enabled)
     Route::post('/withdrawal', [\App\Http\Controllers\Api\WithdrawalController::class, 'store']);
     Route::get('/withdrawals', [\App\Http\Controllers\Api\WithdrawalController::class, 'index']);
     Route::get('/balance', [\App\Http\Controllers\Api\WithdrawalController::class, 'balance']);
+    Route::get('/banks', [\App\Http\Controllers\Api\WithdrawalController::class, 'banks']);
 
     Route::middleware('throttle:30,1')->group(function () {
         Route::post('/whatsapp-wallet/lookup', [WhatsappWalletApiController::class, 'lookup']);

@@ -3,21 +3,30 @@
 namespace App\Services;
 
 use App\Models\Bank;
-use App\Models\MevonPayLedgerEntry;
-use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Models\Business;
+use App\Models\MevonPayLedgerEntry;
 use App\Models\WithdrawalRequest;
+use App\Services\MevonPay\MevonPayLedgerRecorder;
+use App\Services\MevonPay\MevonPayPayoutService;
 use App\Services\Payout\BankPayoutNarration;
 use Illuminate\Support\Str;
 
 /**
- * Runs MavonPay createtransfer for a withdrawal after it is persisted.
- * Used by rentals API, admin withdrawal create, and business dashboard withdrawal create.
+ * Instant payout after a withdrawal is persisted.
+ * Checkout identity uses platform /V1/createtransfer; business identity uses /V1/payout
+ * from the merchant permanent Rubies VA (same as native-app send money).
  */
 class WithdrawalMavonPayPayoutService
 {
+    public const COOLDOWN_MINUTES = 1;
+
+    public const DEBIT_CHECKOUT = 'checkout';
+
+    public const DEBIT_BUSINESS = 'business';
+
     public function __construct(
         protected MavonPayTransferService $mavon,
+        protected MevonPayPayoutService $payout,
         protected MevonPayLedgerRecorder $ledger,
     ) {}
 
@@ -43,19 +52,58 @@ class WithdrawalMavonPayPayoutService
     }
 
     /**
+     * Whether this business's withdrawals should debit their permanent VA (recipient sees business name).
+     */
+    public function usesBusinessDebit(Business $business): bool
+    {
+        return $business->withdrawal_debit_source === self::DEBIT_BUSINESS
+            && $business->hasPermanentSettlementAccount();
+    }
+
+    /**
+     * @return array{source: string, debit_account_name: string, debit_account_number: string, payout_api: string}
+     */
+    public function debitProfile(Business $business): array
+    {
+        if ($this->usesBusinessDebit($business) && $this->payout->isConfigured()) {
+            $name = trim((string) ($business->rubies_business_account_name ?: $business->name));
+            if ($name === '') {
+                $name = 'Checkout';
+            }
+
+            return [
+                'source' => self::DEBIT_BUSINESS,
+                'debit_account_name' => $name,
+                'debit_account_number' => trim((string) $business->rubies_business_account_number),
+                'payout_api' => MevonPayLedgerEntry::PAYOUT_API_PAYOUT,
+            ];
+        }
+
+        $poolName = trim((string) config('services.mevonpay.debit_account_name', ''));
+
+        return [
+            'source' => self::DEBIT_CHECKOUT,
+            'debit_account_name' => $poolName !== '' ? $poolName : 'Checkout',
+            'debit_account_number' => trim((string) config('services.mevonpay.debit_account_number', '')),
+            'payout_api' => MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER,
+        ];
+    }
+
+    /**
      * Attempt instant payout. Updates withdrawal payout_* fields and status; decrements business balance on success.
-     *
-     * Always debits the platform main Mevon account (MEVONPAY_DEBIT_ACCOUNT_*), never the
-     * merchant Rubies VA — business app bank sends use that VA separately via /V1/payout.
      */
     public function processWithdrawal(WithdrawalRequest $withdrawal, Business $business, ?string $bankCode): void
     {
+        $debit = $this->debitProfile($business);
+        $usePayout = $debit['payout_api'] === MevonPayLedgerEntry::PAYOUT_API_PAYOUT;
+
         $withdrawal->update([
             'payout_provider' => MavonPayTransferService::PROVIDER,
             'payout_status' => 'not_started',
         ]);
 
-        if (! $this->mavon->isConfigured()) {
+        $ready = $usePayout ? $this->payout->isConfigured() : $this->mavon->isConfigured();
+        if (! $ready) {
             $withdrawal->update([
                 'payout_status' => 'failed',
                 'payout_response_message' => 'Instant transfer is not available right now. Your withdrawal request has been submitted for manual processing.',
@@ -85,16 +133,30 @@ class WithdrawalMavonPayPayoutService
         $sessionId = 'WD'.$withdrawal->id.'_'.now()->format('YmdHis');
         $narration = BankPayoutNarration::forBusinessWithdrawal($business, $withdrawal->bank_narration);
 
-        $result = $this->mavon->createTransfer([
-            'amount' => (float) $withdrawal->amount,
-            'bankCode' => $resolvedCode,
-            'bankName' => $withdrawal->bank_name,
-            'creditAccountName' => $withdrawal->account_name,
-            'creditAccountNumber' => $withdrawal->account_number,
-            'narration' => $narration,
-            'reference' => $reference,
-            'sessionId' => $sessionId,
-        ]);
+        if ($usePayout) {
+            $result = $this->payout->createPayout([
+                'amount' => (float) $withdrawal->amount,
+                'bankCode' => $resolvedCode,
+                'bankName' => $withdrawal->bank_name,
+                'creditAccountName' => $withdrawal->account_name,
+                'creditAccountNumber' => $withdrawal->account_number,
+                'debitAccountNumber' => $debit['debit_account_number'],
+                'debitAccountName' => $debit['debit_account_name'],
+                'narration' => $narration,
+                'reference' => $reference,
+            ]);
+        } else {
+            $result = $this->mavon->createTransfer([
+                'amount' => (float) $withdrawal->amount,
+                'bankCode' => $resolvedCode,
+                'bankName' => $withdrawal->bank_name,
+                'creditAccountName' => $withdrawal->account_name,
+                'creditAccountNumber' => $withdrawal->account_number,
+                'narration' => $narration,
+                'reference' => $reference,
+                'sessionId' => $sessionId,
+            ]);
+        }
 
         $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
@@ -120,15 +182,17 @@ class WithdrawalMavonPayPayoutService
             MevonPayLedgerEntry::FLOW_BUSINESS_WITHDRAWAL,
             (float) $withdrawal->amount,
             $reference,
-            MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER,
+            $debit['payout_api'],
             $bucket,
-            (string) config('services.mevonpay.debit_account_number', ''),
+            $debit['debit_account_number'],
             $withdrawal,
             [
                 'business_id' => $business->id,
                 'withdrawal_id' => $withdrawal->id,
                 'narration' => $narration,
                 'response_code' => $result['response_code'] ?? null,
+                'debit_source' => $debit['source'],
+                'debit_account_name' => $debit['debit_account_name'],
             ],
         );
 
@@ -142,7 +206,7 @@ class WithdrawalMavonPayPayoutService
      */
     public function summaryMessage(WithdrawalRequest $withdrawal): string
     {
-        if (! $this->isMavonConfigured()) {
+        if (! $this->isMavonConfigured() && ! $this->payout->isConfigured()) {
             return 'Submitted for manual processing (instant transfer is not configured).';
         }
 

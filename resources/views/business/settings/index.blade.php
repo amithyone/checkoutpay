@@ -355,6 +355,39 @@
                         <p class="text-xs text-gray-500 mt-0.5">If enabled, auto-withdrawal runs once daily at 5pm instead of immediately when balance reaches threshold.</p>
                     </div>
                 </div>
+
+                @php
+                    $hasPermanentVa = $business->hasPermanentSettlementAccount();
+                    $debitSource = old('withdrawal_debit_source', $business->withdrawal_debit_source ?? 'checkout');
+                @endphp
+                <div class="md:col-span-2">
+                    <p class="block text-sm font-medium text-gray-700 mb-2">Payout sender on bank statement</p>
+                    <div class="space-y-3">
+                        <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <input type="radio" name="withdrawal_debit_source" value="checkout" class="mt-1 text-primary focus:ring-primary"
+                                {{ $debitSource === 'checkout' ? 'checked' : '' }}>
+                            <span>
+                                <span class="block text-sm font-medium text-gray-900">Checkout</span>
+                                <span class="block text-xs text-gray-500">Recipient sees Checkout. Money leaves the platform debit account.</span>
+                            </span>
+                        </label>
+                        <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg {{ $hasPermanentVa ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60 cursor-not-allowed' }}">
+                            <input type="radio" name="withdrawal_debit_source" value="business" class="mt-1 text-primary focus:ring-primary"
+                                {{ $debitSource === 'business' ? 'checked' : '' }}
+                                {{ $hasPermanentVa ? '' : 'disabled' }}>
+                            <span>
+                                <span class="block text-sm font-medium text-gray-900">Your business name</span>
+                                <span class="block text-xs text-gray-500">Recipient sees {{ $business->name }}. Money leaves your permanent account{{ $hasPermanentVa && $business->rubies_business_account_number ? ' ('.$business->rubies_business_account_number.')' : '' }}.</span>
+                                @unless($hasPermanentVa)
+                                    <span class="block text-xs text-amber-700 mt-1">Unavailable until KYC provisions your permanent settlement account.</span>
+                                @endunless
+                            </span>
+                        </label>
+                    </div>
+                    @error('withdrawal_debit_source')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
             </div>
 
             <div class="mt-6">

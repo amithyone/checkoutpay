@@ -20,10 +20,13 @@ class WithdrawalRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:100'], // Minimum 100 Naira
-            'account_number' => ['required', 'string', 'max:20'],
+            'amount' => ['required', 'numeric', 'min:100'],
+            'account_number' => ['required', 'string', 'size:10'],
             'account_name' => ['required', 'string', 'max:255'],
             'bank_name' => ['required', 'string', 'max:255'],
+            'bank_code' => ['nullable', 'string', 'max:20'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'bank_narration' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -37,6 +40,7 @@ class WithdrawalRequest extends FormRequest
             'amount.numeric' => 'Withdrawal amount must be a valid number.',
             'amount.min' => 'Minimum withdrawal amount is ₦100.',
             'account_number.required' => 'Account number is required.',
+            'account_number.size' => 'Account number must be 10 digits.',
             'account_name.required' => 'Account name is required.',
             'bank_name.required' => 'Bank name is required.',
         ];

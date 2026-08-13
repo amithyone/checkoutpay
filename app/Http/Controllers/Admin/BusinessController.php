@@ -99,11 +99,13 @@ class BusinessController extends Controller
             'website_approved' => 'boolean',
             'uses_external_account_numbers' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
+            'payout_api_enabled' => 'boolean',
             'card_payments_enabled' => 'boolean',
             'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
+        $validated['payout_api_enabled'] = $request->has('payout_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
         $validated['broadcast_pay_at_shop_enabled'] = $request->has('broadcast_pay_at_shop_enabled');
 
@@ -167,11 +169,13 @@ class BusinessController extends Controller
             'balance' => 'nullable|numeric|min:0',
             'uses_external_account_numbers' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
+            'payout_api_enabled' => 'boolean',
             'card_payments_enabled' => 'boolean',
             'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
+        $validated['payout_api_enabled'] = $request->has('payout_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
         $validated['broadcast_pay_at_shop_enabled'] = $request->has('broadcast_pay_at_shop_enabled');
 
@@ -359,6 +363,19 @@ class BusinessController extends Controller
         $msg = $business->whatsapp_wallet_api_enabled
             ? 'WhatsApp wallet merchant API is now enabled for this business (X-API-Key: lookup, ensure, pay/start).'
             : 'WhatsApp wallet merchant API is now disabled for this business.';
+
+        return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
+    }
+
+    public function togglePayoutApi(Business $business): RedirectResponse
+    {
+        $business->update([
+            'payout_api_enabled' => ! $business->payout_api_enabled,
+        ]);
+
+        $msg = $business->payout_api_enabled
+            ? 'Payout API is now enabled for this business (X-API-Key: POST /api/v1/withdrawal).'
+            : 'Payout API is now disabled for this business.';
 
         return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
     }

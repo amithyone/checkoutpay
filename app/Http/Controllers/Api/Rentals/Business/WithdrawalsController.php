@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Cache;
 class WithdrawalsController extends Controller
 {
     use ResolvesBusiness;
-    private const WITHDRAWAL_COOLDOWN_MINUTES = 2;
     private const WITHDRAWAL_BLOCKED_MESSAGE = 'Withdrawal could not be processed. Please try again shortly.';
 
     /**
@@ -99,7 +98,7 @@ class WithdrawalsController extends Controller
         ]);
 
         $payout->processWithdrawal($withdrawal, $business, $bankCode);
-        Cache::put($cooldownKey, true, now()->addMinutes(self::WITHDRAWAL_COOLDOWN_MINUTES));
+        Cache::put($cooldownKey, true, now()->addMinutes(WithdrawalMavonPayPayoutService::COOLDOWN_MINUTES));
         Cache::forget($lockKey);
 
         return response()->json([

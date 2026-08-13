@@ -90,6 +90,17 @@
                     </label>
                 </div>
 
+                <div id="payout-api" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
+                    <h4 class="text-sm font-semibold text-gray-900">
+                        <i class="fas fa-university text-emerald-600 mr-1"></i> Payout API
+                    </h4>
+                    <p class="text-xs text-gray-600">If enabled, this business may call Checkout <code class="bg-white px-1 rounded">POST /api/v1/withdrawal</code> with their API key after you save.</p>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="payout_api_enabled" value="1" {{ old('payout_api_enabled') ? 'checked' : '' }} class="mt-1">
+                        <span class="text-sm text-gray-800"><strong>Enable</strong> Payout API for integrations</span>
+                    </label>
+                </div>
+
                 <div id="card-payments" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
                     <h4 class="text-sm font-semibold text-gray-900">
                         <i class="fas fa-credit-card text-indigo-600 mr-1"></i> Card payments

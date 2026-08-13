@@ -351,6 +351,56 @@ X-API-Key: {{ $business->api_key }}
         </div>
     </div>
 
+    <!-- Payout API -->
+    <div class="bg-white rounded-xl shadow-sm border border-emerald-200 p-4 lg:p-6" id="payouts">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+            <i class="fas fa-university mr-2 text-emerald-600"></i> Payouts (withdrawal API)
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">
+            Requires admin to <strong>enable Payout API</strong> on your business. Authenticate with <code class="bg-gray-100 px-1 rounded text-xs">X-API-Key</code>.
+            Sends money from your Checkout balance to a Nigerian bank account — same as Dashboard → Withdrawals.
+            The name on the recipient’s statement follows <a href="{{ route('business.settings.index') }}" class="text-emerald-800 underline">Settings → Payout sender</a> (Checkout by default, or your business name with a permanent account).
+        </p>
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4">
+            <p class="text-sm text-amber-900"><strong>Do not cron-push customer withdrawals.</strong> There is a 1-minute cooldown per business plus the 60/min API limit. Let each customer tap Withdraw in your app; your server then calls this once per person.</p>
+        </div>
+
+        <div class="space-y-6">
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-2">GET …/banks — NIP bank list</h4>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>GET {{ url('/api/v1/banks') }}
+X-API-Key: {{ $business->api_key }}</code></pre>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-2">GET …/balance</h4>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>GET {{ url('/api/v1/balance') }}
+X-API-Key: {{ $business->api_key }}</code></pre>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-base font-semibold text-gray-900 mb-2">POST …/withdrawal</h4>
+                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                    <pre class="text-xs text-gray-100"><code>POST {{ url('/api/v1/withdrawal') }}
+Content-Type: application/json
+X-API-Key: {{ $business->api_key }}
+
+{
+  "amount": 5000,
+  "account_number": "0123456789",
+  "account_name": "Jane Doe",
+  "bank_name": "Guaranty Trust Bank",
+  "bank_code": "000058"
+}</code></pre>
+                </div>
+                <p class="text-xs text-gray-600 mt-2">Use <code class="bg-gray-100 px-1 rounded">bank_code</code> from <code class="bg-gray-100 px-1 rounded">GET /banks</code>. Response includes <code class="bg-gray-100 px-1 rounded">status</code>, <code class="bg-gray-100 px-1 rounded">payout_status</code>, and <code class="bg-gray-100 px-1 rounded">payout_reference</code>. Poll <code class="bg-gray-100 px-1 rounded">GET /withdrawals</code> if payout is pending.</p>
+            </div>
+        </div>
+        <p class="text-sm text-gray-600 mt-4">Full reference: <a href="{{ route('api-docs') }}#payouts" class="text-primary underline font-medium">public API docs — Payouts</a>.</p>
+    </div>
+
     <!-- Consumer mobile wallet API (end-user app) -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6" id="consumer-wallet-api">
         <h3 class="text-lg font-semibold text-gray-900 mb-2">

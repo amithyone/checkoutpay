@@ -13,7 +13,6 @@ use App\Services\WithdrawalMavonPayPayoutService;
 
 class WithdrawalController extends Controller
 {
-    private const WITHDRAWAL_COOLDOWN_MINUTES = 2;
     private const WITHDRAWAL_BLOCKED_MESSAGE = 'Withdrawal could not be processed. Please try again shortly.';
 
     public function index(Request $request)
@@ -378,7 +377,7 @@ class WithdrawalController extends Controller
         $payout = app(WithdrawalMavonPayPayoutService::class);
         $payout->processWithdrawal($withdrawal, $business, $bankCode);
         $withdrawal->refresh();
-        Cache::put($cooldownKey, true, now()->addMinutes(self::WITHDRAWAL_COOLDOWN_MINUTES));
+        Cache::put($cooldownKey, true, now()->addMinutes(WithdrawalMavonPayPayoutService::COOLDOWN_MINUTES));
         Cache::forget($lockKey);
 
         $business->notify(new \App\Notifications\WithdrawalRequestedNotification($withdrawal));

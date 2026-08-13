@@ -41,6 +41,7 @@ class SettingsController extends Controller
             'currency' => 'nullable|string|size:3',
             'auto_withdraw_threshold' => 'nullable|numeric|min:0',
             'auto_withdraw_end_of_day' => 'boolean',
+            'withdrawal_debit_source' => 'nullable|in:checkout,business',
             'two_factor_enabled' => 'boolean',
             'rental_auto_approve' => 'boolean',
         ]);
@@ -99,6 +100,16 @@ class SettingsController extends Controller
             return redirect()->route('business.settings.index')
                 ->with('error', 'Save a withdrawal account first to enable auto-withdrawal. On the Withdrawals page, request a withdrawal and check "Save this account for future withdrawals".')
                 ->withInput();
+        }
+
+        if (($validated['withdrawal_debit_source'] ?? null) === 'business' && ! $business->hasPermanentSettlementAccount()) {
+            return redirect()->route('business.settings.index')
+                ->with('error', 'Your business name can only appear on payouts after KYC provisions a permanent settlement account.')
+                ->withInput();
+        }
+
+        if (! $request->has('withdrawal_debit_source')) {
+            unset($validated['withdrawal_debit_source']);
         }
 
         $business->update($validated);

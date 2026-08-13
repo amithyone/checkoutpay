@@ -66,6 +66,7 @@
                             <a href="#whatsapp-pay-code" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">WhatsApp Pay Code</a>
                             <a href="#developer-program" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Developer program</a>
                             <a href="#update-amount" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Update payment amount</a>
+                            <a href="#payouts" class="block text-sm text-gray-700 hover:text-primary py-2">Payouts</a>
                             <a href="#whatsapp-wallet" class="block text-sm text-gray-700 hover:text-primary py-2">WhatsApp wallet API</a>
                             <a href="#webhooks" class="block text-sm text-gray-700 hover:text-primary py-2">Webhooks</a>
                             <a href="#code-examples" class="block text-sm text-gray-700 hover:text-primary py-2">Code Examples</a>
@@ -575,6 +576,210 @@ X-API-Key: pk_your_api_key_here</code></pre>
 
                         <h3 class="text-xl font-semibold text-gray-900 mb-3 mt-6">Security</h3>
                         <p class="text-gray-700">Wallet PIN is <strong>never</strong> accepted in WhatsApp chat. The bot sends a time-limited HTTPS link; the customer enters their 4-digit PIN only on that page.</p>
+                    </div>
+
+                    <!-- Payouts -->
+                    <div id="payouts" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sm:p-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-4">
+                            <i class="fas fa-university text-emerald-600 mr-2"></i>Payouts
+                        </h2>
+                        <p class="text-gray-700 mb-4">
+                            Send money from your Checkout business balance to a Nigerian bank account. Same rail as <strong>Dashboard → Withdrawals</strong>.
+                            Checkout must <strong>enable Payout API</strong> on your business (admin). Authenticate with <code class="bg-gray-100 px-2 py-1 rounded text-sm">X-API-Key</code>.
+                            Sender on the bank statement follows <strong>Dashboard → Settings</strong> (Checkout by default, or your business name if you have a permanent settlement account). No per-request override.
+                        </p>
+
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                            <p class="text-sm text-amber-900 font-semibold mb-2">Do not batch withdrawals with a cron</p>
+                            <p class="text-sm text-amber-900 mb-2">
+                                Do <strong>not</strong> run a scheduled job that pushes many customer withdrawals at once. That hits the <strong>1-minute per-business cooldown</strong>, Laravel’s 60 requests/minute API limit, and the bank rail together — most of the batch will return <code class="bg-amber-100 px-1 rounded">429</code> or fail.
+                            </p>
+                            <p class="text-sm text-amber-900">
+                                <strong>Recommended:</strong> let each customer tap Withdraw in <em>your</em> app. Your backend then calls <code class="bg-amber-100 px-1 rounded">POST /api/v1/withdrawal</code> once for that person (amount + their account number + bank). Spread-out, customer-initiated payouts are what this API is for.
+                            </p>
+                        </div>
+
+                        <div class="space-y-8">
+                            <div class="border-l-4 border-emerald-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-get">GET</span>
+                                    <code class="text-lg font-mono text-gray-900">/banks</code>
+                                </div>
+                                <p class="text-gray-700 mb-3">NIP bank list. Use <code class="bg-gray-100 px-1 rounded">code</code> as <code class="bg-gray-100 px-1 rounded">bank_code</code> on withdrawal. Requires Payout API enabled.</p>
+                                <div class="mb-2">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Response</h4>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "success": true,
+  "data": [
+    { "code": "000058", "name": "Guaranty Trust Bank" }
+  ]
+}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-get">GET</span>
+                                    <code class="text-lg font-mono text-gray-900">/balance</code>
+                                </div>
+                                <p class="text-gray-700 mb-3">Current ledger balance and available balance (includes approved overdraft if any).</p>
+                                <div class="code-block">
+                                    <pre><code>{
+  "success": true,
+  "data": {
+    "balance": 125000.00,
+    "available_balance": 125000.00,
+    "currency": "NGN"
+  }
+}</code></pre>
+                                </div>
+                            </div>
+
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-post">POST</span>
+                                    <code class="text-lg font-mono text-gray-900">/withdrawal</code>
+                                </div>
+                                <p class="text-gray-700 mb-4">Pays out immediately when the bank accepts the transfer. Minimum ₦100. One successful or attempted payout per business every <strong>1 minute</strong>.</p>
+
+                                <div class="mb-4">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Request Body</h4>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "amount": 5000,
+  "account_number": "0123456789",
+  "account_name": "Jane Doe",
+  "bank_name": "Guaranty Trust Bank",
+  "bank_code": "000058"
+}</code></pre>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Request Parameters</h4>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Parameter</th>
+                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Type</th>
+                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Required</th>
+                                                    <th class="px-4 py-3 text-left text-gray-700 font-semibold">Description</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-200">
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">amount</td>
+                                                    <td class="px-4 py-3 text-gray-700">number</td>
+                                                    <td class="px-4 py-3 text-gray-700"><span class="text-red-600 font-semibold">Yes</span></td>
+                                                    <td class="px-4 py-3 text-gray-700">Naira to send. Minimum 100. Must be ≤ available balance.</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">account_number</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700"><span class="text-red-600 font-semibold">Yes</span></td>
+                                                    <td class="px-4 py-3 text-gray-700">10-digit NUBAN</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">account_name</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700"><span class="text-red-600 font-semibold">Yes</span></td>
+                                                    <td class="px-4 py-3 text-gray-700">Name on the destination account</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">bank_name</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700"><span class="text-red-600 font-semibold">Yes</span></td>
+                                                    <td class="px-4 py-3 text-gray-700">Bank name (from <code>GET /banks</code>)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">bank_code</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">Recommended</td>
+                                                    <td class="px-4 py-3 text-gray-700">NIP 6-digit code from <code>GET /banks</code>. Required if the name cannot be matched.</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">notes</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Internal note (max 1000)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="px-4 py-3 font-mono text-gray-900">bank_narration</td>
+                                                    <td class="px-4 py-3 text-gray-700">string</td>
+                                                    <td class="px-4 py-3 text-gray-700">No</td>
+                                                    <td class="px-4 py-3 text-gray-700">Optional text on the bank statement (max 255)</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Response (201 Created)</h4>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "success": true,
+  "message": "Transfer completed successfully via AutoPay.",
+  "data": {
+    "id": 41,
+    "amount": 5000,
+    "status": "processed",
+    "payout_status": "successful",
+    "payout_reference": "wd_41_abcdefghij",
+    "payout_response_message": "Approved",
+    "account_number": "0123456789",
+    "account_name": "Jane Doe",
+    "bank_name": "Guaranty Trust Bank",
+    "created_at": "2026-08-13T10:00:00.000000Z",
+    "processed_at": "2026-08-13T10:00:01.000000Z"
+  }
+}</code></pre>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2"><code class="bg-gray-100 px-1 rounded">payout_status</code> is <code class="bg-gray-100 px-1 rounded">successful</code>, <code class="bg-gray-100 px-1 rounded">pending</code>, or <code class="bg-gray-100 px-1 rounded">failed</code>. Balance is decremented only when the bank transfer succeeds. Failed or pending rows stay <code class="bg-gray-100 px-1 rounded">status: pending</code> for admin follow-up.</p>
+                            </div>
+
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-get">GET</span>
+                                    <code class="text-lg font-mono text-gray-900">/withdrawals</code>
+                                </div>
+                                <p class="text-gray-700 mb-3">Paginated history. Optional query <code class="bg-gray-100 px-1 rounded">?status=processed</code> and <code class="bg-gray-100 px-1 rounded">per_page</code> (default 15). Poll this after a pending payout.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 overflow-x-auto">
+                            <h4 class="font-semibold text-gray-900 mb-2">Errors</h4>
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-gray-700 font-semibold">HTTP</th>
+                                        <th class="px-4 py-3 text-left text-gray-700 font-semibold">Typical cause</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="px-4 py-3 font-mono">403</td>
+                                        <td class="px-4 py-3 text-gray-700">Payout API not enabled for this business</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-mono">400</td>
+                                        <td class="px-4 py-3 text-gray-700">Insufficient balance (<code>available_balance</code> in the body)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-mono">422</td>
+                                        <td class="px-4 py-3 text-gray-700">Validation, or bank_code could not be resolved</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-mono">429</td>
+                                        <td class="px-4 py-3 text-gray-700">1-minute cooldown, submit lock, or API rate limit</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <!-- WhatsApp wallet merchant API -->
@@ -1117,6 +1322,9 @@ if ($payload['event'] === 'payment.approved') {
                         <div class="space-y-4">
                             <p class="text-gray-700">
                                 The <code class="bg-gray-100 px-1 py-0.5 rounded">api</code> middleware applies Laravel’s default API rate limiter: <strong>60 requests per minute</strong>, keyed by authenticated user id when the request is authenticated, otherwise by IP address.
+                            </p>
+                            <p class="text-gray-700">
+                                <strong>Payouts</strong> (<code class="bg-gray-100 px-1 py-0.5 rounded">POST /withdrawal</code>) also have a <strong>1-minute cooldown per business</strong>. Let customers trigger their own withdrawals instead of pushing a scheduled batch.
                             </p>
                             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <p class="text-sm text-blue-800">

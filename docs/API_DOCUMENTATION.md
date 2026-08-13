@@ -329,3 +329,125 @@ curl -sS -X POST "https://your-checkout.example.com/api/v1/whatsapp-wallet/pay/s
     "idempotency_key": "order-abc-123-wallet-001"
   }'
 ```
+
+---
+
+## Payouts (withdrawal API)
+
+Send money from your Checkout **business balance** to a Nigerian bank account. Same rail as Dashboard → Withdrawals.
+
+**Prerequisite:** Checkout admin must enable **Payout API** on your business. Otherwise `POST /withdrawal` and `GET /banks` return `403`.
+
+Authenticate with `X-API-Key` like other merchant routes.
+
+The name on the recipient’s bank statement follows the merchant’s dashboard setting (**Settings → Payout sender**): **Checkout** (platform debit, default) or **your business name** (requires a permanent settlement account). There is no per-request override on this API.
+
+### Do not batch with a cron
+
+Do **not** run a scheduled job that pushes many customer withdrawals at once. That hits:
+
+- a **1-minute cooldown per business** on `POST /withdrawal`
+- Laravel’s **60 requests/minute** API limit
+- the bank transfer rail
+
+Most of a cron batch will `429` or fail.
+
+**Recommended:** let each customer tap Withdraw in *your* app. Your backend then calls `POST /api/v1/withdrawal` once for that person (amount + their account number + bank). Spread-out, customer-initiated payouts are what this API is for.
+
+### GET /banks
+
+NIP bank directory. Use `code` as `bank_code` on withdrawal. Requires Payout API enabled.
+
+**Success**
+
+```json
+{
+  "success": true,
+  "data": [
+    { "code": "000058", "name": "Guaranty Trust Bank" }
+  ]
+}
+```
+
+### GET /balance
+
+```json
+{
+  "success": true,
+  "data": {
+    "balance": 125000.0,
+    "available_balance": 125000.0,
+    "currency": "NGN"
+  }
+}
+```
+
+### POST /withdrawal
+
+Pays out immediately when the bank accepts the transfer. Minimum ₦100. One payout attempt per business every 1 minute.
+
+**JSON fields**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|--------|
+| `amount` | number | Yes | Minimum `100`. Must be ≤ available balance |
+| `account_number` | string | Yes | 10-digit NUBAN |
+| `account_name` | string | Yes | Name on the destination account |
+| `bank_name` | string | Yes | From `GET /banks` |
+| `bank_code` | string | Recommended | NIP 6-digit code from `GET /banks`. Required if the name cannot be matched |
+| `notes` | string | No | Internal note, max 1000 |
+| `bank_narration` | string | No | Optional bank-statement text, max 255 |
+
+**Success:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Transfer completed successfully via AutoPay.",
+  "data": {
+    "id": 41,
+    "amount": 5000.0,
+    "status": "processed",
+    "payout_status": "successful",
+    "payout_reference": "wd_41_abcdefghij",
+    "payout_response_message": "Approved",
+    "account_number": "0123456789",
+    "account_name": "Jane Doe",
+    "bank_name": "Guaranty Trust Bank",
+    "created_at": "2026-08-13T10:00:00.000000Z",
+    "processed_at": "2026-08-13T10:00:01.000000Z"
+  }
+}
+```
+
+`payout_status`: `successful` | `pending` | `failed`. Balance is decremented only on success. Failed or pending rows stay `status: pending` for admin follow-up.
+
+**Errors**
+
+| HTTP | Typical cause |
+|------|----------------|
+| `403` | Payout API not enabled for the business |
+| `400` | Insufficient balance (`available_balance` in the body) |
+| `422` | Validation, or `bank_code` could not be resolved |
+| `429` | 1-minute cooldown, submit lock, or API rate limit |
+
+Error body: `{ "success": false, "message": "…" }`.
+
+**curl example**
+
+```bash
+curl -sS -X POST "https://your-checkout.example.com/api/v1/withdrawal" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: pk_your_api_key" \
+  -d '{
+    "amount": 5000,
+    "account_number": "0123456789",
+    "account_name": "Jane Doe",
+    "bank_name": "Guaranty Trust Bank",
+    "bank_code": "000058"
+  }'
+```
+
+### GET /withdrawals
+
+Paginated history. Optional `?status=processed` and `per_page` (default 15). Each row includes `payout_status` and `payout_reference`. Use this to poll after a pending payout.
