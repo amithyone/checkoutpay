@@ -17,7 +17,7 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <p class="text-sm text-gray-600 mb-3">Every merchant API call (payment-request, banks, withdrawal, etc.) from a website or integration, including missing/invalid API keys.</p>
+        <p class="text-sm text-gray-600 mb-3">Every merchant API call (payment-request, banks, withdrawal, etc.). Website is taken from Origin/Referer when the browser sends them, or from <code class="bg-gray-100 px-1 rounded">website_url</code> / <code class="bg-gray-100 px-1 rounded">webhook_url</code> / the business’s saved site when the call comes from a server.</p>
         <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <select name="result" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All results</option>

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\ApiHitLog;
 use App\Models\Business;
+use App\Support\ApiHitWebsiteResolver;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,12 +28,17 @@ class LogMerchantApiHits
         try {
             $status = $response->getStatusCode();
             $started = (float) $request->attributes->get('api_hit_started_at', microtime(true));
-            $origin = $this->truncate((string) $request->headers->get('Origin', ''), 500);
-            $referer = $this->truncate((string) $request->headers->get('Referer', ''), 500);
-            $host = $this->hostFrom($origin) ?: $this->hostFrom($referer);
-
             $business = $request->user();
-            $businessId = $business instanceof Business ? $business->id : null;
+            if (! $business instanceof Business) {
+                $rawKeyLookup = (string) ($request->header('X-API-Key') ?? $request->input('api_key') ?? '');
+                if ($rawKeyLookup !== '') {
+                    $business = Business::query()->where('api_key', $rawKeyLookup)->first();
+                } else {
+                    $business = null;
+                }
+            }
+
+            $context = ApiHitWebsiteResolver::fromRequest($request, $business instanceof Business ? $business : null);
 
             $rawKey = (string) ($request->header('X-API-Key') ?? $request->input('api_key') ?? '');
             $keyHint = $rawKey !== '' ? substr($rawKey, 0, 8) : null;
@@ -40,12 +46,12 @@ class LogMerchantApiHits
             ApiHitLog::query()->create([
                 'method' => strtoupper($request->method()),
                 'path' => $this->truncate('/'.$request->path(), 500),
-                'origin' => $origin !== '' ? $origin : null,
-                'referer' => $referer !== '' ? $referer : null,
-                'website_host' => $host,
+                'origin' => $context['origin'] !== null ? $this->truncate($context['origin'], 500) : null,
+                'referer' => $context['referer'] !== null ? $this->truncate($context['referer'], 500) : null,
+                'website_host' => $context['website_host'],
                 'ip' => $request->ip(),
                 'user_agent' => $this->truncate((string) $request->userAgent(), 500),
-                'business_id' => $businessId,
+                'business_id' => $business instanceof Business ? $business->id : null,
                 'api_key_hint' => $keyHint,
                 'status_code' => $status,
                 'successful' => $status >= 200 && $status < 400,
@@ -56,17 +62,6 @@ class LogMerchantApiHits
         } catch (Throwable) {
             // Never break the API because logging failed.
         }
-    }
-
-    private function hostFrom(string $url): ?string
-    {
-        if ($url === '') {
-            return null;
-        }
-
-        $host = parse_url($url, PHP_URL_HOST);
-
-        return is_string($host) && $host !== '' ? strtolower($host) : null;
     }
 
     private function responseMessage(Response $response): ?string
