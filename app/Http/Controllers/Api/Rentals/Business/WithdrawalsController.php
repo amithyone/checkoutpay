@@ -95,6 +95,7 @@ class WithdrawalsController extends Controller
                 ? trim((string) $validated['bank_narration'])
                 : null,
             'status' => WithdrawalRequest::STATUS_PENDING,
+            'source' => WithdrawalRequest::SOURCE_RENTALS_API,
         ]);
 
         $payout->processWithdrawal($withdrawal, $business, $bankCode);

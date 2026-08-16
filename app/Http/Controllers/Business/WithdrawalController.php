@@ -371,6 +371,7 @@ class WithdrawalController extends Controller
                 ? trim((string) $validated['bank_narration'])
                 : null,
             'status' => WithdrawalRequest::STATUS_PENDING,
+            'source' => WithdrawalRequest::SOURCE_DASHBOARD,
         ]);
 
         /** @var WithdrawalMavonPayPayoutService $payout */
@@ -384,7 +385,7 @@ class WithdrawalController extends Controller
         app(\App\Services\AdminWithdrawalAlertService::class)->send($withdrawal);
 
         return redirect()->route('business.withdrawals.show', $withdrawal)
-            ->with('success', 'Withdrawal request submitted. '.$payout->summaryMessage($withdrawal));
+            ->with('success', 'Withdrawal request submitted. '.$payout->merchantSummaryMessage($withdrawal));
     }
 
     /**

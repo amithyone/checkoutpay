@@ -15,6 +15,16 @@ class WithdrawalRequest extends Model
     const STATUS_REJECTED = 'rejected';
     const STATUS_PROCESSED = 'processed';
 
+    public const SOURCE_DASHBOARD = 'dashboard';
+
+    public const SOURCE_PAYOUT_API = 'payout_api';
+
+    public const SOURCE_ADMIN = 'admin';
+
+    public const SOURCE_AUTO = 'auto';
+
+    public const SOURCE_RENTALS_API = 'rentals_api';
+
     protected $fillable = [
         'business_id',
         'amount',
@@ -24,6 +34,7 @@ class WithdrawalRequest extends Model
         'notes',
         'bank_narration',
         'status',
+        'source',
         'payout_provider',
         'payout_status',
         'payout_reference',
@@ -64,6 +75,11 @@ class WithdrawalRequest extends Model
     public function processor()
     {
         return $this->belongsTo(Admin::class, 'processed_by');
+    }
+
+    public function merchantPayoutMessage(): string
+    {
+        return app(\App\Services\Payout\MerchantPayoutMessageSanitizer::class)->forWithdrawal($this);
     }
 
     /**
@@ -109,5 +125,22 @@ class WithdrawalRequest extends Model
             'processed_by' => $adminId,
             'processed_at' => now(),
         ]);
+    }
+
+    public function isFromPayoutApi(): bool
+    {
+        return $this->source === self::SOURCE_PAYOUT_API;
+    }
+
+    public function sourceLabel(): ?string
+    {
+        return match ($this->source) {
+            self::SOURCE_PAYOUT_API => 'Payout API',
+            self::SOURCE_DASHBOARD => 'Dashboard',
+            self::SOURCE_ADMIN => 'Admin',
+            self::SOURCE_AUTO => 'Auto-withdraw',
+            self::SOURCE_RENTALS_API => 'Rentals API',
+            default => null,
+        };
     }
 }

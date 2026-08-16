@@ -722,14 +722,15 @@ X-API-Key: pk_your_api_key_here</code></pre>
                                     <div class="code-block">
                                         <pre><code>{
   "success": true,
-  "message": "Transfer completed successfully via AutoPay.",
+  "message": "Transfer completed successfully.",
   "data": {
     "id": 41,
     "amount": 5000,
     "status": "processed",
+    "source": "payout_api",
     "payout_status": "successful",
     "payout_reference": "wd_41_abcdefghij",
-    "payout_response_message": "Approved",
+    "payout_response_message": "Transfer completed successfully.",
     "account_number": "0123456789",
     "account_name": "Jane Doe",
     "bank_name": "Guaranty Trust Bank",
@@ -739,7 +740,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
 }</code></pre>
                                     </div>
                                 </div>
-                                <p class="text-sm text-gray-600 mb-2"><code class="bg-gray-100 px-1 rounded">payout_status</code> is <code class="bg-gray-100 px-1 rounded">successful</code>, <code class="bg-gray-100 px-1 rounded">pending</code>, or <code class="bg-gray-100 px-1 rounded">failed</code>. Balance is decremented only when the bank transfer succeeds. Failed or pending rows stay <code class="bg-gray-100 px-1 rounded">status: pending</code> for admin follow-up.</p>
+                                <p class="text-sm text-gray-600 mb-2"><code class="bg-gray-100 px-1 rounded">payout_status</code> is <code class="bg-gray-100 px-1 rounded">successful</code>, <code class="bg-gray-100 px-1 rounded">pending</code>, or <code class="bg-gray-100 px-1 rounded">failed</code>. Balance is decremented only when the bank transfer succeeds. Failed or pending rows stay <code class="bg-gray-100 px-1 rounded">status: pending</code> for admin follow-up. <code class="bg-gray-100 px-1 rounded">message</code> and <code class="bg-gray-100 px-1 rounded">payout_response_message</code> are Checkout-safe copy (provider errors are not forwarded to your app).</p>
                             </div>
 
                             <div class="border-l-4 border-blue-500 pl-4">

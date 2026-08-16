@@ -709,6 +709,12 @@ class ConsumerWalletApiController extends Controller
             }
         }
 
+        $row['meta'] = $meta;
+        if ($tx->type === WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT) {
+            $row['meta'] = app(\App\Services\Payout\MerchantPayoutMessageSanitizer::class)
+                ->sanitizeNativeTransactionMeta($meta);
+        }
+
         return $this->txStatusNormalizer->apply($row, $tx);
     }
 
@@ -758,6 +764,9 @@ class ConsumerWalletApiController extends Controller
         if ($senderAcct !== null) {
             $row['sender_account_number'] = $senderAcct;
         }
+
+        $row['meta'] = app(\App\Services\Payout\MerchantPayoutMessageSanitizer::class)
+            ->sanitizeNativeTransactionMeta(is_array($row['meta'] ?? null) ? $row['meta'] : $meta);
 
         return $this->txStatusNormalizer->apply($row);
     }

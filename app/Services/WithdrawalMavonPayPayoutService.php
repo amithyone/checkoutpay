@@ -9,6 +9,7 @@ use App\Models\WithdrawalRequest;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\MevonPay\MevonPayPayoutService;
 use App\Services\Payout\BankPayoutNarration;
+use App\Services\Payout\MerchantPayoutMessageSanitizer;
 use Illuminate\Support\Str;
 
 /**
@@ -202,7 +203,7 @@ class WithdrawalMavonPayPayoutService
     }
 
     /**
-     * Human-readable flash line after processWithdrawal (optional).
+     * Admin-facing line (may include provider text stored on the row).
      */
     public function summaryMessage(WithdrawalRequest $withdrawal): string
     {
@@ -212,12 +213,24 @@ class WithdrawalMavonPayPayoutService
 
         $status = $withdrawal->payout_status;
         if ($status === MavonPayTransferService::BUCKET_SUCCESSFUL) {
-            return 'Transfer completed successfully via AutoPay.';
+            return 'Transfer completed successfully.';
         }
         if ($status === MavonPayTransferService::BUCKET_PENDING) {
-            return 'Transfer submitted; bank status is pending. Check this withdrawal for updates.';
+            return MerchantPayoutMessageSanitizer::PENDING;
         }
 
-        return 'Instant transfer could not be completed: '.($withdrawal->payout_response_message ?? 'Unknown error').' You can process it manually from the admin panel.';
+        $detail = trim((string) ($withdrawal->payout_response_message ?? ''));
+
+        return $detail !== ''
+            ? 'Instant transfer could not be completed: '.$detail
+            : 'Instant transfer could not be completed.';
+    }
+
+    /**
+     * Merchant API / dashboard copy. Never forwards raw MevonPay errors.
+     */
+    public function merchantSummaryMessage(WithdrawalRequest $withdrawal): string
+    {
+        return app(MerchantPayoutMessageSanitizer::class)->forWithdrawal($withdrawal);
     }
 }

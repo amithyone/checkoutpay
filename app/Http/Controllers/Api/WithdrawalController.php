@@ -79,6 +79,7 @@ class WithdrawalController extends Controller
                 ? trim((string) $request->input('bank_narration'))
                 : null,
             'status' => WithdrawalRequestModel::STATUS_PENDING,
+            'source' => WithdrawalRequestModel::SOURCE_PAYOUT_API,
         ]);
 
         $this->logService->logWithdrawalRequest($withdrawal, $request);
@@ -91,7 +92,7 @@ class WithdrawalController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => $this->payout->summaryMessage($withdrawal),
+            'message' => $this->payout->merchantSummaryMessage($withdrawal),
             'data' => $this->withdrawalPayload($withdrawal),
         ], 201);
     }
@@ -187,9 +188,11 @@ class WithdrawalController extends Controller
             'id' => $withdrawal->id,
             'amount' => (float) $withdrawal->amount,
             'status' => $withdrawal->status,
+            'source' => $withdrawal->source,
             'payout_status' => $withdrawal->payout_status,
             'payout_reference' => $withdrawal->payout_reference,
-            'payout_response_message' => $withdrawal->payout_response_message,
+            'payout_response_message' => app(\App\Services\Payout\MerchantPayoutMessageSanitizer::class)
+                ->forWithdrawal($withdrawal),
             'account_number' => $withdrawal->account_number,
             'account_name' => $withdrawal->account_name,
             'bank_name' => $withdrawal->bank_name,

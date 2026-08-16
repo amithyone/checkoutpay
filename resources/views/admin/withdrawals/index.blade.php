@@ -26,6 +26,13 @@
                 <option value="rejected" {{ request('status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
                 <option value="processed" {{ request('status') === 'processed' ? 'selected' : '' }}>Processed</option>
             </select>
+            <select name="source" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">All sources</option>
+                <option value="payout_api" {{ request('source') === 'payout_api' ? 'selected' : '' }}>Payout API</option>
+                <option value="dashboard" {{ request('source') === 'dashboard' ? 'selected' : '' }}>Dashboard</option>
+                <option value="admin" {{ request('source') === 'admin' ? 'selected' : '' }}>Admin</option>
+                <option value="auto" {{ request('source') === 'auto' ? 'selected' : '' }}>Auto-withdraw</option>
+            </select>
             <select name="business_id" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 <option value="">All Businesses</option>
                 @foreach(\App\Models\Business::all() as $business)
@@ -49,6 +56,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account Details</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
@@ -73,6 +81,9 @@
                                 <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Processed</span>
                             @endif
                         </td>
+                        <td class="px-6 py-4">
+                            @include('partials.withdrawal-source-badge')
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $withdrawal->created_at->format('M d, Y') }}</td>
                         <td class="px-6 py-4">
                             <a href="{{ route('admin.withdrawals.show', $withdrawal) }}" class="text-primary hover:underline text-sm">View</a>
@@ -80,7 +91,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No withdrawals found</td>
+                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">No withdrawals found</td>
                     </tr>
                     @endforelse
                 </tbody>

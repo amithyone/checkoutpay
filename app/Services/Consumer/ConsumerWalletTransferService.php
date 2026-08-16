@@ -37,6 +37,7 @@ class ConsumerWalletTransferService
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private ConsumerWalletSavingsService $savings,
         private MevonPayPayoutPreRefundStatusService $preRefundStatus,
+        private \App\Services\Payout\MerchantPayoutMessageSanitizer $payoutCopy,
     ) {}
 
     private function evolutionInstance(): string
@@ -551,7 +552,7 @@ class ConsumerWalletTransferService
                     'session_id' => $primarySessionId,
                     'api_session_id' => $apiSessionId !== '' ? $apiSessionId : null,
                     'payout_session_id' => $payoutSessionId !== '' ? $payoutSessionId : null,
-                    'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
+                    'response_message' => $this->payoutCopy->forNative($bucket, $receipt['response_message'] !== '' ? $receipt['response_message'] : null),
                     'balance_after' => $balanceAfter,
                     'ledger_scope' => $ledgerScope,
                     'amount_debited' => $amount,
@@ -563,9 +564,11 @@ class ConsumerWalletTransferService
             ];
         }
 
+        $safe = $this->payoutCopy->forNative($bucket, $result['response_message'] ?? null);
+
         return [
             'ok' => false,
-            'message' => (string) ($result['response_message'] ?? 'Bank transfer not completed. Wallet refunded if applicable.'),
+            'message' => $safe,
             'data' => [
                 'balance_after' => $balanceAfter,
                 'ledger_scope' => $ledgerScope,
@@ -573,7 +576,7 @@ class ConsumerWalletTransferService
                 'session_id' => $primarySessionId,
                 'api_session_id' => $apiSessionId !== '' ? $apiSessionId : null,
                 'payout_session_id' => $payoutSessionId !== '' ? $payoutSessionId : null,
-                'response_message' => $receipt['response_message'] !== '' ? $receipt['response_message'] : null,
+                'response_message' => $safe,
                 'reference' => $receipt['reference'] !== '' ? $receipt['reference'] : null,
             ],
         ];

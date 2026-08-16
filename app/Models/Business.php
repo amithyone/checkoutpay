@@ -1178,6 +1178,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
             'account_name' => $details['account_name'],
             'notes' => 'Auto-withdrawal triggered - Balance reached threshold of ₦'.number_format($this->auto_withdraw_threshold, 2),
             'status' => 'pending',
+            'source' => \App\Models\WithdrawalRequest::SOURCE_AUTO,
         ]);
 
         // Send notification to business

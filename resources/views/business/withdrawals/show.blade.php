@@ -18,6 +18,7 @@
                 @else
                     <span class="px-3 py-1 text-xs sm:text-sm font-medium bg-blue-100 text-blue-800 rounded-full">Processed</span>
                 @endif
+                @include('partials.withdrawal-source-badge')
             </div>
         </div>
 
@@ -65,7 +66,7 @@
                 <label class="block text-xs sm:text-sm font-medium text-slate-800 mb-1">Bank transfer status</label>
                 <p class="text-xs sm:text-sm text-slate-700"><span class="font-medium capitalize">{{ str_replace('_', ' ', $withdrawal->payout_status ?? '—') }}</span>
                     @if($withdrawal->payout_response_message)
-                        — {{ $withdrawal->payout_response_message }}
+                        — {{ $withdrawal->merchantPayoutMessage() }}
                     @endif
                 </p>
                 @if($withdrawal->payout_reference)

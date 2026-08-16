@@ -31,6 +31,7 @@ class WhatsappWalletTransferCompletionService
         private WhatsappWalletCountryResolver $walletCountry,
         private WhatsappWalletInternalVaTransferService $internalVaTransfer,
         private MevonPayPayoutPreRefundStatusService $preRefundStatus,
+        private \App\Services\Payout\MerchantPayoutMessageSanitizer $payoutCopy,
     ) {}
 
     private function waBrand(): string
@@ -666,7 +667,7 @@ class WhatsappWalletTransferCompletionService
             return WalletTransferCompletionResult::success((float) $wallet->balance, 'Bank transfer is processing.', $receipt);
         }
 
-        $detail = $result['response_message'] ?? 'The bank could not accept this transfer.';
+        $detail = $this->payoutCopy->forNative($bucket, $result['response_message'] ?? null);
         $this->client->sendText(
             $instance,
             $phone,

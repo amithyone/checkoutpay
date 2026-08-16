@@ -89,6 +89,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                     </tr>
@@ -113,6 +114,9 @@
                                 <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Processed</span>
                             @endif
                         </td>
+                        <td class="px-6 py-4">
+                            @include('partials.withdrawal-source-badge')
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-500">{{ $withdrawal->created_at->format('M d, Y') }}</td>
                         <td class="px-6 py-4">
                             <a href="{{ route('business.withdrawals.show', $withdrawal) }}" class="text-sm text-primary hover:underline">
@@ -122,7 +126,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No withdrawals found</td>
+                        <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">No withdrawals found</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -138,7 +142,7 @@
                         <p class="text-base font-bold text-gray-900 mb-1">₦{{ number_format($withdrawal->amount, 2) }}</p>
                         <p class="text-xs text-gray-500">{{ $withdrawal->created_at->format('M d, Y') }}</p>
                     </div>
-                    <div class="ml-3">
+                    <div class="ml-3 flex flex-col items-end gap-1">
                         @if($withdrawal->status === 'approved')
                             <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
                         @elseif($withdrawal->status === 'pending')
@@ -148,6 +152,7 @@
                         @else
                             <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Processed</span>
                         @endif
+                        @include('partials.withdrawal-source-badge')
                     </div>
                 </div>
                 <div class="space-y-2 pt-3 border-t border-gray-100">

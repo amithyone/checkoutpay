@@ -19,6 +19,10 @@
             @endif
         </div>
 
+        <div class="mb-4">
+            @include('partials.withdrawal-source-badge')
+        </div>
+
         <div class="grid grid-cols-2 gap-6 mb-6">
             <div>
                 <label class="text-sm text-gray-600">Business</label>

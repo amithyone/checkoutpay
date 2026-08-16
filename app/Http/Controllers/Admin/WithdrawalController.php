@@ -21,12 +21,16 @@ class WithdrawalController extends Controller
     {
         $query = WithdrawalRequest::with('business')->latest();
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        if ($request->has('business_id')) {
+        if ($request->filled('business_id')) {
             $query->where('business_id', $request->business_id);
+        }
+
+        if ($request->filled('source')) {
+            $query->where('source', $request->source);
         }
 
         $withdrawals = $query->paginate(20);
@@ -84,6 +88,7 @@ class WithdrawalController extends Controller
                 ? trim((string) $validated['bank_narration'])
                 : null,
             'status' => WithdrawalRequest::STATUS_PENDING,
+            'source' => WithdrawalRequest::SOURCE_ADMIN,
         ]);
 
         $payout->processWithdrawal($withdrawal, $business, $request->input('bank_code'));
