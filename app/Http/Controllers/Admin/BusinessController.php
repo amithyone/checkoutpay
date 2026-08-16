@@ -27,9 +27,7 @@ class BusinessController extends Controller
     public function index(Request $request): View
     {
         $query = Business::withCount(['payments', 'withdrawalRequests', 'verifications'])
-            ->with(['verifications' => function ($q) {
-                $q->latest()->limit(1);
-            }])
+            ->with(['verifications:id,business_id,status,verification_type'])
             ->latest();
 
         // Filter by status
@@ -109,7 +107,9 @@ class BusinessController extends Controller
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
         $validated['broadcast_pay_at_shop_enabled'] = $request->has('broadcast_pay_at_shop_enabled');
 
-        Business::create($validated);
+        $business = Business::create($validated);
+        app(\App\Services\BusinessMevonExternalDefaultService::class)
+            ->syncFromFlag($business, (bool) $validated['uses_external_account_numbers']);
 
         return redirect()->route('admin.businesses.index')
             ->with('success', 'Business created successfully');
@@ -185,6 +185,8 @@ class BusinessController extends Controller
         }
 
         $business->update($validated);
+        app(\App\Services\BusinessMevonExternalDefaultService::class)
+            ->syncFromFlag($business, (bool) $validated['uses_external_account_numbers']);
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Business updated successfully');

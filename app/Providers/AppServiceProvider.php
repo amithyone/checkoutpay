@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Business;
 use App\Models\WhatsappWalletTransaction;
+use App\Observers\BusinessObserver;
 use App\Observers\WhatsappWalletTransactionReferralObserver;
 use App\Services\Admin\AdminSidebarMenu;
 use App\Services\Whatsapp\EvolutionWhatsAppClient;
@@ -44,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         $this->configureSiteBranding();
 
         WhatsappWalletTransaction::observe(WhatsappWalletTransactionReferralObserver::class);
+        Business::observe(BusinessObserver::class);
 
         // Register Telegram notification channel
         $this->app->make(ChannelManager::class)->extend('telegram', function ($app) {

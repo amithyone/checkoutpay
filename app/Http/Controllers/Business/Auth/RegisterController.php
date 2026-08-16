@@ -62,6 +62,7 @@ class RegisterController extends Controller
             'phone' => $validated['phone'] ?? null,
             'address' => $validated['address'] ?? null,
             'is_active' => true,
+            'uses_external_account_numbers' => true,
             'email_verified_at' => null, // Email verification required
         ]);
 

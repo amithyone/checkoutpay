@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\BusinessMevonExternalDefaultService;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -417,18 +418,12 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
-     * Check if all required KYC documents are submitted
+     * Check if all required KYC documents are submitted (pending, reviewing, or approved).
+     * Rejected-only types are treated as missing so the merchant can re-upload.
      */
     public function hasAllRequiredKycDocuments(): bool
     {
-        $requiredTypes = BusinessVerification::getRequiredTypes();
-        $submittedTypes = $this->verifications()
-            ->whereIn('verification_type', $requiredTypes)
-            ->pluck('verification_type')
-            ->unique()
-            ->toArray();
-
-        return count($submittedTypes) === count($requiredTypes);
+        return $this->getMissingKycDocuments() === [];
     }
 
     /**
@@ -439,11 +434,48 @@ class Business extends Authenticatable implements CanResetPasswordContract
         $requiredTypes = BusinessVerification::getRequiredTypes();
         $submittedTypes = $this->verifications()
             ->whereIn('verification_type', $requiredTypes)
+            ->whereIn('status', [
+                BusinessVerification::STATUS_PENDING,
+                BusinessVerification::STATUS_UNDER_REVIEW,
+                BusinessVerification::STATUS_APPROVED,
+            ])
             ->pluck('verification_type')
             ->unique()
             ->toArray();
 
-        return array_diff($requiredTypes, $submittedTypes);
+        return array_values(array_diff($requiredTypes, $submittedTypes));
+    }
+
+    /**
+     * Whether this KYC type can still be added or replaced.
+     * Locked after submit (pending/review) or approval; allowed when never submitted or after rejection.
+     */
+    public function canSubmitKycType(string $type): bool
+    {
+        return $this->kycTypeLockReason($type) === null;
+    }
+
+    /**
+     * @return 'approved'|'submitted'|null
+     */
+    public function kycTypeLockReason(string $type): ?string
+    {
+        $rows = $this->relationLoaded('verifications')
+            ? $this->verifications->where('verification_type', $type)
+            : $this->verifications()->where('verification_type', $type)->get();
+
+        if ($rows->contains(fn ($row) => $row->status === BusinessVerification::STATUS_APPROVED)) {
+            return 'approved';
+        }
+
+        if ($rows->contains(fn ($row) => in_array($row->status, [
+            BusinessVerification::STATUS_PENDING,
+            BusinessVerification::STATUS_UNDER_REVIEW,
+        ], true))) {
+            return 'submitted';
+        }
+
+        return null;
     }
 
     /**
@@ -509,6 +541,71 @@ class Business extends Authenticatable implements CanResetPasswordContract
 
         // Legacy rows may have stored the signatory in name before we split the fields.
         return trim((string) $this->name);
+    }
+
+    /**
+     * Overall KYC badge for admin lists (required docs, not only the latest row).
+     *
+     * @return 'verified'|'pending'|'rejected'|'none'
+     */
+    public function kycListStatus(): string
+    {
+        $required = BusinessVerification::getRequiredTypes();
+        $rows = $this->relationLoaded('verifications')
+            ? $this->verifications
+            : $this->verifications()->get(['id', 'status', 'verification_type']);
+
+        if ($rows->isEmpty()) {
+            return 'none';
+        }
+
+        $approvedTypes = $rows
+            ->where('status', BusinessVerification::STATUS_APPROVED)
+            ->pluck('verification_type')
+            ->unique()
+            ->all();
+
+        if (count(array_intersect($required, $approvedTypes)) === count($required)) {
+            return 'verified';
+        }
+
+        $requiredRows = $rows->whereIn('verification_type', $required);
+        if ($requiredRows->contains(fn ($row) => in_array($row->status, [
+            BusinessVerification::STATUS_PENDING,
+            BusinessVerification::STATUS_UNDER_REVIEW,
+        ], true))) {
+            return 'pending';
+        }
+
+        if ($requiredRows->contains(fn ($row) => $row->status === BusinessVerification::STATUS_REJECTED)) {
+            return 'rejected';
+        }
+
+        return $requiredRows->isEmpty() ? 'none' : 'pending';
+    }
+
+    /**
+     * Webhook to display for admins: business-level first, else first website webhook.
+     */
+    public function displayWebhookUrl(): ?string
+    {
+        $own = trim((string) ($this->webhook_url ?? ''));
+        if ($own !== '') {
+            return $own;
+        }
+
+        $sites = $this->relationLoaded('websites')
+            ? $this->websites
+            : $this->websites()->get(['id', 'webhook_url']);
+
+        foreach ($sites as $site) {
+            $url = trim((string) ($site->webhook_url ?? ''));
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -611,6 +708,34 @@ class Business extends Authenticatable implements CanResetPasswordContract
         }
 
         return in_array($mode, ['external_only', 'hybrid', 'internal_only'], true) ? $mode : 'hybrid';
+    }
+
+    /**
+     * How checkout should issue a temporary pay-in account: Mevon temp VA vs internal pool.
+     *
+     * @return array{mode: string, va_mode: string}
+     */
+    public function checkoutAccountRouting(?string $service = null): array
+    {
+        $assignment = $this->getExternalProviderAssignment('mevonpay');
+        if ($assignment) {
+            return [
+                'mode' => $this->externalProviderModeForService('mevonpay', $service),
+                'va_mode' => $this->externalProviderVaGenerationMode('mevonpay'),
+            ];
+        }
+
+        if ($this->uses_external_account_numbers) {
+            return [
+                'mode' => BusinessMevonExternalDefaultService::ASSIGNMENT_MODE,
+                'va_mode' => BusinessMevonExternalDefaultService::VA_GENERATION_MODE,
+            ];
+        }
+
+        return [
+            'mode' => 'internal_only',
+            'va_mode' => 'dynamic',
+        ];
     }
 
     /**

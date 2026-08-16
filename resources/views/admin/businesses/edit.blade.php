@@ -76,7 +76,7 @@
                 <div>
                     <label class="flex items-center">
                         <input type="checkbox" name="uses_external_account_numbers" value="1" {{ old('uses_external_account_numbers', $business->uses_external_account_numbers) ? 'checked' : '' }} class="mr-2">
-                        <span class="text-sm text-gray-700">Use external account numbers (MEVONPAY)</span>
+                        <span class="text-sm text-gray-700">Use MevonPay temporary account numbers for checkout</span>
                     </label>
                 </div>
 

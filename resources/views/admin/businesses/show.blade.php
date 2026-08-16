@@ -269,7 +269,15 @@
             @endif
             <div>
                 <label class="text-xs text-gray-600">Webhook URL</label>
-                <p class="text-sm font-medium text-gray-900 mt-1 break-all">{{ $business->webhook_url ?? 'N/A' }}</p>
+                @php $adminWebhook = $business->displayWebhookUrl(); @endphp
+                @if($adminWebhook)
+                    <p class="text-sm font-medium text-gray-900 mt-1 break-all">{{ $adminWebhook }}</p>
+                    @if(! trim((string) ($business->webhook_url ?? '')))
+                        <p class="text-xs text-gray-500 mt-1">From an approved/pending website (business-level webhook is empty)</p>
+                    @endif
+                @else
+                    <p class="text-sm font-medium text-gray-900 mt-1">N/A</p>
+                @endif
             </div>
         </div>
 
@@ -616,11 +624,11 @@
                                         <strong>Note:</strong> {{ $website->notes }}
                                     </div>
                                 @endif
-                                @if($website->is_approved && $website->webhook_url)
+                                @if(trim((string) ($website->webhook_url ?? '')) !== '')
                                     <div class="mt-2 text-xs text-gray-600">
                                         <strong>Webhook URL:</strong> <span class="font-mono text-gray-800">{{ $website->webhook_url }}</span>
                                     </div>
-                                @elseif($website->is_approved)
+                                @else
                                     <div class="mt-2 text-xs text-yellow-600">
                                         <i class="fas fa-exclamation-triangle mr-1"></i> No webhook URL configured
                                     </div>

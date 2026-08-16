@@ -21,6 +21,7 @@ class VerificationController extends Controller
     {
         $business = auth('business')->user();
         $verifications = $business->verifications()->latest()->get();
+        $business->setRelation('verifications', $verifications);
 
         return view('business.verification.index', compact('verifications'));
     }
@@ -165,6 +166,18 @@ class VerificationController extends Controller
             }
         }
 
+        $lock = $business->kycTypeLockReason($validated['verification_type']);
+        if ($lock === 'approved') {
+            return back()->withErrors([
+                'verification_type' => 'This KYC item is approved and cannot be changed.',
+            ])->withInput();
+        }
+        if ($lock === 'submitted') {
+            return back()->withErrors([
+                'verification_type' => 'This KYC item is already submitted. You can only change it if it is rejected.',
+            ])->withInput();
+        }
+
         $this->applyKycProfileFields($business, $validated);
 
         // Handle text-based verifications (account_number + bank, BVN, NIN)
@@ -195,16 +208,6 @@ class VerificationController extends Controller
             }
             if ($validated['verification_type'] === BusinessVerification::TYPE_NIN && empty($validated['nin'])) {
                 return back()->withErrors(['nin' => 'NIN is required.']);
-            }
-
-            // Check if verification already exists for this type
-            $existing = $business->verifications()
-                ->where('verification_type', $validated['verification_type'])
-                ->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW])
-                ->first();
-
-            if ($existing) {
-                return back()->withErrors(['verification_type' => 'You already have a pending verification for this type.']);
             }
 
             // For account_number: save to business and set document_type with verified name
@@ -243,16 +246,6 @@ class VerificationController extends Controller
         } else {
             if (! $request->hasFile('document')) {
                 return back()->withErrors(['document' => 'Document file is required for this verification type.']);
-            }
-
-            // Check if verification already exists for this type
-            $existing = $business->verifications()
-                ->where('verification_type', $validated['verification_type'])
-                ->whereIn('status', [BusinessVerification::STATUS_PENDING, BusinessVerification::STATUS_UNDER_REVIEW])
-                ->first();
-
-            if ($existing) {
-                return back()->withErrors(['document' => 'You already have a pending verification for this type.']);
             }
 
             // Store document
@@ -351,38 +344,53 @@ class VerificationController extends Controller
     {
         $updates = [];
 
-        if (! empty($validated['business_phone'])) {
+        if (! $this->kycProfileLocked($business, 'cac') && ! empty($validated['business_phone'])) {
             $updates['phone'] = $this->normalizeNigerianPhoneToLocal11((string) $validated['business_phone']);
         }
 
-        if (array_key_exists('cac_registration_number', $validated) && trim((string) $validated['cac_registration_number']) !== '') {
+        if (! $this->kycProfileLocked($business, 'cac') && array_key_exists('cac_registration_number', $validated) && trim((string) $validated['cac_registration_number']) !== '') {
             $updates['cac_registration_number'] = \App\Models\Business::normalizeCacRegistrationNumber((string) $validated['cac_registration_number']);
         }
 
-        if (! empty($validated['signatory_dob'])) {
+        if (! $this->kycProfileLocked($business, 'identity') && ! empty($validated['signatory_dob'])) {
             $updates['rubies_signatory_dob'] = $validated['signatory_dob'];
         }
 
         // Company / registered name for Mevon create_business_account business_name + cac.
-        if (array_key_exists('business_registered_name', $validated) && trim((string) $validated['business_registered_name']) !== '') {
+        if (! $this->kycProfileLocked($business, 'cac') && array_key_exists('business_registered_name', $validated) && trim((string) $validated['business_registered_name']) !== '') {
             $updates['name'] = trim((string) $validated['business_registered_name']);
         }
 
         // Signatory personal name for BVN/NIN only — never used as the pay-in account title.
-        if (array_key_exists('legal_name', $validated) && trim((string) $validated['legal_name']) !== '') {
+        if (! $this->kycProfileLocked($business, 'identity') && array_key_exists('legal_name', $validated) && trim((string) $validated['legal_name']) !== '') {
             // Some environments may not have the column added yet; avoid 500s.
             if (Schema::hasColumn('businesses', 'rubies_signatory_name')) {
                 $updates['rubies_signatory_name'] = trim((string) $validated['legal_name']);
             }
         }
 
-        if (! empty($validated['business_email'])) {
+        if (! $this->kycProfileLocked($business, 'cac') && ! empty($validated['business_email'])) {
             $updates['email'] = strtolower(trim((string) $validated['business_email']));
         }
 
         if ($updates !== []) {
             $business->update($updates);
         }
+    }
+
+    private function kycProfileLocked(\App\Models\Business $business, string $group): bool
+    {
+        if ($group === 'cac') {
+            return $business->kycTypeLockReason(BusinessVerification::TYPE_CAC_CERTIFICATE) !== null
+                || $business->kycTypeLockReason(BusinessVerification::TYPE_CAC_APPLICATION) !== null;
+        }
+
+        if ($group === 'identity') {
+            return $business->kycTypeLockReason(BusinessVerification::TYPE_BVN) !== null
+                || $business->kycTypeLockReason(BusinessVerification::TYPE_NIN) !== null;
+        }
+
+        return false;
     }
 
     private function formatPayInUserMessage(string $message): string

@@ -23,7 +23,7 @@ class SettingsController extends Controller
         $business = Auth::guard('business')->user();
 
         $validated = $request->validate([
-            'webhook_url' => 'nullable|url|max:500',
+            'webhook_url' => 'sometimes|nullable|url|max:500',
             'profile_picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'notifications_email_enabled' => 'boolean',
             'notifications_payment_enabled' => 'boolean',

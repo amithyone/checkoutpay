@@ -84,8 +84,14 @@ class PaymentService
         $externalOverride = $data['external_override'] ?? null;
         if (is_string($externalOverride) && in_array($externalOverride, ['external_only', 'hybrid', 'internal_only'], true)) {
             $mode = $externalOverride;
+            $vaMode = $business->externalProviderVaGenerationMode('mevonpay');
+            if ($mode !== 'internal_only' && ($vaMode === 'dynamic' || $vaMode === '') && $business->uses_external_account_numbers) {
+                $vaMode = \App\Services\BusinessMevonExternalDefaultService::VA_GENERATION_MODE;
+            }
         } else {
-            $mode = $business->externalProviderModeForService('mevonpay', $requestedService);
+            $routing = $business->checkoutAccountRouting($requestedService);
+            $mode = $routing['mode'];
+            $vaMode = $routing['va_mode'];
         }
 
         $forceExternal = $mode === 'external_only';
@@ -95,15 +101,12 @@ class PaymentService
         $externalExpiresAt = null;
 
         if ($forceExternal || $preferExternal) {
-            $vaMode = $business->externalProviderVaGenerationMode('mevonpay');
+            $vaMode = $vaMode ?: $business->externalProviderVaGenerationMode('mevonpay');
 
             try {
                 if ($vaMode === 'temp') {
                     $registrationNumber = trim((string) ($data['registration_number'] ?? config('services.mevonpay.temp_va_registration_number', '')));
                     $bvn = $data['bvn'] ?? null;
-                    if ($registrationNumber === '' && empty($bvn)) {
-                        throw new \RuntimeException('registration_number (preferred) or bvn is required for Temporary VA (createtempva.php).');
-                    }
 
                     $fname = $data['fname'] ?? null;
                     $lname = $data['lname'] ?? null;

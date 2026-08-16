@@ -21,6 +21,11 @@
         $missingDocs = $business->getMissingKycDocuments();
         $allSubmitted = $business->hasAllRequiredKycDocuments();
         $allApproved = $business->hasAllKycDocumentsApproved();
+        $openKycTypes = collect($requiredTypes)->filter(fn ($type) => $business->canSubmitKycType($type))->values();
+        $lockCacProfile = ! $business->canSubmitKycType(\App\Models\BusinessVerification::TYPE_CAC_CERTIFICATE)
+            || ! $business->canSubmitKycType(\App\Models\BusinessVerification::TYPE_CAC_APPLICATION);
+        $lockIdentityProfile = ! $business->canSubmitKycType(\App\Models\BusinessVerification::TYPE_BVN)
+            || ! $business->canSubmitKycType(\App\Models\BusinessVerification::TYPE_NIN);
     @endphp
 
     <!-- KYC Status Alert -->
@@ -213,7 +218,7 @@
     <!-- Submit Verification -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-2">Verification</h3>
-        <p class="text-sm text-gray-600 mb-6">Fill in pay-in account details (you can request the account on its own), then submit identity items and documents as needed.</p>
+        <p class="text-sm text-gray-600 mb-6">Add KYC while you are still filling it in. After you submit an item it is locked until it is rejected. Approved items cannot be changed.</p>
 
         <form action="{{ route('business.verification.store') }}" method="POST" enctype="multipart/form-data" id="verification-form">
             @csrf
@@ -234,7 +239,11 @@
                             <input type="text" name="business_registered_name" id="business_registered_name" maxlength="255"
                                 placeholder="Exact company / business name on CAC"
                                 value="{{ old('business_registered_name', $business->name) }}"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
+                                {{ $lockCacProfile ? 'readonly' : '' }}
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary {{ $lockCacProfile ? 'bg-gray-100 text-gray-600' : 'bg-white' }}">
+                            @if($lockCacProfile)
+                                <p class="mt-1 text-xs text-gray-500">Locked because CAC KYC is already submitted or approved.</p>
+                            @endif
                             @error('business_registered_name')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -244,7 +253,8 @@
                             <input type="text" name="cac_registration_number" id="cac_registration_number" maxlength="100"
                                 placeholder="e.g. RC1234567 or BN1234567"
                                 value="{{ old('cac_registration_number', $business->cac_registration_number) }}"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
+                                {{ $lockCacProfile ? 'readonly' : '' }}
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary {{ $lockCacProfile ? 'bg-gray-100 text-gray-600' : 'bg-white' }}">
                             <p class="mt-1 text-xs text-gray-500">Use RC for limited companies or BN for business names. This is sent as the registration number when creating the pay-in account.</p>
                             @error('cac_registration_number')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -256,7 +266,8 @@
                                 placeholder="e.g. 08012345678 or +2348012345678"
                                 value="{{ old('business_phone', $business->phone) }}"
                                 autocomplete="tel"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
+                                {{ $lockCacProfile ? 'readonly' : '' }}
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary {{ $lockCacProfile ? 'bg-gray-100 text-gray-600' : 'bg-white' }}">
                             @error('business_phone')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -267,7 +278,8 @@
                                 placeholder="Business email"
                                 value="{{ old('business_email', $business->email) }}"
                                 autocomplete="email"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
+                                {{ $lockCacProfile ? 'readonly' : '' }}
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary {{ $lockCacProfile ? 'bg-gray-100 text-gray-600' : 'bg-white' }}">
                             @error('business_email')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -276,7 +288,8 @@
                             <label for="signatory_dob" class="block text-sm font-medium text-gray-700 mb-1">Signatory date of birth <span id="signatory-dob-required" class="text-red-500 hidden">*</span></label>
                             <input type="date" name="signatory_dob" id="signatory_dob"
                                 value="{{ old('signatory_dob', optional($business->rubies_signatory_dob)?->format('Y-m-d')) }}"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
+                                {{ $lockIdentityProfile ? 'readonly' : '' }}
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary {{ $lockIdentityProfile ? 'bg-gray-100 text-gray-600' : 'bg-white' }}">
                             @error('signatory_dob')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -307,7 +320,8 @@
                         <input type="text" name="legal_name" id="legal_name"
                             placeholder="Full name as on BVN or NIN"
                             value="{{ old('legal_name', $business->rubies_signatory_name) }}"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white max-w-xl">
+                            {{ $lockIdentityProfile ? 'readonly' : '' }}
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary {{ $lockIdentityProfile ? 'bg-gray-100 text-gray-600' : 'bg-white' }} max-w-xl">
                         @error('legal_name')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -319,14 +333,20 @@
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-white">
                             <option value="">Select type</option>
                             <optgroup label="Personal verification">
-                                <option value="bvn">BVN (Bank Verification Number)</option>
-                                <option value="nin">NIN (National Identification Number)</option>
-                                <option value="account_number">Business bank account (NUBAN)</option>
+                                @foreach(['bvn' => 'BVN (Bank Verification Number)', 'nin' => 'NIN (National Identification Number)', 'account_number' => 'Business bank account (NUBAN)'] as $type => $label)
+                                    @php $lock = $business->kycTypeLockReason($type); @endphp
+                                    <option value="{{ $type }}" @disabled($lock) {{ old('verification_type') === $type && ! $lock ? 'selected' : '' }}>
+                                        {{ $label }}@if($lock === 'approved') (approved — locked)@elseif($lock === 'submitted') (submitted — locked)@endif
+                                    </option>
+                                @endforeach
                             </optgroup>
                             <optgroup label="Business documents">
-                                <option value="cac_certificate">CAC Certificate</option>
-                                <option value="cac_application">CAC Application</option>
-                                <option value="utility_bill">Utility Bill</option>
+                                @foreach(['cac_certificate' => 'CAC Certificate', 'cac_application' => 'CAC Application', 'utility_bill' => 'Utility Bill'] as $type => $label)
+                                    @php $lock = $business->kycTypeLockReason($type); @endphp
+                                    <option value="{{ $type }}" @disabled($lock) {{ old('verification_type') === $type && ! $lock ? 'selected' : '' }}>
+                                        {{ $label }}@if($lock === 'approved') (approved — locked)@elseif($lock === 'submitted') (submitted — locked)@endif
+                                    </option>
+                                @endforeach
                             </optgroup>
                         </select>
                         @error('verification_type')
@@ -430,9 +450,13 @@
             </div>
 
             <div class="mt-6">
-                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
-                    <i class="fas fa-upload mr-2"></i> Submit Verification
-                </button>
+                @if($openKycTypes->isEmpty())
+                    <p class="text-sm text-gray-600">All KYC items are submitted or approved. You can re-upload only after an item is rejected.</p>
+                @else
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                        <i class="fas fa-upload mr-2"></i> Submit Verification
+                    </button>
+                @endif
             </div>
         </form>
     </div>

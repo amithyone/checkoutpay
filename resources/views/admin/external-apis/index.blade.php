@@ -72,9 +72,9 @@
                     @php
                         $assigned = $assignedMap[$business->id] ?? null;
                         $enabled = $assigned !== null;
-                        $mode = $assigned['mode'] ?? 'hybrid';
+                        $mode = $assigned['mode'] ?? 'external_only';
                         $selectedServices = $assigned['services'] ?? [];
-                        $vaGenerationMode = $assigned['va_generation_mode'] ?? 'dynamic';
+                        $vaGenerationMode = $assigned['va_generation_mode'] ?? 'temp';
                     @endphp
                     <div class="border border-gray-100 rounded-lg p-3">
                         <div class="flex items-center justify-between gap-4 mb-3">

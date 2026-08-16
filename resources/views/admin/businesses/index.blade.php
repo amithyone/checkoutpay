@@ -85,20 +85,16 @@
                             <div class="text-sm font-medium text-gray-900">{{ $business->name }}</div>
                             <div class="text-xs text-gray-500 mt-1">
                                 <span class="inline-flex items-center">
-                                    @if($business->verifications_count > 0)
-                                        @php
-                                            $latestVerification = $business->verifications->first();
-                                        @endphp
-                                        @if($latestVerification && $latestVerification->status === 'approved')
-                                            <i class="fas fa-check-circle text-green-500 mr-1"></i>
-                                            <span class="text-green-600">KYC Verified</span>
-                                        @elseif($latestVerification && in_array($latestVerification->status, ['pending', 'under_review']))
-                                            <i class="fas fa-clock text-yellow-500 mr-1"></i>
-                                            <span class="text-yellow-600">KYC Pending</span>
-                                        @else
-                                            <i class="fas fa-times-circle text-red-500 mr-1"></i>
-                                            <span class="text-red-600">KYC Rejected</span>
-                                        @endif
+                                    @php $kycStatus = $business->kycListStatus(); @endphp
+                                    @if($kycStatus === 'verified')
+                                        <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                                        <span class="text-green-600">KYC Verified</span>
+                                    @elseif($kycStatus === 'pending')
+                                        <i class="fas fa-clock text-yellow-500 mr-1"></i>
+                                        <span class="text-yellow-600">KYC Pending</span>
+                                    @elseif($kycStatus === 'rejected')
+                                        <i class="fas fa-times-circle text-red-500 mr-1"></i>
+                                        <span class="text-red-600">KYC Rejected</span>
                                     @else
                                         <i class="fas fa-exclamation-circle text-gray-400 mr-1"></i>
                                         <span class="text-gray-500">No KYC</span>

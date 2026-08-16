@@ -36,4 +36,12 @@ class WhatsappWalletNameMatcherTest extends TestCase
             'DANIEL DAVID JOSEPH'
         ));
     }
+
+    public function test_same_names_in_any_order_pass(): void
+    {
+        $this->assertTrue(WhatsappWalletNameMatcher::passes(
+            'Emmanuel Oluebube Emejulu',
+            'OLUEBEUBE EMMANUEL EMEJULU'
+        ));
+    }
 }

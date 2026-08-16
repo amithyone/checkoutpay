@@ -30,9 +30,70 @@ final class WhatsappWalletNameMatcher
             return false;
         }
 
+        if (self::tokensMatchUnordered($profile, $bank)) {
+            return true;
+        }
+
         $min = self::minScoreToPass();
 
         return WhatsappWalletCasualSendParser::scoreNameAgainstAccountName($profile, $bank) >= $min
             || WhatsappWalletCasualSendParser::scoreNameAgainstAccountName($bank, $profile) >= $min;
+    }
+
+    /**
+     * Same given names in any order, with one-letter typos allowed on longer tokens
+     * (e.g. "Emmanuel Oluebube Emejulu" vs "OLUEBEUBE EMMANUEL EMEJULU").
+     */
+    public static function tokensMatchUnordered(string $normalizedA, string $normalizedB): bool
+    {
+        $a = preg_split('/\s+/u', $normalizedA, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $b = preg_split('/\s+/u', $normalizedB, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($a === [] || $b === []) {
+            return false;
+        }
+
+        sort($a);
+        sort($b);
+        if ($a === $b) {
+            return true;
+        }
+
+        $shorter = count($a) <= count($b) ? $a : $b;
+        $longer = count($a) <= count($b) ? $b : $a;
+
+        $used = [];
+        foreach ($shorter as $token) {
+            $found = false;
+            foreach ($longer as $i => $candidate) {
+                if (isset($used[$i])) {
+                    continue;
+                }
+                if (self::tokensAreClose($token, $candidate)) {
+                    $used[$i] = true;
+                    $found = true;
+                    break;
+                }
+            }
+            if (! $found) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function tokensAreClose(string $a, string $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+
+        $lenA = strlen($a);
+        $lenB = strlen($b);
+        if (min($lenA, $lenB) < 4 || abs($lenA - $lenB) > 1) {
+            return false;
+        }
+
+        return levenshtein($a, $b) <= 1;
     }
 }

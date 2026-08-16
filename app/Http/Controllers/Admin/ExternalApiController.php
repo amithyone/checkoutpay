@@ -71,14 +71,14 @@ class ExternalApiController extends Controller
             if (!Business::whereKey($businessId)->exists()) {
                 continue;
             }
-            $mode = $config['mode'] ?? 'hybrid';
+            $mode = $config['mode'] ?? 'external_only';
             if (!in_array($mode, ['external_only', 'hybrid', 'internal_only'], true)) {
-                $mode = 'hybrid';
+                $mode = 'external_only';
             }
 
-            $vaGenerationMode = strtolower(trim((string) ($config['va_generation_mode'] ?? 'dynamic')));
+            $vaGenerationMode = strtolower(trim((string) ($config['va_generation_mode'] ?? 'temp')));
             if (!in_array($vaGenerationMode, ['dynamic', 'temp'], true)) {
-                $vaGenerationMode = 'dynamic';
+                $vaGenerationMode = 'temp';
             }
 
             $services = $config['services'] ?? [];
