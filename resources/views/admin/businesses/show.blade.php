@@ -604,6 +604,10 @@
                                         <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
                                             <i class="fas fa-check-circle mr-1"></i> Approved
                                         </span>
+                                    @elseif($website->isRejected())
+                                        <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                                            <i class="fas fa-times-circle mr-1"></i> Rejected
+                                        </span>
                                     @else
                                         <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
                                             <i class="fas fa-clock mr-1"></i> Pending
@@ -618,10 +622,13 @@
                                             by {{ $website->approver->name }}
                                         @endif
                                     @endif
+                                    @if($website->rejected_at)
+                                        • Rejected {{ $website->rejected_at->format('M d, Y') }}
+                                    @endif
                                 </div>
                                 @if($website->notes)
-                                    <div class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                                        <strong>Note:</strong> {{ $website->notes }}
+                                    <div class="mt-2 text-xs {{ $website->isRejected() ? 'text-red-800 bg-red-50' : 'text-gray-600 bg-gray-50' }} p-2 rounded">
+                                        <strong>{{ $website->isRejected() ? 'Rejection note (visible to business):' : 'Note:' }}</strong> {{ $website->notes }}
                                     </div>
                                 @endif
                                 @if(trim((string) ($website->webhook_url ?? '')) !== '')
@@ -714,25 +721,40 @@
                                     class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
                                     <i class="fas fa-edit mr-1"></i> Edit
                                 </button>
-                                @if(!$website->is_approved)
+                                @if($website->isPendingReview() || $website->isRejected())
                                     <button onclick="showApproveWebsiteModal({{ $website->id }})" 
                                         class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
                                         <i class="fas fa-check mr-1"></i> Approve
                                     </button>
-                                @else
+                                @endif
+                                @if($website->isPendingReview())
+                                    <button onclick="showRejectWebsiteModal({{ $website->id }})" 
+                                        class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
+                                        <i class="fas fa-times mr-1"></i> Reject
+                                    </button>
+                                @elseif($website->is_approved)
                                     <button onclick="showRejectWebsiteModal({{ $website->id }})" 
                                         class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
                                         <i class="fas fa-times mr-1"></i> Revoke
                                     </button>
+                                    <form method="POST" action="{{ route('admin.businesses.delete-website', [$business, $website]) }}" 
+                                        onsubmit="return confirm('Are you sure you want to delete this website?')" class="inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                @elseif($website->isRejected())
+                                    <form method="POST" action="{{ route('admin.businesses.delete-website', [$business, $website]) }}" 
+                                        onsubmit="return confirm('Are you sure you want to delete this website?')" class="inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
                                 @endif
-                                <form method="POST" action="{{ route('admin.businesses.delete-website', [$business, $website]) }}" 
-                                    onsubmit="return confirm('Are you sure you want to delete this website?')" class="inline">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </form>
                             </div>
                         </div>
                     </div>
@@ -1241,21 +1263,21 @@
 <!-- Reject Website Modal -->
 <div id="rejectWebsiteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Revoke Website Approval</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Reject Website</h3>
         <form id="rejectWebsiteForm" method="POST">
             @csrf
             <input type="hidden" name="website_id" id="reject_website_id">
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Rejection Reason <span class="text-red-500">*</span></label>
-                <textarea name="rejection_reason" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
-                    placeholder="Please provide a reason for revoking approval..."></textarea>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Note for the business <span class="text-red-500">*</span></label>
+                <textarea name="rejection_reason" rows="4" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm" 
+                    placeholder="Explain why this website was not approved. This note is shown on their dashboard and emailed to them."></textarea>
             </div>
             <div class="flex justify-end space-x-3">
                 <button type="button" onclick="closeRejectWebsiteModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                     Cancel
                 </button>
                 <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                    Revoke Approval
+                    Reject and email business
                 </button>
             </div>
         </form>

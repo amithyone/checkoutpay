@@ -228,10 +228,12 @@ class BusinessController extends Controller
             'is_approved' => true,
             'approved_at' => now(),
             'approved_by' => auth('admin')->id(),
+            'rejected_at' => null,
+            'rejected_by' => null,
             'notes' => $request->notes,
         ]);
 
-        // Send notification to business
+        $website->refresh();
         $business->notify(new \App\Notifications\WebsiteApprovedNotification($website));
 
         $message = 'Website approved successfully.';
@@ -258,10 +260,15 @@ class BusinessController extends Controller
             'notes' => $request->rejection_reason,
             'approved_at' => null,
             'approved_by' => null,
+            'rejected_at' => now(),
+            'rejected_by' => auth('admin')->id(),
         ]);
 
+        $website->refresh();
+        $business->notify(new \App\Notifications\WebsiteRejectedNotification($website));
+
         return redirect()->route('admin.businesses.show', $business)
-            ->with('success', 'Website approval revoked. Reason: '.$request->rejection_reason);
+            ->with('success', 'Website rejected. The business was emailed with your note.');
     }
 
     public function addWebsite(Request $request, Business $business): RedirectResponse

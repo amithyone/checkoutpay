@@ -19,6 +19,8 @@ class BusinessWebsite extends Model
         'notes',
         'approved_at',
         'approved_by',
+        'rejected_at',
+        'rejected_by',
         'charge_percentage',
         'charge_fixed',
         'charges_paid_by_customer',
@@ -40,6 +42,7 @@ class BusinessWebsite extends Model
         'monthly_revenue' => 'decimal:2',
         'yearly_revenue' => 'decimal:2',
         'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
         'last_monthly_revenue_update' => 'datetime',
         'last_yearly_revenue_update' => 'datetime',
         'created_at' => 'datetime',
@@ -76,7 +79,17 @@ class BusinessWebsite extends Model
      */
     public function scopePending($query)
     {
-        return $query->where('is_approved', false);
+        return $query->where('is_approved', false)->whereNull('rejected_at');
+    }
+
+    public function isRejected(): bool
+    {
+        return ! $this->is_approved && $this->rejected_at !== null;
+    }
+
+    public function isPendingReview(): bool
+    {
+        return ! $this->is_approved && $this->rejected_at === null;
     }
 
     /**

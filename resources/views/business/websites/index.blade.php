@@ -69,6 +69,10 @@
                                             <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full self-start">
                                                 <i class="fas fa-check-circle mr-1"></i> Approved
                                             </span>
+                                        @elseif($website->isRejected())
+                                            <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full self-start">
+                                                <i class="fas fa-times-circle mr-1"></i> Rejected
+                                            </span>
                                         @else
                                             <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full self-start">
                                                 <i class="fas fa-clock mr-1"></i> Pending Approval
@@ -82,8 +86,8 @@
                                         @endif
                                     </div>
                                     @if($website->notes)
-                                        <div class="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded break-words">
-                                            <strong>Note:</strong> {{ $website->notes }}
+                                        <div class="mt-2 text-xs {{ $website->isRejected() ? 'text-red-800 bg-red-50 border border-red-100' : 'text-gray-600 bg-gray-50' }} p-2 rounded break-words">
+                                            <strong>{{ $website->isRejected() ? 'Why it was rejected:' : 'Note:' }}</strong> {{ $website->notes }}
                                         </div>
                                     @endif
                                 </div>
