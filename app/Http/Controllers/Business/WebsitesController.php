@@ -33,6 +33,10 @@ class WebsitesController extends Controller
             'is_approved' => false, // Requires admin approval
         ]);
 
+        if (! trim((string) ($business->website ?? ''))) {
+            $business->update(['website' => $validated['website_url']]);
+        }
+
         // Send notification to business
         $business->notify(new \App\Notifications\WebsiteAddedNotification($website));
 

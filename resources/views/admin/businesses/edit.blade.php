@@ -49,7 +49,7 @@
                     <label for="webhook_url" class="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
                     <input type="url" name="webhook_url" id="webhook_url"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-primary focus:border-primary"
-                        value="{{ old('webhook_url', $business->webhook_url) }}">
+                        value="{{ old('webhook_url', $business->displayWebhookUrl()) }}">
                 </div>
 
                 <div>

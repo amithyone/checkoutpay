@@ -61,6 +61,7 @@ class RegisterController extends Controller
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'] ?? null,
             'address' => $validated['address'] ?? null,
+            'website' => $validated['website'] ?? null,
             'is_active' => true,
             'uses_external_account_numbers' => true,
             'email_verified_at' => null, // Email verification required

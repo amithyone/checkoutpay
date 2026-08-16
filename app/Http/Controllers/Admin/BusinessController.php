@@ -10,6 +10,7 @@ use App\Models\BusinessWebsite;
 use App\Models\CreditFacilityRequest;
 use App\Models\EmailAccount;
 use App\Notifications\PeerLendingLenderProgramConfiguredNotification;
+use App\Services\Business\BusinessWebsiteSyncService;
 use App\Services\Credit\OverdraftFundingService;
 use App\Services\Credit\OverdraftInstallmentService;
 use App\Services\MevonPay\PrivateAccountProvisionService;
@@ -110,6 +111,7 @@ class BusinessController extends Controller
         $business = Business::create($validated);
         app(\App\Services\BusinessMevonExternalDefaultService::class)
             ->syncFromFlag($business, (bool) $validated['uses_external_account_numbers']);
+        app(BusinessWebsiteSyncService::class)->syncFromBusinessRecord($business, true);
 
         return redirect()->route('admin.businesses.index')
             ->with('success', 'Business created successfully');
@@ -187,6 +189,7 @@ class BusinessController extends Controller
         $business->update($validated);
         app(\App\Services\BusinessMevonExternalDefaultService::class)
             ->syncFromFlag($business, (bool) $validated['uses_external_account_numbers']);
+        app(BusinessWebsiteSyncService::class)->syncFromBusinessRecord($business->fresh(), true);
 
         return redirect()->route('admin.businesses.show', $business)
             ->with('success', 'Business updated successfully');

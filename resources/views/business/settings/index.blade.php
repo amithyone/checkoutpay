@@ -590,7 +590,7 @@
             <div>
                 <label for="webhook_url" class="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
                 <div class="flex gap-2">
-                    <input type="url" name="webhook_url" id="webhook_url" value="{{ old('webhook_url', $business->webhook_url) }}"
+                    <input type="url" name="webhook_url" id="webhook_url" value="{{ old('webhook_url', $business->displayWebhookUrl()) }}"
                         class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                         placeholder="https://your-domain.com/webhook">
                     <button type="button" id="test_webhook_btn" class="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-700 whitespace-nowrap" title="Send a test request to verify the URL">
@@ -598,7 +598,7 @@
                     </button>
                 </div>
                 <p id="webhook_test_result" class="mt-1 text-xs hidden" aria-live="polite"></p>
-                <p class="mt-1 text-xs text-gray-500">We'll send payment notifications to this URL</p>
+                <p class="mt-1 text-xs text-gray-500">Saved on your website records (each site can have its own webhook on the Websites page). This field copies onto matching website rows.</p>
                 @error('webhook_url')
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                 @enderror

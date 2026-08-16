@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
 use App\Models\Business;
+use App\Services\Business\BusinessWebsiteSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -113,6 +114,10 @@ class SettingsController extends Controller
         }
 
         $business->update($validated);
+
+        if (array_key_exists('webhook_url', $validated)) {
+            app(BusinessWebsiteSyncService::class)->syncFromBusinessRecord($business->fresh(), true);
+        }
 
         return redirect()->route('business.settings.index')
             ->with('success', 'Settings updated successfully');
