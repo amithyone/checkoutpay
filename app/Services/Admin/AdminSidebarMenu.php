@@ -266,6 +266,7 @@ class AdminSidebarMenu
             ),
             'processed_emails' => $this->link('Inbox', 'admin.processed-emails.index', 'fas fa-inbox', ['admin.processed-emails.*']),
             'transaction_logs' => $this->link('Transaction Logs', 'admin.transaction-logs.index', 'fas fa-history', ['admin.transaction-logs.*']),
+            'api_hits' => $this->link('API hits', 'admin.api-hits.index', 'fas fa-network-wired', ['admin.api-hits.*']),
             'audits' => array_merge(
                 $this->link('Audits', 'admin.audits.index', 'fas fa-clipboard-check', ['admin.audits.*']),
                 ['visible' => $admin->canManageSettings()]

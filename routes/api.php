@@ -39,7 +39,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('v1')->middleware(\App\Http\Middleware\AuthenticateApiKey::class)->group(function () {
+Route::prefix('v1')->middleware([
+    \App\Http\Middleware\LogMerchantApiHits::class,
+    \App\Http\Middleware\AuthenticateApiKey::class,
+])->group(function () {
     // Payment routes (require API key)
     Route::get('/integration/charge-settings', [IntegrationController::class, 'chargeSettings']);
     Route::post('/payment-request', [PaymentController::class, 'store']);

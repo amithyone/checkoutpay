@@ -277,6 +277,9 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
         Route::get('transaction-logs', [\App\Http\Controllers\Admin\TransactionLogController::class, 'index'])->name('transaction-logs.index');
         Route::get('transaction-logs/{transactionId}', [\App\Http\Controllers\Admin\TransactionLogController::class, 'show'])->name('transaction-logs.show');
 
+        Route::get('api-hits', [\App\Http\Controllers\Admin\ApiHitLogController::class, 'index'])->name('api-hits.index');
+        Route::get('api-hits/{apiHit}', [\App\Http\Controllers\Admin\ApiHitLogController::class, 'show'])->name('api-hits.show');
+
         // Payment provider audits (Admin/Super Admin only)
         Route::middleware('admin_or_super')->group(function () {
             Route::get('audits', [AuditsController::class, 'index'])->name('audits.index');

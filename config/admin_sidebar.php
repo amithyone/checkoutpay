@@ -32,6 +32,7 @@ return [
         '_divider_more',
         'processed_emails',
         'transaction_logs',
+        'api_hits',
         'audits',
         'mevon_balance_monitor',
         'honeypot',

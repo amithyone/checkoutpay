@@ -157,6 +157,12 @@ return [
             'route_patterns' => ['admin.transaction-logs.*'],
             'default_roles' => ['super_admin', 'admin', 'staff'],
         ],
+        'api_hits' => [
+            'label' => 'API hits',
+            'group' => 'System',
+            'route_patterns' => ['admin.api-hits.*'],
+            'default_roles' => ['super_admin', 'admin', 'staff'],
+        ],
         'audits' => [
             'label' => 'Audits',
             'group' => 'System',
