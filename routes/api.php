@@ -58,6 +58,7 @@ Route::prefix('v1')->middleware([
     Route::get('/withdrawals', [\App\Http\Controllers\Api\WithdrawalController::class, 'index']);
     Route::get('/balance', [\App\Http\Controllers\Api\WithdrawalController::class, 'balance']);
     Route::get('/banks', [\App\Http\Controllers\Api\WithdrawalController::class, 'banks']);
+    Route::post('/validate-account', [\App\Http\Controllers\Api\WithdrawalController::class, 'validateAccount']);
 
     Route::middleware('throttle:30,1')->group(function () {
         Route::post('/whatsapp-wallet/lookup', [WhatsappWalletApiController::class, 'lookup']);

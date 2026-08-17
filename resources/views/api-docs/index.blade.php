@@ -589,6 +589,19 @@ X-API-Key: pk_your_api_key_here</code></pre>
                             Sender on the bank statement follows <strong>Dashboard → Settings</strong> (Checkout by default, or your business name if you have a permanent settlement account). No per-request override.
                         </p>
 
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+                            <p class="text-sm text-emerald-900 font-semibold mb-2">Validate account name before payout</p>
+                            <p class="text-sm text-emerald-900 mb-2">
+                                Nigerian bank transfers fail when the <strong>account number</strong>, <strong>bank code</strong>, or <strong>account name</strong> is wrong.
+                                Call <code class="bg-emerald-100 px-1 rounded">POST /validate-account</code> first — it returns the verified <code class="bg-emerald-100 px-1 rounded">account_name</code> from the bank.
+                            </p>
+                            <p class="text-sm text-emerald-900">
+                                <strong>Recommended:</strong> when a user adds a payout destination in your app, call validate once, store the returned <code class="bg-emerald-100 px-1 rounded">account_name</code> + <code class="bg-emerald-100 px-1 rounded">bank_code</code>, then send those same values on <code class="bg-emerald-100 px-1 rounded">POST /withdrawal</code>.
+                                You can also validate on every payout if you do not store beneficiaries.
+                                <code class="bg-emerald-100 px-1 rounded">POST /withdrawal</code> rejects mismatched names with <code class="bg-emerald-100 px-1 rounded">422</code> before money is sent.
+                            </p>
+                        </div>
+
                         <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
                             <p class="text-sm text-amber-900 font-semibold mb-2">Do not batch withdrawals with a cron</p>
                             <p class="text-sm text-amber-900 mb-2">
@@ -617,6 +630,40 @@ X-API-Key: pk_your_api_key_here</code></pre>
 }</code></pre>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="border-l-4 border-emerald-500 pl-4">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <span class="endpoint-badge badge-post">POST</span>
+                                    <code class="text-lg font-mono text-gray-900">/validate-account</code>
+                                </div>
+                                <p class="text-gray-700 mb-3">Name enquiry: verify a 10-digit NUBAN + NIP <code class="bg-gray-100 px-1 rounded">bank_code</code> and get the exact <code class="bg-gray-100 px-1 rounded">account_name</code> to use on withdrawal. Requires Payout API enabled.</p>
+                                <div class="mb-4">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Request Body</h4>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "account_number": "0123456789",
+  "bank_code": "000058",
+  "bank_name": "Guaranty Trust Bank"
+}</code></pre>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <h4 class="font-semibold text-gray-900 mb-2">Response (200)</h4>
+                                    <div class="code-block">
+                                        <pre><code>{
+  "success": true,
+  "message": "Account verified. Store account_name and use it unchanged on POST /withdrawal.",
+  "data": {
+    "account_number": "0123456789",
+    "account_name": "JANE DOE",
+    "bank_code": "000058",
+    "bank_name": "Guaranty Trust Bank"
+  }
+}</code></pre>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600">On failure returns <code class="bg-gray-100 px-1 rounded">422</code> with <code class="bg-gray-100 px-1 rounded">success: false</code> — invalid account, wrong bank, or verification temporarily unavailable.</p>
                             </div>
 
                             <div class="border-l-4 border-blue-500 pl-4">
@@ -686,7 +733,7 @@ X-API-Key: pk_your_api_key_here</code></pre>
                                                     <td class="px-4 py-3 font-mono text-gray-900">account_name</td>
                                                     <td class="px-4 py-3 text-gray-700">string</td>
                                                     <td class="px-4 py-3 text-gray-700"><span class="text-red-600 font-semibold">Yes</span></td>
-                                                    <td class="px-4 py-3 text-gray-700">Name on the destination account</td>
+                                                    <td class="px-4 py-3 text-gray-700">Name on the destination account — must match <code>POST /validate-account</code> (store the verified name or validate each time)</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="px-4 py-3 font-mono text-gray-900">bank_name</td>

@@ -7,6 +7,7 @@ use App\Http\Requests\WithdrawalRequest;
 use App\Models\Bank;
 use App\Models\Business;
 use App\Models\WithdrawalRequest as WithdrawalRequestModel;
+use App\Services\Payout\MerchantPayoutAccountValidationService;
 use App\Services\TransactionLogService;
 use App\Services\WithdrawalMavonPayPayoutService;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class WithdrawalController extends Controller
     public function __construct(
         protected TransactionLogService $logService,
         protected WithdrawalMavonPayPayoutService $payout,
+        protected MerchantPayoutAccountValidationService $accountValidation,
     ) {}
 
     /**
@@ -66,6 +68,18 @@ class WithdrawalController extends Controller
                 'success' => false,
                 'message' => self::WITHDRAWAL_BLOCKED_MESSAGE,
             ], 429);
+        }
+
+        $precheck = $this->accountValidation->payoutPrecheckFailure(
+            (string) $request->account_number,
+            (string) $request->account_name,
+            (string) ($bankCode ?? ''),
+            (string) $request->bank_name,
+        );
+        if ($precheck !== null) {
+            Cache::forget($lockKey);
+
+            return response()->json($precheck, 422);
         }
 
         $withdrawal = WithdrawalRequestModel::create([
@@ -122,6 +136,45 @@ class WithdrawalController extends Controller
                 'per_page' => $withdrawals->perPage(),
                 'total' => $withdrawals->total(),
             ],
+        ]);
+    }
+
+    /**
+     * Verify destination account number + bank and return the bank account name.
+     * Call this when the user adds a payout account or before POST /withdrawal.
+     */
+    public function validateAccount(Request $request): JsonResponse
+    {
+        /** @var Business $business */
+        $business = $request->user();
+
+        if ($denied = $this->gatePayoutApi($business)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'account_number' => ['required', 'string', 'size:10'],
+            'bank_code' => ['required', 'string', 'max:20'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $result = $this->accountValidation->validate(
+            (string) $validated['account_number'],
+            (string) $validated['bank_code'],
+            isset($validated['bank_name']) ? (string) $validated['bank_name'] : null,
+        );
+
+        if (! $result['ok']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not verify this account.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account verified. Store account_name and use it unchanged on POST /withdrawal.',
+            'data' => $result['data'],
         ]);
     }
 
