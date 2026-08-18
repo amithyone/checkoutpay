@@ -758,6 +758,170 @@
             .metric .value { font-size: 1.25rem; }
             .cta-row .btn { width: 100%; min-width: 0; }
         }
+
+        /* ——— Origin timeline ——— */
+        .origin-timeline {
+            display: grid; gap: 0;
+            margin-top: 2rem;
+            border-left: 2px solid rgba(0,27,202,0.25);
+            padding-left: 1.5rem;
+        }
+        .ot-item { padding: 0 0 1.75rem; position: relative; }
+        .ot-item:last-child { padding-bottom: 0; }
+        .ot-item::before {
+            content: ""; position: absolute;
+            left: -1.68rem; top: 0.3rem;
+            width: 12px; height: 12px; border-radius: 50%;
+            background: var(--brand);
+            box-shadow: 0 0 0 4px rgba(0,27,202,0.12);
+        }
+        .ot-year {
+            font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--brand); margin-bottom: 0.2rem;
+        }
+        .ot-item strong { display: block; font-size: 0.98rem; margin-bottom: 0.15rem; }
+        .ot-item span { font-size: 0.9rem; color: var(--ink-soft); }
+
+        /* ——— TAM/SAM/SOM bubbles ——— */
+        .tam-wrap {
+            display: flex; align-items: center; justify-content: center;
+            gap: 2.5rem; margin-top: 2.5rem; flex-wrap: wrap;
+        }
+        .tam-bubble {
+            position: relative; border-radius: 50%;
+            display: grid; place-items: center; text-align: center; flex-shrink: 0;
+        }
+        .tam-bubble.tam { width: 240px; height: 240px; background: rgba(0,27,202,0.07); border: 2px solid rgba(0,27,202,0.18); }
+        .tam-bubble.sam { width: 185px; height: 185px; background: rgba(0,27,202,0.12); border: 2px solid rgba(0,27,202,0.28); }
+        .tam-bubble.som { width: 130px; height: 130px; background: linear-gradient(135deg,rgba(0,27,202,0.22),rgba(45,63,224,0.32)); border: 2px solid rgba(0,27,202,0.45); }
+        .tam-bubble .tb-label {
+            font-size: 0.65rem; font-weight: 800; letter-spacing: 0.14em;
+            text-transform: uppercase; color: var(--brand); margin-bottom: 0.2rem;
+        }
+        .tam-bubble .tb-val {
+            font-family: var(--display); font-size: 1.15rem; font-weight: 700;
+            color: var(--brand); letter-spacing: -0.02em; line-height: 1.1;
+        }
+        .tam-bubble .tb-desc { font-size: 0.7rem; color: var(--ink-soft); margin-top: 0.15rem; padding: 0 0.5rem; }
+        .tam-stats {
+            display: grid; grid-template-columns: repeat(3,minmax(0,1fr));
+            gap: 1rem; margin-top: 2rem;
+        }
+        @media (max-width: 720px) {
+            .tam-stats { grid-template-columns: 1fr; }
+            .tam-bubble.tam { width: 195px; height: 195px; }
+            .tam-bubble.sam { width: 150px; height: 150px; }
+            .tam-bubble.som { width: 105px; height: 105px; }
+            .tam-bubble .tb-val { font-size: 0.95rem; }
+        }
+
+        /* ——— Competitor table ——— */
+        .comp-table-wrap {
+            overflow-x: auto; margin-top: 2rem;
+            border: 1px solid var(--line); border-radius: var(--radius); background: #fff;
+        }
+        .comp-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        .comp-table th, .comp-table td {
+            padding: 0.75rem 0.85rem; text-align: center;
+            border-bottom: 1px solid var(--line); font-size: 0.85rem;
+        }
+        .comp-table th {
+            font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--ink-soft); background: var(--paper);
+        }
+        .comp-table th:first-child, .comp-table td:first-child {
+            text-align: left; font-weight: 700; color: var(--ink);
+        }
+        .comp-table tr:last-child td { border-bottom: 0; }
+        .comp-table tr.us-row td { background: rgba(0,27,202,0.04); }
+        .comp-table tr.us-row td:first-child { color: var(--brand); font-weight: 800; }
+        .cell-yes { color: #1f9d7a; font-weight: 800; }
+        .cell-partial { color: var(--warn); font-weight: 700; }
+        .cell-no { color: #c4c9d4; }
+
+        /* ——— Revenue phase bars ——— */
+        .rev-phases {
+            display: grid; grid-template-columns: repeat(3,minmax(0,1fr));
+            gap: 1.25rem; margin-top: 2rem;
+        }
+        @media (max-width: 720px) { .rev-phases { grid-template-columns: 1fr; } }
+        .rev-phase { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; }
+        .rev-phase-label {
+            font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--brand); margin-bottom: 0.85rem;
+        }
+        .rev-bar-row { display: grid; grid-template-columns: 7rem 1fr; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
+        .rev-bar-label { font-size: 0.8rem; font-weight: 600; color: var(--ink-soft); }
+        .rev-bar-track { height: 10px; border-radius: 999px; background: var(--paper-2); overflow: hidden; }
+        .rev-bar-fill { height: 100%; border-radius: 999px; }
+
+        /* ——— Phase roadmap ——— */
+        .phase-line {
+            display: grid; grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 0; margin-top: 2.5rem; position: relative;
+        }
+        .phase-line::before {
+            content: ""; position: absolute; top: 21px; left: 12%; right: 12%;
+            height: 2px;
+            background: linear-gradient(90deg,rgba(0,27,202,0.28),rgba(0,27,202,0.1));
+            z-index: 0;
+        }
+        .phase-node { display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; padding: 0 0.5rem; }
+        .phase-dot {
+            width: 44px; height: 44px; border-radius: 50%;
+            border: 2px solid rgba(0,27,202,0.3);
+            background: #fff; display: grid; place-items: center;
+            z-index: 1; position: relative; margin-bottom: 0.75rem;
+            font-family: var(--display); font-size: 0.8rem; font-weight: 700; color: var(--brand);
+        }
+        .phase-node.active .phase-dot {
+            background: var(--brand); border-color: var(--brand); color: #fff;
+            box-shadow: 0 4px 18px rgba(0,27,202,0.32);
+        }
+        .phase-year { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brand); margin-bottom: 0.35rem; }
+        .phase-title { font-size: 0.88rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .phase-items { display: grid; gap: 0.25rem; list-style: none; padding: 0; }
+        .phase-items li { font-size: 0.78rem; color: var(--ink-soft); line-height: 1.4; }
+        @media (max-width: 800px) {
+            .phase-line { grid-template-columns: 1fr; gap: 1.5rem; }
+            .phase-line::before { display: none; }
+            .phase-node { align-items: flex-start; text-align: left; flex-direction: row; gap: 1rem; }
+            .phase-dot { flex-shrink: 0; }
+        }
+
+        /* ——— Risk cards ——— */
+        .risk-grid {
+            display: grid; grid-template-columns: repeat(2,minmax(0,1fr));
+            gap: 1.1rem; margin-top: 2rem;
+        }
+        @media (max-width: 720px) { .risk-grid { grid-template-columns: 1fr; } }
+        .risk-card {
+            background: #fff; border: 1px solid var(--line);
+            border-radius: 14px; padding: 1.15rem;
+            border-left: 3px solid rgba(0,27,202,0.3);
+        }
+        .risk-card .risk-label {
+            font-size: 0.63rem; font-weight: 800; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--warn); margin-bottom: 0.25rem;
+        }
+        .risk-card .risk-title { font-size: 0.95rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--ink); }
+        .risk-card .risk-desc { font-size: 0.88rem; color: var(--ink-soft); }
+        .mit-label {
+            font-size: 0.63rem; font-weight: 800; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--mint);
+            margin-bottom: 0.2rem; margin-top: 0.65rem;
+        }
+        .mit-text { font-size: 0.88rem; color: var(--ink-soft); line-height: 1.5; }
+
+        /* ——— Ask milestones ——— */
+        .ask-milestones { margin-top: 1.75rem; display: grid; gap: 0.65rem; }
+        .ask-milestone { display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: start; }
+        .ask-milestone-num {
+            font-family: var(--display); font-size: 1.1rem; font-weight: 700;
+            color: #8fd0ef; line-height: 1; padding-top: 0.1rem;
+        }
+        .ask-milestone-text { font-size: 0.92rem; color: rgba(255,255,255,0.85); line-height: 1.5; }
+        .ask-milestone-text strong { color: #fff; }
     </style>
     @include('investor.partials.no-print')
 </head>
@@ -770,10 +934,15 @@
             </a>
             <nav class="top-nav" aria-label="Sections">
                 <a href="{{ route('investor.summary') }}">Exec summary</a>
+                <a href="#origin">Origin</a>
+                <a href="#market">Market</a>
+                <a href="#competitors">Competitors</a>
                 <a href="#flows">Flows</a>
-                <a href="#ecosystem">Ecosystem</a>
+                <a href="#model">Model</a>
+                <a href="#roadmap">Roadmap</a>
                 <a href="#breakin">Break-in</a>
                 <a href="#loans">Loans</a>
+                <a href="#risk">Risks</a>
                 <a href="#ask">Seed use</a>
             </nav>
             <div class="topbar-actions">
@@ -789,11 +958,17 @@
         </div>
         <nav class="wrap mobile-nav" aria-label="Sections (mobile)">
             <a href="{{ route('investor.summary') }}">Exec summary</a>
+            <a href="#origin">Origin</a>
+            <a href="#market">Market</a>
+            <a href="#competitors">Competitors</a>
+            <a href="#traction">Traction</a>
+            <a href="#model">Model</a>
+            <a href="#roadmap">Roadmap</a>
             <a href="#flows">Flows</a>
             <a href="#ecosystem">Ecosystem</a>
-            <a href="#traction">Traction</a>
             <a href="#breakin">Break-in</a>
             <a href="#loans">Loans</a>
+            <a href="#risk">Risks</a>
             <a href="#ask">Seed use</a>
         </nav>
     </header>
@@ -841,6 +1016,67 @@
                         <h3>Ownership today</h3>
                         <p>There have been <strong style="color:var(--ink);">no prior share sales to outside investors</strong> — ownership has not been sold down. Seed is the first capital raise into the business for growth.</p>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        {{-- ORIGIN / HOW WE STARTED --}}
+        <section id="origin" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
+            <div class="wrap">
+                <p class="section-label">How we started</p>
+                <h2>Built in 2025. Registered January 2026. Everything shipped the same year.</h2>
+                <p class="lede">Checkout Now is the work of one founder who saw the problem at the till, the problem in the developer room, and decided to solve both at once — without outside capital.</p>
+
+                <div class="grid-2" style="margin-top: 2rem;">
+                    <div class="panel">
+                        <h3>Innocent Amithy Solomon — Founder &amp; Principal Engineer</h3>
+                        <p>29 years old. Based in Abuja, Nigeria. BSc Computer Science (University of the People, 2023). Background across software engineering, fintech architecture, and creative media. Former IT Consultant at Radio Nigeria (FRCN), Web Developer at OrbitNews, Front-End Designer at Xtratech, and Digital Media Trainer at Voice of Nigeria.</p>
+                        <p style="margin-top: 0.75rem;">Innocent is both the engineer who wrote the system and the person who identified the gap it fills — not a business-side founder waiting for a tech team. Everything in Checkout Now LTD was designed, architected, and shipped by him: from the payment routing and split-settlement engine to the Cheko Windows POS, the Proximity Pay Bluetooth protocol, and the iOS/Android apps.</p>
+                        <p style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--ink-soft);">Also founder of AmithyOne Media — cinematic production, DOP, colour grading. He builds the same way on both sides: from first principles, to completion, without compromise.</p>
+                    </div>
+                    <div class="panel">
+                        <h3>Two reasons this company exists</h3>
+                        <p><strong style="color:var(--ink);">① The till problem.</strong> Innocent watched Nigerian merchants lose sales and shoppers lose patience because typing account numbers is slow and card machines are expensive per counter. Nobody had solved "phone near the till, payment done" without POS hardware investment. That gap became <strong style="color:var(--ink);">Proximity Pay</strong> — a signed Bluetooth contactless session that works with any CheckoutNow wallet near any Cheko till. We are pushing the boundary of a true contactless payment experience.</p>
+                        <p style="margin-top: 0.85rem;"><strong style="color:var(--ink);">② The developer problem.</strong> Developers in Nigeria integrate payment gateways for clients for years — but the gateway keeps the long-term processing value while the developer is paid once and forgotten. CheckoutPay was built differently from the start: approved developers earn <strong style="color:var(--ink);">ongoing revenue share</strong> on qualifying production volume from integrations they build. We pay the engineers who make the ecosystem work — and that makes them our permanent distribution channel.</p>
+                    </div>
+                </div>
+
+                <p class="section-label" style="margin-top: 2.5rem;">Timeline</p>
+                <h2 style="font-size:clamp(1.4rem,2.5vw,1.85rem);">From first line of code to ₦700M+ volume — self-funded, in under two years.</h2>
+                <div class="origin-timeline" style="margin-top: 1.5rem;">
+                    <div class="ot-item">
+                        <div class="ot-year">2022 – 2024</div>
+                        <strong>Engineering career in Abuja</strong>
+                        <span>IT Consulting at Radio Nigeria (FRCN) · Web development and content strategy at OrbitNews · Front-end design and media strategy at Xtratech · Digital media training at Voice of Nigeria. Building the technical depth that Checkout Now LTD now runs on.</span>
+                    </div>
+                    <div class="ot-item">
+                        <div class="ot-year">2025</div>
+                        <strong>Founded Checkout Now Ltd — first product: web payments</strong>
+                        <span>Self-funded from day one. Built CheckoutPay — a developer-grade payment gateway for Nigeria accepting NGN bank transfers via virtual accounts, hosted checkout links, WooCommerce / COPN plugin for WooCommerce stores. This was the foundation everything else grew from. No loans. No external investors.</span>
+                    </div>
+                    <div class="ot-item">
+                        <div class="ot-year">January 2026</div>
+                        <strong>Formally registered Checkout Now LTD</strong>
+                        <span>Company formally registered in Nigeria. Same period: FCCPC digital lending registration deposit placed (₦20M hold toward Nigeria's digital lending license). Demonstrates licensing seriousness — this is not a plan, it is an active process.</span>
+                    </div>
+                    <div class="ot-item">
+                        <div class="ot-year">2026</div>
+                        <strong>Developer Revenue Share Program launched</strong>
+                        <span>First payment gateway in Nigeria to share ongoing processing revenue with the developers who build on it. Approved developers and agencies earn a defined share on qualifying client production volume — not a one-off project fee. This turns every developer we onboard into a permanent sales channel.</span>
+                    </div>
+                    <div class="ot-item">
+                        <div class="ot-year">2026</div>
+                        <strong>Full product stack shipped: iOS · Android · WhatsApp Wallet · Cheko POS · Proximity Pay</strong>
+                        <span>CheckoutNow native apps live on App Store &amp; Google Play. WhatsApp Wallet for peer-to-peer transfer and escrow inside chat. Cheko Windows POS ready for supermarket, hotel, and retail floors. Proximity Pay Bluetooth contactless — phone near the till, signed session, payment done. No card-tap hardware required.</span>
+                    </div>
+                    <div class="ot-item" style="padding-bottom:0;">
+                        <div class="ot-year">Now — 2026</div>
+                        <strong>₦700M+ volume · ~100K transactions · seed raise open</strong>
+                        <span>~70 active merchants · 700+ wallet users · ~₦3M daily average · 80%+ of core roadmap shipped. Raising seed to win the market, harden trust &amp; security, and push Proximity Pay into hundreds more shops.</span>
+                    </div>
+                </div>
+                <div class="quote" style="margin-top: 2rem;">
+                    "We did not raise to build. We built first, proved it works at real volume, and now we raise to win the market." — Innocent Solomon, Founder &amp; Principal Engineer
                 </div>
             </div>
         </section>
@@ -914,6 +1150,193 @@
                         <div class="value" style="font-size:1.35rem;">WordPress</div>
                         <div class="label">WooCommerce plugin</div>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        {{-- MARKET ANALYSIS --}}
+        <section id="market">
+            <div class="wrap">
+                <p class="section-label">Market analysis</p>
+                <h2>One of the world's largest fintech opportunities — underpenetrated at the till.</h2>
+                <p class="lede">Nigeria is a top-5 global fintech market by transaction volume. The infrastructure gap at the shop counter is our entry point — and it is enormous.</p>
+
+                <div class="tam-wrap" role="img" aria-label="TAM SAM SOM market sizing">
+                    <div class="tam-bubble tam">
+                        <div>
+                            <div class="tb-label">TAM</div>
+                            <div class="tb-val">₦1,100T+</div>
+                            <div class="tb-desc">Nigeria NIP annual payment volume (CBN 2024 data)</div>
+                        </div>
+                    </div>
+                    <div class="tam-bubble sam">
+                        <div>
+                            <div class="tb-label">SAM</div>
+                            <div class="tb-val">~5M MSMEs</div>
+                            <div class="tb-desc">Active merchants + 50M+ bankable consumers</div>
+                        </div>
+                    </div>
+                    <div class="tam-bubble som">
+                        <div>
+                            <div class="tb-label">SOM · 5yr</div>
+                            <div class="tb-val">₦500B+</div>
+                            <div class="tb-desc">50K merchants + 500K wallets target</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tam-stats">
+                    <div class="metric">
+                        <div class="value">~40M</div>
+                        <div class="label">MSMEs in Nigeria (NBS) — most without any digital POS today</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value">80%+</div>
+                        <div class="label">NIP transaction count growth in just 2 years (CBN data)</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value">~55%</div>
+                        <div class="label">Mobile internet penetration, Nigeria (NCC 2024) — phones are already in hand</div>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-top: 2rem;">
+                    <div class="panel">
+                        <h3>Why the infrastructure gap exists</h3>
+                        <ul>
+                            <li>Card POS machines cost ₦50K–₦200K+ per terminal — too expensive for every counter in a supermarket or hotel</li>
+                            <li>Contactless card NFC tap requires card issuer + terminal upgrades — slow national rollout</li>
+                            <li>Nigeria's payment culture is already bank-transfer-first — NIP transfer volume dwarfs card volume by multiple orders of magnitude</li>
+                            <li>No solution delivered "phone near the till, done" without extra hardware — until Proximity Pay</li>
+                        </ul>
+                    </div>
+                    <div class="panel">
+                        <h3>Why now is the right moment</h3>
+                        <ul>
+                            <li>Smartphone penetration is growing rapidly — the phone is already in every shopper's hand</li>
+                            <li>Nigeria's fintech regulatory framework is maturing — FCCPC lending licenses and CBN processor licenses are now accessible for compliant operators</li>
+                            <li>Moniepoint, OPay, PalmPay proved the playbook: hardware in shops → own payments → lend → unicorn. We execute the same with a bigger wedge</li>
+                            <li>Developer Revenue Share Program creates organic, low-CAC distribution — every developer we onboard brings us into their clients' shops automatically</li>
+                        </ul>
+                    </div>
+                </div>
+                <p style="margin-top: 0.65rem; font-size: 0.78rem; color: var(--ink-soft);">Market figures are public CBN / NBS / NCC data — indicative of market size, not Checkout Now forward projections or guarantees.</p>
+            </div>
+        </section>
+
+        {{-- COMPETITOR ANALYSIS --}}
+        <section id="competitors" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
+            <div class="wrap">
+                <p class="section-label">Competitor analysis</p>
+                <h2>Everyone else owns one side. We own the loop — and pay the developers.</h2>
+                <p class="lede">Payment gateways own online collection. POS tools own shop operations. Merchant lenders own credit. Checkout Now is the only product that closes all three — with a true contactless in-store pay method, an open standard, and a developer revenue-share program on top.</p>
+
+                <div class="comp-table-wrap">
+                    <table class="comp-table" role="grid" aria-label="Feature comparison: Checkout Now vs competitors">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>In-store POS</th>
+                                <th>Consumer wallet</th>
+                                <th>Contactless pay</th>
+                                <th>Merchant lending</th>
+                                <th>Developer rev-share</th>
+                                <th>Full desktop POS</th>
+                                <th>Open pay standard</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="us-row">
+                                <td>✦ Checkout Now</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Soon*</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                            </tr>
+                            <tr>
+                                <td>Moniepoint</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Limited</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                            </tr>
+                            <tr>
+                                <td>OPay</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-partial">Limited</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                            </tr>
+                            <tr>
+                                <td>PalmPay</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-partial">Limited</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                            </tr>
+                            <tr>
+                                <td>Paystack</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                            </tr>
+                            <tr>
+                                <td>Flutterwave</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                            </tr>
+                            <tr>
+                                <td>RetailMan (POS only)</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-no">✗</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p style="margin-top: 0.65rem; font-size: 0.78rem; color: var(--ink-soft);">✓ = Yes &nbsp;·&nbsp; Soon* = built, gated on FCCPC license &nbsp;·&nbsp; ✗ = Not offered &nbsp;·&nbsp; Based on publicly available product information.</p>
+
+                <div class="grid-3" style="margin-top: 2rem;">
+                    <div class="panel">
+                        <h3>vs Paystack / Flutterwave</h3>
+                        <p>Excellent online payment collection and a solid developer API. But no in-shop POS, no consumer wallet, no contactless. Their merchant has a dashboard — the shopper still types account numbers at the till. The developer who integrated them earns nothing recurring from that client.</p>
+                    </div>
+                    <div class="panel">
+                        <h3>vs Moniepoint / OPay / PalmPay</h3>
+                        <p>Proved the hardware-in-shop → lending playbook and became unicorns. But their POS is a handheld payment gadget — not a full desktop system that manages inventory, staff, and operations. No contactless in-store pay standard. No developer revenue share. No open payment standard for other wallets and banks.</p>
+                    </div>
+                    <div class="panel">
+                        <h3>vs RetailMan</h3>
+                        <p>Full Windows desktop POS — inventory, staff, till management. But RetailMan does not process the payments. No cashflow visibility means no data to score loans. No consumer wallet for in-store pay. No contactless. We combine everything RetailMan does well, plus the payment, wallet, and lending layers on top.</p>
+                    </div>
+                </div>
+                <div class="quote" style="margin-top: 1.5rem;">
+                    No single competitor combines: full desktop POS + consumer wallet + contactless pay + developer revenue share + open pay standard. That is the compound moat.
                 </div>
             </div>
         </section>
@@ -1179,6 +1602,108 @@
             </div>
         </section>
 
+        {{-- BUSINESS MODEL --}}
+        <section id="model">
+            <div class="wrap">
+                <p class="section-label">Business model</p>
+                <h2>Multiple revenue streams that compound with each other.</h2>
+                <p class="lede">Payment fees bring us into the shop. POS SaaS locks us into the shop's operations. The Developer Program brings new shops at low CAC. Loans monetise the trust built from real transaction history. Each stream makes the next one stronger.</p>
+
+                <div class="rev-phases">
+                    <div class="rev-phase">
+                        <div class="rev-phase-label">Now · Seed stage</div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Payment fees</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:100%;background:#0B3D91;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Dev program</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:50%;background:#1A6BB5;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Cheko SaaS</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:18%;background:#3D9AD1;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Loans</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:5%;background:#7EC4E8;opacity:0.6;"></div></div>
+                        </div>
+                        <p style="margin-top:0.75rem;font-size:0.78rem;color:var(--ink-soft);">Primary: <strong style="color:var(--ink);">1% + ₦50 per transaction</strong>. Transparent — no hidden fees. Developer program distributes partner share. Cheko in early rollout.</p>
+                    </div>
+                    <div class="rev-phase">
+                        <div class="rev-phase-label">Series A · 2027–2028</div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Payment fees</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:70%;background:#0B3D91;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Dev program</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:65%;background:#1A6BB5;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Cheko SaaS</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:60%;background:#3D9AD1;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Loans</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:55%;background:#7EC4E8;"></div></div>
+                        </div>
+                        <p style="margin-top:0.75rem;font-size:0.78rem;color:var(--ink-soft);">Merchant loan book live (post-FCCPC). Cheko subscription at 1,000+ shops. Developer channel compounding. Loans begin to rival fees.</p>
+                    </div>
+                    <div class="rev-phase">
+                        <div class="rev-phase-label">Series B · 2029–2030</div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Payment fees</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:80%;background:#0B3D91;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Dev program</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:82%;background:#1A6BB5;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Cheko SaaS</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:90%;background:#3D9AD1;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">Loans</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:100%;background:#7EC4E8;"></div></div>
+                        </div>
+                        <div class="rev-bar-row">
+                            <span class="rev-bar-label">FX / card</span>
+                            <div class="rev-bar-track"><div class="rev-bar-fill" style="width:40%;background:#b2ddf0;"></div></div>
+                        </div>
+                        <p style="margin-top:0.75rem;font-size:0.78rem;color:var(--ink-soft);">Loans become the highest-margin line. USD virtual card FX spread active. Own CBN PSSP processing. All 5 streams compounding.</p>
+                    </div>
+                </div>
+
+                <div class="grid-3" style="margin-top: 2rem;">
+                    <div class="metric">
+                        <div class="value" style="font-size:1.3rem;">1% + ₦50</div>
+                        <div class="label">Per transaction today — transparent, no hidden fees</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value" style="font-size:1.3rem;">~₦7M+</div>
+                        <div class="label">Gross payment revenue implied on ₦700M+ volume to date</div>
+                    </div>
+                    <div class="metric">
+                        <div class="value" style="font-size:1.3rem;">Higher</div>
+                        <div class="label">Loan interest margin vs payment fee margin at same volume</div>
+                    </div>
+                </div>
+
+                <div class="panel" style="margin-top: 2rem;">
+                    <h3>The Developer Revenue Share Program — a distribution moat unique in Nigeria</h3>
+                    <p>Paystack and Flutterwave treat developers as implementation help: the developer builds the integration, the gateway keeps the long-term processing value. <strong style="color:var(--ink);">CheckoutPay was designed the opposite way from the start.</strong> Approved developers and agencies who integrate CheckoutPay for clients earn a defined, ongoing share of qualifying production volume — not a one-off project fee. The developer's Business ID in the WooCommerce plugin or API flow routes revenue share automatically. This means:</p>
+                    <ul style="margin-top: 0.75rem;">
+                        <li><strong>Every developer we onboard is permanently incentivised to recommend Checkout</strong> — they earn as long as the merchant processes volume</li>
+                        <li><strong>Developers become our sales channel</strong> at near-zero cost — they sell to their clients before we spend on direct marketing</li>
+                        <li><strong>Merchants they bring are stickier</strong> — a developer actively managing the integration and earning from it will not migrate their client to a competitor</li>
+                    </ul>
+                    <p style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--ink-soft);">No other payment gateway in Nigeria currently offers this structure. It is both a philosophical stance (pay the engineers who build the ecosystem) and a compounding growth mechanism.</p>
+                </div>
+            </div>
+        </section>
+
         {{-- PRODUCT / PROXIMITY --}}
         <section id="product">
             <div class="wrap">
@@ -1252,6 +1777,92 @@
             </div>
         </section>
 
+        {{-- 5-10 YEAR ROADMAP --}}
+        <section id="roadmap" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
+            <div class="wrap">
+                <p class="section-label">5–10 year plan</p>
+                <h2>From first till kit to a full bank — a clear staircase.</h2>
+                <p class="lede">Each phase unlocks the next. Seed buys market entry. Series A activates lending. Series B secures own CBN licenses. The long-term goal — stated in our own regulatory timeline — is to become a bank as capital and licenses allow.</p>
+
+                <div class="phase-line" role="list" aria-label="Growth roadmap phases">
+                    <div class="phase-node active" role="listitem">
+                        <div class="phase-dot">01</div>
+                        <div class="phase-year">2025 – 2026</div>
+                        <div class="phase-title">Seed · Market Entry</div>
+                        <ul class="phase-items">
+                            <li>200+ Cheko till kits (Abuja + Lagos)</li>
+                            <li>500+ active CheckoutPay merchants</li>
+                            <li>10,000+ CheckoutNow wallets</li>
+                            <li>100+ approved Developer partners</li>
+                            <li>FCCPC license approved</li>
+                            <li>₦5B+ annualised volume run-rate</li>
+                        </ul>
+                    </div>
+                    <div class="phase-node" role="listitem">
+                        <div class="phase-dot">02</div>
+                        <div class="phase-year">2027 – 2028</div>
+                        <div class="phase-title">Series A · Scale &amp; Lend</div>
+                        <ul class="phase-items">
+                            <li>2,000+ merchants on platform</li>
+                            <li>1,000+ Cheko till kits live</li>
+                            <li>Merchant lending book ₦200M+</li>
+                            <li>Rentals vertical live</li>
+                            <li>Port Harcourt + Kano expansion</li>
+                            <li>100,000+ wallet users</li>
+                        </ul>
+                    </div>
+                    <div class="phase-node" role="listitem">
+                        <div class="phase-dot">03</div>
+                        <div class="phase-year">2029 – 2030</div>
+                        <div class="phase-title">Series B · Own Licenses</div>
+                        <ul class="phase-items">
+                            <li>Own CBN PSSP + MMO licenses</li>
+                            <li>10,000+ merchants; ₦50B+ volume</li>
+                            <li>Merchant lending book ₦1B+</li>
+                            <li>Consumer credit soft-launched</li>
+                            <li>Top 6 Nigerian cities active</li>
+                            <li>Open standard: 2+ bank/wallet adopters</li>
+                        </ul>
+                    </div>
+                    <div class="phase-node" role="listitem">
+                        <div class="phase-dot">04</div>
+                        <div class="phase-year">2031+</div>
+                        <div class="phase-title">Series C+ · Become a Bank</div>
+                        <ul class="phase-items">
+                            <li>Full banking license (MFB or commercial)</li>
+                            <li>Consumer payroll banking</li>
+                            <li>Corporate business accounts</li>
+                            <li>Full stack: pay · save · invest · borrow</li>
+                            <li>National density across Nigeria</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-top: 2.5rem;">
+                    <div class="panel">
+                        <h3>What seed specifically unlocks</h3>
+                        <ul>
+                            <li>Cheko till kits scale from early installs to <strong>200+ shops</strong> — the hardware break-in moat</li>
+                            <li>Proximity Pay rolls out to every placed kit — contactless coverage grows with each install</li>
+                            <li>Sales team and city coverage to match kit placement with active merchant onboarding</li>
+                            <li>Security and compliance hardening to carry ₦5B+ volume with confidence</li>
+                            <li>FCCPC final registration push → unlocks merchant loans, the high-margin next product</li>
+                        </ul>
+                    </div>
+                    <div class="panel">
+                        <h3>Why the roadmap is credible right now</h3>
+                        <ul>
+                            <li>We already have <strong>₦700M+ volume and ~100K transactions</strong> without external capital — proof the model works</li>
+                            <li>The full product stack is built — we are not asking for build money, we are asking for market-entry money</li>
+                            <li>FCCPC deposit (₦20M) is already placed — licensing is in progress, not aspirational</li>
+                            <li>Unicorn peers (Moniepoint, OPay, PalmPay) followed this exact path — we have documented playbook evidence</li>
+                            <li>Developer program creates organic merchant acquisition at structurally low customer acquisition cost</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         {{-- WHY WIN --}}
         <section>
             <div class="wrap">
@@ -1263,6 +1874,7 @@
                     <div class="win"><div class="win-num">03</div><div><strong>Distribution stack</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Dashboard + WooCommerce + WhatsApp + native apps + Cheko POS.</p></div></div>
                     <div class="win"><div class="win-num">04</div><div><strong>Open Proximity Pay standard</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Banks and wallets can adopt the same pay method — category pioneer, not a walled garden.</p></div></div>
                     <div class="win"><div class="win-num">05</div><div><strong>Credit as the high-margin next product (licensed)</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Overdraft/loan after Nigeria’s digital lending license (FCCPC) — sticky product on observed shop volume.</p></div></div>
+                    <div class="win"><div class="win-num">06</div><div><strong>Developer Revenue Share — Nigeria's first developer distribution moat</strong><p style="color:var(--ink-soft);margin-top:0.25rem;">Approved developers and agencies earn ongoing revenue share on client integrations — not a one-off fee. Every developer we onboard becomes a permanent sales channel who brings merchants to us and keeps them here. No other Nigerian gateway offers this. It creates compounding, low-CAC merchant acquisition that grows faster the more developers join.</p></div></div>
                 </div>
             </div>
         </section>
@@ -1430,6 +2042,60 @@
             </div>
         </section>
 
+        {{-- RISKS & MITIGATIONS --}}
+        <section id="risk" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
+            <div class="wrap">
+                <p class="section-label">Risks &amp; mitigations</p>
+                <h2>We know the risks. Here is exactly how we manage them.</h2>
+                <p class="lede">Every fintech investment carries risk. We have identified the six most material risks to Checkout Now LTD and the specific mitigations already in place or actively planned.</p>
+
+                <div class="risk-grid">
+                    <div class="risk-card">
+                        <div class="risk-label">Risk 01</div>
+                        <div class="risk-title">Regulatory — FCCPC lending license delay</div>
+                        <p class="risk-desc">If Nigeria's digital lending license (FCCPC) is delayed beyond our plan, merchant loans remain locked — limiting the highest-margin revenue stream in our model.</p>
+                        <div class="mit-label">Mitigation</div>
+                        <p class="mit-text">Credit products are <strong>fully built and held back</strong> — not a development risk. ₦20M FCCPC registration deposit already placed; registration is active, not aspirational. Payment fees, Developer Program, and Cheko SaaS revenue continue to grow independently of lending. Loans are upside acceleration, not a survival dependency.</p>
+                    </div>
+                    <div class="risk-card">
+                        <div class="risk-label">Risk 02</div>
+                        <div class="risk-title">Payment partner dependency (Metavon)</div>
+                        <p class="risk-desc">Money moves through METRAVON INNOVATION LTD under service agreements. A disruption to the partner could affect merchant settlement.</p>
+                        <div class="mit-label">Mitigation</div>
+                        <p class="mit-text">Service-level agreements govern the relationship. Our roadmap includes filing for a <strong>own CBN processor license (PSSP)</strong> at Series A scale — moving from partner-dependent to self-licensed. Diversification of licensed payment partners is on the roadmap path before Series B.</p>
+                    </div>
+                    <div class="risk-card">
+                        <div class="risk-label">Risk 03</div>
+                        <div class="risk-title">Competitive density from OPay / Moniepoint / PalmPay</div>
+                        <p class="risk-desc">These are well-capitalised players with large agent and POS networks already deployed across Nigeria.</p>
+                        <div class="mit-label">Mitigation</div>
+                        <p class="mit-text">We are not deploying a handheld payment gadget — we deploy a <strong>full Windows desktop POS that runs the store</strong> (inventory + staff + till + payments). A merchant running Cheko cannot easily leave — their operations data, sales history, and payment rails are all on our system. Contactless, open standard, and developer channel create additional lock-in layers they do not have.</p>
+                    </div>
+                    <div class="risk-card">
+                        <div class="risk-label">Risk 04</div>
+                        <div class="risk-title">Hardware deployment cost and kit scale</div>
+                        <p class="risk-desc">Windows + Cheko till kits carry a hardware cost per deployment. Kit volume is directly gated by capital raised at seed.</p>
+                        <div class="mit-label">Mitigation</div>
+                        <p class="mit-text">Kit rollout is explicitly phased with seed capacity — 200+ kits at this raise, scaled further at Series A. <strong>Merchant agreement structures</strong> (rental / revenue-share per kit) can offset upfront hardware cost and improve unit economics per shop from the start. We have flexibility on the business model per kit.</p>
+                    </div>
+                    <div class="risk-card">
+                        <div class="risk-label">Risk 05</div>
+                        <div class="risk-title">FX / naira volatility on USD virtual cards</div>
+                        <p class="risk-desc">USD virtual cards carry FX exposure if the naira moves sharply against dollar-denominated positions.</p>
+                        <div class="mit-label">Mitigation</div>
+                        <p class="mit-text">Card exposure is limited at the current stage — USD virtual cards are a consumer wallet feature, not a core treasury position. FX spread is managed through licensed card-issuing partners. Scale in this product is gated behind the merchant loan book, which comes first in the roadmap.</p>
+                    </div>
+                    <div class="risk-card">
+                        <div class="risk-label">Risk 06</div>
+                        <div class="risk-title">Founder concentration</div>
+                        <p class="risk-desc">Innocent Solomon is the principal engineer and key decision-maker. Key-person concentration is a risk at any early-stage company.</p>
+                        <div class="mit-label">Mitigation</div>
+                        <p class="mit-text">Checkout Now's architecture, APIs, and business logic are <strong>documented and operational</strong> — the system runs without Innocent making every decision. Seed capital includes headcount for senior technical and operations hires. Critically: the technology is already built. We are not dependent on one person to build the product; we need a team to scale what already exists and is live.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         {{-- ASK / HOW SEED IS USED --}}
         <section id="ask">
             <div class="wrap">
@@ -1486,6 +2152,54 @@
                                 </div>
                             @endforeach
                             <p style="margin-top:0.85rem;font-size:0.8rem;opacity:0.75;">* Credit liquidity after FCCPC registration.</p>
+
+                            <h3 style="font-size:1.05rem;margin-top:2rem;margin-bottom:0.85rem;">What success looks like at 18 months</h3>
+                            <div class="ask-milestones">
+                                <div class="ask-milestone">
+                                    <div class="ask-milestone-num">01</div>
+                                    <div class="ask-milestone-text"><strong>200+ Cheko till kits placed</strong> in supermarket and retail shops across Abuja and Lagos — hardware in the market, building density</div>
+                                </div>
+                                <div class="ask-milestone">
+                                    <div class="ask-milestone-num">02</div>
+                                    <div class="ask-milestone-text"><strong>FCCPC digital lending license approved</strong> and controlled merchant loan book launched — unlocking the highest-margin revenue stream</div>
+                                </div>
+                                <div class="ask-milestone">
+                                    <div class="ask-milestone-num">03</div>
+                                    <div class="ask-milestone-text"><strong>₦5B+ annualised transaction volume run-rate</strong> — demonstrated by consistent daily throughput, not a projection</div>
+                                </div>
+                                <div class="ask-milestone">
+                                    <div class="ask-milestone-num">04</div>
+                                    <div class="ask-milestone-text"><strong>500+ active merchants</strong> and <strong>10,000+ wallet users</strong> — dual-sided network effect building</div>
+                                </div>
+                                <div class="ask-milestone">
+                                    <div class="ask-milestone-num">05</div>
+                                    <div class="ask-milestone-text"><strong>100+ approved Developer Program partners</strong> — channel in place, compounding organic merchant acquisition</div>
+                                </div>
+                                <div class="ask-milestone">
+                                    <div class="ask-milestone-num">06</div>
+                                    <div class="ask-milestone-text"><strong>Series A-ready</strong> with documented traction across all four streams (payments, Cheko SaaS, developer program, loans)</div>
+                                </div>
+                            </div>
+
+                            <h3 style="font-size:1.05rem;margin-top:2rem;margin-bottom:0.85rem;">Beyond capital — what we are looking for in a partner</h3>
+                            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.75rem;margin-top:0.5rem;">
+                                <div class="ask-card">
+                                    <div class="k">Strategic introduction</div>
+                                    <div class="v" style="font-size:0.9rem;font-weight:600;line-height:1.5;">CBN-licensed payment partners who can diversify our settlement rails beyond Metavon — reducing partner concentration risk</div>
+                                </div>
+                                <div class="ask-card">
+                                    <div class="k">Retail chain relationships</div>
+                                    <div class="v" style="font-size:0.9rem;font-weight:600;line-height:1.5;">Introduction to supermarket groups, hospitality chains, or retail aggregators where Cheko kit placement can scale quickly</div>
+                                </div>
+                                <div class="ask-card">
+                                    <div class="k">Developer ecosystem</div>
+                                    <div class="v" style="font-size:0.9rem;font-weight:600;line-height:1.5;">Connections into Nigeria's developer and agency community who would benefit from and qualify for the Developer Revenue Share Program</div>
+                                </div>
+                                <div class="ask-card">
+                                    <div class="k">FCCPC / regulatory guidance</div>
+                                    <div class="v" style="font-size:0.9rem;font-weight:600;line-height:1.5;">Investors or advisors with fintech regulatory experience in Nigeria who can help accelerate the FCCPC and eventual PSSP license path</div>
+                                </div>
+                            </div>
                         </div>
 
                         @if ($photos['ask_bg']['url'])
