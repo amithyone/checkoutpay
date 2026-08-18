@@ -1001,7 +1001,7 @@
                 <p class="lede">
                     Checkout Now LTD is Nigeria’s dual-sided money company: <strong style="color:var(--ink);">CheckoutPay</strong> for merchants,
                     <strong style="color:var(--ink);">CheckoutNow</strong> for consumers, and <strong style="color:var(--ink);">Cheko</strong> for the shop floor —
-                    with <strong style="color:var(--ink);">Proximity Pay</strong> as the in-store pay method (phone near the till, no account typing).
+                    with <strong style="color:var(--ink);">Proximity Pay</strong> as the in-store pay method (phone near the counter, no account typing).
                 </p>
                 <div class="grid-3" style="margin-top:2rem;">
                     <div class="panel">
@@ -1025,7 +1025,7 @@
             <div class="wrap">
                 <p class="section-label">How we started</p>
                 <h2>Built in 2025. Registered January 2026. Everything shipped the same year.</h2>
-                <p class="lede">Checkout Now is the work of one founder who saw the problem at the till, the problem in the developer room, and decided to solve both at once — without outside capital.</p>
+                <p class="lede">Checkout Now is the work of one founder who saw the problem at the counter, the problem in the developer room, and decided to solve both at once — without outside capital.</p>
 
                 <div class="grid-2" style="margin-top: 2rem;">
                     <div class="panel">
@@ -1036,7 +1036,7 @@
                     </div>
                     <div class="panel">
                         <h3>Two reasons this company exists</h3>
-                        <p><strong style="color:var(--ink);">① The till problem.</strong> Innocent watched Nigerian merchants lose sales and shoppers lose patience because typing account numbers is slow and card machines are expensive per counter. Nobody had solved "phone near the till, payment done" without POS hardware investment. That gap became <strong style="color:var(--ink);">Proximity Pay</strong> — a signed Bluetooth contactless session that works with any CheckoutNow wallet near any Cheko till. We are pushing the boundary of a true contactless payment experience.</p>
+                        <p><strong style="color:var(--ink);">① The counter problem.</strong> Innocent watched Nigerian merchants lose sales and shoppers lose patience because typing account numbers is slow and card machines are expensive per counter. Nobody had solved "phone near the counter, payment done" without POS hardware investment. That gap became <strong style="color:var(--ink);">Proximity Pay</strong> — a signed Bluetooth contactless session that works with any CheckoutNow wallet near any Cheko counter. We are pushing the boundary of a true contactless payment experience.</p>
                         <p style="margin-top: 0.85rem;"><strong style="color:var(--ink);">② The developer problem.</strong> Developers in Nigeria integrate payment gateways for clients for years — but the gateway keeps the long-term processing value while the developer is paid once and forgotten. CheckoutPay was built differently from the start: approved developers earn <strong style="color:var(--ink);">ongoing revenue share</strong> on qualifying production volume from integrations they build. We pay the engineers who make the ecosystem work — and that makes them our permanent distribution channel.</p>
                     </div>
                 </div>
@@ -1067,7 +1067,7 @@
                     <div class="ot-item">
                         <div class="ot-year">2026</div>
                         <strong>Full product stack shipped: iOS · Android · WhatsApp Wallet · Cheko POS · Proximity Pay</strong>
-                        <span>CheckoutNow native apps live on App Store &amp; Google Play. WhatsApp Wallet for peer-to-peer transfer and escrow inside chat. Cheko Windows POS ready for supermarket, hotel, and retail floors. Proximity Pay Bluetooth contactless — phone near the till, signed session, payment done. No card-tap hardware required.</span>
+                        <span>CheckoutNow native apps live on App Store &amp; Google Play. WhatsApp Wallet for peer-to-peer transfer and escrow inside chat. Cheko Windows POS ready for supermarket, hotel, and retail floors. Proximity Pay Bluetooth contactless — phone near the counter, signed session, payment done. No card-tap hardware required.</span>
                     </div>
                     <div class="ot-item" style="padding-bottom:0;">
                         <div class="ot-year">Now — 2026</div>
@@ -1086,7 +1086,7 @@
             <div class="wrap">
                 <p class="section-label">The problem</p>
                 <h2>Paying at a shop is still slower than it should be.</h2>
-                <p class="lede">Nigeria moves a huge share of daily trade through transfers and cash at the till — but shoppers and merchants both feel the friction.</p>
+                <p class="lede">Nigeria moves a huge share of daily trade through transfers and cash at the counter — but shoppers and merchants both feel the friction.</p>
                 <div class="grid-3" style="margin-top:2rem;">
                     <div class="panel">
                         <h3>Merchants</h3>
@@ -1097,7 +1097,7 @@
                         <p>Need one wallet that pays those shops and covers daily money jobs: send money, pay bills, save, spend — not five disconnected apps.</p>
                     </div>
                     <div class="panel">
-                        <h3>At the till</h3>
+                        <h3>At the counter</h3>
                         <p>Typing account numbers is slow. Card machines are costly to put on every counter. Nigeria needs a lighter path to <strong style="color:var(--ink);">pay in seconds</strong>.</p>
                     </div>
                 </div>
@@ -1108,7 +1108,7 @@
         <section id="solution">
             <div class="wrap">
                 <p class="section-label">The solution</p>
-                <h2>One system for shops and shoppers. Pay at the till without typing numbers.</h2>
+                <h2>One system for shops and shoppers. Pay at the counter without typing numbers.</h2>
                 <p class="lede">Checkout owns the loop: merchant collects → shopper pays → in-shop Proximity Pay — on bank-transfer-first payment paths run by licensed partners. Live across desktop, mobile, web, and WordPress.</p>
 
                 <div class="grid-2">
@@ -1120,7 +1120,7 @@
                             <li><strong>Business web app</strong> — full business management in the browser</li>
                             <li><strong>WordPress plugin</strong> — CheckoutPay / COPN for WooCommerce stores</li>
                             <li><strong>Cheko</strong> — <strong>ready on Windows</strong> POS for supermarket, hotel, retail</li>
-                            <li><strong>Proximity Pay</strong> — phone near the till; signed Bluetooth session (no card-tap hardware)</li>
+                            <li><strong>Proximity Pay</strong> — phone near the counter; signed Bluetooth session (no card-tap hardware)</li>
                             <li><strong>Checkout Broadcast Protocol</strong> — open pay standard for banks, wallets, and POS</li>
                         </ul>
                         <p style="margin-top:1rem;font-size:0.85rem;color:var(--ink-soft);">
@@ -1158,7 +1158,7 @@
         <section id="market">
             <div class="wrap">
                 <p class="section-label">Market analysis</p>
-                <h2>One of the world's largest fintech opportunities — underpenetrated at the till.</h2>
+                <h2>One of the world's largest fintech opportunities — underpenetrated at the counter.</h2>
                 <p class="lede">Nigeria is a top-5 global fintech market by transaction volume. The infrastructure gap at the shop counter is our entry point — and it is enormous.</p>
 
                 <div class="tam-wrap" role="img" aria-label="TAM SAM SOM market sizing">
@@ -1207,7 +1207,7 @@
                             <li>Card POS machines cost ₦50K–₦200K+ per terminal — too expensive for every counter in a supermarket or hotel</li>
                             <li>Contactless card NFC tap requires card issuer + terminal upgrades — slow national rollout</li>
                             <li>Nigeria's payment culture is already bank-transfer-first — NIP transfer volume dwarfs card volume by multiple orders of magnitude</li>
-                            <li>No solution delivered "phone near the till, done" without extra hardware — until Proximity Pay</li>
+                            <li>No solution delivered "phone near the counter, done" without extra hardware — until Proximity Pay</li>
                         </ul>
                     </div>
                     <div class="panel">
@@ -1228,40 +1228,75 @@
         <section id="competitors" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
             <div class="wrap">
                 <p class="section-label">Competitor analysis</p>
-                <h2>Everyone else owns one side. We own the loop — and pay the developers.</h2>
-                <p class="lede">Payment gateways own online collection. POS tools own shop operations. Merchant lenders own credit. Checkout Now is the only product that closes all three — with a true contactless in-store pay method, an open standard, and a developer revenue-share program on top.</p>
+                <h2>The real problem: a fragmented stack.</h2>
+                <p class="lede">Every payment provider in Nigeria calls their handheld gadget a "POS" — but it only collects payments. The rest of the business — inventory, accounting, CRM, payroll, reports — is still on paper or in a separate app like RetailMan. We are building Cheko to be the full business operating system at the counter.</p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-top: 2.5rem; margin-bottom: 2.5rem; text-align: center;">
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🍽️</div><strong style="font-size: 0.85rem;">Restaurant</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">💊</div><strong style="font-size: 0.85rem;">Pharmacy</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🏫</div><strong style="font-size: 0.85rem;">School</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🏥</div><strong style="font-size: 0.85rem;">Hospital</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🛒</div><strong style="font-size: 0.85rem;">Supermarket</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">⛽</div><strong style="font-size: 0.85rem;">Fuel Station</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🚌</div><strong style="font-size: 0.85rem;">Transport</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🏨</div><strong style="font-size: 0.85rem;">Hotels</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">👗</div><strong style="font-size: 0.85rem;">Fashion</strong></div>
+                    <div class="panel" style="padding: 1rem; border-radius: 12px;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">📦</div><strong style="font-size: 0.85rem;">Wholesale</strong></div>
+                </div>
 
                 <div class="comp-table-wrap">
                     <table class="comp-table" role="grid" aria-label="Feature comparison: Checkout Now vs competitors">
                         <thead>
                             <tr>
                                 <th>Company</th>
-                                <th>In-store POS</th>
-                                <th>Consumer wallet</th>
-                                <th>Contactless pay</th>
-                                <th>Merchant lending</th>
-                                <th>Developer rev-share</th>
-                                <th>Full desktop POS</th>
-                                <th>Open pay standard</th>
+                                <th>Payments</th>
+                                <th>POS / Counter</th>
+                                <th>Inventory</th>
+                                <th>Accounting</th>
+                                <th>CRM</th>
+                                <th>Reports</th>
+                                <th>Payroll</th>
+                                <th>Online Store</th>
+                                <th>Contactless</th>
+                                <th>Dev rev-share</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr class="us-row">
-                                <td>✦ Checkout Now</td>
+                                <td>✦ Cheko (Checkout Now)</td>
                                 <td class="cell-yes">✓</td>
                                 <td class="cell-yes">✓</td>
                                 <td class="cell-yes">✓</td>
-                                <td class="cell-partial">Soon*</td>
+                                <td class="cell-partial">Soon</td>
+                                <td class="cell-partial">Soon</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Soon</td>
                                 <td class="cell-yes">✓</td>
                                 <td class="cell-yes">✓</td>
                                 <td class="cell-yes">✓</td>
                             </tr>
                             <tr>
+                                <td>Kobopoint</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Partial</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                            </tr>
+                            <tr>
                                 <td>Moniepoint</td>
                                 <td class="cell-yes">✓</td>
-                                <td class="cell-partial">Limited</td>
+                                <td class="cell-partial">Gadget</td>
                                 <td class="cell-no">✗</td>
-                                <td class="cell-yes">✓</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-partial">Partial</td>
+                                <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
@@ -1269,9 +1304,12 @@
                             <tr>
                                 <td>OPay</td>
                                 <td class="cell-yes">✓</td>
-                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Gadget</td>
                                 <td class="cell-no">✗</td>
-                                <td class="cell-partial">Limited</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
@@ -1279,64 +1317,80 @@
                             <tr>
                                 <td>PalmPay</td>
                                 <td class="cell-yes">✓</td>
-                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Gadget</td>
                                 <td class="cell-no">✗</td>
-                                <td class="cell-partial">Limited</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                             </tr>
                             <tr>
                                 <td>Paystack</td>
+                                <td class="cell-partial">Online</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-partial">Partial</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                             </tr>
                             <tr>
                                 <td>Flutterwave</td>
+                                <td class="cell-partial">Online</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-partial">Partial</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                             </tr>
                             <tr>
-                                <td>RetailMan (POS only)</td>
-                                <td class="cell-yes">✓</td>
-                                <td class="cell-no">✗</td>
-                                <td class="cell-no">✗</td>
-                                <td class="cell-no">✗</td>
+                                <td>RetailMan</td>
                                 <td class="cell-no">✗</td>
                                 <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Partial</td>
+                                <td class="cell-yes">✓</td>
+                                <td class="cell-partial">Partial</td>
+                                <td class="cell-no">✗</td>
+                                <td class="cell-no">✗</td>
                                 <td class="cell-no">✗</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <p style="margin-top: 0.65rem; font-size: 0.78rem; color: var(--ink-soft);">✓ = Yes &nbsp;·&nbsp; Soon* = built, gated on FCCPC license &nbsp;·&nbsp; ✗ = Not offered &nbsp;·&nbsp; Based on publicly available product information.</p>
+                <p style="margin-top: 0.65rem; font-size: 0.78rem; color: var(--ink-soft);">✓ = Yes &nbsp;·&nbsp; Soon = In development &nbsp;·&nbsp; ✗ = Not offered &nbsp;·&nbsp; Based on publicly available product information.</p>
 
-                <div class="grid-3" style="margin-top: 2rem;">
+                <div class="grid-2" style="margin-top: 2rem;">
                     <div class="panel">
-                        <h3>vs Paystack / Flutterwave</h3>
-                        <p>Excellent online payment collection and a solid developer API. But no in-shop POS, no consumer wallet, no contactless. Their merchant has a dashboard — the shopper still types account numbers at the till. The developer who integrated them earns nothing recurring from that client.</p>
+                        <h3>vs Kobopoint</h3>
+                        <p>The only other serious full-stack POS competitor in Nigeria. We go further with <strong style="color:var(--ink);">contactless pay (Proximity Pay)</strong>, a native consumer wallet, an open pay standard, and the Developer Revenue Share program as a compounding distribution channel. Kobopoint processes payments through the POS, but the shopper still needs to tap a card or transfer.</p>
                     </div>
                     <div class="panel">
                         <h3>vs Moniepoint / OPay / PalmPay</h3>
-                        <p>Proved the hardware-in-shop → lending playbook and became unicorns. But their POS is a handheld payment gadget — not a full desktop system that manages inventory, staff, and operations. No contactless in-store pay standard. No developer revenue share. No open payment standard for other wallets and banks.</p>
+                        <p>They provide a payment gadget. Period. No inventory. No accounting. No payroll. Their merchant's books are still on paper or in a separate app like RetailMan. They solved payment collection; they did not solve the business operating system.</p>
                     </div>
                     <div class="panel">
                         <h3>vs RetailMan</h3>
-                        <p>Full Windows desktop POS — inventory, staff, till management. But RetailMan does not process the payments. No cashflow visibility means no data to score loans. No consumer wallet for in-store pay. No contactless. We combine everything RetailMan does well, plus the payment, wallet, and lending layers on top.</p>
+                        <p>Does the business management side well (inventory, accounting, reports) but does not process a single naira. No consumer wallet. No contactless. A retailer running RetailMan still needs a separate payment solution like OPay — Cheko is the unified solution that does both.</p>
+                    </div>
+                    <div class="panel">
+                        <h3>vs Paystack / Flutterwave</h3>
+                        <p>Online payment gateways only. No in-store presence. Their merchant cannot ring up a walk-in customer without a separate POS system. Also, the developer who integrated them earns nothing recurring from that client.</p>
                     </div>
                 </div>
                 <div class="quote" style="margin-top: 1.5rem;">
-                    No single competitor combines: full desktop POS + consumer wallet + contactless pay + developer revenue share + open pay standard. That is the compound moat.
+                    We are not selling a payment gadget. We are selling the full operating system for the business counter — with payments built natively inside.
                 </div>
             </div>
         </section>
@@ -1355,7 +1409,7 @@
                         <div class="v-node">
                             <div class="tag">01</div>
                             <strong>Open Cheko</strong>
-                            <span>Windows till · inventory · staff</span>
+                            <span>Windows counter · inventory · staff</span>
                         </div>
                         <div class="v-arrow" aria-hidden="true">→</div>
                         <div class="v-node">
@@ -1386,7 +1440,7 @@
 
                 <div class="diagram-block">
                     <h3>2 · User + CheckoutNow (iOS / Android)</h3>
-                    <p>Consumer wallet: fund → pay shops / send money / bills → optional pay at till via Proximity Pay.</p>
+                    <p>Consumer wallet: fund → pay shops / send money / bills → optional pay at counter via Proximity Pay.</p>
                     <div class="vflow" role="img" aria-label="CheckoutNow mobile flow">
                         <div class="v-node">
                             <div class="tag">01</div>
@@ -1708,13 +1762,13 @@
         <section id="product">
             <div class="wrap">
                 <p class="section-label">Contactless push</p>
-                <h2>Proximity Pay — pay at the till without typing account numbers.</h2>
-                <p class="lede">The till sends a signed pay request over Bluetooth. The customer’s phone checks it and pays into merchant settlement. Seed rolls this pay method out across more shops — and opens it to other banks and wallets via our open pay standard.</p>
+                <h2>Proximity Pay — pay at the counter without typing account numbers.</h2>
+                <p class="lede">The counter sends a signed pay request over Bluetooth. The customer’s phone checks it and pays into merchant settlement. Seed rolls this pay method out across more shops — and opens it to other banks and wallets via our open pay standard.</p>
 
                 <div class="flow" role="img" aria-label="Proximity Pay payment flow">
                     <div class="flow-node">
                         <div class="step">01</div>
-                        <strong>Cheko / till</strong>
+                        <strong>Cheko / counter</strong>
                         <span>Signed Bluetooth request</span>
                     </div>
                     <svg class="flow-arrow" viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M8 18h18M20 10l8 8-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1741,7 +1795,7 @@
                     <h3>Trust &amp; security — what users feel</h3>
                     <ul>
                         <li><strong>Shoppers:</strong> no account numbers to type; the phone only pays after the request is checked</li>
-                        <li><strong>Merchants:</strong> a signed till session they can trust; money settles through licensed partners</li>
+                        <li><strong>Merchants:</strong> a signed counter session they can trust; money settles through licensed partners</li>
                         <li><strong>Banks &amp; wallets:</strong> same open pay standard — verify before money moves</li>
                         <li><strong>Built-in checks:</strong> signed sessions, short-lived requests (harder to replay), identity and fraud ops as we scale</li>
                     </ul>
@@ -1768,10 +1822,10 @@
                         <span style="opacity:0.85;font-size:0.9rem;">OSS · banks · wallets · POS</span>
                     </div>
                     <div class="spokes">
-                        <div class="spoke">Cheko POS<span>First till implementation</span></div>
+                        <div class="spoke">Cheko POS<span>First counter implementation</span></div>
                         <div class="spoke">CheckoutNow<span>First wallet that pays</span></div>
                         <div class="spoke">Other POS<span>Vendors can implement</span></div>
-                        <div class="spoke">Banks &amp; wallets<span>More phones → more tills</span></div>
+                        <div class="spoke">Banks &amp; wallets<span>More phones → more counters</span></div>
                     </div>
                 </div>
             </div>
@@ -1781,7 +1835,7 @@
         <section id="roadmap" style="background: rgba(255,255,255,0.45); border-block: 1px solid var(--line);">
             <div class="wrap">
                 <p class="section-label">5–10 year plan</p>
-                <h2>From first till kit to a full bank — a clear staircase.</h2>
+                <h2>From first counter unit to a full bank — a clear staircase.</h2>
                 <p class="lede">Each phase unlocks the next. Seed buys market entry. Series A activates lending. Series B secures own CBN licenses. The long-term goal — stated in our own regulatory timeline — is to become a bank as capital and licenses allow.</p>
 
                 <div class="phase-line" role="list" aria-label="Growth roadmap phases">
@@ -1790,7 +1844,7 @@
                         <div class="phase-year">2025 – 2026</div>
                         <div class="phase-title">Seed · Market Entry</div>
                         <ul class="phase-items">
-                            <li>200+ Cheko till kits (Abuja + Lagos)</li>
+                            <li>200+ Cheko counter units (Abuja + Lagos)</li>
                             <li>500+ active CheckoutPay merchants</li>
                             <li>10,000+ CheckoutNow wallets</li>
                             <li>100+ approved Developer partners</li>
@@ -1804,7 +1858,7 @@
                         <div class="phase-title">Series A · Scale &amp; Lend</div>
                         <ul class="phase-items">
                             <li>2,000+ merchants on platform</li>
-                            <li>1,000+ Cheko till kits live</li>
+                            <li>1,000+ Cheko counter units live</li>
                             <li>Merchant lending book ₦200M+</li>
                             <li>Rentals vertical live</li>
                             <li>Port Harcourt + Kano expansion</li>
@@ -1842,7 +1896,7 @@
                     <div class="panel">
                         <h3>What seed specifically unlocks</h3>
                         <ul>
-                            <li>Cheko till kits scale from early installs to <strong>200+ shops</strong> — the hardware break-in moat</li>
+                            <li>Cheko counter units scale from early installs to <strong>200+ shops</strong> — the hardware break-in moat</li>
                             <li>Proximity Pay rolls out to every placed kit — contactless coverage grows with each install</li>
                             <li>Sales team and city coverage to match kit placement with active merchant onboarding</li>
                             <li>Security and compliance hardening to carry ₦5B+ volume with confidence</li>
@@ -1921,7 +1975,7 @@
                     <div class="panel">
                         <h3>What we give the shop</h3>
                         <p>
-                            A <strong style="color:var(--ink);">Windows hardware + Cheko software</strong> till kit for new and growing stores:
+                            A <strong style="color:var(--ink);">Windows hardware + Cheko software</strong> counter unit for new and growing stores:
                             inventory, staff, ring up sales, collect payment, and Proximity Pay — under a merchant agreement.
                             How many kits we place scales with seed capacity.
                         </p>
@@ -1931,7 +1985,7 @@
                         <p>
                             Peers mostly deploy a <strong style="color:var(--ink);">handheld payment device</strong>.
                             We deploy a <strong style="color:var(--ink);">full desktop POS system</strong> that runs the store —
-                            inventory + till + payments in one place. Stronger trust for supermarket and retail floors.
+                            inventory + counter + payments in one place. Stronger trust for supermarket and retail floors.
                         </p>
                     </div>
                     <div class="panel">
@@ -1969,7 +2023,7 @@
                             <li><strong>Fit for the loan program.</strong> Merchants who run payments + POS on Checkout naturally surface as eligible (or not) for overdraft / business loans — volume tiers already exist in product.</li>
                             <li><strong>Better economics.</strong> Interest / facility fees on lending typically out-earn thin pay-in / pay-out fees on the same merchant.</li>
                             <li><strong>Sticky loop.</strong> Credit keeps the merchant paying and settling through Checkout; more transactions improve who we can lend to next.</li>
-                            <li><strong>Merchant benefit.</strong> One stack for till + payments + (later) capital — not a separate POS vendor and a separate lender.</li>
+                            <li><strong>Merchant benefit.</strong> One stack for counter + payments + (later) capital — not a separate POS vendor and a separate lender.</li>
                         </ul>
                     </div>
                     <div class="panel">
@@ -1992,7 +2046,7 @@
                     </div>
                     <div class="panel">
                         <h3>POS competitors</h3>
-                        <p><strong style="color:var(--ink);">RetailMan</strong> and classic POS suites sell inventory / staff / till software. We are not “just POS” — payments are native, so the till also shows the sales history that decides credit.</p>
+                        <p><strong style="color:var(--ink);">RetailMan</strong> and classic POS suites sell inventory / staff / counter software. We are not “just POS” — payments are native, so the counter also shows the sales history that decides credit.</p>
                     </div>
                     <div class="panel">
                         <h3>Payments competitors</h3>
@@ -2037,7 +2091,7 @@
                     </div>
                 </div>
                 <blockquote class="quote">
-                    “Checkout Now LTD operates CheckoutPay, CheckoutNow, and Cheko. We process merchant and wallet volume today through licensed payment partners under service agreements — including METRAVON INNOVATION LTD. Consumer and merchant credit products are built and held back pending Nigeria’s digital lending license (FCCPC), which is underway. Proceeds will fund Windows + Cheko till kits in more shops, compliance capital, and — post-approval — a controlled credit book. Long-term, we aim to become a bank as capacity and licenses allow.”
+                    “Checkout Now LTD operates CheckoutPay, CheckoutNow, and Cheko. We process merchant and wallet volume today through licensed payment partners under service agreements — including METRAVON INNOVATION LTD. Consumer and merchant credit products are built and held back pending Nigeria’s digital lending license (FCCPC), which is underway. Proceeds will fund Windows + Cheko counter units in more shops, compliance capital, and — post-approval — a controlled credit book. Long-term, we aim to become a bank as capacity and licenses allow.”
                 </blockquote>
             </div>
         </section>
@@ -2069,12 +2123,12 @@
                         <div class="risk-title">Competitive density from OPay / Moniepoint / PalmPay</div>
                         <p class="risk-desc">These are well-capitalised players with large agent and POS networks already deployed across Nigeria.</p>
                         <div class="mit-label">Mitigation</div>
-                        <p class="mit-text">We are not deploying a handheld payment gadget — we deploy a <strong>full Windows desktop POS that runs the store</strong> (inventory + staff + till + payments). A merchant running Cheko cannot easily leave — their operations data, sales history, and payment rails are all on our system. Contactless, open standard, and developer channel create additional lock-in layers they do not have.</p>
+                        <p class="mit-text">We are not deploying a handheld payment gadget — we deploy a <strong>full Windows desktop POS that runs the store</strong> (inventory + staff + counter + payments). A merchant running Cheko cannot easily leave — their operations data, sales history, and payment rails are all on our system. Contactless, open standard, and developer channel create additional lock-in layers they do not have.</p>
                     </div>
                     <div class="risk-card">
                         <div class="risk-label">Risk 04</div>
                         <div class="risk-title">Hardware deployment cost and kit scale</div>
-                        <p class="risk-desc">Windows + Cheko till kits carry a hardware cost per deployment. Kit volume is directly gated by capital raised at seed.</p>
+                        <p class="risk-desc">Windows + Cheko counter units carry a hardware cost per deployment. Kit volume is directly gated by capital raised at seed.</p>
                         <div class="mit-label">Mitigation</div>
                         <p class="mit-text">Kit rollout is explicitly phased with seed capacity — 200+ kits at this raise, scaled further at Series A. <strong>Merchant agreement structures</strong> (rental / revenue-share per kit) can offset upfront hardware cost and improve unit economics per shop from the start. We have flexibility on the business model per kit.</p>
                     </div>
@@ -2107,7 +2161,7 @@
                         <p class="section-label" style="color:#8fd0ef;">Seed investment</p>
                         <h2>How investor money is used</h2>
                         <p class="lede">
-                            Seed funds <strong style="color:#fff;">competitive scale and trust</strong> — Windows + Cheko till kits in more shops, contactless Proximity Pay, security &amp; compliance —
+                            Seed funds <strong style="color:#fff;">competitive scale and trust</strong> — Windows + Cheko counter units in more shops, contactless Proximity Pay, security &amp; compliance —
                             not rebuilding what is already live. We are past <strong style="color:#fff;">80%+</strong> of core development; capital wins the market and hardens the payment path shoppers and merchants rely on.
                         </p>
 
@@ -2123,11 +2177,11 @@
                             <div class="ask-grid" style="margin-top:0.5rem;">
                                 <div class="ask-card">
                                     <div class="k">01 · Competitive access</div>
-                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Place Windows + Cheko till kits in supermarket and retail shops (break-in marketing), plus sales and city coverage so Checkout can out-execute acquirers and wallets that only own one side of the loop.</div>
+                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Place Windows + Cheko counter units in supermarket and retail shops (break-in marketing), plus sales and city coverage so Checkout can out-execute acquirers and wallets that only own one side of the loop.</div>
                                 </div>
                                 <div class="ask-card">
                                     <div class="k">02 · Contactless push</div>
-                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Till kits ship Proximity Pay–ready: expand contactless at the till and grow the open Checkout Broadcast Protocol so more phones can pay more shops — faster than typing account numbers.</div>
+                                    <div class="v" style="font-size:0.95rem;font-weight:600;line-height:1.4;">Till kits ship Proximity Pay–ready: expand contactless at the counter and grow the open Checkout Broadcast Protocol so more phones can pay more shops — faster than typing account numbers.</div>
                                 </div>
                                 <div class="ask-card">
                                     <div class="k">03 · Security, licensing &amp; compliance</div>
@@ -2157,7 +2211,7 @@
                             <div class="ask-milestones">
                                 <div class="ask-milestone">
                                     <div class="ask-milestone-num">01</div>
-                                    <div class="ask-milestone-text"><strong>200+ Cheko till kits placed</strong> in supermarket and retail shops across Abuja and Lagos — hardware in the market, building density</div>
+                                    <div class="ask-milestone-text"><strong>200+ Cheko counter units placed</strong> in supermarket and retail shops across Abuja and Lagos — hardware in the market, building density</div>
                                 </div>
                                 <div class="ask-milestone">
                                     <div class="ask-milestone-num">02</div>
