@@ -331,6 +331,10 @@ Route::prefix('v1')->group(function () {
     Route::post('/webhook/vtu', [VtuWebhookController::class, 'receive'])->middleware('throttle:120,1');
     Route::post('/webhooks/vtu', [VtuWebhookController::class, 'receive'])->middleware('throttle:120,1');
 
+    // Squad dedicated webhooks (VTU + future payments)
+    Route::post('/webhook/squad', [\App\Http\Controllers\Api\SquadWebhookController::class, 'receive'])->middleware('throttle:120,1');
+    Route::post('/webhooks/squad', [\App\Http\Controllers\Api\SquadWebhookController::class, 'receive'])->middleware('throttle:120,1');
+
     /**
      * Tax Calculator open API
      */
