@@ -46,6 +46,19 @@ class RedirectLegacyCheckoutPayHost
         $host = strtolower($request->getHost());
         $legacy = config('checkout.legacy_hosts', ['check-outpay.com', 'www.check-outpay.com']);
 
-        return in_array($host, $legacy, true);
+        if (! in_array($host, $legacy, true)) {
+            return false;
+        }
+
+        // Keep API / egress / cron on Namecheap during cutover (webhooks & Contabo relay).
+        $path = '/'.ltrim($request->path(), '/');
+        foreach ((array) config('checkout.legacy_host_redirect_skip_prefixes', []) as $prefix) {
+            $prefix = '/'.ltrim((string) $prefix, '/');
+            if ($prefix !== '/' && str_starts_with($path, rtrim($prefix, '/'))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

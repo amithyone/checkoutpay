@@ -243,26 +243,19 @@ class SettingsController extends Controller
 
         $payload = $this->buildTestWebhookPayload();
 
-        try {
-            $response = Http::timeout(10)->post($webhookUrl, $payload);
+        $result = \App\Services\Webhook\WebhookEgressRelay::deliver($webhookUrl, $payload);
 
-            if ($response->successful()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Webhook delivered successfully. Your endpoint responded with HTTP '.$response->status().'.',
-                ]);
-            }
-
+        if ($result['success']) {
             return response()->json([
-                'success' => false,
-                'message' => 'Webhook URL responded with HTTP '.$response->status().'. '.($response->body() ? 'Response: '.Str::limit($response->body(), 200) : ''),
-            ], 422);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Could not reach webhook URL: '.$e->getMessage(),
-            ], 422);
+                'success' => true,
+                'message' => 'Webhook delivered successfully via '.($result['via'] ?? 'direct').'. Your endpoint responded with HTTP '.($result['status'] ?? '?').'.',
+            ]);
         }
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['error'] ?? 'Could not reach webhook URL',
+        ], 422);
     }
 
     /**

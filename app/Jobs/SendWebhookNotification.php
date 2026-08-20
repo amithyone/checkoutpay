@@ -11,7 +11,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class SendWebhookNotification implements ShouldQueue
@@ -213,43 +212,30 @@ class SendWebhookNotification implements ShouldQueue
     }
 
     /**
-     * Send webhook to a single URL
+     * Send webhook to a single URL (direct or via Namecheap egress relay).
      */
     protected function sendWebhook(string $webhookUrl): array
     {
         try {
             $payload = $this->buildWebhookPayload();
+            $result = \App\Services\Webhook\WebhookEgressRelay::deliver($webhookUrl, $payload);
 
-            $response = Http::timeout(10)
-                ->retry(2, 100) // Retry twice with 100ms delay
-                ->post($webhookUrl, $payload);
-
-            $rawBody = $response->body();
-            $bodyPreview = mb_strlen($rawBody) > 4000
-                ? mb_substr($rawBody, 0, 4000).'…(truncated)'
-                : $rawBody;
-
-            if ($response->successful()) {
+            if ($result['success']) {
                 return [
                     'success' => true,
-                    'status' => $response->status(),
-                    'response_body' => $bodyPreview !== '' ? $bodyPreview : null,
-                ];
-            } else {
-                $body = $rawBody;
-                $fullError = sprintf(
-                    "HTTP %d %s\nResponse body: %s",
-                    $response->status(),
-                    $response->reason() ?: '',
-                    $body !== '' ? $body : '(empty)'
-                );
-                return [
-                    'success' => false,
-                    'error' => trim($fullError),
-                    'status' => $response->status(),
-                    'response_body' => $bodyPreview !== '' ? $bodyPreview : null,
+                    'status' => $result['status'],
+                    'response_body' => $result['response_body'] ?? null,
+                    'via' => $result['via'] ?? null,
                 ];
             }
+
+            return [
+                'success' => false,
+                'error' => $result['error'] ?? 'Webhook delivery failed',
+                'status' => $result['status'] ?? null,
+                'response_body' => $result['response_body'] ?? null,
+                'via' => $result['via'] ?? null,
+            ];
         } catch (\Throwable $e) {
             return [
                 'success' => false,

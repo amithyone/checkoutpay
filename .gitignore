@@ -75,3 +75,4 @@ app.zip
 /storage/app/quarantine-unlock.code
 /storage/app/quarantine-baseline.json
 /storage/framework/quarantine.lock
+/storage/app/webhook-egress-relay.secret

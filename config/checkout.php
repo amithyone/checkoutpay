@@ -77,6 +77,30 @@ return [
             'check-outpay.com,www.check-outpay.com'
         )))
     ))),
+    // On Namecheap: redirect browsers to Contabo, but keep these paths local (egress relay / APIs).
+    'legacy_host_redirect_skip_prefixes' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env(
+            'LEGACY_HOST_REDIRECT_SKIP_PREFIXES',
+            '/api/,/cron/,/internal/,/mevon-egress'
+        ))
+    ))),
+
+    /*
+    | Contabo → Namecheap merchant webhook egress (IP allowlists that only trust check-outpay.com).
+    | Contabo: RELAY_CLIENT_ENABLED=true + RELAY_URL=https://check-outpay.com/api/v1/internal/webhook-egress
+    | Namecheap: RELAY_RECEIVER_ENABLED=true + same RELAY_SECRET
+    | After DNS cutover: turn client+receiver off.
+    */
+    'webhook_egress' => [
+        'relay_client_enabled' => filter_var(env('WEBHOOK_EGRESS_RELAY_CLIENT_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'relay_receiver_enabled' => filter_var(env('WEBHOOK_EGRESS_RELAY_RECEIVER_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'relay_url' => (string) env('WEBHOOK_EGRESS_RELAY_URL', 'https://check-outpay.com/api/v1/internal/webhook-egress'),
+        'relay_secret' => (string) env('WEBHOOK_EGRESS_RELAY_SECRET', ''),
+        'fallback_direct' => filter_var(env('WEBHOOK_EGRESS_FALLBACK_DIRECT', true), FILTER_VALIDATE_BOOLEAN),
+        'allowed_ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('WEBHOOK_EGRESS_ALLOWED_IPS', ''))))),
+        'user_agent' => (string) env('WEBHOOK_EGRESS_USER_AGENT', 'CheckoutPay-Webhook/1.0 (+https://check-outpay.com)'),
+    ],
 
     /*
     |--------------------------------------------------------------------------

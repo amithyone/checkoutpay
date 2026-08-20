@@ -296,6 +296,10 @@ Route::prefix('v1')->group(function () {
     Route::post('internal/consumer-chat/reply', [ConsumerChatInternalController::class, 'reply'])
         ->middleware('throttle:30,1');
 
+    // Contabo → Namecheap merchant webhook egress (HMAC). Namecheap forwards to merchant allowlisted IPs.
+    Route::post('internal/webhook-egress', [\App\Http\Controllers\Api\WebhookEgressRelayController::class, 'receive'])
+        ->middleware([\App\Http\Middleware\VerifyWebhookEgressRelaySignature::class, 'throttle:120,1']);
+
     // Secure inbound sync receiver (live site -> this app)
     Route::post('sync/live', [LiveSyncReceiverController::class, 'receive'])
         ->middleware([\App\Http\Middleware\VerifyLiveSyncSignature::class, 'throttle:120,1']);
