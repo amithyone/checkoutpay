@@ -20,7 +20,7 @@
             <div class="sm:col-span-2">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Search</label>
                 <input type="text" name="search" value="{{ request('search') }}"
-                    placeholder="Phone or summary…"
+                    placeholder="Phone, IP, or summary…"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
             </div>
             <div>

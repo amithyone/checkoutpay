@@ -29,7 +29,7 @@
             <div class="lg:col-span-2">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Search</label>
                 <input type="text" name="search" value="{{ request('search') }}"
-                    placeholder="Email, name, session UUID, device…"
+                    placeholder="Email, name, IP, session UUID, device…"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
             </div>
             <div>

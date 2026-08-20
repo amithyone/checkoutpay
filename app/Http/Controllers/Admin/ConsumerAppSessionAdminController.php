@@ -62,7 +62,8 @@ class ConsumerAppSessionAdminController extends Controller
             $q->where(function (Builder $inner) use ($term) {
                 $inner->where('phone_e164', 'like', '%'.$term.'%')
                     ->orWhere('session_uuid', 'like', '%'.$term.'%')
-                    ->orWhere('device_label', 'like', '%'.$term.'%');
+                    ->orWhere('device_label', 'like', '%'.$term.'%')
+                    ->orWhere('ip_address', 'like', '%'.$term.'%');
             });
         }
 
@@ -102,7 +103,8 @@ class ConsumerAppSessionAdminController extends Controller
             $term = trim((string) $request->input('search'));
             $q->where(function (Builder $inner) use ($term) {
                 $inner->where('phone_e164', 'like', '%'.$term.'%')
-                    ->orWhere('summary', 'like', '%'.$term.'%');
+                    ->orWhere('summary', 'like', '%'.$term.'%')
+                    ->orWhere('ip_address', 'like', '%'.$term.'%');
             });
         }
 

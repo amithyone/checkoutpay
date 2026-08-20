@@ -62,7 +62,8 @@ class RentalsAdminAppSessionAdminController extends Controller
                 $inner->where('admin_email', 'like', '%'.$term.'%')
                     ->orWhere('admin_name', 'like', '%'.$term.'%')
                     ->orWhere('session_uuid', 'like', '%'.$term.'%')
-                    ->orWhere('device_label', 'like', '%'.$term.'%');
+                    ->orWhere('device_label', 'like', '%'.$term.'%')
+                    ->orWhere('ip_address', 'like', '%'.$term.'%');
             });
         }
 
@@ -102,7 +103,8 @@ class RentalsAdminAppSessionAdminController extends Controller
             $term = trim((string) $request->input('search'));
             $q->where(function (Builder $inner) use ($term) {
                 $inner->where('admin_email', 'like', '%'.$term.'%')
-                    ->orWhere('summary', 'like', '%'.$term.'%');
+                    ->orWhere('summary', 'like', '%'.$term.'%')
+                    ->orWhere('ip_address', 'like', '%'.$term.'%');
             });
         }
 
