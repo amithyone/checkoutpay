@@ -50,9 +50,14 @@ class RedirectLegacyCheckoutPayHost
             return false;
         }
 
-        // Keep API / egress / cron on Namecheap during cutover (webhooks & Contabo relay).
+        // Keep API / egress / cron / admin on Namecheap during cutover.
         $path = '/'.ltrim($request->path(), '/');
-        foreach ((array) config('checkout.legacy_host_redirect_skip_prefixes', []) as $prefix) {
+        $skip = (array) config('checkout.legacy_host_redirect_skip_prefixes', []);
+        $adminPrefix = '/'.trim(\App\Support\AdminPath::prefix(), '/');
+        if ($adminPrefix !== '/' && ! in_array($adminPrefix, $skip, true) && ! in_array($adminPrefix.'/', $skip, true)) {
+            $skip[] = $adminPrefix;
+        }
+        foreach ($skip as $prefix) {
             $prefix = '/'.ltrim((string) $prefix, '/');
             if ($prefix !== '/' && str_starts_with($path, rtrim($prefix, '/'))) {
                 return false;

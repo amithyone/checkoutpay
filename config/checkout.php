@@ -77,12 +77,12 @@ return [
             'check-outpay.com,www.check-outpay.com'
         )))
     ))),
-    // On Namecheap: redirect browsers to Contabo, but keep these paths local (egress relay / APIs).
+    // On Namecheap: redirect browsers to Contabo, but keep these paths local (egress relay / APIs / admin).
     'legacy_host_redirect_skip_prefixes' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env(
             'LEGACY_HOST_REDIRECT_SKIP_PREFIXES',
-            '/api/,/cron/,/internal/,/mevon-egress'
+            '/api/,/cron/,/internal/,/mevon-egress,/enter0'
         ))
     ))),
 

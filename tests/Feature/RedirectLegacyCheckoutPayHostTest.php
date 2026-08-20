@@ -13,12 +13,16 @@ class RedirectLegacyCheckoutPayHostTest extends TestCase
             'checkout.legacy_host_redirect_force_in_tests' => true,
             'checkout.legacy_host_redirect_to' => 'https://check-outnow.com',
             'checkout.legacy_hosts' => ['check-outpay.com', 'www.check-outpay.com'],
-            'checkout.legacy_host_redirect_skip_prefixes' => ['/api/', '/cron/'],
+            'checkout.legacy_host_redirect_skip_prefixes' => ['/api/', '/cron/', '/enter0'],
         ]);
 
         $this->get('https://check-outpay.com/dashboard/login?x=1')
             ->assertRedirect('https://check-outnow.com/dashboard/login?x=1')
             ->assertStatus(301);
+
+        $admin = $this->get('https://check-outpay.com/enter0/login');
+        $this->assertNotEquals(301, $admin->status());
+        $this->assertNotEquals(308, $admin->status());
     }
 
     public function test_api_paths_are_not_redirected_so_namecheap_can_relay(): void
