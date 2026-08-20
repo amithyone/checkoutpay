@@ -103,6 +103,24 @@ return [
     ],
 
     /*
+    | Namecheap → Contabo API proxy (payment-request / account numbers land on Contabo DB).
+    | Enable only on Namecheap. Skip webhook-egress so outbound still leaves from check-outpay.com.
+    */
+    'api_proxy' => [
+        'enabled' => filter_var(env('API_PROXY_TO_CONTABO_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'to_base_url' => rtrim((string) env('API_PROXY_TO_CONTABO_URL', 'https://check-outnow.com'), '/'),
+        'timeout_seconds' => max(5, (int) env('API_PROXY_TO_CONTABO_TIMEOUT', 25)),
+        'fallback_local' => filter_var(env('API_PROXY_FALLBACK_LOCAL', false), FILTER_VALIDATE_BOOLEAN),
+        'skip_prefixes' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env(
+                'API_PROXY_SKIP_PREFIXES',
+                '/api/v1/internal/webhook-egress,/api/v1/sync/live'
+            ))
+        ))),
+    ],
+
+    /*
     |--------------------------------------------------------------------------
     | Self-quarantine (hijack / empty-DB fail-closed)
     |--------------------------------------------------------------------------

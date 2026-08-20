@@ -15,6 +15,7 @@ class Kernel extends HttpKernel
         // \App\Http\Middleware\TrustHosts::class,
         \App\Http\Middleware\TrustProxies::class,
         \App\Http\Middleware\RedirectLegacyCheckoutPayHost::class,
+        \App\Http\Middleware\ProxyMerchantApiToContabo::class,
         \Illuminate\Http\Middleware\HandleCors::class,
         \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
         \App\Http\Middleware\EnsureNotQuarantined::class,

@@ -139,6 +139,13 @@ class QuarantineService
      */
     public function trip(array $reasons): void
     {
+        // Never write the production lock file from PHPUnit / local test runs.
+        if (app()->environment('testing')) {
+            Log::warning('quarantine_trip_skipped_in_testing', ['reasons' => $reasons]);
+
+            return;
+        }
+
         $path = $this->lockPath();
         $dir = dirname($path);
         if (! is_dir($dir)) {
