@@ -924,6 +924,11 @@
                 <dl class="text-xs text-gray-700 space-y-1 mb-3">
                     <div><span class="text-gray-500">Registered business name (for VA):</span> <span class="font-medium text-gray-900">{{ $business->name ?: '—' }}</span></div>
                     <div><span class="text-gray-500">CAC RC/BN:</span> <span class="font-medium text-gray-900">{{ $business->cac_registration_number ?: '—' }}</span></div>
+                    <div><span class="text-gray-500">Temp VA CAC source:</span>
+                        <span class="font-medium text-gray-900">
+                            {{ $business->use_own_cac_for_temp_va ? 'Business own CAC' : 'Platform (Checkout Now Ltd)' }}
+                        </span>
+                    </div>
                     @if(!empty($business->rubies_signatory_name))
                         <div><span class="text-gray-500">Signatory (BVN/NIN only):</span> {{ $business->rubies_signatory_name }}</div>
                     @endif

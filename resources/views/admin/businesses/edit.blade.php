@@ -80,6 +80,19 @@
                     </label>
                 </div>
 
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="use_own_cac_for_temp_va" value="1" {{ old('use_own_cac_for_temp_va', $business->use_own_cac_for_temp_va) ? 'checked' : '' }} class="mt-1">
+                        <span class="text-sm text-gray-800">
+                            <strong>Request temp accounts under this business’s CAC name</strong>
+                            <span class="block text-xs text-gray-600 mt-1">
+                                Off (default): MevonPay uses the platform RC (<code class="bg-white px-1 rounded">MEVONPAY_TEMP_VA_REGISTRATION_NUMBER</code>) so the account name is Checkout Now Ltd.
+                                On: uses this business’s CAC RC/BN on file ({{ $business->cac_registration_number ?: 'none set yet' }}).
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
                 <div id="whatsapp-wallet-merchant-api" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 scroll-mt-24">
                     <h4 class="text-sm font-semibold text-gray-900">
                         <i class="fab fa-whatsapp text-green-600 mr-1"></i> WhatsApp wallet merchant API

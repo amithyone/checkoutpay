@@ -49,7 +49,14 @@ return [
         'connect_timeout_seconds' => (int) env('MEVONPAY_CONNECT_TIMEOUT_SECONDS', 3),
         /** Cache successful /V1/balance snapshots for the admin dashboard (seconds). */
         'balance_cache_seconds' => (int) env('MEVONPAY_BALANCE_CACHE_SECONDS', 120),
+        /** Platform CAC used for create_tem_va when business does not use its own RC/BN. */
         'temp_va_registration_number' => env('MEVONPAY_TEMP_VA_REGISTRATION_NUMBER', ''),
+        /** Mevon create_tem_va path (new API). */
+        'temp_va_path' => env('MEVONPAY_TEMP_VA_PATH', '/V1/create_tem_va'),
+        /** Mandatory banking partner for create_tem_va (e.g. Rubies). */
+        'temp_va_bank_type' => env('MEVONPAY_TEMP_VA_BANK_TYPE', 'Rubies'),
+        /** bearer (docs) or raw — Authorization header style for create_tem_va. */
+        'temp_va_auth' => env('MEVONPAY_TEMP_VA_AUTH', 'bearer'),
         'account_logs_enabled' => (bool) env('MEVONPAY_ACCOUNT_LOGS_ENABLED', false),
         /** TSQ (transaction status) path — POST with { "reference": "..." }. */
         'transfer_status_path' => env('MEVONPAY_TRANSFER_STATUS_PATH', '/V1/tsk'),

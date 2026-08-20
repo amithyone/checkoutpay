@@ -97,12 +97,14 @@ class BusinessController extends Controller
             'is_active' => 'boolean',
             'website_approved' => 'boolean',
             'uses_external_account_numbers' => 'boolean',
+            'use_own_cac_for_temp_va' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
             'payout_api_enabled' => 'boolean',
             'card_payments_enabled' => 'boolean',
             'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
+        $validated['use_own_cac_for_temp_va'] = $request->has('use_own_cac_for_temp_va');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
         $validated['payout_api_enabled'] = $request->has('payout_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
@@ -170,12 +172,14 @@ class BusinessController extends Controller
             'website_approved' => 'boolean',
             'balance' => 'nullable|numeric|min:0',
             'uses_external_account_numbers' => 'boolean',
+            'use_own_cac_for_temp_va' => 'boolean',
             'whatsapp_wallet_api_enabled' => 'boolean',
             'payout_api_enabled' => 'boolean',
             'card_payments_enabled' => 'boolean',
             'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
+        $validated['use_own_cac_for_temp_va'] = $request->has('use_own_cac_for_temp_va');
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
         $validated['payout_api_enabled'] = $request->has('payout_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');

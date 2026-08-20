@@ -33,46 +33,68 @@ class MevonPayVirtualAccountService
 
     protected function authorizationHeaderValue(): string
     {
-        // Keep auth behavior aligned with transfer service: send configured value as-is.
-        return trim($this->secretKey);
+        $key = trim($this->secretKey);
+        if ($key === '') {
+            return '';
+        }
+
+        $mode = strtolower(trim((string) config('services.mevonpay.temp_va_auth', 'bearer')));
+        if (str_starts_with($key, 'Bearer ') || str_starts_with($key, 'Token ')) {
+            return $key;
+        }
+
+        return $mode === 'raw' ? $key : 'Bearer '.$key;
     }
 
     /**
-     * Create a temporary virtual account (createtempva).
+     * Create a temporary virtual account (create_tem_va).
      *
-     * @return array Normalized: account_number, account_name, bank_name, bank_code, raw
+     * Payload (Mevon):
+     *  - rc_number (CAC RC / BN / IT)
+     *  - business_type: RC | BN | IT
+     *  - bank_type: e.g. Rubies (mandatory)
+     *
+     * @return array Normalized: account_number, account_name, bank_name, bank_code, expires_on?, raw
      */
     public function createTempVa(
-        string $fname,
-        string $lname,
-        ?string $registrationNumber = null,
-        ?string $bvn = null
-    ): array
-    {
+        ?string $rcNumber = null,
+        ?string $businessType = null,
+        ?string $bankType = null
+    ): array {
         if (! $this->isConfigured()) {
             throw new \RuntimeException('MevonPay is not configured (base_url/secret_key missing).');
         }
 
-        $url = rtrim($this->baseUrl, '/') . '/V1/createtempva.php';
+        $path = (string) config('services.mevonpay.temp_va_path', '/V1/create_tem_va');
+        if ($path === '' || $path[0] !== '/') {
+            $path = '/'.ltrim($path, '/');
+        }
+        $url = rtrim($this->baseUrl, '/').$path;
 
-        $authorization = $this->authorizationHeaderValue();
-
-        $effectiveRegistrationNumber = trim((string) ($registrationNumber ?: config('services.mevonpay.temp_va_registration_number', '')));
-
-        $payload = [
-            'type' => 'rubies',
-            'fname' => $fname,
-            'lname' => $lname,
-        ];
-        if ($effectiveRegistrationNumber !== '') {
-            $payload['registration_number'] = $effectiveRegistrationNumber;
-        } elseif (! empty($bvn)) {
-            // Backward compatibility fallback when registration number is unavailable.
-            $payload['bvn'] = $bvn;
+        $effectiveRc = strtoupper(preg_replace('/\s+/', '', trim((string) ($rcNumber ?: config('services.mevonpay.temp_va_registration_number', '')))) ?? '');
+        $effectiveRc = preg_replace('/[^A-Z0-9]/', '', $effectiveRc) ?? '';
+        if ($effectiveRc === '') {
+            throw new \RuntimeException('MevonPay create_tem_va requires an RC/BN number (platform or business CAC).');
         }
 
+        $type = strtoupper(trim((string) ($businessType ?: '')));
+        if (! in_array($type, ['RC', 'BN', 'IT'], true)) {
+            $type = $this->inferBusinessTypeFromRc($effectiveRc);
+        }
+
+        $bank = trim((string) ($bankType ?: config('services.mevonpay.temp_va_bank_type', 'Rubies')));
+        if ($bank === '') {
+            $bank = 'Rubies';
+        }
+
+        $payload = [
+            'rc_number' => $effectiveRc,
+            'business_type' => $type,
+            'bank_type' => $bank,
+        ];
+
         if ($this->shouldLogAccountRequests()) {
-            Log::info('MevonPay createtempva request payload', [
+            Log::info('MevonPay create_tem_va request payload', [
                 'url' => $url,
                 'payload' => $payload,
             ]);
@@ -80,60 +102,73 @@ class MevonPayVirtualAccountService
 
         try {
             $resp = Http::withHeaders(MevonPayEgress::mergeClientHeaders([
-                    'Authorization' => $authorization,
-                ]))
+                'Authorization' => $this->authorizationHeaderValue(),
+            ]))
                 ->acceptJson()
                 ->asJson()
                 ->timeout($this->timeoutSeconds)
                 ->connectTimeout($this->connectTimeoutSeconds)
                 ->post($url, $payload);
         } catch (\Throwable $e) {
-            Log::warning('MevonPay createtempva unreachable', ['error' => $e->getMessage()]);
+            Log::warning('MevonPay create_tem_va unreachable', ['error' => $e->getMessage()]);
             throw new \RuntimeException('MevonPay is unreachable (timeout). Temporary account numbers cannot be created right now.');
         }
 
         $json = $resp->json();
 
         if ($this->shouldLogAccountRequests()) {
-            Log::info('MevonPay createtempva response payload', [
+            Log::info('MevonPay create_tem_va response payload', [
                 'http_status' => $resp->status(),
                 'response' => $json,
             ]);
         }
 
         if (! $resp->successful()) {
-            Log::warning('MevonPay createtempva non-2xx response', [
+            Log::warning('MevonPay create_tem_va non-2xx response', [
                 'http_status' => $resp->status(),
                 'response' => $json,
             ]);
-            throw new \RuntimeException('MevonPay createtempva failed: non-2xx response.');
+            throw new \RuntimeException('MevonPay create_tem_va failed: non-2xx response.');
         }
 
-        // Provider can respond:
-        // - { "status": true/false, "message": "...", "data": {...} }
-        // - or direct { "data": {...} }
         $status = $json['status'] ?? null;
         if ($status !== null && $status === false) {
-            throw new \RuntimeException('MevonPay createtempva error: ' . ($json['message'] ?? 'Unknown error'));
+            throw new \RuntimeException('MevonPay create_tem_va error: '.($json['message'] ?? 'Unknown error'));
         }
 
         $data = $json['data'] ?? $json;
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             $data = [];
         }
 
         $accountNumber = $data['account_number'] ?? $data['accountNumber'] ?? null;
-        if (!is_string($accountNumber) || trim($accountNumber) === '') {
-            throw new \RuntimeException('MevonPay createtempva missing account_number in response.');
+        if (! is_string($accountNumber) || trim($accountNumber) === '') {
+            throw new \RuntimeException('MevonPay create_tem_va missing account_number in response.');
         }
 
         return [
             'account_number' => (string) $accountNumber,
             'account_name' => (string) ($data['account_name'] ?? $data['accountName'] ?? ''),
-            'bank_name' => (string) ($data['bank_name'] ?? ''),
+            'bank_name' => (string) ($data['bank_name'] ?? $data['bankName'] ?? ''),
             'bank_code' => (string) ($data['bank_code'] ?? $data['bankCode'] ?? ''),
+            'expires_on' => isset($data['expires_on'])
+                ? (string) $data['expires_on']
+                : (isset($data['expiresOn']) ? (string) $data['expiresOn'] : null),
             'raw' => $json,
         ];
+    }
+
+    public function inferBusinessTypeFromRc(string $rcNumber): string
+    {
+        $rc = strtoupper(preg_replace('/[^A-Z0-9]/', '', $rcNumber) ?? '');
+        if (str_starts_with($rc, 'BN')) {
+            return 'BN';
+        }
+        if (str_starts_with($rc, 'IT')) {
+            return 'IT';
+        }
+
+        return 'RC';
     }
 
     /**
@@ -153,7 +188,7 @@ class MevonPayVirtualAccountService
 
         $url = rtrim($this->baseUrl, '/') . '/V1/createdynamic';
 
-        $authorization = $this->authorizationHeaderValue();
+        $authorization = trim($this->secretKey);
 
         $payload = [
             'amount' => $amount,
@@ -218,4 +253,3 @@ class MevonPayVirtualAccountService
         ];
     }
 }
-

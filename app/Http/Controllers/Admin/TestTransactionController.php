@@ -158,24 +158,24 @@ class TestTransactionController extends Controller
     }
 
     /**
-     * Test MevonPay temp virtual account creation (createtempva).
+     * Test MevonPay temp virtual account creation (create_tem_va).
      * Returns the temp account details so you can verify provider connectivity.
      */
     public function createMevonpayTempVa(Request $request)
     {
         $validated = $request->validate([
-            'fname' => 'required|string|max:100',
-            'lname' => 'required|string|max:100',
-            'bvn' => 'required|string|max:30',
+            'rc_number' => 'nullable|string|max:50',
+            'business_type' => 'nullable|string|in:RC,BN,IT,rc,bn,it',
+            'bank_type' => 'nullable|string|max:50',
         ]);
 
         try {
             $svc = app(MevonPayVirtualAccountService::class);
+            $rc = trim((string) ($validated['rc_number'] ?? config('services.mevonpay.temp_va_registration_number', '')));
             $result = $svc->createTempVa(
-                $validated['fname'],
-                $validated['lname'],
-                null,
-                $validated['bvn']
+                $rc !== '' ? $rc : null,
+                isset($validated['business_type']) ? strtoupper((string) $validated['business_type']) : null,
+                $validated['bank_type'] ?? null
             );
 
             return response()->json([
@@ -184,7 +184,7 @@ class TestTransactionController extends Controller
                 'data' => $result,
             ]);
         } catch (\Throwable $e) {
-            Log::error('MevonPay createtempva test failed', [
+            Log::error('MevonPay create_tem_va test failed', [
                 'error' => $e->getMessage(),
             ]);
 

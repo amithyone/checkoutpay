@@ -99,32 +99,33 @@ class TestMeveonController extends Controller
     private function createTempVa(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'fname' => 'required|string|max:100',
-            'lname' => 'required|string|max:100',
+            'rc_number' => 'nullable|string|max:50',
             'registration_number' => 'nullable|string|max:50',
-            'bvn' => 'nullable|string|max:30',
+            'business_type' => 'nullable|string|in:RC,BN,IT,rc,bn,it',
+            'bank_type' => 'nullable|string|max:50',
         ]);
 
-        $registration = trim((string) ($validated['registration_number'] ?? ''));
-        $bvn = trim((string) ($validated['bvn'] ?? ''));
-        if ($registration === '' && $bvn === '') {
+        $registration = trim((string) ($validated['rc_number'] ?? $validated['registration_number'] ?? ''));
+        if ($registration === '') {
+            $registration = trim((string) config('services.mevonpay.temp_va_registration_number', ''));
+        }
+        if ($registration === '') {
             return response()->json([
                 'success' => false,
-                'message' => 'Provide registration_number (preferred) or bvn.',
+                'message' => 'Provide rc_number (or configure MEVONPAY_TEMP_VA_REGISTRATION_NUMBER).',
             ], 422);
         }
 
         $result = $this->vaService->createTempVa(
-            (string) $validated['fname'],
-            (string) $validated['lname'],
-            $registration !== '' ? $registration : null,
-            $bvn !== '' ? $bvn : null
+            $registration,
+            isset($validated['business_type']) ? strtoupper((string) $validated['business_type']) : null,
+            $validated['bank_type'] ?? null
         );
 
         return response()->json([
             'success' => true,
-            'action' => 'createtempva',
-            'provider_endpoint' => '/V1/createtempva.php',
+            'action' => 'create_tem_va',
+            'provider_endpoint' => (string) config('services.mevonpay.temp_va_path', '/V1/create_tem_va'),
             'data' => $result,
         ]);
     }

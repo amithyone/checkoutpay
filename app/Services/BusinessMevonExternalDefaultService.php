@@ -7,7 +7,7 @@ use App\Models\ExternalApi;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Default checkout VAs: MevonPay temporary accounts (createtempva), not the internal pool.
+ * Default checkout VAs: MevonPay temporary accounts (create_tem_va), not the internal pool.
  */
 class BusinessMevonExternalDefaultService
 {

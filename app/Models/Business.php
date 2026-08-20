@@ -29,6 +29,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'api_key',
         'webhook_url',
         'uses_external_account_numbers',
+        'use_own_cac_for_temp_va',
         'whatsapp_wallet_api_enabled',
         'payout_api_enabled',
         'withdrawal_debit_source',
@@ -182,6 +183,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'charge_exempt' => 'boolean',
         'balance_audit_exempt' => 'boolean',
         'uses_external_account_numbers' => 'boolean',
+        'use_own_cac_for_temp_va' => 'boolean',
         'whatsapp_wallet_api_enabled' => 'boolean',
         'payout_api_enabled' => 'boolean',
         'card_payments_enabled' => 'boolean',
@@ -619,6 +621,70 @@ class Business extends Authenticatable implements CanResetPasswordContract
         $normalized = preg_replace('/[^A-Z0-9]/', '', $normalized) ?? '';
 
         return $normalized;
+    }
+
+    /**
+     * Infer Mevon create_tem_va business_type from a CAC number.
+     */
+    public static function inferCacBusinessType(string $cac): string
+    {
+        $normalized = self::normalizeCacRegistrationNumber($cac);
+        if (str_starts_with($normalized, 'BN')) {
+            return 'BN';
+        }
+        if (str_starts_with($normalized, 'IT')) {
+            return 'IT';
+        }
+
+        return 'RC';
+    }
+
+    /**
+     * RC/BN + business_type for Mevon create_tem_va.
+     *
+     * Default: platform RC (Checkout Now Ltd) from MEVONPAY_TEMP_VA_REGISTRATION_NUMBER.
+     * When use_own_cac_for_temp_va is on: this business's cac_registration_number.
+     *
+     * @return array{rc_number: string, business_type: string, source: string}
+     */
+    public function resolveMevonTempVaRegistration(?string $overrideRc = null): array
+    {
+        $override = self::normalizeCacRegistrationNumber((string) ($overrideRc ?? ''));
+        if ($override !== '') {
+            return [
+                'rc_number' => $override,
+                'business_type' => self::inferCacBusinessType($override),
+                'source' => 'request_override',
+            ];
+        }
+
+        if ($this->use_own_cac_for_temp_va) {
+            $own = self::normalizeCacRegistrationNumber((string) ($this->cac_registration_number ?? ''));
+            if ($own === '') {
+                throw new \RuntimeException(
+                    'This business is set to use its own CAC for temp account numbers, but no CAC RC/BN is on file.'
+                );
+            }
+
+            return [
+                'rc_number' => $own,
+                'business_type' => self::inferCacBusinessType($own),
+                'source' => 'business_cac',
+            ];
+        }
+
+        $platform = self::normalizeCacRegistrationNumber(
+            (string) config('services.mevonpay.temp_va_registration_number', '')
+        );
+        if ($platform === '') {
+            throw new \RuntimeException('Platform MevonPay temp VA registration number is not configured.');
+        }
+
+        return [
+            'rc_number' => $platform,
+            'business_type' => self::inferCacBusinessType($platform),
+            'source' => 'platform',
+        ];
     }
 
     /**

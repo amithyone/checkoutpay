@@ -54,12 +54,15 @@ class WhatsappWalletTier1TopupVaService
         }
 
         $registrationNumber = trim((string) config('services.mevonpay.temp_va_registration_number', ''));
-        $suffix = substr(preg_replace('/\D/', '', (string) $wallet->phone_e164) ?: '0', -4) ?: '0000';
-        $fname = trim((string) config('whatsapp.wallet.tier1_temp_va_fname', 'WhatsApp'));
-        $lname = trim((string) config('whatsapp.wallet.tier1_temp_va_lname', 'User')).' '.$suffix;
+        if ($registrationNumber === '') {
+            return [
+                'ok' => false,
+                'message' => 'Temporary top-up is not available on *'.(string) config('whatsapp.bot_brand_name', 'CheckoutNow').'* right now. Try again later or *UPGRADE* to Tier 2 for a fixed account.',
+            ];
+        }
 
         try {
-            $va = $this->mevonPayVa->createTempVa($fname, $lname, $registrationNumber, null);
+            $va = $this->mevonPayVa->createTempVa($registrationNumber);
         } catch (\Throwable $e) {
             Log::warning('whatsapp.wallet.tier1_temp_va_failed', [
                 'wallet_id' => $wallet->id,

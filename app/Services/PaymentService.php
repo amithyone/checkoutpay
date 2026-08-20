@@ -105,33 +105,14 @@ class PaymentService
 
             try {
                 if ($vaMode === 'temp') {
-                    $registrationNumber = trim((string) ($data['registration_number'] ?? config('services.mevonpay.temp_va_registration_number', '')));
-                    $bvn = $data['bvn'] ?? null;
-
-                    $fname = $data['fname'] ?? null;
-                    $lname = $data['lname'] ?? null;
-
-                    if (empty($fname) || empty($lname)) {
-                        // Best-effort split: "First Last" from payer_name.
-                        $nameParts = preg_split('/\s+/', (string) ($payerName ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                        if (count($nameParts) >= 2) {
-                            $fname = $nameParts[0] ?? null;
-                            $lname = trim(implode(' ', array_slice($nameParts, 1)));
-                        }
-                    }
-
-                    if (empty($fname)) {
-                        $fname = 'Checkout';
-                    }
-                    if (empty($lname)) {
-                        $lname = 'Pay';
-                    }
+                    // New Mevon create_tem_va: rc_number + business_type + bank_type.
+                    // Default RC = platform (Checkout Now Ltd); optional admin flag uses business CAC.
+                    $overrideRc = trim((string) ($data['registration_number'] ?? $data['rc_number'] ?? ''));
+                    $resolved = $business->resolveMevonTempVaRegistration($overrideRc !== '' ? $overrideRc : null);
 
                     $va = $this->mevonPayVirtualAccountService->createTempVa(
-                        (string) $fname,
-                        (string) $lname,
-                        $registrationNumber !== '' ? $registrationNumber : null,
-                        ! empty($bvn) ? (string) $bvn : null
+                        $resolved['rc_number'],
+                        $resolved['business_type']
                     );
                 } else {
                     // Default to dynamic VA; it doesn't require BVN.
