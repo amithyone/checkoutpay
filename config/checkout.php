@@ -66,6 +66,19 @@ return [
     'setup_complete' => filter_var(env('APP_SETUP_COMPLETE', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
+    | Legacy domain redirect: check-outpay.com → check-outnow.com (Contabo cutover).
+    */
+    'legacy_host_redirect_enabled' => filter_var(env('LEGACY_HOST_REDIRECT_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+    'legacy_host_redirect_to' => rtrim((string) env('LEGACY_HOST_REDIRECT_TO', 'https://check-outnow.com'), '/'),
+    'legacy_hosts' => array_values(array_filter(array_map(
+        'strtolower',
+        array_map('trim', explode(',', (string) env(
+            'LEGACY_HOSTS',
+            'check-outpay.com,www.check-outpay.com'
+        )))
+    ))),
+
+    /*
     |--------------------------------------------------------------------------
     | Self-quarantine (hijack / empty-DB fail-closed)
     |--------------------------------------------------------------------------
