@@ -218,6 +218,10 @@ class PaymentService
             $webhookUrlForPayment = (string) $business->webhook_url;
         }
 
+        if ($webhookUrlForPayment !== '') {
+            $webhookUrlForPayment = InternalPaymentWebhookUrl::rewriteToAppUrl($webhookUrlForPayment);
+        }
+
         if ($useInvoicePool) {
             $charges = $this->chargeService->calculateInvoiceCharges($amount, $business);
             $chargePercentage = $charges['charge_percentage'] ?? 0;
@@ -343,6 +347,10 @@ class PaymentService
             $webhookUrlForPayment = $website->webhook_url;
         } elseif (! empty($business->webhook_url)) {
             $webhookUrlForPayment = (string) $business->webhook_url;
+        }
+
+        if ($webhookUrlForPayment !== '') {
+            $webhookUrlForPayment = InternalPaymentWebhookUrl::rewriteToAppUrl($webhookUrlForPayment);
         }
 
         $charges = $this->chargeService->calculateCharges($amount, $website, $business);

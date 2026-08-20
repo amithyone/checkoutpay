@@ -189,6 +189,8 @@ class SendWebhookNotification implements ShouldQueue
         }
 
         $urls = array_values(array_filter(array_unique($urls), function (string $url): bool {
+            $url = InternalPaymentWebhookUrl::rewriteToAppUrl($url);
+
             if (InternalPaymentWebhookUrl::isInternal($url)) {
                 return false;
             }

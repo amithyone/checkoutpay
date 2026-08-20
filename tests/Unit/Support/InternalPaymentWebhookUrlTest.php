@@ -36,4 +36,25 @@ class InternalPaymentWebhookUrlTest extends TestCase
     {
         $this->assertFalse(InternalPaymentWebhookUrl::isInternal(''));
     }
+
+    public function test_rewrite_legacy_internal_host_to_app_url(): void
+    {
+        config([
+            'app.url' => 'https://check-outnow.com',
+            'checkout.legacy_hosts' => ['check-outpay.com', 'www.check-outpay.com'],
+        ]);
+
+        $this->assertSame(
+            'https://check-outnow.com/internal/whatsapp-wallet-topup',
+            InternalPaymentWebhookUrl::rewriteToAppUrl('https://check-outpay.com/internal/whatsapp-wallet-topup')
+        );
+    }
+
+    public function test_rewrite_leaves_merchant_webhooks_alone(): void
+    {
+        config(['app.url' => 'https://check-outnow.com']);
+
+        $url = 'https://shop.example.com/hooks/checkout';
+        $this->assertSame($url, InternalPaymentWebhookUrl::rewriteToAppUrl($url));
+    }
 }
