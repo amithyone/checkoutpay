@@ -42,6 +42,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware([
     \App\Http\Middleware\LogMerchantApiHits::class,
     \App\Http\Middleware\AuthenticateApiKey::class,
+    'throttle:merchant_api',
 ])->group(function () {
     // Payment routes (require API key)
     Route::get('/integration/charge-settings', [IntegrationController::class, 'chargeSettings']);
@@ -54,11 +55,13 @@ Route::prefix('v1')->middleware([
     Route::get('/payments', [PaymentController::class, 'index']);
 
     // Withdrawal / payout routes (require API key; POST /withdrawal and GET /banks need payout_api_enabled)
-    Route::post('/withdrawal', [\App\Http\Controllers\Api\WithdrawalController::class, 'store']);
+    Route::post('/withdrawal', [\App\Http\Controllers\Api\WithdrawalController::class, 'store'])
+        ->middleware('throttle:merchant_payout');
     Route::get('/withdrawals', [\App\Http\Controllers\Api\WithdrawalController::class, 'index']);
     Route::get('/balance', [\App\Http\Controllers\Api\WithdrawalController::class, 'balance']);
     Route::get('/banks', [\App\Http\Controllers\Api\WithdrawalController::class, 'banks']);
-    Route::post('/validate-account', [\App\Http\Controllers\Api\WithdrawalController::class, 'validateAccount']);
+    Route::post('/validate-account', [\App\Http\Controllers\Api\WithdrawalController::class, 'validateAccount'])
+        ->middleware('throttle:merchant_payout');
 
     Route::middleware('throttle:30,1')->group(function () {
         Route::post('/whatsapp-wallet/lookup', [WhatsappWalletApiController::class, 'lookup']);
@@ -297,8 +300,9 @@ Route::prefix('v1')->group(function () {
     Route::post('sync/live', [LiveSyncReceiverController::class, 'receive'])
         ->middleware([\App\Http\Middleware\VerifyLiveSyncSignature::class, 'throttle:120,1']);
 
-    // Statistics routes
-    Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index']);
+    // Statistics — locked (cron token); not for public / merchant use
+    Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index'])
+        ->middleware(['cron.token', 'throttle:30,1']);
 
     // Email webhook (for email forwarding services like Zapier)
     Route::post('/email/webhook', [\App\Http\Controllers\Api\EmailWebhookController::class, 'receive']);
@@ -307,14 +311,17 @@ Route::prefix('v1')->group(function () {
     Route::get('/webhook/email', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck']); // GET for legacy route too
     Route::get('/email/webhook/health', [\App\Http\Controllers\Api\EmailWebhookController::class, 'healthCheck'])->name('email.webhook.health');
 
-    // Transaction check endpoint (for external sites to trigger email checking)
-    Route::post('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']);
-    Route::get('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction']); // Also support GET
+    // Transaction check — expensive (runs email monitor); requires cron token
+    Route::post('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction'])
+        ->middleware(['cron.token', 'throttle:6,1']);
+    Route::get('/transaction/check', [\App\Http\Controllers\Api\TransactionCheckController::class, 'checkTransaction'])
+        ->middleware(['cron.token', 'throttle:6,1']);
 
-    // Webhook processing cron endpoint (for external cron services)
-    Route::get('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']);
-    Route::post('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks']); // Also support POST
-
+    // Webhook processing cron — requires cron token
+    Route::get('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks'])
+        ->middleware(['cron.token', 'throttle:10,1']);
+    Route::post('/cron/process-webhooks', [\App\Http\Controllers\Cron\WebhookCronController::class, 'processWebhooks'])
+        ->middleware(['cron.token', 'throttle:10,1']);
     // MEVONPAY external funding webhook (account_number is source of truth)
     Route::post('/webhook/mevonpay', [MevonPayWebhookController::class, 'receive']);
     Route::post('/webhooks/mevonpay', [MevonPayWebhookController::class, 'receive']); // plural alias

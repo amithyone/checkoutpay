@@ -78,5 +78,7 @@ class Kernel extends HttpKernel
         'investor.pitch' => \App\Http\Middleware\EnsureInvestorPitchAccess::class,
         'touch.consumer.app.session' => \App\Http\Middleware\TouchConsumerAppSession::class,
         'touch.rentals.admin.app.session' => \App\Http\Middleware\TouchRentalsAdminAppSession::class,
+        'cron.token' => \App\Http\Middleware\VerifyCronToken::class,
+        'api.key' => \App\Http\Middleware\AuthenticateApiKey::class,
     ];
 }

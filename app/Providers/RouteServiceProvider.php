@@ -28,6 +28,22 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        /** Merchant X-API-Key routes: limit by API key (fallback IP). */
+        RateLimiter::for('merchant_api', function (Request $request) {
+            $key = (string) ($request->header('X-API-Key') ?? $request->input('api_key') ?? '');
+            $bucket = $key !== '' ? 'key:'.sha1($key) : 'ip:'.($request->ip() ?? '0');
+
+            return Limit::perMinute(60)->by('merchant-api:'.$bucket);
+        });
+
+        /** Payout / name-enquiry: stricter per key. */
+        RateLimiter::for('merchant_payout', function (Request $request) {
+            $key = (string) ($request->header('X-API-Key') ?? $request->input('api_key') ?? '');
+            $bucket = $key !== '' ? 'key:'.sha1($key) : 'ip:'.($request->ip() ?? '0');
+
+            return Limit::perMinute(12)->by('merchant-payout:'.$bucket);
+        });
+
         RateLimiter::for('consumer_wallet_otp', function (Request $request) {
             $phone = (string) $request->input('phone', '');
             $key = sha1(($request->ip() ?? '0').'|'.$phone);

@@ -15,7 +15,7 @@ class WebhookCronController extends Controller
      * This endpoint can be called by external cron services
      *
      * URL: /api/v1/cron/process-webhooks
-     * Public endpoint - no authentication required
+     * Auth: CRON_EMAIL_FETCH_TOKEN via X-Cron-Token or ?token= (required outside local/testing)
      *
      * Query:
      * - limit: batch size (default 50, max 100) when all=0

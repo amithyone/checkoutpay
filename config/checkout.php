@@ -48,4 +48,16 @@ return [
         'contact_url' => env('WHATSAPP_WALLET_CONTACT_URL', ''),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cron / internal HTTP triggers
+    |--------------------------------------------------------------------------
+    |
+    | Shared secret for /api/v1/transaction/check, /api/v1/cron/process-webhooks,
+    | /api/v1/statistics, and web cron routes that already accept X-Cron-Token.
+    | Pass via header X-Cron-Token or query ?token=
+    |
+    */
+    'cron_api_token' => (string) env('CRON_EMAIL_FETCH_TOKEN', ''),
+
 ];

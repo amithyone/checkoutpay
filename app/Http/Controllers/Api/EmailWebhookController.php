@@ -43,6 +43,16 @@ class EmailWebhookController extends Controller
                         'status' => 'unauthorized',
                     ], 401);
                 }
+            } elseif (! app()->environment('local', 'testing')) {
+                Log::warning('email_webhook_rejected_secret_not_configured', [
+                    'ip' => $request->ip(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Webhook locked: set zapier_webhook_secret in admin settings',
+                    'status' => 'misconfigured',
+                ], 503);
             }
             
             // Detect payload format:
