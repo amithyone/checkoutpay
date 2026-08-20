@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('mevon_pay_discrepancy_alerts', function (Blueprint $table) {
             $table->id();
-            $table->timestamp('checked_at');
+            $table->timestamp('checked_at')->useCurrent();
             $table->decimal('expected_balance', 14, 2);
             $table->decimal('live_balance', 14, 2);
             $table->decimal('variance_amount', 14, 2);

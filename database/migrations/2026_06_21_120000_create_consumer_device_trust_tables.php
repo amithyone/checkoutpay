@@ -48,7 +48,7 @@ return new class extends Migration
             $table->timestamp('otp_verified_at')->nullable();
             $table->string('stepup_token', 64)->nullable()->unique();
             $table->timestamp('stepup_token_expires_at')->nullable();
-            $table->timestamp('expires_at');
+            $table->timestamp('expires_at')->useCurrent();
             $table->timestamps();
 
             $table->foreign('consumer_wallet_api_account_id', 'consumer_stepup_sessions_account_fk')

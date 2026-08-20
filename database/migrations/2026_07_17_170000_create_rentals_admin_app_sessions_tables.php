@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->unsignedBigInteger('personal_access_token_id')->nullable()->index();
-            $table->timestamp('started_at');
+            $table->timestamp('started_at')->useCurrent();
             $table->timestamp('ended_at')->nullable()->index();
             $table->timestamp('last_seen_at')->nullable()->index();
             $table->timestamps();

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->unsignedBigInteger('consumer_device_stepup_session_id');
             $table->unsignedBigInteger('consumer_wallet_api_account_id');
             $table->string('status', 16)->default('pending');
-            $table->timestamp('expires_at');
+            $table->timestamp('expires_at')->useCurrent();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
 

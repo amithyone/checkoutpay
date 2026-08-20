@@ -21,7 +21,7 @@ return new class extends Migration
                 $table->string('path', 255);
                 $table->string('ip', 45)->nullable();
                 $table->string('user_agent', 500)->nullable();
-                $table->timestamp('viewed_at');
+                $table->timestamp('viewed_at')->useCurrent();
                 $table->timestamps();
 
                 // MySQL max identifier length is 64; default name exceeds it.

@@ -22,8 +22,8 @@ return new class extends Migration
                 $table->unsignedBigInteger('referrer_wallet_id')->index();
                 $table->string('attribution_source', 32);
                 $table->string('referral_code_used', 64)->nullable();
-                $table->timestamp('attributed_at');
-                $table->timestamp('bonus_ends_at');
+                $table->timestamp('attributed_at')->useCurrent();
+                $table->timestamp('bonus_ends_at')->useCurrent();
                 $table->unsignedInteger('counted_tx_total')->default(0);
                 $table->unsignedInteger('milestones_paid')->default(0);
                 $table->timestamp('first_deposit_bonus_paid_at')->nullable();
