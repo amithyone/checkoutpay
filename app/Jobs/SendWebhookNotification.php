@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Payment;
 use App\Models\Setting;
 use App\Support\InternalPaymentWebhookUrl;
+use App\Support\SafeOutboundUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -188,7 +189,22 @@ class SendWebhookNotification implements ShouldQueue
         }
 
         $urls = array_values(array_filter(array_unique($urls), function (string $url): bool {
-            return ! InternalPaymentWebhookUrl::isInternal($url);
+            if (InternalPaymentWebhookUrl::isInternal($url)) {
+                return false;
+            }
+
+            $reason = SafeOutboundUrl::rejectionReason($url);
+            if ($reason !== null) {
+                Log::warning('Skipping unsafe webhook URL', [
+                    'payment_id' => $this->payment->id,
+                    'webhook_url' => $url,
+                    'reason' => $reason,
+                ]);
+
+                return false;
+            }
+
+            return true;
         }));
 
         return $urls;

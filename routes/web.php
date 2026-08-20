@@ -25,6 +25,17 @@ Route::get('/llms.txt', [\App\Http\Controllers\Public\SeoController::class, 'llm
 
 Route::get('/', [\App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
+/** Self-quarantine status / unlock (exempt from EnsureNotQuarantined lockout). */
+Route::get('/quarantine/status', [\App\Http\Controllers\QuarantineController::class, 'status'])
+    ->middleware('throttle:60,1')
+    ->name('quarantine.status');
+Route::get('/quarantine/unlock', [\App\Http\Controllers\QuarantineController::class, 'showUnlock'])
+    ->middleware('throttle:30,1')
+    ->name('quarantine.unlock.show');
+Route::post('/quarantine/unlock', [\App\Http\Controllers\QuarantineController::class, 'unlock'])
+    ->middleware('throttle:10,1')
+    ->name('quarantine.unlock');
+
 /** Keep CSRF/session fresh for long-lived browser tabs (admin + investor forms). */
 Route::get('/session/keepalive', \App\Http\Controllers\SessionKeepAliveController::class)
     ->middleware('throttle:60,1')

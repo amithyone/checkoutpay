@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Setting;
+use App\Services\EmailTemplateService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -50,14 +51,17 @@ class PasswordChangedNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $appName = Setting::get('site_name', 'CheckoutPay');
-        
-        return (new MailMessage)
-            ->subject('Password Changed - ' . $appName)
-            ->view('emails.password-changed', [
+
+        return EmailTemplateService::toMailMessage(
+            'password-changed',
+            'emails.password-changed',
+            'Password Changed - '.$appName,
+            [
                 'business' => $notifiable,
                 'ipAddress' => $this->ipAddress,
                 'userAgent' => $this->userAgent,
                 'appName' => $appName,
-            ]);
+            ],
+        );
     }
 }

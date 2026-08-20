@@ -18,23 +18,35 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('dashboard')->name('business.')->group(function () {
     // Business authentication routes
     Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-    Route::post('/register', [RegisterController::class, 'register']);
+    Route::post('/register', [RegisterController::class, 'register'])
+        ->middleware('throttle:5,1');
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+    Route::post('/login', [LoginController::class, 'login'])
+        ->middleware('throttle:10,1');
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
     // Password reset routes
     Route::get('/password/reset', [\App\Http\Controllers\Business\Auth\ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
-    Route::post('/password/email', [\App\Http\Controllers\Business\Auth\ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
+    Route::post('/password/email', [\App\Http\Controllers\Business\Auth\ForgotPasswordController::class, 'sendResetLinkEmail'])
+        ->middleware('throttle:5,1');
     Route::get('/password/reset/{token}', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'showResetForm'])->name('password.reset');
-    Route::post('/password/reset', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'reset'])->name('password.update');
+    Route::post('/password/reset', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'reset'])
+        ->middleware('throttle:5,1');
 
     // Email verification routes
     Route::get('/email/verify', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'notice'])->name('verification.notice');
-    Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verify'])->name('verification.verify');
-    Route::post('/email/verify-pin', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verifyPin'])->name('verification.verify-pin');
-    Route::post('/email/verification-notification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resend'])->name('verification.send');
-    Route::post('/email/resend-verification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resendWithoutAuth'])->name('verification.resend-without-auth');
+    Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verify'])
+        ->middleware(['signed', 'throttle:20,1'])
+        ->name('verification.verify');
+    Route::post('/email/verify-pin', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'verifyPin'])
+        ->middleware('throttle:10,1')
+        ->name('verification.verify-pin');
+    Route::post('/email/verification-notification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:3,1')
+        ->name('verification.send');
+    Route::post('/email/resend-verification', [\App\Http\Controllers\Business\Auth\EmailVerificationController::class, 'resendWithoutAuth'])
+        ->middleware('throttle:3,1')
+        ->name('verification.resend-without-auth');
 
     // Two-Factor Authentication routes
     Route::get('/2fa/verify', [\App\Http\Controllers\Business\Auth\TwoFactorController::class, 'showVerifyForm'])->name('2fa.verify');

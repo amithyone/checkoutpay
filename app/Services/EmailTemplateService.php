@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Log;
 
 class EmailTemplateService
@@ -25,13 +26,30 @@ class EmailTemplateService
     }
 
     /**
-     * Get email template subject (custom from DB or default)
+     * Get email template subject (custom from DB or default).
+     * Optional $data allows safe {{ $var }} substitution in the subject line.
+     *
+     * @param  array<string, mixed>  $data
      */
-    public static function getTemplateSubject(string $templateKey, string $defaultSubject): string
+    public static function getTemplateSubject(string $templateKey, string $defaultSubject, array $data = []): string
     {
         $customSubject = Setting::get("email_template_{$templateKey}_subject", null);
+        $subject = $customSubject ?: $defaultSubject;
 
-        return $customSubject ?: $defaultSubject;
+        if ($data === [] || ! str_contains((string) $subject, '{{')) {
+            return (string) $subject;
+        }
+
+        try {
+            return EmailTemplateRenderer::render((string) $subject, $data);
+        } catch (\Throwable $e) {
+            Log::warning('email_template_subject_render_failed', [
+                'template' => $templateKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $defaultSubject;
+        }
     }
 
     /**
@@ -71,5 +89,26 @@ class EmailTemplateService
         }
 
         return view($defaultView, $data)->render();
+    }
+
+    /**
+     * Build a MailMessage using a safe custom template when enabled, else the default Blade view.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function toMailMessage(
+        string $templateKey,
+        string $defaultView,
+        string $defaultSubject,
+        array $data,
+    ): MailMessage {
+        $subject = self::getTemplateSubject($templateKey, $defaultSubject, $data);
+        $mail = (new MailMessage)->subject($subject);
+
+        if (self::isCustomTemplate($templateKey)) {
+            return $mail->html(self::renderTemplate($templateKey, $data, $defaultView));
+        }
+
+        return $mail->view($defaultView, $data);
     }
 }

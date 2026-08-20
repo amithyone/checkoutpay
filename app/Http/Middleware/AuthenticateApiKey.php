@@ -27,11 +27,18 @@ class AuthenticateApiKey
             ->where('is_active', true)
             ->first();
 
-        if (!$business) {
+        if (! $business) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or inactive API key',
             ], 401);
+        }
+
+        if (! $business->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email verification required before using the API',
+            ], 403);
         }
 
         // Attach business to request

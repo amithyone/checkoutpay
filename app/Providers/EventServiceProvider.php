@@ -12,6 +12,9 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string>>
      */
     protected $listen = [
+        \Illuminate\Console\Events\CommandStarting::class => [
+            \App\Listeners\RefuseDestructiveArtisanWhenQuarantined::class,
+        ],
         \App\Events\PaymentApproved::class => [
             \App\Listeners\CreditDeveloperPartnerShareOnPaymentApproved::class,
             \App\Listeners\SendPaymentWebhook::class,

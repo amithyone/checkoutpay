@@ -82,8 +82,26 @@ class RecaptchaService
         }
     }
 
+    public function isConfigured(): bool
+    {
+        $siteKey = (string) config('services.recaptcha.site_key', '');
+
+        return $this->secretKey !== '' && $siteKey !== '';
+    }
+
+    /**
+     * True when reCAPTCHA should be enforced (enabled flag + keys present).
+     */
     public function isEnabled(): bool
     {
-        return $this->enabled && !empty($this->secretKey);
+        return $this->enabled && $this->isConfigured();
+    }
+
+    /**
+     * True when admin turned reCAPTCHA on but keys are missing (must not fail open).
+     */
+    public function isMisconfigured(): bool
+    {
+        return $this->enabled && ! $this->isConfigured();
     }
 }

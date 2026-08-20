@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Setting;
 use App\Models\WithdrawalRequest;
+use App\Services\EmailTemplateService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -52,13 +53,16 @@ class WithdrawalRequestedNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $appName = Setting::get('site_name', 'CheckoutPay');
-        
-        return (new MailMessage)
-            ->subject('Withdrawal Request Submitted - ' . $appName)
-            ->view('emails.withdrawal-requested', [
+
+        return EmailTemplateService::toMailMessage(
+            'withdrawal-requested',
+            'emails.withdrawal-requested',
+            'Withdrawal Request Submitted - '.$appName,
+            [
                 'business' => $notifiable,
                 'withdrawal' => $this->withdrawal,
                 'appName' => $appName,
-            ]);
+            ],
+        );
     }
 }

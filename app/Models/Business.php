@@ -19,6 +19,7 @@ class Business extends Authenticatable implements CanResetPasswordContract
     protected $fillable = [
         'name',
         'email',
+        'registration_ip',
         'password',
         'phone',
         'address',

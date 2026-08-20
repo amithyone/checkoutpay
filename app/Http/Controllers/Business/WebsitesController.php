@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Business;
 
 use App\Http\Controllers\Controller;
 use App\Models\BusinessWebsite;
+use App\Support\SafeOutboundUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -25,6 +26,13 @@ class WebsitesController extends Controller
             'website_url' => 'required|url|max:500',
             'webhook_url' => 'nullable|url|max:500',
         ]);
+
+        if (filled($validated['webhook_url'] ?? null)) {
+            $reason = SafeOutboundUrl::rejectionReason((string) $validated['webhook_url']);
+            if ($reason !== null) {
+                return back()->withErrors(['webhook_url' => $reason])->withInput();
+            }
+        }
 
         $website = BusinessWebsite::create([
             'business_id' => $business->id,
@@ -90,6 +98,13 @@ class WebsitesController extends Controller
         $validated = $request->validate([
             'webhook_url' => 'nullable|url|max:500',
         ]);
+
+        if (filled($validated['webhook_url'] ?? null)) {
+            $reason = SafeOutboundUrl::rejectionReason((string) $validated['webhook_url']);
+            if ($reason !== null) {
+                return back()->withErrors(['webhook_url' => $reason])->withInput();
+            }
+        }
 
         $website->update([
             'webhook_url' => $validated['webhook_url'],

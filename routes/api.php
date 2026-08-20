@@ -345,7 +345,7 @@ Route::prefix('v1')->group(function () {
     /**
      * Tax Calculator open API
      */
-    Route::prefix('tax')->group(function () {
+    Route::prefix('tax')->middleware('throttle:30,1')->group(function () {
         Route::post('business', [\App\Http\Controllers\Api\TaxController::class, 'saveBusiness']);
         Route::post('personal', [\App\Http\Controllers\Api\TaxController::class, 'savePersonal']);
     });

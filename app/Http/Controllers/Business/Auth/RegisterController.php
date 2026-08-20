@@ -22,6 +22,15 @@ class RegisterController extends Controller
 
     public function register(Request $request, RecaptchaService $recaptcha): RedirectResponse|View
     {
+        // Fail closed: enabled without keys must not skip verification
+        if ($recaptcha->isMisconfigured()) {
+            \Illuminate\Support\Facades\Log::critical('business_register_blocked_recaptcha_misconfigured');
+
+            return back()->withErrors([
+                'g-recaptcha-response' => 'Registration is temporarily unavailable. Please try again later.',
+            ])->withInput($request->except('password', 'password_confirmation'));
+        }
+
         if ($recaptcha->isEnabled()) {
             $request->validate([
                 'g-recaptcha-response' => 'required',
@@ -29,7 +38,7 @@ class RegisterController extends Controller
                 'g-recaptcha-response.required' => 'Please complete the reCAPTCHA verification.',
             ]);
 
-            if (!$recaptcha->verify($request->input('g-recaptcha-response'), $request->ip())) {
+            if (! $recaptcha->verify($request->input('g-recaptcha-response'), $request->ip())) {
                 return back()->withErrors([
                     'g-recaptcha-response' => 'reCAPTCHA verification failed. Please try again.',
                 ])->withInput($request->except('password', 'password_confirmation'));
@@ -38,7 +47,7 @@ class RegisterController extends Controller
 
         // Check if email exists as renter
         $renter = Renter::where('email', $request->email)->first();
-        
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email:rfc,dns|unique:businesses,email|max:255',
@@ -49,7 +58,7 @@ class RegisterController extends Controller
         ]);
 
         // If renter exists, verify password matches
-        if ($renter && !Hash::check($validated['password'], $renter->password)) {
+        if ($renter && ! Hash::check($validated['password'], $renter->password)) {
             return back()->withErrors([
                 'password' => 'The password does not match your renter account. Please use the same password or reset it.',
             ])->withInput($request->except('password', 'password_confirmation'));
@@ -62,23 +71,21 @@ class RegisterController extends Controller
             'phone' => $validated['phone'] ?? null,
             'address' => $validated['address'] ?? null,
             'website' => $validated['website'] ?? null,
+            'registration_ip' => $request->ip(),
             'is_active' => true,
             'uses_external_account_numbers' => true,
-            'email_verified_at' => null, // Email verification required
+            'email_verified_at' => null,
         ]);
 
-        // Create website entry (requires admin approval)
         BusinessWebsite::create([
             'business_id' => $business->id,
             'website_url' => $validated['website'],
             'is_approved' => false,
         ]);
 
-        // Send email verification notification
         $business->sendEmailVerificationNotification();
 
-        // Redirect to verify email page with email in session
-        $message = $renter 
+        $message = $renter
             ? 'Business account created! You can now access both your renter and business dashboards. Please check your email to verify your business account.'
             : 'Registration successful! Please check your email to verify your account.';
 

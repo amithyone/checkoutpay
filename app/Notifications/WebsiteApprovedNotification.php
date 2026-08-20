@@ -4,8 +4,8 @@ namespace App\Notifications;
 
 use App\Models\BusinessWebsite;
 use App\Models\Setting;
+use App\Services\EmailTemplateService;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -19,24 +19,26 @@ class WebsiteApprovedNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        // Check if email notifications and website notifications are enabled
-        if (!$notifiable->shouldReceiveEmailNotifications() || !$notifiable->shouldReceiveWebsiteNotifications()) {
-            return []; // Don't send notification
+        if (! $notifiable->shouldReceiveEmailNotifications() || ! $notifiable->shouldReceiveWebsiteNotifications()) {
+            return [];
         }
-        
+
         return ['mail'];
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         $appName = Setting::get('site_name', 'CheckoutPay');
-        
-        return (new MailMessage)
-            ->subject('Website Approved - ' . $appName)
-            ->view('emails.website-approved', [
+
+        return EmailTemplateService::toMailMessage(
+            'website-approved',
+            'emails.website-approved',
+            'Website Approved - '.$appName,
+            [
                 'business' => $notifiable,
                 'website' => $this->website,
                 'appName' => $appName,
-            ]);
+            ],
+        );
     }
 }

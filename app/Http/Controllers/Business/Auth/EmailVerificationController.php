@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Business\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use Illuminate\Auth\Events\Verified;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -21,37 +20,34 @@ class EmailVerificationController extends Controller
     }
 
     /**
-     * Mark the authenticated user's email address as verified.
+     * Mark the business email as verified (signed URL only — no auto-login).
      */
     public function verify(Request $request): RedirectResponse
     {
         $business = Business::findOrFail($request->route('id'));
 
-        if (!hash_equals((string) $request->route('hash'), sha1($business->getEmailForVerification()))) {
-            return redirect()->route('business.verification.notice')
+        if (! hash_equals((string) $request->route('hash'), sha1($business->getEmailForVerification()))) {
+            return redirect()->route('business.login')
                 ->withErrors(['email' => 'Invalid verification link.']);
         }
 
         if ($business->hasVerifiedEmail()) {
-            // Auto-login and redirect to dashboard
-            \Illuminate\Support\Facades\Auth::guard('business')->login($business);
-            return redirect()->route('business.dashboard')
-                ->with('success', 'Your email has already been verified.');
+            return redirect()->route('business.login')
+                ->with('info', 'Your email is already verified. Please log in.')
+                ->withInput(['email' => $business->email]);
         }
 
         if ($business->markEmailAsVerified()) {
             event(new Verified($business));
         }
 
-        // Auto-login and redirect to dashboard
-        \Illuminate\Support\Facades\Auth::guard('business')->login($business);
-
-        return redirect()->route('business.dashboard')
-            ->with('success', 'Your email has been verified! Welcome to your dashboard.');
+        return redirect()->route('business.login')
+            ->with('success', 'Your email has been verified! Please log in to continue.')
+            ->withInput(['email' => $business->email]);
     }
 
     /**
-     * Verify email using PIN code.
+     * Verify email using PIN code (no auto-login).
      */
     public function verifyPin(Request $request): RedirectResponse
     {
@@ -62,40 +58,34 @@ class EmailVerificationController extends Controller
 
         $business = Business::where('email', $request->email)->first();
 
-        if (!$business) {
+        if (! $business) {
             return redirect()->route('business.verification.notice')
                 ->withErrors(['email' => 'Email address not found.']);
         }
 
         if ($business->hasVerifiedEmail()) {
-            // Auto-login and redirect to dashboard
-            \Illuminate\Support\Facades\Auth::guard('business')->login($business);
-            return redirect()->route('business.dashboard')
-                ->with('success', 'Your email has already been verified.');
+            return redirect()->route('business.login')
+                ->with('info', 'Your email is already verified. Please log in.')
+                ->withInput(['email' => $business->email]);
         }
 
-        // Verify PIN from cache
-        $cachedPin = \Illuminate\Support\Facades\Cache::get('email_verification_pin_' . $business->id);
+        $cachedPin = \Illuminate\Support\Facades\Cache::get('email_verification_pin_'.$business->id);
 
-        if (!$cachedPin || $cachedPin !== $request->pin) {
+        if (! $cachedPin || $cachedPin !== $request->pin) {
             return redirect()->route('business.verification.notice')
                 ->withErrors(['pin' => 'Invalid or expired verification PIN.'])
                 ->withInput(['email' => $request->email]);
         }
 
-        // Mark email as verified
         if ($business->markEmailAsVerified()) {
             event(new Verified($business));
         }
 
-        // Clear PIN from cache
-        \Illuminate\Support\Facades\Cache::forget('email_verification_pin_' . $business->id);
+        \Illuminate\Support\Facades\Cache::forget('email_verification_pin_'.$business->id);
 
-        // Auto-login and redirect to dashboard
-        \Illuminate\Support\Facades\Auth::guard('business')->login($business);
-
-        return redirect()->route('business.dashboard')
-            ->with('success', 'Your email has been verified! Welcome to your dashboard.');
+        return redirect()->route('business.login')
+            ->with('success', 'Your email has been verified! Please log in to continue.')
+            ->withInput(['email' => $business->email]);
     }
 
     /**
@@ -106,7 +96,6 @@ class EmailVerificationController extends Controller
         $email = $request->input('email');
 
         if ($email) {
-            // Resend without auth (from verify page or login page)
             $business = Business::where('email', $email)->first();
             if ($business) {
                 if ($business->hasVerifiedEmail()) {
@@ -115,6 +104,7 @@ class EmailVerificationController extends Controller
                         ->with('registered_email', $email);
                 }
                 $business->sendEmailVerificationNotification();
+
                 return redirect()->route('business.verification.notice')
                     ->with('status', 'Verification email sent! Please check your inbox.')
                     ->with('registered_email', $email);
@@ -127,22 +117,24 @@ class EmailVerificationController extends Controller
                         ->with('registered_email', $email);
                 }
                 $renter->sendEmailVerificationNotification();
+
                 return redirect()->route('business.verification.notice')
                     ->with('status', 'Verification email sent! Please check your inbox.')
                     ->with('registered_email', $email);
             }
+
             return redirect()->route('business.verification.notice')
                 ->withErrors(['email' => 'No account found with this email address.'])
                 ->withInput(['email' => $email]);
         }
 
-        // With auth (from dashboard when logged in)
         if ($request->user('business')) {
             if ($request->user('business')->hasVerifiedEmail()) {
                 return redirect()->route('business.dashboard')
                     ->with('info', 'Your email is already verified.');
             }
             $request->user('business')->sendEmailVerificationNotification();
+
             return back()->with('status', 'Verification link sent! Please check your email.');
         }
 
@@ -164,7 +156,6 @@ class EmailVerificationController extends Controller
 
         $email = $request->email;
 
-        // Try business first
         $business = Business::where('email', $email)->first();
         if ($business) {
             if ($business->hasVerifiedEmail()) {
@@ -173,12 +164,12 @@ class EmailVerificationController extends Controller
                     ->withInput(['email' => $email]);
             }
             $business->sendEmailVerificationNotification();
+
             return redirect()->route('business.login')
                 ->with('status', 'Verification link sent! Please check your email inbox.')
                 ->withInput(['email' => $email]);
         }
 
-        // Try renter (same login form)
         $renter = \App\Models\Renter::where('email', $email)->first();
         if ($renter) {
             if ($renter->hasVerifiedEmail()) {
@@ -187,6 +178,7 @@ class EmailVerificationController extends Controller
                     ->withInput(['email' => $email]);
             }
             $renter->sendEmailVerificationNotification();
+
             return redirect()->route('business.login')
                 ->with('status', 'Verification link sent! Please check your email inbox.')
                 ->withInput(['email' => $email]);

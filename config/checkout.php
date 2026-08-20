@@ -65,4 +65,35 @@ return [
     */
     'setup_complete' => filter_var(env('APP_SETUP_COMPLETE', false), FILTER_VALIDATE_BOOLEAN),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Self-quarantine (hijack / empty-DB fail-closed)
+    |--------------------------------------------------------------------------
+    |
+    | Trips when DB_HOST/database leave the allowlist or row floors fail
+    | (e.g. attacker swapped DB_HOST to an empty remote). Lock file is on disk
+    | so an attacker DB cannot clear quarantine. Unlock with QUARANTINE_UNLOCK_CODE
+    | or delete storage/framework/quarantine.lock after fixing .error.
+    |
+    */
+    'quarantine' => [
+        'enabled' => filter_var(env('QUARANTINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'allowed_db_hosts' => array_values(array_filter(array_map(
+            'strtolower',
+            array_map('trim', explode(',', (string) env('QUARANTINE_ALLOWED_DB_HOSTS', '127.0.0.1,localhost')))
+        ))),
+        'allowed_db_database' => strtolower(trim((string) env('QUARANTINE_ALLOWED_DB_DATABASE', 'checkoutpay'))),
+        'min_payments' => (int) env('QUARANTINE_MIN_PAYMENTS', 0),
+        'min_businesses' => (int) env('QUARANTINE_MIN_BUSINESSES', 0),
+        'min_admins' => (int) env('QUARANTINE_MIN_ADMINS', 0),
+        'required_tables' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('QUARANTINE_REQUIRED_TABLES', 'payments,businesses,admins,settings'))
+        ))),
+        'unlock_code' => (string) env('QUARANTINE_UNLOCK_CODE', ''),
+        'check_interval_seconds' => max(5, (int) env('QUARANTINE_CHECK_INTERVAL_SECONDS', 60)),
+        'lock_relative_path' => 'framework/quarantine.lock',
+        'baseline_relative_path' => 'app/quarantine-baseline.json',
+    ],
+
 ];

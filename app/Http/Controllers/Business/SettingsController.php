@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Business;
 use App\Http\Controllers\Controller;
 use App\Models\Business;
 use App\Services\Business\BusinessWebsiteSyncService;
+use App\Support\SafeOutboundUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -111,6 +112,15 @@ class SettingsController extends Controller
 
         if (! $request->has('withdrawal_debit_source')) {
             unset($validated['withdrawal_debit_source']);
+        }
+
+        if (array_key_exists('webhook_url', $validated) && filled($validated['webhook_url'])) {
+            $reason = SafeOutboundUrl::rejectionReason((string) $validated['webhook_url']);
+            if ($reason !== null) {
+                return redirect()->route('business.settings.index')
+                    ->with('error', $reason)
+                    ->withInput();
+            }
         }
 
         $business->update($validated);
@@ -223,6 +233,14 @@ class SettingsController extends Controller
         ]);
         $webhookUrl = $validated['webhook_url'];
 
+        $reason = SafeOutboundUrl::rejectionReason($webhookUrl);
+        if ($reason !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => $reason,
+            ], 422);
+        }
+
         $payload = $this->buildTestWebhookPayload();
 
         try {
@@ -231,18 +249,18 @@ class SettingsController extends Controller
             if ($response->successful()) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Webhook delivered successfully. Your endpoint responded with HTTP ' . $response->status() . '.',
+                    'message' => 'Webhook delivered successfully. Your endpoint responded with HTTP '.$response->status().'.',
                 ]);
             }
 
             return response()->json([
                 'success' => false,
-                'message' => 'Webhook URL responded with HTTP ' . $response->status() . '. ' . ($response->body() ? 'Response: ' . Str::limit($response->body(), 200) : ''),
+                'message' => 'Webhook URL responded with HTTP '.$response->status().'. '.($response->body() ? 'Response: '.Str::limit($response->body(), 200) : ''),
             ], 422);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Could not reach webhook URL: ' . $e->getMessage(),
+                'message' => 'Could not reach webhook URL: '.$e->getMessage(),
             ], 422);
         }
     }
